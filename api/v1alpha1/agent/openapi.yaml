@@ -1,0 +1,117 @@
+openapi: 3.0.1
+info:
+  title: Migration Planner API - agent endpoint
+  version: undefined
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: /
+paths:
+  /api/v1/sources/{name}/status:
+    put:
+      tags:
+        - source
+      description: replace status of the specified source
+      operationId: replaceSourceStatus
+      parameters:
+        - name: name
+          in: path
+          description: name of the source
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceStatusUpdate'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+
+  /api/v1/sources/{name}/inventory:
+    put:
+      tags:
+        - source
+      description: replace inventory of the specified source
+      operationId: replaceSourceInventory
+      parameters:
+        - name: name
+          in: path
+          description: name of the source
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceInventoryUpdate'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+
+components:
+  schemas:
+    SourceStatusUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    SourceInventoryUpdate:
+      type: object
+      properties:
+        inventory:
+          type: string
+      required:
+        - inventory
