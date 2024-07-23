@@ -36,7 +36,7 @@ func (h *ServiceHandler) ReadSource(ctx context.Context, request server.ReadSour
 	if err != nil {
 		return server.ReadSource400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Get(ctx, id)
+	result, err := h.store.Source().Get(ctx, uint(id))
 	if err != nil {
 		return server.ReadSource404JSONResponse{}, nil
 	}
@@ -48,7 +48,7 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	if err != nil {
 		return server.DeleteSource400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Get(ctx, id)
+	result, err := h.store.Source().Get(ctx, uint(id))
 	if err != nil {
 		return server.DeleteSource404JSONResponse{}, nil
 	}

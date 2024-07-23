@@ -29,7 +29,7 @@ func (h *AgentServiceHandler) ReplaceSourceInventory(ctx context.Context, reques
 	if err != nil {
 		return agentServer.ReplaceSourceInventory400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Update(ctx, id, nil, request.Body.Inventory)
+	result, err := h.store.Source().Update(ctx, uint(id), nil, &request.Body.Inventory)
 	if err != nil {
 		return agentServer.ReplaceSourceInventory400JSONResponse{}, nil
 	}
@@ -41,7 +41,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Update(ctx, id, nil, request.Body.Status)
+	result, err := h.store.Source().Update(ctx, uint(id), nil, &request.Body.Status)
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}

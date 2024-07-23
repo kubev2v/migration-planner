@@ -10,8 +10,8 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
-	. "github.com/kubev2v/migration-planner/api/v1alpha1"
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	. "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
@@ -19,24 +19,24 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (PUT /api/v1/sources/{name}/inventory)
-	ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, name string)
+	// (PUT /api/v1/sources/{id}/inventory)
+	ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, id string)
 
-	// (PUT /api/v1/sources/{name}/status)
-	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, name string)
+	// (PUT /api/v1/sources/{id}/status)
+	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
 
-// (PUT /api/v1/sources/{name}/inventory)
-func (_ Unimplemented) ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, name string) {
+// (PUT /api/v1/sources/{id}/inventory)
+func (_ Unimplemented) ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, id string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (PUT /api/v1/sources/{name}/status)
-func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, name string) {
+// (PUT /api/v1/sources/{id}/status)
+func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -55,17 +55,17 @@ func (siw *ServerInterfaceWrapper) ReplaceSourceInventory(w http.ResponseWriter,
 
 	var err error
 
-	// ------------- Path parameter "name" -------------
-	var name string
+	// ------------- Path parameter "id" -------------
+	var id string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReplaceSourceInventory(w, r, name)
+		siw.Handler.ReplaceSourceInventory(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -81,17 +81,17 @@ func (siw *ServerInterfaceWrapper) ReplaceSourceStatus(w http.ResponseWriter, r 
 
 	var err error
 
-	// ------------- Path parameter "name" -------------
-	var name string
+	// ------------- Path parameter "id" -------------
+	var id string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
 		return
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReplaceSourceStatus(w, r, name)
+		siw.Handler.ReplaceSourceStatus(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -215,17 +215,17 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/sources/{name}/inventory", wrapper.ReplaceSourceInventory)
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory", wrapper.ReplaceSourceInventory)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/sources/{name}/status", wrapper.ReplaceSourceStatus)
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.ReplaceSourceStatus)
 	})
 
 	return r
 }
 
 type ReplaceSourceInventoryRequestObject struct {
-	Name string `json:"name"`
+	Id   string `json:"id"`
 	Body *ReplaceSourceInventoryJSONRequestBody
 }
 
@@ -270,7 +270,7 @@ func (response ReplaceSourceInventory404JSONResponse) VisitReplaceSourceInventor
 }
 
 type ReplaceSourceStatusRequestObject struct {
-	Name string `json:"name"`
+	Id   string `json:"id"`
 	Body *ReplaceSourceStatusJSONRequestBody
 }
 
@@ -317,10 +317,10 @@ func (response ReplaceSourceStatus404JSONResponse) VisitReplaceSourceStatusRespo
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (PUT /api/v1/sources/{name}/inventory)
+	// (PUT /api/v1/sources/{id}/inventory)
 	ReplaceSourceInventory(ctx context.Context, request ReplaceSourceInventoryRequestObject) (ReplaceSourceInventoryResponseObject, error)
 
-	// (PUT /api/v1/sources/{name}/status)
+	// (PUT /api/v1/sources/{id}/status)
 	ReplaceSourceStatus(ctx context.Context, request ReplaceSourceStatusRequestObject) (ReplaceSourceStatusResponseObject, error)
 }
 
@@ -354,10 +354,10 @@ type strictHandler struct {
 }
 
 // ReplaceSourceInventory operation middleware
-func (sh *strictHandler) ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, name string) {
+func (sh *strictHandler) ReplaceSourceInventory(w http.ResponseWriter, r *http.Request, id string) {
 	var request ReplaceSourceInventoryRequestObject
 
-	request.Name = name
+	request.Id = id
 
 	var body ReplaceSourceInventoryJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -387,10 +387,10 @@ func (sh *strictHandler) ReplaceSourceInventory(w http.ResponseWriter, r *http.R
 }
 
 // ReplaceSourceStatus operation middleware
-func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, name string) {
+func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string) {
 	var request ReplaceSourceStatusRequestObject
 
-	request.Name = name
+	request.Id = id
 
 	var body ReplaceSourceStatusJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

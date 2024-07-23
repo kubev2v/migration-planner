@@ -2,6 +2,7 @@ package agentserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -9,7 +10,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/config"
+	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"github.com/sirupsen/logrus"
@@ -66,27 +70,24 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
 
-	/*
-		h := service.NewAgentServiceHandler(s.store, s.ca, s.log, s.cfg.Service.BaseAgentGrpcUrl)
-		server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
+	h := service.NewAgentServiceHandler(s.store, s.log)
+	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
+	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
+	go func() {
+		<-ctx.Done()
+		s.log.Println("Shutdown signal received:", ctx.Err())
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancel()
 
-			srv := tlsmiddleware.NewHTTPServerWithTLSContext(router, s.log, s.cfg.Service.AgentEndpointAddress)
+		srv.SetKeepAlivesEnabled(false)
+		_ = srv.Shutdown(ctxTimeout)
+	}()
 
-			go func() {
-				<-ctx.Done()
-				s.log.Println("Shutdown signal received:", ctx.Err())
-				ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
-				defer cancel()
-
-				srv.SetKeepAlivesEnabled(false)
-				_ = srv.Shutdown(ctxTimeout)
-			}()
-
-			s.log.Printf("Listening on %s...", s.listener.Addr().String())
-			if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
-				return err
-			} */
+	s.log.Printf("Listening on %s...", s.listener.Addr().String())
+	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
+		return err
+	}
 
 	return nil
 }

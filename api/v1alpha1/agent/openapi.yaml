@@ -8,16 +8,16 @@ info:
 servers:
   - url: /
 paths:
-  /api/v1/sources/{name}/status:
+  /api/v1/sources/{id}/status:
     put:
       tags:
         - source
       description: replace status of the specified source
       operationId: replaceSourceStatus
       parameters:
-        - name: name
+        - name: id
           in: path
-          description: name of the source
+          description: ID of the source
           required: true
           schema:
             type: string
@@ -53,16 +53,16 @@ paths:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
 
-  /api/v1/sources/{name}/inventory:
+  /api/v1/sources/{id}/inventory:
     put:
       tags:
         - source
       description: replace inventory of the specified source
       operationId: replaceSourceInventory
       parameters:
-        - name: name
+        - name: id
           in: path
-          description: name of the source
+          description: ID of the source
           required: true
           schema:
             type: string

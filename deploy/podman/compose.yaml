@@ -1,0 +1,25 @@
+version: '4.4'
+
+services:
+  planner-db:
+    container_name: planner-db
+    image: ${PGSQL_IMAGE:-quay.io/sclorg/postgresql-12-c8s:latest}
+    environment:
+      - POSTGRESQL_DATABASE=planner
+      - POSTGRESQL_USER=demouser
+      - POSTGRESQL_PASSWORD=demopass
+      - POSTGRESQL_MASTER_USER=admin
+      - POSTGRESQL_MASTER_PASSWORD=adminpass
+      - PGPASSWORD=adminpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - planner-db:/var/lib/pgsql/data
+    networks:
+      - planner-network
+    restart: unless-stopped
+
+volumes:
+  planner-db:
+networks:
+  planner-network:

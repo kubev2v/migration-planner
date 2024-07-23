@@ -1,0 +1,16 @@
+database:
+  hostname: planner-db
+  type: pgsql
+  port: 5432
+  name: planner
+  user: admin
+  password: adminpass
+service:
+  address: :3443
+  baseUrl: https://localhost:3443
+  altNames:
+    - my-host.abc.com
+    - localhost
+queue:
+  amqpUrl: amqp://127.0.0.1:5672/
+  managementUrl: http://127.0.0.1:15672/

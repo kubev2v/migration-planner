@@ -2,6 +2,7 @@ package apiserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -71,24 +72,22 @@ func (s *Server) Run(ctx context.Context) error {
 
 	h := service.NewServiceHandler(s.store, s.log)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
+	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
-	/*
-		srv := tlsmiddleware.NewHTTPServerWithTLSContext(router, s.log, s.cfg.Service.Address)
+	go func() {
+		<-ctx.Done()
+		s.log.Println("Shutdown signal received:", ctx.Err())
+		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+		defer cancel()
 
-		go func() {
-			<-ctx.Done()
-			s.log.Println("Shutdown signal received:", ctx.Err())
-			ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
-			defer cancel()
+		srv.SetKeepAlivesEnabled(false)
+		_ = srv.Shutdown(ctxTimeout)
+	}()
 
-			srv.SetKeepAlivesEnabled(false)
-			_ = srv.Shutdown(ctxTimeout)
-		}()
-
-		s.log.Printf("Listening on %s...", s.listener.Addr().String())
-		if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
-			return err
-		}*/
+	s.log.Printf("Listening on %s...", s.listener.Addr().String())
+	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
+		return err
+	}
 
 	return nil
 }
