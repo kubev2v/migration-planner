@@ -58,8 +58,7 @@ func (s *SourceStore) Create(ctx context.Context, sourceCreate api.SourceCreate)
 }
 
 func (s *SourceStore) DeleteAll(ctx context.Context) error {
-	condition := model.Source{}
-	result := s.db.Unscoped().Delete(&condition)
+	result := s.db.Unscoped().Exec("DELETE FROM sources")
 	return result.Error
 }
 
@@ -77,6 +76,7 @@ func (s *SourceStore) Delete(ctx context.Context, id uint) error {
 	source := model.NewSourceFromId(id)
 	result := s.db.Unscoped().Delete(&source)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		s.log.Infof("ERROR: %v", result.Error)
 		return result.Error
 	}
 	return nil

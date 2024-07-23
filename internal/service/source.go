@@ -48,9 +48,9 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	if err != nil {
 		return server.DeleteSource400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Get(ctx, uint(id))
+	err = h.store.Source().Delete(ctx, uint(id))
 	if err != nil {
 		return server.DeleteSource404JSONResponse{}, nil
 	}
-	return server.DeleteSource200JSONResponse(*result), nil
+	return server.DeleteSource200JSONResponse{}, nil
 }
