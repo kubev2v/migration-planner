@@ -16,7 +16,8 @@ type Error struct {
 // Source defines model for Source.
 type Source struct {
 	CreatedAt time.Time `json:"createdAt"`
-	Inventory *string   `json:"inventory,omitempty"`
+	Id        string    `json:"id"`
+	Inventory string    `json:"inventory"`
 	Name      string    `json:"name"`
 	Status    string    `json:"status"`
 	UpdatedAt time.Time `json:"updatedAt"`

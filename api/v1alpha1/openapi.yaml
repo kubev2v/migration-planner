@@ -75,16 +75,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/sources/{name}:
+  /api/v1/sources/{id}:
     get:
       tags:
         - source
       description: read the specified source
       operationId: readSource
       parameters:
-        - name: name
+        - name: id
           in: path
-          description: name of the source
+          description: ID of the source
           required: true
           schema:
             type: string
@@ -95,6 +95,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         "401":
           description: Unauthorized
           content:
@@ -113,9 +119,9 @@ paths:
       description: delete a source
       operationId: deleteSource
       parameters:
-        - name: name
+        - name: id
           in: path
-          description: name of the source
+          description: ID of the source
           required: true
           schema:
             type: string
@@ -126,6 +132,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         "401":
           description: Unauthorized
           content:
@@ -144,6 +156,8 @@ components:
     Source:
       type: object
       properties:
+        id:
+          type: string
         name:
           type: string
         status:
@@ -157,9 +171,10 @@ components:
           type: string
           format: date-time
       required:
+        - id
         - name
         - status
-        - data
+        - inventory
         - createdAt
         - updatedAt
 
