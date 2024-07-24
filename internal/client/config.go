@@ -200,7 +200,7 @@ func validateService(service Service) []error {
 		if err != nil {
 			validationErrors = append(validationErrors, fmt.Errorf("invalid server format %q: %w", service.Server, err))
 		}
-		if len(u.Hostname()) == 0 {
+		if err == nil && len(u.Hostname()) == 0 {
 			validationErrors = append(validationErrors, fmt.Errorf("invalid server format %q: no hostname", service.Server))
 		}
 	}

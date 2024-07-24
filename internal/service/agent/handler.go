@@ -25,6 +25,7 @@ func NewAgentServiceHandler(store store.Store, log logrus.FieldLogger) *AgentSer
 }
 
 func (h *AgentServiceHandler) ReplaceSourceInventory(ctx context.Context, request agentServer.ReplaceSourceInventoryRequestObject) (agentServer.ReplaceSourceInventoryResponseObject, error) {
+	h.log.Info("HELLO")
 	id, err := strconv.ParseUint(request.Id, 10, 32)
 	if err != nil {
 		return agentServer.ReplaceSourceInventory400JSONResponse{Message: "invalid ID"}, nil

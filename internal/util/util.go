@@ -2,6 +2,7 @@ package util
 
 import (
 	"fmt"
+	"time"
 )
 
 type StringerWithError func() (string, error)
@@ -19,3 +20,5 @@ func MustString(fn StringerWithError) string {
 	}
 	return s
 }
+
+type Duration time.Duration

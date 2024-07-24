@@ -1,0 +1,6 @@
+config-dir: /tmp/config
+data-dir: /tmp/data
+source-id: 6
+planner-service:
+  service:
+    server: http://127.0.0.1:7443

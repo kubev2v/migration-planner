@@ -3,10 +3,10 @@ module github.com/kubev2v/migration-planner
 go 1.22.5
 
 require (
-	github.com/dustin/go-humanize v1.0.1
 	github.com/getkin/kin-openapi v0.126.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/sirupsen/logrus v1.9.3
@@ -47,5 +47,4 @@ require (
 	golang.org/x/sys v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
-	sigs.k8s.io/json v0.0.0-20221116044647-bc3834ca7abd // indirect
 )
