@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// DefaultInventoryUpdateInterval is the default interval between two status updates
-	DefaultInventoryUpdateInterval = util.Duration(60 * time.Second)
+	// DefaultUpdateInterval is the default interval between two status updates
+	DefaultUpdateInterval = time.Duration(60 * time.Second)
 	// DefaultConfigDir is the default directory where the device's configuration is stored
 	DefaultConfigDir = "/etc/planner"
 	// DefaultConfigFile is the default path to the agent's configuration file
@@ -37,8 +37,8 @@ type Config struct {
 	// PlannerService is the client configuration for connecting to the migration planner server
 	PlannerService PlannerService `json:"planner-service,omitempty"`
 
-	// InventoryUpdateInterval is the interval between two status updates
-	InventoryUpdateInterval util.Duration `json:"inventory-update-interval,omitempty"`
+	// UpdateInterval is the interval between two status updates
+	UpdateInterval util.Duration `json:"update-interval,omitempty"`
 
 	// LogLevel is the level of logging. can be:  "panic", "fatal", "error", "warn"/"warning",
 	// "info", "debug" or "trace", any other will be treated as "info"
@@ -62,12 +62,12 @@ func (s *PlannerService) Equal(s2 *PlannerService) bool {
 
 func NewDefault() *Config {
 	c := &Config{
-		ConfigDir:               DefaultConfigDir,
-		DataDir:                 DefaultDataDir,
-		PlannerService:          PlannerService{Config: *client.NewDefault()},
-		InventoryUpdateInterval: DefaultInventoryUpdateInterval,
-		reader:                  fileio.NewReader(),
-		LogLevel:                logrus.InfoLevel.String(),
+		ConfigDir:      DefaultConfigDir,
+		DataDir:        DefaultDataDir,
+		PlannerService: PlannerService{Config: *client.NewDefault()},
+		UpdateInterval: util.Duration{Duration: DefaultUpdateInterval},
+		reader:         fileio.NewReader(),
+		LogLevel:       logrus.InfoLevel.String(),
 	}
 
 	return c

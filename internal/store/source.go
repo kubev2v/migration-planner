@@ -17,7 +17,7 @@ type Source interface {
 	DeleteAll(ctx context.Context) error
 	Get(ctx context.Context, id uint) (*api.Source, error)
 	Delete(ctx context.Context, id uint) error
-	Update(ctx context.Context, id uint, status, inventory *string) (*api.Source, error)
+	Update(ctx context.Context, id uint, status, statusInfo, inventory *string) (*api.Source, error)
 	InitialMigration() error
 }
 
@@ -82,12 +82,16 @@ func (s *SourceStore) Delete(ctx context.Context, id uint) error {
 	return nil
 }
 
-func (s *SourceStore) Update(ctx context.Context, id uint, status, inventory *string) (*api.Source, error) {
+func (s *SourceStore) Update(ctx context.Context, id uint, status, statusInfo, inventory *string) (*api.Source, error) {
 	source := model.NewSourceFromId(id)
 	selectFields := []string{}
 	if status != nil {
 		source.Status = *status
 		selectFields = append(selectFields, "status")
+	}
+	if statusInfo != nil {
+		source.StatusInfo = *statusInfo
+		selectFields = append(selectFields, "status_info")
 	}
 	if inventory != nil {
 		source.Inventory = *inventory

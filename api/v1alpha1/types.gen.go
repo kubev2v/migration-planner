@@ -7,6 +7,14 @@ import (
 	"time"
 )
 
+// Defines values for SourceStatus.
+const (
+	SourceStatusError                     SourceStatus = "error"
+	SourceStatusGatheringInitialInventory SourceStatus = "gathering-initial-inventory"
+	SourceStatusUpToDate                  SourceStatus = "up-to-date"
+	SourceStatusWaitingForCredentials     SourceStatus = "waiting-for-credentials"
+)
+
 // Error defines model for Error.
 type Error struct {
 	// Message Error message
@@ -15,13 +23,17 @@ type Error struct {
 
 // Source defines model for Source.
 type Source struct {
-	CreatedAt time.Time `json:"createdAt"`
-	Id        string    `json:"id"`
-	Inventory string    `json:"inventory"`
-	Name      string    `json:"name"`
-	Status    string    `json:"status"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	CreatedAt  time.Time    `json:"createdAt"`
+	Id         string       `json:"id"`
+	Inventory  string       `json:"inventory"`
+	Name       string       `json:"name"`
+	Status     SourceStatus `json:"status"`
+	StatusInfo string       `json:"status_info"`
+	UpdatedAt  time.Time    `json:"updatedAt"`
 }
+
+// SourceStatus defines model for Source.Status.
+type SourceStatus string
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {

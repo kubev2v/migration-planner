@@ -53,65 +53,18 @@ paths:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
 
-  /api/v1/sources/{id}/inventory:
-    put:
-      tags:
-        - source
-      description: replace inventory of the specified source
-      operationId: replaceSourceInventory
-      parameters:
-        - name: id
-          in: path
-          description: ID of the source
-          required: true
-          schema:
-            type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SourceInventoryUpdate'
-        required: true
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '../openapi.yaml#/components/schemas/Source'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '../openapi.yaml#/components/schemas/Error'
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '../openapi.yaml#/components/schemas/Error'
-        "404":
-          description: NotFound
-          content:
-            application/json:
-              schema:
-                $ref: '../openapi.yaml#/components/schemas/Error'
-
 components:
   schemas:
     SourceStatusUpdate:
       type: object
       properties:
+        inventory:
+          type: string
         status:
           type: string
-      required:
-        - status
-
-    SourceInventoryUpdate:
-      type: object
-      properties:
-        inventory:
+        status_info:
           type: string
       required:
         - inventory
+        - status
+        - status_info

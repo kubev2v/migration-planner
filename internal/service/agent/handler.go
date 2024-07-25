@@ -24,25 +24,12 @@ func NewAgentServiceHandler(store store.Store, log logrus.FieldLogger) *AgentSer
 	}
 }
 
-func (h *AgentServiceHandler) ReplaceSourceInventory(ctx context.Context, request agentServer.ReplaceSourceInventoryRequestObject) (agentServer.ReplaceSourceInventoryResponseObject, error) {
-	h.log.Info("HELLO")
-	id, err := strconv.ParseUint(request.Id, 10, 32)
-	if err != nil {
-		return agentServer.ReplaceSourceInventory400JSONResponse{Message: "invalid ID"}, nil
-	}
-	result, err := h.store.Source().Update(ctx, uint(id), nil, &request.Body.Inventory)
-	if err != nil {
-		return agentServer.ReplaceSourceInventory400JSONResponse{}, nil
-	}
-	return agentServer.ReplaceSourceInventory200JSONResponse(*result), nil
-}
-
 func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request agentServer.ReplaceSourceStatusRequestObject) (agentServer.ReplaceSourceStatusResponseObject, error) {
 	id, err := strconv.ParseUint(request.Id, 10, 32)
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Update(ctx, uint(id), nil, &request.Body.Status)
+	result, err := h.store.Source().Update(ctx, uint(id), &request.Body.Status, &request.Body.StatusInfo, &request.Body.Inventory)
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}

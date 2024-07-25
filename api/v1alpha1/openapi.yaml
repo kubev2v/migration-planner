@@ -162,6 +162,9 @@ components:
           type: string
         status:
           type: string
+          enum: [waiting-for-credentials, error, gathering-initial-inventory, up-to-date]
+        status_info:
+          type: string
         inventory:
           type: string
         createdAt:
@@ -174,6 +177,7 @@ components:
         - id
         - name
         - status
+        - status_info
         - inventory
         - createdAt
         - updatedAt

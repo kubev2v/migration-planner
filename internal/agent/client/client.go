@@ -35,6 +35,5 @@ func NewDefault() *Config {
 
 // Planner is the client interface for migration planning.
 type Planner interface {
-	UpdateSourceInventory(ctx context.Context, id string, params api.SourceInventoryUpdate, rcb ...client.RequestEditorFn) error
 	UpdateSourceStatus(ctx context.Context, id string, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error
 }

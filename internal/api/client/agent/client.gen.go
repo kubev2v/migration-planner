@@ -91,39 +91,10 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// ReplaceSourceInventoryWithBody request with any body
-	ReplaceSourceInventoryWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	ReplaceSourceInventory(ctx context.Context, id string, body ReplaceSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ReplaceSourceStatusWithBody request with any body
 	ReplaceSourceStatusWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	ReplaceSourceStatus(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-}
-
-func (c *Client) ReplaceSourceInventoryWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceSourceInventoryRequestWithBody(c.Server, id, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) ReplaceSourceInventory(ctx context.Context, id string, body ReplaceSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceSourceInventoryRequest(c.Server, id, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
 }
 
 func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -148,53 +119,6 @@ func (c *Client) ReplaceSourceStatus(ctx context.Context, id string, body Replac
 		return nil, err
 	}
 	return c.Client.Do(req)
-}
-
-// NewReplaceSourceInventoryRequest calls the generic ReplaceSourceInventory builder with application/json body
-func NewReplaceSourceInventoryRequest(server string, id string, body ReplaceSourceInventoryJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewReplaceSourceInventoryRequestWithBody(server, id, "application/json", bodyReader)
-}
-
-// NewReplaceSourceInventoryRequestWithBody generates requests for ReplaceSourceInventory with any type of body
-func NewReplaceSourceInventoryRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/sources/%s/inventory", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("PUT", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
 }
 
 // NewReplaceSourceStatusRequest calls the generic ReplaceSourceStatus builder with application/json body
@@ -287,40 +211,10 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// ReplaceSourceInventoryWithBodyWithResponse request with any body
-	ReplaceSourceInventoryWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceInventoryResponse, error)
-
-	ReplaceSourceInventoryWithResponse(ctx context.Context, id string, body ReplaceSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceInventoryResponse, error)
-
 	// ReplaceSourceStatusWithBodyWithResponse request with any body
 	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
 
 	ReplaceSourceStatusWithResponse(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
-}
-
-type ReplaceSourceInventoryResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *externalRef0.Source
-	JSON400      *externalRef0.Error
-	JSON401      *externalRef0.Error
-	JSON404      *externalRef0.Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ReplaceSourceInventoryResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ReplaceSourceInventoryResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }
 
 type ReplaceSourceStatusResponse struct {
@@ -348,23 +242,6 @@ func (r ReplaceSourceStatusResponse) StatusCode() int {
 	return 0
 }
 
-// ReplaceSourceInventoryWithBodyWithResponse request with arbitrary body returning *ReplaceSourceInventoryResponse
-func (c *ClientWithResponses) ReplaceSourceInventoryWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceInventoryResponse, error) {
-	rsp, err := c.ReplaceSourceInventoryWithBody(ctx, id, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReplaceSourceInventoryResponse(rsp)
-}
-
-func (c *ClientWithResponses) ReplaceSourceInventoryWithResponse(ctx context.Context, id string, body ReplaceSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceInventoryResponse, error) {
-	rsp, err := c.ReplaceSourceInventory(ctx, id, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseReplaceSourceInventoryResponse(rsp)
-}
-
 // ReplaceSourceStatusWithBodyWithResponse request with arbitrary body returning *ReplaceSourceStatusResponse
 func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
 	rsp, err := c.ReplaceSourceStatusWithBody(ctx, id, contentType, body, reqEditors...)
@@ -380,53 +257,6 @@ func (c *ClientWithResponses) ReplaceSourceStatusWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseReplaceSourceStatusResponse(rsp)
-}
-
-// ParseReplaceSourceInventoryResponse parses an HTTP response from a ReplaceSourceInventoryWithResponse call
-func ParseReplaceSourceInventoryResponse(rsp *http.Response) (*ReplaceSourceInventoryResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ReplaceSourceInventoryResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest externalRef0.Source
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest externalRef0.Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest externalRef0.Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest externalRef0.Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	}
-
-	return response, nil
 }
 
 // ParseReplaceSourceStatusResponse parses an HTTP response from a ReplaceSourceStatusWithResponse call
