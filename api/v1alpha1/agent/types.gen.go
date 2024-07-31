@@ -5,9 +5,10 @@ package v1alpha1
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.
 type SourceStatusUpdate struct {
-	Inventory  string `json:"inventory"`
-	Status     string `json:"status"`
-	StatusInfo string `json:"status_info"`
+	CredentialUrl string `json:"credentialUrl"`
+	Inventory     string `json:"inventory"`
+	Status        string `json:"status"`
+	StatusInfo    string `json:"statusInfo"`
 }
 
 // ReplaceSourceStatusJSONRequestBody defines body for ReplaceSourceStatus for application/json ContentType.

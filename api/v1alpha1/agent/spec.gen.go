@@ -19,17 +19,17 @@ import (
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
-	"H4sIAAAAAAAC/7RUTW/bOBD9K8LsHiXTyeakW7KbBYy2aZAgp8AoWHEkMZBIdjiykRr67wVJfyVWCwRI",
-	"bjI5fu/Nm8fZQGV7Zw0a9lBuwFct9jJ+XhNZCh+OrENijfG4R+9lg+FToa9IO9bWQJnqs911DvzsEErw",
-	"TNo0MI45EP4YNKGC8nEPsxxzuLcDVXhKVRFKRnXJ4UdtqZcMJSjJWLDuJzhy0CrUnh6bFRq29Dx5a2SP",
-	"kxeeJQ9RCpqhD7LXUrM2TVFbKipChYa17DzkgNGuHBrJLQaAQhsdLosDeQ6DK9gWoQVY5r8j/KZNbScF",
-	"DU69zZFXrmsF23b3zb0kPbYqPxrAMfVBuP3+hBXDfoT3EekhVp6O889DOHj9Rldet3ikf7LFU/ljTEgC",
-	"73SFxkf1KRZw6WTVYnY+mwcXqIMSWmbnSyHW6/VMxuuZpUZs/+vF58W/1zf318X5bD5rue9CE6y5C3Bf",
-	"dEMyPJnstpPGIGWXt4usyGSDhjM0ylltguErJJ9e1mAU1tqgCjjWoZFOQwn/zOazM8jBSW6jcUI6LVZn",
-	"wsdheLHRahQHX93Ap6+W0HWywiyVZbbOuMXMO6x0rVFlCQsib9K9UFDCXfrb8dijEpI9MpKH8vE10+K/",
-	"PfoOU4fzIH+XyjIl9DBPpgHz7Vaamv0yFaPnK6tisCprGE3sVDrX6SqKFk8+iNgcQf1NWEMJf4nDBhTb",
-	"9Scm4jy+DFoQFg+8s2HmAfF8Pn9nBYn1pY9fP4UYXLwjV9r0E1RXUmV3yd7EefbxnA9GDtxa0j9T3i/m",
-	"Fx9PemP5fzsYFbcJyybkF7YxXcZ6j7Ta5TotAQHjcvwVAAD//+wwVkVABwAA",
+	"H4sIAAAAAAAC/7RVzW7bPBB8FWK/7yiZTpqTbkmbAkbbNEiQU+ADK64kBhLJkisbqaF3L0jalmOrLQIk",
+	"N5o/O7Mzo/UGStNZo1GTh2IDvmywE3F57ZxxYWGdsehIYdzu0HtRY1hK9KVTlpTRUKT7bHecAT1bhAI8",
+	"OaVrGIYMHP7slUMJxeO+zHLI4N70rsRTqNKhIJSXFH5UxnWCoAApCHNS3QRGFp5I1KRE++Da8OzkhpLT",
+	"23qFmox7njzVosPJA0+C+kgWdd+FxtZCkdJ1XhmXj2w8ZIBR0AxqQQ2GArnSKhzmI3gGvc3J5KFJWGZ/",
+	"Alzoykzy6a18nWRHtigJ2273vb3APBTqWO3swLBDJmMb5scTlgR7y+9j4Yd4c9L+f3n5V9NGb16n4pEk",
+	"r5XhtN0hUk1YrSpR+9htChVcWlE2yM5n86Ba6BQaIusLztfr9UzE45lxNd++9fzr4uP1zf11fj6bzxrq",
+	"2tASKWpDuW+qdiJ8kuy2FVqjY5e3C5YzUaMmhlpao3QwaIXOpy+31xIrpVGGOsaiFlZBAR9m89kZZGAF",
+	"NVFGLqziqzPuo3meb5Qc+Kiy7el0Kji0rSiRpWvMVIwaZN5iqSqFkqVaEHET74WEAu7Ss8OYRCZOdEjo",
+	"PBSPx0iLT/vqu5oq7Af6u1AXKeCjveR6zLZTbyoKy3QZPV0ZGWNWGk2oY6fC2laVkTR/8oHE5qDU/w4r",
+	"KOA/Pk5Yvh2vfCL+w8vcBWJxw1sTPA8Vz+fzN2aQUF/q+P1LiMHFG2Klf5IJqCsh2V2SN2GevT/mgxY9",
+	"NcapXynvF/OL9we9MfTZ9FrG4UKi9nGwJAuW8b5Ht9rlOg0BDsNy+B0AAP//Uyt7kKAHAAA=",
 }
 
 // GetSwagger returns the content of the embedded swagger specification file

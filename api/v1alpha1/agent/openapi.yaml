@@ -58,13 +58,16 @@ components:
     SourceStatusUpdate:
       type: object
       properties:
-        inventory:
-          type: string
         status:
           type: string
-        status_info:
+        statusInfo:
+          type: string
+        inventory:
+          type: string
+        credentialUrl:
           type: string
       required:
-        - inventory
         - status
-        - status_info
+        - statusInfo
+        - inventory
+        - credentialUrl
