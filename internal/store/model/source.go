@@ -14,6 +14,7 @@ type Source struct {
 	Status     string
 	StatusInfo string
 	Inventory  string
+	CredUrl    string
 }
 
 type SourceList []Source
@@ -35,13 +36,14 @@ func NewSourceFromId(id uint) *Source {
 
 func (s *Source) ToApiResource() api.Source {
 	return api.Source{
-		Id:         strconv.FormatUint(uint64(s.ID), 10),
-		Name:       s.Name,
-		Status:     api.StringToSourceStatus(s.Status),
-		StatusInfo: s.StatusInfo,
-		Inventory:  s.Inventory,
-		CreatedAt:  s.CreatedAt,
-		UpdatedAt:  s.UpdatedAt,
+		Id:            strconv.FormatUint(uint64(s.ID), 10),
+		Name:          s.Name,
+		Status:        api.StringToSourceStatus(s.Status),
+		StatusInfo:    s.StatusInfo,
+		Inventory:     s.Inventory,
+		CredentialUrl: s.CredUrl,
+		CreatedAt:     s.CreatedAt,
+		UpdatedAt:     s.UpdatedAt,
 	}
 }
 

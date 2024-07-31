@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/lthibault/jitterbug"
+	gateway "github.com/net-byte/go-gateway"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -30,8 +32,6 @@ const (
 	CredentialsFile = "credentials.json"
 )
 
-var sourceStatuses = []string{}
-
 // New creates a new agent.
 func New(log *log.PrefixLogger, config *Config) *Agent {
 	return &Agent{
@@ -41,11 +41,12 @@ func New(log *log.PrefixLogger, config *Config) *Agent {
 }
 
 type Agent struct {
-	config *Config
-	log    *log.PrefixLogger
-	client client.Planner
-	reader *fileio.Reader
-	writer *fileio.Writer
+	config        *Config
+	log           *log.PrefixLogger
+	client        client.Planner
+	reader        *fileio.Reader
+	writer        *fileio.Writer
+	credentialUrl string
 }
 
 type InventoryData struct {
@@ -84,6 +85,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	}(ctx)
 
 	a.initializeFileIO()
+	a.initializeCredentialUrl()
 
 	server := &http.Server{Addr: "0.0.0.0:3333", Handler: a.RESTService()}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
@@ -91,7 +93,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	go func() {
 		<-sig
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second)
+		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second) // nolint:govet
 
 		go func() {
 			<-shutdownCtx.Done()
@@ -177,6 +179,26 @@ func (a *Agent) initializeFileIO() {
 	a.writer = fileio.NewWriter()
 }
 
+func (a *Agent) initializeCredentialUrl() {
+	gw, err := gateway.DiscoverGatewayIPv4()
+	if err != nil {
+		a.log.Errorf("failed finding default GW: %v", err)
+		a.credentialUrl = "N/A"
+		return
+	}
+
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", gw.String(), "80"))
+	if err != nil {
+		a.log.Errorf("failed connecting to default GW: %v", err)
+		a.credentialUrl = "N/A"
+		return
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.TCPAddr)
+	a.credentialUrl = fmt.Sprintf("http://%s:%s", localAddr.IP.String(), a.config.CredUIPort)
+}
+
 func (a *Agent) RESTService() http.Handler {
 	r := chi.NewRouter()
 
@@ -202,9 +224,10 @@ func (a *Agent) credentialHandler(w http.ResponseWriter, r *http.Request) {
 
 func (a *Agent) updateSourceStatus(ctx context.Context, status api.SourceStatus, statusInfo, inventory string) {
 	update := agentapi.SourceStatusUpdate{
-		Status:     string(status),
-		StatusInfo: statusInfo,
-		Inventory:  inventory,
+		Status:        string(status),
+		StatusInfo:    statusInfo,
+		Inventory:     inventory,
+		CredentialUrl: a.credentialUrl,
 	}
 	a.log.Debugf("Updating status to %s: %s", string(status), statusInfo)
 	err := a.client.UpdateSourceStatus(ctx, a.config.SourceID, update)

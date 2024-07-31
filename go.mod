@@ -1,12 +1,15 @@
 module github.com/kubev2v/migration-planner
 
-go 1.22.5
+go 1.22.0
+
+toolchain go1.22.5
 
 require (
 	github.com/getkin/kin-openapi v0.126.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/lthibault/jitterbug v2.0.0+incompatible
+	github.com/net-byte/go-gateway v0.0.2
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/sirupsen/logrus v1.9.3

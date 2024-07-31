@@ -24,6 +24,8 @@ const (
 	DefaultDataDir = "/var/lib/planner"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
+	// DefaultCredUIPort is the default port for the credentials UI
+	DefaultCredUIPort = "8000"
 )
 
 type Config struct {
@@ -39,6 +41,8 @@ type Config struct {
 
 	// UpdateInterval is the interval between two status updates
 	UpdateInterval util.Duration `json:"update-interval,omitempty"`
+
+	CredUIPort string `json:"cred-ui-port"`
 
 	// LogLevel is the level of logging. can be:  "panic", "fatal", "error", "warn"/"warning",
 	// "info", "debug" or "trace", any other will be treated as "info"
@@ -68,7 +72,9 @@ func NewDefault() *Config {
 		UpdateInterval: util.Duration{Duration: DefaultUpdateInterval},
 		reader:         fileio.NewReader(),
 		LogLevel:       logrus.InfoLevel.String(),
+		CredUIPort:     DefaultCredUIPort,
 	}
+	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
 	return c
 }
