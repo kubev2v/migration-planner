@@ -1,0 +1,6 @@
+gather_information_vsphere_validate_certs: false
+gather_information_vsphere_connected_states: # This is used to determine if only a certain type of hypervisor should be collected. This can be blank and all listed in vcenter will be gathered.
+  - DISCONNECTED
+  - CONNECTED
+gather_information_store_in_a_file: true
+gather_information_output_file_name: "output_file.txt"
