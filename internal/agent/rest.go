@@ -98,7 +98,7 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 	log.Info("received credentials")
 	err = testVmwareConnection(log, credentials)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("invalid credentials: %v", err), http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 

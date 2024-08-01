@@ -7,10 +7,17 @@ import (
 	"time"
 )
 
+// Defines values for InfraNetworksType.
+const (
+	Distributed InfraNetworksType = "distributed"
+	Standard    InfraNetworksType = "standard"
+)
+
 // Defines values for SourceStatus.
 const (
 	SourceStatusError                     SourceStatus = "error"
 	SourceStatusGatheringInitialInventory SourceStatus = "gathering-initial-inventory"
+	SourceStatusNotConnected              SourceStatus = "not-connected"
 	SourceStatusUpToDate                  SourceStatus = "up-to-date"
 	SourceStatusWaitingForCredentials     SourceStatus = "waiting-for-credentials"
 )
@@ -21,12 +28,45 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Histogram defines model for Histogram.
+type Histogram struct {
+	Data     []int `json:"data"`
+	MinValue int   `json:"minValue"`
+	Step     int   `json:"step"`
+}
+
+// Infra defines model for Infra.
+type Infra struct {
+	Datastores []struct {
+		FreeCapacityGB  int    `json:"freeCapacityGB"`
+		TotalCapacityGB int    `json:"totalCapacityGB"`
+		Type            string `json:"type"`
+	} `json:"datastores"`
+	Folders map[string]struct {
+		FolderIDs *[]string `json:"folderIDs,omitempty"`
+		NumVMs    *int      `json:"numVMs,omitempty"`
+	} `json:"folders"`
+	Networks []struct {
+		Type   InfraNetworksType `json:"type"`
+		VlanID int               `json:"vlanID"`
+	} `json:"networks"`
+}
+
+// InfraNetworksType defines model for Infra.Networks.Type.
+type InfraNetworksType string
+
+// Inventory defines model for Inventory.
+type Inventory struct {
+	Infra Infra `json:"infra"`
+	Vms   VMs   `json:"vms"`
+}
+
 // Source defines model for Source.
 type Source struct {
 	CreatedAt     time.Time    `json:"createdAt"`
 	CredentialUrl string       `json:"credentialUrl"`
 	Id            string       `json:"id"`
-	Inventory     string       `json:"inventory"`
+	Inventory     Inventory    `json:"inventory"`
 	Name          string       `json:"name"`
 	Status        SourceStatus `json:"status"`
 	StatusInfo    string       `json:"statusInfo"`
@@ -54,6 +94,17 @@ type Status struct {
 
 	// Status Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *string `json:"status,omitempty"`
+}
+
+// VMs defines model for VMs.
+type VMs struct {
+	CpuCores             Histogram      `json:"cpuCores"`
+	DiskGB               Histogram      `json:"diskGB"`
+	NotMigratableReasons map[string]int `json:"notMigratableReasons"`
+	Os                   map[string]int `json:"os"`
+	RamGB                Histogram      `json:"ramGB"`
+	Total                int            `json:"total"`
+	TotalMigratable      int            `json:"totalMigratable"`
 }
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.

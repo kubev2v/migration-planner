@@ -24,6 +24,11 @@ type InventoryUpdater struct {
 	credUrl string
 }
 
+type InventoryData struct {
+	Inventory api.Inventory
+	Error     string
+}
+
 func NewInventoryUpdater(log *log.PrefixLogger, config *Config, client client.Planner) *InventoryUpdater {
 	return &InventoryUpdater{
 		log:    log,
@@ -47,30 +52,31 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context) {
 		case <-updateTicker.C:
 			err := reader.CheckPathExists(credentialsFilePath)
 			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusWaitingForCredentials, "", "")
+				u.updateSourceStatus(ctx, api.SourceStatusWaitingForCredentials, "", nil)
 				continue
 			}
 			err = reader.CheckPathExists(inventoryFilePath)
 			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusGatheringInitialInventory, "", "")
+				u.updateSourceStatus(ctx, api.SourceStatusGatheringInitialInventory, "", nil)
 				continue
 			}
 			inventoryData, err := reader.ReadFile(inventoryFilePath)
 			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("failed reading inventory file: %v", err), "")
+				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("failed reading inventory file: %v", err), nil)
 				continue
 			}
 			var inventory InventoryData
 			err = json.Unmarshal(inventoryData, &inventory)
 			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("invalid inventory file: %v", err), "")
+				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("invalid inventory file: %v", err), nil)
 				continue
 			}
+			u.log.Infof("INVENTORY: %+v", inventory)
 			newStatus := api.SourceStatusUpToDate
 			if len(inventory.Error) > 0 {
 				newStatus = api.SourceStatusError
 			}
-			u.updateSourceStatus(ctx, newStatus, inventory.Error, inventory.Inventory)
+			u.updateSourceStatus(ctx, newStatus, inventory.Error, &inventory.Inventory)
 		}
 	}
 }
@@ -95,7 +101,7 @@ func (u *InventoryUpdater) initializeCredentialUrl() {
 	u.credUrl = fmt.Sprintf("http://%s:%s", localAddr.IP.String(), u.config.CredUIPort)
 }
 
-func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.SourceStatus, statusInfo, inventory string) {
+func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.SourceStatus, statusInfo string, inventory *api.Inventory) {
 	update := agentapi.SourceStatusUpdate{
 		Status:        string(status),
 		StatusInfo:    statusInfo,

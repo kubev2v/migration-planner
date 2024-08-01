@@ -10,7 +10,9 @@ func StringToSourceStatus(s string) SourceStatus {
 		return SourceStatusUpToDate
 	case string(SourceStatusWaitingForCredentials):
 		return SourceStatusWaitingForCredentials
+	case string(SourceStatusNotConnected):
+		return SourceStatusNotConnected
 	default:
-		return SourceStatusWaitingForCredentials
+		return SourceStatusNotConnected
 	}
 }

@@ -29,11 +29,6 @@ type Agent struct {
 	log    *log.PrefixLogger
 }
 
-type InventoryData struct {
-	Inventory string
-	Error     string
-}
-
 func (a *Agent) GetLogPrefix() string {
 	return a.log.Prefix()
 }

@@ -29,7 +29,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{Message: "invalid ID"}, nil
 	}
-	result, err := h.store.Source().Update(ctx, uint(id), &request.Body.Status, &request.Body.StatusInfo, &request.Body.Inventory, &request.Body.CredentialUrl)
+	result, err := h.store.Source().Update(ctx, uint(id), &request.Body.Status, &request.Body.StatusInfo, &request.Body.CredentialUrl, request.Body.Inventory)
 	if err != nil {
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}

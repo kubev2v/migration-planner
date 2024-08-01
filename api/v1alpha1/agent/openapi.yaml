@@ -63,11 +63,10 @@ components:
         statusInfo:
           type: string
         inventory:
-          type: string
+          $ref: '../openapi.yaml#/components/schemas/Inventory'
         credentialUrl:
           type: string
       required:
         - status
         - statusInfo
-        - inventory
         - credentialUrl

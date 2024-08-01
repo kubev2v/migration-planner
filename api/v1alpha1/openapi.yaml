@@ -162,11 +162,11 @@ components:
           type: string
         status:
           type: string
-          enum: [waiting-for-credentials, error, gathering-initial-inventory, up-to-date]
+          enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date]
         statusInfo:
           type: string
         inventory:
-          type: string
+          $ref: '#/components/schemas/Inventory'
         credentialUrl:
           type: string
         createdAt:
@@ -219,3 +219,112 @@ components:
           type: string
           description: 'Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
       description: Status is a return value for calls that don't return other objects.
+
+    Inventory:
+      type: object
+      required:
+      - vms
+      - infra
+      properties:
+        vms:
+          type: object
+          $ref: '#/components/schemas/VMs'
+        infra:
+          type: object
+          $ref: '#/components/schemas/Infra'
+
+    VMs:
+      type: object
+      required:
+      - total
+      - totalMigratable
+      - cpuCores
+      - ramGB
+      - diskGB
+      - os
+      - notMigratableReasons
+      properties:
+        total:
+          type: integer
+        totalMigratable:
+          type: integer
+        cpuCores:
+          type: object
+          $ref: '#/components/schemas/Histogram'
+        ramGB:
+          type: object
+          $ref: '#/components/schemas/Histogram'
+        diskGB:
+          type: object
+          $ref: '#/components/schemas/Histogram'
+        os:
+          type: object
+          additionalProperties:
+            type: integer
+        notMigratableReasons:
+          type: object
+          additionalProperties:
+            type: integer
+
+    Infra:
+      type: object
+      required:
+      - folders
+      - networks
+      - datastores
+      properties:
+        folders:
+          type: object
+          additionalProperties:
+            type: object
+            properties:
+              numVMs:
+                type: integer
+              folderIDs:
+                type: array
+                items:
+                  type: string
+        networks:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - vlanID
+            properties:
+              type:
+                type: string
+                enum: [standard, distributed]
+              vlanID:
+                type: integer
+        datastores:
+          type: array
+          items:
+            type: object
+            required:
+              - type
+              - totalCapacityGB
+              - freeCapacityGB
+            properties:
+              type:
+                type: string
+              totalCapacityGB:
+                type: integer
+              freeCapacityGB:
+                type: integer
+
+    Histogram:
+      type: object
+      required:
+      - minValue
+      - step
+      - data
+      properties:
+        minValue:
+          type: integer
+        step:
+          type: integer
+        data:
+          type: array
+          items:
+            type: integer

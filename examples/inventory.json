@@ -1,0 +1,85 @@
+{
+    "err": "Failed collecting some information",
+    "inventory": {
+        "vms": {
+            "total": 10,
+            "totalMigratable": 8,
+            "cpuCores": {
+                "minValue": 1,
+                "step": 1,
+                "data": [
+                    3,
+                    0,
+                    2,
+                    5
+                ]
+            },
+            "ramGB": {
+                "minValue": 2,
+                "step": 2,
+                "data": [
+                    2,
+                    1,
+                    3,
+                    4
+                ]
+            },
+            "diskGB": {
+                "minValue": 1,
+                "step": 1,
+                "data": [
+                    1,
+                    2,
+                    3,
+                    4
+                ]
+            },
+            "os": {
+                "windows": 4,
+                "linux": 6
+            },
+            "notMigratableReasons": {
+                "no guest tools": 1,
+                "other error": 1
+            }
+        },
+        "infra": {
+	    "folders": {
+                "1234": {
+                    "numVMs": 3,
+                    "folderIDs": [
+                        "2345"
+                    ]
+                },
+                "2345": {
+                    "numVMs": 2
+                },
+                "3456": {
+                    "numVMs": 5
+                }
+	    },
+            "datastores": [
+                {
+                    "type": "vmfs",
+                    "totalCapacityGB": 1000,
+                    "freeCapacityGB": 100
+                },
+                {
+                    "type": "otherType",
+                    "totalCapacityGB": 2000,
+                    "freeCapacityGB": 500
+                }
+            ],
+            "networks": [
+                {
+                    "type": "distributed",
+                    "vlanID": 7
+                },
+                {
+                    "type": "standard",
+                    "vlanID": 12
+                }
+            ]
+        }
+    }
+}
