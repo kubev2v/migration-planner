@@ -41,42 +41,14 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context) {
 	defer updateTicker.Stop()
 
 	u.initializeCredentialUrl()
-	inventoryFilePath := filepath.Join(u.config.DataDir, InventoryFile)
-	credentialsFilePath := filepath.Join(u.config.DataDir, CredentialsFile)
-	reader := fileio.NewReader()
 
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-updateTicker.C:
-			err := reader.CheckPathExists(credentialsFilePath)
-			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusWaitingForCredentials, "", nil)
-				continue
-			}
-			err = reader.CheckPathExists(inventoryFilePath)
-			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusGatheringInitialInventory, "", nil)
-				continue
-			}
-			inventoryData, err := reader.ReadFile(inventoryFilePath)
-			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("failed reading inventory file: %v", err), nil)
-				continue
-			}
-			var inventory InventoryData
-			err = json.Unmarshal(inventoryData, &inventory)
-			if err != nil {
-				u.updateSourceStatus(ctx, api.SourceStatusError, fmt.Sprintf("invalid inventory file: %v", err), nil)
-				continue
-			}
-			u.log.Infof("INVENTORY: %+v", inventory)
-			newStatus := api.SourceStatusUpToDate
-			if len(inventory.Error) > 0 {
-				newStatus = api.SourceStatusError
-			}
-			u.updateSourceStatus(ctx, newStatus, inventory.Error, &inventory.Inventory)
+			status, statusInfo, inventory := calculateStatus(u.config.DataDir)
+			u.updateSourceStatus(ctx, status, statusInfo, inventory)
 		}
 	}
 }
@@ -99,6 +71,34 @@ func (u *InventoryUpdater) initializeCredentialUrl() {
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	u.credUrl = fmt.Sprintf("http://%s:%s", localAddr.IP.String(), u.config.CredUIPort)
+}
+
+func calculateStatus(dataDir string) (api.SourceStatus, string, *api.Inventory) {
+	inventoryFilePath := filepath.Join(dataDir, InventoryFile)
+	credentialsFilePath := filepath.Join(dataDir, CredentialsFile)
+	reader := fileio.NewReader()
+
+	err := reader.CheckPathExists(credentialsFilePath)
+	if err != nil {
+		return api.SourceStatusWaitingForCredentials, "No credentials provided", nil
+	}
+	err = reader.CheckPathExists(inventoryFilePath)
+	if err != nil {
+		return api.SourceStatusGatheringInitialInventory, "Inventory not yet collected", nil
+	}
+	inventoryData, err := reader.ReadFile(inventoryFilePath)
+	if err != nil {
+		return api.SourceStatusError, fmt.Sprintf("Failed reading inventory file: %v", err), nil
+	}
+	var inventory InventoryData
+	err = json.Unmarshal(inventoryData, &inventory)
+	if err != nil {
+		return api.SourceStatusError, fmt.Sprintf("Invalid inventory file: %v", err), nil
+	}
+	if len(inventory.Error) > 0 {
+		return api.SourceStatusError, inventory.Error, &inventory.Inventory
+	}
+	return api.SourceStatusUpToDate, "Inventory successfully collected", &inventory.Inventory
 }
 
 func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.SourceStatus, statusInfo string, inventory *api.Inventory) {

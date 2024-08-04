@@ -8,6 +8,7 @@ require (
 	github.com/getkin/kin-openapi v0.126.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/render v1.0.3
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/net-byte/go-gateway v0.0.2
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
@@ -27,6 +28,7 @@ require (
 )
 
 require (
+	github.com/ajg/form v1.5.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-openapi/jsonpointer v0.21.0 // indirect

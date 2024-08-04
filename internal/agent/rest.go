@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/render"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/vmware/govmomi/session/cache"
@@ -68,11 +69,28 @@ func createRESTService(log *log.PrefixLogger, dataDir string) http.Handler {
 	r.Use(middleware.RequestID)
 	r.Use(middleware.Logger)
 
+	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
+		statusHandler(dataDir, w, r)
+	})
 	r.Put("/credentials", func(w http.ResponseWriter, r *http.Request) {
 		credentialHandler(log, dataDir, w, r)
 	})
 
 	return r
+}
+
+type StatusReply struct {
+	Status     string
+	StatusInfo string
+}
+
+func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func statusHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
+	status, statusInfo, _ := calculateStatus(dataDir)
+	_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
 }
 
 type Credentials struct {
