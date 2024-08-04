@@ -19,7 +19,7 @@ The overall flow of this role is as follows:
 - Gather all registered dvswitch
 - Get datastore information from VMWare
 - Get resourcepool information
-- Write all the information into an output file.
+- Write all the information into a json output file.
 
 Requirements
 ------------
@@ -41,7 +41,7 @@ A description of the settable variables for this role should go here, including 
 `gather_information_vsphere_password` | string  | vCenter password                                                                                                                                 | 
 `gather_information_vsphere_validate_certs` | boolean | vCenter validate certs                                                                                                                           | false
 `gather_information_store_in_a_file` | boolean | This is used to determing if an output file is needed                                                                                           | true
-`gather_information_output_file_name` | string | The output file name | "output_file.txt"
+`gather_information_output_file_name` | string | The output file name | "output_file.json"
 `gather_information_vsphere_connected_states` | list    | This is used to determine if only a certain type of hypervisor should be collected. This can be blank and all listed in vcenter will be gathered | "[DISCONNECTED, CONNECTED]"
 
 

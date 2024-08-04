@@ -8,13 +8,13 @@
         file: vsphere_creds.yml
 
     - name: Create or clear the output file
-      when: "{{ gather_information_store_in_a_file }}"
+      when: gather_information_store_in_a_file
       copy:
         content: ""
         dest: "{{ gather_information_output_file_name }}"
 
     - name: Ensure the output file is writable
-      when: "{{ gather_information_store_in_a_file }}"
+      when: gather_information_store_in_a_file
       file:
         path: "{{ gather_information_output_file_name }}"
         state: touch
@@ -178,10 +178,10 @@
         vcenter_validate_certs: false
       register: gather_information_vcenter_resourcepool_info
 
-    - name: Concatenate all register outputs and write to the output file
-      when: "{{ gather_information_store_in_a_file }}"
-      copy:
-        content: |
+    - name: Generating output
+      when: gather_information_store_in_a_file
+      set_fact:
+        json_output: |
           {
             "esxi_hosts": {{ r_hosts.value | to_json }},
             "powered_on_hosts": {{ r_discovered_hosts | to_json }},
@@ -200,6 +200,13 @@
             "resourcePools_information": {{ gather_information_vcenter_resourcepool_info | to_json}}
           }
 
+    - name: Prettify the json output file
+      when: gather_information_store_in_a_file
+      set_fact:
+        prettify_json_output: "{{ json_output | to_json(indent=4) }}"
+
+    - name: Store the prettify json
+      when: gather_information_store_in_a_file
+      copy:
+        content: "{{ prettify_json_output }}"
         dest: "{{ gather_information_output_file_name }}"
-
-

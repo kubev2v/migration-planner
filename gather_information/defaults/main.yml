@@ -3,4 +3,4 @@ gather_information_vsphere_connected_states: # This is used to determine if only
   - DISCONNECTED
   - CONNECTED
 gather_information_store_in_a_file: true
-gather_information_output_file_name: "output_file.txt"
+gather_information_output_file_name: "output_file.json"
