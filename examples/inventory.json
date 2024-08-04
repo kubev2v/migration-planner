@@ -4,39 +4,44 @@
         "vms": {
             "total": 10,
             "totalMigratable": 8,
+	    "totalMigratableWithWarnings": 1,
             "cpuCores": {
-                "minValue": 1,
-                "step": 1,
-                "data": [
-                    3,
-                    0,
-                    2,
-                    5
-                ]
-            },
+		"total": 10,
+		"totalForMigratableOnline": 6,
+		"totalForMigratableOffline": 0,
+		"totalForMigratableWithWarningsOnline": 1,
+		"totalForMigratableWithWarningsOffline": 0,
+		"totalForNotMigratableOnline": 3,
+		"totalForNotMigratableOffline": 0,
+		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
+	    },
             "ramGB": {
-                "minValue": 2,
-                "step": 2,
-                "data": [
-                    2,
-                    1,
-                    3,
-                    4
-                ]
+		"total": 20,
+		"totalForMigratableOnline": 10,
+		"totalForMigratableOffline": 0,
+		"totalForMigratableWithWarningsOnline": 3,
+		"totalForMigratableWithWarningsOffline": 0,
+		"totalForNotMigratableOnline": 7,
+		"totalForNotMigratableOffline": 0,
+		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
             },
             "diskGB": {
-                "minValue": 1,
-                "step": 1,
-                "data": [
-                    1,
-                    2,
-                    3,
-                    4
-                ]
+		"total": 200,
+		"totalForMigratableOnline": 100,
+		"totalForMigratableOffline": 0,
+		"totalForMigratableWithWarningsOnline": 30,
+		"totalForMigratableWithWarningsOffline": 0,
+		"totalForNotMigratableOnline": 70,
+		"totalForNotMigratableOffline": 0,
+		"histogram": {"minValue": 100, "step": 10, "data": [3, 0, 2, 5]}
             },
             "os": {
                 "windows": 4,
                 "linux": 6
+            },
+	    "migrationWarnings": {
+                "vm too big": 1,
+                "other warning": 1
             },
             "notMigratableReasons": {
                 "no guest tools": 1,
@@ -44,20 +49,9 @@
             }
         },
         "infra": {
-	    "folders": {
-                "1234": {
-                    "numVMs": 3,
-                    "folderIDs": [
-                        "2345"
-                    ]
-                },
-                "2345": {
-                    "numVMs": 2
-                },
-                "3456": {
-                    "numVMs": 5
-                }
-	    },
+	    "totalHosts": 5,
+	    "totalClusters": 2,
+	    "hostsPerCluster": [2, 3],
             "datastores": [
                 {
                     "type": "vmfs",
@@ -73,11 +67,13 @@
             "networks": [
                 {
                     "type": "distributed",
-                    "vlanID": 7
+                    "name": "vlan7",
+                    "network": "net1"
                 },
                 {
                     "type": "standard",
-                    "vlanID": 12
+                    "name": "vlan12",
+                    "network": "net2"
                 }
             ]
         }

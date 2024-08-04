@@ -28,13 +28,6 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-// Histogram defines model for Histogram.
-type Histogram struct {
-	Data     []int `json:"data"`
-	MinValue int   `json:"minValue"`
-	Step     int   `json:"step"`
-}
-
 // Infra defines model for Infra.
 type Infra struct {
 	Datastores []struct {
@@ -42,14 +35,14 @@ type Infra struct {
 		TotalCapacityGB int    `json:"totalCapacityGB"`
 		Type            string `json:"type"`
 	} `json:"datastores"`
-	Folders map[string]struct {
-		FolderIDs *[]string `json:"folderIDs,omitempty"`
-		NumVMs    *int      `json:"numVMs,omitempty"`
-	} `json:"folders"`
-	Networks []struct {
-		Type   InfraNetworksType `json:"type"`
-		VlanID int               `json:"vlanID"`
+	HostsPerCluster []int `json:"hostsPerCluster"`
+	Networks        []struct {
+		Name    string            `json:"name"`
+		Network string            `json:"network"`
+		Type    InfraNetworksType `json:"type"`
 	} `json:"networks"`
+	TotalClusters int `json:"totalClusters"`
+	TotalHosts    int `json:"totalHosts"`
 }
 
 // InfraNetworksType defines model for Infra.Networks.Type.
@@ -96,15 +89,33 @@ type Status struct {
 	Status *string `json:"status,omitempty"`
 }
 
+// VMResourceBreakdown defines model for VMResourceBreakdown.
+type VMResourceBreakdown struct {
+	Histogram struct {
+		Data     []int `json:"data"`
+		MinValue int   `json:"minValue"`
+		Step     int   `json:"step"`
+	} `json:"histogram"`
+	Total                                 int `json:"total"`
+	TotalForMigratableOffline             int `json:"totalForMigratableOffline"`
+	TotalForMigratableOnline              int `json:"totalForMigratableOnline"`
+	TotalForMigratableWithWarningsOffline int `json:"totalForMigratableWithWarningsOffline"`
+	TotalForMigratableWithWarningsOnline  int `json:"totalForMigratableWithWarningsOnline"`
+	TotalForNotMigratableOffline          int `json:"totalForNotMigratableOffline"`
+	TotalForNotMigratableOnline           int `json:"totalForNotMigratableOnline"`
+}
+
 // VMs defines model for VMs.
 type VMs struct {
-	CpuCores             Histogram      `json:"cpuCores"`
-	DiskGB               Histogram      `json:"diskGB"`
-	NotMigratableReasons map[string]int `json:"notMigratableReasons"`
-	Os                   map[string]int `json:"os"`
-	RamGB                Histogram      `json:"ramGB"`
-	Total                int            `json:"total"`
-	TotalMigratable      int            `json:"totalMigratable"`
+	CpuCores                    VMResourceBreakdown `json:"cpuCores"`
+	DiskGB                      VMResourceBreakdown `json:"diskGB"`
+	MigrationWarnings           map[string]int      `json:"migrationWarnings"`
+	NotMigratableReasons        map[string]int      `json:"notMigratableReasons"`
+	Os                          map[string]int      `json:"os"`
+	RamGB                       VMResourceBreakdown `json:"ramGB"`
+	Total                       int                 `json:"total"`
+	TotalMigratable             int                 `json:"totalMigratable"`
+	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.

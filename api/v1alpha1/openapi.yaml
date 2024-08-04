@@ -243,20 +243,23 @@ components:
       - diskGB
       - os
       - notMigratableReasons
+      - migrationWarnings
       properties:
         total:
           type: integer
         totalMigratable:
           type: integer
+        totalMigratableWithWarnings:
+          type: integer
         cpuCores:
           type: object
-          $ref: '#/components/schemas/Histogram'
+          $ref: '#/components/schemas/VMResourceBreakdown'
         ramGB:
           type: object
-          $ref: '#/components/schemas/Histogram'
+          $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
           type: object
-          $ref: '#/components/schemas/Histogram'
+          $ref: '#/components/schemas/VMResourceBreakdown'
         os:
           type: object
           additionalProperties:
@@ -265,38 +268,44 @@ components:
           type: object
           additionalProperties:
             type: integer
+        migrationWarnings:
+          type: object
+          additionalProperties:
+            type: integer
 
     Infra:
       type: object
       required:
-      - folders
+      - totalHosts
+      - totalClusters
+      - hostsPerCluster
       - networks
       - datastores
       properties:
-        folders:
-          type: object
-          additionalProperties:
-            type: object
-            properties:
-              numVMs:
-                type: integer
-              folderIDs:
-                type: array
-                items:
-                  type: string
+        totalHosts:
+          type: integer
+        totalClusters:
+          type: integer
+        hostsPerCluster:
+          type: array
+          items:
+            type: integer
         networks:
           type: array
           items:
             type: object
             required:
               - type
-              - vlanID
+              - name
+              - network
             properties:
               type:
                 type: string
                 enum: [standard, distributed]
-              vlanID:
-                type: integer
+              name:
+                type: string
+              network:
+                type: string
         datastores:
           type: array
           items:
@@ -313,18 +322,44 @@ components:
               freeCapacityGB:
                 type: integer
 
-    Histogram:
+    VMResourceBreakdown:
       type: object
       required:
-      - minValue
-      - step
-      - data
+      - histogram
+      - total
+      - totalForMigratableOnline
+      - totalForMigratableOffline
+      - totalForMigratableWithWarningsOnline
+      - totalForMigratableWithWarningsOffline
+      - totalForNotMigratableOnline
+      - totalForNotMigratableOffline
       properties:
-        minValue:
+        total:
           type: integer
-        step:
+        totalForMigratableOnline:
           type: integer
-        data:
-          type: array
-          items:
-            type: integer
+        totalForMigratableOffline:
+          type: integer
+        totalForMigratableWithWarningsOnline:
+          type: integer
+        totalForMigratableWithWarningsOffline:
+          type: integer
+        totalForNotMigratableOnline:
+          type: integer
+        totalForNotMigratableOffline:
+          type: integer
+        histogram:
+          type: object
+          required:
+          - minValue
+          - step
+          - data
+          properties:
+            minValue:
+              type: integer
+            step:
+              type: integer
+            data:
+              type: array
+              items:
+                type: integer
