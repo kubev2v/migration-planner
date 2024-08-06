@@ -95,10 +95,10 @@ type VMResourceBreakdown struct {
 		MinValue int   `json:"minValue"`
 		Step     int   `json:"step"`
 	} `json:"histogram"`
-	Total                          int  `json:"total"`
-	TotalForMigratable             *int `json:"totalForMigratable,omitempty"`
-	TotalForMigratableWithWarnings *int `json:"totalForMigratableWithWarnings,omitempty"`
-	TotalForNotMigratable          *int `json:"totalForNotMigratable,omitempty"`
+	Total                          int `json:"total"`
+	TotalForMigratable             int `json:"totalForMigratable"`
+	TotalForMigratableWithWarnings int `json:"totalForMigratableWithWarnings"`
+	TotalForNotMigratable          int `json:"totalForNotMigratable"`
 }
 
 // VMs defines model for VMs.

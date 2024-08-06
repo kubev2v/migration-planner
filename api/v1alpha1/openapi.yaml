@@ -324,12 +324,9 @@ components:
       required:
       - histogram
       - total
-      - totalForMigratableOnline
-      - totalForMigratableOffline
-      - totalForMigratableWithWarningsOnline
-      - totalForMigratableWithWarningsOffline
-      - totalForNotMigratableOnline
-      - totalForNotMigratableOffline
+      - totalForMigratable
+      - totalForMigratableWithWarnings
+      - totalForNotMigratable
       properties:
         total:
           type: integer
