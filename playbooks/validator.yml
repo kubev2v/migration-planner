@@ -1,0 +1,14 @@
+- hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars_files:
+    - vsphere_cred_example.yml
+
+  roles:
+    - name: Run virtual machine validator
+      role: ../roles/validator
+      vars:
+        validator_vsphere_server: "{{ vsphere_url_sdk }}"
+        validator_vsphere_username: "{{ vsphere_username }}"
+        validator_vsphere_password: "{{ vsphere_password }}"

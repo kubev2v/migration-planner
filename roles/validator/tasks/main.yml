@@ -23,14 +23,23 @@
   changed_when: false
   environment:
     OUTPUT_PATH: "{{ output_path }}"
-    VSPHERE_SERVER: "{{ vsphere_server | mandatory }}"
-    VSPHERE_USERNAME: "{{ vsphere_username | mandatory }}"
-    VSPHERE_PASSWORD: "{{ vsphere_password | mandatory }}"
+    VSPHERE_SERVER: "{{ validator_vsphere_server | mandatory }}"
+    VSPHERE_USERNAME: "{{ validator_vsphere_username | mandatory }}"
+    VSPHERE_PASSWORD: "{{ validator_vsphere_password | mandatory }}"
     OPA_SERVER: "{{ opa_server }}"
 
 - name: Print the result
   ansible.builtin.debug:
     msg: "{{ lookup('ansible.builtin.file', output_path) }}"
+
+- name: set fact
+  set_fact:
+    output_content: "{{ lookup('ansible.builtin.file', output_path) }}"
+
+- name: Save the output in a json file
+  copy:
+    content: "{{ output_content | to_json(indent=4) }}"
+    dest: "{{ validator_output_file_name }}"
 
 - name: Remove validator image
   containers.podman.podman_container:

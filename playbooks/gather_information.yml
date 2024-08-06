@@ -1,0 +1,15 @@
+- hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars_files:
+    - vsphere_cred_example.yml
+
+  roles:
+    - name: Run gather information
+      role: ../roles/gather_information
+      vars:
+        gather_information_vsphere_hostname: "{{ vsphere_url }}"
+        gather_information_vsphere_username: "{{ vsphere_username }}"
+        gather_information_vsphere_password: "{{ vsphere_password }}"
+        gather_information_vsphere_validate_certs: false

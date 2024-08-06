@@ -1,0 +1,7 @@
+vsphere_url: "1.1.1.1"
+vsphere_url_sdk: "https://1.1.1.1/sdk"
+vsphere_username: ""
+vsphere_password: ""
+validator_output_file_name: "output_opa.json"
+gather_information_output_file_name: "output_file.json"
+aggregated_report_output_file_name: "aggregated_data.json"

@@ -1,0 +1,26 @@
+- hosts: localhost
+  gather_facts: false
+  connection: local
+
+  vars_files:
+    - vsphere_cred_example.yml
+
+  roles:
+    - name: Run gather information
+      role: ../roles/gather_information
+      vars:
+        gather_information_vsphere_hostname: "{{ vsphere_url }}"
+        gather_information_vsphere_username: "{{ vsphere_username }}"
+        gather_information_vsphere_password: "{{ vsphere_password }}"
+        gather_information_vsphere_validate_certs: false
+
+    - name: Run virtual machine validator
+      role: ../roles/validator
+      vars:
+        validator_vsphere_server: "{{ vsphere_url_sdk }}"
+        validator_vsphere_username: "{{ vsphere_username }}"
+        validator_vsphere_password: "{{ vsphere_password }}"
+
+  tasks:
+    - name: Run Python script to aggregate VM data
+      command: "python3 ../aggregate_data.py {{ gather_information_output_file_name }} {{ validator_output_file_name }} {{ aggregated_report_output_file_name }}"
