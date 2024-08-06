@@ -336,17 +336,11 @@ components:
       properties:
         total:
           type: integer
-        totalForMigratableOnline:
+        totalForMigratable:
           type: integer
-        totalForMigratableOffline:
+        totalForMigratableWithWarnings:
           type: integer
-        totalForMigratableWithWarningsOnline:
-          type: integer
-        totalForMigratableWithWarningsOffline:
-          type: integer
-        totalForNotMigratableOnline:
-          type: integer
-        totalForNotMigratableOffline:
+        totalForNotMigratable:
           type: integer
         histogram:
           type: object

@@ -7,32 +7,23 @@
 	    "totalMigratableWithWarnings": 1,
             "cpuCores": {
 		"total": 10,
-		"totalForMigratableOnline": 6,
-		"totalForMigratableOffline": 0,
-		"totalForMigratableWithWarningsOnline": 1,
-		"totalForMigratableWithWarningsOffline": 0,
-		"totalForNotMigratableOnline": 3,
-		"totalForNotMigratableOffline": 0,
+		"totalForMigratable": 6,
+		"totalForMigratableWithWarnings": 1,
+		"totalForNotMigratable": 3,
 		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
 	    },
             "ramGB": {
 		"total": 20,
-		"totalForMigratableOnline": 10,
-		"totalForMigratableOffline": 0,
-		"totalForMigratableWithWarningsOnline": 3,
-		"totalForMigratableWithWarningsOffline": 0,
-		"totalForNotMigratableOnline": 7,
-		"totalForNotMigratableOffline": 0,
+		"totalForMigratable": 10,
+		"totalForMigratableWithWarnings": 3,
+		"totalForNotMigratable": 7,
 		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
             },
             "diskGB": {
 		"total": 200,
-		"totalForMigratableOnline": 100,
-		"totalForMigratableOffline": 0,
-		"totalForMigratableWithWarningsOnline": 30,
-		"totalForMigratableWithWarningsOffline": 0,
-		"totalForNotMigratableOnline": 70,
-		"totalForNotMigratableOffline": 0,
+		"totalForMigratable": 100,
+		"totalForMigratableWithWarnings": 30,
+		"totalForNotMigratable": 70,
 		"histogram": {"minValue": 100, "step": 10, "data": [3, 0, 2, 5]}
             },
             "os": {
