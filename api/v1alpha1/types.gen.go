@@ -37,9 +37,8 @@ type Infra struct {
 	} `json:"datastores"`
 	HostsPerCluster []int `json:"hostsPerCluster"`
 	Networks        []struct {
-		Name    string            `json:"name"`
-		Network string            `json:"network"`
-		Type    InfraNetworksType `json:"type"`
+		Name string            `json:"name"`
+		Type InfraNetworksType `json:"type"`
 	} `json:"networks"`
 	TotalClusters int `json:"totalClusters"`
 	TotalHosts    int `json:"totalHosts"`

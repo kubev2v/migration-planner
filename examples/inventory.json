@@ -58,13 +58,11 @@
             "networks": [
                 {
                     "type": "distributed",
-                    "name": "vlan7",
-                    "network": "net1"
+                    "name": "vlan7"
                 },
                 {
                     "type": "standard",
-                    "name": "vlan12",
-                    "network": "net2"
+                    "name": "vlan12"
                 }
             ]
         }

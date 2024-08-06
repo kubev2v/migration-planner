@@ -297,14 +297,11 @@ components:
             required:
               - type
               - name
-              - network
             properties:
               type:
                 type: string
                 enum: [standard, distributed]
               name:
-                type: string
-              network:
                 type: string
         datastores:
           type: array
