@@ -70,7 +70,13 @@ def vms(vm_details, validator):
         "total_for_migrateable_with_warnings": 0,
         "total_for_not_migrateable": 0
     }
-    total_disk = {
+    total_disk_GB = {
+        "total": 0,
+        "total_for_migrateable": 0,
+        "total_for_migrateable_with_warnings": 0,
+        "total_for_not_migrateable": 0
+    }
+    total_disk_count = {
         "total": 0,
         "total_for_migrateable": 0,
         "total_for_migrateable_with_warnings": 0,
@@ -78,40 +84,45 @@ def vms(vm_details, validator):
     }
 
     power_state = {}
-    total_disk_capacity = 0
     guest_os = {}
 
     for vm in vm_details:
         vm_memory = vm['memory']['size_MiB']
         vm_cpu = vm['cpu']['count']
-        vm_disks = len(vm['disks'])
+        total_disk_capacity = 0
+        for vm_disk in vm['disks']:
+            total_disk_capacity = total_disk_capacity + vm['disks'][vm_disk]['capacity']
+        total_disk_capacity_GB = get_value_in_GB(total_disk_capacity)
+        vm_disk_count = len(vm['disks'])
         # migrateable
         if vm["name"] in migrateable_vms_data["migratable_vms"]:
             total_memory["total_for_migrateable"] = total_memory["total_for_migrateable"] + vm_memory
             total_cpu["total_for_migrateable"] = total_cpu["total_for_migrateable"] + vm_cpu
-            total_disk["total_for_migrateable"] = total_disk["total_for_migrateable"] + vm_disks
+            total_disk_GB["total_for_migrateable"] = total_disk_GB["total_for_migrateable"] + total_disk_capacity_GB
+            total_disk_count["total_for_migrateable"] = total_disk_count["total_for_migrateable"] + vm_disk_count
 
         # migrateable with warnings
         if vm["name"] in migrateable_vms_data["migratable_vms_with_warnings"]:
             total_memory["total_for_migrateable_with_warnings"] = total_memory["total_for_migrateable_with_warnings"] + vm_memory
             total_cpu["total_for_migrateable_with_warnings"] = total_cpu["total_for_migrateable_with_warnings"] + vm_cpu
-            total_disk["total_for_migrateable_with_warnings"] = total_disk["total_for_migrateable_with_warnings"] + vm_disks
+            total_disk_GB["total_for_migrateable_with_warnings"] = total_disk_GB["total_for_migrateable_with_warnings"] + total_disk_capacity_GB
+            total_disk_count["total_for_migrateable_with_warnings"] = total_disk_count["total_for_migrateable_with_warnings"] + vm_disk_count
 
         # not migrateable
         if vm["name"] in migrateable_vms_data["not_migratable_vms"]:
             total_memory["total_for_not_migrateable"] = total_memory["total_for_not_migrateable"] + vm_memory
             total_cpu["total_for_not_migrateable"] = total_cpu["total_for_not_migrateable"] + vm_cpu
-            total_disk["total_for_not_migrateable"] = total_disk["total_for_not_migrateable"] + vm_disks
+            total_disk_GB["not_migratable_vms"] = total_disk_GB["not_migratable_vms"] + total_disk_capacity_GB
+            total_disk_count["not_migratable_vms"] = total_disk_count["not_migratable_vms"] + vm_disk_count
 
         total_memory["total"] = total_memory["total"] + vm_memory
         total_cpu["total"] = total_cpu["total"] + vm_cpu
-        total_disk["total"] = total_disk["total"] + vm_disks
+        total_disk_GB["total"] = total_disk_GB["total"] + total_disk_capacity_GB
+        total_disk_count["total"] = total_disk_count["total"] + vm_disk_count
 
         if vm['power_state'] not in power_state:
             power_state[vm['power_state']] = 0
         power_state[vm['power_state']] = power_state[vm['power_state']] +1
-        for vm_disk in vm['disks']:
-            total_disk_capacity = total_disk_capacity + vm['disks'][vm_disk]['capacity']
         if vm['guest_OS'] not in guest_os:
             guest_os[vm['guest_OS']] = 0
         guest_os[vm['guest_OS']] = guest_os[vm['guest_OS']] + 1
@@ -128,12 +139,18 @@ def vms(vm_details, validator):
         "totalForMigratableWithWarnings": total_memory["total_for_migrateable_with_warnings"],
         "totalForNotMigratable": total_memory["total_for_not_migrateable"]
     }
-    disk = {
-        "total": total_disk["total"],
-        "totalForMigratable": total_disk["total_for_migrateable"],
-        "totalForMigratableWithWarnings": total_disk["total_for_migrateable_with_warnings"],
-        "totalForNotMigratable": total_disk["total_for_not_migrateable"],
-        "totalCapacityInGB": get_value_in_GB(total_disk_capacity)
+    diskGB = {
+        "total": total_disk_GB["total"],
+        "totalForMigratable": total_disk_GB["total_for_migrateable"],
+        "totalForMigratableWithWarnings": total_disk_GB["total_for_migrateable_with_warnings"],
+        "totalForNotMigratable": total_disk_GB["total_for_not_migrateable"],
+
+    }
+    diskCount = {
+        "total": total_disk_count["total"],
+        "totalForMigratable": total_disk_count["total_for_migrateable"],
+        "totalForMigratableWithWarnings": total_disk_count["total_for_migrateable_with_warnings"],
+        "totalForNotMigratable": total_disk_count["total_for_not_migrateable"],
 
     }
     return {
@@ -143,7 +160,8 @@ def vms(vm_details, validator):
         "totalNotMigratable": len(migrateable_vms_data["not_migratable_vms"]),
         "cpuCores": cpu,
         "ramGB": ram,
-        "diskGB": disk,
+        "diskGB": diskGB,
+        "diskCount": diskCount,
         "os": guest_os,
         "powerStates": power_state,
         "migrationWarnings": migrateable_vms_data["warnings"],
@@ -170,12 +188,13 @@ def migrateable_vms(validator):
         has_warning = False
         vm = validator[vm_name]["result"]
         for result in vm:
+            # category can be one of: “Critical”, “Warning”, or “Information”
             if result["category"] == "Warning":
                 has_warning = True
                 warnings = add_new_assessment_to_dict_if_needed(result, warnings)
                 warnings[result["label"]]["total_vms"] = warnings[result["label"]]["total_vms"] + 1
 
-            if result["category"] == "Error":
+            if result["category"] == "Critical":
                 migratable = False
                 errors = add_new_assessment_to_dict_if_needed(result, errors)
                 errors[result["label"]]["total_vms"] = errors[result["label"]]["total_vms"] + 1
