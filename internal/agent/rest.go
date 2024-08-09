@@ -94,9 +94,9 @@ func statusHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 }
 
 type Credentials struct {
-	URL      string
-	Username string
-	Password string
+	URL      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWriter, r *http.Request) {
