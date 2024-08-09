@@ -2,7 +2,7 @@ import json
 import argparse
 
 def get_value_in_GB(val):
-    return  round(val / (1024 ** 3), 2)
+    return (int) (round(val / (1024 ** 3), 2))
 
 def infra_host_per_cluster(esxis_information):
     host_per_clsusters = []
@@ -39,8 +39,10 @@ def infra_datastore(datastore_information):
 def infra_networks(networks_information):
     networks = []
     for network in networks_information:
+        # FIXME: This is what API expects either fix API or here
+        t = "distributed" if network["type"] == "DISTRIBUTED_PORTGROUP" else "standard"
         networks.append({
-            "type": network["type"],
+            "type": t,
             "name": network["name"]
         })
     return networks
@@ -131,26 +133,33 @@ def vms(vm_details, validator):
         "total": total_cpu["total"],
         "totalForMigratable": total_cpu["total_for_migrateable"],
         "totalForMigratableWithWarnings": total_cpu["total_for_migrateable_with_warnings"],
-        "totalForNotMigratable": total_cpu["total_for_not_migrateable"]
+        "totalForNotMigratable": total_cpu["total_for_not_migrateable"],
+        # FIXME: Load correct data or make histogram non-mandatory
+        "histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
     }
     ram = {
         "total": total_memory["total"],
         "totalForMigratable": total_memory["total_for_migrateable"],
         "totalForMigratableWithWarnings": total_memory["total_for_migrateable_with_warnings"],
-        "totalForNotMigratable": total_memory["total_for_not_migrateable"]
+        "totalForNotMigratable": total_memory["total_for_not_migrateable"],
+        # FIXME: Load correct data or make histogram non-mandatory
+        "histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
     }
     diskGB = {
         "total": total_disk_GB["total"],
         "totalForMigratable": total_disk_GB["total_for_migrateable"],
         "totalForMigratableWithWarnings": total_disk_GB["total_for_migrateable_with_warnings"],
         "totalForNotMigratable": total_disk_GB["total_for_not_migrateable"],
-
+        # FIXME: Load correct data or make histogram non-mandatory
+        "histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
     }
     diskCount = {
         "total": total_disk_count["total"],
         "totalForMigratable": total_disk_count["total_for_migrateable"],
         "totalForMigratableWithWarnings": total_disk_count["total_for_migrateable_with_warnings"],
         "totalForNotMigratable": total_disk_count["total_for_not_migrateable"],
+        # FIXME: Load correct data or make histogram non-mandatory
+        "histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
 
     }
     return {
@@ -191,13 +200,16 @@ def migrateable_vms(validator):
             # category can be one of: “Critical”, “Warning”, or “Information”
             if result["category"] == "Warning":
                 has_warning = True
-                warnings = add_new_assessment_to_dict_if_needed(result, warnings)
-                warnings[result["label"]]["total_vms"] = warnings[result["label"]]["total_vms"] + 1
+                # FIXME: when new API ..
+                #warnings = add_new_assessment_to_dict_if_needed(result, warnings)
+                #warnings[result["label"]]["total_vms"] = warnings[result["label"]]["total_vms"] + 1
+                warnings[result["label"]] = warnings.get(result["label"], 0) + 1
 
             if result["category"] == "Critical":
                 migratable = False
-                errors = add_new_assessment_to_dict_if_needed(result, errors)
-                errors[result["label"]]["total_vms"] = errors[result["label"]]["total_vms"] + 1
+                #errors = add_new_assessment_to_dict_if_needed(result, errors)
+                #errors[result["label"]]["total_vms"] = errors[result["label"]]["total_vms"] + 1
+                errors[result["label"]] = errors.get(result["label"], 0) + 1
 
         if migratable:
             migratable_vms[vm_name] = vm
