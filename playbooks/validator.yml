@@ -2,9 +2,6 @@
   gather_facts: false
   connection: local
 
-  vars_files:
-    - vsphere_cred_example.yml
-
   roles:
     - name: Run virtual machine validator
       role: ../roles/validator

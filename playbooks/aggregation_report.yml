@@ -2,8 +2,14 @@
   gather_facts: false
   connection: local
 
-  vars_files:
-    - vsphere_cred_example.yml
+  vars:
+    vsphere_url: "{{ URL }}"
+    vsphere_url_sdk: "https://{{ URL }}/sdk"
+    vsphere_username: "{{ Username }}"
+    vsphere_password: "{{ Password }}"
+    validator_output_file_name: "/tmp/output.json"
+    gather_information_output_file_name: "/tmp/infra.json"
+    aggregated_report_output_file_name: "/tmp/inventory.json"
 
   roles:
     - name: Run gather information

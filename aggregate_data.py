@@ -15,7 +15,7 @@ def s_pg(standard_pg_info):
     vlans_per_clusters = []
     for pg_per_cluster in standard_pg_info:
         vlans = []
-        hosts_portgroup_info = pg_per_cluster["hosts_portgroup_info"]
+        hosts_portgroup_info = pg_per_cluster.get('hosts_portgroup_info', [])
         for host in hosts_portgroup_info:
             pgs = hosts_portgroup_info[host]
             for pg in pgs:
