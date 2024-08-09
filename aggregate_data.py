@@ -229,7 +229,7 @@ def aggregate_inventory_data(inventory, validator):
             "infra": {
                 "datastores": infra_datastore(datastore_information),
                 "totalHosts": len(esxi_hosts),
-                "hostsPowerState": infra_host_powerstate(esxi_hosts),
+                "hostPowerStates": infra_host_powerstate(esxi_hosts),
                 "totalClusters": len(clusters_information),
                 "networks": infra_networks(networks_information),
                 "totalHosts": len(esxi_hosts),
