@@ -1,8 +1,4 @@
 ---
-- name: Include vSphere creds
-  ansible.builtin.include_vars:
-    file: vsphere_creds.yml
-
 - name: Create or clear the output file
   when: gather_information_store_in_a_file
   copy:
