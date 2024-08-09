@@ -26,6 +26,7 @@
       if gather_information_debug | default(false) else omit }}"
     connection_states: "{{ gather_information_vsphere_connected_states
       if (gather_information_vsphere_connected_states is defined and gather_information_vsphere_connected_states | length > 0) else omit }}"
+  ignore_errors: yes
   register: r_hosts
 
 - name: Set fact with list of hosts to operate on that are POWERED_ON
@@ -39,6 +40,7 @@
     username: '{{ gather_information_vsphere_username }}'
     password: '{{ gather_information_vsphere_password }}'
     validate_certs: "{{ gather_information_vsphere_validate_certs }}"
+  ignore_errors: yes
   register: vcenter_about_info
 
 - name: Get vm information from VMware
@@ -47,6 +49,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: '{{ gather_information_vsphere_validate_certs }}'
+  ignore_errors: yes
   register: vcenter_vm_info
 
 - name: Get vm_detailed information from VMware
@@ -89,6 +92,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: false
+  ignore_errors: yes
   register: gather_information_vcenter_datacenter_info
 
 - name: Get folders information
@@ -99,6 +103,7 @@
     validate_certs: false
     datacenter: "{{ item['name'] }}"
   loop: "{{ gather_information_vcenter_datacenter_info['value'] }}"
+  ignore_errors: yes
   register: gather_information_vcenter_folder_info
 
   # cluster info
@@ -108,6 +113,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: false
+  ignore_errors: yes
   register: gather_information_vcenter_cluster_info
 
 - name: Gather info about ESXi Host for each cluster
@@ -118,6 +124,7 @@
     validate_certs: "{{ gather_information_vsphere_validate_certs }}"
     cluster_name: "{{ item['name'] }}"
   loop: "{{ gather_information_vcenter_cluster_info['value']}}"
+  ignore_errors: yes
   register: vmware_host_config_info
 
 - name: Get standard portgoroup info
@@ -128,6 +135,7 @@
     validate_certs: "{{ gather_information_vsphere_validate_certs }}"
     cluster_name: "{{ item['name'] }}"
   loop: "{{ gather_information_vcenter_cluster_info['value']}}"
+  ignore_errors: yes
   register: vmware_standard_pg_info
 
 - name: Get distributed portgoroup info
@@ -138,6 +146,7 @@
     validate_certs: "{{ gather_information_vsphere_validate_certs }}"
     datacenter: "{{ item['name'] }}"
   loop: "{{ gather_information_vcenter_datacenter_info['value']}}"
+  ignore_errors: yes
   register: vmware_dvpg_info
 
 # network info
@@ -147,6 +156,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: false
+  ignore_errors: yes
   register: gather_information_vcenter_network_info
 
 - name: Gather all registered dvswitch
@@ -156,6 +166,7 @@
     password: '{{ gather_information_vsphere_password }}'
     validate_certs: false
   delegate_to: localhost
+  ignore_errors: yes
   register: dvswitch_info
 
 # datastore info
@@ -165,6 +176,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: false
+  ignore_errors: yes
   register: gather_information_vcenter_datastore_info
 
 # resourcepool info
@@ -174,6 +186,7 @@
     vcenter_username: '{{ gather_information_vsphere_username }}'
     vcenter_password: '{{ gather_information_vsphere_password }}'
     vcenter_validate_certs: false
+  ignore_errors: yes
   register: gather_information_vcenter_resourcepool_info
 
 - name: Generating output
@@ -227,5 +240,3 @@
 - name: Debug print vm_list
   ansible.builtin.debug:
     var: aggregated_data
-
-
