@@ -25,7 +25,7 @@ const (
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
 	// DefaultCredUIPort is the default port for the credentials UI
-	DefaultCredUIPort = "8000"
+	DefaultCredUIPort = "8443"
 )
 
 type Config struct {

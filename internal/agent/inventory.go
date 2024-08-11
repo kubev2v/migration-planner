@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -18,10 +19,11 @@ import (
 )
 
 type InventoryUpdater struct {
-	log     *log.PrefixLogger
-	config  *Config
-	client  client.Planner
-	credUrl string
+	log        *log.PrefixLogger
+	config     *Config
+	client     client.Planner
+	credUrl    string
+	prevStatus []byte
 }
 
 type InventoryData struct {
@@ -31,9 +33,11 @@ type InventoryData struct {
 
 func NewInventoryUpdater(log *log.PrefixLogger, config *Config, client client.Planner) *InventoryUpdater {
 	return &InventoryUpdater{
-		log:    log,
-		config: config,
-		client: client}
+		log:        log,
+		config:     config,
+		client:     client,
+		prevStatus: []byte{},
+	}
 }
 
 func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context) {
@@ -70,7 +74,7 @@ func (u *InventoryUpdater) initializeCredentialUrl() {
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	u.credUrl = fmt.Sprintf("http://%s:%s", localAddr.IP.String(), u.config.CredUIPort)
+	u.credUrl = fmt.Sprintf("https://%s:%s", localAddr.IP.String(), u.config.CredUIPort)
 }
 
 func calculateStatus(dataDir string) (api.SourceStatus, string, *api.Inventory) {
@@ -108,9 +112,22 @@ func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.So
 		Inventory:     inventory,
 		CredentialUrl: u.credUrl,
 	}
+
+	newContents, err := json.Marshal(update)
+	if err != nil {
+		u.log.Errorf("failed marshalling new status: %v", err)
+	}
+	if bytes.Equal(u.prevStatus, newContents) {
+		u.log.Debug("Local status did not change, skipping service update")
+		return
+	}
+
 	u.log.Debugf("Updating status to %s: %s", string(status), statusInfo)
-	err := u.client.UpdateSourceStatus(ctx, u.config.SourceID, update)
+	err = u.client.UpdateSourceStatus(ctx, u.config.SourceID, update)
 	if err != nil {
 		u.log.Errorf("failed updating status: %v", err)
+		return
 	}
+
+	u.prevStatus = newContents
 }
