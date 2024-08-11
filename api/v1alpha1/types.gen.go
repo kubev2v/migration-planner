@@ -35,7 +35,8 @@ type Infra struct {
 		TotalCapacityGB int    `json:"totalCapacityGB"`
 		Type            string `json:"type"`
 	} `json:"datastores"`
-	HostsPerCluster []int `json:"hostsPerCluster"`
+	HostPowerStates map[string]int `json:"hostPowerStates"`
+	HostsPerCluster []int          `json:"hostsPerCluster"`
 	Networks        []struct {
 		Name string            `json:"name"`
 		Type InfraNetworksType `json:"type"`
@@ -51,6 +52,13 @@ type InfraNetworksType string
 type Inventory struct {
 	Infra Infra `json:"infra"`
 	Vms   VMs   `json:"vms"`
+}
+
+// MigrationIssues defines model for MigrationIssues.
+type MigrationIssues = []struct {
+	Assessment string `json:"assessment"`
+	Count      int    `json:"count"`
+	Label      string `json:"label"`
 }
 
 // Source defines model for Source.
@@ -104,10 +112,12 @@ type VMResourceBreakdown struct {
 // VMs defines model for VMs.
 type VMs struct {
 	CpuCores                    VMResourceBreakdown `json:"cpuCores"`
+	DiskCount                   VMResourceBreakdown `json:"diskCount"`
 	DiskGB                      VMResourceBreakdown `json:"diskGB"`
-	MigrationWarnings           map[string]int      `json:"migrationWarnings"`
-	NotMigratableReasons        map[string]int      `json:"notMigratableReasons"`
+	MigrationWarnings           MigrationIssues     `json:"migrationWarnings"`
+	NotMigratableReasons        MigrationIssues     `json:"notMigratableReasons"`
 	Os                          map[string]int      `json:"os"`
+	PowerStates                 map[string]int      `json:"powerStates"`
 	RamGB                       VMResourceBreakdown `json:"ramGB"`
 	Total                       int                 `json:"total"`
 	TotalMigratable             int                 `json:"totalMigratable"`

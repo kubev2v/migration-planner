@@ -241,7 +241,9 @@ components:
       - cpuCores
       - ramGB
       - diskGB
+      - diskCount
       - os
+      - powerStates
       - notMigratableReasons
       - migrationWarnings
       properties:
@@ -260,18 +262,23 @@ components:
         diskGB:
           type: object
           $ref: '#/components/schemas/VMResourceBreakdown'
+        diskCount:
+          type: object
+          $ref: '#/components/schemas/VMResourceBreakdown'
+        powerStates:
+          type: object
+          additionalProperties:
+            type: integer
         os:
           type: object
           additionalProperties:
             type: integer
         notMigratableReasons:
           type: object
-          additionalProperties:
-            type: integer
+          $ref: '#/components/schemas/MigrationIssues'
         migrationWarnings:
           type: object
-          additionalProperties:
-            type: integer
+          $ref: '#/components/schemas/MigrationIssues'
 
     Infra:
       type: object
@@ -279,6 +286,7 @@ components:
       - totalHosts
       - totalClusters
       - hostsPerCluster
+      - hostPowerStates
       - networks
       - datastores
       properties:
@@ -289,6 +297,10 @@ components:
         hostsPerCluster:
           type: array
           items:
+            type: integer
+        hostPowerStates:
+          type: object
+          additionalProperties:
             type: integer
         networks:
           type: array
@@ -351,3 +363,19 @@ components:
               type: array
               items:
                 type: integer
+
+    MigrationIssues:
+      type: array
+      items:
+        type: object
+        required:
+        - label
+        - assessment
+        - count
+        properties:
+          label:
+            type: string
+          assessment:
+            type: string
+          count:
+            type: integer

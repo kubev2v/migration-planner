@@ -4,45 +4,103 @@
         "vms": {
             "total": 10,
             "totalMigratable": 8,
-	    "totalMigratableWithWarnings": 1,
+            "totalMigratableWithWarnings": 1,
             "cpuCores": {
-		"total": 10,
-		"totalForMigratable": 6,
-		"totalForMigratableWithWarnings": 1,
-		"totalForNotMigratable": 3,
-		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
-	    },
+                "total": 10,
+                "totalForMigratable": 6,
+                "totalForMigratableWithWarnings": 1,
+                "totalForNotMigratable": 3,
+                "histogram": {
+                    "minValue": 1,
+                    "step": 1,
+                    "data": [
+                        3,
+                        0,
+                        2,
+                        5
+                    ]
+                }
+            },
             "ramGB": {
-		"total": 20,
-		"totalForMigratable": 10,
-		"totalForMigratableWithWarnings": 3,
-		"totalForNotMigratable": 7,
-		"histogram": {"minValue": 1, "step": 1, "data": [3, 0, 2, 5]}
+                "total": 20,
+                "totalForMigratable": 10,
+                "totalForMigratableWithWarnings": 3,
+                "totalForNotMigratable": 7,
+                "histogram": {
+                    "minValue": 1,
+                    "step": 1,
+                    "data": [
+                        3,
+                        0,
+                        2,
+                        5
+                    ]
+                }
             },
             "diskGB": {
-		"total": 200,
-		"totalForMigratable": 100,
-		"totalForMigratableWithWarnings": 30,
-		"totalForNotMigratable": 70,
-		"histogram": {"minValue": 100, "step": 10, "data": [3, 0, 2, 5]}
+                "total": 200,
+                "totalForMigratable": 100,
+                "totalForMigratableWithWarnings": 30,
+                "totalForNotMigratable": 70,
+                "histogram": {
+                    "minValue": 100,
+                    "step": 10,
+                    "data": [
+                        3,
+                        0,
+                        2,
+                        5
+                    ]
+                }
+            },
+            "diskCount": {
+                "total": 20,
+                "totalForMigratable": 10,
+                "totalForMigratableWithWarnings": 3,
+                "totalForNotMigratable": 7,
+                "histogram": {
+                    "minValue": 1,
+                    "step": 1,
+                    "data": [
+                        6,
+                        0,
+                        4,
+                        10
+                    ]
+                }
             },
             "os": {
                 "windows": 4,
                 "linux": 6
             },
-	    "migrationWarnings": {
-                "vm too big": 1,
-                "other warning": 1
+            "powerStates": {
+                "POWERED_OFF": 2,
+                "POWERED_ON": 8
             },
-            "notMigratableReasons": {
-                "no guest tools": 1,
-                "other error": 1
-            }
+            "migrationWarnings": [
+                {
+                    "label": "Changed Block Tracking (CBT) not enabled",
+                    "assessment": "Changed Block Tracking (CBT) has not been enabled on this VM. This feature is a prerequisite for VM warm migration.",
+                    "count": 40
+                },
+                {
+                    "label": "Invalid VM Name",
+                    "assessment": "The VM name must comply with the DNS subdomain name format defined in RFC 1123. The name can contain lowercase letters (a-z), numbers (0-9), and hyphens (-), up to a maximum of 63 characters. The first and last characters must be alphanumeric. The name must not contain uppercase letters, spaces, periods (.), or special characters. The VM will be renamed automatically during the migration to meet the RFC convention.",
+                    "count": 16
+                }
+            ],
+            "notMigratableReasons": []
         },
         "infra": {
-	    "totalHosts": 5,
-	    "totalClusters": 2,
-	    "hostsPerCluster": [2, 3],
+            "totalHosts": 5,
+            "totalClusters": 2,
+            "hostsPerCluster": [
+                2,
+                3
+            ],
+            "hostPowerStates": {
+                "POWERED_ON": 5
+            },
             "datastores": [
                 {
                     "type": "vmfs",
