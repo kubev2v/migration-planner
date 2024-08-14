@@ -3,10 +3,10 @@
   connection: local
 
   vars:
-    vsphere_url: "{{ URL }}"
-    vsphere_url_sdk: "https://{{ URL }}/sdk"
-    vsphere_username: "{{ Username }}"
-    vsphere_password: "{{ Password }}"
+    vsphere_url: "{{ url }}"
+    vsphere_url_sdk: "https://{{ url }}/sdk"
+    vsphere_username: "{{ username }}"
+    vsphere_password: "{{ password }}"
     validator_output_file_name: "/tmp/output.json"
     gather_information_output_file_name: "/tmp/infra.json"
     aggregated_report_output_file_name: "/tmp/inventory.json"

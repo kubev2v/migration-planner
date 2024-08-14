@@ -205,21 +205,19 @@ def vms(vm_details, validator):
         "notMigratableReasons": migrateable_vms_data["errors"]
     }
 
-def add_new_assessment_to_dict_if_needed(result, assessment_dict):
-    if result["label"] not in assessment_dict:
-        assessment_dict[result["label"]] = {
-            "assessment": result["assessment"],
-            "total_vms": 0
-        }
-
-    return assessment_dict
+def update_if_exists(assesments, key, value):
+    for a in assesments:
+        if a.get(key) == value:
+            a["count"] += 1
+            return True
+    return False
 
 def migrateable_vms(validator):
     migratable_vms = {}
     migratable_vms_with_warnings = {}
     not_migratable_vms = {}
-    warnings = {}
-    errors = {}
+    warnings = []
+    errors = []
     for vm_name in validator:
         migratable = True
         has_warning = False
@@ -228,16 +226,21 @@ def migrateable_vms(validator):
             # category can be one of: “Critical”, “Warning”, or “Information”
             if result["category"] == "Warning":
                 has_warning = True
-                # FIXME: when new API ..
-                #warnings = add_new_assessment_to_dict_if_needed(result, warnings)
-                #warnings[result["label"]]["total_vms"] = warnings[result["label"]]["total_vms"] + 1
-                warnings[result["label"]] = warnings.get(result["label"], 0) + 1
+                if not update_if_exists(warnings, "label", result["label"]):
+                    warnings.append({
+                        "label": result["label"],
+                        "assessment": result["assessment"],
+                        "count": 1
+                    })
 
             if result["category"] == "Critical":
                 migratable = False
-                #errors = add_new_assessment_to_dict_if_needed(result, errors)
-                #errors[result["label"]]["total_vms"] = errors[result["label"]]["total_vms"] + 1
-                errors[result["label"]] = errors.get(result["label"], 0) + 1
+                if not update_if_exists(errors, "label", result["label"]):
+                    errors.append({
+                        "label": result["label"],
+                        "assessment": result["assessment"],
+                        "count": 1
+                    })
 
         if migratable:
             migratable_vms[vm_name] = vm
