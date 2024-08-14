@@ -1,0 +1,54 @@
+{
+  "ignition": { "version": "3.0.0" },
+  "passwd": {
+    "users": [
+          {
+            "name": "core"
+          }
+    ]
+  },
+  "storage": {
+    "directories": [{
+      "path": "/var/home/core/vol",
+      "overwrite": true,
+      "user": {
+        "id": 1001
+      }
+    }, {
+      "path": "/var/home/core/vol/data",
+      "overwrite": true,
+      "user": {
+        "id": 1001
+      }
+    }, {
+      "path": "/var/home/core/vol/config",
+      "overwrite": true,
+      "user": {
+        "id": 1001
+      }
+    }],
+    "files": [{
+      "path": "/var/home/core/vol/config.yaml",
+      "mode": 400,
+      "user": {
+        "id": 1001
+      },
+      "contents": {"source": "data:text/plain;base64,Y29uZmlnLWRpcjogL2FnZW50L2NvbmZpZwpkYXRhLWRpcjogL2FnZW50L2RhdGEKbG9nLWxldmVsOiBkZWJ1Zwpzb3VyY2UtaWQ6IDEKdXBkYXRlLWludGVydmFsOiA1cwpwbGFubmVyLXNlcnZpY2U6CiAgc2VydmljZToKICAgIHNlcnZlcjogaHR0cDovLzEwLjAuMC43ODo3NDQzCg=="}
+    }]
+  },
+  "systemd": {
+    "units": [{
+      "name": "planner-agent-ui.service",
+      "enabled": true,
+      "contents": "[Unit]\nDescription=Agent UI\nWants=network-online.target\nAfter=network-online.target\nRequiresMountsFor=%t/containers\n\n[Service]\nEnvironment=PODMAN_SYSTEMD_UNIT=%n\nRestart=on-failure\nTimeoutStopSec=70\nExecStart=/usr/bin/podman run --network host --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon -p 8443:8443 -d quay.io/kubev2v/planner-agent-ui\nExecStop=/usr/bin/podman stop --ignore -t 10 --cidfile=%t/%n.ctr-id\nExecStopPost=/usr/bin/podman rm -f --ignore -t 10 --cidfile=%t/%n.ctr-id\nType=notify\nNotifyAccess=all\n\n[Install]\nWantedBy=default.target"
+    }, {
+      "name": "planner-agent-playbook.service",
+      "enabled": true,
+      "contents": "[Unit]\nDescription=Podman container-planner-playbook.service\nDocumentation=man:podman-generate-systemd(1)\nWants=network-online.target\nAfter=network-online.target\nRequiresMountsFor=%t/containers\n\n[Service]\nType=oneshot\nRestartSec=2s\nExecStartPre=/usr/bin/podman run --rm -v myvol:/mnt:Z --name test-container alpine sh -c \"/usr/bin/test -f /mnt/data/credentials.json\"\nExecStartPre=/usr/bin/podman run -d -p 8181:8181 --network host --entrypoint /usr/bin/opa quay.io/kubev2v/forklift-validation:release-v2.6.4 run --server /usr/share/opa/policies\nEnvironment=PODMAN_SYSTEMD_UNIT=%n\nRestart=on-failure\nTimeoutStopSec=70\nExecStart=/usr/bin/podman run --network host --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace -v myvol:/vol:Z --name planner-playbook -d quay.io/machacekondra/vmware_validation ansible-playbook -e aggregated_report_output_file_name=/vol/data/inventory.json -e @/vol/data/credentials.json machacekondra.vmware_validation.aggregation_report\nExecStop=/usr/bin/podman stop --ignore -t 10 --cidfile=%t/%n.ctr-id\nExecStopPost=/usr/bin/podman rm -f --ignore -t 10 --cidfile=%t/%n.ctr-id\nType=notify\nNotifyAccess=all\n\n[Install]\nWantedBy=default.target"
+    }, {
+      "name": "planner-agent.service",
+      "enabled": true,
+      "contents": "[Unit]\nDescription=Podman container-planner-agent.service\nDocumentation=man:podman-generate-systemd(1)\nWants=network-online.target\nAfter=network-online.target\nRequiresMountsFor=%t/containers\n\n[Service]\nEnvironment=PODMAN_SYSTEMD_UNIT=%n\nRestart=on-failure\nTimeoutStopSec=70\nExecStartPre=/usr/bin/podman volume create myvol\nExecStartPre=/usr/sbin/setenforce 0 \nExecStartPre=/usr/bin/podman run --rm -v /var/home/core/vol:/src:Z -v myvol:/mnt:Z --name temp-container alpine sh -c \"cp -r /src/* /mnt/ && chmod -R a+rw /mnt\"\nExecStart=/usr/bin/podman run -p 3333:3333 --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace -d -v myvol:/agent:Z --name planner-agent quay.io/machacekondra/planner-agent -config /agent/config.yaml\nExecStop=/usr/bin/podman stop --ignore -t 10 --cidfile=%t/%n.ctr-id\nExecStopPost=/usr/bin/podman rm -f --ignore -t 10 --cidfile=%t/%n.ctr-id\nType=notify\nNotifyAccess=all\n\n[Install]\nWantedBy=default.target"
+    }]
+  }
+}
