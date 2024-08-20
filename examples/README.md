@@ -26,6 +26,13 @@ $ cp coreos.iso ~/Downloads/
 $ sudo virt-install --name coreos-vm --memory 4096 --vcpus 2 --disk path=/home/omachace/coreos.qcow,size=20,format=qcow2 --cdrom /home/omachace/coreos.iso --os-variant fedora-coreos-stable --boot hd,cdrom --network network=default --graphics vnc,listen=0.0.0.0
 ```
 
+## OVA
+Rename `coreos.iso` to `AgentVM-1.iso` and build OVA archive, which you can later upload.
+
+```
+tar -cvf AgentVM.ova AgentVM-1.iso AgentVM.ovf
+```
+
 ## Input the credentials
 Open your browser put the VM IP `https://VM_IP:8443` put the crendentials of VMware environment.
 Then wait for the script to finish. After script is finished you can see the inventory as follows:
