@@ -1,4 +1,0 @@
-output_path: "/tmp/output.json"
-opa_server: "127.0.0.1:8181"
-collector_binary_url: "https://github.com/machacekondra/vmware-vm-validator/releases/download/0.0.1-pre/collector"
-collector_binary: "/tmp/collector"
