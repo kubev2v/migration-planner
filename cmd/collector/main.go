@@ -32,6 +32,7 @@ func main() {
 	credsFile := os.Args[1]
 	outputFile := os.Args[2]
 
+	waitForFile(credsFile)
 	// Load credentials from file
 	credsData, err := os.ReadFile(credsFile)
 	if err != nil {
@@ -530,6 +531,21 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 	}
 	if migratable {
 		inv.Vms.TotalMigratable++
+	}
+}
+
+func waitForFile(filename string) {
+	for {
+		// Check if the file exists
+		if _, err := os.Stat(filename); err == nil {
+			// File exists, exit the loop
+			break
+		} else if os.IsNotExist(err) {
+			// File does not exist, wait and check again
+			time.Sleep(2 * time.Second) // Wait for 2 seconds before checking again
+		} else {
+			return
+		}
 	}
 }
 
