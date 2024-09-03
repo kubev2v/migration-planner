@@ -2,3 +2,8 @@
 /rpmbuild/
 /.vscode/
 /reports/
+examples/AgentVM.ova
+examples/AgentVM-1.iso
+examples/rhcos-live.x86_64.iso
+examples/config.ign
+examples/config.yaml

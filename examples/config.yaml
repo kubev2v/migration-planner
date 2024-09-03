@@ -1,8 +1,0 @@
-config-dir: /tmp/config
-data-dir: /tmp/data
-source-id: 1
-update-interval: 5s
-cred-ui-port: 8443
-planner-service:
-  service:
-    server: http://127.0.0.1:7443

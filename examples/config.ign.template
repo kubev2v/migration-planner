@@ -3,7 +3,10 @@
   "passwd": {
     "users": [
           {
-            "name": "core"
+            "name": "core",
+            "sshAuthorizedKeys": [
+              "@CONFIG_SSH_KEY@"
+            ]
           }
     ]
   },
@@ -33,7 +36,7 @@
       "user": {
         "id": 1001
       },
-      "contents": {"source": "data:text/plain;base64,Y29uZmlnLWRpcjogL2FnZW50L2NvbmZpZwpkYXRhLWRpcjogL2FnZW50L2RhdGEKbG9nLWxldmVsOiBkZWJ1Zwpzb3VyY2UtaWQ6IDEKdXBkYXRlLWludGVydmFsOiA1cwpwbGFubmVyLXNlcnZpY2U6CiAgc2VydmljZToKICAgIHNlcnZlcjogaHR0cDovLzEwLjAuMC43ODo3NDQzCg=="}
+      "contents": {"source": "data:text/plain;base64,@CONFIG_DATA@"}
     }]
   },
   "systemd": {

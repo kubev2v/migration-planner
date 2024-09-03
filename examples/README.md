@@ -33,6 +33,14 @@ Rename `coreos.iso` to `AgentVM-1.iso` and build OVA archive, which you can late
 tar -cvf AgentVM.ova AgentVM-1.iso AgentVM.ovf
 ```
 
+## Script to create OVA
+There is a script called `createova.sh`, which does the job for you. It download the RHCOS ISO and bundle the ignition based on your SSH key and IP address of Agent service.
+To execute it just run:
+```
+./createova.sh AGENT_SERVICE_IP PATH_TO_SSH_PUB_KEY
+```
+For example `./createova.sh 10.0.0.2 ~/.ssh/id_rsa.pub`. It will generate `AgentVM.ova` file in current this directory.
+
 ## Input the credentials
 Open your browser put the VM IP `https://VM_IP:8443` put the crendentials of VMware environment.
 Then wait for the script to finish. After script is finished you can see the inventory as follows:
