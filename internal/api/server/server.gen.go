@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -32,6 +33,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/sources/{id})
 	ReadSource(w http.ResponseWriter, r *http.Request, id string)
+
+	// (GET /api/v1/sources/{id}/image)
+	GetSourceImage(w http.ResponseWriter, r *http.Request, id string)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -60,6 +64,11 @@ func (_ Unimplemented) DeleteSource(w http.ResponseWriter, r *http.Request, id s
 
 // (GET /api/v1/sources/{id})
 func (_ Unimplemented) ReadSource(w http.ResponseWriter, r *http.Request, id string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/sources/{id}/image)
+func (_ Unimplemented) GetSourceImage(w http.ResponseWriter, r *http.Request, id string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -160,6 +169,32 @@ func (siw *ServerInterfaceWrapper) ReadSource(w http.ResponseWriter, r *http.Req
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ReadSource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetSourceImage operation middleware
+func (siw *ServerInterfaceWrapper) GetSourceImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSourceImage(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -296,6 +331,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/sources/{id}", wrapper.ReadSource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/image", wrapper.GetSourceImage)
 	})
 
 	return r
@@ -474,6 +512,60 @@ func (response ReadSource404JSONResponse) VisitReadSourceResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSourceImageRequestObject struct {
+	Id string `json:"id"`
+}
+
+type GetSourceImageResponseObject interface {
+	VisitGetSourceImageResponse(w http.ResponseWriter) error
+}
+
+type GetSourceImage200ApplicationoctetStreamResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response GetSourceImage200ApplicationoctetStreamResponse) VisitGetSourceImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/octet-stream")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetSourceImage400JSONResponse Error
+
+func (response GetSourceImage400JSONResponse) VisitGetSourceImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceImage401JSONResponse Error
+
+func (response GetSourceImage401JSONResponse) VisitGetSourceImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceImage404JSONResponse Error
+
+func (response GetSourceImage404JSONResponse) VisitGetSourceImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -491,6 +583,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/sources/{id})
 	ReadSource(ctx context.Context, request ReadSourceRequestObject) (ReadSourceResponseObject, error)
+
+	// (GET /api/v1/sources/{id}/image)
+	GetSourceImage(ctx context.Context, request GetSourceImageRequestObject) (GetSourceImageResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -646,6 +741,32 @@ func (sh *strictHandler) ReadSource(w http.ResponseWriter, r *http.Request, id s
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ReadSourceResponseObject); ok {
 		if err := validResponse.VisitReadSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSourceImage operation middleware
+func (sh *strictHandler) GetSourceImage(w http.ResponseWriter, r *http.Request, id string) {
+	var request GetSourceImageRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSourceImage(ctx, request.(GetSourceImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSourceImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSourceImageResponseObject); ok {
+		if err := validResponse.VisitGetSourceImageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -106,6 +106,9 @@ type ClientInterface interface {
 
 	// ReadSource request
 	ReadSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSourceImage request
+	GetSourceImage(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -170,6 +173,18 @@ func (c *Client) DeleteSource(ctx context.Context, id string, reqEditors ...Requ
 
 func (c *Client) ReadSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReadSourceRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetSourceImage(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSourceImageRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -342,6 +357,40 @@ func NewReadSourceRequest(server string, id string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewGetSourceImageRequest generates requests for GetSourceImage
+func NewGetSourceImageRequest(server string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/image", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -401,6 +450,9 @@ type ClientWithResponsesInterface interface {
 
 	// ReadSourceWithResponse request
 	ReadSourceWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ReadSourceResponse, error)
+
+	// GetSourceImageWithResponse request
+	GetSourceImageWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error)
 }
 
 type DeleteSourcesResponse struct {
@@ -523,6 +575,30 @@ func (r ReadSourceResponse) StatusCode() int {
 	return 0
 }
 
+type GetSourceImageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON404      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSourceImageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSourceImageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
 func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error) {
 	rsp, err := c.DeleteSources(ctx, reqEditors...)
@@ -574,6 +650,15 @@ func (c *ClientWithResponses) ReadSourceWithResponse(ctx context.Context, id str
 		return nil, err
 	}
 	return ParseReadSourceResponse(rsp)
+}
+
+// GetSourceImageWithResponse request returning *GetSourceImageResponse
+func (c *ClientWithResponses) GetSourceImageWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error) {
+	rsp, err := c.GetSourceImage(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSourceImageResponse(rsp)
 }
 
 // ParseDeleteSourcesResponse parses an HTTP response from a DeleteSourcesWithResponse call
@@ -750,6 +835,46 @@ func ParseReadSourceResponse(rsp *http.Response) (*ReadSourceResponse, error) {
 		}
 		response.JSON200 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSourceImageResponse parses an HTTP response from a GetSourceImageWithResponse call
+func ParseGetSourceImageResponse(rsp *http.Response) (*GetSourceImageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSourceImageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
