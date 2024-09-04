@@ -49,7 +49,10 @@ tidy:
 lint: tools
 	$(GOBIN)/golangci-lint run -v
 
-build: bin
+image:
+	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
+
+build: bin image
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin

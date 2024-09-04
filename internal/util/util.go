@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 )
 
@@ -47,4 +48,11 @@ func (duration *Duration) UnmarshalJSON(b []byte) error {
 	}
 
 	return nil
+}
+
+func GetEnv(key, defaultValue string) string {
+	if value, exists := os.LookupEnv(key); exists {
+		return value
+	}
+	return defaultValue
 }
