@@ -54,3 +54,7 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	}
 	return server.DeleteSource200JSONResponse{}, nil
 }
+
+func (h *ServiceHandler) GetSourceImage(ctx context.Context, request server.GetSourceImageRequestObject) (server.GetSourceImageResponseObject, error) {
+	return server.GetSourceImage404JSONResponse{}, nil
+}
