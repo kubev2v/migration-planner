@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math"
 	"net/http"
 	"os"
@@ -23,7 +24,14 @@ import (
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+type VCenterCreds struct {
+	Url      string `json:"url"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 func main() {
+	logger := log.New(os.Stdout, "*********** Collector: ", log.Ldate|log.Ltime|log.Lshortfile)
 	// Parse command-line arguments
 	if len(os.Args) < 3 {
 		fmt.Println("Usage: collector <creds_file> <inv_file>")
@@ -32,49 +40,30 @@ func main() {
 	credsFile := os.Args[1]
 	outputFile := os.Args[2]
 
+	logger.Println("Wait for credentials")
 	waitForFile(credsFile)
-	// Load credentials from file
+
+	logger.Println("Load credentials from file")
 	credsData, err := os.ReadFile(credsFile)
 	if err != nil {
 		fmt.Printf("Error reading credentials file: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Parse JSON credentials
-	var creds struct {
-		Url      string `json:"url"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
+	var creds VCenterCreds
 	if err := json.Unmarshal(credsData, &creds); err != nil {
 		fmt.Printf("Error parsing credentials JSON: %v\n", err)
 		os.Exit(1)
 	}
 
 	opaServer := "127.0.0.1:8181"
-	// Provider
-	vsphereType := api.VSphere
-	provider := &api.Provider{
-		Spec: api.ProviderSpec{
-			URL:  creds.Url,
-			Type: &vsphereType,
-		},
-	}
+	logger.Println("Create Provider")
+	provider := getProvider(creds)
 
-	// Secret
-	secret := &core.Secret{
-		ObjectMeta: meta.ObjectMeta{
-			Name:      "vsphere-secret",
-			Namespace: "default",
-		},
-		Data: map[string][]byte{
-			"user":               []byte(creds.Username),
-			"password":           []byte(creds.Password),
-			"insecureSkipVerify": []byte("true"),
-		},
-	}
+	logger.Println("Create Secret")
+	secret := getSecret(creds)
 
-	// Check if opaServer is responding
+	logger.Println("Check if opaServer is responding")
 	resp, err := http.Get("http://" + opaServer + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
 		fmt.Println("OPA server " + opaServer + " is not responding")
@@ -82,14 +71,14 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	// DB
+	logger.Println("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
 		fmt.Println("Error creating DB.", err)
 		return
 	}
 
-	// Vshere collector
+	logger.Println("vSphere collector")
 	collector, err := createCollector(db, provider, secret)
 	if err != nil {
 		fmt.Println("Error creating collector.", err)
@@ -98,19 +87,23 @@ func main() {
 	defer collector.DB().Close(true)
 	defer collector.Shutdown()
 
-	// List VMs
+	logger.Println("List VMs")
 	vms := &[]vspheremodel.VM{}
 	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
+	logger.Println("List Hosts")
 	hosts := &[]vspheremodel.Host{}
 	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
+
+	logger.Println("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
@@ -118,12 +111,91 @@ func main() {
 		return
 	}
 
-	// Create inventory
-	inv := &apiplanner.Inventory{
+	logger.Println("Create inventory")
+	inv := createBasicInventoryObj(vms, collector, hosts, clusters)
+
+	logger.Println("Run the validation of VMs")
+	vms, err = validation(vms, opaServer)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	logger.Println("Fill the inventory object with more data")
+	fillInventoryObjectWithMoreData(vms, inv)
+
+	logger.Println("Write the inventory to output file")
+	if err := createOuput(outputFile, inv); err != nil {
+		fmt.Println("Error writing output:", err)
+		return
+	}
+}
+
+func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
+	cpuSet := []int{}
+	memorySet := []int{}
+	diskGBSet := []int{}
+	diskCountSet := []int{}
+	for _, vm := range *vms {
+		// histogram collection
+		cpuSet = append(cpuSet, int(vm.CpuCount))
+		memorySet = append(memorySet, int(vm.MemoryMB/1024))
+		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
+		diskCountSet = append(diskCountSet, len(vm.Disks))
+
+		// inventory
+		migratable, hasWarning := migrationReport(vm.Concerns, inv)
+		inv.Vms.Os[vm.GuestName]++
+		inv.Vms.PowerStates[vm.PowerState]++
+
+		// Update total values
+		inv.Vms.CpuCores.Total += int(vm.CpuCount)
+		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
+		inv.Vms.DiskCount.Total += len(vm.Disks)
+		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
+
+		// Not Migratable
+		if !migratable {
+			inv.Vms.CpuCores.TotalForNotMigratable += int(vm.CpuCount)
+			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
+			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
+			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
+		} else {
+			// Migratable with warning(s)
+			if hasWarning {
+				inv.Vms.CpuCores.TotalForMigratableWithWarnings += int(vm.CpuCount)
+				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
+				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
+				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) //Migratable
+			} else {
+				// Migratable without any warnings
+				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
+				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
+				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
+				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
+			}
+		}
+
+	}
+
+	// Histogram
+	inv.Vms.CpuCores.Histogram = histogram(cpuSet)
+	inv.Vms.RamGB.Histogram = histogram(memorySet)
+	inv.Vms.DiskCount.Histogram = histogram(diskCountSet)
+	inv.Vms.DiskGB.Histogram = histogram(diskGBSet)
+}
+
+func createBasicInventoryObj(vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster) *apiplanner.Inventory {
+	return &apiplanner.Inventory{
 		Vms: apiplanner.VMs{
 			Total:       len(*vms),
 			PowerStates: map[string]int{},
 			Os:          map[string]int{},
+			MigrationWarnings: []struct {
+				Assessment string `json:"assessment"`
+				Count      int    `json:"count"`
+				Label      string `json:"label"`
+			}{},
 			NotMigratableReasons: []struct {
 				Assessment string `json:"assessment"`
 				Count      int    `json:"count"`
@@ -139,90 +211,29 @@ func main() {
 			Networks:        getNetworks(collector),
 		},
 	}
+}
 
-	// Run the validation of VMs
-	vms, err = validation(vms, opaServer)
-	if err != nil {
-		fmt.Println(err)
-		return
+func getProvider(creds VCenterCreds) *api.Provider {
+	vsphereType := api.VSphere
+	return &api.Provider{
+		Spec: api.ProviderSpec{
+			URL:  creds.Url,
+			Type: &vsphereType,
+		},
 	}
+}
 
-	// Transform VM data to inventory.json
-	cpuSet := []int{}
-	memorySet := []int{}
-	diskGBSet := []int{}
-	diskCountSet := []int{}
-	for _, vm := range *vms {
-		// histogram collection
-		cpuSet = append(cpuSet, int(vm.CpuCount))
-		memorySet = append(memorySet, int(vm.MemoryMB/1024))
-		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
-		diskCountSet = append(diskCountSet, len(vm.Disks))
-
-		// inventory
-		migrationReport(vm.Concerns, inv)
-		inv.Vms.Os[vm.GuestName]++
-		inv.Vms.PowerStates[vm.PowerState]++
-
-		// CPU
-		inv.Vms.CpuCores.Total += int(vm.CpuCount)
-		if !isMigratable(vm) {
-			inv.Vms.CpuCores.TotalForNotMigratable += int(vm.CpuCount)
-		} else {
-			if isMigratebleWithWarning(vm) {
-				inv.Vms.CpuCores.TotalForMigratableWithWarnings += int(vm.CpuCount)
-			} else {
-				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
-			}
-		}
-
-		// RAM
-		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
-		if !isMigratable(vm) {
-			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
-		} else {
-			if isMigratebleWithWarning(vm) {
-				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
-			} else {
-				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
-			}
-		}
-
-		// DiskCount
-		inv.Vms.DiskCount.Total += len(vm.Disks)
-		if !isMigratable(vm) {
-			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
-		} else {
-			if isMigratebleWithWarning(vm) {
-				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
-			} else {
-				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
-			}
-		}
-
-		// DiskGB
-		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
-		if !isMigratable(vm) {
-			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
-		} else {
-			if isMigratebleWithWarning(vm) {
-				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks)
-			} else {
-				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
-			}
-		}
-	}
-
-	// Histogram
-	inv.Vms.CpuCores.Histogram = histogram(cpuSet)
-	inv.Vms.RamGB.Histogram = histogram(memorySet)
-	inv.Vms.DiskCount.Histogram = histogram(diskCountSet)
-	inv.Vms.DiskGB.Histogram = histogram(diskGBSet)
-
-	// Write the inventory to output file:
-	if err := createOuput(outputFile, inv); err != nil {
-		fmt.Println("Error writing output:", err)
-		return
+func getSecret(creds VCenterCreds) *core.Secret {
+	return &core.Secret{
+		ObjectMeta: meta.ObjectMeta{
+			Name:      "vsphere-secret",
+			Namespace: "default",
+		},
+		Data: map[string][]byte{
+			"user":               []byte(creds.Username),
+			"password":           []byte(creds.Password),
+			"insecureSkipVerify": []byte("true"),
+		},
 	}
 }
 
@@ -261,25 +272,6 @@ func histogram(d []int) struct {
 		Step:     int(math.Round(binSize)),
 		MinValue: minVal,
 	}
-}
-
-func isMigratable(vm vspheremodel.VM) bool {
-	for _, c := range vm.Concerns {
-		if c.Category == "Critical" {
-			return false
-		}
-	}
-	return true
-}
-
-func isMigratebleWithWarning(vm vspheremodel.VM) bool {
-	for _, c := range vm.Concerns {
-		if c.Category == "Warning" {
-			return true
-		}
-	}
-
-	return false
 }
 
 func getNetworks(collector *vsphere.Collector) []struct {
@@ -493,7 +485,7 @@ func validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, e
 	return &res, nil
 }
 
-func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) {
+func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) (bool, bool) {
 	migratable := true
 	hasWarning := false
 	for _, result := range concern {
@@ -504,7 +496,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 			} else {
 				inv.Vms.NotMigratableReasons = append(inv.Vms.NotMigratableReasons, NotMigratableReason{
 					Label:      result.Label,
-					Count:      0,
+					Count:      1,
 					Assessment: result.Assessment,
 				})
 			}
@@ -516,7 +508,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 			} else {
 				inv.Vms.MigrationWarnings = append(inv.Vms.MigrationWarnings, NotMigratableReason{
 					Label:      result.Label,
-					Count:      0,
+					Count:      1,
 					Assessment: result.Assessment,
 				})
 			}
@@ -532,6 +524,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 	if migratable {
 		inv.Vms.TotalMigratable++
 	}
+	return migratable, hasWarning
 }
 
 func waitForFile(filename string) {
