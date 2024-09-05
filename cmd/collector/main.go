@@ -2,15 +2,19 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"log"
 	"math"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -20,6 +24,10 @@ import (
 	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/view"
+	"github.com/vmware/govmomi/vim25/mo"
+	"github.com/vmware/govmomi/vim25/types"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -62,6 +70,9 @@ func main() {
 
 	logger.Println("Create Secret")
 	secret := getSecret(creds)
+
+	logger.Println("Create govmomi client")
+	govmomiClient := createGoVmomiClient(creds)
 
 	logger.Println("Check if opaServer is responding")
 	resp, err := http.Get("http://" + opaServer + "/health")
@@ -111,8 +122,10 @@ func main() {
 		return
 	}
 
+	vlanIDs := retrieveVlanInformation(logger, govmomiClient)
+
 	logger.Println("Create inventory")
-	inv := createBasicInventoryObj(vms, collector, hosts, clusters)
+	inv := createBasicInventoryObj(vms, collector, hosts, clusters, vlanIDs)
 
 	logger.Println("Run the validation of VMs")
 	vms, err = validation(vms, opaServer)
@@ -129,6 +142,100 @@ func main() {
 		fmt.Println("Error writing output:", err)
 		return
 	}
+}
+
+func retrieveVlanInformation(logger *log.Logger, govmomiClient *govmomi.Client) []string {
+	logger.Println("retrieveVlanInformation")
+	ctx := context.Background()
+
+	vlanIDs := retrieveDistributedVLANs(logger, govmomiClient, ctx)
+	vlanIDs = retrieveStandardVLANs(logger, govmomiClient, ctx, vlanIDs)
+	for _, vlanID := range vlanIDs {
+		logger.Println("@@@@@@@   VLAN ID: ", vlanID)
+	}
+	return vlanIDs
+}
+
+func retrieveStandardVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context, vlanIDs []string) []string {
+	// Use ViewManager to create a view of HostSystem objects
+	m := view.NewManager(govmomiClient.Client)
+	v, err := m.CreateContainerView(ctx, govmomiClient.ServiceContent.RootFolder, []string{"HostSystem"}, true)
+	if err != nil {
+		logger.Fatal("Error creating container view: %v\n", err)
+		return vlanIDs
+	}
+	defer v.Destroy(ctx)
+
+	// Retrieve all HostSystem objects
+	var hostList []mo.HostSystem
+	err = v.Retrieve(ctx, []string{"HostSystem"}, []string{"name", "config.network.vswitch"}, &hostList)
+	if err != nil {
+		logger.Fatal("Error retrieving HostSystem list: %v\n", err)
+		return vlanIDs
+	}
+
+	// Iterate over each HostSystem to retrieve standard vSwitches
+	for _, host := range hostList {
+		logger.Println("Host: %s\n", host.Name)
+
+		// Retrieve standard vSwitches and their VLANs
+		for _, portgroup := range host.Config.Network.Portgroup {
+			// PortGroup has a VLAN ID assigned
+			logger.Println("    PortGroup:", portgroup, " , VLAN ID ", portgroup.Spec.VlanId)
+			vlanIDs = append(vlanIDs, strconv.Itoa(int((portgroup.Spec.VlanId))))
+		}
+	}
+	return vlanIDs
+}
+
+func retrieveDistributedVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context) []string {
+	vlans := []string{}
+	m := view.NewManager(govmomiClient.Client)
+	v, err := m.CreateContainerView(ctx, govmomiClient.ServiceContent.RootFolder, []string{"DistributedVirtualSwitch"}, true)
+	if err != nil {
+		logger.Println("Error creating container view: %v\n", err)
+		return nil
+	}
+	defer v.Destroy(ctx)
+
+	// Retrieve all DVS objects
+	var dvsList []mo.DistributedVirtualSwitch
+	err = v.Retrieve(ctx, []string{"DistributedVirtualSwitch"}, []string{"name", "portgroup"}, &dvsList)
+	if err != nil {
+		logger.Println("Error retrieving DVS list: %v\n", err)
+		return nil
+	}
+	for _, dvs := range dvsList {
+		logger.Println("DVS: %s\n", dvs.Name)
+
+		// Retrieve VLAN information for each port group
+		for _, pgRef := range dvs.Portgroup {
+			var pgMo mo.DistributedVirtualPortgroup
+			err = govmomiClient.RetrieveOne(ctx, pgRef, []string{"name", "config"}, &pgMo)
+			if err != nil {
+				logger.Println("Error retrieving portgroup properties: %v\n", err)
+				continue
+			}
+			if setting, ok := pgMo.Config.DefaultPortConfig.(*types.VMwareDVSPortSetting); ok {
+				switch vlan := setting.Vlan.(type) {
+				case *types.VmwareDistributedVirtualSwitchVlanIdSpec:
+					// If it's a VLAN ID, retrieve the VLAN ID
+					logger.Printf("VLAN ID: %d\n", vlan.VlanId)
+					vlans = append(vlans, strconv.Itoa(int(vlan.VlanId)))
+				case *types.VmwareDistributedVirtualSwitchTrunkVlanSpec:
+					// If it's a Trunk VLAN Spec, retrieve the range of VLAN IDs
+					logger.Printf("Trunk VLAN IDs: %v\n", vlan.VlanId)
+					for _, vlanIdRange := range vlan.VlanId {
+						vlans = append(vlans, fmt.Sprintf("Range %s - %s", strconv.Itoa(int(vlanIdRange.Start)), strconv.Itoa(int(vlanIdRange.End))))
+					}
+				default:
+					logger.Println("Unknown VLAN Spec type")
+				}
+			}
+		}
+	}
+
+	return vlans
 }
 
 func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
@@ -185,7 +292,7 @@ func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.DiskGB.Histogram = histogram(diskGBSet)
 }
 
-func createBasicInventoryObj(vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster) *apiplanner.Inventory {
+func createBasicInventoryObj(vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster, vlanIDs []string) *apiplanner.Inventory {
 	return &apiplanner.Inventory{
 		Vms: apiplanner.VMs{
 			Total:       len(*vms),
@@ -209,10 +316,33 @@ func createBasicInventoryObj(vms *[]vspheremodel.VM, collector *vsphere.Collecto
 			TotalClusters:   len(*clusters),
 			HostsPerCluster: getHostsPerCluster(*clusters),
 			Networks:        getNetworks(collector),
+			Vlans:           vlanIDs,
 		},
 	}
 }
+func createGoVmomiClient(creds VCenterCreds) *govmomi.Client {
+	vc := flag.String("vc", creds.Url, "vCenter URL")
+	username := flag.String("username", creds.Username, "vCenter username")
+	password := flag.String("password", creds.Password, "vCenter password")
+	flag.Parse()
 
+	u, err := url.Parse(*vc)
+	if err != nil {
+		fmt.Printf("Failed to parse vCenter URL: %v\n", err)
+		os.Exit(1)
+	}
+
+	u.User = url.UserPassword(*username, *password)
+	// Create a new vSphere client
+	ctx := context.Background()
+	govmomiC, err := govmomi.NewClient(ctx, u, true)
+	if err != nil {
+		fmt.Printf("Failed to create vSphere client: %v\n", err)
+		os.Exit(1)
+	}
+
+	return govmomiC
+}
 func getProvider(creds VCenterCreds) *api.Provider {
 	vsphereType := api.VSphere
 	return &api.Provider{

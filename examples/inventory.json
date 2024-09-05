@@ -113,6 +113,11 @@
                     "freeCapacityGB": 500
                 }
             ],
+            "vlans": [
+                "375",
+                "341",
+                "Range 0 - 4094"
+            ],
             "networks": [
                 {
                     "type": "distributed",
