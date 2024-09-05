@@ -2,10 +2,11 @@ package image
 
 import (
 	"archive/tar"
-	"bytes"
+	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -13,6 +14,10 @@ import (
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
+
+type Key int
+
+const ResponseWriterKey Key = 0
 
 type Ova struct {
 	Id uint64
@@ -22,7 +27,12 @@ type Image interface {
 	Generate() (io.Reader, error)
 }
 
-func (o *Ova) Generate() (io.Reader, error) {
+func (o *Ova) Generate(ctx context.Context) (io.Reader, error) {
+	writer, ok := ctx.Value(ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return nil, fmt.Errorf("error getting writer")
+	}
+
 	// Generate iginition
 	ignitionContent, err := o.generateIgnition()
 	if err != nil {
@@ -30,20 +40,19 @@ func (o *Ova) Generate() (io.Reader, error) {
 	}
 
 	// Genreate TAR file
-	var buf bytes.Buffer
-	tw := tar.NewWriter(&buf)
+	tw := tar.NewWriter(writer)
 	reader, err := isoeditor.NewRHCOSStreamReader("rhcos-live.x86_64.iso", &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error reading ISO file: %w", err)
-	}
-	isoData, err := io.ReadAll(reader)
-	if err != nil {
-		return nil, fmt.Errorf("error reading ISO file: %w", err)
+		return nil, fmt.Errorf("error reading rhcos iso: %w", err)
 	}
 	// Create a header for AgentVM-1.iso
+	length, err := reader.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, err
+	}
 	header := &tar.Header{
 		Name:    "AgentVM-1.iso",
-		Size:    int64(len(isoData)),
+		Size:    length,
 		Mode:    0600,
 		ModTime: time.Now(),
 	}
@@ -53,14 +62,18 @@ func (o *Ova) Generate() (io.Reader, error) {
 		return nil, err
 	}
 
-	if _, err := tw.Write([]byte(isoData)); err != nil {
+	_, err = reader.Seek(0, io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+	if _, err = io.Copy(tw, reader); err != nil {
 		return nil, err
 	}
 
 	// Write OVF file
 	ovfContent, err := os.ReadFile("data/AgentVM.ovf")
 	if err != nil {
-		return nil, fmt.Errorf("error reading OVF file: %w", err)
+		return nil, err
 	}
 	// Create a header for AgentVM.ovf
 	header = &tar.Header{
@@ -83,7 +96,7 @@ func (o *Ova) Generate() (io.Reader, error) {
 		return nil, err
 	}
 
-	return &buf, nil
+	return nil, err
 }
 
 func (o *Ova) generateIgnition() (string, error) {

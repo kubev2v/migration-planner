@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"strconv"
@@ -15,10 +16,10 @@ func (h *ServiceHandler) GetSourceImage(ctx context.Context, request server.GetS
 		return server.GetSourceImage400JSONResponse{Message: "invalid ID"}, nil
 	}
 
-	image := &image.Ova{Id: id}
-	reader, err := image.Generate()
+	i := &image.Ova{Id: id}
+	_, err = i.Generate(ctx)
 	if err != nil {
 		return server.GetSourceImage400JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
 	}
-	return server.GetSourceImage200ApplicationoctetStreamResponse{Body: reader}, nil
+	return server.GetSourceImage200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
 }
