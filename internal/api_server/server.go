@@ -13,6 +13,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -49,6 +50,16 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
+// Middleware to inject ResponseWriter into context
+func withResponseWriter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add ResponseWriter to context
+		ctx := context.WithValue(r.Context(), image.ResponseWriterKey, w)
+		// Pass the modified context to the next handler
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 func (s *Server) Run(ctx context.Context) error {
 	s.log.Println("Initializing API server")
 	swagger, err := api.GetSwagger()
@@ -68,6 +79,7 @@ func (s *Server) Run(ctx context.Context) error {
 		middleware.Logger,
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
+		withResponseWriter,
 	)
 
 	h := service.NewServiceHandler(s.store, s.log)
