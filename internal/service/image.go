@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"net/http"
 	"strconv"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -16,9 +17,12 @@ func (h *ServiceHandler) GetSourceImage(ctx context.Context, request server.GetS
 		return server.GetSourceImage400JSONResponse{Message: "invalid ID"}, nil
 	}
 
-	i := &image.Ova{Id: id}
-	_, err = i.Generate(ctx)
-	if err != nil {
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return server.GetSourceImage400JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+	ova := &image.Ova{Id: id, Writer: writer}
+	if err := ova.Generate(); err != nil {
 		return server.GetSourceImage400JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
 	}
 	return server.GetSourceImage200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil

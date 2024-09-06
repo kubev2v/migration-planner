@@ -2,11 +2,9 @@ package image
 
 import (
 	"archive/tar"
-	"context"
 	"encoding/base64"
 	"fmt"
 	"io"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -17,38 +15,50 @@ import (
 
 type Key int
 
+// Key to store the ResponseWriter in the context of openapi
 const ResponseWriterKey Key = 0
 
 type Ova struct {
-	Id uint64
+	Id     uint64
+	Writer io.Writer
 }
 
 type Image interface {
 	Generate() (io.Reader, error)
 }
 
-func (o *Ova) Generate(ctx context.Context) (io.Reader, error) {
-	writer, ok := ctx.Value(ResponseWriterKey).(http.ResponseWriter)
-	if !ok {
-		return nil, fmt.Errorf("error getting writer")
+func (o *Ova) Generate() error {
+	tw := tar.NewWriter(o.Writer)
+	defer tw.Close()
+
+	// Write ISO to TAR
+	if err := o.writeIso(tw); err != nil {
+		return err
 	}
 
+	// Write OVF to TAR
+	if err := writeOvf(tw); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (o *Ova) writeIso(tw *tar.Writer) error {
 	// Generate iginition
 	ignitionContent, err := o.generateIgnition()
 	if err != nil {
-		return nil, fmt.Errorf("error generating ignition: %w", err)
+		return fmt.Errorf("error generating ignition: %w", err)
 	}
-
-	// Genreate TAR file
-	tw := tar.NewWriter(writer)
+	// Generate ISO data reader with ignition content
 	reader, err := isoeditor.NewRHCOSStreamReader("rhcos-live.x86_64.iso", &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return nil, fmt.Errorf("error reading rhcos iso: %w", err)
+		return fmt.Errorf("error reading rhcos iso: %w", err)
 	}
 	// Create a header for AgentVM-1.iso
 	length, err := reader.Seek(0, io.SeekEnd)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	header := &tar.Header{
 		Name:    "AgentVM-1.iso",
@@ -59,24 +69,29 @@ func (o *Ova) Generate(ctx context.Context) (io.Reader, error) {
 
 	// Write the header to the tar archive
 	if err := tw.WriteHeader(header); err != nil {
-		return nil, err
+		return err
 	}
 
+	// Reset the reader to start
 	_, err = reader.Seek(0, io.SeekStart)
 	if err != nil {
-		return nil, err
+		return err
 	}
+	// Write ISO data to writer output
 	if _, err = io.Copy(tw, reader); err != nil {
-		return nil, err
+		return err
 	}
 
-	// Write OVF file
+	return nil
+}
+
+func writeOvf(tw *tar.Writer) error {
 	ovfContent, err := os.ReadFile("data/AgentVM.ovf")
 	if err != nil {
-		return nil, err
+		return err
 	}
 	// Create a header for AgentVM.ovf
-	header = &tar.Header{
+	header := &tar.Header{
 		Name:    "AgentVM.ovf",
 		Size:    int64(len(ovfContent)),
 		Mode:    0600,
@@ -85,18 +100,13 @@ func (o *Ova) Generate(ctx context.Context) (io.Reader, error) {
 
 	// Write the header to the tar archive
 	if err := tw.WriteHeader(header); err != nil {
-		return nil, err
+		return err
 	}
 	if _, err := tw.Write([]byte(ovfContent)); err != nil {
-		return nil, err
+		return err
 	}
 
-	// Close the tar writer
-	if err := tw.Close(); err != nil {
-		return nil, err
-	}
-
-	return nil, err
+	return nil
 }
 
 func (o *Ova) generateIgnition() (string, error) {
