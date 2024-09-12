@@ -9,3 +9,4 @@ rhcos-live.x86_64.iso
 examples/config.ign
 examples/config.yaml
 *.local.*
+/tmp/
