@@ -14,6 +14,7 @@ import (
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // ServerInterface represents all server handlers.
@@ -29,13 +30,13 @@ type ServerInterface interface {
 	CreateSource(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/sources/{id})
-	DeleteSource(w http.ResponseWriter, r *http.Request, id string)
+	DeleteSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id})
-	ReadSource(w http.ResponseWriter, r *http.Request, id string)
+	ReadSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id}/image)
-	GetSourceImage(w http.ResponseWriter, r *http.Request, id string)
+	GetSourceImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -58,17 +59,17 @@ func (_ Unimplemented) CreateSource(w http.ResponseWriter, r *http.Request) {
 }
 
 // (DELETE /api/v1/sources/{id})
-func (_ Unimplemented) DeleteSource(w http.ResponseWriter, r *http.Request, id string) {
+func (_ Unimplemented) DeleteSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // (GET /api/v1/sources/{id})
-func (_ Unimplemented) ReadSource(w http.ResponseWriter, r *http.Request, id string) {
+func (_ Unimplemented) ReadSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // (GET /api/v1/sources/{id}/image)
-func (_ Unimplemented) GetSourceImage(w http.ResponseWriter, r *http.Request, id string) {
+func (_ Unimplemented) GetSourceImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -133,7 +134,7 @@ func (siw *ServerInterfaceWrapper) DeleteSource(w http.ResponseWriter, r *http.R
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id string
+	var id openapi_types.UUID
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -159,7 +160,7 @@ func (siw *ServerInterfaceWrapper) ReadSource(w http.ResponseWriter, r *http.Req
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id string
+	var id openapi_types.UUID
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -185,7 +186,7 @@ func (siw *ServerInterfaceWrapper) GetSourceImage(w http.ResponseWriter, r *http
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id string
+	var id openapi_types.UUID
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -425,7 +426,7 @@ func (response CreateSource401JSONResponse) VisitCreateSourceResponse(w http.Res
 }
 
 type DeleteSourceRequestObject struct {
-	Id string `json:"id"`
+	Id openapi_types.UUID `json:"id"`
 }
 
 type DeleteSourceResponseObject interface {
@@ -469,7 +470,7 @@ func (response DeleteSource404JSONResponse) VisitDeleteSourceResponse(w http.Res
 }
 
 type ReadSourceRequestObject struct {
-	Id string `json:"id"`
+	Id openapi_types.UUID `json:"id"`
 }
 
 type ReadSourceResponseObject interface {
@@ -513,7 +514,7 @@ func (response ReadSource404JSONResponse) VisitReadSourceResponse(w http.Respons
 }
 
 type GetSourceImageRequestObject struct {
-	Id string `json:"id"`
+	Id openapi_types.UUID `json:"id"`
 }
 
 type GetSourceImageResponseObject interface {
@@ -697,7 +698,7 @@ func (sh *strictHandler) CreateSource(w http.ResponseWriter, r *http.Request) {
 }
 
 // DeleteSource operation middleware
-func (sh *strictHandler) DeleteSource(w http.ResponseWriter, r *http.Request, id string) {
+func (sh *strictHandler) DeleteSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request DeleteSourceRequestObject
 
 	request.Id = id
@@ -723,7 +724,7 @@ func (sh *strictHandler) DeleteSource(w http.ResponseWriter, r *http.Request, id
 }
 
 // ReadSource operation middleware
-func (sh *strictHandler) ReadSource(w http.ResponseWriter, r *http.Request, id string) {
+func (sh *strictHandler) ReadSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request ReadSourceRequestObject
 
 	request.Id = id
@@ -749,7 +750,7 @@ func (sh *strictHandler) ReadSource(w http.ResponseWriter, r *http.Request, id s
 }
 
 // GetSourceImage operation middleware
-func (sh *strictHandler) GetSourceImage(w http.ResponseWriter, r *http.Request, id string) {
+func (sh *strictHandler) GetSourceImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request GetSourceImageRequestObject
 
 	request.Id = id

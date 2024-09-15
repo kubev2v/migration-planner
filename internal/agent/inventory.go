@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
@@ -123,7 +124,7 @@ func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.So
 	}
 
 	u.log.Debugf("Updating status to %s: %s", string(status), statusInfo)
-	err = u.client.UpdateSourceStatus(ctx, u.config.SourceID, update)
+	err = u.client.UpdateSourceStatus(ctx, uuid.MustParse(u.config.SourceID), update)
 	if err != nil {
 		u.log.Errorf("failed updating status: %v", err)
 		return

@@ -15,6 +15,7 @@ import (
 
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
@@ -102,13 +103,13 @@ type ClientInterface interface {
 	CreateSource(ctx context.Context, body CreateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSource request
-	DeleteSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	DeleteSource(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ReadSource request
-	ReadSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReadSource(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSourceImage request
-	GetSourceImage(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -159,7 +160,7 @@ func (c *Client) CreateSource(ctx context.Context, body CreateSourceJSONRequestB
 	return c.Client.Do(req)
 }
 
-func (c *Client) DeleteSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) DeleteSource(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteSourceRequest(c.Server, id)
 	if err != nil {
 		return nil, err
@@ -171,7 +172,7 @@ func (c *Client) DeleteSource(ctx context.Context, id string, reqEditors ...Requ
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReadSource(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) ReadSource(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReadSourceRequest(c.Server, id)
 	if err != nil {
 		return nil, err
@@ -183,7 +184,7 @@ func (c *Client) ReadSource(ctx context.Context, id string, reqEditors ...Reques
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSourceImage(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) GetSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSourceImageRequest(c.Server, id)
 	if err != nil {
 		return nil, err
@@ -290,7 +291,7 @@ func NewCreateSourceRequestWithBody(server string, contentType string, body io.R
 }
 
 // NewDeleteSourceRequest generates requests for DeleteSource
-func NewDeleteSourceRequest(server string, id string) (*http.Request, error) {
+func NewDeleteSourceRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -324,7 +325,7 @@ func NewDeleteSourceRequest(server string, id string) (*http.Request, error) {
 }
 
 // NewReadSourceRequest generates requests for ReadSource
-func NewReadSourceRequest(server string, id string) (*http.Request, error) {
+func NewReadSourceRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -358,7 +359,7 @@ func NewReadSourceRequest(server string, id string) (*http.Request, error) {
 }
 
 // NewGetSourceImageRequest generates requests for GetSourceImage
-func NewGetSourceImageRequest(server string, id string) (*http.Request, error) {
+func NewGetSourceImageRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -446,13 +447,13 @@ type ClientWithResponsesInterface interface {
 	CreateSourceWithResponse(ctx context.Context, body CreateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSourceResponse, error)
 
 	// DeleteSourceWithResponse request
-	DeleteSourceWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteSourceResponse, error)
+	DeleteSourceWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSourceResponse, error)
 
 	// ReadSourceWithResponse request
-	ReadSourceWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ReadSourceResponse, error)
+	ReadSourceWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*ReadSourceResponse, error)
 
 	// GetSourceImageWithResponse request
-	GetSourceImageWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error)
+	GetSourceImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error)
 }
 
 type DeleteSourcesResponse struct {
@@ -635,7 +636,7 @@ func (c *ClientWithResponses) CreateSourceWithResponse(ctx context.Context, body
 }
 
 // DeleteSourceWithResponse request returning *DeleteSourceResponse
-func (c *ClientWithResponses) DeleteSourceWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*DeleteSourceResponse, error) {
+func (c *ClientWithResponses) DeleteSourceWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSourceResponse, error) {
 	rsp, err := c.DeleteSource(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -644,7 +645,7 @@ func (c *ClientWithResponses) DeleteSourceWithResponse(ctx context.Context, id s
 }
 
 // ReadSourceWithResponse request returning *ReadSourceResponse
-func (c *ClientWithResponses) ReadSourceWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*ReadSourceResponse, error) {
+func (c *ClientWithResponses) ReadSourceWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*ReadSourceResponse, error) {
 	rsp, err := c.ReadSource(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -653,7 +654,7 @@ func (c *ClientWithResponses) ReadSourceWithResponse(ctx context.Context, id str
 }
 
 // GetSourceImageWithResponse request returning *GetSourceImageResponse
-func (c *ClientWithResponses) GetSourceImageWithResponse(ctx context.Context, id string, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error) {
+func (c *ClientWithResponses) GetSourceImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error) {
 	rsp, err := c.GetSourceImage(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err

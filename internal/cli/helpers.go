@@ -3,6 +3,8 @@ package cli
 import (
 	"fmt"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 const (
@@ -15,13 +17,22 @@ var (
 	}
 )
 
-func parseAndValidateKindId(arg string) (string, string, error) {
-	kind, id, _ := strings.Cut(arg, "/")
+func parseAndValidateKindId(arg string) (string, *uuid.UUID, error) {
+	kind, idStr, _ := strings.Cut(arg, "/")
 	kind = singular(kind)
 	if _, ok := pluralKinds[kind]; !ok {
-		return "", "", fmt.Errorf("invalid resource kind: %s", kind)
+		return "", nil, fmt.Errorf("invalid resource kind: %s", kind)
 	}
-	return kind, id, nil
+
+	if len(idStr) == 0 {
+		return kind, nil, nil
+	}
+
+	id, err := uuid.Parse(idStr)
+	if err != nil {
+		return "", nil, fmt.Errorf("invalid ID: %w", err)
+	}
+	return kind, &id, nil
 }
 
 func singular(kind string) string {

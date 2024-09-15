@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/middleware"
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	client "github.com/kubev2v/migration-planner/internal/api/client/agent"
 	baseclient "github.com/kubev2v/migration-planner/internal/client"
@@ -35,5 +36,5 @@ func NewDefault() *Config {
 
 // Planner is the client interface for migration planning.
 type Planner interface {
-	UpdateSourceStatus(ctx context.Context, id string, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error
+	UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error
 }

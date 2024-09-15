@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 )
@@ -19,7 +20,7 @@ type Key int
 const ResponseWriterKey Key = 0
 
 type Ova struct {
-	Id     uint64
+	Id     uuid.UUID
 	Writer io.Writer
 }
 

@@ -2,19 +2,24 @@ package model
 
 import (
 	"encoding/json"
-	"strconv"
+	"time"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"gorm.io/gorm"
 )
 
 type Source struct {
-	gorm.Model
+	ID         openapi_types.UUID `json:"id" gorm:"primaryKey"`
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  gorm.DeletedAt `gorm:"index"`
 	Name       string
 	Status     string
 	StatusInfo string
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	CredUrl    string
+	CredUrl    *string
 }
 
 type SourceList []Source
@@ -25,30 +30,30 @@ func (s Source) String() string {
 }
 
 func NewSourceFromApiCreateResource(resource *api.SourceCreate) *Source {
-	return &Source{Name: resource.Name}
+	return &Source{ID: uuid.New(), Name: resource.Name}
 }
 
-func NewSourceFromId(id uint) *Source {
-	s := Source{}
-	s.ID = id
+func NewSourceFromId(id uuid.UUID) *Source {
+	s := Source{ID: id}
 	return &s
 }
 
 func (s *Source) ToApiResource() api.Source {
-	inventory := api.Inventory{}
-	if s.Inventory != nil {
-		inventory = s.Inventory.Data
-	}
-	return api.Source{
-		Id:            strconv.FormatUint(uint64(s.ID), 10),
+	source := api.Source{
+		Id:            s.ID,
 		Name:          s.Name,
 		Status:        api.StringToSourceStatus(s.Status),
 		StatusInfo:    s.StatusInfo,
-		Inventory:     inventory,
+		Inventory:     nil,
 		CredentialUrl: s.CredUrl,
 		CreatedAt:     s.CreatedAt,
 		UpdatedAt:     s.UpdatedAt,
 	}
+
+	if s.Inventory != nil {
+		source.Inventory = &s.Inventory.Data
+	}
+	return source
 }
 
 func (sl SourceList) ToApiResource() api.SourceList {

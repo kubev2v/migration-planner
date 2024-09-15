@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 )
@@ -32,11 +31,7 @@ func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.Delet
 }
 
 func (h *ServiceHandler) ReadSource(ctx context.Context, request server.ReadSourceRequestObject) (server.ReadSourceResponseObject, error) {
-	id, err := strconv.ParseUint(request.Id, 10, 32)
-	if err != nil {
-		return server.ReadSource400JSONResponse{Message: "invalid ID"}, nil
-	}
-	result, err := h.store.Source().Get(ctx, uint(id))
+	result, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
 		return server.ReadSource404JSONResponse{}, nil
 	}
@@ -44,11 +39,7 @@ func (h *ServiceHandler) ReadSource(ctx context.Context, request server.ReadSour
 }
 
 func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
-	id, err := strconv.ParseUint(request.Id, 10, 32)
-	if err != nil {
-		return server.DeleteSource400JSONResponse{Message: "invalid ID"}, nil
-	}
-	err = h.store.Source().Delete(ctx, uint(id))
+	err := h.store.Source().Delete(ctx, request.Id)
 	if err != nil {
 		return server.DeleteSource404JSONResponse{}, nil
 	}

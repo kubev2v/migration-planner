@@ -76,8 +76,8 @@ func (o *DeleteOptions) Run(ctx context.Context, args []string) error {
 	}
 	switch kind {
 	case SourceKind:
-		if len(id) > 0 {
-			response, err := c.DeleteSourceWithResponse(ctx, id)
+		if id != nil {
+			response, err := c.DeleteSourceWithResponse(ctx, *id)
 			if err != nil {
 				return fmt.Errorf("deleting %s/%s: %w", kind, id, err)
 			}
