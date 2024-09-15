@@ -88,6 +88,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -125,6 +126,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "200":
           description: OK
@@ -164,6 +166,7 @@ paths:
           required: true
           schema:
             type: string
+            format: uuid
       responses:
         "200":
           description: An OVA image
@@ -198,6 +201,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         name:
           type: string
         status:

@@ -5,6 +5,8 @@ package v1alpha1
 
 import (
 	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for InfraNetworksType.
@@ -63,14 +65,14 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
-	CreatedAt     time.Time    `json:"createdAt"`
-	CredentialUrl string       `json:"credentialUrl"`
-	Id            string       `json:"id"`
-	Inventory     Inventory    `json:"inventory"`
-	Name          string       `json:"name"`
-	Status        SourceStatus `json:"status"`
-	StatusInfo    string       `json:"statusInfo"`
-	UpdatedAt     time.Time    `json:"updatedAt"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	CredentialUrl string             `json:"credentialUrl"`
+	Id            openapi_types.UUID `json:"id"`
+	Inventory     Inventory          `json:"inventory"`
+	Name          string             `json:"name"`
+	Status        SourceStatus       `json:"status"`
+	StatusInfo    string             `json:"statusInfo"`
+	UpdatedAt     time.Time          `json:"updatedAt"`
 }
 
 // SourceStatus defines model for Source.Status.

@@ -7,6 +7,7 @@ require (
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/render v1.0.3
+	github.com/google/uuid v1.6.0
 	github.com/konveyor/forklift-controller v0.0.0-20221102112227-e73b65a01cda
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/net-byte/go-gateway v0.0.2
@@ -58,7 +59,6 @@ require (
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.1 // indirect
 	github.com/imdario/mergo v0.3.7 // indirect

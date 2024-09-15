@@ -16,6 +16,7 @@ import (
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // RequestEditorFn  is the function signature for the RequestEditor callback function
@@ -92,12 +93,12 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// ReplaceSourceStatusWithBody request with any body
-	ReplaceSourceStatusWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	ReplaceSourceStatus(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaceSourceStatusRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
 		return nil, err
@@ -109,7 +110,7 @@ func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id string, con
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReplaceSourceStatus(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+func (c *Client) ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaceSourceStatusRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
@@ -122,7 +123,7 @@ func (c *Client) ReplaceSourceStatus(ctx context.Context, id string, body Replac
 }
 
 // NewReplaceSourceStatusRequest calls the generic ReplaceSourceStatus builder with application/json body
-func NewReplaceSourceStatusRequest(server string, id string, body ReplaceSourceStatusJSONRequestBody) (*http.Request, error) {
+func NewReplaceSourceStatusRequest(server string, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
@@ -133,7 +134,7 @@ func NewReplaceSourceStatusRequest(server string, id string, body ReplaceSourceS
 }
 
 // NewReplaceSourceStatusRequestWithBody generates requests for ReplaceSourceStatus with any type of body
-func NewReplaceSourceStatusRequestWithBody(server string, id string, contentType string, body io.Reader) (*http.Request, error) {
+func NewReplaceSourceStatusRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -212,9 +213,9 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// ReplaceSourceStatusWithBodyWithResponse request with any body
-	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
+	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
 
-	ReplaceSourceStatusWithResponse(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
+	ReplaceSourceStatusWithResponse(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
 }
 
 type ReplaceSourceStatusResponse struct {
@@ -243,7 +244,7 @@ func (r ReplaceSourceStatusResponse) StatusCode() int {
 }
 
 // ReplaceSourceStatusWithBodyWithResponse request with arbitrary body returning *ReplaceSourceStatusResponse
-func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
+func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
 	rsp, err := c.ReplaceSourceStatusWithBody(ctx, id, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
@@ -251,7 +252,7 @@ func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx contex
 	return ParseReplaceSourceStatusResponse(rsp)
 }
 
-func (c *ClientWithResponses) ReplaceSourceStatusWithResponse(ctx context.Context, id string, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
+func (c *ClientWithResponses) ReplaceSourceStatusWithResponse(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
 	rsp, err := c.ReplaceSourceStatus(ctx, id, body, reqEditors...)
 	if err != nil {
 		return nil, err

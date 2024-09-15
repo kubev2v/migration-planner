@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	client "github.com/kubev2v/migration-planner/internal/api/client/agent"
 )
@@ -26,7 +27,7 @@ type planner struct {
 	client *client.ClientWithResponses
 }
 
-func (p *planner) UpdateSourceStatus(ctx context.Context, id string, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error {
+func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error {
 	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params, rcb...)
 	if err != nil {
 		return err

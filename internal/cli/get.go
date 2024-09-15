@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/client"
@@ -104,9 +105,9 @@ func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: 
 		return err
 	}
 	switch {
-	case kind == SourceKind && len(id) > 0:
-		response, err = c.ReadSourceWithResponse(ctx, id)
-	case kind == SourceKind && len(id) == 0:
+	case kind == SourceKind && id != nil:
+		response, err = c.ReadSourceWithResponse(ctx, *id)
+	case kind == SourceKind && id == nil:
 		response, err = c.ListSourcesWithResponse(ctx)
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", kind)
@@ -114,9 +115,9 @@ func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: 
 	return processReponse(response, err, kind, id, o.Output)
 }
 
-func processReponse(response interface{}, err error, kind string, id string, output string) error {
+func processReponse(response interface{}, err error, kind string, id *uuid.UUID, output string) error {
 	errorPrefix := fmt.Sprintf("reading %s/%s", kind, id)
-	if len(id) == 0 {
+	if id == nil {
 		errorPrefix = fmt.Sprintf("listing %s", plural(kind))
 	}
 
@@ -149,12 +150,12 @@ func processReponse(response interface{}, err error, kind string, id string, out
 	}
 }
 
-func printTable(response interface{}, kind string, id string) error {
+func printTable(response interface{}, kind string, id *uuid.UUID) error {
 	w := tabwriter.NewWriter(os.Stdout, 0, 8, 1, '\t', 0)
 	switch {
-	case kind == SourceKind && len(id) == 0:
+	case kind == SourceKind && id == nil:
 		printSourcesTable(w, *(response.(*apiclient.ListSourcesResponse).JSON200)...)
-	case kind == SourceKind && len(id) > 0:
+	case kind == SourceKind && id != nil:
 		printSourcesTable(w, *(response.(*apiclient.ReadSourceResponse).JSON200))
 	default:
 		return fmt.Errorf("unknown resource type %s", kind)

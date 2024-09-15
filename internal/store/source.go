@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/sirupsen/logrus"
@@ -15,9 +16,9 @@ type Source interface {
 	List(ctx context.Context) (*api.SourceList, error)
 	Create(ctx context.Context, sourceCreate api.SourceCreate) (*api.Source, error)
 	DeleteAll(ctx context.Context) error
-	Get(ctx context.Context, id uint) (*api.Source, error)
-	Delete(ctx context.Context, id uint) error
-	Update(ctx context.Context, id uint, status, statusInfo, credUrl *string, inventory *api.Inventory) (*api.Source, error)
+	Get(ctx context.Context, id uuid.UUID) (*api.Source, error)
+	Delete(ctx context.Context, id uuid.UUID) error
+	Update(ctx context.Context, id uuid.UUID, status, statusInfo, credUrl *string, inventory *api.Inventory) (*api.Source, error)
 	InitialMigration() error
 }
 
@@ -62,7 +63,7 @@ func (s *SourceStore) DeleteAll(ctx context.Context) error {
 	return result.Error
 }
 
-func (s *SourceStore) Get(ctx context.Context, id uint) (*api.Source, error) {
+func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*api.Source, error) {
 	source := model.NewSourceFromId(id)
 	result := s.db.First(&source)
 	if result.Error != nil {
@@ -72,7 +73,7 @@ func (s *SourceStore) Get(ctx context.Context, id uint) (*api.Source, error) {
 	return &apiSource, nil
 }
 
-func (s *SourceStore) Delete(ctx context.Context, id uint) error {
+func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
 	source := model.NewSourceFromId(id)
 	result := s.db.Unscoped().Delete(&source)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -82,7 +83,7 @@ func (s *SourceStore) Delete(ctx context.Context, id uint) error {
 	return nil
 }
 
-func (s *SourceStore) Update(ctx context.Context, id uint, status, statusInfo, credUrl *string, inventory *api.Inventory) (*api.Source, error) {
+func (s *SourceStore) Update(ctx context.Context, id uuid.UUID, status, statusInfo, credUrl *string, inventory *api.Inventory) (*api.Source, error) {
 	source := model.NewSourceFromId(id)
 	selectFields := []string{}
 	if status != nil {

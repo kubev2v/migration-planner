@@ -14,13 +14,14 @@ import (
 	. "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/status)
-	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string)
+	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -28,7 +29,7 @@ type ServerInterface interface {
 type Unimplemented struct{}
 
 // (PUT /api/v1/sources/{id}/status)
-func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string) {
+func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -48,7 +49,7 @@ func (siw *ServerInterfaceWrapper) ReplaceSourceStatus(w http.ResponseWriter, r 
 	var err error
 
 	// ------------- Path parameter "id" -------------
-	var id string
+	var id openapi_types.UUID
 
 	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
@@ -188,7 +189,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ReplaceSourceStatusRequestObject struct {
-	Id   string `json:"id"`
+	Id   openapi_types.UUID `json:"id"`
 	Body *ReplaceSourceStatusJSONRequestBody
 }
 
@@ -269,7 +270,7 @@ type strictHandler struct {
 }
 
 // ReplaceSourceStatus operation middleware
-func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id string) {
+func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request ReplaceSourceStatusRequestObject
 
 	request.Id = id
