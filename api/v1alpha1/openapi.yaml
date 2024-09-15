@@ -224,8 +224,6 @@ components:
         - name
         - status
         - statusInfo
-        - inventory
-        - credentialUrl
         - createdAt
         - updatedAt
 

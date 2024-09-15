@@ -66,9 +66,9 @@ type MigrationIssues = []struct {
 // Source defines model for Source.
 type Source struct {
 	CreatedAt     time.Time          `json:"createdAt"`
-	CredentialUrl string             `json:"credentialUrl"`
+	CredentialUrl *string            `json:"credentialUrl,omitempty"`
 	Id            openapi_types.UUID `json:"id"`
-	Inventory     Inventory          `json:"inventory"`
+	Inventory     *Inventory         `json:"inventory,omitempty"`
 	Name          string             `json:"name"`
 	Status        SourceStatus       `json:"status"`
 	StatusInfo    string             `json:"statusInfo"`

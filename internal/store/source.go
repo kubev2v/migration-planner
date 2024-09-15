@@ -99,7 +99,7 @@ func (s *SourceStore) Update(ctx context.Context, id uuid.UUID, status, statusIn
 		selectFields = append(selectFields, "inventory")
 	}
 	if credUrl != nil {
-		source.CredUrl = *credUrl
+		source.CredUrl = credUrl
 		selectFields = append(selectFields, "cred_url")
 	}
 

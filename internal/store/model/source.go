@@ -19,7 +19,7 @@ type Source struct {
 	Status     string
 	StatusInfo string
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	CredUrl    string
+	CredUrl    *string
 }
 
 type SourceList []Source
@@ -39,20 +39,21 @@ func NewSourceFromId(id uuid.UUID) *Source {
 }
 
 func (s *Source) ToApiResource() api.Source {
-	inventory := api.Inventory{}
-	if s.Inventory != nil {
-		inventory = s.Inventory.Data
-	}
-	return api.Source{
+	source := api.Source{
 		Id:            s.ID,
 		Name:          s.Name,
 		Status:        api.StringToSourceStatus(s.Status),
 		StatusInfo:    s.StatusInfo,
-		Inventory:     inventory,
+		Inventory:     nil,
 		CredentialUrl: s.CredUrl,
 		CreatedAt:     s.CreatedAt,
 		UpdatedAt:     s.UpdatedAt,
 	}
+
+	if s.Inventory != nil {
+		source.Inventory = &s.Inventory.Data
+	}
+	return source
 }
 
 func (sl SourceList) ToApiResource() api.SourceList {
