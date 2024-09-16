@@ -148,21 +148,19 @@ func retrieveVlanInformation(logger *log.Logger, govmomiClient *govmomi.Client) 
 	logger.Println("retrieveVlanInformation")
 	ctx := context.Background()
 
-	vlanIDs := retrieveDistributedVLANs(logger, govmomiClient, ctx)
-	vlanIDs = retrieveStandardVLANs(logger, govmomiClient, ctx, vlanIDs)
-	for _, vlanID := range vlanIDs {
-		logger.Println("@@@@@@@   VLAN ID: ", vlanID)
-	}
+	seenVlanIds := retrieveDistributedVLANs(logger, govmomiClient, ctx)
+	seenVlanIds = retrieveStandardVLANs(logger, govmomiClient, ctx, seenVlanIds)
+	for
 	return vlanIDs
 }
 
-func retrieveStandardVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context, vlanIDs []string) []string {
+func retrieveStandardVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context, seenVlanIds map[string]bool) map[string]bool {
 	// Use ViewManager to create a view of HostSystem objects
 	m := view.NewManager(govmomiClient.Client)
 	v, err := m.CreateContainerView(ctx, govmomiClient.ServiceContent.RootFolder, []string{"HostSystem"}, true)
 	if err != nil {
 		logger.Fatal("Error creating container view: %v\n", err)
-		return vlanIDs
+		return seenVlanIds
 	}
 	defer v.Destroy(ctx)
 
@@ -171,7 +169,7 @@ func retrieveStandardVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ct
 	err = v.Retrieve(ctx, []string{"HostSystem"}, []string{"name", "config.network.vswitch"}, &hostList)
 	if err != nil {
 		logger.Fatal("Error retrieving HostSystem list: %v\n", err)
-		return vlanIDs
+		return seenVlanIds
 	}
 
 	// Iterate over each HostSystem to retrieve standard vSwitches
@@ -182,14 +180,18 @@ func retrieveStandardVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ct
 		for _, portgroup := range host.Config.Network.Portgroup {
 			// PortGroup has a VLAN ID assigned
 			logger.Println("    PortGroup:", portgroup, " , VLAN ID ", portgroup.Spec.VlanId)
-			vlanIDs = append(vlanIDs, strconv.Itoa(int((portgroup.Spec.VlanId))))
+			strVlanID := strconv.Itoa(int((portgroup.Spec.VlanId)))
+			if !seenVlanIds[strVlanID] {
+				seenVlanIds[strVlanID] = true
+			}
 		}
 	}
-	return vlanIDs
+	return seenVlanIds
 }
 
-func retrieveDistributedVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context) []string {
+func retrieveDistributedVLANs(logger *log.Logger, govmomiClient *govmomi.Client, ctx context.Context) map[string]bool {
 	vlans := []string{}
+	seenVlanIDs := map[string]bool{}
 	m := view.NewManager(govmomiClient.Client)
 	v, err := m.CreateContainerView(ctx, govmomiClient.ServiceContent.RootFolder, []string{"DistributedVirtualSwitch"}, true)
 	if err != nil {
@@ -221,12 +223,20 @@ func retrieveDistributedVLANs(logger *log.Logger, govmomiClient *govmomi.Client,
 				case *types.VmwareDistributedVirtualSwitchVlanIdSpec:
 					// If it's a VLAN ID, retrieve the VLAN ID
 					logger.Printf("VLAN ID: %d\n", vlan.VlanId)
-					vlans = append(vlans, strconv.Itoa(int(vlan.VlanId)))
+					strVlanId := strconv.Itoa(int(vlan.VlanId))
+					if !seenVlanIDs[strVlanId] {
+						seenVlanIDs[strVlanId] = true
+						vlans = append(vlans, strVlanId)
+					}
 				case *types.VmwareDistributedVirtualSwitchTrunkVlanSpec:
 					// If it's a Trunk VLAN Spec, retrieve the range of VLAN IDs
 					logger.Printf("Trunk VLAN IDs: %v\n", vlan.VlanId)
 					for _, vlanIdRange := range vlan.VlanId {
-						vlans = append(vlans, fmt.Sprintf("Range %s - %s", strconv.Itoa(int(vlanIdRange.Start)), strconv.Itoa(int(vlanIdRange.End))))
+						strRange := fmt.Sprintf("Range %s - %s", strconv.Itoa(int(vlanIdRange.Start)), strconv.Itoa(int(vlanIdRange.End)))
+						if !seenVlanIDs[strRange] {
+							seenVlanIDs[strRange] = true
+							vlans = append(vlans, strRange)
+						}
 					}
 				default:
 					logger.Println("Unknown VLAN Spec type")
@@ -235,7 +245,7 @@ func retrieveDistributedVLANs(logger *log.Logger, govmomiClient *govmomi.Client,
 		}
 	}
 
-	return vlans
+	return seenVlanIDs
 }
 
 func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
