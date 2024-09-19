@@ -59,7 +59,7 @@ func (a *Agent) Run(ctx context.Context) error {
 		}
 	}(ctx)
 
-	StartREST(a.log, a.config.DataDir)
+	StartServer(a.log, a.config)
 
 	client, err := newPlannerClient(a.config)
 	if err != nil {

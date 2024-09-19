@@ -6,14 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 	"time"
 
 	"github.com/go-chi/chi"
-	"github.com/go-chi/chi/middleware"
 	"github.com/go-chi/render"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -27,56 +23,13 @@ const (
 	CredentialsFile = "credentials.json"
 )
 
-func StartREST(log *log.PrefixLogger, dataDir string) {
-	server := &http.Server{Addr: "0.0.0.0:3333", Handler: createRESTService(log, dataDir)}
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	go func() {
-		<-sig
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second) // nolint:govet
-
-		go func() {
-			<-shutdownCtx.Done()
-			if shutdownCtx.Err() == context.DeadlineExceeded {
-				log.Fatal("graceful shutdown timed out.. forcing exit.")
-			}
-		}()
-
-		// Trigger graceful shutdown
-		err := server.Shutdown(shutdownCtx)
-		if err != nil {
-			log.Fatal(err)
-		}
-		serverStopCtx()
-	}()
-
-	go func() {
-		// Run the server
-		err := server.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
-		}
-
-		// Wait for server context to be stopped
-		<-serverCtx.Done()
-	}()
-}
-
-func createRESTService(log *log.PrefixLogger, dataDir string) http.Handler {
-	r := chi.NewRouter()
-
-	r.Use(middleware.RequestID)
-	r.Use(middleware.Logger)
-
-	r.Get("/status", func(w http.ResponseWriter, r *http.Request) {
+func RegisterApi(router *chi.Mux, log *log.PrefixLogger, dataDir string) {
+	router.Get("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		statusHandler(dataDir, w, r)
 	})
-	r.Put("/credentials", func(w http.ResponseWriter, r *http.Request) {
+	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
 		credentialHandler(log, dataDir, w, r)
 	})
-
-	return r
 }
 
 type StatusReply struct {
@@ -94,9 +47,10 @@ func statusHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 }
 
 type Credentials struct {
-	URL      string `json:"url"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	URL                  string `json:"url"`
+	Username             string `json:"username"`
+	Password             string `json:"password"`
+	IsDataSharingAllowed bool   `json:"isDataSharingAllowed"`
 }
 
 func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWriter, r *http.Request) {
