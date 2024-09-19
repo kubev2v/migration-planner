@@ -22,10 +22,10 @@ const (
 	DefaultConfigFile = DefaultConfigDir + "/config.yaml"
 	// DefaultDataDir is the default directory where the agent's data is stored
 	DefaultDataDir = "/var/lib/planner"
+	// DefaultWwwDir is the default directory from which the agent serves static files
+	DefaultWwwDir = "/var/www/planner"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
-	// DefaultCredUIPort is the default port for the credentials UI
-	DefaultCredUIPort = "8443"
 )
 
 type Config struct {
@@ -33,6 +33,8 @@ type Config struct {
 	ConfigDir string `json:"config-dir"`
 	// DataDir is the directory where the agent's data is stored
 	DataDir string `json:"data-dir"`
+	// WwwDir is the directory from which the agent serves static files
+	WwwDir string `json:"www-dir"`
 	// SourceID is the ID of this source in the planner
 	SourceID string `json:"source-id"`
 
@@ -41,8 +43,6 @@ type Config struct {
 
 	// UpdateInterval is the interval between two status updates
 	UpdateInterval util.Duration `json:"update-interval,omitempty"`
-
-	CredUIPort string `json:"cred-ui-port"`
 
 	// LogLevel is the level of logging. can be:  "panic", "fatal", "error", "warn"/"warning",
 	// "info", "debug" or "trace", any other will be treated as "info"
@@ -68,11 +68,11 @@ func NewDefault() *Config {
 	c := &Config{
 		ConfigDir:      DefaultConfigDir,
 		DataDir:        DefaultDataDir,
+		WwwDir:         DefaultWwwDir,
 		PlannerService: PlannerService{Config: *client.NewDefault()},
 		UpdateInterval: util.Duration{Duration: DefaultUpdateInterval},
 		reader:         fileio.NewReader(),
 		LogLevel:       logrus.InfoLevel.String(),
-		CredUIPort:     DefaultCredUIPort,
 	}
 	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
