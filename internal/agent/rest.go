@@ -33,8 +33,8 @@ func RegisterApi(router *chi.Mux, log *log.PrefixLogger, dataDir string) {
 }
 
 type StatusReply struct {
-	Status     string
-	StatusInfo string
+	Status     string `json:"status"`
+	StatusInfo string `json:"statusInfo"`
 }
 
 func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {
