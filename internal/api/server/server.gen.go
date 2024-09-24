@@ -567,6 +567,15 @@ func (response GetSourceImage404JSONResponse) VisitGetSourceImageResponse(w http
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSourceImage500JSONResponse Error
+
+func (response GetSourceImage500JSONResponse) VisitGetSourceImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 

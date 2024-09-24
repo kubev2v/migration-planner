@@ -30,7 +30,6 @@ type Image interface {
 
 func (o *Ova) Generate() error {
 	tw := tar.NewWriter(o.Writer)
-	defer tw.Close()
 
 	// Write ISO to TAR
 	if err := o.writeIso(tw); err != nil {
