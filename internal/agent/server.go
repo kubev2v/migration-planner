@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,10 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+const (
+	agentPort = 3333
+)
+
 func StartServer(log *log.PrefixLogger, config *Config) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
@@ -21,7 +26,7 @@ func StartServer(log *log.PrefixLogger, config *Config) {
 	RegisterFileServer(router, log, config.WwwDir)
 	RegisterApi(router, log, config.DataDir)
 
-	server := &http.Server{Addr: "0.0.0.0:3333", Handler: router}
+	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%s", agentPort), Handler: router}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
