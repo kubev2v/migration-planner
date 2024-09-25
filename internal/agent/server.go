@@ -26,7 +26,7 @@ func StartServer(log *log.PrefixLogger, config *Config) {
 	RegisterFileServer(router, log, config.WwwDir)
 	RegisterApi(router, log, config.DataDir)
 
-	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%s", agentPort), Handler: router}
+	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", agentPort), Handler: router}
 	serverCtx, serverStopCtx := context.WithCancel(context.Background())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

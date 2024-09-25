@@ -75,7 +75,7 @@ func (u *InventoryUpdater) initializeCredentialUrl() {
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	u.credUrl = fmt.Sprintf("https://%s:%s", localAddr.IP.String(), agentPort)
+	u.credUrl = fmt.Sprintf("http://%s:%d", localAddr.IP.String(), agentPort)
 }
 
 func calculateStatus(dataDir string) (api.SourceStatus, string, *api.Inventory) {
