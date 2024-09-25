@@ -1,8 +1,0 @@
-config-dir: /agent/config
-data-dir: /agent/data
-log-level: debug
-source-id: 1
-update-interval: 5s
-planner-service:
-  service:
-    server: http://@CONFIG_IP@:7443
