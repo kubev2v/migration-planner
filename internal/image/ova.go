@@ -117,7 +117,7 @@ func (o *Ova) generateIgnition() (string, error) {
 	if err != nil {
 		return ignitionContent, fmt.Errorf("error reading OVF template file: %w", err)
 	}
-	cfgContent := strings.Replace(string(cfgTemplate), "@CONFIG_ID@", fmt.Sprintf("%d", o.Id), -1)
+	cfgContent := strings.Replace(string(cfgTemplate), "@CONFIG_ID@", fmt.Sprintf("%s", o.Id), -1)
 	cfgContent = strings.Replace(string(cfgContent), "@CONFIG_IP@", ip, -1)
 
 	// gen config.ign
