@@ -11,6 +11,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/go-chi/cors"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -22,6 +23,12 @@ func StartServer(log *log.PrefixLogger, config *Config) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
+	router.Use(cors.Handler(cors.Options{
+		AllowedMethods:   []string{"GET", "PUT", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type"},
+		AllowCredentials: false,
+		MaxAge:           300,
+	}))
 
 	RegisterFileServer(router, log, config.WwwDir)
 	RegisterApi(router, log, config.DataDir)
