@@ -53,7 +53,7 @@ func StartServer(log *log.PrefixLogger, config *Config) {
 		// Run the server
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err)
+			log.Fatal(err.Error())
 		}
 
 		// Wait for server context to be stopped
