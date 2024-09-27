@@ -41,3 +41,17 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 
 	return nil
 }
+
+func (p *planner) Health(ctx context.Context) error {
+	resp, err := p.client.HealthWithResponse(ctx)
+	if err != nil {
+		return err
+	}
+	if resp.HTTPResponse != nil {
+		defer resp.HTTPResponse.Body.Close()
+	}
+	if resp.StatusCode() != http.StatusOK {
+		return fmt.Errorf("health check failed with status: %s", resp.Status())
+	}
+	return nil
+}

@@ -96,6 +96,9 @@ type ClientInterface interface {
 	ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// Health request
+	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -112,6 +115,18 @@ func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id openapi_typ
 
 func (c *Client) ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewReplaceSourceStatusRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHealthRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -169,6 +184,33 @@ func NewReplaceSourceStatusRequestWithBody(server string, id openapi_types.UUID,
 	return req, nil
 }
 
+// NewHealthRequest generates requests for Health
+func NewHealthRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/health")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -216,6 +258,9 @@ type ClientWithResponsesInterface interface {
 	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
 
 	ReplaceSourceStatusWithResponse(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
+
+	// HealthWithResponse request
+	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
 }
 
 type ReplaceSourceStatusResponse struct {
@@ -243,6 +288,27 @@ func (r ReplaceSourceStatusResponse) StatusCode() int {
 	return 0
 }
 
+type HealthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r HealthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r HealthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // ReplaceSourceStatusWithBodyWithResponse request with arbitrary body returning *ReplaceSourceStatusResponse
 func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
 	rsp, err := c.ReplaceSourceStatusWithBody(ctx, id, contentType, body, reqEditors...)
@@ -258,6 +324,15 @@ func (c *ClientWithResponses) ReplaceSourceStatusWithResponse(ctx context.Contex
 		return nil, err
 	}
 	return ParseReplaceSourceStatusResponse(rsp)
+}
+
+// HealthWithResponse request returning *HealthResponse
+func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error) {
+	rsp, err := c.Health(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHealthResponse(rsp)
 }
 
 // ParseReplaceSourceStatusResponse parses an HTTP response from a ReplaceSourceStatusWithResponse call
@@ -302,6 +377,22 @@ func ParseReplaceSourceStatusResponse(rsp *http.Response) (*ReplaceSourceStatusR
 		}
 		response.JSON404 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseHealthResponse parses an HTTP response from a HealthWithResponse call
+func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &HealthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil

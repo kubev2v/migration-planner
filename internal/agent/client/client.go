@@ -37,4 +37,6 @@ func NewDefault() *Config {
 // Planner is the client interface for migration planning.
 type Planner interface {
 	UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error
+	// Health is checking the connectivity with console.redhat.com by making requests to /health endpoint.
+	Health(ctx context.Context) error
 }

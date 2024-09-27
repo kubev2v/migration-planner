@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/kubev2v/migration-planner/internal/agent/client"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -42,18 +43,31 @@ func (a *Agent) Run(ctx context.Context) error {
 	defer utilruntime.HandleCrash()
 	ctx, cancel := context.WithCancel(ctx)
 	shutdownSignals := []os.Signal{os.Interrupt, syscall.SIGTERM}
-
 	// handle teardown
 	shutdownHandler := make(chan os.Signal, 2)
 	signal.Notify(shutdownHandler, shutdownSignals...)
+	// health check closing ch
+	healthCheckCh := make(chan chan any)
 	go func(ctx context.Context) {
 		select {
 		case <-shutdownHandler:
 			a.log.Infof("Received SIGTERM or SIGINT signal, shutting down.")
+			//We must wait for the health checker to close any open requests and the log file.
+			c := make(chan any)
+			healthCheckCh <- c
+			<-c
+			a.log.Infof("Health check stopped.")
+
 			close(shutdownHandler)
 			cancel()
 		case <-ctx.Done():
 			a.log.Infof("Context has been cancelled, shutting down.")
+			//We must wait for the health checker to close any open requests and the log file.
+			c := make(chan any)
+			healthCheckCh <- c
+			<-c
+			a.log.Infof("Health check stopped.")
+
 			close(shutdownHandler)
 			cancel()
 		}
@@ -65,8 +79,22 @@ func (a *Agent) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+
+	// start the health check
+	healthChecker, err := NewHealthChecker(
+		a.log,
+		client,
+		a.config.DataDir,
+		time.Duration(a.config.HealthCheckInterval*int64(time.Second)),
+	)
+	if err != nil {
+		return err
+	}
+	healthChecker.Start(healthCheckCh)
+
 	inventoryUpdater := NewInventoryUpdater(a.log, a.config, client)
 	inventoryUpdater.UpdateServiceWithInventory(ctx)
+
 	return nil
 }
 

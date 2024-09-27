@@ -26,6 +26,8 @@ const (
 	DefaultWwwDir = "/var/www/planner"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
+	// DefaultHealthCheck is the default value for health check interval in seconds.
+	DefaultHealthCheck = 5 * 60 // 5 min
 )
 
 type Config struct {
@@ -49,6 +51,8 @@ type Config struct {
 	LogLevel string `json:"log-level,omitempty"`
 	// LogPrefix is the log prefix used for testing
 	LogPrefix string `json:"log-prefix,omitempty"`
+	// HealthCheckInterval is the interval between two health checks
+	HealthCheckInterval int64 `json:"health-check-interval,omitempty"`
 
 	reader *fileio.Reader
 }
@@ -66,13 +70,14 @@ func (s *PlannerService) Equal(s2 *PlannerService) bool {
 
 func NewDefault() *Config {
 	c := &Config{
-		ConfigDir:      DefaultConfigDir,
-		DataDir:        DefaultDataDir,
-		WwwDir:         DefaultWwwDir,
-		PlannerService: PlannerService{Config: *client.NewDefault()},
-		UpdateInterval: util.Duration{Duration: DefaultUpdateInterval},
-		reader:         fileio.NewReader(),
-		LogLevel:       logrus.InfoLevel.String(),
+		ConfigDir:           DefaultConfigDir,
+		DataDir:             DefaultDataDir,
+		WwwDir:              DefaultWwwDir,
+		PlannerService:      PlannerService{Config: *client.NewDefault()},
+		UpdateInterval:      util.Duration{Duration: DefaultUpdateInterval},
+		reader:              fileio.NewReader(),
+		LogLevel:            logrus.InfoLevel.String(),
+		HealthCheckInterval: DefaultHealthCheck,
 	}
 	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
