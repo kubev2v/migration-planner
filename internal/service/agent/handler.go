@@ -30,3 +30,8 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 	}
 	return agentServer.ReplaceSourceStatus200JSONResponse(*result), nil
 }
+
+func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.HealthRequestObject) (agentServer.HealthResponseObject, error) {
+	// NO-OP
+	return nil, nil
+}
