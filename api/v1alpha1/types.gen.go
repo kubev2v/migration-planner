@@ -43,8 +43,9 @@ type Infra struct {
 		Name string            `json:"name"`
 		Type InfraNetworksType `json:"type"`
 	} `json:"networks"`
-	TotalClusters int `json:"totalClusters"`
-	TotalHosts    int `json:"totalHosts"`
+	TotalClusters int      `json:"totalClusters"`
+	TotalHosts    int      `json:"totalHosts"`
+	Vlans         []string `json:"vlans"`
 }
 
 // InfraNetworksType defines model for Infra.Networks.Type.

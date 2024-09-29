@@ -345,6 +345,7 @@ components:
       - hostsPerCluster
       - hostPowerStates
       - networks
+      - vlans
       - datastores
       properties:
         totalHosts:
@@ -359,6 +360,10 @@ components:
           type: object
           additionalProperties:
             type: integer
+        vlans:
+          type: array
+          items:
+            type: string
         networks:
           type: array
           items:
