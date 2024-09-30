@@ -1,0 +1,119 @@
+{% if state == "present" %}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-config
+data:
+  config: |
+    config-dir: /config
+    data-dir: /data
+    log-level: debug
+    source-id: d62bb62b-2771-46ce-81e3-01f437677a82
+    update-interval: 5s
+    planner-service:
+      service:
+        server: http://localhost:7443
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: db-config
+data:
+  POSTGRES_USER: demouser
+  POSTGRES_PASSWORD: demopass
+  POSTGRES_MASTER_USER: admin
+  POSTGRES_MASTER_PASSWORD: adminpass
+  POSTGRES_DB: planner
+---
+{% endif %}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: planner
+spec:
+  containers:
+    - name: agent-ui 
+      image: quay.io/kubev2v/planner-agent-ui:latest
+    - name: agent
+      image: quay.io/machacekondra/planner-agent:latest
+      command: 
+        - /app/planner-agent
+      args:
+        - -config 
+        - /agent/config.yaml
+      volumeMounts:
+        - mountPath: /agent
+          name: agent_config
+        - mountPath: /data
+          name: agent_data
+        - mountPath: /config
+          name: agent_config_folder
+    - name: forklift-validation
+      image: quay.io/kubev2v/forklift-validation:release-v2.6.4
+      command:
+        - /usr/bin/opa
+      args:
+        - run
+        - --server
+        - /usr/share/opa
+    - image: {{ db_image }}
+      name: db
+      ports:
+        - containerPort: 5432
+          hostPort: {{ db_port }}
+      env:
+        - name: POSTGRESQL_USER
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: POSTGRES_USER
+        - name: POSTGRESQL_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: POSTGRES_PASSWORD
+        - name: POSTGRESQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: POSTGRES_DB
+        - name: POSTGRESQL_MASTER_USER
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: POSTGRES_MASTER_USER
+        - name: POSTGRESQL_MASTER_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: db-config
+              key: POSTGRES_MASTER_PASSWORD
+      volumeMounts:
+        - name: postgres-planner-pvc
+          mountPath: /var/lib/postgresql/data
+    - image: {{ planner_api_image }}
+      name: planner-api
+      ports:
+        - containerPort: 3443
+          hostPort: 3443
+        - containerPort: 7443
+          hostPort: 7443
+
+  volumes:
+    - name: agent_config
+      configMap:
+        name: agent-config
+        items:
+          - key: config
+            path: config.yaml
+    - name: agent_config_folder
+      persistentVolumeClaim:
+        claimName: agent_config_folder
+    - name: agent_data
+      persistentVolumeClaim:
+        claimName: agent_data
+    - name: collector_data
+      persistentVolumeClaim:
+        claimName: collector_data
+    - name: postgres-planner-pvc
+      persistentVolumeClaim:
+        claimName: planner-db
