@@ -25,11 +25,17 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 3443
-          #livenessProbe:
-          #  httpGet:
-          #    path: /health
-          #    port: 3443
-          #  initialDelaySeconds: 30
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3443
+            initialDelaySeconds: 30
+          env:
+            - name: CONFIG_SERVER
+              valueFrom:
+                secretKeyRef:
+                  name: migration-planner-secret
+                  key: config_ip
           volumeMounts:
             - name: migration-planner-config
               mountPath: "/.migration-planner/config.yaml"

@@ -6,4 +6,4 @@ source-id: @CONFIG_ID@
 update-interval: 5s
 planner-service:
   service:
-    server: http://@CONFIG_IP@:7443
+    server: @CONFIG_SERVER@

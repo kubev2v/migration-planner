@@ -111,14 +111,14 @@ func writeOvf(tw *tar.Writer) error {
 
 func (o *Ova) generateIgnition() (string, error) {
 	ignitionContent := ""
-	ip := util.GetEnv("CONFIG_IP", "127.0.0.1")
+	ip := util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443")
 
 	cfgTemplate, err := os.ReadFile("data/config.yaml.template")
 	if err != nil {
 		return ignitionContent, fmt.Errorf("error reading OVF template file: %w", err)
 	}
 	cfgContent := strings.Replace(string(cfgTemplate), "@CONFIG_ID@", fmt.Sprintf("%s", o.Id), -1)
-	cfgContent = strings.Replace(string(cfgContent), "@CONFIG_IP@", ip, -1)
+	cfgContent = strings.Replace(string(cfgContent), "@CONFIG_SERVER@", ip, -1)
 
 	// gen config.ign
 	ignTemplate, err := os.ReadFile("data/config.ign.template")
