@@ -10,13 +10,14 @@ COPY . .
 USER 0
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /planner-agent cmd/planner-agent/main.go
 
-FROM registry.access.redhat.com/ubi9/ubi-micro
+FROM registry.access.redhat.com/ubi9/ubi-minimal
 
 WORKDIR /app
 
 COPY --from=builder /planner-agent /app/
 
 # Use non-root user
+RUN microdnf install -y net-tools
 RUN chown -R 1001:0 /app
 USER 1001
 

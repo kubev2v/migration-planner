@@ -35,7 +35,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: migration-planner-secret
-                  key: config_ip
+                  key: config_server
           volumeMounts:
             - name: migration-planner-config
               mountPath: "/.migration-planner/config.yaml"
