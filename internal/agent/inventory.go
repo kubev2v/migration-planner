@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"path/filepath"
 	"time"
 
@@ -16,7 +17,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/lthibault/jitterbug"
-	gateway "github.com/net-byte/go-gateway"
 )
 
 type InventoryUpdater struct {
@@ -59,16 +59,24 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context) {
 }
 
 func (u *InventoryUpdater) initializeCredentialUrl() {
-	gw, err := gateway.DiscoverGatewayIPv4()
+	// Parse the service URL
+	parsedURL, err := url.Parse(u.config.PlannerService.Service.Server)
 	if err != nil {
-		u.log.Errorf("failed finding default GW: %v", err)
+		u.log.Errorf("error parsing service URL: %v", err)
 		u.credUrl = "N/A"
 		return
 	}
 
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", gw.String(), "80"))
+	// Use either port if specified, or scheme
+	port := parsedURL.Port()
+	if port == "" {
+		port = parsedURL.Scheme
+	}
+
+	// Connect to service
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
-		u.log.Errorf("failed connecting to default GW: %v", err)
+		u.log.Errorf("failed connecting to migration planner: %v", err)
 		u.credUrl = "N/A"
 		return
 	}
