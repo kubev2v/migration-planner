@@ -10,7 +10,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/konveyor/forklift-controller v0.0.0-20221102112227-e73b65a01cda
 	github.com/lthibault/jitterbug v2.0.0+incompatible
-	github.com/net-byte/go-gateway v0.0.2
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/onsi/ginkgo/v2 v2.15.0
