@@ -1,0 +1,32 @@
+name: Build and push images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build_push:
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY: quay.io
+      # Set tag 'latest' on main branch
+      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
+      REGISTRY_ORG: kubev2v
+    steps:
+      - name: Checkout forklift
+        uses: actions/checkout@v4
+
+      - name: Login to quay.io with bot account
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USERNAME }}
+          password: ${{ secrets.QUAY_TOKEN }}
+
+      - name: Build and push images to quay.io
+        run: |
+          cd ${GITHUB_WORKSPACE}
+          make build-containers
+          make push-containers
