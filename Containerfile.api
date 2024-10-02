@@ -3,12 +3,12 @@ FROM registry.access.redhat.com/ubi9/go-toolset as builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
-RUN curl -o /app/rhcos-live.x86_64.iso https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
 RUN go mod download
 
 COPY . .
 
 USER 0
+RUN curl -o /app/rhcos-live.x86_64.iso https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /planner-api cmd/planner-api/main.go
 
 FROM registry.access.redhat.com/ubi9/ubi-micro
