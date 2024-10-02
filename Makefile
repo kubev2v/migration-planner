@@ -63,19 +63,13 @@ build-api: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	mkdir -p $${HOME}/go/migration-planner-go-cache/.cache
-	podman build -f Containerfile.agent $(GO_CACHE) -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
-	touch bin/.migration-planner-agent-container
+	podman build -f Containerfile.agent -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
 bin/.migration-planner-collector-container: bin Containerfile.collector go.mod go.sum $(GO_FILES)
-	mkdir -p $${HOME}/go/migration-planner-go-cache/.cache
-	podman build -f Containerfile.collector $(GO_CACHE) -t $(MIGRATION_PLANNER_COLLECTOR_IMAGE):latest
-	touch bin/.migration-planner-collector-container
+	podman build -f Containerfile.collector -t $(MIGRATION_PLANNER_COLLECTOR_IMAGE):latest
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
-	mkdir -p $${HOME}/go/migration-planner-go-cache/.cache
-	podman build -f Containerfile.api $(GO_CACHE) -t $(MIGRATION_PLANNER_API_IMAGE):latest
-	touch bin/.migration-planner-api-container
+	podman build -f Containerfile.api -t $(MIGRATION_PLANNER_API_IMAGE):latest
 
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-collector-container: bin/.migration-planner-collector-container
