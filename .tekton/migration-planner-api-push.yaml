@@ -24,7 +24,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/omachace-tenant/migration-planner/migration-planner-api:{{revision}}
   - name: dockerfile
-    value: Dockerfile.planner-api
+    value: Containerfile.api
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while maintaining trust after pipeline customization.
