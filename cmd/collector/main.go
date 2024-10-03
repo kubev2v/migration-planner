@@ -20,6 +20,7 @@ import (
 	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/util"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -56,7 +57,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	opaServer := "127.0.0.1:8181"
+	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
 	logger.Println("Create Provider")
 	provider := getProvider(creds)
 
