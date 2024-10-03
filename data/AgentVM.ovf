@@ -5,14 +5,14 @@
   </References>
   <NetworkSection>
     <Info>The list of logical networks</Info>
-    <Network ovf:name="nested-devqe-segment-222">
-      <Description>The nested-devqe-segment-222 network</Description>
+    <Network ovf:name="routable-network">
+      <Description>Routable network</Description>
     </Network>
   </NetworkSection>
   <VirtualSystem ovf:id="AgentVM">
     <Info>A Virtual system</Info>
     <Name>AgentVM</Name>
-    <OperatingSystemSection ovf:id="80" ovf:version="8" vmw:osType="rhel8_64Guest">
+    <OperatingSystemSection ovf:id="80" ovf:version="8" vmw:osType="rhel9_64Guest">
       <Info>The operating system installed</Info>
       <Description>Other Linux (64-bit)</Description>
     </OperatingSystemSection>
@@ -67,7 +67,7 @@
       <Item>
         <rasd:AddressOnParent>0</rasd:AddressOnParent>
         <rasd:AutomaticAllocation>true</rasd:AutomaticAllocation>
-        <rasd:Connection>nested-devqe-segment-222</rasd:Connection>
+        <rasd:Connection>routable-network</rasd:Connection>
         <rasd:ElementName>Network adapter 1</rasd:ElementName>
         <rasd:InstanceID>6</rasd:InstanceID>
         <rasd:ResourceSubType>E1000</rasd:ResourceSubType>

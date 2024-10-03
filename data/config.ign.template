@@ -1,51 +1,155 @@
-{
-  "ignition": { "version": "3.0.0" },
-  "passwd": {
-    "users": [
-          {
-            "name": "core",
-            "passwordHash": "$y$j9T$hUUbW8zoB.Qcmpwm4/RuK1$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529"
-          }
-    ]
-  },
-  "storage": {
-    "directories": [{
-      "path": "/var/home/core/vol",
-      "overwrite": true,
-      "user": {
-        "id": 1001
-      }
-    }, {
-      "path": "/var/home/core/vol/data",
-      "overwrite": true,
-      "user": {
-        "id": 1001
-      }
-    }, {
-      "path": "/var/home/core/vol/config",
-      "overwrite": true,
-      "user": {
-        "id": 1001
-      }
-    }],
-    "files": [{
-      "path": "/var/home/core/vol/config.yaml",
-      "mode": 400,
-      "user": {
-        "id": 1001
-      },
-      "contents": {"source": "data:text/plain;base64,@CONFIG_DATA@"}
-    }]
-  },
-  "systemd": {
-    "units": [{
-      "name": "planner-agent-collector.service",
-      "enabled": true,
-      "contents": "[Unit]\nDescription=Podman container-planner-colector.service\nDocumentation=man:podman-generate-systemd(1)\nWants=network-online.target\nAfter=network-online.target\nRequiresMountsFor=%t/containers\n\n[Service]\nType=oneshot\nRestartSec=2s\nExecStartPre=/usr/bin/podman run --rm -v myvol:/mnt:Z --name test-container alpine sh -c \"/usr/bin/test -f /mnt/data/credentials.json\"\nExecStartPre=/usr/bin/podman run -d -p 8181:8181 --network host --entrypoint /usr/bin/opa quay.io/kubev2v/forklift-validation:release-v2.6.4 run --server /usr/share/opa/policies\nEnvironment=PODMAN_SYSTEMD_UNIT=%n\nRestart=on-failure\nTimeoutStopSec=70\nExecStart=/usr/bin/podman run --network host --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace -v myvol:/vol:Z --name planner-collector -d quay.io/machacekondra/collector /vol/data/credentials.json /vol/data/inventory.json\nExecStop=/usr/bin/podman stop --ignore -t 10 --cidfile=%t/%n.ctr-id\nExecStopPost=/usr/bin/podman rm -f --ignore -t 10 --cidfile=%t/%n.ctr-id\nType=notify\nNotifyAccess=all\n\n[Install]\nWantedBy=default.target"
-    }, {
-      "name": "planner-agent.service",
-      "enabled": true,
-      "contents": "[Unit]\nDescription=Podman container-planner-agent.service\nDocumentation=man:podman-generate-systemd(1)\nWants=network-online.target\nAfter=network-online.target\nRequiresMountsFor=%t/containers\n\n[Service]\nEnvironment=PODMAN_SYSTEMD_UNIT=%n\nRestart=on-failure\nTimeoutStopSec=70\nExecStartPre=/usr/bin/podman volume create myvol\nExecStartPre=/usr/sbin/setenforce 0 \nExecStartPre=/usr/bin/podman run --rm -v /var/home/core/vol:/src:Z -v myvol:/mnt:Z --name temp-container alpine sh -c \"cp -r /src/* /mnt/ && chmod -R a+rw /mnt\"\nExecStartPre=/usr/bin/podman run --rm -v myvol:/agent:Z --name www-container fedora sh -c \"curl -L https://github.com/machacekondra/planner-agent-ui/releases/download/0.0.1/agent-1.0.0-alpha.tgz -o /tmp/agent-1.0.0-alpha.tgz && mkdir /agent/www && tar xf /tmp/agent-1.0.0-alpha.tgz -C /agent/www package/dist\"\nExecStart=/usr/bin/podman run --network host -p 3333:3333 --cidfile=%t/%n.ctr-id --cgroups=no-conmon --rm --sdnotify=conmon --replace -d -v myvol:/agent:Z --name planner-agent quay.io/machacekondra/planner-agent -config /agent/config.yaml\nExecStop=/usr/bin/podman stop --ignore -t 10 --cidfile=%t/%n.ctr-id\nExecStopPost=/usr/bin/podman rm -f --ignore -t 10 --cidfile=%t/%n.ctr-id\nType=notify\nNotifyAccess=all\n\n[Install]\nWantedBy=default.target"
-    }]
-  }
-}
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+    - name: core
+      password_hash: "$y$j9T$hUUbW8zoB.Qcmpwm4/RuK1$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529"
+
+storage:
+  links:
+    - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
+      target: /usr/lib/systemd/user/podman-auto-update.timer
+      user:
+        name: core
+      group:
+        name: core
+  directories:
+    - path: /home/core/.config
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/vol
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/vol/config
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/vol/data
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+  files:
+    - path: /etc/ssh/sshd_config.d/40-rhcos-defaults.conf
+      overwrite: true
+      contents:
+        inline: |
+          PasswordAuthentication yes
+    - path: /home/core/vol/config.yaml
+      contents:
+        inline: |
+          config-dir: /agent/config
+          data-dir: /agent/data
+          www-dir: /app/www
+          log-level: debug
+          source-id: @CONFIG_ID@
+          update-interval: 5s
+          planner-service:
+            service:
+              server: @CONFIG_SERVER@
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/containers/systemd/collector.network
+      contents:
+        inline: |
+          [Network]
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/containers/systemd/planner.volume
+      contents:
+        inline: |
+          [Volume]
+          VolumeName=planner.volume
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/systemd/user/planner-setup.service
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Prepare data volume for the container
+          Before=planner-agent.service
+
+          [Service]
+          ExecStart=/usr/bin/podman run --rm -v planner.volume:/agent -v /home/core/vol:/mnt:Z alpine sh -c "cp -r /mnt/* /agent/ && chmod -R a+rwx /agent"
+
+          Type=oneshot
+          RemainAfterExit=yes
+
+          [Install]
+          WantedBy=multi-user.target
+    - path: /home/core/.config/containers/systemd/planner-agent.container
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Planner agent quadlet
+          Wants=planner-setup.service
+
+          [Container]
+          Image=quay.io/kubev2v/migration-planner-agent
+          ContainerName=planner-agent
+          AutoUpdate=registry
+          Exec= -config /agent/config.yaml
+          PublishPort=3333:3333
+          Volume=planner.volume:/agent
+
+          [Install]
+          WantedBy=multi-user.target default.target
+    - path: /home/core/.config/containers/systemd/planner-agent-opa.container
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Collector quadlet
+          Before=planner-agent-collector.service
+
+          [Container]
+          ContainerName=opa
+          Image=quay.io/kubev2v/forklift-validation:release-v2.6.4
+          Entrypoint=/usr/bin/opa
+          PublishPort=8181:8181
+          Exec=run --server /usr/share/opa/policies
+          Network=collector.network
+
+          [Install]
+          WantedBy=multi-user.target default.target
+
+    - path: /home/core/.config/containers/systemd/planner-agent-collector.container
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=Collector quadlet
+          Wants=planner-agent-opa.service
+
+          [Container]
+          Image=quay.io/kubev2v/migration-planner-collector
+          ContainerName=migration-planner-collector
+          AutoUpdate=registry
+          Exec=/vol/data/credentials.json /vol/data/inventory.json
+          Volume=planner.volume:/vol
+          Environment=OPA_SERVER=opa:8181
+          Network=collector.network
+
+          [Service]
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target default.target

@@ -84,6 +84,21 @@ push-containers: build-containers
 	podman push $(MIGRATION_PLANNER_COLLECTOR_IMAGE):latest
 	podman push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
+deploy-on-openshift:
+	oc apply -f 'deploy/k8s/*-service.yaml'
+	oc apply -f 'deploy/k8s/*-secret.yaml'
+	oc create route edge planner --service=migration-planner-ui || true
+	oc expose service migration-planner-agent --name planner-agent || true
+	@config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
+	oc create secret generic migration-planner-secret --from-literal=config_server=http://$$config_server || true
+	oc apply -f deploy/k8s/
+
+undeploy-on-openshift:
+	oc delete route planner || true
+	oc delete route planner-agent || true
+	oc delete secret migration-planner-secret || true
+	oc delete -f deploy/k8s || true
+
 bin:
 	mkdir -p bin
 

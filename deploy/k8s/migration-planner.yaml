@@ -21,7 +21,7 @@ spec:
             requests:
               cpu: 300m
               memory: 400Mi
-          image: quay.io/machacekondra/migration-planner
+          image: quay.io/kubev2v/migration-planner-api
           imagePullPolicy: Always
           ports:
             - containerPort: 3443

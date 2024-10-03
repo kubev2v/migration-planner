@@ -2,13 +2,14 @@ package image
 
 import (
 	"archive/tar"
-	"encoding/base64"
 	"fmt"
 	"io"
 	"os"
 	"strings"
 	"time"
 
+	"github.com/coreos/butane/config"
+	"github.com/coreos/butane/config/common"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
@@ -110,22 +111,18 @@ func writeOvf(tw *tar.Writer) error {
 }
 
 func (o *Ova) generateIgnition() (string, error) {
-	ignitionContent := ""
-	ip := util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443")
-
-	cfgTemplate, err := os.ReadFile("data/config.yaml.template")
+	butaneTemplate, err := os.ReadFile("data/config.ign.template")
 	if err != nil {
-		return ignitionContent, fmt.Errorf("error reading OVF template file: %w", err)
+		return "", fmt.Errorf("error reading ignition template file: %w", err)
 	}
-	cfgContent := strings.Replace(string(cfgTemplate), "@CONFIG_ID@", fmt.Sprintf("%s", o.Id), -1)
-	cfgContent = strings.Replace(string(cfgContent), "@CONFIG_SERVER@", ip, -1)
 
-	// gen config.ign
-	ignTemplate, err := os.ReadFile("data/config.ign.template")
+	butaneContent := strings.Replace(string(butaneTemplate), "@CONFIG_ID@", o.Id.String(), -1)
+	butaneContent = strings.Replace(butaneContent, "@CONFIG_SERVER@", util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"), -1)
+
+	dataOut, _, err := config.TranslateBytes([]byte(butaneContent), common.TranslateBytesOptions{})
 	if err != nil {
-		return ignitionContent, fmt.Errorf("error reading OVF template file: %w", err)
+		return "", fmt.Errorf("error translating config: %w", err)
 	}
-	ignitionContent = strings.Replace(string(ignTemplate), "@CONFIG_DATA@", base64.StdEncoding.EncodeToString([]byte(cfgContent)), -1)
 
-	return ignitionContent, nil
+	return string(dataOut), nil
 }
