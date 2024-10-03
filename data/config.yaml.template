@@ -1,9 +1,0 @@
-config-dir: /agent/config
-data-dir: /agent/data
-www-dir: /agent/www/package/dist
-log-level: debug
-source-id: @CONFIG_ID@
-update-interval: 5s
-planner-service:
-  service:
-    server: @CONFIG_SERVER@

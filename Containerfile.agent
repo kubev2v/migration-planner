@@ -1,3 +1,10 @@
+FROM docker.io/library/alpine as ui
+
+WORKDIR /app
+RUN mkdir /app/www && \
+     wget -O /tmp/agent-1.0.0-alpha.tgz https://github.com/machacekondra/planner-agent-ui/releases/download/0.0.1/agent-1.0.0-alpha.tgz && \
+     tar xf /tmp/agent-1.0.0-alpha.tgz -C /app/www
+
 # Builder container
 FROM registry.access.redhat.com/ubi9/go-toolset as builder
 
@@ -15,6 +22,7 @@ FROM registry.access.redhat.com/ubi9/ubi-micro
 WORKDIR /app
 
 COPY --from=builder /planner-agent /app/
+COPY --from=ui /app/www/package/dist /app/www
 
 # Use non-root user
 RUN chown -R 1001:0 /app
