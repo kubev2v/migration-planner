@@ -1,0 +1,148 @@
+- name: Setup dev env
+  gather_facts: true
+  hosts: localhost
+
+  tasks:
+    - name: Set facts about images
+      ansible.builtin.set_fact:
+        agent_ui_image: quay.io/kubev2v/planner-agent-ui:latest
+        agent_image: localhost/planner-agent:latest
+        forklift_validation_image: quay.io/kubev2v/forklift-validation:release-v2.6.4
+        collector_image: localhost/planner-collector:latest
+        planner_api_image: localhost/planner-api:latest
+        db_image: quay.io/sclorg/postgresql-12-c8s:latest
+        db_port: 5432
+        state: "{{ state | default('present') }}"
+
+    - name: Create env
+      when: state == "present"
+      block:
+        - name: Remove older dev pod
+          containers.podman.podman_pod:
+            name: planner
+            state: absent
+          ignore_errors: true
+        
+        - name: Remove kube yml
+          ansible.builtin.file:
+            path: "{{ playbook_dir }}/kube.yml"
+            state: absent
+
+        - name: Build images
+          containers.podman.podman_image:
+            name: "{{ item.name }}"
+            build:
+              file: "{{ item.path }}"
+            state: build
+          loop:
+            - { name: 'planner-agent', path: '{{ playbook_dir | dirname }}/Dockerfile.agent' }
+            - { name: 'planner-collector', path: '{{ playbook_dir | dirname }}/Dockerfile.collector' }
+            - { name: 'planner-api', path: '{{ playbook_dir | dirname }}/Dockerfile.planner-api' }
+
+        - name: Generate kube file
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/kube.yml.j2"
+            dest: "{{ playbook_dir }}/kube.yml"
+            owner: "{{ ansible_user_id }}"
+            group: "{{ ansible_user_id }}"
+            mode: "0644"
+        
+        - name: Create apps network
+          containers.podman.podman_network:
+            name: planner
+
+        - name: Start pod
+          containers.podman.podman_play:
+            kube_file: "{{ playbook_dir }}/kube.yml"
+            network:
+              - planner
+            state: started
+        
+        - name: Init postgres
+          block:
+            - name: Wait for db container to start
+              community.postgresql.postgresql_ping:
+                db: planner
+                login_host: localhost
+                login_user: admin
+                login_password: adminpass
+              register: result
+              until: result.is_available
+
+            - name: Alter admin role
+              containers.podman.podman_container_exec:
+                name: planner-db
+                argv:
+                  - psql
+                  - -c
+                  - 'ALTER ROLE admin WITH SUPERUSER'
+
+            - name: Create db
+              containers.podman.podman_container_exec:
+                name: planner-db
+                argv:
+                  - createdb
+                  - admin
+              ignore_errors: true
+              
+        - name: Start collector container
+          containers.podman.podman_container:
+            name: planner-collector
+            image: "{{ collector_image }}"
+            volumes_from:
+              - planner-agent
+            command: 
+              - /app/collector
+              - /data/credentials.json
+              - /data/inventory
+            force_restart: true
+            network:
+              - planner
+            state: started
+            restart_policy: always
+
+    - name: Destroy env
+      when: state == "absent"
+      block:
+        - name: Remove kube yml
+          ansible.builtin.file:
+            path: "{{ playbook_dir }}/kube.yml"
+            state: absent
+
+        - name: Generate kube file
+          ansible.builtin.template:
+            src: "{{ playbook_dir }}/kube.yml.j2"
+            dest: "{{ playbook_dir }}/kube.yml"
+            owner: "{{ ansible_user_id }}"
+            group: "{{ ansible_user_id }}"
+            mode: "0644"
+
+        - name: Stop collector container
+          containers.podman.podman_container:
+            name: planner-collector
+            state: absent
+        
+        - name: Stop planner api container
+          containers.podman.podman_container:
+            name: planner-api
+            state: absent
+
+        - name: Stop pod
+          containers.podman.podman_play:
+            kube_file: "{{ playbook_dir }}/kube.yml"
+            state: absent
+
+        - name: Remove volumes
+          containers.podman.podman_volume:
+            name: "{{ item }}"
+            state: absent
+          loop:
+            - agent-config
+            - agent_config_folder
+            - agent_data
+
+        - name: Remove kube file
+          ansible.builtin.file:
+            path: "{{ playbook_dir }}/kube.yml"
+            state: absent
+          ignore_errors: true
