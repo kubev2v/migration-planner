@@ -78,7 +78,7 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.config/systemd/user/planner-setup.service
+    - path: /home/core/.config/containers/systemd/planner-setup.container
       mode: 0644
       contents:
         inline: |
@@ -86,14 +86,18 @@ storage:
           Description=Prepare data volume for the container
           Before=planner-agent.service
 
-          [Service]
-          ExecStart=/usr/bin/podman run --rm -v planner.volume:/agent -v /home/core/vol:/mnt:Z alpine sh -c "cp -r /mnt/* /agent/ && chmod -R a+rwx /agent"
+          [Container]
+          Image=registry.access.redhat.com/ubi9/ubi-micro
+          Exec=sh -c "cp -r /mnt/* /agent/ && chmod -R a+rwx /agent"
+          Volume=planner.volume:/agent
+          Volume=/home/core/vol:/mnt:Z
 
+          [Service]
           Type=oneshot
           RemainAfterExit=yes
 
           [Install]
-          WantedBy=multi-user.target
+          WantedBy=multi-user.target default.target
     - path: /home/core/.config/containers/systemd/planner-agent.container
       mode: 0644
       contents:
@@ -103,7 +107,7 @@ storage:
           Wants=planner-setup.service
 
           [Container]
-          Image=quay.io/kubev2v/migration-planner-agent
+          Image=@MIGRATION_PLANNER_AGENT_IMAGE@
           ContainerName=planner-agent
           AutoUpdate=registry
           Exec= -config /agent/config.yaml
@@ -140,7 +144,7 @@ storage:
           Wants=planner-agent-opa.service
 
           [Container]
-          Image=quay.io/kubev2v/migration-planner-collector
+          Image=@MIGRATION_PLANNER_COLLECTOR_IMAGE@
           ContainerName=migration-planner-collector
           AutoUpdate=registry
           Exec=/vol/data/credentials.json /vol/data/inventory.json

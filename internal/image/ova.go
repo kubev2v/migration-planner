@@ -118,6 +118,8 @@ func (o *Ova) generateIgnition() (string, error) {
 
 	butaneContent := strings.Replace(string(butaneTemplate), "@CONFIG_ID@", o.Id.String(), -1)
 	butaneContent = strings.Replace(butaneContent, "@CONFIG_SERVER@", util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"), -1)
+	butaneContent = strings.Replace(butaneContent, "@MIGRATION_PLANNER_COLLECTOR_IMAGE@", util.GetEnv("MIGRATION_PLANNER_COLLECTOR_IMAGE", "quay.io/kubev2v/migration-planner-collector"), -1)
+	butaneContent = strings.Replace(butaneContent, "@MIGRATION_PLANNER_AGENT_IMAGE@", util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"), -1)
 
 	dataOut, _, err := config.TranslateBytes([]byte(butaneContent), common.TranslateBytesOptions{})
 	if err != nil {
