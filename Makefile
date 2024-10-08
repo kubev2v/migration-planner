@@ -9,6 +9,7 @@ VERBOSE ?= false
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_COLLECTOR_IMAGE ?= quay.io/kubev2v/migration-planner-collector
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
+MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -85,6 +86,8 @@ push-containers: build-containers
 	podman push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
 deploy-on-openshift:
+	sed 's|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
 	oc apply -f 'deploy/k8s/*-service.yaml'
 	oc apply -f 'deploy/k8s/*-secret.yaml'
 	oc create route edge planner --service=migration-planner-ui || true
