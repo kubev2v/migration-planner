@@ -18,6 +18,7 @@ type Source struct {
 	Name       string
 	Status     string
 	StatusInfo string
+	SshKey     string
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	CredUrl    *string
 }
@@ -30,7 +31,7 @@ func (s Source) String() string {
 }
 
 func NewSourceFromApiCreateResource(resource *api.SourceCreate) *Source {
-	return &Source{ID: uuid.New(), Name: resource.Name}
+	return &Source{ID: uuid.New(), Name: resource.Name, SshKey: resource.SshKey}
 }
 
 func NewSourceFromId(id uuid.UUID) *Source {
@@ -48,6 +49,7 @@ func (s *Source) ToApiResource() api.Source {
 		CredentialUrl: s.CredUrl,
 		CreatedAt:     s.CreatedAt,
 		UpdatedAt:     s.UpdatedAt,
+		SshKey:        s.SshKey,
 	}
 
 	if s.Inventory != nil {
