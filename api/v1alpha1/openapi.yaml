@@ -234,6 +234,8 @@ components:
         updatedAt:
           type: string
           format: date-time
+        sshKey:
+          type: string
       required:
         - id
         - name
@@ -241,14 +243,18 @@ components:
         - statusInfo
         - createdAt
         - updatedAt
+        - sshKey
 
     SourceCreate:
       type: object
       properties:
         name:
           type: string
+        sshKey:
+          type: string
       required:
         - name
+        - sshKey
 
     SourceList:
       type: array

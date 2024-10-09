@@ -4,6 +4,8 @@ passwd:
   users:
     - name: core
       password_hash: "$y$j9T$hUUbW8zoB.Qcmpwm4/RuK1$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529"
+      ssh_authorized_keys:
+        - @SSH_KEY@
 
 storage:
   links:
