@@ -7,13 +7,16 @@ import (
 	"net/http"
 	"net/url"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
+	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/vmware/govmomi/session/cache"
+	"github.com/vmware/govmomi"
+	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
 )
@@ -54,9 +57,9 @@ type Credentials struct {
 }
 
 func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWriter, r *http.Request) {
-	var credentials Credentials
+	credentials := &Credentials{}
 
-	err := json.NewDecoder(r.Body).Decode(&credentials)
+	err := json.NewDecoder(r.Body).Decode(credentials)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -68,9 +71,9 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 	}
 
 	log.Info("received credentials")
-	err = testVmwareConnection(log, credentials)
+	status, err := testVmwareConnection(r.Context(), log, credentials)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, err.Error(), status)
 		return
 	}
 
@@ -88,20 +91,47 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 	w.WriteHeader(204)
 }
 
-func testVmwareConnection(log *log.PrefixLogger, credentials Credentials) error {
-	u, err := soap.ParseURL(credentials.URL)
+func parseUrl(credentials *Credentials) (*url.URL, error) {
+	u, err := url.Parse(credentials.URL)
 	if err != nil {
-		return err
+		return nil, err
 	}
+	if u.Path == "" || u.Path == "/" {
+		u.Path = "/sdk"
+	}
+	credentials.URL = u.String()
 	u.User = url.UserPassword(credentials.Username, credentials.Password)
-	s := &cache.Session{URL: u, Reauth: true, Insecure: true}
-	c := new(vim25.Client)
-	log.Info("logging into vmware using received credentials")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	err = s.Login(ctx, c, nil)
+	return u, nil
+}
+
+func testVmwareConnection(requestCtx context.Context, log *log.PrefixLogger, credentials *Credentials) (status int, err error) {
+	u, err := parseUrl(credentials)
 	if err != nil {
-		return err
+		return http.StatusBadRequest, liberr.Wrap(err)
 	}
-	return s.Logout(ctx, c)
+
+	ctx, cancel := context.WithTimeout(requestCtx, 10*time.Second)
+	defer cancel()
+	vimClient, err := vim25.NewClient(ctx, soap.NewClient(u, true))
+	if err != nil {
+		return http.StatusBadRequest, liberr.Wrap(err)
+	}
+	client := &govmomi.Client{
+		SessionManager: session.NewManager(vimClient),
+		Client:         vimClient,
+	}
+	log.Info("logging into vmware using received credentials")
+	err = client.Login(ctx, u.User)
+	if err != nil {
+		err = liberr.Wrap(err)
+		if strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
+			return http.StatusUnauthorized, err
+		}
+		return http.StatusBadRequest, err
+	}
+
+	client.Logout(ctx)
+	client.CloseIdleConnections()
+
+	return http.StatusAccepted, nil
 }
