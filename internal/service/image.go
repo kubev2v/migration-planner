@@ -15,7 +15,11 @@ func (h *ServiceHandler) GetSourceImage(ctx context.Context, request server.GetS
 	if !ok {
 		return server.GetSourceImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
-	ova := &image.Ova{Id: request.Id, Writer: writer}
+	result, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		return server.GetSourceImage404JSONResponse{}, nil
+	}
+	ova := &image.Ova{Id: request.Id, SshKey: result.SshKey, Writer: writer}
 	if err := ova.Generate(); err != nil {
 		return server.GetSourceImage500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
 	}
