@@ -5,7 +5,7 @@ passwd:
     - name: core
       password_hash: "$y$j9T$hUUbW8zoB.Qcmpwm4/RuK1$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529"
       ssh_authorized_keys:
-        - @SSH_KEY@
+        - {{.SshKey}}
 
 storage:
   links:
@@ -53,11 +53,11 @@ storage:
           data-dir: /agent/data
           www-dir: /app/www
           log-level: debug
-          source-id: @CONFIG_ID@
+          source-id: {{.SourceId}}
           update-interval: 5s
           planner-service:
             service:
-              server: @CONFIG_SERVER@
+              server: {{.PlannerService}}
       mode: 0644
       user:
         name: core
@@ -109,7 +109,7 @@ storage:
           Wants=planner-setup.service
 
           [Container]
-          Image=@MIGRATION_PLANNER_AGENT_IMAGE@
+          Image={{.MigrationPlannerAgentImage}}
           ContainerName=planner-agent
           AutoUpdate=registry
           Exec= -config /agent/config.yaml
@@ -146,7 +146,7 @@ storage:
           Wants=planner-agent-opa.service
 
           [Container]
-          Image=@MIGRATION_PLANNER_COLLECTOR_IMAGE@
+          Image={{.MigrationPlannerCollectorImage}}
           ContainerName=migration-planner-collector
           AutoUpdate=registry
           Exec=/vol/data/credentials.json /vol/data/inventory.json
