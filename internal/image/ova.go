@@ -2,10 +2,11 @@ package image
 
 import (
 	"archive/tar"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	"text/template"
 	"time"
 
 	"github.com/coreos/butane/config"
@@ -24,6 +25,15 @@ type Ova struct {
 	Id     uuid.UUID
 	Writer io.Writer
 	SshKey string
+}
+
+// IgnitionData defines modifiable fields in ignition config
+type IgnitionData struct {
+	SourceId                       string
+	SshKey                         string
+	PlannerService                 string
+	MigrationPlannerCollectorImage string
+	MigrationPlannerAgentImage     string
 }
 
 type Image interface {
@@ -112,18 +122,24 @@ func writeOvf(tw *tar.Writer) error {
 }
 
 func (o *Ova) generateIgnition() (string, error) {
-	butaneTemplate, err := os.ReadFile("data/config.ign.template")
-	if err != nil {
-		return "", fmt.Errorf("error reading ignition template file: %w", err)
+	ignData := IgnitionData{
+		SourceId:                       o.Id.String(),
+		SshKey:                         o.SshKey,
+		PlannerService:                 util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
+		MigrationPlannerCollectorImage: util.GetEnv("MIGRATION_PLANNER_COLLECTOR_IMAGE", "quay.io/kubev2v/migration-planner-collector"),
+		MigrationPlannerAgentImage:     util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
 	}
 
-	butaneContent := strings.Replace(string(butaneTemplate), "@CONFIG_ID@", o.Id.String(), -1)
-	butaneContent = strings.Replace(butaneContent, "@SSH_KEY@", o.SshKey, -1)
-	butaneContent = strings.Replace(butaneContent, "@CONFIG_SERVER@", util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"), -1)
-	butaneContent = strings.Replace(butaneContent, "@MIGRATION_PLANNER_COLLECTOR_IMAGE@", util.GetEnv("MIGRATION_PLANNER_COLLECTOR_IMAGE", "quay.io/kubev2v/migration-planner-collector"), -1)
-	butaneContent = strings.Replace(butaneContent, "@MIGRATION_PLANNER_AGENT_IMAGE@", util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"), -1)
+	var buf bytes.Buffer
+	t, err := template.New("ignition.template").ParseFiles("data/ignition.template")
+	if err != nil {
+		return "", fmt.Errorf("error reading the ignition template: %w", err)
+	}
+	if err := t.Execute(&buf, ignData); err != nil {
+		return "", fmt.Errorf("error parsing the ignition template: %w", err)
+	}
 
-	dataOut, _, err := config.TranslateBytes([]byte(butaneContent), common.TranslateBytesOptions{})
+	dataOut, _, err := config.TranslateBytes(buf.Bytes(), common.TranslateBytesOptions{})
 	if err != nil {
 		return "", fmt.Errorf("error translating config: %w", err)
 	}
