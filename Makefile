@@ -10,6 +10,7 @@ MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_COLLECTOR_IMAGE ?= quay.io/kubev2v/migration-planner-collector
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
+DOWNLOAD_RHCOS ?= true
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -42,6 +43,18 @@ help:
 	@echo "    build:           run all builds"
 	@echo "    clean:           clean up all containers and volumes"
 
+GOBIN = $(shell pwd)/bin
+GINKGO = $(GOBIN)/ginkgo
+ginkgo: ## Download ginkgo locally if necessary.
+ifeq (, $(shell which ginkgo 2> /dev/null))
+	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+endif
+
+TEST_PACKAGES := ./...
+GINKGO_OPTIONS ?= --skip e2e
+test: ginkgo
+	$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(GINKGO_OPTIONS) $(TEST_PACKAGES)
+
 generate:
 	go generate -v $(shell go list ./...)
 	hack/mockgen.sh
@@ -50,10 +63,12 @@ tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
 
 lint: tools
-	$(GOBIN)/golangci-lint run -v
+	$(GOBIN)/golangci-lint run -v --timeout 2m
 
 image:
+ifeq ($(DOWNLOAD_RHCOS), true)
 	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
+endif
 
 build: bin image
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
