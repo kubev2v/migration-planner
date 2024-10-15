@@ -21,6 +21,7 @@ type Source struct {
 	SshKey     string
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	CredUrl    *string
+	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`
 }
 
 type SourceList []Source
