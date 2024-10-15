@@ -199,6 +199,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/agents:
+    get:
+      tags:
+        - agent
+      description: list agents
+      operationId: listAgents
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /health:
     get:
       tags:
@@ -442,3 +461,36 @@ components:
             type: string
           count:
             type: integer
+
+    Agent:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
+        statusInfo:
+          type: string
+        credentialUrl:
+          type: string
+        sourceId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - status
+        - statusInfo
+        - credentialUrl
+        - createdAt
+        - updatedAt
+
+    AgentList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Agent'
