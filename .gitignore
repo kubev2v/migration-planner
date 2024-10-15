@@ -10,3 +10,4 @@ examples/config.ign
 examples/config.yaml
 *.local.*
 /tmp/
+cover.out
