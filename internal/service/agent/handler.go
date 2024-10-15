@@ -35,3 +35,7 @@ func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.He
 	// NO-OP
 	return nil, nil
 }
+
+func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request agentServer.UpdateAgentStatusRequestObject) (agentServer.UpdateAgentStatusResponseObject, error) {
+	return nil, nil
+}
