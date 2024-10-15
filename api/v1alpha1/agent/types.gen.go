@@ -7,6 +7,14 @@ import (
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
+// AgentStatusUpdate defines model for AgentStatusUpdate.
+type AgentStatusUpdate struct {
+	CredentialUrl string `json:"credentialUrl"`
+	Id            string `json:"id"`
+	Status        string `json:"status"`
+	StatusInfo    string `json:"statusInfo"`
+}
+
 // SourceStatusUpdate defines model for SourceStatusUpdate.
 type SourceStatusUpdate struct {
 	CredentialUrl string                  `json:"credentialUrl"`
@@ -14,6 +22,9 @@ type SourceStatusUpdate struct {
 	Status        string                  `json:"status"`
 	StatusInfo    string                  `json:"statusInfo"`
 }
+
+// UpdateAgentStatusJSONRequestBody defines body for UpdateAgentStatus for application/json ContentType.
+type UpdateAgentStatusJSONRequestBody = AgentStatusUpdate
 
 // ReplaceSourceStatusJSONRequestBody defines body for ReplaceSourceStatus for application/json ContentType.
 type ReplaceSourceStatusJSONRequestBody = SourceStatusUpdate

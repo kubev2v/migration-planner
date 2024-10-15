@@ -53,6 +53,42 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/agents/{id}/status:
+    put:
+      tags:
+        - agent
+      description: update status of the agent
+      operationId: updateAgentStatus
+      parameters:
+        - name: id
+          in: path
+          description: ID the agent
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentStatusUpdate'
+      responses:
+        "200":
+          description: OK
+        "201":
+          description: OK
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "410":
+          description: Gone
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /health:
     get:
       tags:
@@ -80,3 +116,19 @@ components:
         - status
         - statusInfo
         - credentialUrl
+    AgentStatusUpdate:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        statusInfo:
+          type: string
+        credentialUrl:
+          type: string
+      required:
+        - status
+        - statusInfo
+        - credentialUrl
+        - id

@@ -20,6 +20,9 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (PUT /api/v1/agents/{id}/status)
+	UpdateAgentStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (PUT /api/v1/sources/{id}/status)
 	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -30,6 +33,11 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (PUT /api/v1/agents/{id}/status)
+func (_ Unimplemented) UpdateAgentStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (PUT /api/v1/sources/{id}/status)
 func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
@@ -49,6 +57,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// UpdateAgentStatus operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAgentStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAgentStatus(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // ReplaceSourceStatus operation middleware
 func (siw *ServerInterfaceWrapper) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +239,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/agents/{id}/status", wrapper.UpdateAgentStatus)
+	})
+	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.ReplaceSourceStatus)
 	})
 	r.Group(func(r chi.Router) {
@@ -212,6 +249,49 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 
 	return r
+}
+
+type UpdateAgentStatusRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateAgentStatusJSONRequestBody
+}
+
+type UpdateAgentStatusResponseObject interface {
+	VisitUpdateAgentStatusResponse(w http.ResponseWriter) error
+}
+
+type UpdateAgentStatus200Response struct {
+}
+
+func (response UpdateAgentStatus200Response) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type UpdateAgentStatus201Response struct {
+}
+
+func (response UpdateAgentStatus201Response) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.WriteHeader(201)
+	return nil
+}
+
+type UpdateAgentStatus401JSONResponse externalRef0.Error
+
+func (response UpdateAgentStatus401JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentStatus410JSONResponse externalRef0.Error
+
+func (response UpdateAgentStatus410JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(410)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type ReplaceSourceStatusRequestObject struct {
@@ -277,6 +357,9 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (PUT /api/v1/agents/{id}/status)
+	UpdateAgentStatus(ctx context.Context, request UpdateAgentStatusRequestObject) (UpdateAgentStatusResponseObject, error)
+
 	// (PUT /api/v1/sources/{id}/status)
 	ReplaceSourceStatus(ctx context.Context, request ReplaceSourceStatusRequestObject) (ReplaceSourceStatusResponseObject, error)
 
@@ -311,6 +394,39 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// UpdateAgentStatus operation middleware
+func (sh *strictHandler) UpdateAgentStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateAgentStatusRequestObject
+
+	request.Id = id
+
+	var body UpdateAgentStatusJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAgentStatus(ctx, request.(UpdateAgentStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAgentStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAgentStatusResponseObject); ok {
+		if err := validResponse.VisitUpdateAgentStatusResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ReplaceSourceStatus operation middleware

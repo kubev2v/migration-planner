@@ -9,6 +9,16 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AgentStatus.
+const (
+	AgentStatusError                     AgentStatus = "error"
+	AgentStatusGatheringInitialInventory AgentStatus = "gathering-initial-inventory"
+	AgentStatusNotConnected              AgentStatus = "not-connected"
+	AgentStatusSourceGone                AgentStatus = "source-gone"
+	AgentStatusUpToDate                  AgentStatus = "up-to-date"
+	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
+)
+
 // Defines values for InfraNetworksType.
 const (
 	Distributed InfraNetworksType = "distributed"
@@ -23,6 +33,23 @@ const (
 	SourceStatusUpToDate                  SourceStatus = "up-to-date"
 	SourceStatusWaitingForCredentials     SourceStatus = "waiting-for-credentials"
 )
+
+// Agent defines model for Agent.
+type Agent struct {
+	CreatedAt     time.Time   `json:"createdAt"`
+	CredentialUrl string      `json:"credentialUrl"`
+	Id            string      `json:"id"`
+	SourceId      *string     `json:"sourceId,omitempty"`
+	Status        AgentStatus `json:"status"`
+	StatusInfo    string      `json:"statusInfo"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
+}
+
+// AgentStatus defines model for Agent.Status.
+type AgentStatus string
+
+// AgentList defines model for AgentList.
+type AgentList = []Agent
 
 // Error defines model for Error.
 type Error struct {
