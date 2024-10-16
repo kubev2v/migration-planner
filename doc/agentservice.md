@@ -1,11 +1,11 @@
 # Agent service
-Agent service is responsible for serving collected data to the user. Once user create a source for his vCenter environment the Agent service provide a streaming service to download OVA image that is ready to be booted on the vCenter enviroment to run the collection of the data.
+The Agent service is responsible for receiving and serving the collected vCenter data to the user. Once the user creates a source for their vCenter environment, the Agent service will provide a streaming service to download an OVA image. The OVA image can be booted on the vCenter enviroment to perform the collection of the vCenter data.
 
 ## Agent API
 There are two APIs related to the Agent.
 
 ### Internal API
-Internal Agent API exposed for the UI. This API contains operations to create source, download OVA, etc. By default running on port 3443. This API is not exposed externaly to users, it's used only internally by UI.
+The API contains operations to create a source, download the OVA image, etc. By default it runs on tcp port 3443. The API is not exposed externally to users, as it is only used internally by the UI.
 
 ### Agent API
-The Agent API is exposed for the communication with the Agent VM. The only operation is to update the status of the source. By default running on port 7443. This API must be externally exposed, so agent VM can send over data.
+The Agent API is exposed to communicate with the Agent VM. Its only operation is to update the status of the source. By default it runs on tcp port 7443. This API must be externally exposed so that the agent VM can initiate communication with it.
