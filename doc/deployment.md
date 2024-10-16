@@ -31,8 +31,6 @@ Agent images are defined in the ignition file. So in order to modify the images 
 
 ```
 env:
-  - name: MIGRATION_PLANNER_COLLECTOR_IMAGE
-    value: quay.io/$USER/migration-planner-collector
   - name: MIGRATION_PLANNER_AGENT_IMAGE
     value: quay.io/$USER/migration-planner-agent
 ```

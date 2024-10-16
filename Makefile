@@ -7,7 +7,6 @@ GO_CACHE := -v $${HOME}/go/migration-planner-go-cache:/opt/app-root/src/go:Z -v 
 TIMEOUT ?= 30m
 VERBOSE ?= false
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
-MIGRATION_PLANNER_COLLECTOR_IMAGE ?= quay.io/kubev2v/migration-planner-collector
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 DOWNLOAD_RHCOS ?= true
@@ -81,23 +80,18 @@ build-api: bin
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
 	podman build -f Containerfile.agent -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
-bin/.migration-planner-collector-container: bin Containerfile.collector go.mod go.sum $(GO_FILES)
-	podman build -f Containerfile.collector -t $(MIGRATION_PLANNER_COLLECTOR_IMAGE):latest
-
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	podman build -f Containerfile.api -t $(MIGRATION_PLANNER_API_IMAGE):latest
 
 migration-planner-api-container: bin/.migration-planner-api-container
-migration-planner-collector-container: bin/.migration-planner-collector-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
 
-build-containers: migration-planner-api-container migration-planner-agent-container migration-planner-collector-container
+build-containers: migration-planner-api-container migration-planner-agent-container
 
 .PHONY: build-containers
 
 push-containers: build-containers
 	podman push $(MIGRATION_PLANNER_API_IMAGE):latest
-	podman push $(MIGRATION_PLANNER_COLLECTOR_IMAGE):latest
 	podman push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
 deploy-on-openshift:

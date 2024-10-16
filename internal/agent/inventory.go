@@ -28,8 +28,8 @@ type InventoryUpdater struct {
 }
 
 type InventoryData struct {
-	Inventory api.Inventory
-	Error     string
+	Inventory api.Inventory `json:"inventory"`
+	Error     string        `json:"error"`
 }
 
 func NewInventoryUpdater(log *log.PrefixLogger, config *Config, client client.Planner) *InventoryUpdater {
