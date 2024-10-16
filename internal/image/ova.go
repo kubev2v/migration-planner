@@ -29,11 +29,10 @@ type Ova struct {
 
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
-	SourceId                       string
-	SshKey                         string
-	PlannerService                 string
-	MigrationPlannerCollectorImage string
-	MigrationPlannerAgentImage     string
+	SourceId                   string
+	SshKey                     string
+	PlannerService             string
+	MigrationPlannerAgentImage string
 }
 
 type Image interface {
@@ -123,11 +122,10 @@ func writeOvf(tw *tar.Writer) error {
 
 func (o *Ova) generateIgnition() (string, error) {
 	ignData := IgnitionData{
-		SourceId:                       o.Id.String(),
-		SshKey:                         o.SshKey,
-		PlannerService:                 util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
-		MigrationPlannerCollectorImage: util.GetEnv("MIGRATION_PLANNER_COLLECTOR_IMAGE", "quay.io/kubev2v/migration-planner-collector"),
-		MigrationPlannerAgentImage:     util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
+		SourceId:                   o.Id.String(),
+		SshKey:                     o.SshKey,
+		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
+		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
 	}
 
 	var buf bytes.Buffer

@@ -92,6 +92,9 @@ func (a *Agent) Run(ctx context.Context) error {
 	}
 	healthChecker.Start(healthCheckCh)
 
+	collector := NewCollector(a.log, a.config.DataDir)
+	collector.collect(ctx)
+
 	inventoryUpdater := NewInventoryUpdater(a.log, a.config, client)
 	inventoryUpdater.UpdateServiceWithInventory(ctx)
 
