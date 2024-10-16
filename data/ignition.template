@@ -22,19 +22,19 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/vol
+    - path: /home/core/.migration-planner
       overwrite: true
       user:
         name: core
       group:
         name: core
-    - path: /home/core/vol/config
+    - path: /home/core/.migration-planner/config
       overwrite: true
       user:
         name: core
       group:
         name: core
-    - path: /home/core/vol/data
+    - path: /home/core/.migration.planner/data
       overwrite: true
       user:
         name: core
@@ -46,7 +46,7 @@ storage:
       contents:
         inline: |
           PasswordAuthentication yes
-    - path: /home/core/vol/config.yaml
+    - path: /home/core/.migration-planner/config/config.yaml
       contents:
         inline: |
           config-dir: /agent/config
@@ -63,7 +63,7 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.config/containers/systemd/collector.network
+    - path: /home/core/.config/containers/systemd/agent.network
       contents:
         inline: |
           [Network]
@@ -71,50 +71,24 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.config/containers/systemd/planner.volume
-      contents:
-        inline: |
-          [Volume]
-          VolumeName=planner.volume
-      user:
-        name: core
-      group:
-        name: core
-    - path: /home/core/.config/containers/systemd/planner-setup.container
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Prepare data volume for the container
-          Before=planner-agent.service
-
-          [Container]
-          Image=registry.access.redhat.com/ubi9/ubi-micro
-          Exec=sh -c "cp -r /mnt/* /agent/ && chmod -R a+rwx /agent"
-          Volume=planner.volume:/agent
-          Volume=/home/core/vol:/mnt:Z
-
-          [Service]
-          Type=oneshot
-          RemainAfterExit=yes
-
-          [Install]
-          WantedBy=multi-user.target default.target
     - path: /home/core/.config/containers/systemd/planner-agent.container
       mode: 0644
       contents:
         inline: |
           [Unit]
           Description=Planner agent quadlet
-          Wants=planner-setup.service
+          Wants=planner-agent-opa.service
 
           [Container]
           Image={{.MigrationPlannerAgentImage}}
           ContainerName=planner-agent
           AutoUpdate=registry
-          Exec= -config /agent/config.yaml
+          Exec= -config /agent/config/config.yaml
           PublishPort=3333:3333
-          Volume=planner.volume:/agent
+          Volume=/home/core/.migration-planner:/agent:Z
+          Environment=OPA_SERVER=opa:8181
+          Network=agent.network
+          UserNS=keep-id:uid=1001
 
           [Install]
           WantedBy=multi-user.target default.target
@@ -123,8 +97,8 @@ storage:
       contents:
         inline: |
           [Unit]
-          Description=Collector quadlet
-          Before=planner-agent-collector.service
+          Description=OPA quadlet
+          Before=planner-agent.service
 
           [Container]
           ContainerName=opa
@@ -132,30 +106,7 @@ storage:
           Entrypoint=/usr/bin/opa
           PublishPort=8181:8181
           Exec=run --server /usr/share/opa/policies
-          Network=collector.network
-
-          [Install]
-          WantedBy=multi-user.target default.target
-
-    - path: /home/core/.config/containers/systemd/planner-agent-collector.container
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=Collector quadlet
-          Wants=planner-agent-opa.service
-
-          [Container]
-          Image={{.MigrationPlannerCollectorImage}}
-          ContainerName=migration-planner-collector
-          AutoUpdate=registry
-          Exec=/vol/data/credentials.json /vol/data/inventory.json
-          Volume=planner.volume:/vol
-          Environment=OPA_SERVER=opa:8181
-          Network=collector.network
-
-          [Service]
-          Restart=on-failure
+          Network=agent.network
 
           [Install]
           WantedBy=multi-user.target default.target
