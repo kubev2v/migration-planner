@@ -130,7 +130,7 @@ func testVmwareConnection(requestCtx context.Context, log *log.PrefixLogger, cre
 		return http.StatusBadRequest, err
 	}
 
-	client.Logout(ctx)
+	_ = client.Logout(ctx)
 	client.CloseIdleConnections()
 
 	return http.StatusAccepted, nil
