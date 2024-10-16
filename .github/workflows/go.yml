@@ -28,3 +28,15 @@ jobs:
       run: |
         if [[ $(git ls-files --others --exclude-standard) ]]; then git ls-files --others --exclude-standard; echo "These files are not tracked by git"; exit 1; fi
         if [ -n "$(git status --porcelain)" ]; then echo "There are uncommitted changes:"; git status --short; exit 1; fi
+
+  Lint:
+    name: Lint code
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6.1.1
+        with:
+          args: --timeout=2m
