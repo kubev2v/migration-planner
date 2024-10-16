@@ -27,6 +27,8 @@ func handleGetLogin(log *log.PrefixLogger, wwwDir string) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "text/html")
 		w.Header().Set("Content-Length", strconv.Itoa(len(file)))
-		w.Write(file)
+		if _, err := w.Write(file); err != nil {
+			log.Warnf("Failed writing the content of %s", pathToIndeHtml)
+		}
 	}
 }
