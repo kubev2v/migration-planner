@@ -1,16 +1,17 @@
-package main
+package agent
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"net/http"
 	"os"
 	"path/filepath"
 	"slices"
+	"sync"
 	"time"
 
 	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
@@ -21,113 +22,128 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/log"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type VCenterCreds struct {
-	Url      string `json:"url"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+type Collector struct {
+	log     *log.PrefixLogger
+	dataDir string
+	once    sync.Once
 }
 
-func main() {
-	logger := log.New(os.Stdout, "*********** Collector: ", log.Ldate|log.Ltime|log.Lshortfile)
-	// Parse command-line arguments
-	if len(os.Args) < 3 {
-		fmt.Println("Usage: collector <creds_file> <inv_file>")
-		os.Exit(1)
+func NewCollector(log *log.PrefixLogger, dataDir string) *Collector {
+	return &Collector{
+		log:     log,
+		dataDir: dataDir,
 	}
-	credsFile := os.Args[1]
-	outputFile := os.Args[2]
+}
 
-	logger.Println("Wait for credentials")
-	waitForFile(credsFile)
+func (c *Collector) collect(ctx context.Context) {
+	c.once.Do(func() {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+					c.run()
+					return
+				}
+			}
+		}()
+	})
+}
 
-	logger.Println("Load credentials from file")
-	credsData, err := os.ReadFile(credsFile)
+func (c *Collector) run() {
+	credentialsFilePath := filepath.Join(c.dataDir, CredentialsFile)
+	c.log.Infof("Waiting for credentials")
+	waitForFile(credentialsFilePath)
+
+	credsData, err := os.ReadFile(credentialsFilePath)
 	if err != nil {
-		fmt.Printf("Error reading credentials file: %v\n", err)
-		os.Exit(1)
+		c.log.Errorf("Error reading credentials file: %v\n", err)
+		return
 	}
 
-	var creds VCenterCreds
+	var creds Credentials
 	if err := json.Unmarshal(credsData, &creds); err != nil {
-		fmt.Printf("Error parsing credentials JSON: %v\n", err)
-		os.Exit(1)
+		c.log.Errorf("Error parsing credentials JSON: %v\n", err)
+		return
 	}
 
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	logger.Println("Create Provider")
+	c.log.Infof("Create Provider")
 	provider := getProvider(creds)
 
-	logger.Println("Create Secret")
+	c.log.Infof("Create Secret")
 	secret := getSecret(creds)
 
-	logger.Println("Check if opaServer is responding")
+	c.log.Infof("Check if opaServer is responding")
 	resp, err := http.Get("http://" + opaServer + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
-		fmt.Println("OPA server " + opaServer + " is not responding")
+		c.log.Errorf("OPA server %s is not responding", opaServer)
 		return
 	}
 	defer resp.Body.Close()
 
-	logger.Println("Create DB")
+	c.log.Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
-		fmt.Println("Error creating DB.", err)
+		c.log.Errorf("Error creating DB: %s", err)
 		return
 	}
 
-	logger.Println("vSphere collector")
+	c.log.Infof("vSphere collector")
 	collector, err := createCollector(db, provider, secret)
 	if err != nil {
-		fmt.Println("Error creating collector.", err)
+		c.log.Errorf("Error running collector: %s", err)
 		return
 	}
 	defer collector.DB().Close(true)
 	defer collector.Shutdown()
 
-	logger.Println("List VMs")
+	c.log.Infof("List VMs")
 	vms := &[]vspheremodel.VM{}
 	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		fmt.Println(err)
+		c.log.Errorf("Error list database: %s", err)
 		return
 	}
 
-	logger.Println("List Hosts")
+	c.log.Infof("List Hosts")
 	hosts := &[]vspheremodel.Host{}
 	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		fmt.Println(err)
+		c.log.Errorf("Error list database: %s", err)
 		return
 	}
 
-	logger.Println("List Clusters")
+	c.log.Infof("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		fmt.Println(err)
+		c.log.Errorf("Error list database: %s", err)
 		return
 	}
 
-	logger.Println("Create inventory")
+	c.log.Infof("Create inventory")
 	inv := createBasicInventoryObj(vms, collector, hosts, clusters)
 
-	logger.Println("Run the validation of VMs")
+	c.log.Infof("Run the validation of VMs")
 	vms, err = validation(vms, opaServer)
 	if err != nil {
-		fmt.Println(err)
+		c.log.Errorf("Error running validation: %s", err)
 		return
 	}
 
-	logger.Println("Fill the inventory object with more data")
+	c.log.Infof("Fill the inventory object with more data")
 	fillInventoryObjectWithMoreData(vms, inv)
 
-	logger.Println("Write the inventory to output file")
-	if err := createOuput(outputFile, inv); err != nil {
-		fmt.Println("Error writing output:", err)
+	c.log.Infof("Write the inventory to output file")
+	if err := createOuput(filepath.Join(c.dataDir, InventoryFile), inv); err != nil {
+		c.log.Errorf("Fill the inventory object with more data: %s", err)
 		return
 	}
 }
@@ -214,17 +230,17 @@ func createBasicInventoryObj(vms *[]vspheremodel.VM, collector *vsphere.Collecto
 	}
 }
 
-func getProvider(creds VCenterCreds) *api.Provider {
+func getProvider(creds Credentials) *api.Provider {
 	vsphereType := api.VSphere
 	return &api.Provider{
 		Spec: api.ProviderSpec{
-			URL:  creds.Url,
+			URL:  creds.URL,
 			Type: &vsphereType,
 		},
 	}
 }
 
-func getSecret(creds VCenterCreds) *core.Secret {
+func getSecret(creds Credentials) *core.Secret {
 	return &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      "vsphere-secret",
@@ -559,9 +575,4 @@ type VMResult struct {
 
 type VMValidation struct {
 	Result []VMResult `json:"result"`
-}
-
-type InventoryData struct {
-	Inventory apiplanner.Inventory `json:"inventory"`
-	Error     string               `json:"error"`
 }
