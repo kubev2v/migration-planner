@@ -1,0 +1,78 @@
+name: Run e2e test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
+      PODMAN: "docker"
+
+    steps:
+      - name: Checkout the code
+        uses: actions/checkout@v2
+
+      - name: Temporary workaround
+        run: |
+          cat << EOF | sudo tee -a /etc/docker/daemon.json
+          {
+            "insecure-registries" : [ "${REGISTRY_IP}:5000" ]
+          }
+          EOF
+          sudo systemctl daemon-reload
+          sudo systemctl restart docker || true
+          sleep 10
+          sudo journalctl --no-pager -u docker
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+
+      - name: Setup libvirt
+        run: |
+          sudo apt update
+          sudo apt install sshpass libvirt-dev libvirt-daemon libvirt-daemon-system
+          sudo systemctl restart libvirtd
+
+      - name: Set env variables
+        run: |
+          echo "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')" >> $GITHUB_ENV
+          echo "MIGRATION_PLANNER_AGENT_IMAGE=${REGISTRY_IP}:5000/agent" >> $GITHUB_ENV
+
+      - name: Deploy vcsim
+        run: |
+          kubectl create deployment vcsim --image=docker.io/vmware/vcsim
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 deploy/vcsim 8989:8989 &
+
+      - name: Deploy registry
+        run: |
+          kubectl create deployment registry --image=docker.io/registry
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 deploy/registry 5000:5000 &
+
+      - name: Build assisted-migration containers
+        run: |
+          make migration-planner-agent-container
+          make migration-planner-api-container
+          docker push $MIGRATION_PLANNER_AGENT_IMAGE
+          kind load docker-image $MIGRATION_PLANNER_API_IMAGE
+
+      - name: Deploy assisted-migration
+        run: |
+          make deploy-on-kind
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
+          kubectl port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
+
+      - name: Run test
+        run: |
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
