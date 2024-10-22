@@ -41,6 +41,15 @@ storage:
       group:
         name: core
   files:
+    {{if .InsecureRegistry}}
+    - path: /etc/containers/registries.conf.d/myregistry.conf
+      overwrite: true
+      contents:
+        inline: |
+          [[registry]]
+          location = "{{.InsecureRegistry}}"
+          insecure = true
+    {{end}}
     - path: /etc/ssh/sshd_config.d/40-rhcos-defaults.conf
       overwrite: true
       contents:

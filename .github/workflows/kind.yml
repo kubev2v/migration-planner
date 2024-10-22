@@ -1,0 +1,93 @@
+name: Run e2e test
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
+      MIGRATION_PLANNER_API_IMAGE_PULL_POLICY: "Never"
+      PODMAN: "docker"
+
+    steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout the code
+        uses: actions/checkout@v2
+
+      - name: Set env variables
+        run: |
+          export "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')"
+          echo "REGISTRY_IP=${REGISTRY_IP}" >> $GITHUB_ENV
+          echo "MIGRATION_PLANNER_AGENT_IMAGE=${REGISTRY_IP}:5000/agent" >> $GITHUB_ENV
+          echo "INSECURE_REGISTRY=${REGISTRY_IP}:5000" >> $GITHUB_ENV
+
+      - name: Ignore insecure registry
+        run: |
+          cat << EOF > daemon.json
+          {
+            "insecure-registries" : [ "${INSECURE_REGISTRY}" ]
+          }
+          EOF
+          sudo mv daemon.json /etc/docker/daemon.json
+          sudo systemctl daemon-reload
+          sudo systemctl restart docker
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kind
+
+      - name: Setup libvirt
+        run: |
+          sudo apt update
+          sudo apt install sshpass libvirt-dev libvirt-daemon libvirt-daemon-system
+          sudo systemctl restart libvirtd
+
+      - name: Deploy vcsim
+        run: |
+          kubectl create deployment vcsim --image=docker.io/vmware/vcsim
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 deploy/vcsim 8989:8989 &
+
+      - name: Deploy registry
+        run: |
+          kubectl create deployment registry --image=docker.io/registry
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 deploy/registry 5000:5000 &
+
+      - name: Build assisted-migration containers
+        run: |
+          make migration-planner-agent-container MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE
+          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE
+          docker push $MIGRATION_PLANNER_AGENT_IMAGE
+          kind load docker-image $MIGRATION_PLANNER_API_IMAGE
+          docker rmi $MIGRATION_PLANNER_API_IMAGE
+
+      - name: Deploy assisted-migration
+        run: |
+          make deploy-on-kind MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=$MIGRATION_PLANNER_API_IMAGE_PULL_POLICY INSECURE_REGISTRY=$INSECURE_REGISTRY
+          kubectl wait --for=condition=Ready pods --all --timeout=240s
+          kubectl port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
+          kubectl port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
+
+      - name: Run test
+        run: |
+          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
