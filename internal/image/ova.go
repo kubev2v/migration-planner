@@ -33,6 +33,7 @@ type IgnitionData struct {
 	SshKey                     string
 	PlannerService             string
 	MigrationPlannerAgentImage string
+	InsecureRegistry           string
 }
 
 type Image interface {
@@ -126,6 +127,10 @@ func (o *Ova) generateIgnition() (string, error) {
 		SshKey:                     o.SshKey,
 		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
+	}
+
+	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {
+		ignData.InsecureRegistry = insecureRegistry
 	}
 
 	var buf bytes.Buffer
