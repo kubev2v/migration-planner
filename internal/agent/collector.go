@@ -276,6 +276,8 @@ func histogram(d []int) struct {
 		binIndex := int(float64(data-minVal) / binSize)
 		if binIndex == numberOfBins {
 			binIndex--
+		} else if binIndex < 0 {
+			binIndex = 0
 		}
 		bins[binIndex]++
 	}
