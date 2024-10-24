@@ -34,7 +34,7 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.migration.planner/data
+    - path: /home/core/.migration-planner/data
       overwrite: true
       user:
         name: core
