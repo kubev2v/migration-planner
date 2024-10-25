@@ -1,26 +1,35 @@
 package store
 
 import (
+	"context"
+
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
 type Store interface {
+	NewTransactionContext(ctx context.Context) (context.Context, error)
 	Source() Source
 	InitialMigration() error
 	Close() error
 }
 
 type DataStore struct {
-	source Source
 	db     *gorm.DB
+	source Source
+	log    logrus.FieldLogger
 }
 
 func NewStore(db *gorm.DB, log logrus.FieldLogger) Store {
 	return &DataStore{
-		source: NewSource(db, log),
 		db:     db,
+		log:    log,
+		source: NewSource(db, log),
 	}
+}
+
+func (s *DataStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
+	return newTransactionContext(ctx, s.db, s.log)
 }
 
 func (s *DataStore) Source() Source {
@@ -28,10 +37,18 @@ func (s *DataStore) Source() Source {
 }
 
 func (s *DataStore) InitialMigration() error {
-	if err := s.Source().InitialMigration(); err != nil {
+	ctx, err := s.NewTransactionContext(context.Background())
+	if err != nil {
 		return err
 	}
-	return nil
+
+	if err := s.Source().InitialMigration(ctx); err != nil {
+		_, _ = Rollback(ctx)
+		return err
+	}
+
+	_, err = Commit(ctx)
+	return err
 }
 
 func (s *DataStore) Close() error {
