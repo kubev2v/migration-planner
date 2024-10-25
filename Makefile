@@ -73,7 +73,10 @@ build: bin image
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/migration-planner-api
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api ...
+
+build-agent: bin
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent ...
 
 
 # rebuild container only on source changes
@@ -97,13 +100,12 @@ push-containers: build-containers
 deploy-on-openshift:
 	sed 's|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
-	oc apply -f 'deploy/k8s/*-service.yaml'
-	oc apply -f 'deploy/k8s/*-secret.yaml'
+	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui || true
 	oc expose service migration-planner-agent --name planner-agent || true
 	@config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
 	oc create secret generic migration-planner-secret --from-literal=config_server=http://$$config_server || true
-	oc apply -f deploy/k8s/
+	ls deploy/k8s | awk '! /secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
 
 undeploy-on-openshift:
 	oc delete route planner || true
