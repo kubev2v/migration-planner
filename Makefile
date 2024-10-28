@@ -114,7 +114,7 @@ deploy-on-kind:
 	$(KUBECTL) apply -f deploy/k8s/
 
 deploy-on-openshift:
-	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui || true
