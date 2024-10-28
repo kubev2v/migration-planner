@@ -10,7 +10,7 @@ MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
-INSECURE_REGISTRY ?= 
+INSECURE_REGISTRY ?= true
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
@@ -114,14 +114,14 @@ deploy-on-kind:
 	$(KUBECTL) apply -f deploy/k8s/
 
 deploy-on-openshift:
-	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui || true
 	oc expose service migration-planner-agent --name planner-agent || true
 	@config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
 	oc create secret generic migration-planner-secret --from-literal=config_server=http://$$config_server || true
-	ls deploy/k8s | awk '! /secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
+	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -f deploy/k8s/{}
 
 undeploy-on-openshift:
 	oc delete route planner || true
