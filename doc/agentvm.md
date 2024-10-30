@@ -32,10 +32,17 @@ $ systemctl --user status planner-agent
 ```
 
 ### Inspecting the host directory with data
-The ignition create a `.migration-planner` directory in `core` user home directory.
-This directory should contain all relevant data, so in order to find misconfiguration please search in this directory.
+When the virtual machine boots, ignition creates the `.migration-planner` directory in the `core` user's home directory.
+This directory contains two subdirectories: `data` and `config`.
+The `data` directory contains a `credentials.json` file, which is created when the user enters their vCenter credentials.
+It also contains an `inventory.json` file, which is created by the `planner-agent` service when vCenter data is fetched.
+The `config` directory contains a `config.yaml` file, which is created by ignition and contains configuration for the
+`planner-agent` service.
+
+To explore the data and configuration created and used by `planner-agent`:
 ```
-$ ls -l .migration-planner
+$ ls -l /home/core/.migration-planner/data
+$ cat /home/core/.migration-planner/config/config.yaml
 ```
 
 ### Check logs of the services
