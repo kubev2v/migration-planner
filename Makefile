@@ -10,6 +10,7 @@ MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
+MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 INSECURE_REGISTRY ?= true
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
@@ -106,22 +107,30 @@ push-containers: build-containers
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
 deploy-on-kind:
-	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
-	$(KUBECTL) apply -f 'deploy/k8s/*-service.yaml'
-	$(KUBECTL) apply -f 'deploy/k8s/*-secret.yaml'
+	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
+             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
+             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
+             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g" \
+             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
+	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
 	@config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	$(KUBECTL) create secret generic migration-planner-secret --from-literal=config_server=http://$$config_server:7443 || true
-	$(KUBECTL) apply -f deploy/k8s/
+	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=config_server=http://$$config_server:7443 || true
+	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/k8s/
 
 deploy-on-openshift:
-	sed 's|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g' deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
+	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
+             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
+             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
+             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g" \
+             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
-	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -f deploy/k8s/{}
-	oc create route edge planner --service=migration-planner-ui || true
-	oc expose service migration-planner-agent --name planner-agent || true
+	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
+	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
+	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
 	@config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
-	oc create secret generic migration-planner-secret --from-literal=config_server=http://$$config_server || true
-	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -f deploy/k8s/{}
+	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=config_server=http://$$config_server || true
+	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 
 undeploy-on-openshift:
 	oc delete route planner || true

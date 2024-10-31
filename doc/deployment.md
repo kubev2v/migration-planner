@@ -7,7 +7,8 @@ In order to deploy the Agent service on top of OpenShift there is Makefile targe
 
 ```
 $ oc login --token=$TOKEN --server=$SERVER
-$ make deploy-on-openshift
+$ oc new-project assisted-migration
+$ make deploy-on-openshift MIGRATION_PLANNER_NAMESPACE=assisted-migration
 ```
 
 The deployment process deploys all relevant parts of the project, including the UI and database.
