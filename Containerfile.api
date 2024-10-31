@@ -9,7 +9,7 @@ RUN go mod download
 COPY . .
 
 USER 0
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /planner-api cmd/planner-api/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /planner-api cmd/planner-api/*.go
 
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
@@ -25,4 +25,4 @@ USER 1001
 
 # Run the server
 EXPOSE 3443
-ENTRYPOINT ["/app/planner-api"]
+ENTRYPOINT ["/bin/bash", "-c", "/app/planner-api run"]
