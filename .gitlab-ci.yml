@@ -1,0 +1,19 @@
+stages:
+  - deploy
+
+deploy-job:
+  stage: deploy
+  environment: production
+  tags:
+    - shared
+  image:
+    name: fedora:latest
+  script:
+    - sudo dnf install -y make git
+    - curl -k -O https://mirror.openshift.com/pub/openshift-v4/clients/ocp/latest/openshift-client-linux.tar.gz
+    - tar xf openshift-client-linux.tar.gz
+    - chmod +x oc
+    - sudo mv oc /usr/local/bin
+    - oc login --insecure-skip-tls-verify --token=$TOKEN --server=$CNV_CLUSTER
+    - oc delete deploy migration-planner
+    - make deploy-on-openshift
