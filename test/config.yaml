@@ -1,0 +1,13 @@
+database:
+  hostname: localhost
+  name: planner
+  password: adminpass
+  port: 5432
+  type: pgsql
+  user: admin
+service:
+  address: :3443
+  agentEndpointAddress: :7443
+  baseAgentEndpointUrl: https://localhost:7443
+  baseUrl: https://localhost:3443
+  logLevel: info

@@ -70,6 +70,9 @@ tidy:
 lint: tools
 	$(GOBIN)/golangci-lint run -v --timeout 2m
 
+migrate:
+	./bin/planner-api migrate --config $(PWD)/test/config.yaml
+
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
 	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso

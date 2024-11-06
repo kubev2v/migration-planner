@@ -9,6 +9,11 @@ on:  # yamllint disable-line rule:truthy
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      PGHOST: localhost
+      PGDATABASE: planner
+      PGUSERNAME: admin
+      PGPASSWORD: adminpass
     steps:
     - uses: actions/checkout@v4
 
@@ -20,10 +25,42 @@ jobs:
         sudo apt update
         sudo apt install libvirt-dev
 
+    - name: Add PostgreSQL binaries to PATH
+      shell: bash
+      run: |
+        echo "$(pg_config --bindir)" >> $GITHUB_PATH
+    - name: Start preinstalled PostgreSQL
+      shell: bash
+      run: |
+        echo "Initializing database cluster..."
+        # Convert backslashes to forward slashes in RUNNER_TEMP for Windows Git Bash
+        export PGHOST="${RUNNER_TEMP//\\//}/postgres"
+        export PGDATA="$PGHOST/pgdata"
+        mkdir -p "$PGDATA"
+        
+        # initdb requires file for password in non-interactive mode
+        export PWFILE="$RUNNER_TEMP/pwfile"
+        echo "postgres" > "$PWFILE"
+        initdb --pgdata="$PGDATA" --username="postgres" --pwfile="$PWFILE"
+
+        echo "Starting PostgreSQL..."
+        echo "unix_socket_directories = '$PGHOST'" >> "$PGDATA/postgresql.conf"
+        pg_ctl start
+
+        echo "Creating user..."
+        psql --host "$PGHOST" --username="postgres" --dbname="postgres" --command="CREATE USER $PGUSERNAME PASSWORD '$PGPASSWORD'" --command="\du"
+
+        echo "Creating database..."
+        createdb --owner="$PGUSERNAME" --username="postgres" "$PGDATABASE"
+
     - name: Prepare
       run: |
         make generate
         DOWNLOAD_RHCOS=false make build
+
+    - name: Migrate the db
+      run: |
+        make migrate
 
     - name: Test
       run: |
