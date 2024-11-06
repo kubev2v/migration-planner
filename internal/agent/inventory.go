@@ -84,6 +84,7 @@ func (u *InventoryUpdater) initializeCredentialUrl() {
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	u.credUrl = fmt.Sprintf("http://%s:%d", localAddr.IP.String(), agentPort)
+	u.log.Infof("Discovered Agent IP address: %s", u.credUrl)
 }
 
 func calculateStatus(dataDir string) (api.SourceStatus, string, *api.Inventory) {

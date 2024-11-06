@@ -72,14 +72,6 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.config/containers/systemd/agent.network
-      contents:
-        inline: |
-          [Network]
-      user:
-        name: core
-      group:
-        name: core
     - path: /home/core/.config/containers/systemd/planner-agent.container
       mode: 0644
       contents:
@@ -95,8 +87,8 @@ storage:
           Exec= -config /agent/config/config.yaml
           PublishPort=3333:3333
           Volume=/home/core/.migration-planner:/agent:Z
-          Environment=OPA_SERVER=opa:8181
-          Network=agent.network
+          Environment=OPA_SERVER=127.0.0.1:8181
+          Network=host
           UserNS=keep-id:uid=1001
 
           [Install]
@@ -115,7 +107,7 @@ storage:
           Entrypoint=/usr/bin/opa
           PublishPort=8181:8181
           Exec=run --server /usr/share/opa/policies
-          Network=agent.network
+          Network=host
 
           [Install]
           WantedBy=multi-user.target default.target

@@ -41,6 +41,18 @@ var _ = Describe("e2e", func() {
 		Eventually(func() bool {
 			return agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())
+
+		Eventually(func() string {
+			s, err := svc.GetSource()
+			if err != nil {
+				return ""
+			}
+			if s.CredentialUrl != nil {
+				return *s.CredentialUrl
+			}
+
+			return ""
+		}, "3m", "2s").Should(Equal(fmt.Sprintf("http://%s:3333", agentIP)))
 	})
 
 	AfterEach(func() {
@@ -54,8 +66,11 @@ var _ = Describe("e2e", func() {
 
 	Context("Flow", func() {
 		It("Up to date", func() {
+			// Check that planner-agent service is running
 			r := agent.IsServiceRunning(agentIP, "planner-agent")
 			Expect(r).To(BeTrue())
+
+			// Put the vCenter credentials and check that source is up to date eventually
 			err = agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "pass")
 			Expect(err).To(BeNil())
 			Eventually(func() bool {
