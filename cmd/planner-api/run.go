@@ -27,11 +27,10 @@ var runCmd = &cobra.Command{
 		if configFile == "" {
 			configFile = config.ConfigFile()
 		}
-		cfg, err := config.NewFromFile(configFile)
+		cfg, err := config.LoadOrGenerate(configFile)
 		if err != nil {
 			log.Fatalf("reading configuration: %v", err)
 		}
-		log.Printf("Using config: %s", cfg)
 
 		logLvl, err := logrus.ParseLevel(cfg.Service.LogLevel)
 		if err != nil {
