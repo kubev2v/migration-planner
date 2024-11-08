@@ -2,6 +2,7 @@ package e2e_test
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -71,8 +72,9 @@ var _ = Describe("e2e", func() {
 			Expect(r).To(BeTrue())
 
 			// Put the vCenter credentials and check that source is up to date eventually
-			err = agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "pass")
+			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "pass")
 			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			Eventually(func() bool {
 				source, err := svc.GetSource()
 				if err != nil {
@@ -80,6 +82,12 @@ var _ = Describe("e2e", func() {
 				}
 				return source.Status == v1alpha1.SourceStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
+		})
+		It("Return 422 in case of wrong URL", func() {
+			// Put the vCenter credentials with wrong URL and check it return HTTP 422 error code
+			res, err := agent.Login("this is not URL", "user", "pass")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusUnprocessableEntity))
 		})
 	})
 })

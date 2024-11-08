@@ -88,11 +88,11 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 	}
 
 	log.Info("successfully wrote credentials to file")
-	w.WriteHeader(204)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func parseUrl(credentials *Credentials) (*url.URL, error) {
-	u, err := url.Parse(credentials.URL)
+	u, err := url.ParseRequestURI(credentials.URL)
 	if err != nil {
 		return nil, err
 	}
@@ -107,7 +107,7 @@ func parseUrl(credentials *Credentials) (*url.URL, error) {
 func testVmwareConnection(requestCtx context.Context, log *log.PrefixLogger, credentials *Credentials) (status int, err error) {
 	u, err := parseUrl(credentials)
 	if err != nil {
-		return http.StatusBadRequest, liberr.Wrap(err)
+		return http.StatusUnprocessableEntity, liberr.Wrap(err)
 	}
 
 	ctx, cancel := context.WithTimeout(requestCtx, 10*time.Second)
