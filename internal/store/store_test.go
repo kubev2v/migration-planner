@@ -27,14 +27,9 @@ var _ = Describe("Store", Ordered, func() {
 
 		store = st.NewStore(db, log.WithField("test", "store"))
 		Expect(store).ToNot(BeNil())
-
-		// migrate
-		err = store.InitialMigration()
-		Expect(err).To(BeNil())
 	})
 
 	AfterAll(func() {
-		gormDB.Exec("DROP TABLE sources;")
 		store.Close()
 	})
 
