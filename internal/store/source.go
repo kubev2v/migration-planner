@@ -13,7 +13,7 @@ import (
 )
 
 type Source interface {
-	List(ctx context.Context) (*api.SourceList, error)
+	List(ctx context.Context) (api.SourceList, error)
 	Create(ctx context.Context, sourceCreate api.SourceCreate) (*api.Source, error)
 	DeleteAll(ctx context.Context) error
 	Get(ctx context.Context, id uuid.UUID) (*api.Source, error)
@@ -38,14 +38,13 @@ func (s *SourceStore) InitialMigration(ctx context.Context) error {
 	return s.getDB(ctx).AutoMigrate(&model.Source{})
 }
 
-func (s *SourceStore) List(ctx context.Context) (*api.SourceList, error) {
+func (s *SourceStore) List(ctx context.Context) (api.SourceList, error) {
 	var sources model.SourceList
 	result := s.getDB(ctx).Model(&sources).Order("id").Find(&sources)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	apiSourceList := sources.ToApiResource()
-	return &apiSourceList, nil
+	return sources.ToApiResource(), nil
 }
 
 func (s *SourceStore) Create(ctx context.Context, sourceCreate api.SourceCreate) (*api.Source, error) {

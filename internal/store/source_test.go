@@ -46,13 +46,13 @@ var _ = Describe("source store", Ordered, func() {
 
 			sources, err := s.Source().List(context.TODO())
 			Expect(err).To(BeNil())
-			Expect(*sources).To(HaveLen(2))
+			Expect(sources).To(HaveLen(2))
 		})
 
 		It("list all sources -- no sources", func() {
 			sources, err := s.Source().List(context.TODO())
 			Expect(err).To(BeNil())
-			Expect(*sources).To(HaveLen(0))
+			Expect(sources).To(HaveLen(0))
 		})
 
 		AfterEach(func() {
