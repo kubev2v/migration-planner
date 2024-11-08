@@ -1,2 +1,2 @@
-# migration-planner
-Plan migrations to OpenShift Virtualization
+# Assisted migration
+Plan migrations to OpenShift Virtualization from VMware.
