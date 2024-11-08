@@ -32,7 +32,7 @@ var (
 
 type PlannerAgent interface {
 	Run(string) error
-	Login(url string, user string, pass string) error
+	Login(url string, user string, pass string) (*http.Response, error)
 	Remove() error
 	GetIp() (string, error)
 	IsServiceRunning(string, string) bool
@@ -111,10 +111,10 @@ func (p *plannerAgentLibvirt) prepareImage(sourceId string) error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) Login(url string, user string, pass string) error {
+func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http.Response, error) {
 	agentIP, err := p.GetIp()
 	if err != nil {
-		return fmt.Errorf("failed to get agent IP: %w", err)
+		return nil, fmt.Errorf("failed to get agent IP: %w", err)
 	}
 
 	credentials := map[string]string{
@@ -125,7 +125,7 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) error 
 
 	jsonData, err := json.Marshal(credentials)
 	if err != nil {
-		return fmt.Errorf("failed to marshal credentials: %w", err)
+		return nil, fmt.Errorf("failed to marshal credentials: %w", err)
 	}
 
 	resp, err := http.NewRequest(
@@ -134,18 +134,18 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) error 
 		bytes.NewBuffer(jsonData),
 	)
 	if err != nil {
-		return fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	resp.Header.Set("Content-Type", "application/json")
 
 	client := &http.Client{}
 	response, err := client.Do(resp)
 	if err != nil {
-		return fmt.Errorf("failed to send request: %w", err)
+		return response, fmt.Errorf("failed to send request: %w", err)
 	}
 	defer response.Body.Close()
 
-	return nil
+	return response, nil
 }
 
 func (p *plannerAgentLibvirt) RestartService() error {
