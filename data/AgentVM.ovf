@@ -11,7 +11,7 @@
   </NetworkSection>
   <VirtualSystem ovf:id="AgentVM">
     <Info>A Virtual system</Info>
-    <Name>AgentVM</Name>
+    <Name>MigrationAssessment</Name>
     <OperatingSystemSection ovf:id="80" ovf:version="8" vmw:osType="rhel9_64Guest">
       <Info>The operating system installed</Info>
       <Description>Other Linux (64-bit)</Description>
