@@ -11,7 +11,7 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 	if err != nil {
 		return nil, err
 	}
-	return server.ListSources200JSONResponse(*result), nil
+	return server.ListSources200JSONResponse(result), nil
 }
 
 func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {

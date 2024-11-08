@@ -64,7 +64,7 @@ var _ = Describe("Store", Ordered, func() {
 			sources, err := store.Source().List(ctx)
 			Expect(err).To(BeNil())
 			Expect(sources).NotTo(BeNil())
-			Expect(*sources).To(HaveLen(1))
+			Expect(sources).To(HaveLen(1))
 
 			// rollback
 			_, cerr := st.Rollback(ctx)
