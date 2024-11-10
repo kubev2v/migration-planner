@@ -1,0 +1,24 @@
+---
+# The ArgoCD application that points to the chart code in this repo.
+# Reminder: ArgoCD uses the helm format only for variable substitution, and 
+# applies the manifests with its own order and control, wihich is far better.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mig
+  namespace: openshift-gitops
+spec:
+  destination:
+    namespace: default
+    server: https://kubernetes.default.svc
+  project: default
+  source:
+    path: migration-cluster-day2/charts/migration-cluster-day2
+    repoURL: https://github.com/kubev2v/migration-planner
+    targetRevision: main
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - Validate=false

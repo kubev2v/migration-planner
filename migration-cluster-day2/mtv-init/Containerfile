@@ -1,0 +1,8 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal as builder
+RUN microdnf install -y go-toolset jq
+COPY . . 
+RUN go build -o /usr/local/bin/migration-helper
+
+FROM registry.access.redhat.com/ubi9/ubi-micro
+COPY --from=builder /usr/local/bin/migration-helper /usr/local/bin/migration-helper
+ENTRYPOINT migration-helper
