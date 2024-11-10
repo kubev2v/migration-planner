@@ -1,0 +1,83 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ .Values.lvmsOperator.subscription.namespace }}
+  # prevent the namespace deletion because in some sceneraious the namespace
+  # is not removed and stays in terminating state.
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+  labels:
+    argocd.argoproj.io/managed-by: openshift-gitops
+---
+apiVersion: operators.coreos.com/v1
+kind: OperatorGroup
+metadata:
+  name: lvm-storage-operator-group
+  namespace: {{ .Values.lvmsOperator.subscription.namespace }}
+  labels: {{ include "migration-cluster-day2.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  targetNamespaces:
+    - {{ .Values.lvmsOperator.subscription.namespace }}
+---
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: lvm-storage-operator 
+  namespace: {{ .Values.lvmsOperator.subscription.namespace }}
+  labels: {{ include "migration-cluster-day2.labels" . | nindent 4 }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  channel: {{ .Values.lvmsOperator.subscription.channel }}
+  installPlanApproval: Automatic
+  name: lvms-operator
+  source: redhat-operators 
+  sourceNamespace: openshift-marketplace
+---
+
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    description: Provides RWO and RWOP Filesystem & Block volumes
+    argocd.argoproj.io/sync-wave: "1"
+    storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    owned-by.topolvm.io/group: lvm.topolvm.io
+    owned-by.topolvm.io/kind: LVMCluster
+    {{ include "migration-cluster-day2.labels" . | nindent 4 }}
+  name: lvms-vg1-1
+parameters:
+  csi.storage.k8s.io/fstype: xfs
+  topolvm.io/device-class: vg1
+provisioner: topolvm.io
+reclaimPolicy: Delete
+volumeBindingMode: WaitForFirstConsumer
+
+---
+apiVersion: lvm.topolvm.io/v1alpha1
+kind: LVMCluster
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true
+  finalizers:
+    - lvmcluster.topolvm.io
+  generation: 1
+  name: lvmcluster
+  namespace: {{ .Values.lvmsOperator.subscription.namespace }}
+  labels: {{ include "migration-cluster-day2.labels" . | nindent 4 }}
+spec:
+  storage:
+    deviceClasses:
+    - fstype: xfs
+      name: vg1
+      thinPoolConfig:
+        chunkSizeCalculationPolicy: Static
+        name: thin-pool-1
+        overprovisionRatio: 10
+        sizePercent: 90

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="fonts.css" />
+  <!-- Include latest PatternFly CSS via CDN -->
+  <link rel="stylesheet" href="https://unpkg.com/@patternfly/patternfly/patternfly.css" crossorigin="anonymous" >
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Custom styles for additional adjustments */
+
+    /* Add some padding around the main content */
+    .pf-c-page__main {
+      padding: 2rem;
+    }
+
+    /* Adjust form input width to 100% for responsiveness */
+    .pf-c-form-control {
+      width: 100%;
+    }
+
+    /* Add subtle shadow to the form card */
+    .pf-c-card.pf-m-shadow-lg {
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+    }
+
+    /* Customize button appearance */
+    .pf-c-button.pf-m-primary {
+      padding: 0.5rem 2rem;
+      font-size: 1rem;
+    }
+
+    /* Increase margin between form groups */
+    .pf-c-form__group {
+      margin-bottom: 1.5rem;
+    }
+
+    /* Make the form title stand out */
+    .pf-c-title.pf-m-2xl {
+      font-weight: bold;
+      font-size: 1.75rem;
+      margin-bottom: 1rem;
+    }
+
+    /* Adjust the masthead branding */
+    .pf-v5-c-masthead__brand {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: #007bba; /* Custom blue color for the title */
+    }
+
+    /* Improve spacing around the entire form */
+    .pf-c-card {
+      padding: 2rem;
+    }
+
+    /* Add a hover effect for the submit button */
+    .pf-c-button.pf-m-primary:hover {
+      background-color: #005f8b;
+      color: #fff;
+    }
+
+  </style>
+</head>
+<body>
+  <header class="pf-v5-c-masthead" id="basic-masthead">
+    <span class="pf-v5-c-masthead__toggle">
+      <button
+        class="pf-v5-c-button pf-m-plain"
+        type="button"
+        aria-label="Global navigation"
+      >
+        <i class="fas fa-bars" aria-hidden="true"></i>
+      </button>
+    </span>
+    <div class="pf-v5-c-masthead__main">
+      <a class="pf-v5-c-masthead__brand" href="#">Migration Preparations</a>
+    </div>
+  </header>
+
+  <main class="pf-c-page__main pf-l-page__main-section pf-m-light">
+    <div class="pf-l-flex pf-m-column pf-m-align-items-center">
+      <div class="pf-c-card pf-m-shadow-lg pf-u-p-lg pf-u-m-lg" style="max-width: 500px;">
+        <h1 class="pf-c-title pf-m-2xl pf-u-text-align-center">Create Source Provider</h1>
+        <form action="/upload" method="post" enctype="multipart/form-data" class="pf-c-form pf-l-grid pf-m-gutter">
+          <div class="pf-c-form__group pf-l-grid__item pf-m-12-col">
+            <label for="vddk" class="pf-c-form__label">VDDK File</label>
+            <span class="pf-c-form__label-required" aria-hidden="true">&#42;</span>
+            <input type="file" name="vddk" id="vddk" class="pf-c-form-control" required />
+            <a href="https://developer.vmware.com/web/sdk/7.0/vddk" target="_blank">Download the vddk file from VMWare</a>
+            TODO - If the vddk image already exists in the internal registry then propose to skip or totally hide this section.
+          </div>
+
+          <div class="pf-c-form__group pf-l-grid__item pf-m-12-col">
+            <label for="url" class="pf-c-form__label">vSphere URL</label>
+            <span class="pf-c-form__label-required" aria-hidden="true">&#42;</span>
+            <input type="url" name="url" id="url" class="pf-c-form-control" required />
+          </div>
+
+          <div class="pf-c-form__group pf-l-grid__item pf-m-12-col">
+            <label for="username" class="pf-c-form__label">vSphere Username</label>
+            <span class="pf-c-form__label-required" aria-hidden="true">&#42;</span>
+            <input type="text" name="username" id="username" class="pf-c-form-control" required />
+          </div>
+
+          <div class="pf-c-form__group pf-l-grid__item pf-m-12-col">
+            <label for="password" class="pf-c-form__label">vSphere Password</label>
+            <span class="pf-c-form__label-required" aria-hidden="true">&#42;</span>
+            <input type="password" name="password" id="password" class="pf-c-form-control" required />
+          </div>
+
+
+
+          <div class="pf-l-flex pf-m-justify-content-center pf-u-mt-md">
+            <button type="submit" class="pf-c-button pf-m-primary">Create</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </main>
+</body>
+</html>
+
