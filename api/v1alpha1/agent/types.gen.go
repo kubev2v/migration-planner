@@ -13,6 +13,7 @@ type AgentStatusUpdate struct {
 	Id            string `json:"id"`
 	Status        string `json:"status"`
 	StatusInfo    string `json:"statusInfo"`
+	Version       string `json:"version"`
 }
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.

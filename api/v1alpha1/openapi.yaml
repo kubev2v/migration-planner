@@ -482,6 +482,13 @@ components:
         updatedAt:
           type: string
           format: date-time
+        deletedAt:
+          type: string
+          format: date-time
+        associated:
+          type: boolean
+        version:
+          type: string
       required:
         - id
         - status
@@ -489,6 +496,8 @@ components:
         - credentialUrl
         - createdAt
         - updatedAt
+        - associated
+        - version
 
     AgentList:
       type: array

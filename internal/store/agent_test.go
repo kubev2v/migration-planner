@@ -15,10 +15,10 @@ import (
 )
 
 const (
-	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url) VALUES ('%s', '%s', '%s', '%s');"
-	insertAgentWithSourceStm    = "INSERT INTO agents (id, status, status_info, cred_url, source_id) VALUES ('%s', '%s', '%s', '%s', '%s');"
-	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at) VALUES ('%s', '%s', '%s', '%s', '%s');"
-	insertAgentWithDeletedAtStm = "INSERT INTO agents (id, status, status_info, cred_url, deleted_at) VALUES ('%s', '%s', '%s', '%s', '%s');"
+	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
+	insertAgentWithSourceStm    = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
+	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
+	insertAgentWithDeletedAtStm = "INSERT INTO agents (id, status, status_info, cred_url, deleted_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 )
 
 var _ = Describe("agent store", Ordered, func() {
