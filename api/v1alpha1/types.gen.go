@@ -36,13 +36,16 @@ const (
 
 // Agent defines model for Agent.
 type Agent struct {
+	Associated    bool        `json:"associated"`
 	CreatedAt     time.Time   `json:"createdAt"`
 	CredentialUrl string      `json:"credentialUrl"`
+	DeletedAt     *time.Time  `json:"deletedAt,omitempty"`
 	Id            string      `json:"id"`
 	SourceId      *string     `json:"sourceId,omitempty"`
 	Status        AgentStatus `json:"status"`
 	StatusInfo    string      `json:"statusInfo"`
 	UpdatedAt     time.Time   `json:"updatedAt"`
+	Version       string      `json:"version"`
 }
 
 // AgentStatus defines model for Agent.Status.

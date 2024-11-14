@@ -127,8 +127,11 @@ components:
           type: string
         credentialUrl:
           type: string
+        version:
+          type: string
       required:
         - status
         - statusInfo
         - credentialUrl
         - id
+        - version

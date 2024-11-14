@@ -16,6 +16,7 @@ type Agent struct {
 	CredUrl    string
 	SourceID   *string
 	Source     *Source
+	Version    string
 }
 
 type AgentList []Agent
@@ -35,6 +36,7 @@ func NewAgentFromApiResource(resource *apiAgent.AgentStatusUpdate) *Agent {
 		Status:     resource.Status,
 		StatusInfo: resource.StatusInfo,
 		CredUrl:    resource.CredentialUrl,
+		Version:    resource.Version,
 	}
 }
 
@@ -46,6 +48,7 @@ func (a *Agent) ToApiResource() api.Agent {
 		CreatedAt:     a.CreatedAt,
 		UpdatedAt:     a.UpdatedAt,
 		CredentialUrl: a.CredUrl,
+		Version:       a.Version,
 	}
 
 	if a.SourceID != nil {
