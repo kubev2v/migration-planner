@@ -33,6 +33,7 @@ var (
 type PlannerAgent interface {
 	Run(string) error
 	Login(url string, user string, pass string) (*http.Response, error)
+	Version() (string, error)
 	Remove() error
 	GetIp() (string, error)
 	IsServiceRunning(string, string) bool
@@ -109,6 +110,38 @@ func (p *plannerAgentLibvirt) prepareImage(sourceId string) error {
 	}
 
 	return nil
+}
+
+func (p *plannerAgentLibvirt) Version() (string, error) {
+	agentIP, err := p.GetIp()
+	if err != nil {
+		return "", fmt.Errorf("failed to get agent IP: %w", err)
+	}
+	// Create a new HTTP GET request
+	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:3333/api/v1/version", agentIP), nil)
+	if err != nil {
+		return "", fmt.Errorf("Failed to create request: %v", err)
+	}
+
+	// Set the Content-Type header to application/json
+	req.Header.Set("Content-Type", "application/json")
+
+	// Send the request using http.DefaultClient
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("Failed to send request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Read the response body
+	var result struct {
+		Version string `json:"version"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode response: %v", err)
+	}
+	return result.Version, nil
 }
 
 func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http.Response, error) {

@@ -33,6 +33,7 @@ GO_LD_FLAGS := -ldflags "\
 	-X github.com/kubev2v/migration-planner/pkg/version.commitFromGit=$(SOURCE_GIT_COMMIT) \
 	-X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=$(SOURCE_GIT_TREE_STATE) \
 	-X github.com/kubev2v/migration-planner/pkg/version.buildDate=$(BIN_TIMESTAMP) \
+	-X github.com/kubev2v/migration-planner/internal/agent.version=$(SOURCE_GIT_TAG) \
 	$(LD_FLAGS)"
 GO_BUILD_FLAGS += $(GO_LD_FLAGS)
 
@@ -93,7 +94,7 @@ build-agent: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . -f Containerfile.agent -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
+	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . -f Containerfile.api -t $(MIGRATION_PLANNER_API_IMAGE):latest

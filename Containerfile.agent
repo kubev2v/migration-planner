@@ -14,8 +14,13 @@ RUN go mod download
 
 COPY . .
 
+ARG VERSION
+ENV VERSION=${VERSION}
+
 USER 0
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false -o /planner-agent cmd/planner-agent/main.go
+RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false \
+  -ldflags "-X github.com/kubev2v/migration-planner/internal/agent.version=${VERSION}" \
+  -o /planner-agent cmd/planner-agent/main.go
 
 FROM registry.access.redhat.com/ubi9/ubi-micro
 

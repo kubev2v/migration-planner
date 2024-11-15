@@ -27,6 +27,9 @@ const (
 )
 
 func RegisterApi(router *chi.Mux, log *log.PrefixLogger, dataDir string) {
+	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
+		_ = render.Render(w, r, VersionReply{Version: version})
+	})
 	router.Get("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		statusHandler(dataDir, w, r)
 	})
@@ -40,7 +43,15 @@ type StatusReply struct {
 	StatusInfo string `json:"statusInfo"`
 }
 
+type VersionReply struct {
+	Version string `json:"version"`
+}
+
 func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func (v VersionReply) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 

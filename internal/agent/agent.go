@@ -17,6 +17,11 @@ const (
 	InventoryFile = "inventory.json"
 )
 
+// This varible is set during build time.
+// It contains the version of the code.
+// For more info take a look into Makefile.
+var version string
+
 // New creates a new agent.
 func New(log *log.PrefixLogger, config *Config) *Agent {
 	return &Agent{
@@ -36,7 +41,7 @@ func (a *Agent) GetLogPrefix() string {
 
 func (a *Agent) Run(ctx context.Context) error {
 	var err error
-	a.log.Infof("Starting agent...")
+	a.log.Infof("Starting agent: %s", version)
 	defer a.log.Infof("Agent stopped")
 	a.log.Infof("Configuration: %s", a.config.String())
 

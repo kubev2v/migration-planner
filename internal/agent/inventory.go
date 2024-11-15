@@ -121,6 +121,8 @@ func (u *InventoryUpdater) updateSourceStatus(ctx context.Context, status api.So
 		StatusInfo:    statusInfo,
 		Inventory:     inventory,
 		CredentialUrl: u.credUrl,
+		// TODO: when moving to AgentStatusUpdate put this:
+		//Version: version,
 	}
 
 	newContents, err := json.Marshal(update)
