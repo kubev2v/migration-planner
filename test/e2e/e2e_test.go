@@ -89,5 +89,10 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusUnprocessableEntity))
 		})
+		It("version endpoint is not empty", func() {
+			version, err := agent.Version()
+			Expect(err).To(BeNil())
+			Expect(version).ToNot(BeEmpty())
+		})
 	})
 })
