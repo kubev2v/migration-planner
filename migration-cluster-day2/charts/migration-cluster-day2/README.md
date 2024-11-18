@@ -21,18 +21,23 @@ After ArgoCD (OpenShift GitOps) is ready, apply this manifest that will create t
 be responsible for the Day-2:
 
 ```console
-oc create -f https://raw.githubusercontent.com/rgolangh/migration-cluster-day2/refs/heads/main/manifest.yaml
+oc create -f https://raw.githubusercontent.com/kubev2v/migration-planner/refs/heads/main/migration-cluster-day2/manifest.yaml
 ```
 
 > [!Note]
 > The argo application is referencing the HEAD of the main branch of the helm chart, and not a version, 
 > because it is quicker and easier to publish changes. when things get stable enough we will shall move to versions.
 
+Add admin role to mtv service account once the openshift-mtv namespace is automatically created
+```console
+oc adm policy add-role-to-user admin system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller -n openshift-mtv
+```
+
 Initialize the MTV provider
 
 Navigate to the mtv-init application route
 ```console
-oc get route -n default mtv-init -o jsonpath={.status.ingress[0].host}
+oc get route -n openshift-mtv mtv-init -o jsonpath={.status.ingress[0].host}
 ```
 
 Fill in the details of form:
