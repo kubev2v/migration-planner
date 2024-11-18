@@ -4,9 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
-	"os/signal"
-	"syscall"
 	"time"
 
 	"github.com/go-chi/chi"
@@ -14,49 +11,59 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
-const (
-	agentPort = 3333
-)
+/*
+Server serves 3 endpoints:
+- /login serves the credentials login form
+- /api/v1/credentials called by the agent ui to pass the credentials entered by the user
+- /api/v1/status return the status of the agent.
+*/
+type Server struct {
+	port       int
+	dataFolder string
+	wwwFolder  string
+	restServer *http.Server
+	log        *log.PrefixLogger
+}
 
-func StartServer(log *log.PrefixLogger, config *Config) {
+func NewServer(port int, dataFolder, wwwFolder string) *Server {
+	return &Server{
+		port:       port,
+		dataFolder: dataFolder,
+		wwwFolder:  wwwFolder,
+	}
+}
+
+func (s *Server) Start(log *log.PrefixLogger) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 
-	RegisterFileServer(router, log, config.WwwDir)
-	RegisterApi(router, log, config.DataDir)
+	RegisterFileServer(router, log, s.wwwFolder)
+	RegisterApi(router, log, s.dataFolder)
 
-	server := &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", agentPort), Handler: router}
-	serverCtx, serverStopCtx := context.WithCancel(context.Background())
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
+
+	// Run the server
+	s.log = log
+	err := s.restServer.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		s.log.Fatalf("failed to start server: %w", err)
+	}
+}
+
+func (s *Server) Stop(stopCh chan any) {
+	shutdownCtx, _ := context.WithTimeout(context.Background(), 10*time.Second) // nolint:govet
+	doneCh := make(chan any)
+
 	go func() {
-		<-sig
-		shutdownCtx, _ := context.WithTimeout(serverCtx, 30*time.Second) // nolint:govet
-
-		go func() {
-			<-shutdownCtx.Done()
-			if shutdownCtx.Err() == context.DeadlineExceeded {
-				log.Fatal("graceful shutdown timed out.. forcing exit.")
-			}
-		}()
-
-		// Trigger graceful shutdown
-		err := server.Shutdown(shutdownCtx)
+		err := s.restServer.Shutdown(shutdownCtx)
 		if err != nil {
-			log.Fatal(err)
+			s.log.Errorf("failed to graceful shutdown the server: %s", err)
 		}
-		serverStopCtx()
+		close(doneCh)
 	}()
 
-	go func() {
-		// Run the server
-		err := server.ListenAndServe()
-		if err != nil && err != http.ErrServerClosed {
-			log.Fatal(err.Error())
-		}
+	<-doneCh
 
-		// Wait for server context to be stopped
-		<-serverCtx.Done()
-	}()
+	close(stopCh)
 }

@@ -27,7 +27,9 @@ const (
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
 	// DefaultHealthCheck is the default value for health check interval in seconds.
-	DefaultHealthCheck = 5 * 60 // 5 min
+	// default value set 10s health check should be faster than the update period in order to block it
+	// if the console is unreachable
+	DefaultHealthCheck = 10
 )
 
 type Config struct {
