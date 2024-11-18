@@ -18,7 +18,7 @@ type Source struct {
 	Name       string
 	Status     string
 	StatusInfo string
-	SshKey     string
+	SshKey     *string
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	CredUrl    *string
 	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`

@@ -93,9 +93,23 @@ var _ = Describe("source store", Ordered, func() {
 
 		Context("create", func() {
 			It("successfully creates one source", func() {
+				sshKey := "some key"
 				source, err := s.Source().Create(context.TODO(), v1alpha1.SourceCreate{
 					Name:   "name-1",
-					SshKey: "some key",
+					SshKey: &sshKey,
+				})
+				Expect(err).To(BeNil())
+				Expect(source).NotTo(BeNil())
+
+				var count int
+				tx := gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
+				Expect(tx.Error).To(BeNil())
+				Expect(count).To(Equal(1))
+			})
+
+			It("successfully creates one source without sshkey", func() {
+				source, err := s.Source().Create(context.TODO(), v1alpha1.SourceCreate{
+					Name: "name-1",
 				})
 				Expect(err).To(BeNil())
 				Expect(source).NotTo(BeNil())
