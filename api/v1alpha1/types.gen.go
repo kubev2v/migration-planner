@@ -100,7 +100,7 @@ type Source struct {
 	Id            openapi_types.UUID `json:"id"`
 	Inventory     *Inventory         `json:"inventory,omitempty"`
 	Name          string             `json:"name"`
-	SshKey        string             `json:"sshKey"`
+	SshKey        *string            `json:"sshKey,omitempty"`
 	Status        SourceStatus       `json:"status"`
 	StatusInfo    string             `json:"statusInfo"`
 	UpdatedAt     time.Time          `json:"updatedAt"`
@@ -111,8 +111,8 @@ type SourceStatus string
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	Name   string `json:"name"`
-	SshKey string `json:"sshKey"`
+	Name   string  `json:"name"`
+	SshKey *string `json:"sshKey,omitempty"`
 }
 
 // SourceList defines model for SourceList.

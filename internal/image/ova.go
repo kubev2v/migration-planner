@@ -24,7 +24,7 @@ const ResponseWriterKey Key = 0
 type Ova struct {
 	Id     uuid.UUID
 	Writer io.Writer
-	SshKey string
+	SshKey *string
 }
 
 // IgnitionData defines modifiable fields in ignition config
@@ -124,9 +124,11 @@ func writeOvf(tw *tar.Writer) error {
 func (o *Ova) generateIgnition() (string, error) {
 	ignData := IgnitionData{
 		SourceId:                   o.Id.String(),
-		SshKey:                     o.SshKey,
 		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
+	}
+	if o.SshKey != nil {
+		ignData.SshKey = *o.SshKey
 	}
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {

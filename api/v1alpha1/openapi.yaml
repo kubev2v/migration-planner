@@ -262,7 +262,6 @@ components:
         - statusInfo
         - createdAt
         - updatedAt
-        - sshKey
 
     SourceCreate:
       type: object
@@ -273,7 +272,6 @@ components:
           type: string
       required:
         - name
-        - sshKey
 
     SourceList:
       type: array
