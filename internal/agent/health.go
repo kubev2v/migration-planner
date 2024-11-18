@@ -12,16 +12,19 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+type AgentHealthState int
+
 const (
-	healthCheckStateConsoleUnreachable = iota
-	healthCheckStateConsoleReachable
+	HealthCheckStateConsoleUnreachable AgentHealthState = iota
+	HealthCheckStateConsoleReachable
 	logFilename    = "health.log"
 	defaultTimeout = 5 //seconds
 )
 
 type HealthChecker struct {
 	once          sync.Once
-	state         int
+	lock          sync.Mutex
+	state         AgentHealthState
 	checkInterval time.Duration
 	client        client.Planner
 	logFilepath   string
@@ -51,7 +54,7 @@ func NewHealthChecker(log *log.PrefixLogger, client client.Planner, logFolder st
 		return nil, fmt.Errorf("failed to open file %s for append %w", logFile, err)
 	}
 	return &HealthChecker{
-		state:         healthCheckStateConsoleUnreachable,
+		state:         HealthCheckStateConsoleUnreachable,
 		checkInterval: checkInterval,
 		client:        client,
 		logFilepath:   logFile,
@@ -76,6 +79,8 @@ func NewHealthChecker(log *log.PrefixLogger, client client.Planner, logFolder st
 // checkInterval represents the time to wait between checks.
 // closeCh is the channel used to close the goroutine.
 func (h *HealthChecker) Start(closeCh chan chan any) {
+	h.do()
+
 	h.once.Do(func() {
 		go func() {
 			t := time.NewTicker(h.checkInterval)
@@ -100,6 +105,12 @@ func (h *HealthChecker) Start(closeCh chan chan any) {
 	})
 }
 
+func (h *HealthChecker) State() AgentHealthState {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+	return h.state
+}
+
 func (h *HealthChecker) do() {
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout*time.Second)
 	defer cancel()
@@ -109,14 +120,18 @@ func (h *HealthChecker) do() {
 		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is unreachable.\n", time.Now().Format(time.RFC3339)))); err != nil {
 			h.logger.Errorf("failed to write to log file %s %w", h.logFilepath, err)
 		}
-		h.state = healthCheckStateConsoleUnreachable
+		h.lock.Lock()
+		h.state = HealthCheckStateConsoleUnreachable
+		h.lock.Unlock()
 		return
 	}
 	// if state changed from unreachable to ok log the entry
-	if h.state == healthCheckStateConsoleUnreachable {
+	if h.state == HealthCheckStateConsoleUnreachable {
 		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is OK.\n", time.Now().Format(time.RFC3339)))); err != nil {
 			h.logger.Errorf("failed to write to log file %s %w", h.logFilepath, err)
 		}
 	}
-	h.state = healthCheckStateConsoleReachable
+	h.lock.Lock()
+	h.state = HealthCheckStateConsoleReachable
+	h.lock.Unlock()
 }
