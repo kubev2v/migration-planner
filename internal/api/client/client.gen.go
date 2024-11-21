@@ -114,6 +114,9 @@ type ClientInterface interface {
 	// GetSourceImage request
 	GetSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// HeadSourceImage request
+	HeadSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// Health request
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -204,6 +207,18 @@ func (c *Client) ReadSource(ctx context.Context, id openapi_types.UUID, reqEdito
 
 func (c *Client) GetSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSourceImageRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) HeadSourceImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewHeadSourceImageRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -449,6 +464,40 @@ func NewGetSourceImageRequest(server string, id openapi_types.UUID) (*http.Reque
 	return req, nil
 }
 
+// NewHeadSourceImageRequest generates requests for HeadSourceImage
+func NewHeadSourceImageRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/image", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("HEAD", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewHealthRequest generates requests for Health
 func NewHealthRequest(server string) (*http.Request, error) {
 	var err error
@@ -541,6 +590,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetSourceImageWithResponse request
 	GetSourceImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceImageResponse, error)
+
+	// HeadSourceImageWithResponse request
+	HeadSourceImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadSourceImageResponse, error)
 
 	// HealthWithResponse request
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
@@ -714,6 +766,27 @@ func (r GetSourceImageResponse) StatusCode() int {
 	return 0
 }
 
+type HeadSourceImageResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+}
+
+// Status returns HTTPResponse.Status
+func (r HeadSourceImageResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r HeadSourceImageResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type HealthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -804,6 +877,15 @@ func (c *ClientWithResponses) GetSourceImageWithResponse(ctx context.Context, id
 		return nil, err
 	}
 	return ParseGetSourceImageResponse(rsp)
+}
+
+// HeadSourceImageWithResponse request returning *HeadSourceImageResponse
+func (c *ClientWithResponses) HeadSourceImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadSourceImageResponse, error) {
+	rsp, err := c.HeadSourceImage(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseHeadSourceImageResponse(rsp)
 }
 
 // HealthWithResponse request returning *HealthResponse
@@ -1090,6 +1172,22 @@ func ParseGetSourceImageResponse(rsp *http.Response) (*GetSourceImageResponse, e
 		}
 		response.JSON500 = &dest
 
+	}
+
+	return response, nil
+}
+
+// ParseHeadSourceImageResponse parses an HTTP response from a HeadSourceImageWithResponse call
+func ParseHeadSourceImageResponse(rsp *http.Response) (*HeadSourceImageResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &HeadSourceImageResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
 	}
 
 	return response, nil
