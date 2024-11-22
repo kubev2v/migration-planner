@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
+	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
 
 type Key int
@@ -38,6 +39,15 @@ type IgnitionData struct {
 
 type Image interface {
 	Generate() (io.Reader, error)
+	Validate() (io.Reader, error)
+}
+
+func (o *Ova) Validate() error {
+	if _, err := o.isoReader(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (o *Ova) Generate() error {
@@ -56,16 +66,26 @@ func (o *Ova) Generate() error {
 	return nil
 }
 
-func (o *Ova) writeIso(tw *tar.Writer) error {
+func (o *Ova) isoReader() (overlay.OverlayReader, error) {
 	// Generate iginition
 	ignitionContent, err := o.generateIgnition()
 	if err != nil {
-		return fmt.Errorf("error generating ignition: %w", err)
+		return nil, fmt.Errorf("error generating ignition: %w", err)
 	}
 	// Generate ISO data reader with ignition content
 	reader, err := isoeditor.NewRHCOSStreamReader("rhcos-live.x86_64.iso", &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return fmt.Errorf("error reading rhcos iso: %w", err)
+		return nil, fmt.Errorf("error reading rhcos iso: %w", err)
+	}
+
+	return reader, nil
+}
+
+func (o *Ova) writeIso(tw *tar.Writer) error {
+	// Get ISO reader
+	reader, err := o.isoReader()
+	if err != nil {
+		return err
 	}
 	// Create a header for AgentVM-1.iso
 	length, err := reader.Seek(0, io.SeekEnd)

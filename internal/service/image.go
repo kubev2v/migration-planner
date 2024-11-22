@@ -25,3 +25,19 @@ func (h *ServiceHandler) GetSourceImage(ctx context.Context, request server.GetS
 	}
 	return server.GetSourceImage200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
 }
+
+func (h *ServiceHandler) HeadSourceImage(ctx context.Context, request server.HeadSourceImageRequestObject) (server.HeadSourceImageResponseObject, error) {
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return server.HeadSourceImage500Response{}, nil
+	}
+	result, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		return server.HeadSourceImage404Response{}, nil
+	}
+	ova := &image.Ova{Id: request.Id, SshKey: result.SshKey, Writer: writer}
+	if err := ova.Validate(); err != nil {
+		return server.HeadSourceImage500Response{}, nil
+	}
+	return server.HeadSourceImage200Response{}, nil
+}
