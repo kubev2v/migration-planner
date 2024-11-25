@@ -96,16 +96,15 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agents        *[]SourceAgentItem `json:"agents,omitempty"`
-	CreatedAt     time.Time          `json:"createdAt"`
-	CredentialUrl *string            `json:"credentialUrl,omitempty"`
-	Id            openapi_types.UUID `json:"id"`
-	Inventory     *Inventory         `json:"inventory,omitempty"`
-	Name          string             `json:"name"`
-	SshKey        *string            `json:"sshKey,omitempty"`
-	Status        SourceStatus       `json:"status"`
-	StatusInfo    string             `json:"statusInfo"`
-	UpdatedAt     time.Time          `json:"updatedAt"`
+	Agents     *[]SourceAgentItem `json:"agents,omitempty"`
+	CreatedAt  time.Time          `json:"createdAt"`
+	Id         openapi_types.UUID `json:"id"`
+	Inventory  *Inventory         `json:"inventory,omitempty"`
+	Name       string             `json:"name"`
+	SshKey     *string            `json:"sshKey,omitempty"`
+	Status     SourceStatus       `json:"status"`
+	StatusInfo string             `json:"statusInfo"`
+	UpdatedAt  time.Time          `json:"updatedAt"`
 }
 
 // SourceStatus defines model for Source.Status.

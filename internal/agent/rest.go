@@ -26,12 +26,13 @@ const (
 	CredentialsFile = "credentials.json"
 )
 
-func RegisterApi(router *chi.Mux, log *log.PrefixLogger, dataDir string) {
+func RegisterApi(router *chi.Mux, log *log.PrefixLogger, statusUpdater *StatusUpdater, dataDir string) {
 	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, VersionReply{Version: version})
 	})
 	router.Get("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
-		statusHandler(dataDir, w, r)
+		status, statusInfo, _ := statusUpdater.CalculateStatus()
+		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
 	})
 	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
 		credentialHandler(log, dataDir, w, r)
@@ -53,11 +54,6 @@ func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {
 
 func (v VersionReply) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
-}
-
-func statusHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
-	status, statusInfo, _ := calculateStatus(dataDir)
-	_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
 }
 
 type Credentials struct {

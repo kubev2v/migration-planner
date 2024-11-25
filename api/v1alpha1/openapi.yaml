@@ -292,8 +292,6 @@ components:
           type: string
         inventory:
           $ref: '#/components/schemas/Inventory'
-        credentialUrl:
-          type: string
         createdAt:
           type: string
           format: date-time
@@ -328,7 +326,7 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Source'
-
+    
     SourceAgentItem:
       type: object
       properties:

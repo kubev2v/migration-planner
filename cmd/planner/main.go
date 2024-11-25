@@ -24,7 +24,6 @@ func NewPlannerCtlCommand() *cobra.Command {
 		},
 	}
 	cmd.AddCommand(cli.NewCmdGet())
-	cmd.AddCommand(cli.NewCmdCreate())
 	cmd.AddCommand(cli.NewCmdDelete())
 	cmd.AddCommand(cli.NewCmdVersion())
 

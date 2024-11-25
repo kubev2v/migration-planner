@@ -130,7 +130,6 @@ components:
       required:
         - inventory
         - agentId
-
     AgentStatusUpdate:
       type: object
       properties:
