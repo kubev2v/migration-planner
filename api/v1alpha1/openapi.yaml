@@ -328,9 +328,13 @@ components:
     Inventory:
       type: object
       required:
+      - vcenter
       - vms
       - infra
       properties:
+        vcenter:
+          type: object
+          $ref: '#/components/schemas/VCenter'
         vms:
           type: object
           $ref: '#/components/schemas/VMs'
@@ -338,6 +342,13 @@ components:
           type: object
           $ref: '#/components/schemas/Infra'
 
+    VCenter:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
     VMs:
       type: object
       required:

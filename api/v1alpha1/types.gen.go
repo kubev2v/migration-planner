@@ -82,8 +82,9 @@ type InfraNetworksType string
 
 // Inventory defines model for Inventory.
 type Inventory struct {
-	Infra Infra `json:"infra"`
-	Vms   VMs   `json:"vms"`
+	Infra   Infra   `json:"infra"`
+	Vcenter VCenter `json:"vcenter"`
+	Vms     VMs     `json:"vms"`
 }
 
 // MigrationIssues defines model for MigrationIssues.
@@ -128,6 +129,11 @@ type Status struct {
 
 	// Status Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *string `json:"status,omitempty"`
+}
+
+// VCenter defines model for VCenter.
+type VCenter struct {
+	Id string `json:"id"`
 }
 
 // VMResourceBreakdown defines model for VMResourceBreakdown.
