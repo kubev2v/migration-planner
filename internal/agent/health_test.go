@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
-	client "github.com/kubev2v/migration-planner/internal/api/client/agent"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -232,6 +231,10 @@ func (c *agentTestClient) Health(ctx context.Context) error {
 	return nil
 }
 
-func (c *agentTestClient) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error {
+func (c *agentTestClient) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error {
+	return nil
+}
+
+func (c *agentTestClient) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
 	return nil
 }

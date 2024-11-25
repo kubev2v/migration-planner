@@ -15,6 +15,7 @@ var _ Planner = (*planner)(nil)
 
 var (
 	ErrEmptyResponse = errors.New("empty response")
+	ErrSourceGone    = errors.New("source is gone")
 )
 
 func NewPlanner(client *client.ClientWithResponses) Planner {
@@ -27,8 +28,8 @@ type planner struct {
 	client *client.ClientWithResponses
 }
 
-func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate, rcb ...client.RequestEditorFn) error {
-	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params, rcb...)
+func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error {
+	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params)
 	if err != nil {
 		return err
 	}
@@ -52,6 +53,23 @@ func (p *planner) Health(ctx context.Context) error {
 	}
 	if resp.StatusCode() != http.StatusOK {
 		return fmt.Errorf("health check failed with status: %s", resp.Status())
+	}
+	return nil
+}
+
+func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
+	resp, err := p.client.UpdateAgentStatusWithResponse(ctx, id, params)
+	if err != nil {
+		return err
+	}
+	if resp.HTTPResponse != nil {
+		defer resp.HTTPResponse.Body.Close()
+	}
+	if resp.StatusCode() == http.StatusGone {
+		return ErrSourceGone
+	}
+	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusCreated {
+		return fmt.Errorf("update agent status failed with status: %s", resp.Status())
 	}
 	return nil
 }

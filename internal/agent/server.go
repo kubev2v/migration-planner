@@ -33,13 +33,13 @@ func NewServer(port int, dataFolder, wwwFolder string) *Server {
 	}
 }
 
-func (s *Server) Start(log *log.PrefixLogger) {
+func (s *Server) Start(log *log.PrefixLogger, statusUpdater *StatusUpdater) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 
 	RegisterFileServer(router, log, s.wwwFolder)
-	RegisterApi(router, log, s.dataFolder)
+	RegisterApi(router, log, statusUpdater, s.dataFolder)
 
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 

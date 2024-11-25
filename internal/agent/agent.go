@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -10,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/lthibault/jitterbug"
@@ -28,11 +31,12 @@ const (
 var version string
 
 // New creates a new agent.
-func New(log *log.PrefixLogger, config *Config) *Agent {
+func New(id uuid.UUID, log *log.PrefixLogger, config *Config) *Agent {
 	return &Agent{
 		config:           config,
 		log:              log,
 		healtCheckStopCh: make(chan chan any),
+		id:               id,
 	}
 }
 
@@ -42,6 +46,7 @@ type Agent struct {
 	server           *Server
 	healtCheckStopCh chan chan any
 	credUrl          string
+	id               uuid.UUID
 }
 
 func (a *Agent) GetLogPrefix() string {
@@ -67,7 +72,10 @@ func (a *Agent) Run(ctx context.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	a.start(ctx, client)
 
-	<-sig
+	select {
+	case <-sig:
+	case <-ctx.Done():
+	}
 
 	a.log.Info("stopping agent...")
 
@@ -91,9 +99,12 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
+	inventoryUpdater := NewInventoryUpdater(a.log, a.id, plannerClient)
+	statusUpdater := NewStatusUpdater(a.log, a.id, version, a.credUrl, a.config, plannerClient)
+
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config.DataDir, a.config.WwwDir)
-	go a.server.Start(a.log)
+	go a.server.Start(a.log, statusUpdater)
 
 	// get the credentials url
 	a.initializeCredentialUrl()
@@ -115,9 +126,15 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	collector := NewCollector(a.log, a.config.DataDir)
 	collector.collect(ctx)
 
-	inventoryUpdater := NewInventoryUpdater(a.log, a.config, a.credUrl, plannerClient)
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})
 
+	/*
+		Main loop
+		The status of agent is always computed even if we don't have connectivity with the backend.
+		If we're connected to the backend, the agent sends its status and if the status is UpToDate,
+		it sends the inventory.
+		In case of "source gone", it stops everything and break from the loop.
+	*/
 	go func() {
 		for {
 			select {
@@ -126,16 +143,30 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			case <-updateTicker.C:
 			}
 
+			// calculate status regardless if we have connectivity withe the backend.
+			status, statusInfo, inventory := statusUpdater.CalculateStatus()
+
 			//	check for health. Send requests only if we have connectivity
 			if healthChecker.State() == HealthCheckStateConsoleUnreachable {
 				continue
 			}
 
-			// set the status
-			inventoryUpdater.UpdateServiceWithInventory(ctx)
+			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo); err != nil {
+				if errors.Is(err, client.ErrSourceGone) {
+					a.log.Info("Source is gone..Stop sending requests")
+					// stop the server and the healthchecker
+					a.Stop()
+					break
+				}
+				a.log.Errorf("unable to update agent status: %s", err)
+				continue // skip inventory update if we cannot update agent's state.
+			}
+
+			if status == api.AgentStatusUpToDate {
+				inventoryUpdater.UpdateServiceWithInventory(ctx, api.SourceStatusUpToDate, "Inventory collected with success", inventory)
+			}
 		}
 	}()
-
 }
 
 func (a *Agent) initializeCredentialUrl() {
