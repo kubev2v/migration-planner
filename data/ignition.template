@@ -52,6 +52,10 @@ storage:
           location = "{{.InsecureRegistry}}"
           insecure = true
     {{end}}
+    - path: /var/lib/systemd/linger/core
+      mode: 0644
+      contents:
+        inline: ""
     - path: /etc/ssh/sshd_config.d/40-rhcos-defaults.conf
       overwrite: true
       contents:
@@ -110,6 +114,10 @@ storage:
           PublishPort=8181:8181
           Exec=run --server /usr/share/opa/policies
           Network=host
+
+          [Service]
+          Restart=on-failure
+          RestartSec=5
 
           [Install]
           WantedBy=multi-user.target default.target

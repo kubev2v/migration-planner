@@ -246,7 +246,7 @@ func (p *plannerAgentLibvirt) IsServiceRunning(agentIp string, service string) b
 }
 
 func (p *plannerAgentLibvirt) DumpLogs(agentIp string) {
-	stdout, _ := RunCommand(agentIp, "journalctl --no-pager --user -u planner-agent")
+	stdout, _ := RunCommand(agentIp, "journalctl --no-pager")
 	fmt.Fprintf(GinkgoWriter, "Journal: %v\n", stdout)
 }
 
