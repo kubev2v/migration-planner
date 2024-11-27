@@ -17,6 +17,7 @@ type Agent struct {
 	SourceID   *string
 	Source     *Source
 	Version    string
+	Associated bool
 }
 
 type AgentList []Agent
@@ -49,6 +50,11 @@ func (a *Agent) ToApiResource() api.Agent {
 		UpdatedAt:     a.UpdatedAt,
 		CredentialUrl: a.CredUrl,
 		Version:       a.Version,
+		Associated:    a.Associated,
+	}
+
+	if a.DeletedAt.Valid {
+		agent.DeletedAt = &a.DeletedAt.Time
 	}
 
 	if a.SourceID != nil {

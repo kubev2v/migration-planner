@@ -5,6 +5,7 @@ package v1alpha1
 
 import (
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // AgentStatusUpdate defines model for AgentStatusUpdate.
@@ -18,10 +19,8 @@ type AgentStatusUpdate struct {
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.
 type SourceStatusUpdate struct {
-	CredentialUrl string                  `json:"credentialUrl"`
-	Inventory     *externalRef0.Inventory `json:"inventory,omitempty"`
-	Status        string                  `json:"status"`
-	StatusInfo    string                  `json:"statusInfo"`
+	AgentId   openapi_types.UUID     `json:"agentId"`
+	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
 // UpdateAgentStatusJSONRequestBody defines body for UpdateAgentStatus for application/json ContentType.

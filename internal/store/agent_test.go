@@ -103,9 +103,9 @@ var _ = Describe("agent store", Ordered, func() {
 		})
 
 		It("successfuly list the agents -- with filter by source-id", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1", "source-name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-2", "source-name-1"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-2"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, "agent-1", "not-connected", "status-info-1", "cred_url-1", "source-1"))
 			Expect(tx.Error).To(BeNil())
@@ -183,9 +183,10 @@ var _ = Describe("agent store", Ordered, func() {
 	})
 
 	Context("get", func() {
-		It("successfuly return nil when agent is not found", func() {
+		It("successfuly return ErrRecordNotFound when agent is not found", func() {
 			agent, err := s.Agent().Get(context.TODO(), "id")
-			Expect(err).To(BeNil())
+			Expect(err).ToNot(BeNil())
+			Expect(err).To(Equal(store.ErrRecordNotFound))
 			Expect(agent).To(BeNil())
 		})
 
@@ -203,7 +204,7 @@ var _ = Describe("agent store", Ordered, func() {
 		})
 
 		It("successfuly return the agent connected to a source", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1", "source-name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, "agent-1", "not-connected", "status-info-1", "cred_url-1", "source-1"))
 			Expect(tx.Error).To(BeNil())
@@ -269,15 +270,17 @@ var _ = Describe("agent store", Ordered, func() {
 		})
 
 		It("successfuly updates an agent -- source_id field", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1", "source-name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, "source-1"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			agent, err := s.Agent().UpdateSourceID(context.TODO(), "agent-1", "source-1")
+			associated := true
+			agent, err := s.Agent().UpdateSourceID(context.TODO(), "agent-1", "source-1", associated)
 			Expect(err).To(BeNil())
 			Expect(agent).NotTo(BeNil())
 			Expect(*agent.SourceId).To(Equal("source-1"))
+			Expect(agent.Associated).To(BeTrue())
 
 			rawSourceID := ""
 			gormdb.Raw("select source_id from agents where id = 'agent-1';").Scan(&rawSourceID)
@@ -288,7 +291,7 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			agent, err := s.Agent().UpdateSourceID(context.TODO(), "agent-1", "source-1")
+			agent, err := s.Agent().UpdateSourceID(context.TODO(), "agent-1", "source-1", true)
 			Expect(err).ToNot(BeNil())
 			Expect(agent).To(BeNil())
 		})

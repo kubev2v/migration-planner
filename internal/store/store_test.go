@@ -3,7 +3,7 @@ package store_test
 import (
 	"context"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	st "github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -16,7 +16,6 @@ var _ = Describe("Store", Ordered, func() {
 	var (
 		store  st.Store
 		gormDB *gorm.DB
-		sshKey string
 	)
 
 	BeforeAll(func() {
@@ -25,7 +24,6 @@ var _ = Describe("Store", Ordered, func() {
 		db, err := st.InitDB(cfg, log)
 		Expect(err).To(BeNil())
 		gormDB = db
-		sshKey = "ssh-key"
 
 		store = st.NewStore(db, log.WithField("test", "store"))
 		Expect(store).ToNot(BeNil())
@@ -40,7 +38,7 @@ var _ = Describe("Store", Ordered, func() {
 			ctx, err := store.NewTransactionContext(context.TODO())
 			Expect(err).To(BeNil())
 
-			source, err := store.Source().Create(ctx, api.SourceCreate{Name: "test", SshKey: &sshKey})
+			source, err := store.Source().Create(ctx, uuid.New())
 			Expect(source).ToNot(BeNil())
 			Expect(err).To(BeNil())
 
@@ -58,7 +56,7 @@ var _ = Describe("Store", Ordered, func() {
 			ctx, err := store.NewTransactionContext(context.TODO())
 			Expect(err).To(BeNil())
 
-			source, err := store.Source().Create(ctx, api.SourceCreate{Name: "test", SshKey: &sshKey})
+			source, err := store.Source().Create(ctx, uuid.New())
 			Expect(source).ToNot(BeNil())
 			Expect(err).To(BeNil())
 

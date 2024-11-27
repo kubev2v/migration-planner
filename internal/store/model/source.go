@@ -11,17 +11,12 @@ import (
 )
 
 type Source struct {
-	ID         openapi_types.UUID `json:"id" gorm:"primaryKey"`
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  gorm.DeletedAt `gorm:"index"`
-	Name       string
-	Status     string
-	StatusInfo string
-	SshKey     *string
-	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	CredUrl    *string
-	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`
+	ID        openapi_types.UUID `json:"id" gorm:"primaryKey"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt gorm.DeletedAt            `gorm:"index"`
+	Inventory *JSONField[api.Inventory] `gorm:"type:jsonb"`
+	Agents    []Agent                   `gorm:"constraint:OnDelete:SET NULL;"`
 }
 
 type SourceList []Source
@@ -31,8 +26,8 @@ func (s Source) String() string {
 	return string(val)
 }
 
-func NewSourceFromApiCreateResource(resource *api.SourceCreate) *Source {
-	return &Source{ID: uuid.New(), Name: resource.Name, SshKey: resource.SshKey}
+func NewSourceFromApiCreateResource(id uuid.UUID) *Source {
+	return &Source{ID: id}
 }
 
 func NewSourceFromId(id uuid.UUID) *Source {
@@ -42,15 +37,18 @@ func NewSourceFromId(id uuid.UUID) *Source {
 
 func (s *Source) ToApiResource() api.Source {
 	source := api.Source{
-		Id:            s.ID,
-		Name:          s.Name,
-		Status:        api.StringToSourceStatus(s.Status),
-		StatusInfo:    s.StatusInfo,
-		Inventory:     nil,
-		CredentialUrl: s.CredUrl,
-		CreatedAt:     s.CreatedAt,
-		UpdatedAt:     s.UpdatedAt,
-		SshKey:        s.SshKey,
+		Id:        s.ID,
+		Inventory: nil,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+	}
+
+	if len(s.Agents) > 0 {
+		agents := make([]api.SourceAgentItem, 0, len(s.Agents))
+		for _, a := range s.Agents {
+			agents = append(agents, api.SourceAgentItem{Id: uuid.MustParse(a.ID), Associated: a.Associated})
+		}
+		source.Agents = &agents
 	}
 
 	if s.Inventory != nil {

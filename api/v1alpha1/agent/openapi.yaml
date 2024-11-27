@@ -53,6 +53,12 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /api/v1/agents/{id}/status:
     put:
       tags:
@@ -77,6 +83,12 @@ paths:
           description: OK
         "201":
           description: OK
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
         "401":
           description: Unauthorized
           content:
@@ -85,6 +97,12 @@ paths:
                 $ref: '../openapi.yaml#/components/schemas/Error'
         "410":
           description: Gone
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -104,18 +122,15 @@ components:
     SourceStatusUpdate:
       type: object
       properties:
-        status:
+        agentId:
           type: string
-        statusInfo:
-          type: string
+          format: uuid
         inventory:
           $ref: '../openapi.yaml#/components/schemas/Inventory'
-        credentialUrl:
-          type: string
       required:
-        - status
-        - statusInfo
-        - credentialUrl
+        - inventory
+        - agentId
+
     AgentStatusUpdate:
       type: object
       properties:

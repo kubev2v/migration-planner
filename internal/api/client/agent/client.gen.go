@@ -347,8 +347,10 @@ type ClientWithResponsesInterface interface {
 type UpdateAgentStatusResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON400      *externalRef0.Error
 	JSON401      *externalRef0.Error
 	JSON410      *externalRef0.Error
+	JSON500      *externalRef0.Error
 }
 
 // Status returns HTTPResponse.Status
@@ -374,6 +376,7 @@ type ReplaceSourceStatusResponse struct {
 	JSON400      *externalRef0.Error
 	JSON401      *externalRef0.Error
 	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
 }
 
 // Status returns HTTPResponse.Status
@@ -470,6 +473,13 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -483,6 +493,13 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 			return nil, err
 		}
 		response.JSON410 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
@@ -530,6 +547,13 @@ func ParseReplaceSourceStatusResponse(rsp *http.Response) (*ReplaceSourceStatusR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

@@ -27,36 +27,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-    post:
-      tags:
-        - source
-      description: create a source
-      operationId: createSource
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SourceCreate'
-        required: true
-      responses:
-        "201":
-          description: Created
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Source'
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
     delete:
       tags:
         - source
@@ -243,6 +213,58 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/agents/{id}:
+    delete:
+      tags:
+        - agent
+      description: delete an agent
+      operationId: deleteAgent
+      parameters:
+        - name: id
+          in: path
+          description: ID of the agent
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Agent"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   /health:
     get:
       tags:
@@ -280,6 +302,10 @@ components:
           format: date-time
         sshKey:
           type: string
+        agents:
+          type: array
+          items:
+            $ref: '#/components/schemas/SourceAgentItem'
       required:
         - id
         - name
@@ -302,6 +328,18 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Source'
+
+    SourceAgentItem:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        associated:
+          type: boolean
+      required:
+        - id
+        - associated
 
     Error:
       properties:

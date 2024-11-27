@@ -276,6 +276,15 @@ func (response UpdateAgentStatus201Response) VisitUpdateAgentStatusResponse(w ht
 	return nil
 }
 
+type UpdateAgentStatus400JSONResponse externalRef0.Error
+
+func (response UpdateAgentStatus400JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UpdateAgentStatus401JSONResponse externalRef0.Error
 
 func (response UpdateAgentStatus401JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
@@ -290,6 +299,15 @@ type UpdateAgentStatus410JSONResponse externalRef0.Error
 func (response UpdateAgentStatus410JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(410)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAgentStatus500JSONResponse externalRef0.Error
+
+func (response UpdateAgentStatus500JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -335,6 +353,15 @@ type ReplaceSourceStatus404JSONResponse externalRef0.Error
 func (response ReplaceSourceStatus404JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReplaceSourceStatus500JSONResponse externalRef0.Error
+
+func (response ReplaceSourceStatus500JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
