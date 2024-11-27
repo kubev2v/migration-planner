@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -15,7 +14,7 @@ import (
 )
 
 const (
-	insertSourceStm = "INSERT INTO sources (id, name) VALUES ('%s', '%s');"
+	insertSourceStm = "INSERT INTO sources (id) VALUES ('%s');"
 )
 
 var _ = Describe("source store", Ordered, func() {
@@ -39,9 +38,9 @@ var _ = Describe("source store", Ordered, func() {
 
 	Context("list", func() {
 		It("successfully list all the sources", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
 			sources, err := s.Source().List(context.TODO())
@@ -63,22 +62,21 @@ var _ = Describe("source store", Ordered, func() {
 	Context("get", func() {
 		It("successfully get a source", func() {
 			id := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
 			source, err := s.Source().Get(context.TODO(), id)
 			Expect(err).To(BeNil())
 			Expect(source).ToNot(BeNil())
-			Expect(source.Name).To(Equal("name-1"))
 		})
 
 		It("failed get a source -- source does not exists", func() {
 			id := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
 			source, err := s.Source().Get(context.TODO(), id)
@@ -93,11 +91,8 @@ var _ = Describe("source store", Ordered, func() {
 
 		Context("create", func() {
 			It("successfully creates one source", func() {
-				sshKey := "some key"
-				source, err := s.Source().Create(context.TODO(), v1alpha1.SourceCreate{
-					Name:   "name-1",
-					SshKey: &sshKey,
-				})
+				sourceID := uuid.New()
+				source, err := s.Source().Create(context.TODO(), sourceID)
 				Expect(err).To(BeNil())
 				Expect(source).NotTo(BeNil())
 
@@ -108,9 +103,8 @@ var _ = Describe("source store", Ordered, func() {
 			})
 
 			It("successfully creates one source without sshkey", func() {
-				source, err := s.Source().Create(context.TODO(), v1alpha1.SourceCreate{
-					Name: "name-1",
-				})
+				sourceID := uuid.New()
+				source, err := s.Source().Create(context.TODO(), sourceID)
 				Expect(err).To(BeNil())
 				Expect(source).NotTo(BeNil())
 
@@ -128,9 +122,9 @@ var _ = Describe("source store", Ordered, func() {
 		Context("delete", func() {
 			It("successfully delete a source", func() {
 				id := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "name-1"))
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
 				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-2"))
+				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 				Expect(tx.Error).To(BeNil())
 
 				err := s.Source().Delete(context.TODO(), id)
@@ -144,9 +138,9 @@ var _ = Describe("source store", Ordered, func() {
 
 			It("successfully delete all sources", func() {
 				id := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "name-1"))
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
 				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "name-2"))
+				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 				Expect(tx.Error).To(BeNil())
 
 				err := s.Source().DeleteAll(context.TODO())

@@ -96,6 +96,7 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
+	Agents        *[]SourceAgentItem `json:"agents,omitempty"`
 	CreatedAt     time.Time          `json:"createdAt"`
 	CredentialUrl *string            `json:"credentialUrl,omitempty"`
 	Id            openapi_types.UUID `json:"id"`
@@ -109,6 +110,12 @@ type Source struct {
 
 // SourceStatus defines model for Source.Status.
 type SourceStatus string
+
+// SourceAgentItem defines model for SourceAgentItem.
+type SourceAgentItem struct {
+	Associated bool               `json:"associated"`
+	Id         openapi_types.UUID `json:"id"`
+}
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
@@ -163,6 +170,3 @@ type VMs struct {
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
-
-// CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
-type CreateSourceJSONRequestBody = SourceCreate

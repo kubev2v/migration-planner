@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	"github.com/kubev2v/migration-planner/internal/store"
 )
 
 func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
@@ -12,14 +13,6 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 		return nil, err
 	}
 	return server.ListSources200JSONResponse(result), nil
-}
-
-func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
-	result, err := h.store.Source().Create(ctx, *request.Body)
-	if err != nil {
-		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
-	}
-	return server.CreateSource201JSONResponse(*result), nil
 }
 
 func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
@@ -39,9 +32,29 @@ func (h *ServiceHandler) ReadSource(ctx context.Context, request server.ReadSour
 }
 
 func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
-	err := h.store.Source().Delete(ctx, request.Id)
+	// Delete the agents first
+	ctx, err := h.store.NewTransactionContext(ctx)
 	if err != nil {
 		return server.DeleteSource404JSONResponse{}, nil
 	}
+
+	agents, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter().BySourceID(request.Id.String()), store.NewAgentQueryOptions())
+	if err != nil {
+		return server.DeleteSource400JSONResponse{}, nil
+	}
+
+	for _, agent := range agents {
+		if err := h.store.Agent().Delete(ctx, agent.Id, true); err != nil {
+			store.Rollback(ctx)
+			return server.DeleteSource400JSONResponse{}, nil
+		}
+	}
+
+	if err := h.store.Source().Delete(ctx, request.Id); err != nil {
+		store.Rollback(ctx)
+		return server.DeleteSource404JSONResponse{}, nil
+	}
+
+	store.Commit(ctx)
 	return server.DeleteSource200JSONResponse{}, nil
 }

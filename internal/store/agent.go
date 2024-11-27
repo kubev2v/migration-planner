@@ -25,7 +25,7 @@ type Agent interface {
 	List(ctx context.Context, filter *AgentQueryFilter, opts *AgentQueryOptions) (api.AgentList, error)
 	Get(ctx context.Context, id string) (*api.Agent, error)
 	Update(ctx context.Context, agentUpdate apiAgent.AgentStatusUpdate) (*api.Agent, error)
-	UpdateSourceID(ctx context.Context, agentID string, sourceID string) (*api.Agent, error)
+	UpdateSourceID(ctx context.Context, agentID string, sourceID string, associated bool) (*api.Agent, error)
 	Create(ctx context.Context, agentUpdate apiAgent.AgentStatusUpdate) (*api.Agent, error)
 	Delete(ctx context.Context, id string, softDeletion bool) error
 	InitialMigration(context.Context) error
@@ -100,7 +100,7 @@ func (a *AgentStore) Update(ctx context.Context, agentUpdate apiAgent.AgentStatu
 
 // UpdateSourceID updates the sources id field of an agent.
 // The source must exists.
-func (a *AgentStore) UpdateSourceID(ctx context.Context, agentID string, sourceID string) (*api.Agent, error) {
+func (a *AgentStore) UpdateSourceID(ctx context.Context, agentID string, sourceID string, associated bool) (*api.Agent, error) {
 	agent := model.NewAgentFromID(agentID)
 
 	if err := a.getDB(ctx).WithContext(ctx).First(agent).Error; err != nil {
@@ -108,6 +108,7 @@ func (a *AgentStore) UpdateSourceID(ctx context.Context, agentID string, sourceI
 	}
 
 	agent.SourceID = &sourceID
+	agent.Associated = associated
 
 	if tx := a.getDB(ctx).WithContext(ctx).Clauses(clause.Returning{}).Updates(&agent); tx.Error != nil {
 		return nil, tx.Error
@@ -121,9 +122,9 @@ func (a *AgentStore) UpdateSourceID(ctx context.Context, agentID string, sourceI
 func (a *AgentStore) Get(ctx context.Context, id string) (*api.Agent, error) {
 	agent := model.NewAgentFromID(id)
 
-	if err := a.getDB(ctx).WithContext(ctx).First(&agent).Error; err != nil {
+	if err := a.getDB(ctx).WithContext(ctx).Unscoped().First(&agent).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, ErrRecordNotFound
 		}
 		return nil, err
 	}
