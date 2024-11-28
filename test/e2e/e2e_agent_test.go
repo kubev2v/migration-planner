@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/client"
@@ -31,7 +30,7 @@ var (
 )
 
 type PlannerAgent interface {
-	Run(string) error
+	Run() error
 	Login(url string, user string, pass string) (*http.Response, error)
 	Version() (string, error)
 	Remove() error
@@ -41,9 +40,9 @@ type PlannerAgent interface {
 }
 
 type PlannerService interface {
-	Create(name string) (string, error)
 	RemoveSources() error
 	GetSource() (*api.Source, error)
+	GetAgent() (*api.Agent, error)
 }
 
 type plannerService struct {
@@ -72,8 +71,8 @@ func NewPlannerAgent(configPath string, name string) (*plannerAgentLibvirt, erro
 	return &plannerAgentLibvirt{c: c, name: name, con: conn}, nil
 }
 
-func (p *plannerAgentLibvirt) Run(sourceId string) error {
-	if err := p.prepareImage(sourceId); err != nil {
+func (p *plannerAgentLibvirt) Run() error {
+	if err := p.prepareImage(); err != nil {
 		return err
 	}
 
@@ -85,7 +84,7 @@ func (p *plannerAgentLibvirt) Run(sourceId string) error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) prepareImage(sourceId string) error {
+func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
 	file, err := os.Create(defaultOvaPath)
 	if err != nil {
@@ -94,7 +93,7 @@ func (p *plannerAgentLibvirt) prepareImage(sourceId string) error {
 	defer os.Remove(file.Name())
 
 	// Download OVA
-	res, err := p.c.GetSourceImage(context.TODO(), uuid.MustParse(sourceId))
+	res, err := p.c.GetImage(context.TODO(), &api.GetImageParams{})
 	if err != nil {
 		return fmt.Errorf("error getting source image: %w", err)
 	}
@@ -260,20 +259,18 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 	return &plannerService{c: c}, nil
 }
 
-func (s *plannerService) Create(name string) (string, error) {
+func (s *plannerService) GetAgent() (*api.Agent, error) {
 	ctx := context.TODO()
-	body := api.SourceCreate{Name: name}
-	_, err := s.c.CreateSource(ctx, body)
-	if err != nil {
-		return "", fmt.Errorf("Error creating source")
+	res, err := s.c.ListAgentsWithResponse(ctx)
+	if err != nil || res.HTTPResponse.StatusCode != 200 {
+		return nil, fmt.Errorf("Error listing agents")
 	}
 
-	source, err := s.GetSource()
-	if err != nil {
-		return "", err
+	if len(*res.JSON200) == 0 {
+		return nil, fmt.Errorf("No agents found")
 	}
 
-	return source.Id.String(), nil
+	return &(*res.JSON200)[0], nil
 }
 
 func (s *plannerService) GetSource() (*api.Source, error) {

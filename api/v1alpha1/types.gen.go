@@ -118,8 +118,7 @@ type SourceAgentItem struct {
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	Name   string  `json:"name"`
-	SshKey *string `json:"sshKey,omitempty"`
+	Name string `json:"name"`
 }
 
 // SourceList defines model for SourceList.
@@ -168,4 +167,16 @@ type VMs struct {
 	Total                       int                 `json:"total"`
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
+}
+
+// GetImageParams defines parameters for GetImage.
+type GetImageParams struct {
+	// SshKey public SSH key
+	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
+}
+
+// HeadImageParams defines parameters for HeadImage.
+type HeadImageParams struct {
+	// SshKey public SSH key
+	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
 }

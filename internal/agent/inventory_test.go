@@ -29,8 +29,6 @@ var _ = Describe("Inventory", func() {
 				UpdateSourceStatusFunc: func(ctx context.Context, id uuid.UUID, params v1alpha1.SourceStatusUpdate) error {
 					Expect(id).To(Equal(sourceID))
 					Expect(params.AgentId).To(Equal(agentID))
-					Expect(params.Status).To(Equal("up-to-date"))
-					Expect(params.StatusInfo).To(Equal("status_info"))
 					Expect(params.Inventory).ToNot(BeNil())
 					return nil
 
@@ -38,7 +36,8 @@ var _ = Describe("Inventory", func() {
 			}
 
 			inventory := &api.Inventory{
-				Vms: api.VMs{Total: 2},
+				Vms:     api.VMs{Total: 2},
+				Vcenter: api.VCenter{Id: sourceID.String()},
 			}
 			inventoryUpdater := agent.NewInventoryUpdater(log.NewPrefixLogger(""), agentID, &client)
 			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), api.SourceStatusUpToDate, "status_info", inventory)

@@ -107,7 +107,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	go a.server.Start(a.log, statusUpdater)
 
 	// get the credentials url
-	a.initializeCredentialUrl()
+	credUrl := a.initializeCredentialUrl()
 
 	// start the health check
 	healthChecker, err := NewHealthChecker(
@@ -151,7 +151,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 				continue
 			}
 
-			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo); err != nil {
+			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, credUrl); err != nil {
 				if errors.Is(err, client.ErrSourceGone) {
 					a.log.Info("Source is gone..Stop sending requests")
 					// stop the server and the healthchecker
@@ -169,13 +169,12 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}()
 }
 
-func (a *Agent) initializeCredentialUrl() {
+func (a *Agent) initializeCredentialUrl() string {
 	// Parse the service URL
 	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
 	if err != nil {
 		a.log.Errorf("error parsing service URL: %v", err)
-		a.credUrl = "N/A"
-		return
+		return "N/A"
 	}
 
 	// Use either port if specified, or scheme
@@ -188,14 +187,14 @@ func (a *Agent) initializeCredentialUrl() {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
 		a.log.Errorf("failed connecting to migration planner: %v", err)
-		a.credUrl = "N/A"
-		return
+		return "N/A"
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	a.credUrl = fmt.Sprintf("http://%s:%d", localAddr.IP.String(), defaultAgentPort)
-	a.log.Infof("Discovered Agent IP address: %s", a.credUrl)
+	credUrl := fmt.Sprintf("http://%s:%d", localAddr.IP.String(), defaultAgentPort)
+	a.log.Infof("Discovered Agent IP address: %s", credUrl)
+	return credUrl
 }
 
 func newPlannerClient(cfg *Config) (client.Planner, error) {

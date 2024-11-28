@@ -59,7 +59,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 	// An agent is allowed to change sources.
 	if agent.SourceId == nil || *agent.SourceId != source.Id.String() {
 		if agent, err = h.store.Agent().UpdateSourceID(ctx, agent.Id, request.Id.String(), associated); err != nil {
-			store.Rollback(ctx)
+			_, _ = store.Rollback(ctx)
 			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 		}
 	}
@@ -75,7 +75,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 
 	result, err := h.store.Source().Update(ctx, request.Id, &request.Body.Inventory)
 	if err != nil {
-		store.Rollback(ctx)
+		_, _ = store.Rollback(ctx)
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}
 
@@ -117,7 +117,7 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 	}
 
 	if _, err := h.store.Agent().Update(ctx, *request.Body); err != nil {
-		store.Rollback(ctx)
+		_, _ = store.Rollback(ctx)
 		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
 	}
 

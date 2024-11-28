@@ -39,7 +39,7 @@ func NewStatusUpdater(log *log.PrefixLogger, agentID uuid.UUID, version, credUrl
 	}
 }
 
-func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus, statusInfo string) error {
+func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus, statusInfo string, credUrl string) error {
 	ctx, cancel := context.WithTimeout(ctx, defaultUpdateStatusTimeout*time.Second)
 	defer cancel()
 
@@ -47,7 +47,7 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 		Id:            s.agentID.String(),
 		Status:        string(status),
 		StatusInfo:    statusInfo,
-		CredentialUrl: s.credUrl,
+		CredentialUrl: credUrl,
 		Version:       s.version,
 	}
 

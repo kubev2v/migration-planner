@@ -68,7 +68,6 @@ storage:
           data-dir: /agent/data
           www-dir: /app/www
           log-level: debug
-          source-id: {{.SourceId}}
           update-interval: 5s
           planner-service:
             service:
