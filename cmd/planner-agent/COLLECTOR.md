@@ -26,7 +26,7 @@ EOF
 Create VMware credentials file.
 
 ```
-cat <<EOF > /tmp/data/creds.json
+cat <<EOF > /tmp/data/credentials.json
 {
   "username": "user@example.com",
   "password": "userpassword",

@@ -305,12 +305,14 @@ func histogram(d []int) struct {
 }
 
 func getNetworks(collector *vsphere.Collector) []struct {
-	Name string                       `json:"name"`
-	Type apiplanner.InfraNetworksType `json:"type"`
+	Name   string                       `json:"name"`
+	Type   apiplanner.InfraNetworksType `json:"type"`
+	VlanId *string                      `json:"vlanId,omitempty"`
 } {
 	r := []struct {
-		Name string                       `json:"name"`
-		Type apiplanner.InfraNetworksType `json:"type"`
+		Name   string                       `json:"name"`
+		Type   apiplanner.InfraNetworksType `json:"type"`
+		VlanId *string                      `json:"vlanId,omitempty"`
 	}{}
 	networks := &[]vspheremodel.Network{}
 	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
@@ -318,22 +320,27 @@ func getNetworks(collector *vsphere.Collector) []struct {
 		return nil
 	}
 	for _, n := range *networks {
+		vlanId := "" // TODO: use: https://github.com/kubev2v/forklift/pull/1225
 		r = append(r, struct {
-			Name string                       `json:"name"`
-			Type apiplanner.InfraNetworksType `json:"type"`
-		}{Name: n.Name, Type: apiplanner.InfraNetworksType(getNetworkType(&n))})
+			Name   string                       `json:"name"`
+			Type   apiplanner.InfraNetworksType `json:"type"`
+			VlanId *string                      `json:"vlanId,omitempty"`
+		}{Name: n.Name, Type: apiplanner.InfraNetworksType(getNetworkType(&n)), VlanId: &vlanId})
 	}
 
 	return r
 }
 
-// FIXME:
 func getNetworkType(n *vspheremodel.Network) string {
-	if n.Key == "hosted" {
-		return "standard"
-	} else {
-		return "distributed"
+	if n.Variant == vspheremodel.NetDvPortGroup {
+		return string(apiplanner.Distributed)
+	} else if n.Variant == vspheremodel.NetStandard {
+		return string(apiplanner.Standard)
+	} else if n.Variant == vspheremodel.NetDvSwitch {
+		return string(apiplanner.Dvswitch)
 	}
+
+	return string(apiplanner.Unsupported)
 }
 
 func getHostsPerCluster(clusters []vspheremodel.Cluster) []int {

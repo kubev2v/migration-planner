@@ -458,8 +458,10 @@ components:
             properties:
               type:
                 type: string
-                enum: [standard, distributed]
+                enum: [standard, distributed, dvswitch, unsupported]
               name:
+                type: string
+              vlanId:
                 type: string
         datastores:
           type: array
