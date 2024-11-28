@@ -22,7 +22,9 @@ const (
 // Defines values for InfraNetworksType.
 const (
 	Distributed InfraNetworksType = "distributed"
+	Dvswitch    InfraNetworksType = "dvswitch"
 	Standard    InfraNetworksType = "standard"
+	Unsupported InfraNetworksType = "unsupported"
 )
 
 // Defines values for SourceStatus.
@@ -70,8 +72,9 @@ type Infra struct {
 	HostPowerStates map[string]int `json:"hostPowerStates"`
 	HostsPerCluster []int          `json:"hostsPerCluster"`
 	Networks        []struct {
-		Name string            `json:"name"`
-		Type InfraNetworksType `json:"type"`
+		Name   string            `json:"name"`
+		Type   InfraNetworksType `json:"type"`
+		VlanId *string           `json:"vlanId,omitempty"`
 	} `json:"networks"`
 	TotalClusters int `json:"totalClusters"`
 	TotalHosts    int `json:"totalHosts"`
