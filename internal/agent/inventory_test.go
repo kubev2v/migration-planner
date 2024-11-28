@@ -40,7 +40,7 @@ var _ = Describe("Inventory", func() {
 				Vcenter: api.VCenter{Id: sourceID.String()},
 			}
 			inventoryUpdater := agent.NewInventoryUpdater(log.NewPrefixLogger(""), agentID, &client)
-			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), api.SourceStatusUpToDate, "status_info", inventory)
+			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), inventory)
 		})
 	})
 })

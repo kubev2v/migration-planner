@@ -34,7 +34,7 @@ func NewInventoryUpdater(log *log.PrefixLogger, agentID uuid.UUID, client client
 	return updater
 }
 
-func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, status api.SourceStatus, statusInfo string, inventory *api.Inventory) {
+func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, inventory *api.Inventory) {
 	update := agentapi.SourceStatusUpdate{
 		Inventory: *inventory,
 		AgentId:   u.agentID,
@@ -49,7 +49,6 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, statu
 		return
 	}
 
-	u.log.Debugf("Updating status to %s: %s", string(status), statusInfo)
 	err = u.client.UpdateSourceStatus(ctx, uuid.MustParse(inventory.Vcenter.Id), update)
 	if err != nil {
 		u.log.Errorf("failed updating status: %v", err)
