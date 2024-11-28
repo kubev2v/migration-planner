@@ -1,18 +1,21 @@
 package main
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
+	"path"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
-var (
-	agentID string
+const (
+	agentFilename = "agent_id"
 )
 
 func main() {
@@ -35,7 +38,6 @@ func NewAgentCommand() *agentCmd {
 	}
 
 	flag.StringVar(&a.configFile, "config", agent.DefaultConfigFile, "Path to the agent's configuration file.")
-	flag.StringVar(&agentID, "id", os.Getenv("AGENT_ID"), "ID of the agent")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
@@ -58,13 +60,28 @@ func NewAgentCommand() *agentCmd {
 }
 
 func (a *agentCmd) Execute() error {
-	// FIXME: !!!
-	if agentID == "" {
-		agentID = uuid.New().String()
+	agentID, err := a.getAgentID()
+	if err != nil {
+		a.log.Fatalf("failed to retreive agent_id: %v", err)
 	}
+
 	agentInstance := agent.New(uuid.MustParse(agentID), a.log, a.config)
 	if err := agentInstance.Run(context.Background()); err != nil {
 		a.log.Fatalf("running device agent: %v", err)
 	}
 	return nil
+}
+
+func (a *agentCmd) getAgentID() (string, error) {
+	// look for it in data dir
+	dataDirPath := path.Join(a.config.DataDir, agentFilename)
+	if _, err := os.Stat(dataDirPath); err == nil {
+		content, err := os.ReadFile(dataDirPath)
+		if err != nil {
+			return "", err
+		}
+		return string(bytes.TrimSpace(content)), nil
+	}
+
+	return "", errors.New("agent_id not found")
 }
