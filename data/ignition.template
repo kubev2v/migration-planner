@@ -9,6 +9,21 @@ passwd:
         - {{.SshKey}}
       {{end}}
 
+systemd:
+  units:
+    - name: planner-agent-id.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Service to retrieve system uuid
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/bash -c 'cat /sys/class/dmi/id/product_uuid > /var/home/core/.migration-planner/data/agent_id'
+        ExecStartPost=/bin/bash -c 'chown core:core /var/home/core/.migration-planner/data/agent_id'
+        RemainAfterExit=true
+        [Install]
+        WantedBy=multi-user.target
+
 storage:
   links:
     - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
@@ -99,6 +114,7 @@ storage:
           [Service]
           Restart=on-failure
           RestartSec=5
+          ExecStartPre=/bin/bash -c 'until [ -f /var/home/core/.migration-planner/data/agent_id ]; do sleep 1; done'
 
           [Install]
           WantedBy=multi-user.target default.target
