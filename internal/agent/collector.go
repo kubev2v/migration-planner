@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"strings"
 	"sync"
 	"time"
 
@@ -20,15 +19,10 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
 	vspheremodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
 	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/vmware/govmomi"
-	"github.com/vmware/govmomi/session"
-	"github.com/vmware/govmomi/vim25"
-	"github.com/vmware/govmomi/vim25/soap"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -94,12 +88,6 @@ func (c *Collector) run() {
 	}
 	defer resp.Body.Close()
 
-	vCenterID, err := getVCenterID(context.TODO(), &creds)
-	if err != nil {
-		c.log.Errorf("failed to get vCenterID: %s", err)
-		return
-	}
-
 	c.log.Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
@@ -140,8 +128,16 @@ func (c *Collector) run() {
 		return
 	}
 
+	c.log.Infof("Get About")
+	about := &vspheremodel.About{}
+	err = collector.DB().Get(about)
+	if err != nil {
+		c.log.Errorf("Error list database about table: %s", err)
+		return
+	}
+
 	c.log.Infof("Create inventory")
-	inv := createBasicInventoryObj(vCenterID, vms, collector, hosts, clusters)
+	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
 
 	c.log.Infof("Run the validation of VMs")
 	vms, err = validation(vms, opaServer)
@@ -574,38 +570,6 @@ func waitForFile(filename string) {
 			return
 		}
 	}
-}
-
-func getVCenterID(ctx context.Context, credentials *Credentials) (string, error) {
-	u, err := parseUrl(credentials)
-	if err != nil {
-		return "", liberr.Wrap(err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	vimClient, err := vim25.NewClient(ctx, soap.NewClient(u, true))
-	if err != nil {
-		return "", liberr.Wrap(err)
-	}
-	client := &govmomi.Client{
-		SessionManager: session.NewManager(vimClient),
-		Client:         vimClient,
-	}
-	err = client.Login(ctx, u.User)
-	if err != nil {
-		err = liberr.Wrap(err)
-		if strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
-			return "", err
-		}
-		return "", err
-	}
-
-	id := client.ServiceContent.About.InstanceUuid
-	_ = client.Logout(ctx)
-	client.CloseIdleConnections()
-
-	return id, nil
 }
 
 type NotMigratableReasons []NotMigratableReason
