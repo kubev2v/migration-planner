@@ -11,7 +11,6 @@ import (
 
 	"github.com/coreos/butane/config"
 	"github.com/coreos/butane/config/common"
-	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -23,14 +22,12 @@ type Key int
 const ResponseWriterKey Key = 0
 
 type Ova struct {
-	Id     uuid.UUID
 	Writer io.Writer
 	SshKey *string
 }
 
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
-	SourceId                   string
 	SshKey                     string
 	PlannerService             string
 	MigrationPlannerAgentImage string
@@ -143,7 +140,6 @@ func writeOvf(tw *tar.Writer) error {
 
 func (o *Ova) generateIgnition() (string, error) {
 	ignData := IgnitionData{
-		SourceId:                   o.Id.String(),
 		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
 	}

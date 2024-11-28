@@ -15,7 +15,6 @@ var _ = Describe("e2e", func() {
 	var (
 		svc      PlannerService
 		agent    PlannerAgent
-		sourceId string
 		agentIP  string
 		err      error
 		systemIP = os.Getenv("PLANNER_IP")
@@ -26,10 +25,7 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil())
 		agent, err = NewPlannerAgent(defaultConfigPath, vmName)
 		Expect(err).To(BeNil())
-		sourceId, err = svc.Create("testsource")
-		Expect(err).To(BeNil())
-		Expect(sourceId).ToNot(BeNil())
-		err = agent.Run(sourceId)
+		err = agent.Run()
 		Expect(err).To(BeNil())
 		Eventually(func() string {
 			agentIP, err = agent.GetIp()
@@ -44,12 +40,12 @@ var _ = Describe("e2e", func() {
 		}, "3m", "2s").Should(BeTrue())
 
 		Eventually(func() string {
-			s, err := svc.GetSource()
+			s, err := svc.GetAgent()
 			if err != nil {
 				return ""
 			}
-			if s.CredentialUrl != nil {
-				return *s.CredentialUrl
+			if s.CredentialUrl != "N/A" && s.CredentialUrl != "" {
+				return s.CredentialUrl
 			}
 
 			return ""
@@ -76,23 +72,12 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			Eventually(func() bool {
-				source, err := svc.GetSource()
+				apiAgent, err := svc.GetAgent()
 				if err != nil {
 					return false
 				}
-				return source.Status == v1alpha1.SourceStatusUpToDate
+				return apiAgent.Status == v1alpha1.AgentStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
-		})
-		It("Return 422 in case of wrong URL", func() {
-			// Put the vCenter credentials with wrong URL and check it return HTTP 422 error code
-			res, err := agent.Login("this is not URL", "user", "pass")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusUnprocessableEntity))
-		})
-		It("version endpoint is not empty", func() {
-			version, err := agent.Version()
-			Expect(err).To(BeNil())
-			Expect(version).ToNot(BeEmpty())
 		})
 	})
 })

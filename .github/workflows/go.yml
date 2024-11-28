@@ -55,6 +55,9 @@ jobs:
 
     - name: Prepare
       run: |
+        # FIXME: Move to Makefile!
+        go install github.com/matryer/moq@latest
+        export PATH=$PATH:$(go env GOPATH)/bin
         make generate
         DOWNLOAD_RHCOS=false make build
 

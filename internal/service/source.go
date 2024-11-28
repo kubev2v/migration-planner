@@ -45,16 +45,16 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 
 	for _, agent := range agents {
 		if err := h.store.Agent().Delete(ctx, agent.Id, true); err != nil {
-			store.Rollback(ctx)
+			_, _ = store.Rollback(ctx)
 			return server.DeleteSource400JSONResponse{}, nil
 		}
 	}
 
 	if err := h.store.Source().Delete(ctx, request.Id); err != nil {
-		store.Rollback(ctx)
+		_, _ = store.Rollback(ctx)
 		return server.DeleteSource404JSONResponse{}, nil
 	}
 
-	store.Commit(ctx)
+	_, _ = store.Commit(ctx)
 	return server.DeleteSource200JSONResponse{}, nil
 }

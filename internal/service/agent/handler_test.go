@@ -39,7 +39,7 @@ var _ = Describe("agent store", Ordered, func() {
 
 		s = store.NewStore(db, log)
 		gormdb = db
-		s.InitialMigration()
+		_ = s.InitialMigration()
 	})
 
 	AfterAll(func() {
@@ -66,6 +66,7 @@ var _ = Describe("agent store", Ordered, func() {
 
 			count := -1
 			tx := gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
 
 			status := ""
@@ -95,6 +96,7 @@ var _ = Describe("agent store", Ordered, func() {
 
 			count := -1
 			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
 
 			status := ""

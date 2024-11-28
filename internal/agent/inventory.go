@@ -14,7 +14,6 @@ import (
 
 type InventoryUpdater struct {
 	log        *log.PrefixLogger
-	sourceID   uuid.UUID
 	client     client.Planner
 	agentID    uuid.UUID
 	prevStatus []byte
@@ -37,10 +36,8 @@ func NewInventoryUpdater(log *log.PrefixLogger, agentID uuid.UUID, client client
 
 func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, status api.SourceStatus, statusInfo string, inventory *api.Inventory) {
 	update := agentapi.SourceStatusUpdate{
-		Status:     string(status),
-		StatusInfo: statusInfo,
-		Inventory:  *inventory,
-		AgentId:    u.agentID,
+		Inventory: *inventory,
+		AgentId:   u.agentID,
 	}
 
 	newContents, err := json.Marshal(update)

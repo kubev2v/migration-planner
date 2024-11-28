@@ -58,6 +58,10 @@ func NewAgentCommand() *agentCmd {
 }
 
 func (a *agentCmd) Execute() error {
+	// FIXME: !!!
+	if agentID == "" {
+		agentID = uuid.New().String()
+	}
 	agentInstance := agent.New(uuid.MustParse(agentID), a.log, a.config)
 	if err := agentInstance.Run(context.Background()); err != nil {
 		a.log.Fatalf("running device agent: %v", err)

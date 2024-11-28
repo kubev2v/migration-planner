@@ -34,7 +34,7 @@ var _ = Describe("source handler", Ordered, func() {
 
 		s = store.NewStore(db, log)
 		gormdb = db
-		s.InitialMigration()
+		_ = s.InitialMigration()
 	})
 
 	AfterAll(func() {

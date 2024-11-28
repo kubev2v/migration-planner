@@ -122,21 +122,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/sources/{id}/image:
+  /api/v1/image:
     head:
       tags:
-        - source
         - image
-      description: head the OVA file for the source
-      operationId: headSourceImage
+      description: head the OVA image
+      operationId: headImage
       parameters:
-        - name: id
-          in: path
-          description: ID of the source
-          required: true
+        - name: sshKey
+          in: query
+          description: public SSH key
+          required: false
           schema:
             type: string
-            format: uuid
       responses:
         "200":
           description: An OVA image
@@ -150,18 +148,16 @@ paths:
           description: Internal Server Error
     get:
       tags:
-        - source
         - image
-      description: get the OVA file for the source
-      operationId: getSourceImage
+      description: get the OVA image
+      operationId: getImage
       parameters:
-        - name: id
-          in: path
-          description: ID of the source
-          required: true
+        - name: sshKey
+          in: query
+          description: public SSH key
+          required: false
           schema:
             type: string
-            format: uuid
       responses:
         "200":
           description: An OVA image
@@ -316,8 +312,6 @@ components:
       type: object
       properties:
         name:
-          type: string
-        sshKey:
           type: string
       required:
         - name

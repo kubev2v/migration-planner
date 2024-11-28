@@ -41,7 +41,7 @@ var _ = Describe("Status", func() {
 			}
 
 			statusUpdater := agent.NewStatusUpdater(log.NewPrefixLogger(""), agentID, "best_version", "www-cred-url", &agent.Config{}, &client)
-			Expect(statusUpdater.UpdateStatus(context.TODO(), api.AgentStatusUpToDate, "status_info"))
+			Expect(statusUpdater.UpdateStatus(context.TODO(), api.AgentStatusUpToDate, "status_info", "www-cred-url"))
 		})
 	})
 
