@@ -72,9 +72,10 @@ type Infra struct {
 	HostPowerStates map[string]int `json:"hostPowerStates"`
 	HostsPerCluster []int          `json:"hostsPerCluster"`
 	Networks        []struct {
-		Name   string            `json:"name"`
-		Type   InfraNetworksType `json:"type"`
-		VlanId *string           `json:"vlanId,omitempty"`
+		Dvswitch *string           `json:"dvswitch,omitempty"`
+		Name     string            `json:"name"`
+		Type     InfraNetworksType `json:"type"`
+		VlanId   *string           `json:"vlanId,omitempty"`
 	} `json:"networks"`
 	TotalClusters int `json:"totalClusters"`
 	TotalHosts    int `json:"totalHosts"`

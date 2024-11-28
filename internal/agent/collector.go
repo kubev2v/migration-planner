@@ -305,27 +305,37 @@ func histogram(d []int) struct {
 }
 
 func getNetworks(collector *vsphere.Collector) []struct {
-	Name   string                       `json:"name"`
-	Type   apiplanner.InfraNetworksType `json:"type"`
-	VlanId *string                      `json:"vlanId,omitempty"`
+	Dvswitch *string                      `json:"dvswitch,omitempty"`
+	Name     string                       `json:"name"`
+	Type     apiplanner.InfraNetworksType `json:"type"`
+	VlanId   *string                      `json:"vlanId,omitempty"`
 } {
 	r := []struct {
-		Name   string                       `json:"name"`
-		Type   apiplanner.InfraNetworksType `json:"type"`
-		VlanId *string                      `json:"vlanId,omitempty"`
+		Dvswitch *string                      `json:"dvswitch,omitempty"`
+		Name     string                       `json:"name"`
+		Type     apiplanner.InfraNetworksType `json:"type"`
+		VlanId   *string                      `json:"vlanId,omitempty"`
 	}{}
 	networks := &[]vspheremodel.Network{}
 	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		return nil
 	}
+
 	for _, n := range *networks {
-		vlanId := "" // TODO: use: https://github.com/kubev2v/forklift/pull/1225
+
+		vlanId := n.VlanId
+		dvNet := &vspheremodel.Network{}
+		if n.Variant == vspheremodel.NetDvPortGroup {
+			dvNet.WithRef(n.DVSwitch)
+			_ = collector.DB().Get(dvNet)
+		}
 		r = append(r, struct {
-			Name   string                       `json:"name"`
-			Type   apiplanner.InfraNetworksType `json:"type"`
-			VlanId *string                      `json:"vlanId,omitempty"`
-		}{Name: n.Name, Type: apiplanner.InfraNetworksType(getNetworkType(&n)), VlanId: &vlanId})
+			Dvswitch *string                      `json:"dvswitch,omitempty"`
+			Name     string                       `json:"name"`
+			Type     apiplanner.InfraNetworksType `json:"type"`
+			VlanId   *string                      `json:"vlanId,omitempty"`
+		}{Name: n.Name, Type: apiplanner.InfraNetworksType(getNetworkType(&n)), VlanId: &vlanId, Dvswitch: &dvNet.Name})
 	}
 
 	return r
