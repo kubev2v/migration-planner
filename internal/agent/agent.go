@@ -163,7 +163,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			}
 
 			if status == api.AgentStatusUpToDate {
-				inventoryUpdater.UpdateServiceWithInventory(ctx, api.SourceStatusUpToDate, "Inventory collected with success", inventory)
+				inventoryUpdater.UpdateServiceWithInventory(ctx, inventory)
 			}
 		}
 	}()
