@@ -42,7 +42,7 @@ type PlannerAgent interface {
 type PlannerService interface {
 	RemoveSources() error
 	GetSource() (*api.Source, error)
-	GetAgent() (*api.Agent, error)
+	GetAgent(string) (*api.Agent, error)
 }
 
 type plannerService struct {
@@ -259,7 +259,7 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 	return &plannerService{c: c}, nil
 }
 
-func (s *plannerService) GetAgent() (*api.Agent, error) {
+func (s *plannerService) GetAgent(agentIp string) (*api.Agent, error) {
 	ctx := context.TODO()
 	res, err := s.c.ListAgentsWithResponse(ctx)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
@@ -270,7 +270,12 @@ func (s *plannerService) GetAgent() (*api.Agent, error) {
 		return nil, fmt.Errorf("No agents found")
 	}
 
-	return &(*res.JSON200)[0], nil
+	agent := &(*res.JSON200)[0]
+	if agent.CredentialUrl == fmt.Sprintf("http://%s:3333", agentIp) {
+		return agent, nil
+	}
+
+	return nil, fmt.Errorf("No agents found")
 }
 
 func (s *plannerService) GetSource() (*api.Source, error) {
