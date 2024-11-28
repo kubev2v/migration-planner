@@ -463,6 +463,8 @@ components:
                 type: string
               vlanId:
                 type: string
+              dvswitch:
+                type: string
         datastores:
           type: array
           items:
