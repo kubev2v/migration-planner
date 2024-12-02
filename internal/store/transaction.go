@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
@@ -17,7 +17,6 @@ const (
 type Tx struct {
 	txId int64
 	tx   *gorm.DB
-	log  logrus.FieldLogger
 }
 
 func Commit(ctx context.Context) (context.Context, error) {
@@ -49,7 +48,7 @@ func FromContext(ctx context.Context) *gorm.DB {
 	return nil
 }
 
-func newTransactionContext(ctx context.Context, db *gorm.DB, log logrus.FieldLogger) (context.Context, error) {
+func newTransactionContext(ctx context.Context, db *gorm.DB) (context.Context, error) {
 	//look into the context to see if we have another tx
 	_, found := ctx.Value(transactionKey).(*Tx)
 	if found {
@@ -61,7 +60,7 @@ func newTransactionContext(ctx context.Context, db *gorm.DB, log logrus.FieldLog
 		Context: ctx,
 	})
 
-	tx, err := newTransaction(conn, log)
+	tx, err := newTransaction(conn)
 	if err != nil {
 		return ctx, err
 	}
@@ -70,7 +69,7 @@ func newTransactionContext(ctx context.Context, db *gorm.DB, log logrus.FieldLog
 	return ctx, nil
 }
 
-func newTransaction(db *gorm.DB, log logrus.FieldLogger) (*Tx, error) {
+func newTransaction(db *gorm.DB) (*Tx, error) {
 	// must call begin on 'db', which is Gorm.
 	tx := db.Begin()
 	if tx.Error != nil {
@@ -85,7 +84,6 @@ func newTransaction(db *gorm.DB, log logrus.FieldLogger) (*Tx, error) {
 	return &Tx{
 		txId: txid.ID,
 		tx:   tx,
-		log:  log,
 	}, nil
 }
 
@@ -102,10 +100,10 @@ func (t *Tx) Commit() error {
 	}
 
 	if err := t.tx.Commit().Error; err != nil {
-		t.log.Errorf("failed to commit transaction %d: %w", t.txId, err)
+		zap.S().Named("transaction").Errorf("failed to commit transaction %d: %w", t.txId, err)
 		return err
 	}
-	t.log.Debugf("transaction %d commited", t.txId)
+	zap.S().Named("transaction").Debugf("transaction %d commited", t.txId)
 	t.tx = nil // in case we call commit twice
 	return nil
 }
@@ -116,11 +114,11 @@ func (t *Tx) Rollback() error {
 	}
 
 	if err := t.tx.Rollback().Error; err != nil {
-		t.log.Errorf("failed to rollback transaction %d: %w", t.txId, err)
+		zap.S().Named("transaction").Errorf("failed to rollback transaction %d: %w", t.txId, err)
 		return err
 	}
 	t.tx = nil // in case we call commit twice
 
-	t.log.Debugf("transaction %d rollback", t.txId)
+	zap.S().Named("transaction").Debugf("transaction %d rollback", t.txId)
 	return nil
 }

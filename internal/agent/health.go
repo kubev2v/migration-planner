@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/agent/client"
-	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 type AgentHealthState int
@@ -29,10 +29,9 @@ type HealthChecker struct {
 	client        client.Planner
 	logFilepath   string
 	logFile       *os.File
-	logger        *log.PrefixLogger
 }
 
-func NewHealthChecker(log *log.PrefixLogger, client client.Planner, logFolder string, checkInterval time.Duration) (*HealthChecker, error) {
+func NewHealthChecker(client client.Planner, logFolder string, checkInterval time.Duration) (*HealthChecker, error) {
 	logFile := path.Join(logFolder, logFilename)
 	// check if we can write into the log file
 	_, err := os.Stat(logFolder)
@@ -59,7 +58,6 @@ func NewHealthChecker(log *log.PrefixLogger, client client.Planner, logFolder st
 		client:        client,
 		logFilepath:   logFile,
 		logFile:       f,
-		logger:        log,
 	}, nil
 }
 
@@ -89,10 +87,10 @@ func (h *HealthChecker) Start(closeCh chan chan any) {
 				select {
 				case c := <-closeCh:
 					if err := h.logFile.Sync(); err != nil {
-						h.logger.Errorf("failed to flush the log file %w", err)
+						zap.S().Named("health").Errorf("failed to flush the log file %w", err)
 					}
 					if err := h.logFile.Close(); err != nil {
-						h.logger.Errorf("failed to close log file %s %w", h.logFilepath, err)
+						zap.S().Named("health").Errorf("failed to close log file %s %w", h.logFilepath, err)
 					}
 					c <- struct{}{}
 					close(c)
@@ -118,7 +116,7 @@ func (h *HealthChecker) do() {
 	err := h.client.Health(ctx)
 	if err != nil {
 		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is unreachable.\n", time.Now().Format(time.RFC3339)))); err != nil {
-			h.logger.Errorf("failed to write to log file %s %w", h.logFilepath, err)
+			zap.S().Named("health").Errorf("failed to write to log file %s %w", h.logFilepath, err)
 		}
 		h.lock.Lock()
 		h.state = HealthCheckStateConsoleUnreachable
@@ -128,7 +126,7 @@ func (h *HealthChecker) do() {
 	// if state changed from unreachable to ok log the entry
 	if h.state == HealthCheckStateConsoleUnreachable {
 		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is OK.\n", time.Now().Format(time.RFC3339)))); err != nil {
-			h.logger.Errorf("failed to write to log file %s %w", h.logFilepath, err)
+			zap.S().Named("health").Errorf("failed to write to log file %s %w", h.logFilepath, err)
 		}
 	}
 	h.lock.Lock()

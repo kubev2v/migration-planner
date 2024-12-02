@@ -16,7 +16,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -27,12 +26,10 @@ var _ = Describe("Agent", func() {
 		testHttpServer  *httptest.Server
 		agentTmpFolder  string
 		agentID         uuid.UUID
-		logger          *log.PrefixLogger
 		endpointsCalled map[string]any
 	)
 
 	BeforeEach(func() {
-		logger = log.NewPrefixLogger("")
 		agentID, _ = uuid.NewUUID()
 		endpointsCalled = make(map[string]any)
 
@@ -76,7 +73,7 @@ var _ = Describe("Agent", func() {
 			}
 			config.PlannerService.Service.Server = testHttpServer.URL
 
-			a := agent.New(agentID, logger, &config)
+			a := agent.New(agentID, &config)
 			ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 			go func() {
 				err := a.Run(ctx)

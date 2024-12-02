@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
-	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 /*
@@ -22,7 +22,6 @@ type Server struct {
 	dataFolder string
 	wwwFolder  string
 	restServer *http.Server
-	log        *log.PrefixLogger
 }
 
 func NewServer(port int, dataFolder, wwwFolder string) *Server {
@@ -33,21 +32,20 @@ func NewServer(port int, dataFolder, wwwFolder string) *Server {
 	}
 }
 
-func (s *Server) Start(log *log.PrefixLogger, statusUpdater *StatusUpdater) {
+func (s *Server) Start(statusUpdater *StatusUpdater) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 
-	RegisterFileServer(router, log, s.wwwFolder)
-	RegisterApi(router, log, statusUpdater, s.dataFolder)
+	RegisterFileServer(router, s.wwwFolder)
+	RegisterApi(router, statusUpdater, s.dataFolder)
 
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 
 	// Run the server
-	s.log = log
 	err := s.restServer.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		s.log.Fatalf("failed to start server: %w", err)
+		zap.S().Named("server").Fatalf("failed to start server: %w", err)
 	}
 }
 
@@ -58,7 +56,7 @@ func (s *Server) Stop(stopCh chan any) {
 	go func() {
 		err := s.restServer.Shutdown(shutdownCtx)
 		if err != nil {
-			s.log.Errorf("failed to graceful shutdown the server: %s", err)
+			zap.S().Named("server").Errorf("failed to graceful shutdown the server: %s", err)
 		}
 		close(doneCh)
 	}()

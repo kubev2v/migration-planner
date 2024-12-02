@@ -15,7 +15,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -33,11 +32,10 @@ var _ = Describe("agent store", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		log := logrus.New()
-		db, err := store.InitDB(config.NewDefault(), log)
+		db, err := store.InitDB(config.NewDefault())
 		Expect(err).To(BeNil())
 
-		s = store.NewStore(db, log)
+		s = store.NewStore(db)
 		gormdb = db
 		_ = s.InitialMigration()
 	})
@@ -50,7 +48,7 @@ var _ = Describe("agent store", Ordered, func() {
 		It("successfully creates the agent", func() {
 			agentID := uuid.New()
 
-			srv := service.NewAgentServiceHandler(s, logrus.New())
+			srv := service.NewAgentServiceHandler(s)
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -80,7 +78,7 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewAgentServiceHandler(s, logrus.New())
+			srv := service.NewAgentServiceHandler(s)
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -110,7 +108,7 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithDeletedAtStm, agentID, "not-connected", "status-info-1", "cred_url-1", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339)))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewAgentServiceHandler(s, logrus.New())
+			srv := service.NewAgentServiceHandler(s)
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -137,7 +135,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			sourceID := uuid.New()
-			srv := service.NewAgentServiceHandler(s, logrus.New())
+			srv := service.NewAgentServiceHandler(s)
 			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -167,7 +165,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			sourceID := uuid.New()
-			srv := service.NewAgentServiceHandler(s, logrus.New())
+			srv := service.NewAgentServiceHandler(s)
 			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -190,7 +188,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(*source.Agents).To(HaveLen(1))
 			Expect((*source.Agents)[0].Id).To(Equal(agentID))
 
-			// make another request from another agent
+			//			 make another request from another agent
 			secondAgentID := uuid.New()
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())

@@ -22,20 +22,18 @@ import (
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 	core "k8s.io/api/core/v1"
 	meta "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 type Collector struct {
-	log     *log.PrefixLogger
 	dataDir string
 	once    sync.Once
 }
 
-func NewCollector(log *log.PrefixLogger, dataDir string) *Collector {
+func NewCollector(dataDir string) *Collector {
 	return &Collector{
-		log:     log,
 		dataDir: dataDir,
 	}
 }
@@ -58,100 +56,100 @@ func (c *Collector) collect(ctx context.Context) {
 
 func (c *Collector) run() {
 	credentialsFilePath := filepath.Join(c.dataDir, CredentialsFile)
-	c.log.Infof("Waiting for credentials")
+	zap.S().Named("collector").Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 
 	credsData, err := os.ReadFile(credentialsFilePath)
 	if err != nil {
-		c.log.Errorf("Error reading credentials file: %v\n", err)
+		zap.S().Named("collector").Errorf("Error reading credentials file: %v\n", err)
 		return
 	}
 
 	var creds Credentials
 	if err := json.Unmarshal(credsData, &creds); err != nil {
-		c.log.Errorf("Error parsing credentials JSON: %v\n", err)
+		zap.S().Named("collector").Errorf("Error parsing credentials JSON: %v\n", err)
 		return
 	}
 
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	c.log.Infof("Create Provider")
+	zap.S().Named("collector").Infof("Create Provider")
 	provider := getProvider(creds)
 
-	c.log.Infof("Create Secret")
+	zap.S().Named("collector").Infof("Create Secret")
 	secret := getSecret(creds)
 
-	c.log.Infof("Check if opaServer is responding")
+	zap.S().Named("collector").Infof("Check if opaServer is responding")
 	resp, err := http.Get("http://" + opaServer + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
-		c.log.Errorf("OPA server %s is not responding", opaServer)
+		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
 		return
 	}
 	defer resp.Body.Close()
 
-	c.log.Infof("Create DB")
+	zap.S().Named("collector").Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
-		c.log.Errorf("Error creating DB: %s", err)
+		zap.S().Named("collector").Errorf("Error creating DB: %s", err)
 		return
 	}
 
-	c.log.Infof("vSphere collector")
+	zap.S().Named("collector").Infof("vSphere collector")
 	collector, err := createCollector(db, provider, secret)
 	if err != nil {
-		c.log.Errorf("Error running collector: %s", err)
+		zap.S().Named("collector").Errorf("Error running collector: %s", err)
 		return
 	}
 	defer collector.DB().Close(true)
 	defer collector.Shutdown()
 
-	c.log.Infof("List VMs")
+	zap.S().Named("collector").Infof("List VMs")
 	vms := &[]vspheremodel.VM{}
 	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		c.log.Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("Error list database: %s", err)
 		return
 	}
 
-	c.log.Infof("List Hosts")
+	zap.S().Named("collector").Infof("List Hosts")
 	hosts := &[]vspheremodel.Host{}
 	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		c.log.Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("Error list database: %s", err)
 		return
 	}
 
-	c.log.Infof("List Clusters")
+	zap.S().Named("collector").Infof("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		c.log.Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("Error list database: %s", err)
 		return
 	}
 
-	c.log.Infof("Get About")
+	zap.S().Named("collector").Infof("Get About")
 	about := &vspheremodel.About{}
 	err = collector.DB().Get(about)
 	if err != nil {
-		c.log.Errorf("Error list database about table: %s", err)
+		zap.S().Named("collector").Errorf("Error list database about table: %s", err)
 		return
 	}
 
-	c.log.Infof("Create inventory")
+	zap.S().Named("collector").Infof("Create inventory")
 	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
 
-	c.log.Infof("Run the validation of VMs")
+	zap.S().Named("collector").Infof("Run the validation of VMs")
 	vms, err = validation(vms, opaServer)
 	if err != nil {
-		c.log.Errorf("Error running validation: %s", err)
+		zap.S().Named("collector").Errorf("Error running validation: %s", err)
 		return
 	}
 
-	c.log.Infof("Fill the inventory object with more data")
+	zap.S().Named("collector").Infof("Fill the inventory object with more data")
 	fillInventoryObjectWithMoreData(vms, inv)
 
-	c.log.Infof("Write the inventory to output file")
+	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, InventoryFile), inv); err != nil {
-		c.log.Errorf("Fill the inventory object with more data: %s", err)
+		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %s", err)
 		return
 	}
 }

@@ -14,8 +14,8 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/lthibault/jitterbug"
+	"go.uber.org/zap"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
@@ -31,10 +31,9 @@ const (
 var version string
 
 // New creates a new agent.
-func New(id uuid.UUID, log *log.PrefixLogger, config *Config) *Agent {
+func New(id uuid.UUID, config *Config) *Agent {
 	return &Agent{
 		config:           config,
-		log:              log,
 		healtCheckStopCh: make(chan chan any),
 		id:               id,
 	}
@@ -42,22 +41,17 @@ func New(id uuid.UUID, log *log.PrefixLogger, config *Config) *Agent {
 
 type Agent struct {
 	config           *Config
-	log              *log.PrefixLogger
 	server           *Server
 	healtCheckStopCh chan chan any
 	credUrl          string
 	id               uuid.UUID
 }
 
-func (a *Agent) GetLogPrefix() string {
-	return a.log.Prefix()
-}
-
 func (a *Agent) Run(ctx context.Context) error {
 	var err error
-	a.log.Infof("Starting agent: %s", version)
-	defer a.log.Infof("Agent stopped")
-	a.log.Infof("Configuration: %s", a.config.String())
+	zap.S().Infof("Starting agent: %s", version)
+	defer zap.S().Infof("Agent stopped")
+	zap.S().Infof("Configuration: %s", a.config.String())
 
 	defer utilruntime.HandleCrash()
 
@@ -77,7 +71,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 
-	a.log.Info("stopping agent...")
+	zap.S().Info("stopping agent...")
 
 	a.Stop()
 	cancel()
@@ -90,40 +84,39 @@ func (a *Agent) Stop() {
 	a.server.Stop(serverCh)
 
 	<-serverCh
-	a.log.Info("server stopped")
+	zap.S().Info("server stopped")
 
 	c := make(chan any)
 	a.healtCheckStopCh <- c
 	<-c
-	a.log.Info("health check stopped")
+	zap.S().Info("health check stopped")
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
-	inventoryUpdater := NewInventoryUpdater(a.log, a.id, plannerClient)
-	statusUpdater := NewStatusUpdater(a.log, a.id, version, a.credUrl, a.config, plannerClient)
+	inventoryUpdater := NewInventoryUpdater(a.id, plannerClient)
+	statusUpdater := NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
 
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config.DataDir, a.config.WwwDir)
-	go a.server.Start(a.log, statusUpdater)
+	go a.server.Start(statusUpdater)
 
 	// get the credentials url
 	credUrl := a.initializeCredentialUrl()
 
 	// start the health check
 	healthChecker, err := NewHealthChecker(
-		a.log,
 		plannerClient,
 		a.config.DataDir,
 		time.Duration(a.config.HealthCheckInterval*int64(time.Second)),
 	)
 	if err != nil {
-		a.log.Fatalf("failed to start health check: %w", err)
+		zap.S().Fatalf("failed to start health check: %w", err)
 	}
 
 	// TODO refactor health checker to call it from the main goroutine
 	healthChecker.Start(a.healtCheckStopCh)
 
-	collector := NewCollector(a.log, a.config.DataDir)
+	collector := NewCollector(a.config.DataDir)
 	collector.collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})
@@ -153,12 +146,12 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, credUrl); err != nil {
 				if errors.Is(err, client.ErrSourceGone) {
-					a.log.Info("Source is gone..Stop sending requests")
+					zap.S().Info("Source is gone..Stop sending requests")
 					// stop the server and the healthchecker
 					a.Stop()
 					break
 				}
-				a.log.Errorf("unable to update agent status: %s", err)
+				zap.S().Errorf("unable to update agent status: %s", err)
 				continue // skip inventory update if we cannot update agent's state.
 			}
 
@@ -173,7 +166,7 @@ func (a *Agent) initializeCredentialUrl() string {
 	// Parse the service URL
 	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
 	if err != nil {
-		a.log.Errorf("error parsing service URL: %v", err)
+		zap.S().Errorf("error parsing service URL: %v", err)
 		return "N/A"
 	}
 
@@ -186,14 +179,14 @@ func (a *Agent) initializeCredentialUrl() string {
 	// Connect to service
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
-		a.log.Errorf("failed connecting to migration planner: %v", err)
+		zap.S().Errorf("failed connecting to migration planner: %v", err)
 		return "N/A"
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
 	credUrl := fmt.Sprintf("http://%s:%d", localAddr.IP.String(), defaultAgentPort)
-	a.log.Infof("Discovered Agent IP address: %s", credUrl)
+	zap.S().Infof("Discovered Agent IP address: %s", credUrl)
 	return credUrl
 }
 

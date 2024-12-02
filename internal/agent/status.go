@@ -12,7 +12,6 @@ import (
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
-	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
 const (
@@ -21,16 +20,14 @@ const (
 
 type StatusUpdater struct {
 	agentID uuid.UUID
-	log     *log.PrefixLogger
 	version string
 	config  *Config
 	client  client.Planner
 	credUrl string
 }
 
-func NewStatusUpdater(log *log.PrefixLogger, agentID uuid.UUID, version, credUrl string, config *Config, client client.Planner) *StatusUpdater {
+func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *Config, client client.Planner) *StatusUpdater {
 	return &StatusUpdater{
-		log:     log,
 		client:  client,
 		config:  config,
 		agentID: agentID,

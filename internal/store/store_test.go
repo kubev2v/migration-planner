@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	st "github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -19,13 +18,12 @@ var _ = Describe("Store", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		log := log.InitLogs()
 		cfg := config.NewDefault()
-		db, err := st.InitDB(cfg, log)
+		db, err := st.InitDB(cfg)
 		Expect(err).To(BeNil())
 		gormDB = db
 
-		store = st.NewStore(db, log.WithField("test", "store"))
+		store = st.NewStore(db)
 		Expect(store).ToNot(BeNil())
 	})
 

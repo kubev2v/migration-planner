@@ -9,7 +9,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -24,11 +23,10 @@ var _ = Describe("source store", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		log := logrus.New()
-		db, err := store.InitDB(config.NewDefault(), log)
+		db, err := store.InitDB(config.NewDefault())
 		Expect(err).To(BeNil())
 
-		s = store.NewStore(db, log)
+		s = store.NewStore(db)
 		gormdb = db
 	})
 
