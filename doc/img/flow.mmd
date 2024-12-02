@@ -1,0 +1,46 @@
+graph TB
+    User((User))
+    MainUI[Migration Assessment UI]
+    Service[Migration Assessment Service]
+    AgentUI[Agent UI]
+    OVA[OVA Image]
+    Agent[Agent]
+    VCenter[(vCenter)]
+    Console[Assisted installer]
+    
+    subgraph Openshift-Console
+        Console
+    end
+
+    subgraph vCenter
+        VCenter
+        subgraph Agent VM OVA
+            AgentUI
+            Agent
+        end
+    end
+    
+    User-->| 1 - Generate OVA| MainUI
+    MainUI<--> |2 - Generate OVA| Service
+    Service-->|3 - Generates OVA| OVA
+    User<-->|4 - Downloads OVA| OVA
+    User-->|5 - Deploy OVA to| vCenter
+    Agent-->|6 - Registers with| Service
+    Service-->|7 - Display Agent IP| MainUI
+    User-->|8 - Enter vCenter credentials| AgentUI
+    AgentUI-->|9 - Execute collection of data | Agent
+    Agent<-->|10 - Fetch infrastructure data| VCenter
+    Agent-->|11 - Sends data to| Service
+    Service-->|12 - Display data| MainUI
+    User-->|13 - Create cluster | MainUI
+    MainUI-->|14 - Create cluster | Openshift-Console
+
+    classDef service fill:#f96,stroke:#333,stroke-width:2px
+    classDef ui fill:#9cf,stroke:#333,stroke-width:2px
+    classDef agent fill:#9f9,stroke:#333,stroke-width:2px
+    classDef infra fill:#fcf,stroke:#333,stroke-width:2px
+    
+    class Service service
+    class MainUI,AgentUI ui
+    class Agent agent
+    class VCenter infra
