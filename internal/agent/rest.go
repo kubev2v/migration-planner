@@ -14,11 +14,11 @@ import (
 	"github.com/go-chi/render"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
 	"github.com/vmware/govmomi/vim25/soap"
+	"go.uber.org/zap"
 )
 
 const (
@@ -26,7 +26,7 @@ const (
 	CredentialsFile = "credentials.json"
 )
 
-func RegisterApi(router *chi.Mux, log *log.PrefixLogger, statusUpdater *StatusUpdater, dataDir string) {
+func RegisterApi(router *chi.Mux, statusUpdater *StatusUpdater, dataDir string) {
 	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, VersionReply{Version: version})
 	})
@@ -35,7 +35,7 @@ func RegisterApi(router *chi.Mux, log *log.PrefixLogger, statusUpdater *StatusUp
 		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
 	})
 	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
-		credentialHandler(log, dataDir, w, r)
+		credentialHandler(dataDir, w, r)
 	})
 }
 
@@ -63,7 +63,7 @@ type Credentials struct {
 	IsDataSharingAllowed bool   `json:"isDataSharingAllowed"`
 }
 
-func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWriter, r *http.Request) {
+func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 	credentials := &Credentials{}
 
 	err := json.NewDecoder(r.Body).Decode(credentials)
@@ -77,8 +77,8 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 		return
 	}
 
-	log.Info("received credentials")
-	status, err := testVmwareConnection(r.Context(), log, credentials)
+	zap.S().Named("rest").Info("received credentials")
+	status, err := testVmwareConnection(r.Context(), credentials)
 	if err != nil {
 		http.Error(w, err.Error(), status)
 		return
@@ -94,7 +94,7 @@ func credentialHandler(log *log.PrefixLogger, dataDir string, w http.ResponseWri
 		return
 	}
 
-	log.Info("successfully wrote credentials to file")
+	zap.S().Named("rest").Info("successfully wrote credentials to file")
 	w.WriteHeader(http.StatusNoContent)
 }
 
@@ -111,7 +111,7 @@ func parseUrl(credentials *Credentials) (*url.URL, error) {
 	return u, nil
 }
 
-func testVmwareConnection(requestCtx context.Context, log *log.PrefixLogger, credentials *Credentials) (status int, err error) {
+func testVmwareConnection(requestCtx context.Context, credentials *Credentials) (status int, err error) {
 	u, err := parseUrl(credentials)
 	if err != nil {
 		return http.StatusUnprocessableEntity, liberr.Wrap(err)
@@ -127,7 +127,7 @@ func testVmwareConnection(requestCtx context.Context, log *log.PrefixLogger, cre
 		SessionManager: session.NewManager(vimClient),
 		Client:         vimClient,
 	}
-	log.Info("logging into vmware using received credentials")
+	zap.S().Named("rest").Info("logging into vmware using received credentials")
 	err = client.Login(ctx, u.User)
 	if err != nil {
 		err = liberr.Wrap(err)

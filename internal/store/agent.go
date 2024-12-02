@@ -7,7 +7,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -32,12 +32,11 @@ type Agent interface {
 }
 
 type AgentStore struct {
-	db  *gorm.DB
-	log logrus.FieldLogger
+	db *gorm.DB
 }
 
-func NewAgentSource(db *gorm.DB, log logrus.FieldLogger) Agent {
-	return &AgentStore{db: db, log: log}
+func NewAgentSource(db *gorm.DB) Agent {
+	return &AgentStore{db: db}
 }
 
 func (a *AgentStore) InitialMigration(ctx context.Context) error {
@@ -143,7 +142,7 @@ func (a *AgentStore) Delete(ctx context.Context, id string, softDeletion bool) e
 	}
 	result := tx.Delete(&agent)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		a.log.Infof("ERROR: %v", result.Error)
+		zap.S().Named("agent_store").Infof("ERROR: %v", result.Error)
 		return result.Error
 	}
 	return nil

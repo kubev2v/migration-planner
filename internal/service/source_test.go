@@ -12,7 +12,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -28,11 +27,10 @@ var _ = Describe("source handler", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		log := logrus.New()
-		db, err := store.InitDB(config.NewDefault(), log)
+		db, err := store.InitDB(config.NewDefault())
 		Expect(err).To(BeNil())
 
-		s = store.NewStore(db, log)
+		s = store.NewStore(db)
 		gormdb = db
 		_ = s.InitialMigration()
 	})
@@ -48,7 +46,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s, logrus.New())
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.ListSources(context.TODO(), server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
@@ -69,7 +67,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s, logrus.New())
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.ReadSource(context.TODO(), server.ReadSourceRequestObject{Id: firstSource})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReadSource200JSONResponse{})))
@@ -81,7 +79,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s, logrus.New())
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.ReadSource(context.TODO(), server.ReadSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReadSource404JSONResponse{})))
@@ -100,7 +98,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s, logrus.New())
+			srv := service.NewServiceHandler(s)
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -119,7 +117,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, agent.String(), source.String()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s, logrus.New())
+			srv := service.NewServiceHandler(s)
 			_, err := srv.DeleteSource(context.TODO(), server.DeleteSourceRequestObject{Id: source})
 			Expect(err).To(BeNil())
 

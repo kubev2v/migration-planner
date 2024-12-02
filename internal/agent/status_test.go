@@ -10,7 +10,6 @@ import (
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -40,7 +39,7 @@ var _ = Describe("Status", func() {
 				},
 			}
 
-			statusUpdater := agent.NewStatusUpdater(log.NewPrefixLogger(""), agentID, "best_version", "www-cred-url", &agent.Config{}, &client)
+			statusUpdater := agent.NewStatusUpdater(agentID, "best_version", "www-cred-url", &agent.Config{}, &client)
 			Expect(statusUpdater.UpdateStatus(context.TODO(), api.AgentStatusUpToDate, "status_info", "www-cred-url"))
 		})
 	})
@@ -61,7 +60,7 @@ var _ = Describe("Status", func() {
 		})
 
 		It("compute status returns Waiting for credentials", func() {
-			statusUpdater := agent.NewStatusUpdater(log.NewPrefixLogger(""),
+			statusUpdater := agent.NewStatusUpdater(
 				agentID,
 				"best_version",
 				"www-cred-url",
@@ -83,7 +82,7 @@ var _ = Describe("Status", func() {
 			Expect(err).To(BeNil())
 			creds.Close()
 
-			statusUpdater := agent.NewStatusUpdater(log.NewPrefixLogger(""),
+			statusUpdater := agent.NewStatusUpdater(
 				agentID,
 				"best_version",
 				"www-cred-url",
@@ -111,7 +110,7 @@ var _ = Describe("Status", func() {
 			_, err = inventoryFile.Write([]byte("{\"inventory\": {}, \"error\": \"\"}"))
 			Expect(err).To(BeNil())
 
-			statusUpdater := agent.NewStatusUpdater(log.NewPrefixLogger(""),
+			statusUpdater := agent.NewStatusUpdater(
 				agentID,
 				"best_version",
 				"www-cred-url",

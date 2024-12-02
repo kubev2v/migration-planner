@@ -6,21 +6,19 @@ import (
 
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 type AgentServiceHandler struct {
 	store store.Store
-	log   logrus.FieldLogger
 }
 
 // Make sure we conform to servers Service interface
 var _ agentServer.Service = (*AgentServiceHandler)(nil)
 
-func NewAgentServiceHandler(store store.Store, log logrus.FieldLogger) *AgentServiceHandler {
+func NewAgentServiceHandler(store store.Store) *AgentServiceHandler {
 	return &AgentServiceHandler{
 		store: store,
-		log:   log,
 	}
 }
 
@@ -66,7 +64,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 
 	// We are not allowing updates from agents not associated with the source ("first come first serve").
 	if !agent.Associated {
-		h.log.Errorf("Failed to update status of source %s from agent %s. Agent is not the associated with the source", source.Id, agent.Id)
+		zap.S().Errorf("Failed to update status of source %s from agent %s. Agent is not the associated with the source", source.Id, agent.Id)
 		if _, err := store.Commit(ctx); err != nil {
 			return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
 		}

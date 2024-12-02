@@ -16,8 +16,9 @@ import (
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 )
 
 const (
@@ -25,7 +26,6 @@ const (
 )
 
 type Server struct {
-	log      logrus.FieldLogger
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
@@ -33,13 +33,11 @@ type Server struct {
 
 // New returns a new instance of a migration-planner server.
 func New(
-	log logrus.FieldLogger,
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
 ) *Server {
 	return &Server{
-		log:      log,
 		cfg:      cfg,
 		store:    store,
 		listener: listener,
@@ -61,7 +59,7 @@ func withResponseWriter(next http.Handler) http.Handler {
 }
 
 func (s *Server) Run(ctx context.Context) error {
-	s.log.Println("Initializing API server")
+	zap.S().Named("api_server").Info("Initializing API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed loading swagger spec: %w", err)
@@ -76,19 +74,19 @@ func (s *Server) Run(ctx context.Context) error {
 	router := chi.NewRouter()
 	router.Use(
 		middleware.RequestID,
-		middleware.Logger,
+		zapchi.Logger(zap.S(), "router_api"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		withResponseWriter,
 	)
 
-	h := service.NewServiceHandler(s.store, s.log)
+	h := service.NewServiceHandler(s.store)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {
 		<-ctx.Done()
-		s.log.Println("Shutdown signal received:", ctx.Err())
+		zap.S().Named("api_server").Infof("Shutdown signal received: %s", ctx.Err())
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 		defer cancel()
 
@@ -96,7 +94,7 @@ func (s *Server) Run(ctx context.Context) error {
 		_ = srv.Shutdown(ctxTimeout)
 	}()
 
-	s.log.Printf("Listening on %s...", s.listener.Addr().String())
+	zap.S().Named("api_server").Infof("Listening on %s...", s.listener.Addr().String())
 	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
 		return err
 	}

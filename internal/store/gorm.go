@@ -6,14 +6,14 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
-	"k8s.io/klog/v2"
 )
 
-func InitDB(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
+func InitDB(cfg *config.Config) (*gorm.DB, error) {
 	var dia gorm.Dialector
 
 	if cfg.Database.Type == "pgsql" {
@@ -32,7 +32,7 @@ func InitDB(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
 	}
 
 	newLogger := logger.New(
-		log,
+		logrus.New(),
 		logger.Config{
 			SlowThreshold:             time.Second, // Slow SQL threshold
 			LogLevel:                  logger.Warn, // Log level
@@ -44,13 +44,13 @@ func InitDB(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
 
 	newDB, err := gorm.Open(dia, &gorm.Config{Logger: newLogger, TranslateError: true})
 	if err != nil {
-		klog.Fatalf("failed to connect database: %v", err)
+		zap.S().Named("gorm").Fatalf("failed to connect database: %v", err)
 		return nil, err
 	}
 
 	sqlDB, err := newDB.DB()
 	if err != nil {
-		klog.Fatalf("failed to configure connections: %v", err)
+		zap.S().Named("gorm").Fatalf("failed to configure connections: %v", err)
 		return nil, err
 	}
 	sqlDB.SetMaxIdleConns(10)
@@ -59,11 +59,11 @@ func InitDB(cfg *config.Config, log *logrus.Logger) (*gorm.DB, error) {
 	if cfg.Database.Type == "pgsql" {
 		var minorVersion string
 		if result := newDB.Raw("SELECT version()").Scan(&minorVersion); result.Error != nil {
-			klog.Infoln(result.Error.Error())
+			zap.S().Named("gorm").Infoln(result.Error.Error())
 			return nil, result.Error
 		}
 
-		klog.Infof("PostgreSQL information: '%s'", minorVersion)
+		zap.S().Named("gorm").Infof("PostgreSQL information: '%s'", minorVersion)
 	}
 
 	return newDB, nil

@@ -12,6 +12,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 const (
@@ -26,14 +28,12 @@ func main() {
 }
 
 type agentCmd struct {
-	log        *log.PrefixLogger
 	config     *agent.Config
 	configFile string
 }
 
 func NewAgentCommand() *agentCmd {
 	a := &agentCmd{
-		log:    log.NewPrefixLogger(""),
 		config: agent.NewDefault(),
 	}
 
@@ -48,13 +48,22 @@ func NewAgentCommand() *agentCmd {
 	flag.Parse()
 
 	if err := a.config.ParseConfigFile(a.configFile); err != nil {
-		a.log.Fatalf("Error parsing config: %v", err)
+		zap.S().Fatalf("Error parsing config: %v", err)
 	}
 	if err := a.config.Validate(); err != nil {
-		a.log.Fatalf("Error validating config: %v", err)
+		zap.S().Fatalf("Error validating config: %v", err)
 	}
 
-	a.log.SetLevel(a.config.LogLevel)
+	logLvl, err := zap.ParseAtomicLevel(a.config.LogLevel)
+	if err != nil {
+		logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
+	}
+
+	logger := log.InitLog(logLvl)
+	defer func() { _ = logger.Sync() }()
+
+	undo := zap.ReplaceGlobals(logger)
+	defer undo()
 
 	return a
 }
@@ -62,12 +71,12 @@ func NewAgentCommand() *agentCmd {
 func (a *agentCmd) Execute() error {
 	agentID, err := a.getAgentID()
 	if err != nil {
-		a.log.Fatalf("failed to retreive agent_id: %v", err)
+		zap.S().Fatalf("failed to retreive agent_id: %v", err)
 	}
 
-	agentInstance := agent.New(uuid.MustParse(agentID), a.log, a.config)
+	agentInstance := agent.New(uuid.MustParse(agentID), a.config)
 	if err := agentInstance.Run(context.Background()); err != nil {
-		a.log.Fatalf("running device agent: %v", err)
+		zap.S().Fatalf("running device agent: %v", err)
 	}
 	return nil
 }

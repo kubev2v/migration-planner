@@ -8,7 +8,6 @@ import (
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -39,7 +38,7 @@ var _ = Describe("Inventory", func() {
 				Vms:     api.VMs{Total: 2},
 				Vcenter: api.VCenter{Id: sourceID.String()},
 			}
-			inventoryUpdater := agent.NewInventoryUpdater(log.NewPrefixLogger(""), agentID, &client)
+			inventoryUpdater := agent.NewInventoryUpdater(agentID, &client)
 			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), inventory)
 		})
 	})

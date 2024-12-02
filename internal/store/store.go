@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 
-	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -19,20 +18,18 @@ type DataStore struct {
 	agent  Agent
 	db     *gorm.DB
 	source Source
-	log    logrus.FieldLogger
 }
 
-func NewStore(db *gorm.DB, log logrus.FieldLogger) Store {
+func NewStore(db *gorm.DB) Store {
 	return &DataStore{
-		agent:  NewAgentSource(db, log),
-		source: NewSource(db, log),
+		agent:  NewAgentSource(db),
+		source: NewSource(db),
 		db:     db,
-		log:    log,
 	}
 }
 
 func (s *DataStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
-	return newTransactionContext(ctx, s.db, s.log)
+	return newTransactionContext(ctx, s.db)
 }
 
 func (s *DataStore) Source() Source {

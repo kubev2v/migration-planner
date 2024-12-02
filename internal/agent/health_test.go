@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -21,7 +20,7 @@ var _ = Describe("Health checker", func() {
 			tmpDir, err := os.MkdirTemp("", "health")
 			Expect(err).To(BeNil())
 
-			healthChecker, err := NewHealthChecker(log.NewPrefixLogger(""), nil, tmpDir, 0)
+			healthChecker, err := NewHealthChecker(nil, tmpDir, 0)
 			Expect(err).To(BeNil())
 			Expect(healthChecker.logFilepath).To(Equal(path.Join(tmpDir, "health.log")))
 
@@ -31,7 +30,7 @@ var _ = Describe("Health checker", func() {
 		})
 
 		It("should fail -- log folder missing", func() {
-			_, err := NewHealthChecker(log.NewPrefixLogger(""), nil, "some_unknown_folder", 0)
+			_, err := NewHealthChecker(nil, "some_unknown_folder", 0)
 			Expect(err).NotTo(BeNil())
 		})
 	})
@@ -49,7 +48,7 @@ var _ = Describe("Health checker", func() {
 
 			testClient = &agentTestClient{}
 
-			hc, err = NewHealthChecker(log.NewPrefixLogger(""), testClient, tmpDir, 2*time.Second)
+			hc, err = NewHealthChecker(testClient, tmpDir, 2*time.Second)
 			Expect(err).To(BeNil())
 		})
 
@@ -129,7 +128,7 @@ var _ = Describe("Health checker", func() {
 
 			testClient = &agentTestClient{}
 
-			hc, err = NewHealthChecker(log.NewPrefixLogger(""), testClient, tmpDir, 1*time.Second)
+			hc, err = NewHealthChecker(testClient, tmpDir, 1*time.Second)
 			Expect(err).To(BeNil())
 
 		})

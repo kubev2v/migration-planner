@@ -9,11 +9,10 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
-	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 type InventoryUpdater struct {
-	log        *log.PrefixLogger
 	client     client.Planner
 	agentID    uuid.UUID
 	prevStatus []byte
@@ -24,9 +23,8 @@ type InventoryData struct {
 	Error     string        `json:"error"`
 }
 
-func NewInventoryUpdater(log *log.PrefixLogger, agentID uuid.UUID, client client.Planner) *InventoryUpdater {
+func NewInventoryUpdater(agentID uuid.UUID, client client.Planner) *InventoryUpdater {
 	updater := &InventoryUpdater{
-		log:        log,
 		client:     client,
 		agentID:    agentID,
 		prevStatus: []byte{},
@@ -42,16 +40,16 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, inven
 
 	newContents, err := json.Marshal(update)
 	if err != nil {
-		u.log.Errorf("failed marshalling new status: %v", err)
+		zap.S().Named("inventory").Errorf("failed marshalling new status: %v", err)
 	}
 	if bytes.Equal(u.prevStatus, newContents) {
-		u.log.Debug("Local status did not change, skipping service update")
+		zap.S().Named("inventory").Debug("Local status did not change, skipping service update")
 		return
 	}
 
 	err = u.client.UpdateSourceStatus(ctx, uuid.MustParse(inventory.Vcenter.Id), update)
 	if err != nil {
-		u.log.Errorf("failed updating status: %v", err)
+		zap.S().Named("inventory").Errorf("failed updating status: %v", err)
 		return
 	}
 

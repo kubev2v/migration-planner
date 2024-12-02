@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/sirupsen/logrus"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -27,15 +27,14 @@ type Source interface {
 }
 
 type SourceStore struct {
-	db  *gorm.DB
-	log logrus.FieldLogger
+	db *gorm.DB
 }
 
 // Make sure we conform to Source interface
 var _ Source = (*SourceStore)(nil)
 
-func NewSource(db *gorm.DB, log logrus.FieldLogger) Source {
-	return &SourceStore{db: db, log: log}
+func NewSource(db *gorm.DB) Source {
+	return &SourceStore{db: db}
 }
 
 func (s *SourceStore) InitialMigration(ctx context.Context) error {
@@ -83,7 +82,7 @@ func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
 	source := model.NewSourceFromId(id)
 	result := s.getDB(ctx).Unscoped().Delete(&source)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		s.log.Infof("ERROR: %v", result.Error)
+		zap.S().Named("source_store").Infof("ERROR: %v", result.Error)
 		return result.Error
 	}
 	return nil
