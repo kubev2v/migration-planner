@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/IBM/sarama"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"sigs.k8s.io/yaml"
 )
@@ -29,11 +30,21 @@ type dbConfig struct {
 }
 
 type svcConfig struct {
-	Address              string `json:"address,omitempty"`
-	AgentEndpointAddress string `json:"agentEndpointAddress,omitempty"`
-	BaseUrl              string `json:"baseUrl,omitempty"`
-	BaseAgentEndpointUrl string `json:"baseAgentEndpointUrl,omitempty"`
-	LogLevel             string `json:"logLevel,omitempty"`
+	Address              string      `json:"address,omitempty"`
+	AgentEndpointAddress string      `json:"agentEndpointAddress,omitempty"`
+	BaseUrl              string      `json:"baseUrl,omitempty"`
+	BaseAgentEndpointUrl string      `json:"baseAgentEndpointUrl,omitempty"`
+	LogLevel             string      `json:"logLevel,omitempty"`
+	Kafka                kafkaConfig `json:"kafka,omitempty"`
+}
+
+type kafkaConfig struct {
+	Brokers  []string            `yaml:"brokers"`
+	Topic    string              `yaml:"topic"`
+	Version  sarama.KafkaVersion `yaml:"-"`
+	ClientID string              `yaml:"clientID"`
+
+	SaramaConfig *sarama.Config
 }
 
 func ConfigDir() string {
@@ -120,7 +131,7 @@ func Validate(cfg *Config) error {
 }
 
 func (cfg *Config) String() string {
-	contents, err := json.Marshal(cfg)
+	contents, err := json.Marshal(cfg) // nolint: staticcheck
 	if err != nil {
 		return "<error>"
 	}
