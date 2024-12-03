@@ -13,6 +13,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/leosunmo/zapchi"
@@ -28,17 +29,20 @@ type AgentServer struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
+	evWriter *events.EventProducer
 }
 
 // New returns a new instance of a migration-planner server.
 func New(
 	cfg *config.Config,
 	store store.Store,
+	ew *events.EventProducer,
 	listener net.Listener,
 ) *AgentServer {
 	return &AgentServer{
 		cfg:      cfg,
 		store:    store,
+		evWriter: ew,
 		listener: listener,
 	}
 }
@@ -68,7 +72,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
 
-	h := service.NewAgentServiceHandler(s.store)
+	h := service.NewAgentServiceHandler(s.store, s.evWriter)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

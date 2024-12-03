@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -46,7 +47,8 @@ var _ = Describe("agent handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-2", "not-connected", "status-info-2", "cred_url-2"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
@@ -64,7 +66,8 @@ var _ = Describe("agent handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.DeleteAgent(context.TODO(), server.DeleteAgentRequestObject{Id: agentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent200JSONResponse{})))
@@ -79,7 +82,8 @@ var _ = Describe("agent handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.DeleteAgent(context.TODO(), server.DeleteAgentRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent404JSONResponse{})))
@@ -90,7 +94,8 @@ var _ = Describe("agent handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssociatedAgentStm, agentID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.DeleteAgent(context.TODO(), server.DeleteAgentRequestObject{Id: agentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent400JSONResponse{})))

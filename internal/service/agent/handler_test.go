@@ -6,11 +6,13 @@ import (
 	"reflect"
 	"time"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -48,7 +50,8 @@ var _ = Describe("agent store", Ordered, func() {
 		It("successfully creates the agent", func() {
 			agentID := uuid.New()
 
-			srv := service.NewAgentServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -71,6 +74,10 @@ var _ = Describe("agent store", Ordered, func() {
 			tx = gormdb.Raw(fmt.Sprintf("SELECT status from agents WHERE id = '%s';", agentID)).Scan(&status)
 			Expect(tx.Error).To(BeNil())
 			Expect(status).To(Equal("waiting-for-credentials"))
+
+			// should find one event
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		It("successfully updates the agent", func() {
@@ -78,7 +85,8 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewAgentServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -101,6 +109,10 @@ var _ = Describe("agent store", Ordered, func() {
 			tx = gormdb.Raw(fmt.Sprintf("SELECT status from agents WHERE id = '%s';", agentID)).Scan(&status)
 			Expect(tx.Error).To(BeNil())
 			Expect(status).To(Equal("waiting-for-credentials"))
+
+			// should find one event
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		It("should receive 410 when agent is soft deleted", func() {
@@ -108,7 +120,8 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithDeletedAtStm, agentID, "not-connected", "status-info-1", "cred_url-1", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339)))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewAgentServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -135,7 +148,8 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			sourceID := uuid.New()
-			srv := service.NewAgentServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -157,6 +171,10 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(source.Agents).ToNot(BeNil())
 			Expect(*source.Agents).To(HaveLen(1))
 			Expect((*source.Agents)[0].Id).To(Equal(agentID))
+
+			// should have one 1 event only
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		It("agents not associated with the source are not allowed to update inventory", func() {
@@ -165,7 +183,8 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			sourceID := uuid.New()
-			srv := service.NewAgentServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -175,6 +194,10 @@ var _ = Describe("agent store", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus200JSONResponse{})))
+
+			// should have 1 event (inventory)
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(1))
 
 			// according to the multi source model the agent should be associated with the source
 			agent, err := s.Agent().Get(context.TODO(), agentID.String())
@@ -202,6 +225,10 @@ var _ = Describe("agent store", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus400JSONResponse{})))
+
+			// should have one 1 event only
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		AfterEach(func() {
@@ -209,5 +236,21 @@ var _ = Describe("agent store", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
-
 })
+
+type testwriter struct {
+	Messages []cloudevents.Event
+}
+
+func newTestWriter() *testwriter {
+	return &testwriter{Messages: []cloudevents.Event{}}
+}
+
+func (t *testwriter) Write(ctx context.Context, topic string, e cloudevents.Event) error {
+	t.Messages = append(t.Messages, e)
+	return nil
+}
+
+func (t *testwriter) Close(_ context.Context) error {
+	return nil
+}

@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"reflect"
 
+	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -46,7 +48,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ListSources(context.TODO(), server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
@@ -67,7 +70,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ReadSource(context.TODO(), server.ReadSourceRequestObject{Id: firstSource})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReadSource200JSONResponse{})))
@@ -79,7 +83,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ReadSource(context.TODO(), server.ReadSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReadSource404JSONResponse{})))
@@ -98,7 +103,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -117,7 +123,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, agent.String(), source.String()))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			_, err := srv.DeleteSource(context.TODO(), server.DeleteSourceRequestObject{Id: source})
 			Expect(err).To(BeNil())
 
@@ -143,3 +150,20 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 	})
 })
+
+type testwriter struct {
+	Messages []cloudevents.Event
+}
+
+func newTestWriter() *testwriter {
+	return &testwriter{Messages: []cloudevents.Event{}}
+}
+
+func (t *testwriter) Write(ctx context.Context, topic string, e cloudevents.Event) error {
+	t.Messages = append(t.Messages, e)
+	return nil
+}
+
+func (t *testwriter) Close(_ context.Context) error {
+	return nil
+}
