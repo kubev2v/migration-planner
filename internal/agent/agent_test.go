@@ -15,6 +15,7 @@ import (
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -64,8 +65,8 @@ var _ = Describe("Agent", func() {
 	Context("Agent", func() {
 		It("agents starts successfully -- status waiting-for-credentials", func() {
 			updateInterval, _ := time.ParseDuration("5s")
-			config := agent.Config{
-				PlannerService:      agent.PlannerService{Config: *client.NewDefault()},
+			config := config.Config{
+				PlannerService:      config.PlannerService{Config: *client.NewDefault()},
 				DataDir:             agentTmpFolder,
 				ConfigDir:           agentTmpFolder,
 				UpdateInterval:      util.Duration{Duration: updateInterval},

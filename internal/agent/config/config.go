@@ -1,4 +1,4 @@
-package agent
+package config
 
 import (
 	"encoding/json"
@@ -14,6 +14,10 @@ import (
 )
 
 const (
+	// name of the file which stores the source credentials
+	CredentialsFile = "credentials.json"
+	// name of the file which stores the current inventory
+	InventoryFile = "inventory.json"
 	// DefaultUpdateInterval is the default interval between two status updates
 	DefaultUpdateInterval = time.Duration(60 * time.Second)
 	// DefaultConfigDir is the default directory where the device's configuration is stored
@@ -31,6 +35,13 @@ const (
 	// if the console is unreachable
 	DefaultHealthCheck = 10
 )
+
+type Credentials struct {
+	URL                  string `json:"url"`
+	Username             string `json:"username"`
+	Password             string `json:"password"`
+	IsDataSharingAllowed bool   `json:"isDataSharingAllowed"`
+}
 
 type Config struct {
 	// ConfigDir is the directory where the agent's configuration is stored

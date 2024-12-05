@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/agent"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -28,16 +29,16 @@ func main() {
 }
 
 type agentCmd struct {
-	config     *agent.Config
+	config     *config.Config
 	configFile string
 }
 
 func NewAgentCommand() *agentCmd {
 	a := &agentCmd{
-		config: agent.NewDefault(),
+		config: config.NewDefault(),
 	}
 
-	flag.StringVar(&a.configFile, "config", agent.DefaultConfigFile, "Path to the agent's configuration file.")
+	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])

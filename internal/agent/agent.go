@@ -14,14 +14,14 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/lthibault/jitterbug"
 	"go.uber.org/zap"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
 const (
-	// name of the file which stores the current inventory
-	InventoryFile    = "inventory.json"
 	defaultAgentPort = 3333
 )
 
@@ -31,7 +31,7 @@ const (
 var version string
 
 // New creates a new agent.
-func New(id uuid.UUID, config *Config) *Agent {
+func New(id uuid.UUID, config *config.Config) *Agent {
 	return &Agent{
 		config:           config,
 		healtCheckStopCh: make(chan chan any),
@@ -40,7 +40,7 @@ func New(id uuid.UUID, config *Config) *Agent {
 }
 
 type Agent struct {
-	config           *Config
+	config           *config.Config
 	server           *Server
 	healtCheckStopCh chan chan any
 	credUrl          string
@@ -93,8 +93,8 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
-	inventoryUpdater := NewInventoryUpdater(a.id, plannerClient)
-	statusUpdater := NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
+	inventoryUpdater := service.NewInventoryUpdater(a.id, plannerClient)
+	statusUpdater := service.NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
 
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config.DataDir, a.config.WwwDir)
@@ -104,7 +104,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	credUrl := a.initializeCredentialUrl()
 
 	// start the health check
-	healthChecker, err := NewHealthChecker(
+	healthChecker, err := service.NewHealthChecker(
 		plannerClient,
 		a.config.DataDir,
 		time.Duration(a.config.HealthCheckInterval*int64(time.Second)),
@@ -116,8 +116,8 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	// TODO refactor health checker to call it from the main goroutine
 	healthChecker.Start(a.healtCheckStopCh)
 
-	collector := NewCollector(a.config.DataDir)
-	collector.collect(ctx)
+	collector := service.NewCollector(a.config.DataDir)
+	collector.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})
 
@@ -140,7 +140,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			status, statusInfo, inventory := statusUpdater.CalculateStatus()
 
 			//	check for health. Send requests only if we have connectivity
-			if healthChecker.State() == HealthCheckStateConsoleUnreachable {
+			if healthChecker.State() == service.HealthCheckStateConsoleUnreachable {
 				continue
 			}
 
@@ -190,7 +190,7 @@ func (a *Agent) initializeCredentialUrl() string {
 	return credUrl
 }
 
-func newPlannerClient(cfg *Config) (client.Planner, error) {
+func newPlannerClient(cfg *config.Config) (client.Planner, error) {
 	httpClient, err := client.NewFromConfig(&cfg.PlannerService.Config)
 	if err != nil {
 		return nil, err

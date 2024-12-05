@@ -1,4 +1,4 @@
-package agent
+package service
 
 import (
 	"context"
@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 )
 
@@ -21,12 +22,12 @@ const (
 type StatusUpdater struct {
 	agentID uuid.UUID
 	version string
-	config  *Config
+	config  *config.Config
 	client  client.Planner
 	credUrl string
 }
 
-func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *Config, client client.Planner) *StatusUpdater {
+func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
 	return &StatusUpdater{
 		client:  client,
 		config:  config,
@@ -52,8 +53,8 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 }
 
 func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Inventory) {
-	inventoryFilePath := filepath.Join(s.config.DataDir, InventoryFile)
-	credentialsFilePath := filepath.Join(s.config.DataDir, CredentialsFile)
+	inventoryFilePath := filepath.Join(s.config.DataDir, config.InventoryFile)
+	credentialsFilePath := filepath.Join(s.config.DataDir, config.CredentialsFile)
 	reader := fileio.NewReader()
 
 	err := reader.CheckPathExists(credentialsFilePath)

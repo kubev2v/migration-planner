@@ -13,7 +13,9 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/vmware/govmomi"
 	"github.com/vmware/govmomi/session"
 	"github.com/vmware/govmomi/vim25"
@@ -21,12 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	// name of the file which stores the source credentials
-	CredentialsFile = "credentials.json"
-)
-
-func RegisterApi(router *chi.Mux, statusUpdater *StatusUpdater, dataDir string) {
+func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, dataDir string) {
 	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, VersionReply{Version: version})
 	})
@@ -56,15 +53,8 @@ func (v VersionReply) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
 
-type Credentials struct {
-	URL                  string `json:"url"`
-	Username             string `json:"username"`
-	Password             string `json:"password"`
-	IsDataSharingAllowed bool   `json:"isDataSharingAllowed"`
-}
-
 func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
-	credentials := &Credentials{}
+	credentials := &config.Credentials{}
 
 	err := json.NewDecoder(r.Body).Decode(credentials)
 	if err != nil {
@@ -84,7 +74,7 @@ func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	credPath := filepath.Join(dataDir, CredentialsFile)
+	credPath := filepath.Join(dataDir, config.CredentialsFile)
 	buf, _ := json.Marshal(credentials)
 	writer := fileio.NewWriter()
 
@@ -98,7 +88,7 @@ func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func parseUrl(credentials *Credentials) (*url.URL, error) {
+func parseUrl(credentials *config.Credentials) (*url.URL, error) {
 	u, err := url.ParseRequestURI(credentials.URL)
 	if err != nil {
 		return nil, err
@@ -111,7 +101,7 @@ func parseUrl(credentials *Credentials) (*url.URL, error) {
 	return u, nil
 }
 
-func testVmwareConnection(requestCtx context.Context, credentials *Credentials) (status int, err error) {
+func testVmwareConnection(requestCtx context.Context, credentials *config.Credentials) (status int, err error) {
 	u, err := parseUrl(credentials)
 	if err != nil {
 		return http.StatusUnprocessableEntity, liberr.Wrap(err)

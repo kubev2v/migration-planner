@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"go.uber.org/zap"
 )
 
@@ -32,7 +33,7 @@ func NewServer(port int, dataFolder, wwwFolder string) *Server {
 	}
 }
 
-func (s *Server) Start(statusUpdater *StatusUpdater) {
+func (s *Server) Start(statusUpdater *service.StatusUpdater) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
