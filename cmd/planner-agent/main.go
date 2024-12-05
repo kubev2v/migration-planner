@@ -54,6 +54,10 @@ func NewAgentCommand() *agentCmd {
 		zap.S().Fatalf("Error validating config: %v", err)
 	}
 
+	return a
+}
+
+func (a *agentCmd) Execute() error {
 	logLvl, err := zap.ParseAtomicLevel(a.config.LogLevel)
 	if err != nil {
 		logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
@@ -65,10 +69,6 @@ func NewAgentCommand() *agentCmd {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	return a
-}
-
-func (a *agentCmd) Execute() error {
 	agentID, err := a.getAgentID()
 	if err != nil {
 		zap.S().Fatalf("failed to retreive agent_id: %v", err)
