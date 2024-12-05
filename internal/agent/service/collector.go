@@ -1,4 +1,4 @@
-package agent
+package service
 
 import (
 	"bytes"
@@ -21,6 +21,7 @@ import (
 	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"go.uber.org/zap"
 	core "k8s.io/api/core/v1"
@@ -38,7 +39,7 @@ func NewCollector(dataDir string) *Collector {
 	}
 }
 
-func (c *Collector) collect(ctx context.Context) {
+func (c *Collector) Collect(ctx context.Context) {
 	c.once.Do(func() {
 		go func() {
 			for {
@@ -55,7 +56,7 @@ func (c *Collector) collect(ctx context.Context) {
 }
 
 func (c *Collector) run() {
-	credentialsFilePath := filepath.Join(c.dataDir, CredentialsFile)
+	credentialsFilePath := filepath.Join(c.dataDir, config.CredentialsFile)
 	zap.S().Named("collector").Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 
@@ -65,7 +66,7 @@ func (c *Collector) run() {
 		return
 	}
 
-	var creds Credentials
+	var creds config.Credentials
 	if err := json.Unmarshal(credsData, &creds); err != nil {
 		zap.S().Named("collector").Errorf("Error parsing credentials JSON: %v\n", err)
 		return
@@ -148,7 +149,7 @@ func (c *Collector) run() {
 	fillInventoryObjectWithMoreData(vms, inv)
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
-	if err := createOuput(filepath.Join(c.dataDir, InventoryFile), inv); err != nil {
+	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
 		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %s", err)
 		return
 	}
@@ -239,7 +240,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 	}
 }
 
-func getProvider(creds Credentials) *api.Provider {
+func getProvider(creds config.Credentials) *api.Provider {
 	vsphereType := api.VSphere
 	return &api.Provider{
 		Spec: api.ProviderSpec{
@@ -249,7 +250,7 @@ func getProvider(creds Credentials) *api.Provider {
 	}
 }
 
-func getSecret(creds Credentials) *core.Secret {
+func getSecret(creds config.Credentials) *core.Secret {
 	return &core.Secret{
 		ObjectMeta: meta.ObjectMeta{
 			Name:      "vsphere-secret",
