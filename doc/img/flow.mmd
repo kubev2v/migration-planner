@@ -1,15 +1,15 @@
 graph TB
     User((User))
-    MainUI[Migration Assessment UI]
-    Service[Migration Assessment Service]
+    Service[Migration Assessment]
     AgentUI[Agent UI]
     OVA[OVA Image]
     Agent[Agent]
     VCenter[(vCenter)]
-    Console[Assisted installer]
+    AI[Assisted installer]
     
-    subgraph Openshift-Console
-        Console
+    subgraph Console-Dot
+        AI
+        Service
     end
 
     subgraph vCenter
@@ -20,20 +20,16 @@ graph TB
         end
     end
     
-    User-->| 1 - Generate OVA| MainUI
-    MainUI<--> |2 - Generate OVA| Service
-    Service-->|3 - Generates OVA| OVA
-    User<-->|4 - Downloads OVA| OVA
-    User-->|5 - Deploy OVA to| vCenter
-    Agent-->|6 - Registers with| Service
-    Service-->|7 - Display Agent IP| MainUI
-    User-->|8 - Enter vCenter credentials| AgentUI
-    AgentUI-->|9 - Execute collection of data | Agent
-    Agent<-->|10 - Fetch infrastructure data| VCenter
-    Agent-->|11 - Sends data to| Service
-    Service-->|12 - Display data| MainUI
-    User-->|13 - Create cluster | MainUI
-    MainUI-->|14 - Create cluster | Openshift-Console
+    User-->| 1 - Create OVA| Service
+    Service-->|2 - Generates OVA| OVA
+    User<-->|3 - Downloads OVA| OVA
+    User-->|4 - Deploy OVA to| vCenter
+    Agent-->|5 - Registers with| Service
+    User-->|6 - Enter vCenter credentials| AgentUI
+    AgentUI-->|7 - Execute collection of data | Agent
+    Agent<-->|8 - Fetch infrastructure data| VCenter
+    Agent-->|9 - Sends data to| Service
+    Service-->|10 - Create cluster | AI
 
     classDef service fill:#f96,stroke:#333,stroke-width:2px
     classDef ui fill:#9cf,stroke:#333,stroke-width:2px
@@ -41,6 +37,5 @@ graph TB
     classDef infra fill:#fcf,stroke:#333,stroke-width:2px
     
     class Service service
-    class MainUI,AgentUI ui
     class Agent agent
     class VCenter infra
