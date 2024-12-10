@@ -4,12 +4,14 @@ go 1.22.2
 
 require (
 	github.com/IBM/sarama v1.43.3
+	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/coreos/butane v0.22.0
 	github.com/getkin/kin-openapi v0.126.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/render v1.0.3
+	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.6.0
 	github.com/konveyor/forklift-controller v0.0.0-20221102112227-e73b65a01cda
 	github.com/kubev2v/migration-event-streamer v0.0.0-20241125102656-9cdf9e64a16b
@@ -38,6 +40,7 @@ require (
 )
 
 require (
+	github.com/MicahParks/jwkset v0.5.19 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go v1.50.25 // indirect

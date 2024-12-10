@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/image"
@@ -75,8 +76,14 @@ func (s *Server) Run(ctx context.Context) error {
 		ErrorHandler: oapiErrorHandler,
 	}
 
+	authenticator, err := auth.NewAuthenticator(s.cfg.Service.Auth)
+	if err != nil {
+		return fmt.Errorf("failed to create authenticator: %w", err)
+	}
+
 	router := chi.NewRouter()
 	router.Use(
+		authenticator.Authenticator,
 		middleware.RequestID,
 		zapchi.Logger(zap.S(), "router_api"),
 		middleware.Recoverer,
