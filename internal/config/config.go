@@ -36,6 +36,7 @@ type svcConfig struct {
 	BaseAgentEndpointUrl string      `json:"baseAgentEndpointUrl,omitempty"`
 	LogLevel             string      `json:"logLevel,omitempty"`
 	Kafka                kafkaConfig `json:"kafka,omitempty"`
+	Auth                 Auth        `json:"auth"`
 }
 
 type kafkaConfig struct {
@@ -45,6 +46,11 @@ type kafkaConfig struct {
 	ClientID string              `yaml:"clientID"`
 
 	SaramaConfig *sarama.Config
+}
+
+type Auth struct {
+	AuthenticationType string `json:"type"`
+	JwtCertUrl         string `json:"jwt_cert_url"`
 }
 
 func ConfigDir() string {
