@@ -13,9 +13,9 @@ spec:
     server: https://kubernetes.default.svc
   project: default
   source:
-    path: charts/migration-cluster-day2
-    repoURL: https://github.com/borod108/migration-cluster-day2
-    targetRevision: task/removelvm
+    path: migration-cluster-day2/charts/migration-cluster-day2
+    repoURL: https://github.com/kubev2v/migration-planner
+    targetRevision: main
   syncPolicy:
     automated:
       prune: true
