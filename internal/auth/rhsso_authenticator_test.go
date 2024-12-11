@@ -95,7 +95,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
+		Username string `json:"preffered_username"`
 		ClientID string `json:"client_id"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
@@ -132,7 +132,7 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 
 func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
+		Username string `json:"preffered_username"`
 		ClientID string `json:"client_id"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
@@ -176,7 +176,7 @@ func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) 
 
 func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
+		Username string `json:"preffered_username"`
 		ClientID string `json:"client_id"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims

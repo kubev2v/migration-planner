@@ -55,7 +55,7 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
 	}
 
 	return User{
-		Username:     claims["username"].(string),
+		Username:     claims["preffered_username"].(string),
 		Organization: claims["org_id"].(string),
 		ClientID:     claims["client_id"].(string),
 	}, nil
