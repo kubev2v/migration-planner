@@ -26,7 +26,6 @@ var _ = Describe("sso authentication", func() {
 			user, err := authenticator.Authenticate(sToken)
 			Expect(err).To(BeNil())
 			Expect(user.Username).To(Equal("batman"))
-			Expect(user.ClientID).To(Equal("batman_id"))
 			Expect(user.Organization).To(Equal("GothamCity"))
 		})
 
@@ -95,8 +94,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
-		ClientID string `json:"client_id"`
+		Username string `json:"preffered_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
@@ -104,7 +102,6 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		"batman",
-		"batman_id",
 		"GothamCity",
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
@@ -132,8 +129,7 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 
 func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
-		ClientID string `json:"client_id"`
+		Username string `json:"preffered_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
@@ -156,7 +152,6 @@ func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) 
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		"batman",
-		"batman_id",
 		"GothamCity",
 		registedClaims,
 	}
@@ -176,8 +171,7 @@ func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) 
 
 func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"username"`
-		ClientID string `json:"client_id"`
+		Username string `json:"preffered_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
@@ -185,7 +179,6 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		"batman",
-		"batman_id",
 		"GothamCity",
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
