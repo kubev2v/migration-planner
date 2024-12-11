@@ -27,6 +27,5 @@ func newContext(ctx context.Context, u User) context.Context {
 type User struct {
 	Username     string
 	Organization string
-	ClientID     string
 	Token        *jwt.Token
 }
