@@ -9,7 +9,7 @@ import (
 )
 
 func (h *ServiceHandler) ListAgents(ctx context.Context, request server.ListAgentsRequestObject) (server.ListAgentsResponseObject, error) {
-	result, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(true))
+	result, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
 	if err != nil {
 		return nil, err
 	}
