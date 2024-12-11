@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -17,8 +18,9 @@ import (
 )
 
 const (
-	insertAgentStm           = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
-	insertAssociatedAgentStm = "INSERT INTO agents (id, associated) VALUES ('%s',  TRUE);"
+	insertAgentStm            = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
+	insertSoftDeletedAgentStm = "INSERT INTO agents (id, deleted_at) VALUES ('%s', '%s');"
+	insertAssociatedAgentStm  = "INSERT INTO agents (id, associated) VALUES ('%s',  TRUE);"
 )
 
 var _ = Describe("agent handler", Ordered, func() {
@@ -49,6 +51,24 @@ var _ = Describe("agent handler", Ordered, func() {
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
+			Expect(resp).To(HaveLen(2))
+		})
+
+		It("successfully list agents -- except soft-deleted agents", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-2", "not-connected", "status-info-2", "cred_url-2"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSoftDeletedAgentStm, "agent-3", time.Now().Format(time.RFC3339)))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
 			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
