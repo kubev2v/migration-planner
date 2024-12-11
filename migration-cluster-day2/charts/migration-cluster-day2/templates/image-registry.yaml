@@ -34,8 +34,6 @@ roleRef:
   name: migration-cluster-day2-installer
   apiGroup: rbac.authorization.k8s.io
 ---
-
----
 # pvc for the image registry for RWO - used with LVM storage backend
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -46,6 +44,7 @@ metadata:
   annotations:
     argocd.argoproj.io/sync-wave: "5"
 spec:
+  storageClassName: lvms-vg1-1
   accessModes:
   - ReadWriteOnce 
   resources:
@@ -53,8 +52,6 @@ spec:
       # we require the image registry for building the vddk image, we don't need more than 
       # 50Gi at the moment
       storage: 40Gi
-
-
 ---
 apiVersion: batch/v1
 kind: Job

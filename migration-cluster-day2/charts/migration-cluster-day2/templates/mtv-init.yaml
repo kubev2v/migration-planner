@@ -61,4 +61,13 @@ spec:
     kind: "Service"
     name: mtv-init
     weight: null
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vmware-credentials
+  namespace: {{ .Values.mtvOperator.subscription.namespace }}
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+
 
