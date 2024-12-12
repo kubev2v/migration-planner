@@ -51,6 +51,31 @@ func (o *Ova) Validate() error {
 	return nil
 }
 
+func calculateTarSize(contentSize int) int {
+	const blockSize = 512
+
+	// Size of the tar header block
+	size := blockSize
+
+	// Size of the file content, rounded up to nearest 512 bytes
+	size += ((contentSize + blockSize - 1) / blockSize) * blockSize
+
+	return size
+}
+
+func (o *Ova) OvaSize() (int, error) {
+	isoSize, err := o.isoSize()
+	if err != nil {
+		return -1, err
+	}
+	ovfSize, err := o.ovfSize()
+	if err != nil {
+		return -1, err
+	}
+
+	return ovfSize + isoSize, nil
+}
+
 func (o *Ova) Generate() error {
 	tw := tar.NewWriter(o.Writer)
 
@@ -63,6 +88,8 @@ func (o *Ova) Generate() error {
 	if err := writeOvf(tw); err != nil {
 		return err
 	}
+
+	tw.Flush()
 
 	return nil
 }
@@ -88,13 +115,13 @@ func (o *Ova) writeIso(tw *tar.Writer) error {
 	if err != nil {
 		return err
 	}
-	// Create a header for AgentVM-1.iso
+	// Create a header for MigrationAssessment.iso
 	length, err := reader.Seek(0, io.SeekEnd)
 	if err != nil {
 		return err
 	}
 	header := &tar.Header{
-		Name:    "AgentVM-1.iso",
+		Name:    "MigrationAssessment.iso",
 		Size:    length,
 		Mode:    0600,
 		ModTime: time.Now(),
@@ -118,14 +145,48 @@ func (o *Ova) writeIso(tw *tar.Writer) error {
 	return nil
 }
 
+func (o *Ova) isoSize() (int, error) {
+	// Get ISO reader
+	reader, err := o.isoReader()
+	if err != nil {
+		return -1, err
+	}
+	length, err := reader.Seek(0, io.SeekEnd)
+	if err != nil {
+		return -1, err
+	}
+
+	// Reset the reader to start
+	_, err = reader.Seek(0, io.SeekStart)
+	if err != nil {
+		return -1, err
+	}
+
+	return calculateTarSize(int(length)), nil
+}
+
+func (o *Ova) ovfSize() (int, error) {
+	file, err := os.Open("data/MigrationAssessment.ovf")
+	if err != nil {
+		return -1, err
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return -1, err
+	}
+
+	return calculateTarSize(int(fileInfo.Size())), nil
+}
+
 func writeOvf(tw *tar.Writer) error {
-	ovfContent, err := os.ReadFile("data/AgentVM.ovf")
+	ovfContent, err := os.ReadFile("data/MigrationAssessment.ovf")
 	if err != nil {
 		return err
 	}
 	// Create a header for AgentVM.ovf
 	header := &tar.Header{
-		Name:    "AgentVM.ovf",
+		Name:    "MigrationAssessment.ovf",
 		Size:    int64(len(ovfContent)),
 		Mode:    0600,
 		ModTime: time.Now(),
