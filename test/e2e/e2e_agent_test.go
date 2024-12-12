@@ -104,7 +104,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	}
 
 	// Untar ISO from OVA
-	if err = Untar(file, defaultIsoPath, "AgentVM-1.iso"); err != nil {
+	if err = Untar(file, defaultIsoPath, "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 

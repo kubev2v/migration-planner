@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -16,12 +17,24 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	if !ok {
 		return server.GetImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
-
 	ova := &image.Ova{SshKey: request.Params.SshKey, Writer: writer}
+
 	// get token if any
 	if user, found := auth.UserFromContext(ctx); found {
 		ova.Jwt = user.Token
 	}
+
+	// Calculate the size of the OVA, so the download show estimated time:
+	size, err := ova.OvaSize()
+	if err != nil {
+		return server.GetImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+
+	// Set proper headers of the OVA file:
+	writer.Header().Set("Content-Type", "application/ovf")
+	writer.Header().Set("Content-Length", strconv.Itoa(size))
+
+	// Generate the OVA image
 	if err := ova.Generate(); err != nil {
 		return server.GetImage500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
 	}

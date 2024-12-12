@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" xmlns:vmw="http://www.vmware.com/schema/ovf" xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData" xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData">
   <References>
-    <File ovf:id="file1" ovf:href="AgentVM-1.iso" ovf:size="1220542464"/>
+    <File ovf:id="file1" ovf:href="MigrationAssessment.iso" ovf:size="1220542464"/>
   </References>
   <NetworkSection>
     <Info>The list of logical networks</Info>
@@ -9,7 +9,7 @@
       <Description>Routable network</Description>
     </Network>
   </NetworkSection>
-  <VirtualSystem ovf:id="AgentVM">
+  <VirtualSystem ovf:id="MigrationAssessment">
     <Info>A Virtual system</Info>
     <Name>MigrationAssessment</Name>
     <OperatingSystemSection ovf:id="80" ovf:version="8" vmw:osType="rhel9_64Guest">
