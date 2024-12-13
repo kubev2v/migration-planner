@@ -67,6 +67,13 @@ storage:
           location = "{{.InsecureRegistry}}"
           insecure = true
     {{end}}
+    {{ if .Token }}
+    - path: /home/core/.migration-planner/config/jwt.json
+      mode: 0644
+      contents:
+        inline: |
+          {{ .Token }}
+    {{ end }}
     - path: /var/lib/systemd/linger/core
       mode: 0644
       contents:

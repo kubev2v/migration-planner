@@ -1,6 +1,10 @@
 package auth
 
-import "context"
+import (
+	"context"
+
+	"github.com/golang-jwt/jwt/v5"
+)
 
 type usernameKeyType struct{}
 
@@ -24,4 +28,5 @@ type User struct {
 	Username     string
 	Organization string
 	ClientID     string
+	Token        *jwt.Token
 }

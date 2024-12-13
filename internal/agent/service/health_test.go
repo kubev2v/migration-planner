@@ -54,7 +54,7 @@ var _ = Describe("Health checker", func() {
 
 		It("should close OK", func() {
 			closeCh := make(chan chan any)
-			hc.Start(closeCh)
+			hc.Start(context.TODO(), closeCh)
 			<-time.After(2 * time.Second)
 
 			c := make(chan any, 1)
@@ -81,7 +81,7 @@ var _ = Describe("Health checker", func() {
 
 		It("should call health endpoint", func() {
 			closeCh := make(chan chan any)
-			hc.Start(closeCh)
+			hc.Start(context.TODO(), closeCh)
 			<-time.After(5 * time.Second)
 
 			c := make(chan any, 1)
@@ -136,7 +136,7 @@ var _ = Describe("Health checker", func() {
 		It("should write OK -- only failures", func() {
 			closeCh := make(chan chan any)
 			testClient.ShouldReturnError = true
-			hc.Start(closeCh)
+			hc.Start(context.TODO(), closeCh)
 
 			<-time.After(5 * time.Second)
 
@@ -155,7 +155,7 @@ var _ = Describe("Health checker", func() {
 		It("should write OK -- failures and one OK line", func() {
 			closeCh := make(chan chan any)
 			testClient.ShouldReturnError = true
-			hc.Start(closeCh)
+			hc.Start(context.TODO(), closeCh)
 
 			<-time.After(2 * time.Second)
 			testClient.ShouldReturnError = false
@@ -182,7 +182,7 @@ var _ = Describe("Health checker", func() {
 		It("should write OK -- failures and 2 OK lines", func() {
 			closeCh := make(chan chan any)
 			testClient.ShouldReturnError = true
-			hc.Start(closeCh)
+			hc.Start(context.TODO(), closeCh)
 
 			<-time.After(2 * time.Second)
 			testClient.ShouldReturnError = false

@@ -76,8 +76,8 @@ func NewHealthChecker(client client.Planner, logFolder string, checkInterval tim
 // initialInterval represents the time after which the check is started.
 // checkInterval represents the time to wait between checks.
 // closeCh is the channel used to close the goroutine.
-func (h *HealthChecker) Start(closeCh chan chan any) {
-	h.do()
+func (h *HealthChecker) Start(ctx context.Context, closeCh chan chan any) {
+	h.do(ctx)
 
 	h.once.Do(func() {
 		go func() {
@@ -96,7 +96,7 @@ func (h *HealthChecker) Start(closeCh chan chan any) {
 					close(c)
 					return
 				case <-t.C:
-					h.do()
+					h.do(ctx)
 				}
 			}
 		}()
@@ -109,8 +109,8 @@ func (h *HealthChecker) State() AgentHealthState {
 	return h.state
 }
 
-func (h *HealthChecker) do() {
-	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout*time.Second)
+func (h *HealthChecker) do(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout*time.Second)
 	defer cancel()
 
 	err := h.client.Health(ctx)
