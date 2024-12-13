@@ -23,7 +23,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, dataDir string) {
+func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configuration *config.Config) {
 	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, VersionReply{Version: version})
 	})
@@ -31,8 +31,11 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, dataDir 
 		status, statusInfo, _ := statusUpdater.CalculateStatus()
 		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
 	})
+	router.Get("/api/v1/url", func(w http.ResponseWriter, r *http.Request) {
+		_ = render.Render(w, r, ServiceUIReply{URL: configuration.PlannerService.Service.UI})
+	})
 	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
-		credentialHandler(dataDir, w, r)
+		credentialHandler(configuration.DataDir, w, r)
 	})
 }
 
@@ -43,6 +46,14 @@ type StatusReply struct {
 
 type VersionReply struct {
 	Version string `json:"version"`
+}
+
+type ServiceUIReply struct {
+	URL string `json:"url"`
+}
+
+func (s ServiceUIReply) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
 }
 
 func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {

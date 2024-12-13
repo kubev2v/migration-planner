@@ -29,6 +29,7 @@ type Ova struct {
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
 	SshKey                     string
+	PlannerServiceUI           string
 	PlannerService             string
 	MigrationPlannerAgentImage string
 	InsecureRegistry           string
@@ -141,6 +142,7 @@ func writeOvf(tw *tar.Writer) error {
 func (o *Ova) generateIgnition() (string, error) {
 	ignData := IgnitionData{
 		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
+		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", "http://localhost:3000/migrate/wizard"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
 	}
 	if o.SshKey != nil {

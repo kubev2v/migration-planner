@@ -87,6 +87,7 @@ storage:
           planner-service:
             service:
               server: {{.PlannerService}}
+              ui: {{.PlannerServiceUI}}
       mode: 0644
       user:
         name: core

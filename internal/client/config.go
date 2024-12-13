@@ -39,6 +39,7 @@ type Config struct {
 type Service struct {
 	// Server is the URL of the Planner API server (the part before /api/v1/...).
 	Server string `json:"server"`
+	UI     string `json:"ui"`
 }
 
 func (c *Config) Equal(c2 *Config) bool {

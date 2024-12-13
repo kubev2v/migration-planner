@@ -8,6 +8,7 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"go.uber.org/zap"
 )
@@ -19,17 +20,19 @@ Server serves 3 endpoints:
 - /api/v1/status return the status of the agent.
 */
 type Server struct {
-	port       int
-	dataFolder string
-	wwwFolder  string
-	restServer *http.Server
+	port          int
+	dataFolder    string
+	wwwFolder     string
+	configuration *config.Config
+	restServer    *http.Server
 }
 
-func NewServer(port int, dataFolder, wwwFolder string) *Server {
+func NewServer(port int, configuration *config.Config) *Server {
 	return &Server{
-		port:       port,
-		dataFolder: dataFolder,
-		wwwFolder:  wwwFolder,
+		port:          port,
+		dataFolder:    configuration.DataDir,
+		wwwFolder:     configuration.WwwDir,
+		configuration: configuration,
 	}
 }
 
@@ -39,7 +42,7 @@ func (s *Server) Start(statusUpdater *service.StatusUpdater) {
 	router.Use(middleware.Logger)
 
 	RegisterFileServer(router, s.wwwFolder)
-	RegisterApi(router, statusUpdater, s.dataFolder)
+	RegisterApi(router, statusUpdater, s.configuration)
 
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 

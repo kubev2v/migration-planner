@@ -97,7 +97,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	statusUpdater := service.NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
 
 	// start server
-	a.server = NewServer(defaultAgentPort, a.config.DataDir, a.config.WwwDir)
+	a.server = NewServer(defaultAgentPort, a.config)
 	go a.server.Start(statusUpdater)
 
 	// get the credentials url
