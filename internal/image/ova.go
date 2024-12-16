@@ -11,6 +11,7 @@ import (
 
 	"github.com/coreos/butane/config"
 	"github.com/coreos/butane/config/common"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -24,6 +25,7 @@ const ResponseWriterKey Key = 0
 type Ova struct {
 	Writer io.Writer
 	SshKey *string
+	Jwt    *jwt.Token
 }
 
 // IgnitionData defines modifiable fields in ignition config
@@ -33,6 +35,7 @@ type IgnitionData struct {
 	PlannerService             string
 	MigrationPlannerAgentImage string
 	InsecureRegistry           string
+	Token                      string
 }
 
 type Image interface {
@@ -147,6 +150,9 @@ func (o *Ova) generateIgnition() (string, error) {
 	}
 	if o.SshKey != nil {
 		ignData.SshKey = *o.SshKey
+	}
+	if o.Jwt != nil {
+		ignData.Token = o.Jwt.Raw
 	}
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {

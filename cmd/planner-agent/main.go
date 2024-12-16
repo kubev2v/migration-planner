@@ -19,6 +19,7 @@ import (
 
 const (
 	agentFilename = "agent_id"
+	jwtFilename   = "jwt.json"
 )
 
 func main() {
@@ -76,23 +77,31 @@ func (a *agentCmd) Execute() error {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	agentID, err := a.getAgentID()
+	agentID, err := a.readFile(agentFilename)
 	if err != nil {
 		zap.S().Fatalf("failed to retreive agent_id: %v", err)
 	}
 
-	agentInstance := agent.New(uuid.MustParse(agentID), a.config)
+	// Try to read jwt from file.
+	// We're assuming the jwt is valid.
+	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
+	jwt, err := a.readFile(jwtFilename)
+	if err != nil {
+		zap.S().Errorf("failed to read jwt: %v", err)
+	}
+
+	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
 	if err := agentInstance.Run(context.Background()); err != nil {
 		zap.S().Fatalf("running device agent: %v", err)
 	}
 	return nil
 }
 
-func (a *agentCmd) getAgentID() (string, error) {
+func (a *agentCmd) readFile(filename string) (string, error) {
 	// look for it in data dir
-	dataDirPath := path.Join(a.config.DataDir, agentFilename)
-	if _, err := os.Stat(dataDirPath); err == nil {
-		content, err := os.ReadFile(dataDirPath)
+	confDirPath := path.Join(a.config.DataDir, filename)
+	if _, err := os.Stat(confDirPath); err == nil {
+		content, err := os.ReadFile(confDirPath)
 		if err != nil {
 			return "", err
 		}

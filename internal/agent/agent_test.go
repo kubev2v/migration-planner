@@ -74,7 +74,8 @@ var _ = Describe("Agent", func() {
 			}
 			config.PlannerService.Service.Server = testHttpServer.URL
 
-			a := agent.New(agentID, &config)
+			jwt := ""
+			a := agent.New(agentID, jwt, &config)
 			ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 			go func() {
 				err := a.Run(ctx)

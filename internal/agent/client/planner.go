@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	client "github.com/kubev2v/migration-planner/internal/api/client/agent"
 )
 
@@ -29,7 +30,12 @@ type planner struct {
 }
 
 func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error {
-	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params)
+	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := p.jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -44,7 +50,13 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 }
 
 func (p *planner) Health(ctx context.Context) error {
-	resp, err := p.client.HealthWithResponse(ctx)
+	resp, err := p.client.HealthWithResponse(ctx, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := p.jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
+
 	if err != nil {
 		return err
 	}
@@ -58,7 +70,12 @@ func (p *planner) Health(ctx context.Context) error {
 }
 
 func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
-	resp, err := p.client.UpdateAgentStatusWithResponse(ctx, id, params)
+	resp, err := p.client.UpdateAgentStatusWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
+		if jwt, found := p.jwtFromContext(ctx); found {
+			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+		}
+		return nil
+	})
 	if err != nil {
 		return err
 	}
@@ -72,4 +89,12 @@ func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params ap
 		return fmt.Errorf("update agent status failed with status: %s", resp.Status())
 	}
 	return nil
+}
+
+func (p *planner) jwtFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(common.JwtKey)
+	if val == nil {
+		return "", false
+	}
+	return val.(string), true
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/lthibault/jitterbug"
@@ -31,11 +32,12 @@ const (
 var version string
 
 // New creates a new agent.
-func New(id uuid.UUID, config *config.Config) *Agent {
+func New(id uuid.UUID, jwt string, config *config.Config) *Agent {
 	return &Agent{
 		config:           config,
 		healtCheckStopCh: make(chan chan any),
 		id:               id,
+		jwt:              jwt,
 	}
 }
 
@@ -45,6 +47,7 @@ type Agent struct {
 	healtCheckStopCh chan chan any
 	credUrl          string
 	id               uuid.UUID
+	jwt              string
 }
 
 func (a *Agent) Run(ctx context.Context) error {
@@ -96,6 +99,11 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	inventoryUpdater := service.NewInventoryUpdater(a.id, plannerClient)
 	statusUpdater := service.NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
 
+	// insert jwt into the context if any
+	if a.jwt != "" {
+		ctx = context.WithValue(ctx, common.JwtKey, a.jwt)
+	}
+
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config)
 	go a.server.Start(statusUpdater)
@@ -114,7 +122,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 
 	// TODO refactor health checker to call it from the main goroutine
-	healthChecker.Start(a.healtCheckStopCh)
+	healthChecker.Start(ctx, a.healtCheckStopCh)
 
 	collector := service.NewCollector(a.config.DataDir)
 	collector.Collect(ctx)
