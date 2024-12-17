@@ -161,6 +161,7 @@ require (
 )
 
 replace (
+	github.com/chenzhuoyu/iasm => github.com/cloudwego/iasm v0.2.0
 	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20241129095927-4890e072e015
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.34.1
 )
