@@ -132,8 +132,9 @@ deploy-on-openshift:
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
 	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
-	@config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
-	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=config_server=http://$$config_server || true
+	config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
+	config_server_ui=$$(oc get route planner -o jsonpath='{.spec.host}'); \
+	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
 	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 
 undeploy-on-openshift:
