@@ -165,8 +165,8 @@ func printTable(response interface{}, kind string, id *uuid.UUID) error {
 }
 
 func printSourcesTable(w *tabwriter.Writer, sources ...api.Source) {
-	fmt.Fprintln(w, "ID\tNAME\tSTATUS")
+	fmt.Fprintln(w, "ID")
 	for _, s := range sources {
-		fmt.Fprintf(w, "%s\t%s\t%s\n", s.Id, s.Name, s.Status)
+		fmt.Fprintf(w, "%s\n", s.Id)
 	}
 }

@@ -27,15 +27,6 @@ const (
 	Unsupported InfraNetworksType = "unsupported"
 )
 
-// Defines values for SourceStatus.
-const (
-	SourceStatusError                     SourceStatus = "error"
-	SourceStatusGatheringInitialInventory SourceStatus = "gathering-initial-inventory"
-	SourceStatusNotConnected              SourceStatus = "not-connected"
-	SourceStatusUpToDate                  SourceStatus = "up-to-date"
-	SourceStatusWaitingForCredentials     SourceStatus = "waiting-for-credentials"
-)
-
 // Agent defines model for Agent.
 type Agent struct {
 	Associated    bool        `json:"associated"`
@@ -100,19 +91,13 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agents     *[]SourceAgentItem `json:"agents,omitempty"`
-	CreatedAt  time.Time          `json:"createdAt"`
-	Id         openapi_types.UUID `json:"id"`
-	Inventory  *Inventory         `json:"inventory,omitempty"`
-	Name       string             `json:"name"`
-	SshKey     *string            `json:"sshKey,omitempty"`
-	Status     SourceStatus       `json:"status"`
-	StatusInfo string             `json:"statusInfo"`
-	UpdatedAt  time.Time          `json:"updatedAt"`
+	Agents    *[]SourceAgentItem `json:"agents,omitempty"`
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Inventory *Inventory         `json:"inventory,omitempty"`
+	Name      *string            `json:"name,omitempty"`
+	UpdatedAt time.Time          `json:"updatedAt"`
 }
-
-// SourceStatus defines model for Source.Status.
-type SourceStatus string
 
 // SourceAgentItem defines model for SourceAgentItem.
 type SourceAgentItem struct {

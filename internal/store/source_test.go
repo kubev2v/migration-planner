@@ -46,6 +46,24 @@ var _ = Describe("source store", Ordered, func() {
 			Expect(sources).To(HaveLen(2))
 		})
 
+		It("successfully list all the sources -- with agents", func() {
+			sourceID := uuid.NewString()
+			agentID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE agents set source_id = '%s';", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			sources, err := s.Source().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(1))
+			agents := *sources[0].Agents
+			Expect(agents).To(HaveLen(1))
+			Expect(agents[0].Id.String()).To(Equal(agentID))
+		})
+
 		It("list all sources -- no sources", func() {
 			sources, err := s.Source().List(context.TODO())
 			Expect(err).To(BeNil())
@@ -53,6 +71,7 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE from agents;")
 			gormdb.Exec("DELETE from sources;")
 		})
 	})
