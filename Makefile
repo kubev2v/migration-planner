@@ -119,7 +119,7 @@ deploy-on-kind:
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
 	@config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=config_server=http://$$config_server:7443 || true
+	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=config_server=http://$$config_server:7443 --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/k8s/
 
 deploy-on-openshift:

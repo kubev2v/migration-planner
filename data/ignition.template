@@ -107,6 +107,7 @@ storage:
           [Unit]
           Description=Planner agent quadlet
           Wants=planner-agent-opa.service
+          After=planner-agent-opa.service
 
           [Container]
           Image={{.MigrationPlannerAgentImage}}
