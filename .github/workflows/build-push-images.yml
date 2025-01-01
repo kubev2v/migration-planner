@@ -11,8 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REGISTRY: quay.io
-      # Set tag 'latest' on main branch
-      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && 'latest' || (github.head_ref||github.ref_name) }}
+      # Set tag to the last commit sha on main branch, otherwise tag will be the branch name
+      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && github.sha || (github.head_ref||github.ref_name) }}
       REGISTRY_ORG: kubev2v
     steps:
       - name: Checkout forklift

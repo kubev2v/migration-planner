@@ -12,6 +12,7 @@ MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 INSECURE_REGISTRY ?= true
+REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
@@ -91,13 +92,14 @@ build-api: bin
 build-agent: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent ...
 
-
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent -t $(MIGRATION_PLANNER_AGENT_IMAGE):latest
+	$(PODMAN) image tag $(MIGRATION_PLANNER_AGENT_IMAGE):latest $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . -f Containerfile.api -t $(MIGRATION_PLANNER_API_IMAGE):latest
+	$(PODMAN) image tag $(MIGRATION_PLANNER_API_IMAGE):latest $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG)
 
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
@@ -108,7 +110,9 @@ build-containers: migration-planner-api-container migration-planner-agent-contai
 
 push-containers: build-containers
 	$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):latest
+	$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG)
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
+	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
 
 deploy-on-kind:
 	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
