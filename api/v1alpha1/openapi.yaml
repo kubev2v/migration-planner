@@ -279,13 +279,6 @@ components:
         id:
           type: string
           format: uuid
-        name:
-          type: string
-        status:
-          type: string
-          enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date]
-        statusInfo:
-          type: string
         inventory:
           $ref: '#/components/schemas/Inventory'
         createdAt:
@@ -294,17 +287,12 @@ components:
         updatedAt:
           type: string
           format: date-time
-        sshKey:
-          type: string
         agents:
           type: array
           items:
             $ref: '#/components/schemas/SourceAgentItem'
       required:
         - id
-        - name
-        - status
-        - statusInfo
         - createdAt
         - updatedAt
 

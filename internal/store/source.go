@@ -43,7 +43,7 @@ func (s *SourceStore) InitialMigration(ctx context.Context) error {
 
 func (s *SourceStore) List(ctx context.Context) (api.SourceList, error) {
 	var sources model.SourceList
-	result := s.getDB(ctx).Model(&sources).Order("id").Find(&sources)
+	result := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents").Find(&sources)
 	if result.Error != nil {
 		return nil, result.Error
 	}
