@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -17,12 +16,12 @@ var (
 )
 
 type Source interface {
-	List(ctx context.Context) (api.SourceList, error)
-	Create(ctx context.Context, id uuid.UUID) (*api.Source, error)
+	List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error)
+	Create(ctx context.Context, source model.Source) (*model.Source, error)
 	DeleteAll(ctx context.Context) error
-	Get(ctx context.Context, id uuid.UUID) (*api.Source, error)
+	Get(ctx context.Context, id uuid.UUID) (*model.Source, error)
 	Delete(ctx context.Context, id uuid.UUID) error
-	Update(ctx context.Context, id uuid.UUID, inventory *api.Inventory) (*api.Source, error)
+	Update(ctx context.Context, source model.Source) (*model.Source, error)
 	InitialMigration(context.Context) error
 }
 
@@ -41,23 +40,29 @@ func (s *SourceStore) InitialMigration(ctx context.Context) error {
 	return s.getDB(ctx).AutoMigrate(&model.Source{})
 }
 
-func (s *SourceStore) List(ctx context.Context) (api.SourceList, error) {
+func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error) {
 	var sources model.SourceList
-	result := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents").Find(&sources)
+	tx := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents")
+
+	if filter != nil {
+		for _, fn := range filter.QueryFn {
+			tx = fn(tx)
+		}
+	}
+
+	result := tx.Find(&sources)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return sources.ToApiResource(), nil
+	return sources, nil
 }
 
-func (s *SourceStore) Create(ctx context.Context, id uuid.UUID) (*api.Source, error) {
-	source := model.NewSourceFromApiCreateResource(id)
-	result := s.getDB(ctx).Create(source)
+func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.Source, error) {
+	result := s.getDB(ctx).Create(&source)
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	createdResource := source.ToApiResource()
-	return &createdResource, nil
+	return &source, nil
 }
 
 func (s *SourceStore) DeleteAll(ctx context.Context) error {
@@ -65,8 +70,8 @@ func (s *SourceStore) DeleteAll(ctx context.Context) error {
 	return result.Error
 }
 
-func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*api.Source, error) {
-	source := model.NewSourceFromId(id)
+func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, error) {
+	source := model.Source{ID: id}
 	result := s.getDB(ctx).Preload("Agents").First(&source)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -74,12 +79,11 @@ func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*api.Source, error
 		}
 		return nil, result.Error
 	}
-	apiSource := source.ToApiResource()
-	return &apiSource, nil
+	return &source, nil
 }
 
 func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
-	source := model.NewSourceFromId(id)
+	source := model.Source{ID: id}
 	result := s.getDB(ctx).Unscoped().Delete(&source)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		zap.S().Named("source_store").Infof("ERROR: %v", result.Error)
@@ -88,20 +92,17 @@ func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (s *SourceStore) Update(ctx context.Context, id uuid.UUID, inventory *api.Inventory) (*api.Source, error) {
-	source := model.NewSourceFromId(id)
+func (s *SourceStore) Update(ctx context.Context, source model.Source) (*model.Source, error) {
 	selectFields := []string{}
-	if inventory != nil {
-		source.Inventory = model.MakeJSONField(*inventory)
+	if source.Inventory != nil {
 		selectFields = append(selectFields, "inventory")
 	}
-	result := s.getDB(ctx).Model(source).Clauses(clause.Returning{}).Select(selectFields).Updates(&source)
+	result := s.getDB(ctx).Model(&source).Clauses(clause.Returning{}).Select(selectFields).Updates(&source)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	apiSource := source.ToApiResource()
-	return &apiSource, nil
+	return &source, nil
 }
 
 func (s *SourceStore) getDB(ctx context.Context) *gorm.DB {

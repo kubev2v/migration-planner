@@ -20,7 +20,7 @@ func UserFromContext(ctx context.Context) (User, bool) {
 	return val.(User), true
 }
 
-func newContext(ctx context.Context, u User) context.Context {
+func NewUserContext(ctx context.Context, u User) context.Context {
 	return context.WithValue(ctx, usernameKey, u)
 }
 

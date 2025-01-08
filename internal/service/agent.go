@@ -5,15 +5,21 @@ import (
 	"errors"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 )
 
 func (h *ServiceHandler) ListAgents(ctx context.Context, request server.ListAgentsRequestObject) (server.ListAgentsResponseObject, error) {
-	result, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
+	qf := store.NewAgentQueryFilter()
+	if user, found := auth.UserFromContext(ctx); found {
+		qf = qf.ByUsername(user.Username)
+	}
+	result, err := h.store.Agent().List(ctx, qf, store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
 	if err != nil {
 		return nil, err
 	}
-	return server.ListAgents200JSONResponse(result), nil
+	return server.ListAgents200JSONResponse(mappers.AgentListToApi(result)), nil
 }
 
 func (h *ServiceHandler) DeleteAgent(ctx context.Context, request server.DeleteAgentRequestObject) (server.DeleteAgentResponseObject, error) {
@@ -24,8 +30,15 @@ func (h *ServiceHandler) DeleteAgent(ctx context.Context, request server.DeleteA
 		}
 		return server.DeleteAgent500JSONResponse{}, nil
 	}
-	if agent.DeletedAt != nil {
-		return server.DeleteAgent200JSONResponse(*agent), nil
+
+	if user, found := auth.UserFromContext(ctx); found {
+		if agent.Username != user.Username {
+			return server.DeleteAgent403JSONResponse{}, nil
+		}
+	}
+
+	if agent.DeletedAt.Valid {
+		return server.DeleteAgent200JSONResponse(mappers.AgentToApi(*agent)), nil
 	}
 	if agent.Associated {
 		return server.DeleteAgent400JSONResponse{Message: "cannot delete an associated agent"}, nil
@@ -37,5 +50,5 @@ func (h *ServiceHandler) DeleteAgent(ctx context.Context, request server.DeleteA
 		return server.DeleteAgent500JSONResponse{}, nil
 	}
 
-	return server.DeleteAgent200JSONResponse(*agent), nil
+	return server.DeleteAgent200JSONResponse(mappers.AgentToApi(*agent)), nil
 }

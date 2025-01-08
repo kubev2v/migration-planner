@@ -8,6 +8,7 @@ import (
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -18,8 +19,9 @@ import (
 )
 
 const (
-	insertAgentWithSourceStm = "INSERT INTO agents (id, source_id,associated) VALUES ('%s', '%s',  TRUE);"
-	insertSourceStm          = "INSERT INTO sources (id) VALUES ('%s');"
+	insertAgentWithSourceStm    = "INSERT INTO agents (id, source_id,associated) VALUES ('%s', '%s',  TRUE);"
+	insertSourceStm             = "INSERT INTO sources (id) VALUES ('%s');"
+	insertSourceWithUsernameStm = "INSERT INTO sources (id,username, org_id) VALUES ('%s', '%s', '%s');"
 )
 
 var _ = Describe("source handler", Ordered, func() {
@@ -54,6 +56,27 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
 			Expect(resp).To(HaveLen(2))
+		})
+
+		It("successfully list all the sources -- filtered by user", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "cosmin", "cosmin"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
+			Expect(resp).To(HaveLen(1))
 		})
 
 		AfterEach(func() {
@@ -114,6 +137,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(count).To(Equal(0))
 
 		})
+
 		It("successfully deletes a source", func() {
 			source := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, source))
@@ -142,8 +166,68 @@ var _ = Describe("source handler", Ordered, func() {
 			myAgent, err := s.Agent().Get(context.TODO(), agent.String())
 			Expect(err).To(BeNil())
 			Expect(myAgent.DeletedAt).NotTo(BeNil())
-
 		})
+
+		It("successfully deletes a source -- under user's scope", func() {
+			source := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, source, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			agent := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, agent.String(), source.String()))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: source})
+			Expect(err).To(BeNil())
+
+			count := 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM SOURCES;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// we still have an agent but it's soft deleted
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM AGENTS;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			myAgent, err := s.Agent().Get(context.TODO(), agent.String())
+			Expect(err).To(BeNil())
+			Expect(myAgent.DeletedAt).NotTo(BeNil())
+		})
+
+		It("fails to delete a source -- under user's scope", func() {
+			source := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, source, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			agent := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithSourceStm, agent.String(), source.String()))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "user",
+				Organization: "user",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: source})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{})))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")

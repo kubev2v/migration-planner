@@ -469,6 +469,15 @@ func (response ListAgents401JSONResponse) VisitListAgentsResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListAgents403JSONResponse Error
+
+func (response ListAgents403JSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListAgents500JSONResponse Error
 
 func (response ListAgents500JSONResponse) VisitListAgentsResponse(w http.ResponseWriter) error {
@@ -509,6 +518,15 @@ type DeleteAgent401JSONResponse Error
 func (response DeleteAgent401JSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAgent403JSONResponse Error
+
+func (response DeleteAgent403JSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -727,6 +745,15 @@ func (response DeleteSource401JSONResponse) VisitDeleteSourceResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type DeleteSource403JSONResponse Error
+
+func (response DeleteSource403JSONResponse) VisitDeleteSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type DeleteSource404JSONResponse Error
 
 func (response DeleteSource404JSONResponse) VisitDeleteSourceResponse(w http.ResponseWriter) error {
@@ -767,6 +794,15 @@ type ReadSource401JSONResponse Error
 func (response ReadSource401JSONResponse) VisitReadSourceResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ReadSource403JSONResponse Error
+
+func (response ReadSource403JSONResponse) VisitReadSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }

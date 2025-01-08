@@ -20,7 +20,7 @@ func (n *NoneAuthenticator) Authenticator(next http.Handler) http.Handler {
 			Username:     "admin",
 			Organization: "internal",
 		}
-		ctx := newContext(r.Context(), user)
+		ctx := NewUserContext(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

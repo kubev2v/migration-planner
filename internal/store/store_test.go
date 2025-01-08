@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	st "github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -36,7 +37,13 @@ var _ = Describe("Store", Ordered, func() {
 			ctx, err := store.NewTransactionContext(context.TODO())
 			Expect(err).To(BeNil())
 
-			source, err := store.Source().Create(ctx, uuid.New())
+			sourceID := uuid.New()
+			m := model.Source{
+				ID:       sourceID,
+				Username: "admin",
+				OrgID:    "org",
+			}
+			source, err := store.Source().Create(ctx, m)
 			Expect(source).ToNot(BeNil())
 			Expect(err).To(BeNil())
 
@@ -54,12 +61,17 @@ var _ = Describe("Store", Ordered, func() {
 			ctx, err := store.NewTransactionContext(context.TODO())
 			Expect(err).To(BeNil())
 
-			source, err := store.Source().Create(ctx, uuid.New())
+			m := model.Source{
+				ID:       uuid.New(),
+				Username: "admin",
+				OrgID:    "org",
+			}
+			source, err := store.Source().Create(ctx, m)
 			Expect(source).ToNot(BeNil())
 			Expect(err).To(BeNil())
 
 			// count in the same transaction
-			sources, err := store.Source().List(ctx)
+			sources, err := store.Source().List(ctx, st.NewSourceQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(sources).NotTo(BeNil())
 			Expect(sources).To(HaveLen(1))

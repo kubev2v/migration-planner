@@ -76,7 +76,7 @@ func (rh *RHSSOAuthenticator) Authenticator(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := newContext(r.Context(), user)
+		ctx := NewUserContext(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

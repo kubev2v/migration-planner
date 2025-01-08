@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -15,6 +15,7 @@ import (
 
 const (
 	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
+	insertAgentWithUsernameStm  = "INSERT INTO agents (id, status, status_info, cred_url,username, org_id,  version) VALUES ('%s', '%s', '%s', '%s','%s', '%s', 'version_1');"
 	insertAgentWithSourceStm    = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 	insertAgentWithDeletedAtStm = "INSERT INTO agents (id, status, status_info, cred_url, deleted_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
@@ -51,12 +52,12 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(agents).To(HaveLen(3))
 
-			Expect(agents[0].Id).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
+			Expect(agents[0].ID).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
 			Expect(string(agents[0].Status)).To(Equal("not-connected"))
 			Expect(agents[0].StatusInfo).Should(BeElementOf("status-info-1", "status-info-2", "status-info-3"))
-			Expect(agents[0].CredentialUrl).Should(BeElementOf("cred_url-1", "cred_url-2", "cred_url-3"))
-			Expect(agents[1].Id).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
-			Expect(agents[2].Id).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
+			Expect(agents[0].CredUrl).Should(BeElementOf("cred_url-1", "cred_url-2", "cred_url-3"))
+			Expect(agents[1].ID).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
+			Expect(agents[2].ID).Should(BeElementOf("agent-1", "agent-2", "agent-3"))
 		})
 
 		It("list all the agents -- no agents to be found in the db", func() {
@@ -77,7 +78,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(agents).To(HaveLen(3))
 
-			Expect(agents[0].Id).To(Equal("agent-1"))
+			Expect(agents[0].ID).To(Equal("agent-1"))
 		})
 
 		It("successfuly list all the agents -- with options order by update_id", func() {
@@ -97,7 +98,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(agents).To(HaveLen(3))
 
-			Expect(agents[0].Id).To(Equal("agent-2"))
+			Expect(agents[0].ID).To(Equal("agent-2"))
 		})
 
 		It("successfuly list the agents -- with filter by source-id", func() {
@@ -116,7 +117,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(agents).To(HaveLen(1))
 
-			Expect(agents[0].Id).To(Equal("agent-1"))
+			Expect(agents[0].ID).To(Equal("agent-1"))
 		})
 
 		It("successfuly list the agents -- with filter by soft deletion", func() {
@@ -131,7 +132,7 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(agents).To(HaveLen(1))
 
-			Expect(agents[0].Id).To(Equal("agent-1"))
+			Expect(agents[0].ID).To(Equal("agent-1"))
 		})
 
 		It("successfuly list the agents -- without filter by soft deletion", func() {
@@ -147,6 +148,19 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(agents).To(HaveLen(2))
 		})
 
+		It("successfuly list all the agents -- filtered by user", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, "agent-1", "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, "agent-2", "not-connected", "status-info-1", "cred_url-1", "user", "user"))
+			Expect(tx.Error).To(BeNil())
+
+			agents, err := s.Agent().List(context.TODO(), store.NewAgentQueryFilter().ByUsername("admin"), store.NewAgentQueryOptions())
+			Expect(err).To(BeNil())
+			Expect(agents).To(HaveLen(1))
+
+			Expect(agents[0].Username).To(Equal("admin"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -155,11 +169,13 @@ var _ = Describe("agent store", Ordered, func() {
 
 	Context("create", func() {
 		It("successfuly creates an agent", func() {
-			agentData := apiAgent.AgentStatusUpdate{
-				Id:            "agent-1",
-				CredentialUrl: "creds-url-1",
-				Status:        "waiting-for-credentials",
-				StatusInfo:    "status-info-1",
+			agentData := model.Agent{
+				ID:         "agent-1",
+				CredUrl:    "creds-url-1",
+				Username:   "admin",
+				OrgID:      "whatever",
+				Status:     "waiting-for-credentials",
+				StatusInfo: "status-info-1",
 			}
 
 			agent, err := s.Agent().Create(context.TODO(), agentData)
@@ -171,7 +187,8 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(count).To(Equal(1))
 
 			Expect(agent).ToNot(BeNil())
-			Expect(agent.Id).To(Equal("agent-1"))
+			Expect(agent.ID).To(Equal("agent-1"))
+			Expect(agent.Username).To(Equal("admin"))
 			Expect(string(agent.Status)).To(Equal("waiting-for-credentials"))
 		})
 
@@ -195,10 +212,10 @@ var _ = Describe("agent store", Ordered, func() {
 			agent, err := s.Agent().Get(context.TODO(), "agent-1")
 			Expect(err).To(BeNil())
 
-			Expect(agent.Id).To(Equal("agent-1"))
+			Expect(agent.ID).To(Equal("agent-1"))
 			Expect(string(agent.Status)).To(Equal("not-connected"))
 			Expect(agent.StatusInfo).To(Equal("status-info-1"))
-			Expect(agent.CredentialUrl).To(Equal("cred_url-1"))
+			Expect(agent.CredUrl).To(Equal("cred_url-1"))
 		})
 
 		It("successfuly return the agent connected to a source", func() {
@@ -210,12 +227,12 @@ var _ = Describe("agent store", Ordered, func() {
 			agent, err := s.Agent().Get(context.TODO(), "agent-1")
 			Expect(err).To(BeNil())
 
-			Expect(agent.Id).To(Equal("agent-1"))
+			Expect(agent.ID).To(Equal("agent-1"))
 			Expect(string(agent.Status)).To(Equal("not-connected"))
 			Expect(agent.StatusInfo).To(Equal("status-info-1"))
-			Expect(agent.CredentialUrl).To(Equal("cred_url-1"))
-			Expect(agent.SourceId).ToNot(BeNil())
-			Expect(*agent.SourceId).To(Equal("source-1"))
+			Expect(agent.CredUrl).To(Equal("cred_url-1"))
+			Expect(agent.SourceID).ToNot(BeNil())
+			Expect(*agent.SourceID).To(Equal("source-1"))
 		})
 
 		AfterEach(func() {
@@ -229,11 +246,11 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			agentData := apiAgent.AgentStatusUpdate{
-				Id:            "agent-1",
-				CredentialUrl: "creds-url-1",
-				Status:        "waiting-for-credentials",
-				StatusInfo:    "status-info-1",
+			agentData := model.Agent{
+				ID:         "agent-1",
+				CredUrl:    "creds-url-1",
+				Status:     "waiting-for-credentials",
+				StatusInfo: "status-info-1",
 			}
 
 			agent, err := s.Agent().Update(context.TODO(), agentData)
@@ -250,11 +267,11 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			agentData := apiAgent.AgentStatusUpdate{
-				Id:            "agent-1",
-				CredentialUrl: "creds-url-1",
-				Status:        "not-connected",
-				StatusInfo:    "another-status-info-1",
+			agentData := model.Agent{
+				ID:         "agent-1",
+				CredUrl:    "creds-url-1",
+				Status:     "not-connected",
+				StatusInfo: "another-status-info-1",
 			}
 
 			agent, err := s.Agent().Update(context.TODO(), agentData)
@@ -277,7 +294,7 @@ var _ = Describe("agent store", Ordered, func() {
 			agent, err := s.Agent().UpdateSourceID(context.TODO(), "agent-1", "source-1", associated)
 			Expect(err).To(BeNil())
 			Expect(agent).NotTo(BeNil())
-			Expect(*agent.SourceId).To(Equal("source-1"))
+			Expect(*agent.SourceID).To(Equal("source-1"))
 			Expect(agent.Associated).To(BeTrue())
 
 			rawSourceID := ""
@@ -298,8 +315,8 @@ var _ = Describe("agent store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
 			Expect(tx.Error).To(BeNil())
 
-			agentData := apiAgent.AgentStatusUpdate{
-				Id: "unknown-id",
+			agentData := model.Agent{
+				ID: "unknown-id",
 			}
 
 			agent, err := s.Agent().Update(context.TODO(), agentData)
