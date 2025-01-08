@@ -63,7 +63,7 @@ jobs:
 
       - name: Deploy vcsim
         run: |
-          kubectl create deployment vcsim --image=docker.io/vmware/vcsim
+          make deploy-vsphere-simulator
           kubectl wait --for=condition=Ready pods --all --timeout=240s
           kubectl port-forward --address 0.0.0.0 deploy/vcsim 8989:8989 &
 
