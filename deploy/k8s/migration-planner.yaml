@@ -46,7 +46,6 @@ spec:
             - name:  INSECURE_REGISTRY
               value: "true"
           volumeMounts:
-          volumeMounts:
             - name: migration-planner-config
               mountPath: "/.migration-planner/config.yaml"
               subPath: config.yaml

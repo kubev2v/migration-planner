@@ -114,6 +114,9 @@ push-containers: build-containers
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):latest
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
 
+deploy-vsphere-simulator:
+	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
+
 deploy-on-kind:
 	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
              s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \

@@ -42,8 +42,9 @@ type PlannerAgent interface {
 
 type PlannerService interface {
 	RemoveSources() error
+	RemoveAgent(UUID string) error
 	GetSource() (*api.Source, error)
-	GetAgent() (*api.Agent, error)
+	GetAgent(credentialUrl string) (*api.Agent, error)
 }
 
 type plannerService struct {
@@ -260,7 +261,7 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 	return &plannerService{c: c}, nil
 }
 
-func (s *plannerService) GetAgent() (*api.Agent, error) {
+func (s *plannerService) GetAgent(credentialUrl string) (*api.Agent, error) {
 	ctx := context.TODO()
 	res, err := s.c.ListAgentsWithResponse(ctx)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
@@ -271,9 +272,8 @@ func (s *plannerService) GetAgent() (*api.Agent, error) {
 		return nil, fmt.Errorf("No agents found")
 	}
 
-	nullUuid := uuid.UUID{}
 	for _, agent := range *res.JSON200 {
-		if agent.Id != nullUuid.String() {
+		if agent.CredentialUrl == credentialUrl {
 			return &agent, nil
 		}
 	}
@@ -300,6 +300,18 @@ func (s *plannerService) GetSource() (*api.Source, error) {
 	}
 
 	return nil, fmt.Errorf("No sources found")
+}
+
+func (s *plannerService) RemoveAgent(UUID string) error {
+	parsedUUID, err1 := uuid.Parse(UUID)
+	if err1 != nil {
+		return err1
+	}
+	_, err2 := s.c.DeleteAgentWithResponse(context.TODO(), parsedUUID)
+	if err2 != nil {
+		return err2
+	}
+	return nil
 }
 
 func (s *plannerService) RemoveSources() error {
