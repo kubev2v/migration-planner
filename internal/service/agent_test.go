@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -18,9 +19,10 @@ import (
 )
 
 const (
-	insertAgentStm            = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
-	insertSoftDeletedAgentStm = "INSERT INTO agents (id, deleted_at) VALUES ('%s', '%s');"
-	insertAssociatedAgentStm  = "INSERT INTO agents (id, associated) VALUES ('%s',  TRUE);"
+	insertAgentStm             = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
+	insertAgentWithUsernameStm = "INSERT INTO agents (id, status, status_info, cred_url,username, org_id, version) VALUES ('%s', '%s', '%s', '%s','%s','%s', 'version_1');"
+	insertSoftDeletedAgentStm  = "INSERT INTO agents (id, deleted_at) VALUES ('%s', '%s');"
+	insertAssociatedAgentStm   = "INSERT INTO agents (id, associated) VALUES ('%s',  TRUE);"
 )
 
 var _ = Describe("agent handler", Ordered, func() {
@@ -75,6 +77,27 @@ var _ = Describe("agent handler", Ordered, func() {
 			Expect(resp).To(HaveLen(2))
 		})
 
+		It("successfully list all the agents -- filtered by user", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, "agent-1", "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, "agent-2", "not-connected", "status-info-2", "cred_url-2", "user", "user"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+			resp, err := srv.ListAgents(ctx, server.ListAgentsRequestObject{})
+
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
+			Expect(resp).To(HaveLen(1))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 		})
@@ -119,6 +142,42 @@ var _ = Describe("agent handler", Ordered, func() {
 			resp, err := srv.DeleteAgent(context.TODO(), server.DeleteAgentRequestObject{Id: agentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent400JSONResponse{})))
+		})
+
+		It("successfully delete user's agent", func() {
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+			resp, err := srv.DeleteAgent(ctx, server.DeleteAgentRequestObject{Id: agentID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent200JSONResponse{})))
+		})
+
+		It("fails to delete other user's agent", func() {
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			user := auth.User{
+				Username:     "user",
+				Organization: "user",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+			resp, err := srv.DeleteAgent(ctx, server.DeleteAgentRequestObject{Id: agentID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteAgent403JSONResponse{})))
 		})
 
 		AfterEach(func() {

@@ -7,13 +7,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
 )
 
 const (
-	insertSourceStm = "INSERT INTO sources (id) VALUES ('%s');"
+	insertSourceStm             = "INSERT INTO sources (id) VALUES ('%s');"
+	insertSourceWithUsernameStm = "INSERT INTO sources (id, username, org_id) VALUES ('%s', '%s', '%s');"
 )
 
 var _ = Describe("source store", Ordered, func() {
@@ -41,7 +43,7 @@ var _ = Describe("source store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
 			Expect(tx.Error).To(BeNil())
 
-			sources, err := s.Source().List(context.TODO())
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(sources).To(HaveLen(2))
 		})
@@ -56,18 +58,30 @@ var _ = Describe("source store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf("UPDATE agents set source_id = '%s';", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			sources, err := s.Source().List(context.TODO())
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(sources).To(HaveLen(1))
-			agents := *sources[0].Agents
+			agents := sources[0].Agents
 			Expect(agents).To(HaveLen(1))
-			Expect(agents[0].Id.String()).To(Equal(agentID))
+			Expect(agents[0].ID).To(Equal(agentID))
 		})
 
 		It("list all sources -- no sources", func() {
-			sources, err := s.Source().List(context.TODO())
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(sources).To(HaveLen(0))
+		})
+
+		It("successfully list the user's sources", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "user", "user"))
+			Expect(tx.Error).To(BeNil())
+
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter().ByUsername("admin"))
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(1))
+			Expect(sources[0].Username).To(Equal("admin"))
 		})
 
 		AfterEach(func() {
@@ -109,7 +123,12 @@ var _ = Describe("source store", Ordered, func() {
 		Context("create", func() {
 			It("successfully creates one source", func() {
 				sourceID := uuid.New()
-				source, err := s.Source().Create(context.TODO(), sourceID)
+				m := model.Source{
+					ID:       sourceID,
+					Username: "admin",
+					OrgID:    "org",
+				}
+				source, err := s.Source().Create(context.TODO(), m)
 				Expect(err).To(BeNil())
 				Expect(source).NotTo(BeNil())
 
@@ -121,7 +140,12 @@ var _ = Describe("source store", Ordered, func() {
 
 			It("successfully creates one source without sshkey", func() {
 				sourceID := uuid.New()
-				source, err := s.Source().Create(context.TODO(), sourceID)
+				m := model.Source{
+					ID:       sourceID,
+					Username: "admin",
+					OrgID:    "org",
+				}
+				source, err := s.Source().Create(context.TODO(), m)
 				Expect(err).To(BeNil())
 				Expect(source).NotTo(BeNil())
 
