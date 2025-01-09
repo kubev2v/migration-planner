@@ -5,7 +5,7 @@ deploy-job:
   stage: deploy
   environment: production
   tags:
-    - shared
+    - shared-podman
   image:
     name: fedora:latest
   script:
