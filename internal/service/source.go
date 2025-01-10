@@ -10,15 +10,23 @@ import (
 )
 
 func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
+	// Get user content
 	filter := store.NewSourceQueryFilter()
 	if user, found := auth.UserFromContext(ctx); found {
 		filter = filter.ByUsername(user.Username)
 	}
-	result, err := h.store.Source().List(ctx, filter)
+	userResult, err := h.store.Source().List(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
-	return server.ListSources200JSONResponse(mappers.SourceListToApi(result)), nil
+
+	// Get default content
+	defaultResult, err := h.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
+	if err != nil {
+		return nil, err
+	}
+
+	return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult, defaultResult)), nil
 }
 
 func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {

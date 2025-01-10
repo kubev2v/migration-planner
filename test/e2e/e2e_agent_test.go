@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/client"
@@ -266,11 +267,18 @@ func (s *plannerService) GetAgent() (*api.Agent, error) {
 		return nil, fmt.Errorf("Error listing agents")
 	}
 
-	if len(*res.JSON200) == 0 {
+	if len(*res.JSON200) == 1 {
 		return nil, fmt.Errorf("No agents found")
 	}
 
-	return &(*res.JSON200)[0], nil
+	nullUuid := uuid.UUID{}
+	for _, agent := range *res.JSON200 {
+		if agent.Id != nullUuid.String() {
+			return &agent, nil
+		}
+	}
+
+	return nil, fmt.Errorf("No agents found")
 }
 
 func (s *plannerService) GetSource() (*api.Source, error) {
@@ -280,11 +288,18 @@ func (s *plannerService) GetSource() (*api.Source, error) {
 		return nil, fmt.Errorf("Error listing sources")
 	}
 
-	if len(*res.JSON200) == 0 {
+	if len(*res.JSON200) == 1 {
 		return nil, fmt.Errorf("No sources found")
 	}
 
-	return &(*res.JSON200)[0], nil
+	nullUuid := uuid.UUID{}
+	for _, source := range *res.JSON200 {
+		if source.Id != nullUuid {
+			return &source, nil
+		}
+	}
+
+	return nil, fmt.Errorf("No sources found")
 }
 
 func (s *plannerService) RemoveSources() error {

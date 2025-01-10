@@ -11,15 +11,23 @@ import (
 )
 
 func (h *ServiceHandler) ListAgents(ctx context.Context, request server.ListAgentsRequestObject) (server.ListAgentsResponseObject, error) {
+	// Get user content:
 	qf := store.NewAgentQueryFilter()
 	if user, found := auth.UserFromContext(ctx); found {
 		qf = qf.ByUsername(user.Username)
 	}
-	result, err := h.store.Agent().List(ctx, qf, store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
+	userResult, err := h.store.Agent().List(ctx, qf, store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
 	if err != nil {
 		return nil, err
 	}
-	return server.ListAgents200JSONResponse(mappers.AgentListToApi(result)), nil
+
+	// Get default content
+	defaultResult, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter().ByDefaultInventory(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
+	if err != nil {
+		return nil, err
+	}
+
+	return server.ListAgents200JSONResponse(mappers.AgentListToApi(userResult, defaultResult)), nil
 }
 
 func (h *ServiceHandler) DeleteAgent(ctx context.Context, request server.DeleteAgentRequestObject) (server.DeleteAgentResponseObject, error) {
