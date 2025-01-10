@@ -28,10 +28,12 @@ func SourceToApi(s model.Source) api.Source {
 	return source
 }
 
-func SourceListToApi(sources model.SourceList) api.SourceList {
-	sourceList := make([]api.Source, 0, len(sources))
+func SourceListToApi(sources ...model.SourceList) api.SourceList {
+	sourceList := []api.Source{}
 	for _, source := range sources {
-		sourceList = append(sourceList, SourceToApi(source))
+		for _, s := range source {
+			sourceList = append(sourceList, SourceToApi(s))
+		}
 	}
 	return sourceList
 }
@@ -59,10 +61,12 @@ func AgentToApi(a model.Agent) api.Agent {
 	return agent
 }
 
-func AgentListToApi(agents model.AgentList) api.AgentList {
-	agentList := make([]api.Agent, 0, len(agents))
+func AgentListToApi(agents ...model.AgentList) api.AgentList {
+	agentList := []api.Agent{}
 	for _, agent := range agents {
-		agentList = append(agentList, AgentToApi(agent))
+		for _, a := range agent {
+			agentList = append(agentList, AgentToApi(a))
+		}
 	}
 	return agentList
 }

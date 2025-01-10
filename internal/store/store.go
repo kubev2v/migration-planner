@@ -3,13 +3,18 @@ package store
 import (
 	"context"
 
+	"github.com/google/uuid"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type Store interface {
 	NewTransactionContext(ctx context.Context) (context.Context, error)
 	Agent() Agent
 	Source() Source
+	Seed() error
 	InitialMigration() error
 	Close() error
 }
@@ -56,6 +61,48 @@ func (s *DataStore) InitialMigration() error {
 	}
 	_, err = Commit(ctx)
 	return err
+}
+
+func (s *DataStore) Seed() error {
+	sourceUuid := uuid.UUID{}
+	sourceUuidStr := sourceUuid.String()
+
+	tx, err := newTransaction(s.db)
+	if err != nil {
+		return err
+	}
+	// Create/update default source
+	source := model.Source{
+		ID:        sourceUuid,
+		Inventory: model.MakeJSONField(GenerateDefaultInventory()),
+	}
+
+	if err := tx.tx.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&source).Error; err != nil {
+		_ = tx.Rollback()
+	}
+
+	// Create/update default agent
+	agent := model.Agent{
+		ID:         sourceUuidStr,
+		Status:     string(api.AgentStatusUpToDate),
+		StatusInfo: "Inventory successfully collected",
+		CredUrl:    "Example report",
+		SourceID:   &sourceUuidStr,
+		Associated: true,
+	}
+	if err := tx.tx.Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(&agent).Error; err != nil {
+		_ = tx.Rollback()
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *DataStore) Close() error {

@@ -1,6 +1,9 @@
 package store
 
-import "gorm.io/gorm"
+import (
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
 
 type BaseQuerier struct {
 	QueryFn []func(tx *gorm.DB) *gorm.DB
@@ -29,6 +32,13 @@ func (qf *AgentQueryFilter) ByUsername(username string) *AgentQueryFilter {
 func (qf *AgentQueryFilter) ByOrgID(id string) *AgentQueryFilter {
 	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("org_id = ?", id)
+	})
+	return qf
+}
+
+func (qf *AgentQueryFilter) ByDefaultInventory() *AgentQueryFilter {
+	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id = ?", uuid.UUID{})
 	})
 	return qf
 }
@@ -98,6 +108,13 @@ func (sf *SourceQueryFilter) ByUsername(username string) *SourceQueryFilter {
 func (sf *SourceQueryFilter) ByOrgID(id string) *SourceQueryFilter {
 	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("org_id = ?", id)
+	})
+	return sf
+}
+
+func (sf *SourceQueryFilter) ByDefaultInventory() *SourceQueryFilter {
+	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id = ?", uuid.UUID{})
 	})
 	return sf
 }

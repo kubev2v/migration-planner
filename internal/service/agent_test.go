@@ -100,6 +100,7 @@ var _ = Describe("agent handler", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
 
@@ -182,6 +183,7 @@ var _ = Describe("agent handler", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
 })

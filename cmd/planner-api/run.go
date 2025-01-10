@@ -59,6 +59,13 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalf("running initial migration: %v", err)
 		}
 
+		// Initialize database with basic example report
+		if v, b := os.LookupEnv("NO_SEED"); !b || v == "false" {
+			if err := store.Seed(); err != nil {
+				zap.S().Fatalf("seeding database with default report: %v", err)
+			}
+		}
+
 		// initilize event writer
 		ep, _ := getEventProducer(cfg)
 
