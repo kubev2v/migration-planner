@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"github.com/go-chi/chi"
 	"github.com/go-chi/render"
 	liberr "github.com/konveyor/forklift-controller/pkg/lib/error"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
@@ -37,6 +39,19 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
 		credentialHandler(configuration.DataDir, w, r)
 	})
+	router.Get("/api/v1/inventory", func(w http.ResponseWriter, r *http.Request) {
+		data, err := getInventory(configuration.DataDir)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if data == nil {
+			http.Error(w, "Inventory not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Add("Content-Disposition", "attachment")
+		_ = render.Render(w, r, InventoryReply{Inventory: data.Inventory})
+	})
 }
 
 type StatusReply struct {
@@ -52,6 +67,10 @@ type ServiceUIReply struct {
 	URL string `json:"url"`
 }
 
+type InventoryReply struct {
+	Inventory api.Inventory `json:"inventory"`
+}
+
 func (s ServiceUIReply) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
 }
@@ -62,6 +81,26 @@ func (s StatusReply) Render(w http.ResponseWriter, r *http.Request) error {
 
 func (v VersionReply) Render(w http.ResponseWriter, r *http.Request) error {
 	return nil
+}
+
+func (v InventoryReply) Render(w http.ResponseWriter, r *http.Request) error {
+	return nil
+}
+
+func getInventory(dataDir string) (*service.InventoryData, error) {
+	filename := filepath.Join(dataDir, config.InventoryFile)
+	contents, err := os.ReadFile(filename)
+	if err != nil {
+		return nil, fmt.Errorf("error reading inventory file: %v", err)
+	}
+
+	var inventory service.InventoryData
+	err = json.Unmarshal(contents, &inventory)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing inventory file: %v", err)
+	}
+
+	return &inventory, nil
 }
 
 func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
