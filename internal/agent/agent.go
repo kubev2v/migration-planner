@@ -34,20 +34,20 @@ var version string
 // New creates a new agent.
 func New(id uuid.UUID, jwt string, config *config.Config) *Agent {
 	return &Agent{
-		config:           config,
-		healtCheckStopCh: make(chan chan any),
-		id:               id,
-		jwt:              jwt,
+		config:            config,
+		healthCheckStopCh: make(chan chan any),
+		id:                id,
+		jwt:               jwt,
 	}
 }
 
 type Agent struct {
-	config           *config.Config
-	server           *Server
-	healtCheckStopCh chan chan any
-	credUrl          string
-	id               uuid.UUID
-	jwt              string
+	config            *config.Config
+	server            *Server
+	healthCheckStopCh chan chan any
+	credUrl           string
+	id                uuid.UUID
+	jwt               string
 }
 
 func (a *Agent) Run(ctx context.Context) error {
@@ -90,7 +90,7 @@ func (a *Agent) Stop() {
 	zap.S().Info("server stopped")
 
 	c := make(chan any)
-	a.healtCheckStopCh <- c
+	a.healthCheckStopCh <- c
 	<-c
 	zap.S().Info("health check stopped")
 }
@@ -122,7 +122,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 
 	// TODO refactor health checker to call it from the main goroutine
-	healthChecker.Start(ctx, a.healtCheckStopCh)
+	healthChecker.Start(ctx, a.healthCheckStopCh)
 
 	collector := service.NewCollector(a.config.DataDir)
 	collector.Collect(ctx)
@@ -150,6 +150,16 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			//	check for health. Send requests only if we have connectivity
 			if healthChecker.State() == service.HealthCheckStateConsoleUnreachable {
 				continue
+			}
+
+			nsc := service.NewSmartStateClient()
+			zap.S().Debug("trying to get smart state results")
+			smartResults, err := nsc.GetResults()
+			if err != nil {
+				zap.S().Errorf("error getting smart analysis results: %s", err)
+			}
+			if smartResults != nil {
+				inventory.SmartState = &smartResults
 			}
 
 			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, credUrl); err != nil {

@@ -385,7 +385,9 @@ components:
         infra:
           type: object
           $ref: '#/components/schemas/Infra'
-
+        smartState:
+          type: object
+          $ref: '#/components/schemas/SmartState'
     VCenter:
       type: object
       required:
@@ -439,6 +441,12 @@ components:
         migrationWarnings:
           type: object
           $ref: '#/components/schemas/MigrationIssues'
+
+    SmartState:
+      type: array
+      items:
+        type: object
+        additionalProperties: true
 
     Infra:
       type: object

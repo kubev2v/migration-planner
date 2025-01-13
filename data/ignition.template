@@ -100,6 +100,27 @@ storage:
         name: core
       group:
         name: core
+
+    - path: /home/core/.config/containers/systemd/manageiq-service.container
+      mode: 0644
+      contents:
+        inline: |
+          [Unit]
+          Description=ManageIQ SmartState Service
+
+          [Container]
+          ContainerName=manageiq-service
+          Image=quay.io/bodnopoz/manageiq-service:latest
+          PublishPort=3334:3334
+          Network=host
+          UserNS=keep-id:uid=1001
+
+          [Service]
+          Restart=on-failure
+          RestartSec=5
+
+          [Install]
+          WantedBy=multi-user.target default.target
     - path: /home/core/.config/containers/systemd/planner-agent.container
       mode: 0644
       contents:
