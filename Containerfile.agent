@@ -2,7 +2,7 @@ FROM registry.access.redhat.com/ubi9/ubi as ui
 
 WORKDIR /app
 RUN mkdir /app/www && \
-     curl -Lo /tmp/agent-latest.tgz https://github.com/kubev2v/migration-planner-ui/releases/download/v0.0.1-test/agent-v0.0.1-test.tgz && \
+     curl -Lo /tmp/agent-latest.tgz https://github.com/kubev2v/migration-planner-ui/releases/download/latest/agent-latest.tgz && \
      tar xf /tmp/agent-latest.tgz -C /app/www
 
 # Builder container
