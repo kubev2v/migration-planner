@@ -19,6 +19,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
+	chiprometheus "github.com/toshi0607/chi-prometheus"
 	"go.uber.org/zap"
 )
 
@@ -71,7 +72,12 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	}
 
 	router := chi.NewRouter()
+
+	metricMiddleware := chiprometheus.New("agent_server")
+	metricMiddleware.MustRegisterDefault()
+
 	router.Use(
+		metricMiddleware.Handler,
 		authenticator.Authenticator,
 		middleware.RequestID,
 		zapchi.Logger(zap.S(), "router_agent"),

@@ -144,6 +144,12 @@ deploy-on-openshift:
 	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
 	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 
+deploy-local-obs:
+	@podman play kube --network host deploy/observability.yml
+
+undeploy-local-obs:
+	@podman kube down deploy/observability.yml
+
 undeploy-on-openshift:
 	oc delete route planner || true
 	oc delete route planner-agent || true

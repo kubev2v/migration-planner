@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"go.uber.org/zap"
 )
 
@@ -170,7 +171,40 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 		zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
 	}
 
+	// must not block here.
+	// don't care about errors or context
+	go h.updateMetrics()
+
 	return agentServer.UpdateAgentStatus200Response{}, nil
+}
+
+// update metrics about agents states
+// it lists all the agents and update the metrics by agent state
+func (h *AgentServiceHandler) updateMetrics() {
+	agents, err := h.store.Agent().List(context.TODO(), store.NewAgentQueryFilter(), store.NewAgentQueryOptions())
+	if err != nil {
+		zap.S().Named("agent_handler").Warnf("failed to update agent metrics: %s", err)
+		return
+	}
+	// holds the total number of agents by state
+	// set defaults
+	states := map[string]int{
+		string(api.AgentStatusUpToDate):                  0,
+		string(api.AgentStatusError):                     0,
+		string(api.AgentStatusWaitingForCredentials):     0,
+		string(api.AgentStatusGatheringInitialInventory): 0,
+	}
+	for _, a := range agents {
+		if count, ok := states[a.Status]; ok {
+			count += 1
+			states[a.Status] = count
+			continue
+		}
+		states[a.Status] = 1
+	}
+	for k, v := range states {
+		metrics.UpdateAgentStateCounterMetric(k, v)
+	}
 }
 
 func (h *AgentServiceHandler) newAgentEvent(agent api.Agent) (string, io.Reader) {
