@@ -171,7 +171,9 @@ func testVmwareConnection(requestCtx context.Context, credentials *config.Creden
 	err = client.Login(ctx, u.User)
 	if err != nil {
 		err = liberr.Wrap(err)
-		if strings.Contains(err.Error(), "Login failure") {
+		// Cover both the different error messages returns from the production and test environments in case of incorrect credentials
+		if strings.Contains(err.Error(), "Login failure") ||
+			strings.Contains(err.Error(), "incorrect") && strings.Contains(err.Error(), "password") {
 			return http.StatusUnauthorized, err
 		}
 		return http.StatusBadRequest, err
