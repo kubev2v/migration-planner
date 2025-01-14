@@ -107,7 +107,7 @@ type SourceAgentItem struct {
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	Name string `json:"name"`
+	Inventory Inventory `json:"inventory"`
 }
 
 // SourceList defines model for SourceList.
@@ -169,3 +169,6 @@ type HeadImageParams struct {
 	// SshKey public SSH key
 	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
 }
+
+// CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
+type CreateSourceJSONRequestBody = SourceCreate
