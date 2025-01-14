@@ -7,7 +7,6 @@ metadata:
   labels:
     app: vcsim
   name: vcsim
-  namespace: default
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
