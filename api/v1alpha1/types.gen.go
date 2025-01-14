@@ -77,9 +77,10 @@ type InfraNetworksType string
 
 // Inventory defines model for Inventory.
 type Inventory struct {
-	Infra   Infra   `json:"infra"`
-	Vcenter VCenter `json:"vcenter"`
-	Vms     VMs     `json:"vms"`
+	Infra      Infra       `json:"infra"`
+	SmartState *SmartState `json:"smartState,omitempty"`
+	Vcenter    VCenter     `json:"vcenter"`
+	Vms        VMs         `json:"vms"`
 }
 
 // MigrationIssues defines model for MigrationIssues.
@@ -88,6 +89,9 @@ type MigrationIssues = []struct {
 	Count      int    `json:"count"`
 	Label      string `json:"label"`
 }
+
+// SmartState defines model for SmartState.
+type SmartState = []map[string]interface{}
 
 // Source defines model for Source.
 type Source struct {

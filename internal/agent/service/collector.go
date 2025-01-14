@@ -153,6 +153,12 @@ func (c *Collector) run() {
 		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %s", err)
 		return
 	}
+
+	zap.S().Named("collector").Infof("calling SmartState analysis init_scan")
+	sc := NewSmartStateClient()
+	if err = sc.InitScan(creds); err != nil {
+		zap.S().Named("collector").Errorf("Error running smart state analysis init_scan: %s", err)
+	}
 }
 
 func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
