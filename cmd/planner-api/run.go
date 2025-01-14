@@ -96,6 +96,18 @@ var runCmd = &cobra.Command{
 			}
 		}()
 
+		go func() {
+			defer cancel()
+			listener, err := newListener("0.0.0.0:8080")
+			if err != nil {
+				zap.S().Named("metrics_server").Fatalf("creating listener: %s", err)
+			}
+			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener)
+			if err := metricsServer.Run(ctx); err != nil {
+				zap.S().Named("metrics_server").Fatalf("failed to run metrics server: %s", err)
+			}
+		}()
+
 		<-ctx.Done()
 		_ = ep.Close()
 

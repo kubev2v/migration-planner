@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 )
 
 func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRequestObject) (server.GetImageResponseObject, error) {
@@ -36,8 +37,12 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 
 	// Generate the OVA image
 	if err := ova.Generate(); err != nil {
+		metrics.IncreaseOvaDownloadsTotalMetric("failed")
 		return server.GetImage500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
 	}
+
+	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+
 	return server.GetImage200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
 }
 

@@ -136,6 +136,7 @@ func (c *Collector) run() {
 	}
 
 	zap.S().Named("collector").Infof("Create inventory")
+
 	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
 
 	zap.S().Named("collector").Infof("Run the validation of VMs")
