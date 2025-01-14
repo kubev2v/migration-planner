@@ -38,6 +38,9 @@ type ServerInterface interface {
 	// (GET /api/v1/sources)
 	ListSources(w http.ResponseWriter, r *http.Request)
 
+	// (POST /api/v1/sources)
+	CreateSource(w http.ResponseWriter, r *http.Request)
+
 	// (DELETE /api/v1/sources/{id})
 	DeleteSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -79,6 +82,11 @@ func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/v1/sources)
 func (_ Unimplemented) ListSources(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/sources)
+func (_ Unimplemented) CreateSource(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -224,6 +232,21 @@ func (siw *ServerInterfaceWrapper) ListSources(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListSources(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateSource operation middleware
+func (siw *ServerInterfaceWrapper) CreateSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSource(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -430,6 +453,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/sources", wrapper.ListSources)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/sources", wrapper.CreateSource)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources/{id}", wrapper.DeleteSource)
@@ -710,6 +736,68 @@ func (response ListSources401JSONResponse) VisitListSourcesResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateSourceRequestObject struct {
+	Body *CreateSourceJSONRequestBody
+}
+
+type CreateSourceResponseObject interface {
+	VisitCreateSourceResponse(w http.ResponseWriter) error
+}
+
+type CreateSource201JSONResponse Source
+
+func (response CreateSource201JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateSource400JSONResponse Error
+
+func (response CreateSource400JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateSource401JSONResponse Error
+
+func (response CreateSource401JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateSource403JSONResponse Error
+
+func (response CreateSource403JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateSource404JSONResponse Error
+
+func (response CreateSource404JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateSource500JSONResponse Error
+
+func (response CreateSource500JSONResponse) VisitCreateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type DeleteSourceRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -851,6 +939,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/sources)
 	ListSources(ctx context.Context, request ListSourcesRequestObject) (ListSourcesResponseObject, error)
+
+	// (POST /api/v1/sources)
+	CreateSource(ctx context.Context, request CreateSourceRequestObject) (CreateSourceResponseObject, error)
 
 	// (DELETE /api/v1/sources/{id})
 	DeleteSource(ctx context.Context, request DeleteSourceRequestObject) (DeleteSourceResponseObject, error)
@@ -1034,6 +1125,37 @@ func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListSourcesResponseObject); ok {
 		if err := validResponse.VisitListSourcesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateSource operation middleware
+func (sh *strictHandler) CreateSource(w http.ResponseWriter, r *http.Request) {
+	var request CreateSourceRequestObject
+
+	var body CreateSourceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateSource(ctx, request.(CreateSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateSource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateSourceResponseObject); ok {
+		if err := validResponse.VisitCreateSourceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

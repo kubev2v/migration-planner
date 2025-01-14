@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -92,4 +93,23 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 
 	_, _ = store.Commit(ctx)
 	return server.DeleteSource200JSONResponse{}, nil
+}
+
+func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
+	username, orgID := "", ""
+	if user, found := auth.UserFromContext(ctx); found {
+		username, orgID = user.Username, user.Organization
+	}
+
+	inventory := request.Body.Inventory
+	id, err := uuid.Parse(inventory.Vcenter.Id)
+	if err != nil {
+		return server.CreateSource500JSONResponse{}, nil
+	}
+
+	if _, err = h.store.Source().Create(ctx, mappers.SourceFromApi(id, username, orgID, &inventory)); err != nil {
+		return server.CreateSource500JSONResponse{}, nil
+	}
+
+	return server.CreateSource201JSONResponse{}, nil
 }
