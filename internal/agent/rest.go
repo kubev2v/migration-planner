@@ -37,7 +37,7 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 		_ = render.Render(w, r, ServiceUIReply{URL: configuration.PlannerService.Service.UI})
 	})
 	router.Put("/api/v1/credentials", func(w http.ResponseWriter, r *http.Request) {
-		credentialHandler(configuration.DataDir, w, r)
+		credentialHandler(configuration.PersistentDataDir, w, r)
 	})
 	router.Get("/api/v1/inventory", func(w http.ResponseWriter, r *http.Request) {
 		data, err := getInventory(configuration.DataDir)

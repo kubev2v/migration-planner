@@ -136,7 +136,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	// TODO refactor health checker to call it from the main goroutine
 	healthChecker.Start(ctx, a.healtCheckStopCh)
 
-	collector := service.NewCollector(a.config.DataDir)
+	collector := service.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
 	collector.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})

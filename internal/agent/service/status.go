@@ -54,7 +54,7 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 
 func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Inventory) {
 	inventoryFilePath := filepath.Join(s.config.DataDir, config.InventoryFile)
-	credentialsFilePath := filepath.Join(s.config.DataDir, config.CredentialsFile)
+	credentialsFilePath := filepath.Join(s.config.PersistentDataDir, config.CredentialsFile)
 	reader := fileio.NewReader()
 
 	err := reader.CheckPathExists(credentialsFilePath)
