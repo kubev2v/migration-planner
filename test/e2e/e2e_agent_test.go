@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/client"
@@ -263,7 +264,9 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 
 func (s *plannerService) GetAgent(credentialUrl string) (*api.Agent, error) {
 	ctx := context.TODO()
-	res, err := s.c.ListAgentsWithResponse(ctx)
+	includeDefault := true
+	params := v1alpha1.ListAgentsParams{IncludeDefault: &includeDefault}
+	res, err := s.c.ListAgentsWithResponse(ctx, &params)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("Error listing agents")
 	}
@@ -283,7 +286,9 @@ func (s *plannerService) GetAgent(credentialUrl string) (*api.Agent, error) {
 
 func (s *plannerService) GetSource() (*api.Source, error) {
 	ctx := context.TODO()
-	res, err := s.c.ListSourcesWithResponse(ctx)
+	includeDefault := true
+	params := v1alpha1.ListSourcesParams{IncludeDefault: &includeDefault}
+	res, err := s.c.ListSourcesWithResponse(ctx, &params)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("Error listing sources")
 	}

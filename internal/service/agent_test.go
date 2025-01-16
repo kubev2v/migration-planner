@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -54,10 +55,47 @@ var _ = Describe("agent handler", Ordered, func() {
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 
-			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
+			params := v1alpha1.ListAgentsParams{}
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: params})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
 			Expect(resp).To(HaveLen(2))
+		})
+
+		It("successfully list the agents including the default", func() {
+			// Initialize the database with a simulation of a basic example report
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.UUID{}.String(), "connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			includeDefault := true
+			params := v1alpha1.ListAgentsParams{IncludeDefault: &includeDefault}
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: params})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
+			Expect(resp).To(HaveLen(2))
+		})
+
+		It("successfully list the agents without including the default", func() {
+			// Initialize the database with a simulation of a basic example report
+			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.UUID{}.String(), "connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, "agent-1", "not-connected", "status-info-1", "cred_url-1"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: v1alpha1.ListAgentsParams{}})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
+			Expect(resp).To(HaveLen(1))
 		})
 
 		It("successfully list agents -- except soft-deleted agents", func() {
@@ -71,7 +109,7 @@ var _ = Describe("agent handler", Ordered, func() {
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 
-			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{})
+			resp, err := srv.ListAgents(context.TODO(), server.ListAgentsRequestObject{Params: v1alpha1.ListAgentsParams{}})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))
 			Expect(resp).To(HaveLen(2))
@@ -91,7 +129,8 @@ var _ = Describe("agent handler", Ordered, func() {
 				Organization: "admin",
 			}
 			ctx := auth.NewUserContext(context.TODO(), user)
-			resp, err := srv.ListAgents(ctx, server.ListAgentsRequestObject{})
+
+			resp, err := srv.ListAgents(ctx, server.ListAgentsRequestObject{Params: v1alpha1.ListAgentsParams{}})
 
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListAgents200JSONResponse{})))

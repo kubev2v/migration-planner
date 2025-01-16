@@ -21,13 +21,17 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 		return nil, err
 	}
 
-	// Get default content
-	defaultResult, err := h.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
-	if err != nil {
-		return nil, err
+	includeDefault := request.Params.IncludeDefault
+	if includeDefault != nil && *includeDefault {
+		// Get default content
+		defaultResult, err := h.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
+		if err != nil {
+			return nil, err
+		}
+		return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult, defaultResult)), nil
 	}
 
-	return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult, defaultResult)), nil
+	return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult)), nil
 }
 
 func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
