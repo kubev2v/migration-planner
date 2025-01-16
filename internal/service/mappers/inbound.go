@@ -19,11 +19,12 @@ func AgentFromApi(username string, orgID string, resource *apiAgent.AgentStatusU
 	}
 }
 
-func SourceFromApi(id uuid.UUID, username string, orgID string, inventory *api.Inventory) model.Source {
+func SourceFromApi(id uuid.UUID, username string, orgID string, inventory *api.Inventory, onPremises bool) model.Source {
 	source := model.Source{
-		ID:       id,
-		Username: username,
-		OrgID:    orgID,
+		ID:         id,
+		Username:   username,
+		OrgID:      orgID,
+		OnPremises: onPremises,
 	}
 
 	if inventory != nil {

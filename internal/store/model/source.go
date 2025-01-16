@@ -10,14 +10,15 @@ import (
 )
 
 type Source struct {
-	ID        openapi_types.UUID `json:"id" gorm:"primaryKey"`
-	Username  string
-	OrgID     string
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt            `gorm:"index"`
-	Inventory *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	Agents    []Agent                   `gorm:"constraint:OnDelete:SET NULL;"`
+	ID         openapi_types.UUID `json:"id" gorm:"primaryKey"`
+	Username   string
+	OrgID      string
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  gorm.DeletedAt            `gorm:"index"`
+	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
+	OnPremises bool
+	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`
 }
 
 type SourceList []Source

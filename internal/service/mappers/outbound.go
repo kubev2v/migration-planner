@@ -8,10 +8,11 @@ import (
 
 func SourceToApi(s model.Source) api.Source {
 	source := api.Source{
-		Id:        s.ID,
-		Inventory: nil,
-		CreatedAt: s.CreatedAt,
-		UpdatedAt: s.UpdatedAt,
+		Id:         s.ID,
+		Inventory:  nil,
+		CreatedAt:  s.CreatedAt,
+		UpdatedAt:  s.UpdatedAt,
+		OnPremises: s.OnPremises,
 	}
 
 	if len(s.Agents) > 0 {

@@ -107,7 +107,15 @@ func (h *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 		return server.CreateSource500JSONResponse{}, nil
 	}
 
-	if _, err = h.store.Source().Create(ctx, mappers.SourceFromApi(id, username, orgID, &inventory)); err != nil {
+	source, err := h.store.Source().Get(ctx, id)
+	if err == nil && source != nil {
+		if _, err = h.store.Source().Update(ctx, mappers.SourceFromApi(id, username, orgID, &inventory, true)); err != nil {
+			return server.CreateSource500JSONResponse{}, nil
+		}
+		return server.CreateSource201JSONResponse{}, nil
+	}
+
+	if _, err = h.store.Source().Create(ctx, mappers.SourceFromApi(id, username, orgID, &inventory, true)); err != nil {
 		return server.CreateSource500JSONResponse{}, nil
 	}
 

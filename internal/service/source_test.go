@@ -7,6 +7,7 @@ import (
 
 	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -22,6 +23,7 @@ const (
 	insertAgentWithSourceStm    = "INSERT INTO agents (id, source_id,associated) VALUES ('%s', '%s',  TRUE);"
 	insertSourceStm             = "INSERT INTO sources (id) VALUES ('%s');"
 	insertSourceWithUsernameStm = "INSERT INTO sources (id,username, org_id) VALUES ('%s', '%s', '%s');"
+	insertSourceOnPremisesStm   = "INSERT INTO sources (id,username, org_id, on_premises) VALUES ('%s', '%s', '%s', TRUE);"
 )
 
 var _ = Describe("source handler", Ordered, func() {
@@ -77,6 +79,32 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
 			Expect(resp).To(HaveLen(1))
+		})
+
+		It("successfully list all the sources -- on premises", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{})))
+			Expect(resp).To(HaveLen(2))
+
+			count := 0
+			tx = gormdb.Raw("SELECT count(*) from sources where on_premises IS TRUE;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
 		})
 
 		AfterEach(func() {
@@ -226,6 +254,40 @@ var _ = Describe("source handler", Ordered, func() {
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: source})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{})))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+
+		Context("create", func() {
+			It("successfully creates a source on prem", func() {
+				eventWriter := newTestWriter()
+				srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+
+				resp, err := srv.CreateSource(context.TODO(), server.CreateSourceRequestObject{
+					Body: &v1alpha1.SourceCreate{
+						Inventory: v1alpha1.Inventory{
+							Vcenter: v1alpha1.VCenter{
+								Id: uuid.NewString(),
+							},
+						},
+					},
+				})
+				Expect(err).To(BeNil())
+				Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.CreateSource201JSONResponse{})))
+
+				count := 0
+				tx := gormdb.Raw("SELECT count(*) from sources;").Scan(&count)
+				Expect(tx.Error).To(BeNil())
+				Expect(count).To(Equal(1))
+
+				onPrem := false
+				tx = gormdb.Raw("SELECT on_premises from sources LIMIT 1;").Scan(&onPrem)
+				Expect(tx.Error).To(BeNil())
+				Expect(onPrem).To(BeTrue())
+			})
 		})
 
 		AfterEach(func() {

@@ -16,6 +16,7 @@ import (
 const (
 	insertSourceStm             = "INSERT INTO sources (id) VALUES ('%s');"
 	insertSourceWithUsernameStm = "INSERT INTO sources (id, username, org_id) VALUES ('%s', '%s', '%s');"
+	insertSourceOnPremisesStm   = "INSERT INTO sources (id,username, org_id, on_premises) VALUES ('%s', '%s', '%s', TRUE);"
 )
 
 var _ = Describe("source store", Ordered, func() {
@@ -82,6 +83,23 @@ var _ = Describe("source store", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(sources).To(HaveLen(1))
 			Expect(sources[0].Username).To(Equal("admin"))
+		})
+
+		It("successfully list the source on prem", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, uuid.NewString(), "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter().ByUsername("admin").ByOnPremises(false))
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(2))
+
+			sources, err = s.Source().List(context.TODO(), store.NewSourceQueryFilter().ByUsername("admin").ByOnPremises(true))
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(1))
 		})
 
 		AfterEach(func() {
