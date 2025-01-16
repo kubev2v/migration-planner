@@ -108,7 +108,7 @@ func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: 
 	case kind == SourceKind && id != nil:
 		response, err = c.ReadSourceWithResponse(ctx, *id)
 	case kind == SourceKind && id == nil:
-		response, err = c.ListSourcesWithResponse(ctx)
+		response, err = c.ListSourcesWithResponse(ctx, nil)
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", kind)
 	}

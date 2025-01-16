@@ -158,6 +158,12 @@ type VMs struct {
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
+// ListAgentsParams defines parameters for ListAgents.
+type ListAgentsParams struct {
+	// WithExample Returning the sources list with the default report
+	WithExample *bool `form:"with_example,omitempty" json:"with_example,omitempty"`
+}
+
 // GetImageParams defines parameters for GetImage.
 type GetImageParams struct {
 	// SshKey public SSH key
@@ -168,6 +174,12 @@ type GetImageParams struct {
 type HeadImageParams struct {
 	// SshKey public SSH key
 	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
+}
+
+// ListSourcesParams defines parameters for ListSources.
+type ListSourcesParams struct {
+	// WithExample Returning the sources list with the default report
+	WithExample *bool `form:"with_example,omitempty" json:"with_example,omitempty"`
 }
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.

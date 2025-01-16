@@ -14,6 +14,13 @@ paths:
         - source
       description: list sources
       operationId: listSources
+      parameters:
+        - name: with_example
+          in: query
+          description: Returning the sources list with the default report
+          required: false
+          schema:
+            type: boolean
       responses:
         "200":
           description: OK
@@ -256,6 +263,13 @@ paths:
         - agent
       description: list agents
       operationId: listAgents
+      parameters:
+        - name: with_example
+          in: query
+          description: Returning the sources list with the default report
+          required: false
+          schema:
+            type: boolean
       responses:
         "200":
           description: OK

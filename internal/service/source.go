@@ -21,6 +21,12 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 		return nil, err
 	}
 
+	withExample := request.Params.WithExample
+
+	if withExample == nil || !*withExample {
+		return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult)), nil
+	}
+
 	// Get default content
 	defaultResult, err := h.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
 	if err != nil {

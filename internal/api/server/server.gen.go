@@ -21,7 +21,7 @@ import (
 type ServerInterface interface {
 
 	// (GET /api/v1/agents)
-	ListAgents(w http.ResponseWriter, r *http.Request)
+	ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams)
 
 	// (DELETE /api/v1/agents/{id})
 	DeleteAgent(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -36,7 +36,7 @@ type ServerInterface interface {
 	DeleteSources(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/sources)
-	ListSources(w http.ResponseWriter, r *http.Request)
+	ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams)
 
 	// (POST /api/v1/sources)
 	CreateSource(w http.ResponseWriter, r *http.Request)
@@ -56,7 +56,7 @@ type ServerInterface interface {
 type Unimplemented struct{}
 
 // (GET /api/v1/agents)
-func (_ Unimplemented) ListAgents(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -81,7 +81,7 @@ func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
 }
 
 // (GET /api/v1/sources)
-func (_ Unimplemented) ListSources(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -118,8 +118,21 @@ type MiddlewareFunc func(http.Handler) http.Handler
 func (siw *ServerInterfaceWrapper) ListAgents(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAgentsParams
+
+	// ------------- Optional query parameter "with_example" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "with_example", r.URL.Query(), &params.WithExample)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "with_example", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAgents(w, r)
+		siw.Handler.ListAgents(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -230,8 +243,21 @@ func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.
 func (siw *ServerInterfaceWrapper) ListSources(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSourcesParams
+
+	// ------------- Optional query parameter "with_example" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "with_example", r.URL.Query(), &params.WithExample)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "with_example", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListSources(w, r)
+		siw.Handler.ListSources(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -471,6 +497,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ListAgentsRequestObject struct {
+	Params ListAgentsParams
 }
 
 type ListAgentsResponseObject interface {
@@ -712,6 +739,7 @@ func (response DeleteSources401JSONResponse) VisitDeleteSourcesResponse(w http.R
 }
 
 type ListSourcesRequestObject struct {
+	Params ListSourcesParams
 }
 
 type ListSourcesResponseObject interface {
@@ -983,8 +1011,10 @@ type strictHandler struct {
 }
 
 // ListAgents operation middleware
-func (sh *strictHandler) ListAgents(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListAgents(w http.ResponseWriter, r *http.Request, params ListAgentsParams) {
 	var request ListAgentsRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAgents(ctx, request.(ListAgentsRequestObject))
@@ -1109,8 +1139,10 @@ func (sh *strictHandler) DeleteSources(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListSources operation middleware
-func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams) {
 	var request ListSourcesRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListSources(ctx, request.(ListSourcesRequestObject))

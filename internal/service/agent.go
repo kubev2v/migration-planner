@@ -21,6 +21,12 @@ func (h *ServiceHandler) ListAgents(ctx context.Context, request server.ListAgen
 		return nil, err
 	}
 
+	withExample := request.Params.WithExample
+
+	if withExample == nil || !*withExample {
+		return server.ListAgents200JSONResponse(mappers.AgentListToApi(userResult)), nil
+	}
+
 	// Get default content
 	defaultResult, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter().ByDefaultInventory(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
 	if err != nil {
