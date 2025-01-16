@@ -64,7 +64,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 
 	associated := false
 	if source == nil {
-		source, err = h.store.Source().Create(ctx, mappers.SourceFromApi(request.Id, username, orgID, nil))
+		source, err = h.store.Source().Create(ctx, mappers.SourceFromApi(request.Id, username, orgID, nil, false))
 		if err != nil {
 			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 		}
@@ -90,7 +90,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}
 
-	newSource := mappers.SourceFromApi(request.Id, username, "", &request.Body.Inventory)
+	newSource := mappers.SourceFromApi(request.Id, username, "", &request.Body.Inventory, false)
 	result, err := h.store.Source().Update(ctx, newSource)
 	if err != nil {
 		_, _ = store.Rollback(ctx)

@@ -118,3 +118,13 @@ func (sf *SourceQueryFilter) ByDefaultInventory() *SourceQueryFilter {
 	})
 	return sf
 }
+
+func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter {
+	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		if isOnPremises {
+			return tx.Where("on_premises IS TRUE")
+		}
+		return tx.Where("on_premises IS NOT TRUE")
+	})
+	return qf
+}

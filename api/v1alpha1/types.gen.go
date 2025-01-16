@@ -91,12 +91,13 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agents    *[]SourceAgentItem `json:"agents,omitempty"`
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
-	Inventory *Inventory         `json:"inventory,omitempty"`
-	Name      *string            `json:"name,omitempty"`
-	UpdatedAt time.Time          `json:"updatedAt"`
+	Agents     *[]SourceAgentItem `json:"agents,omitempty"`
+	CreatedAt  time.Time          `json:"createdAt"`
+	Id         openapi_types.UUID `json:"id"`
+	Inventory  *Inventory         `json:"inventory,omitempty"`
+	Name       *string            `json:"name,omitempty"`
+	OnPremises bool               `json:"onPremises"`
+	UpdatedAt  time.Time          `json:"updatedAt"`
 }
 
 // SourceAgentItem defines model for SourceAgentItem.

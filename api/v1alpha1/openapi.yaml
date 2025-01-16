@@ -361,6 +361,8 @@ components:
           format: date-time
         name:
           type: string
+        onPremises:
+          type: boolean
         agents:
           type: array
           items:
@@ -369,6 +371,7 @@ components:
         - id
         - createdAt
         - updatedAt
+        - onPremises
 
     SourceCreate:
       type: object
