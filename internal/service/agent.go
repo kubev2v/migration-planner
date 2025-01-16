@@ -16,18 +16,22 @@ func (h *ServiceHandler) ListAgents(ctx context.Context, request server.ListAgen
 	if user, found := auth.UserFromContext(ctx); found {
 		qf = qf.ByUsername(user.Username)
 	}
-	userResult, err := h.store.Agent().List(ctx, qf, store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
+	userResult, err := h.store.Agent().List(ctx, qf, store.NewAgentQueryOptions().WithIncludeSoftDeleted(false).ExcludeDefaultInventory())
 	if err != nil {
 		return nil, err
 	}
 
-	// Get default content
-	defaultResult, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter().ByDefaultInventory(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
-	if err != nil {
-		return nil, err
+	includeDefault := request.Params.IncludeDefault
+	if includeDefault != nil && *includeDefault {
+		// Get default content
+		defaultResult, err := h.store.Agent().List(ctx, store.NewAgentQueryFilter().ByDefaultInventory(), store.NewAgentQueryOptions().WithIncludeSoftDeleted(false))
+		if err != nil {
+			return nil, err
+		}
+		return server.ListAgents200JSONResponse(mappers.AgentListToApi(userResult, defaultResult)), nil
 	}
 
-	return server.ListAgents200JSONResponse(mappers.AgentListToApi(userResult, defaultResult)), nil
+	return server.ListAgents200JSONResponse(mappers.AgentListToApi(userResult)), nil
 }
 
 func (h *ServiceHandler) DeleteAgent(ctx context.Context, request server.DeleteAgentRequestObject) (server.DeleteAgentResponseObject, error) {

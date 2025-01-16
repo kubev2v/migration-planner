@@ -69,6 +69,14 @@ func (o *AgentQueryOptions) WithIncludeSoftDeleted(includeSoftDeleted bool) *Age
 	return o
 }
 
+func (o *AgentQueryOptions) ExcludeDefaultInventory() *AgentQueryOptions {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		// Exclude the default inventory agent by its unique zero UUID
+		return tx.Where("id != ?", uuid.UUID{}.String())
+	})
+	return o
+}
+
 func (qf *AgentQueryFilter) ByID(ids []string) *AgentQueryFilter {
 	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("id IN ?", ids)

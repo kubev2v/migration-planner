@@ -171,6 +171,12 @@ type VMs struct {
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
+// ListAgentsParams defines parameters for ListAgents.
+type ListAgentsParams struct {
+	// IncludeDefault control whatever the default report should be added to the result
+	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
+}
+
 // GetImageParams defines parameters for GetImage.
 type GetImageParams struct {
 	// SshKey public SSH key
@@ -181,6 +187,12 @@ type GetImageParams struct {
 type HeadImageParams struct {
 	// SshKey public SSH key
 	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
+}
+
+// ListSourcesParams defines parameters for ListSources.
+type ListSourcesParams struct {
+	// IncludeDefault control whatever the default report should be added to the result
+	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
 
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
