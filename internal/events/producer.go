@@ -14,6 +14,7 @@ import (
 const (
 	InventoryMessageKind string = "assisted.migrations.events.inventory"
 	AgentMessageKind     string = "assisted.migrations.events.agent"
+	UIMessageKind        string = "assisted.migrations.events.ui"
 	defaultTopic         string = "assisted.migrations.events"
 )
 

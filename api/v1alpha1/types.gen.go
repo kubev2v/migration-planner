@@ -53,6 +53,18 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Event defines model for Event.
+type Event struct {
+	CreatedAt time.Time   `json:"createdAt"`
+	Data      []EventData `json:"data"`
+}
+
+// EventData defines model for EventData.
+type EventData struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // Infra defines model for Infra.
 type Infra struct {
 	Datastores []struct {
@@ -170,6 +182,9 @@ type HeadImageParams struct {
 	// SshKey public SSH key
 	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
 }
+
+// PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
+type PushEventsJSONRequestBody = Event
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
