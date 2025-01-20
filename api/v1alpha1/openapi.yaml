@@ -333,6 +333,51 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /api/v1/events:
+    post:
+      tags:
+        - ui events
+      description: pass events from ui to kafka
+      operationId: pushEvents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Event'
+        required: true
+      responses:
+        "201":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+
   /health:
     get:
       tags:
@@ -636,3 +681,28 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Agent'
+
+    EventData:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+
+    Event:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/EventData'
+      required:
+        - createdAt
+        - data

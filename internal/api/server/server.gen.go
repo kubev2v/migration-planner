@@ -26,6 +26,9 @@ type ServerInterface interface {
 	// (DELETE /api/v1/agents/{id})
 	DeleteAgent(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (POST /api/v1/events)
+	PushEvents(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/v1/image)
 	GetImage(w http.ResponseWriter, r *http.Request, params GetImageParams)
 
@@ -62,6 +65,11 @@ func (_ Unimplemented) ListAgents(w http.ResponseWriter, r *http.Request) {
 
 // (DELETE /api/v1/agents/{id})
 func (_ Unimplemented) DeleteAgent(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/events)
+func (_ Unimplemented) PushEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -146,6 +154,21 @@ func (siw *ServerInterfaceWrapper) DeleteAgent(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.DeleteAgent(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// PushEvents operation middleware
+func (siw *ServerInterfaceWrapper) PushEvents(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PushEvents(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -443,6 +466,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Delete(options.BaseURL+"/api/v1/agents/{id}", wrapper.DeleteAgent)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/events", wrapper.PushEvents)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/image", wrapper.GetImage)
 	})
 	r.Group(func(r chi.Router) {
@@ -569,6 +595,59 @@ func (response DeleteAgent404JSONResponse) VisitDeleteAgentResponse(w http.Respo
 type DeleteAgent500JSONResponse Error
 
 func (response DeleteAgent500JSONResponse) VisitDeleteAgentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushEventsRequestObject struct {
+	Body *PushEventsJSONRequestBody
+}
+
+type PushEventsResponseObject interface {
+	VisitPushEventsResponse(w http.ResponseWriter) error
+}
+
+type PushEvents201JSONResponse Source
+
+func (response PushEvents201JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushEvents400JSONResponse Error
+
+func (response PushEvents400JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushEvents401JSONResponse Error
+
+func (response PushEvents401JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushEvents403JSONResponse Error
+
+func (response PushEvents403JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PushEvents500JSONResponse Error
+
+func (response PushEvents500JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -928,6 +1007,9 @@ type StrictServerInterface interface {
 	// (DELETE /api/v1/agents/{id})
 	DeleteAgent(ctx context.Context, request DeleteAgentRequestObject) (DeleteAgentResponseObject, error)
 
+	// (POST /api/v1/events)
+	PushEvents(ctx context.Context, request PushEventsRequestObject) (PushEventsResponseObject, error)
+
 	// (GET /api/v1/image)
 	GetImage(ctx context.Context, request GetImageRequestObject) (GetImageResponseObject, error)
 
@@ -1025,6 +1107,37 @@ func (sh *strictHandler) DeleteAgent(w http.ResponseWriter, r *http.Request, id 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(DeleteAgentResponseObject); ok {
 		if err := validResponse.VisitDeleteAgentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PushEvents operation middleware
+func (sh *strictHandler) PushEvents(w http.ResponseWriter, r *http.Request) {
+	var request PushEventsRequestObject
+
+	var body PushEventsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PushEvents(ctx, request.(PushEventsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PushEvents")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PushEventsResponseObject); ok {
+		if err := validResponse.VisitPushEventsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -32,4 +33,15 @@ func SourceFromApi(id uuid.UUID, username string, orgID string, inventory *api.I
 	}
 
 	return source
+}
+
+func UIEventFromApi(apiEvent api.Event) events.UIEvent {
+	uiEvent := events.UIEvent{
+		CreatedAt: apiEvent.CreatedAt,
+		Data:      make(map[string]string),
+	}
+	for _, v := range apiEvent.Data {
+		uiEvent.Data[v.Key] = v.Value
+	}
+	return uiEvent
 }

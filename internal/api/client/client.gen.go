@@ -97,6 +97,11 @@ type ClientInterface interface {
 	// DeleteAgent request
 	DeleteAgent(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// PushEventsWithBody request with any body
+	PushEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	PushEvents(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetImage request
 	GetImage(ctx context.Context, params *GetImageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -138,6 +143,30 @@ func (c *Client) ListAgents(ctx context.Context, reqEditors ...RequestEditorFn) 
 
 func (c *Client) DeleteAgent(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAgentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PushEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPushEventsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) PushEvents(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPushEventsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -313,6 +342,46 @@ func NewDeleteAgentRequest(server string, id openapi_types.UUID) (*http.Request,
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewPushEventsRequest calls the generic PushEvents builder with application/json body
+func NewPushEventsRequest(server string, body PushEventsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPushEventsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewPushEventsRequestWithBody generates requests for PushEvents with any type of body
+func NewPushEventsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/events")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -653,6 +722,11 @@ type ClientWithResponsesInterface interface {
 	// DeleteAgentWithResponse request
 	DeleteAgentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAgentResponse, error)
 
+	// PushEventsWithBodyWithResponse request with any body
+	PushEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PushEventsResponse, error)
+
+	PushEventsWithResponse(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PushEventsResponse, error)
+
 	// GetImageWithResponse request
 	GetImageWithResponse(ctx context.Context, params *GetImageParams, reqEditors ...RequestEditorFn) (*GetImageResponse, error)
 
@@ -726,6 +800,32 @@ func (r DeleteAgentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DeleteAgentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type PushEventsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *Source
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r PushEventsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PushEventsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -942,6 +1042,23 @@ func (c *ClientWithResponses) DeleteAgentWithResponse(ctx context.Context, id op
 	return ParseDeleteAgentResponse(rsp)
 }
 
+// PushEventsWithBodyWithResponse request with arbitrary body returning *PushEventsResponse
+func (c *ClientWithResponses) PushEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PushEventsResponse, error) {
+	rsp, err := c.PushEventsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePushEventsResponse(rsp)
+}
+
+func (c *ClientWithResponses) PushEventsWithResponse(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PushEventsResponse, error) {
+	rsp, err := c.PushEvents(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePushEventsResponse(rsp)
+}
+
 // GetImageWithResponse request returning *GetImageResponse
 func (c *ClientWithResponses) GetImageWithResponse(ctx context.Context, params *GetImageParams, reqEditors ...RequestEditorFn) (*GetImageResponse, error) {
 	rsp, err := c.GetImage(ctx, params, reqEditors...)
@@ -1117,6 +1234,60 @@ func ParseDeleteAgentResponse(rsp *http.Response) (*DeleteAgentResponse, error) 
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePushEventsResponse parses an HTTP response from a PushEventsWithResponse call
+func ParsePushEventsResponse(rsp *http.Response) (*PushEventsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PushEventsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Source
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
