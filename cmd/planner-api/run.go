@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -24,7 +25,6 @@ var runCmd = &cobra.Command{
 	Use:   "run",
 	Short: "Run the planner api",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		zap.S().Info("Starting API service")
 		defer zap.S().Info("API service stopped")
 
 		if configFile == "" {
@@ -46,6 +46,8 @@ var runCmd = &cobra.Command{
 		undo := zap.ReplaceGlobals(logger)
 		defer undo()
 
+		zap.S().Info("Starting API service...")
+		zap.S().Infof("Build from git commit: %s", version.Get().GitCommit)
 		zap.S().Info("Initializing data store")
 		db, err := store.InitDB(cfg)
 		if err != nil {
