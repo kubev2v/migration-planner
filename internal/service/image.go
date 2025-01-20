@@ -10,7 +10,9 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	certprovider "github.com/kubev2v/migration-planner/pkg/cert_provider"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
+	"go.uber.org/zap"
 )
 
 func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRequestObject) (server.GetImageResponseObject, error) {
@@ -23,11 +25,13 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	// get token if any
 	if user, found := auth.UserFromContext(ctx); found {
 		ova.Jwt = user.Token
+		ova.CertProvider = certprovider.NewSelfSignedCertificateProvider(user.Organization)
 	}
 
 	// Calculate the size of the OVA, so the download show estimated time:
 	size, err := ova.OvaSize()
 	if err != nil {
+		zap.S().Named("ova").Errorf("failed to generate ova image: %s", err)
 		return server.GetImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
 

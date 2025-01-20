@@ -3,9 +3,12 @@ package image
 import (
 	"archive/tar"
 	"bytes"
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"text/template"
 	"time"
 
@@ -15,6 +18,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
+	"go.uber.org/zap"
 )
 
 type Key int
@@ -22,10 +26,19 @@ type Key int
 // Key to store the ResponseWriter in the context of openapi
 const ResponseWriterKey Key = 0
 
+// CertificateProvider provides the entire certificate chain and private key.
+// The provider (Vault, selfsigned ...) must implement this interface.
+type CertificateProvider interface {
+	GetCACertificate(expire time.Time) (*x509.Certificate, *rsa.PrivateKey, error)
+	GetCertificate(caCert *x509.Certificate, caKey *rsa.PrivateKey) (*x509.Certificate, *rsa.PrivateKey, error)
+	ConvertToPEM(cert *x509.Certificate, key *rsa.PrivateKey) ([]byte, []byte)
+}
+
 type Ova struct {
-	Writer io.Writer
-	SshKey *string
-	Jwt    *jwt.Token
+	Writer       io.Writer
+	SshKey       *string
+	Jwt          *jwt.Token
+	CertProvider CertificateProvider
 }
 
 // IgnitionData defines modifiable fields in ignition config
@@ -36,6 +49,9 @@ type IgnitionData struct {
 	MigrationPlannerAgentImage string
 	InsecureRegistry           string
 	Token                      string
+	UICaCertificate            string
+	UICertificate              string
+	UIPrivateKey               string
 }
 
 type Image interface {
@@ -220,8 +236,30 @@ func (o *Ova) generateIgnition() (string, error) {
 		ignData.InsecureRegistry = insecureRegistry
 	}
 
+	// generate ui certificates if cert provider is provided
+	if o.CertProvider != nil {
+		caCertificate, caPrivateKey, err := o.CertProvider.GetCACertificate(time.Now().AddDate(1, 0, 0)) // expire in 1 year
+		if err != nil {
+			return "", err
+		}
+
+		uiCertificate, uiPrivateKey, err := o.CertProvider.GetCertificate(caCertificate, caPrivateKey)
+		if err != nil {
+			return "", err
+		}
+
+		uiCertPem, uiPrivateKeyPem := o.CertProvider.ConvertToPEM(uiCertificate, uiPrivateKey)
+		caCertPem, _ := o.CertProvider.ConvertToPEM(caCertificate, uiPrivateKey)
+
+		ignData.UICaCertificate = string(caCertPem)
+		ignData.UICertificate = string(uiCertPem)
+		ignData.UIPrivateKey = string(uiPrivateKeyPem)
+
+		zap.S().Named("ova").Debug("UI certificates generated")
+	}
+
 	var buf bytes.Buffer
-	t, err := template.New("ignition.template").ParseFiles("data/ignition.template")
+	t, err := template.New("ignition.template").Funcs(getTemplateFuncMap()).ParseFiles("data/ignition.template")
 	if err != nil {
 		return "", fmt.Errorf("error reading the ignition template: %w", err)
 	}
@@ -235,4 +273,34 @@ func (o *Ova) generateIgnition() (string, error) {
 	}
 
 	return string(dataOut), nil
+}
+
+func getTemplateFuncMap() template.FuncMap {
+	writeCertificateFunc := func(cert string, intend int) string {
+		var sb strings.Builder
+		spacer := ""
+		for {
+			if intend == 0 {
+				break
+			}
+			spacer = fmt.Sprintf(" %s", spacer)
+			intend -= 1
+		}
+		lines := strings.Split(cert, "\n")
+		for idx, l := range lines {
+			if l == "" {
+				continue
+			}
+			if idx < len(lines)-1 {
+				fmt.Fprintf(&sb, "%s%s\n", spacer, strings.TrimSpace(l))
+				continue
+			}
+			fmt.Fprintf(&sb, "%s%s", spacer, strings.TrimSpace(l))
+		}
+		return sb.String()
+	}
+
+	return template.FuncMap{
+		"write_certificate": writeCertificateFunc,
+	}
 }

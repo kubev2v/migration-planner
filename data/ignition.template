@@ -58,6 +58,39 @@ storage:
       group:
         name: core
   files:
+    {{ if .UICaCertificate }}
+    - path: /home/core/.migration-planner/config/agent_ui_ca.crt
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+{{ write_certificate .UICaCertificate 10 -}}
+    {{ end }}
+    {{ if .UICertificate }}
+    - path: /home/core/.migration-planner/config/agent_ui.crt
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+{{ write_certificate .UICertificate 10 }}
+    {{ end }}
+    {{ if .UIPrivateKey }}
+    - path: /home/core/.migration-planner/config/agent_ui.key
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+{{ write_certificate .UIPrivateKey 10 }}
+    {{ end }}
     {{if .InsecureRegistry}}
     - path: /etc/containers/registries.conf.d/myregistry.conf
       overwrite: true
