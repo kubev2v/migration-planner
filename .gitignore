@@ -11,3 +11,4 @@ examples/config.yaml
 *.local.*
 /tmp/
 cover.out
+/docker-config/
