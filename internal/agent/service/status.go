@@ -20,11 +20,12 @@ const (
 )
 
 type StatusUpdater struct {
-	agentID uuid.UUID
-	version string
-	config  *config.Config
-	client  client.Planner
-	credUrl string
+	agentID       uuid.UUID
+	version       string
+	config        *config.Config
+	client        client.Planner
+	credUrl       string
+	HealthChecker *HealthChecker
 }
 
 func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
