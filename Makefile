@@ -18,7 +18,7 @@ KUBECTL ?= kubectl
 IFACE ?= eth0
 PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
-DOCKER_AUTH_FILE ?= "${DOCKER_CONF}/auth.json"
+DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -111,24 +111,24 @@ build-containers: migration-planner-api-container migration-planner-agent-contai
 .PHONY: build-containers
 
 quay-login:
-	if [ ! -f "$(DOCKER_AUTH_FILE)" ] && [ -n "$(QUAY_USER)" ] && [ -n "$(QUAY_TOKEN)" ]; then \
+	if [ ! -f $(DOCKER_AUTH_FILE) ] && [ -n $(QUAY_USER) ] && [ -n $(QUAY_TOKEN) ]; then \
 		mkdir -p "$(DOCKER_CONF)"; \
-		$(PODMAN) login --authfile "$(DOCKER_AUTH_FILE)" -u="$(QUAY_USER)" -p="$(QUAY_TOKEN)" quay.io; \
+		$(PODMAN) login --authfile $(DOCKER_AUTH_FILE) -u=$(QUAY_USER) -p=$(QUAY_TOKEN) quay.io; \
 	fi;
 
 push-api-container: migration-planner-api-container quay-login
-	if [ -f "$(DOCKER_AUTH_FILE)" ]; then \
-		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):latest --authfile $(DOCKER_AUTH_FILE); \
-		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG) --authfile $(DOCKER_AUTH_FILE); \
+	if [ -f $(DOCKER_AUTH_FILE) ]; then \
+		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):latest; \
+		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
 	else \
 		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):latest; \
 		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
 	fi;
 
 push-agent-container: migration-planner-agent-container quay-login
-	if [ -f "$(DOCKER_AUTH_FILE)" ]; then \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):latest --authfile=$(DOCKER_AUTH_FILE); \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG) --authfile=$(DOCKER_AUTH_FILE); \
+	if [ -f $(DOCKER_AUTH_FILE) ]; then \
+		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):latest; \
+		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
 	else \
 		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):latest; \
 		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
