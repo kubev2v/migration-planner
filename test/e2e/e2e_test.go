@@ -40,7 +40,7 @@ var _ = Describe("e2e", func() {
 		}, "3m", "2s").Should(BeTrue())
 
 		Eventually(func() string {
-			s, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
+			s, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
 			if err != nil {
 				return ""
 			}
@@ -49,7 +49,7 @@ var _ = Describe("e2e", func() {
 			}
 
 			return ""
-		}, "3m", "2s").Should(Equal(fmt.Sprintf("http://%s:3333", agentIP)))
+		}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 
 		// Check that planner-agent service is running
 		r := agent.IsServiceRunning(agentIP, "planner-agent")
@@ -57,7 +57,7 @@ var _ = Describe("e2e", func() {
 	})
 
 	AfterEach(func() {
-		s, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
+		s, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
 		if err != nil {
 			s = nil
 		}
@@ -119,7 +119,7 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			Eventually(func() bool {
-				apiAgent, err := svc.GetAgent(fmt.Sprintf("http://%s:3333", agentIP))
+				apiAgent, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
 				if err != nil {
 					return false
 				}

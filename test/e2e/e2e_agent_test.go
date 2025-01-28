@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -120,7 +121,7 @@ func (p *plannerAgentLibvirt) Version() (string, error) {
 		return "", fmt.Errorf("failed to get agent IP: %w", err)
 	}
 	// Create a new HTTP GET request
-	req, err := http.NewRequest("GET", fmt.Sprintf("http://%s:3333/api/v1/version", agentIP), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:3333/api/v1/version", agentIP), nil)
 	if err != nil {
 		return "", fmt.Errorf("Failed to create request: %v", err)
 	}
@@ -129,7 +130,11 @@ func (p *plannerAgentLibvirt) Version() (string, error) {
 	req.Header.Set("Content-Type", "application/json")
 
 	// Send the request using http.DefaultClient
-	client := &http.Client{}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 	resp, err := client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("Failed to send request: %v", err)
@@ -165,7 +170,7 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http
 
 	resp, err := http.NewRequest(
 		"PUT",
-		fmt.Sprintf("http://%s:3333/api/v1/credentials", agentIP),
+		fmt.Sprintf("https://%s:3333/api/v1/credentials", agentIP),
 		bytes.NewBuffer(jsonData),
 	)
 	if err != nil {
@@ -173,7 +178,11 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http
 	}
 	resp.Header.Set("Content-Type", "application/json")
 
-	client := &http.Client{}
+	client := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		},
+	}
 	response, err := client.Do(resp)
 	if err != nil {
 		return response, fmt.Errorf("failed to send request: %w", err)
