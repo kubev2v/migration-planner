@@ -1,7 +1,12 @@
 package agent
 
 import (
+	"bytes"
 	"context"
+	"crypto/rsa"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/pem"
 	"fmt"
 	"net/http"
 	"time"
@@ -25,15 +30,28 @@ type Server struct {
 	wwwFolder     string
 	configuration *config.Config
 	restServer    *http.Server
+	tlsConfig     *tls.Config
 }
 
-func NewServer(port int, configuration *config.Config) *Server {
-	return &Server{
+func NewServer(port int, configuration *config.Config, cert *x509.Certificate, certPrivateKey *rsa.PrivateKey) *Server {
+	s := &Server{
 		port:          port,
 		dataFolder:    configuration.DataDir,
 		wwwFolder:     configuration.WwwDir,
 		configuration: configuration,
 	}
+
+	if cert != nil && certPrivateKey != nil {
+		tlsConfig, err := getTlsConfig(cert, certPrivateKey)
+		if err != nil {
+			zap.S().Named("server").Errorf("failed to create tls configuration: %s", err)
+			return s
+		}
+
+		s.tlsConfig = tlsConfig
+	}
+
+	return s
 }
 
 func (s *Server) Start(statusUpdater *service.StatusUpdater) {
@@ -46,7 +64,15 @@ func (s *Server) Start(statusUpdater *service.StatusUpdater) {
 
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 
-	// Run the server
+	if s.tlsConfig != nil {
+		zap.S().Named("server").Info("tls configured")
+		s.restServer.TLSConfig = s.tlsConfig
+		if err := s.restServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
+			zap.S().Named("server").Fatalf("failed to start server with tls: %w", err)
+		}
+	}
+
+	// Run the server without tls
 	err := s.restServer.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		zap.S().Named("server").Fatalf("failed to start server: %w", err)
@@ -68,4 +94,32 @@ func (s *Server) Stop(stopCh chan any) {
 	<-doneCh
 
 	close(stopCh)
+}
+
+// getTLSConfig tries to create a tls configuration
+func getTlsConfig(cert *x509.Certificate, privateKey *rsa.PrivateKey) (*tls.Config, error) {
+	certPEM := new(bytes.Buffer)
+	if err := pem.Encode(certPEM, &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: cert.Raw,
+	}); err != nil {
+		return nil, err
+	}
+
+	privKeyPEM := new(bytes.Buffer)
+	if err := pem.Encode(privKeyPEM, &pem.Block{
+		Type:  "RSA PRIVATE KEY",
+		Bytes: x509.MarshalPKCS1PrivateKey(privateKey),
+	}); err != nil {
+		return nil, err
+	}
+
+	serverCert, err := tls.X509KeyPair(certPEM.Bytes(), privKeyPEM.Bytes())
+	if err != nil {
+		return nil, err
+	}
+
+	return &tls.Config{
+		Certificates: []tls.Certificate{serverCert},
+	}, nil
 }

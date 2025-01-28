@@ -104,12 +104,24 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 		ctx = context.WithValue(ctx, common.JwtKey, a.jwt)
 	}
 
-	// start server
-	a.server = NewServer(defaultAgentPort, a.config)
-	go a.server.Start(statusUpdater)
-
 	// get the credentials url
 	credUrl := a.initializeCredentialUrl()
+
+	cert, key, err := NewSelfSignedCertificateProvider(credUrl).GetCertificate(time.Now().AddDate(1, 0, 0))
+	if err != nil {
+		zap.S().Named("agent").Errorf("failed to generate certificate: %s", err)
+	}
+
+	// start server
+	a.server = NewServer(defaultAgentPort, a.config, cert, key)
+	go a.server.Start(statusUpdater)
+
+	protocol := "http"
+	if a.server.tlsConfig != nil {
+		protocol = "https"
+	}
+	a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrl.IP.String(), defaultAgentPort)
+	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
 	// start the health check
 	healthChecker, err := service.NewHealthChecker(
@@ -152,7 +164,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 				continue
 			}
 
-			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, credUrl); err != nil {
+			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, a.credUrl); err != nil {
 				if errors.Is(err, client.ErrSourceGone) {
 					zap.S().Info("Source is gone..Stop sending requests")
 					// stop the server and the healthchecker
@@ -170,12 +182,12 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}()
 }
 
-func (a *Agent) initializeCredentialUrl() string {
+func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
 	// Parse the service URL
 	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
 	if err != nil {
 		zap.S().Errorf("error parsing service URL: %v", err)
-		return "N/A"
+		return nil
 	}
 
 	// Use either port if specified, or scheme
@@ -188,14 +200,12 @@ func (a *Agent) initializeCredentialUrl() string {
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
 		zap.S().Errorf("failed connecting to migration planner: %v", err)
-		return "N/A"
+		return nil
 	}
 	defer conn.Close()
 
 	localAddr := conn.LocalAddr().(*net.TCPAddr)
-	credUrl := fmt.Sprintf("http://%s:%d", localAddr.IP.String(), defaultAgentPort)
-	zap.S().Infof("Discovered Agent IP address: %s", credUrl)
-	return credUrl
+	return localAddr
 }
 
 func newPlannerClient(cfg *config.Config) (client.Planner, error) {
