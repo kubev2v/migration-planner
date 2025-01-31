@@ -3,14 +3,33 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 )
+
+func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
+	source, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		return server.GetSourceDownloadURL404JSONResponse{}, nil
+	}
+
+	// FIXME: refactor the environment vars + config.yaml
+	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
+	newURL, expiresAt, err := image.GenerateDownloadURLByToken(baseUrl, source)
+	if err != nil {
+		return server.GetSourceDownloadURL400JSONResponse{}, err
+	}
+
+	return server.GetSourceDownloadURL200JSONResponse{Url: newURL, ExpiresAt: (*time.Time)(expiresAt)}, nil
+}
 
 func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
 	// Get user content
@@ -38,7 +57,13 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
-	source := mappers.SourceFromApi(uuid.New(), user, request.Body)
+	// Generate a signing key for tokens for the source
+	imageTokenKey, err := image.HMACKey(32)
+	if err != nil {
+		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
+	}
+
+	source := mappers.SourceFromApi(uuid.New(), user, imageTokenKey, request.Body)
 	result, err := h.store.Source().Create(ctx, source)
 	if err != nil {
 		return server.CreateSource400JSONResponse{Message: err.Error()}, nil

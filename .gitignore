@@ -12,3 +12,4 @@ examples/config.yaml
 /tmp/
 cover.out
 /docker-config/
+deploy/k8s/migration-planner.yaml

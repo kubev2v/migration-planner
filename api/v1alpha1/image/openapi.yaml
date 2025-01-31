@@ -1,0 +1,71 @@
+openapi: 3.0.1
+info:
+  title: Migration Planner image API
+  version: undefined
+  license:
+    name: Apache 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0.html
+servers:
+  - url: /
+paths:
+  /api/v1/image/bytoken/{token}/{name}:
+    get:
+      tags:
+        - image
+      description: Get the OVA image via URL
+      operationId: getImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          description: Image name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An OVA image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+  /health:
+    get:
+      tags:
+        - health
+      description: Health check
+      operationId: health
+      responses:
+        "200":
+          description: OK
+

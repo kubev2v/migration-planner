@@ -11,6 +11,7 @@ import (
 	pkgKafka "github.com/kubev2v/migration-event-streamer/pkg/kafka"
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
+	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -94,6 +95,19 @@ var runCmd = &cobra.Command{
 
 			agentserver := agentserver.New(cfg, store, ep, listener)
 			if err := agentserver.Run(ctx); err != nil {
+				zap.S().Fatalf("Error running server: %s", err)
+			}
+		}()
+
+		go func() {
+			defer cancel()
+			listener, err := newListener(cfg.Service.ImageEndpointAddress)
+			if err != nil {
+				zap.S().Fatalf("creating listener: %s", err)
+			}
+
+			imageserver := imageserver.New(cfg, store, ep, listener)
+			if err := imageserver.Run(ctx); err != nil {
 				zap.S().Fatalf("Error running server: %s", err)
 			}
 		}()

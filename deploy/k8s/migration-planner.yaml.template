@@ -25,12 +25,19 @@ spec:
           imagePullPolicy: @MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@
           ports:
             - containerPort: 3443
+            - containerPort: 7443
+            - containerPort: 11443
           livenessProbe:
             httpGet:
               path: /health
               port: 3443
             initialDelaySeconds: 30
           env:
+            - name: MIGRATION_PLANNER_IMAGE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: migration-planner-secret
+                  key: migration_planner_image_url
             - name: CONFIG_SERVER
               valueFrom:
                 secretKeyRef:

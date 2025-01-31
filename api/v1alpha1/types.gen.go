@@ -166,6 +166,15 @@ type VMs struct {
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
+// PresignedUrl defines model for presigned-url.
+type PresignedUrl struct {
+	// ExpiresAt Expiration time for the URL token.
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+
+	// Url Pre-signed URL for downloading the source discovery image.
+	Url string `json:"url"`
+}
+
 // ListSourcesParams defines parameters for ListSources.
 type ListSourcesParams struct {
 	// IncludeDefault control whatever the default report should be added to the result

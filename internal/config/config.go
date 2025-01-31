@@ -32,8 +32,10 @@ type dbConfig struct {
 type svcConfig struct {
 	Address              string      `json:"address,omitempty"`
 	AgentEndpointAddress string      `json:"agentEndpointAddress,omitempty"`
+	ImageEndpointAddress string      `json:"imageEndpointAddress,omitempty"`
 	BaseUrl              string      `json:"baseUrl,omitempty"`
 	BaseAgentEndpointUrl string      `json:"baseAgentEndpointUrl,omitempty"`
+	BaseImageEndpointUrl string      `json:"baseImageEndpointUrl,omitempty"`
 	LogLevel             string      `json:"logLevel,omitempty"`
 	Kafka                kafkaConfig `json:"kafka,omitempty"`
 	Auth                 Auth        `json:"auth"`
@@ -82,8 +84,10 @@ func NewDefault() (*Config, error) {
 		Service: &svcConfig{
 			Address:              ":3443",
 			AgentEndpointAddress: ":7443",
+			ImageEndpointAddress: ":11443",
 			BaseUrl:              "https://localhost:3443",
-			BaseAgentEndpointUrl: util.GetEnv("BASE_AGENT_ENDPOINT_URL", "https://localhost:7443"),
+			BaseAgentEndpointUrl: "https://localhost:7443",
+			BaseImageEndpointUrl: "https://localhost:11443",
 			LogLevel:             "info",
 		},
 	}

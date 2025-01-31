@@ -33,7 +33,7 @@ var _ = Describe("source handler", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-    cfg, err := config.NewDefault()
+		cfg, err := config.NewDefault()
 		Expect(err).To(BeNil())
 		db, err := store.InitDB(cfg)
 		Expect(err).To(BeNil())
