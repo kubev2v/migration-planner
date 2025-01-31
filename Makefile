@@ -147,8 +147,9 @@ deploy-on-kind:
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
-	@config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=config_server=http://$$config_server:7443 --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
+	config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+	migration_planner_image_url=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server:7443 --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/k8s/
 
 deploy-on-openshift:
@@ -162,9 +163,11 @@ deploy-on-openshift:
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
 	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
+	oc expose service migration-planner-image -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-image || true
 	config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
+	migration_planner_image_url=$$(oc get route planner-image -o jsonpath='{.spec.host}'); \
 	config_server_ui=$$(oc get route planner -o jsonpath='{.spec.host}'); \
-	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
+	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
 	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
 
 deploy-local-obs:

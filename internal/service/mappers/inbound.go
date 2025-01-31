@@ -34,12 +34,13 @@ func AgentFromApi(id uuid.UUID, user auth.User, resource *apiAgent.AgentStatusUp
 	}
 }
 
-func SourceFromApi(id uuid.UUID, user auth.User, resource *v1alpha1.CreateSourceJSONRequestBody) model.Source {
+func SourceFromApi(id uuid.UUID, user auth.User, imageTokenKey string, resource *v1alpha1.CreateSourceJSONRequestBody) model.Source {
 	source := model.Source{
-		ID:       id,
-		Username: user.Username,
-		OrgID:    user.Organization,
-		Name:     resource.Name,
+		ID:            id,
+		Username:      user.Username,
+		OrgID:         user.Organization,
+		Name:          resource.Name,
+		ImageTokenKey: imageTokenKey,
 	}
 
 	if resource.SshPublicKey != nil {

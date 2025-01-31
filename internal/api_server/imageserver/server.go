@@ -1,4 +1,4 @@
-package apiserver
+package imageserver
 
 import (
 	"context"
@@ -10,13 +10,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/api/server"
-	"github.com/kubev2v/migration-planner/internal/auth"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1/image"
+	server "github.com/kubev2v/migration-planner/internal/api/server/image"
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
-	"github.com/kubev2v/migration-planner/internal/image"
-	"github.com/kubev2v/migration-planner/internal/service"
+	service "github.com/kubev2v/migration-planner/internal/service/image"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -28,7 +27,7 @@ const (
 	gracefulShutdownTimeout = 5 * time.Second
 )
 
-type Server struct {
+type ImageServer struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
@@ -41,12 +40,12 @@ func New(
 	store store.Store,
 	ew *events.EventProducer,
 	listener net.Listener,
-) *Server {
-	return &Server{
+) *ImageServer {
+	return &ImageServer{
 		cfg:      cfg,
 		store:    store,
-		listener: listener,
 		evWriter: ew,
+		listener: listener,
 	}
 }
 
@@ -54,18 +53,8 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
-// Middleware to inject ResponseWriter into context
-func WithResponseWriter(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add ResponseWriter to context
-		ctx := context.WithValue(r.Context(), image.ResponseWriterKey, w)
-		// Pass the modified context to the next handler
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-func (s *Server) Run(ctx context.Context) error {
-	zap.S().Named("api_server").Info("Initializing API server")
+func (s *ImageServer) Run(ctx context.Context) error {
+	zap.S().Named("image_server").Info("Initializing Image-side API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed loading swagger spec: %w", err)
@@ -77,33 +66,27 @@ func (s *Server) Run(ctx context.Context) error {
 		ErrorHandler: oapiErrorHandler,
 	}
 
-	authenticator, err := auth.NewAuthenticator(s.cfg.Service.Auth)
-	if err != nil {
-		return fmt.Errorf("failed to create authenticator: %w", err)
-	}
-
 	router := chi.NewRouter()
 
-	metricMiddleware := chiprometheus.New("api_server")
+	metricMiddleware := chiprometheus.New("image_server")
 	metricMiddleware.MustRegisterDefault()
 
 	router.Use(
 		metricMiddleware.Handler,
-		authenticator.Authenticator,
 		middleware.RequestID,
-		zapchi.Logger(zap.S(), "router_api"),
+		zapchi.Logger(zap.S(), "router_image"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		WithResponseWriter,
+		apiserver.WithResponseWriter,
 	)
 
-	h := service.NewServiceHandler(s.store, s.evWriter)
+	h := service.NewImageHandler(s.store, s.evWriter, s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {
 		<-ctx.Done()
-		zap.S().Named("api_server").Infof("Shutdown signal received: %s", ctx.Err())
+		zap.S().Named("image_server").Infof("Shutdown signal received: %s", ctx.Err())
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 		defer cancel()
 
@@ -111,7 +94,7 @@ func (s *Server) Run(ctx context.Context) error {
 		_ = srv.Shutdown(ctxTimeout)
 	}()
 
-	zap.S().Named("api_server").Infof("Listening on %s...", s.listener.Addr().String())
+	zap.S().Named("image_server").Infof("Listening on %s...", s.listener.Addr().String())
 	if err := srv.Serve(s.listener); err != nil && !errors.Is(err, net.ErrClosed) {
 		return err
 	}
