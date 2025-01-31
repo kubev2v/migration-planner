@@ -5,12 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net/http"
+	"strconv"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/events"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -30,6 +35,50 @@ func NewAgentServiceHandler(store store.Store, ew *events.EventProducer) *AgentS
 		store:       store,
 		eventWriter: ew,
 	}
+}
+
+func (h *AgentServiceHandler) GetImageByToken(ctx context.Context, req agentServer.GetImageByTokenRequestObject) (agentServer.GetImageByTokenResponseObject, error) {
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return agentServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+
+	// TODO: parse token
+
+	sourceId, err := image.IdFromJWT(req.Token)
+	if err != nil {
+		return agentServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+	sourceUUID, err := uuid.Parse(sourceId)
+	if err != nil {
+		return agentServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
+	}
+	source, err := h.store.Source().Get(ctx, sourceUUID)
+	if err != nil {
+		return agentServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
+	}
+
+	ova := &image.Ova{Source: source, Writer: writer}
+
+	// Calculate the size of the OVA, so the download show estimated time:
+	size, err := ova.OvaSize()
+	if err != nil {
+		return agentServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+
+	// Set proper headers of the OVA file:
+	writer.Header().Set("Content-Type", "application/ovf")
+	writer.Header().Set("Content-Length", strconv.Itoa(size))
+
+	// Generate the OVA image
+	if err := ova.Generate(); err != nil {
+		metrics.IncreaseOvaDownloadsTotalMetric("failed")
+		return agentServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
+	}
+
+	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+
+	return agentServer.GetImageByToken200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
 }
 
 func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request agentServer.ReplaceSourceStatusRequestObject) (agentServer.ReplaceSourceStatusResponseObject, error) {

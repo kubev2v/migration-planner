@@ -2,13 +2,38 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 )
+
+func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
+	// FIXME: Store me in /sources table
+	var imageTokenKey string
+	imageTokenKey, err := image.HMACKey(32)
+	if err != nil {
+		return nil, err
+	}
+	/*
+		source, err := h.store.Source().Get(ctx, request.Id)
+		if err != nil {
+			return server.GetSourceDownloadURL404JSONResponse{}, nil
+		}
+	*/
+
+	newURL, expiresAt, err := image.GenerateShortImageDownloadURLByToken(h.cfg.Service.BaseAgentEndpointUrl, request.Id.String(), imageTokenKey)
+	//newURL, expiresAt, err := image.GenerateShortImageDownloadURLByToken(h.cfg.Service.BaseAgentEndpointUrl, source.ID.String(), source.imageTokenKey)
+	if err != nil {
+		return server.GetSourceDownloadURL400JSONResponse{}, err
+	}
+
+	return server.GetSourceDownloadURL200JSONResponse{Url: newURL, ExpiresAt: (*time.Time)(expiresAt)}, nil
+}
 
 func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
 	// Get user content

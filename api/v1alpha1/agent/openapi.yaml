@@ -8,6 +8,51 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/image/bytoken/{token}:
+    get:
+      tags:
+        - image
+      description: Get the OVA image via URL
+      operationId: getImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An OVA image
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /api/v1/sources/{id}/status:
     put:
       tags:

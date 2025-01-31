@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 )
 
@@ -18,7 +19,9 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	if !ok {
 		return server.GetImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
-	ova := &image.Ova{SshKey: request.Params.SshKey, Writer: writer}
+	// TODO: Get source from DB
+	source := &model.Source{}
+	ova := &image.Ova{Source: source, Writer: writer}
 
 	// get token if any
 	if user, found := auth.UserFromContext(ctx); found {
