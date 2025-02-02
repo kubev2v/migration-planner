@@ -18,9 +18,14 @@
   </features>
   <devices>
     <emulator>/usr/bin/qemu-system-x86_64</emulator>
+      <disk type='file' device='disk'>
+          <driver name='qemu' type='qcow2'/>
+          <source file='/tmp/untarova/persistence-disk.qcow2'/>
+          <target dev='vda' bus='virtio'/>
+      </disk>
     <disk type='file' device='cdrom'>
       <driver name='qemu' type='raw'/>
-      <source file='/tmp/agent.iso'/>
+      <source file='/tmp/untarova/agent.iso'/>
       <target dev='sda' bus='sata'/>
       <readonly/>
     </disk>

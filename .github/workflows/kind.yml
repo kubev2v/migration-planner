@@ -66,7 +66,7 @@ jobs:
       - name: Build assisted-migration containers
         run: |
           make migration-planner-agent-container MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE
-          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE
+          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE PERSISTENT_DISK_DEVICE=/dev/vda
           docker push $MIGRATION_PLANNER_AGENT_IMAGE
           kind load docker-image $MIGRATION_PLANNER_API_IMAGE
           docker rmi $MIGRATION_PLANNER_API_IMAGE
@@ -80,4 +80,6 @@ jobs:
 
       - name: Run test
         run: |
+          mkdir /tmp/untarova
+          cp data/persistence-disk.qcow2 /tmp/untarova/persistence-disk.qcow2
           sudo make integration-test PLANNER_IP=${REGISTRY_IP}
