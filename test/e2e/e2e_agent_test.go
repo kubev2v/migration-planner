@@ -27,11 +27,11 @@ const (
 var (
 	home              string = os.Getenv("HOME")
 	defaultConfigPath string = filepath.Join(home, ".config/planner/client.yaml")
-	defaultIsoPath    string = "/tmp/untarova/agent.iso"
 	defaultBasePath   string = "/tmp/untarova/"
+	defaultIsoPath           = filepath.Join(defaultBasePath, "agent.iso")
+	defaultVmdkName          = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
 	defaultOvaPath    string = filepath.Join(home, "myimage.ova")
 	defaultServiceUrl string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
-	defaultVmdkName          = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
 )
 
 type PlannerAgent interface {

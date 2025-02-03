@@ -40,7 +40,7 @@ var _ = Describe("e2e", func() {
 		Eventually(func() bool {
 			return agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())
-		fmt.Println("service is running")
+
 		Eventually(func() string {
 			s, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
 			if err != nil {
@@ -75,7 +75,7 @@ var _ = Describe("e2e", func() {
 
 	Context("Check Vcenter login behavior", func() {
 
-		FIt("should successfully login with valid credentials", func() {
+		It("should successfully login with valid credentials", func() {
 
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
 			Expect(err).To(BeNil())
