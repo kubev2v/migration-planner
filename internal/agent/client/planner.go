@@ -30,7 +30,7 @@ type planner struct {
 }
 
 func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error {
-	resp, err := p.client.ReplaceSourceStatusWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
+	resp, err := p.client.UpdateSourceInventoryWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
 		if jwt, found := p.jwtFromContext(ctx); found {
 			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
 		}

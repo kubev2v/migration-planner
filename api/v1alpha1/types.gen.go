@@ -29,23 +29,17 @@ const (
 
 // Agent defines model for Agent.
 type Agent struct {
-	Associated    bool        `json:"associated"`
-	CreatedAt     time.Time   `json:"createdAt"`
-	CredentialUrl string      `json:"credentialUrl"`
-	DeletedAt     *time.Time  `json:"deletedAt,omitempty"`
-	Id            string      `json:"id"`
-	SourceId      *string     `json:"sourceId,omitempty"`
-	Status        AgentStatus `json:"status"`
-	StatusInfo    string      `json:"statusInfo"`
-	UpdatedAt     time.Time   `json:"updatedAt"`
-	Version       string      `json:"version"`
+	CreatedAt     time.Time          `json:"createdAt"`
+	CredentialUrl string             `json:"credentialUrl"`
+	Id            openapi_types.UUID `json:"id"`
+	Status        AgentStatus        `json:"status"`
+	StatusInfo    string             `json:"statusInfo"`
+	UpdatedAt     time.Time          `json:"updatedAt"`
+	Version       string             `json:"version"`
 }
 
 // AgentStatus defines model for Agent.Status.
 type AgentStatus string
-
-// AgentList defines model for AgentList.
-type AgentList = []Agent
 
 // Error defines model for Error.
 type Error struct {
@@ -103,28 +97,29 @@ type MigrationIssues = []struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agents     *[]SourceAgentItem `json:"agents,omitempty"`
+	Agent      *Agent             `json:"agent,omitempty"`
 	CreatedAt  time.Time          `json:"createdAt"`
 	Id         openapi_types.UUID `json:"id"`
 	Inventory  *Inventory         `json:"inventory,omitempty"`
-	Name       *string            `json:"name,omitempty"`
+	Name       string             `json:"name"`
 	OnPremises bool               `json:"onPremises"`
 	UpdatedAt  time.Time          `json:"updatedAt"`
 }
 
-// SourceAgentItem defines model for SourceAgentItem.
-type SourceAgentItem struct {
-	Associated bool               `json:"associated"`
-	Id         openapi_types.UUID `json:"id"`
-}
-
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	Inventory Inventory `json:"inventory"`
+	Name         string  `json:"name"`
+	SshPublicKey *string `json:"sshPublicKey,omitempty"`
 }
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
+
+// SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
+type SourceUpdateOnPrem struct {
+	AgentId   openapi_types.UUID `json:"agent_id"`
+	Inventory Inventory          `json:"inventory"`
+}
 
 // Status Status is a return value for calls that don't return other objects.
 type Status struct {
@@ -171,28 +166,16 @@ type VMs struct {
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
-// ListAgentsParams defines parameters for ListAgents.
-type ListAgentsParams struct {
+// ListSourcesParams defines parameters for ListSources.
+type ListSourcesParams struct {
 	// IncludeDefault control whatever the default report should be added to the result
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
 
 // GetImageParams defines parameters for GetImage.
 type GetImageParams struct {
-	// SshKey public SSH key
+	// SshKey Public SSH key
 	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
-}
-
-// HeadImageParams defines parameters for HeadImage.
-type HeadImageParams struct {
-	// SshKey public SSH key
-	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
-}
-
-// ListSourcesParams defines parameters for ListSources.
-type ListSourcesParams struct {
-	// IncludeDefault control whatever the default report should be added to the result
-	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
 
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
@@ -200,3 +183,6 @@ type PushEventsJSONRequestBody = Event
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
+
+// UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
+type UpdateSourceJSONRequestBody = SourceUpdateOnPrem

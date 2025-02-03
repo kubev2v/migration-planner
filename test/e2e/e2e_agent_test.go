@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
@@ -46,9 +47,8 @@ type PlannerAgent interface {
 
 type PlannerService interface {
 	RemoveSources() error
-	RemoveAgent(UUID string) error
-	GetSource() (*api.Source, error)
-	GetAgent(credentialUrl string) (*api.Agent, error)
+	GetSource(id uuid.UUID) (*api.Source, error)
+	CreateSource(name string) (*api.Source, error)
 }
 
 type plannerService struct {
@@ -56,12 +56,13 @@ type plannerService struct {
 }
 
 type plannerAgentLibvirt struct {
-	c    *internalclient.ClientWithResponses
-	name string
-	con  *libvirt.Connect
+	c        *internalclient.ClientWithResponses
+	name     string
+	con      *libvirt.Connect
+	sourceID uuid.UUID
 }
 
-func NewPlannerAgent(configPath string, name string) (*plannerAgentLibvirt, error) {
+func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string) (*plannerAgentLibvirt, error) {
 	_ = createConfigFile(configPath)
 
 	c, err := client.NewFromConfigFile(configPath)
@@ -74,11 +75,11 @@ func NewPlannerAgent(configPath string, name string) (*plannerAgentLibvirt, erro
 		return nil, fmt.Errorf("failed to connect to hypervisor: %v", err)
 	}
 
-	return &plannerAgentLibvirt{c: c, name: name, con: conn}, nil
+	return &plannerAgentLibvirt{c: c, name: name, con: conn, sourceID: sourceID}, nil
 }
 
 func (p *plannerAgentLibvirt) Run() error {
-	if err := p.prepareImage(); err != nil {
+	if err := p.prepareImage(p.sourceID); err != nil {
 		return err
 	}
 
@@ -90,7 +91,7 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) prepareImage() error {
+func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 	// Create OVA:
 	ovaFile, err := os.Create(defaultOvaPath)
 	if err != nil {
@@ -104,8 +105,15 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 		}
 	}
 
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewUserContext(context.TODO(), user)
+
 	// Download OVA
-	res, err := p.c.GetImage(context.TODO(), &api.GetImageParams{})
+
+	res, err := p.c.GetImage(ctx, sourceID, &api.GetImageParams{})
 	if err != nil {
 		return fmt.Errorf("error getting source image: %w", err)
 	}
@@ -288,65 +296,49 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 	return &plannerService{c: c}, nil
 }
 
-func (s *plannerService) GetAgent(credentialUrl string) (*api.Agent, error) {
-	ctx := context.TODO()
-	includeDefault := true
-	params := v1alpha1.ListAgentsParams{IncludeDefault: &includeDefault}
-	res, err := s.c.ListAgentsWithResponse(ctx, &params)
-	if err != nil || res.HTTPResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("Error listing agents")
+func (s *plannerService) CreateSource(name string) (*api.Source, error) {
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewUserContext(context.TODO(), user)
+
+	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
+	res, err := s.c.CreateSourceWithResponse(ctx, params)
+	if err != nil || res.HTTPResponse.StatusCode != 201 {
+		return nil, fmt.Errorf("Error creating the source: %s", err)
 	}
 
-	if len(*res.JSON200) == 1 {
-		return nil, fmt.Errorf("No agents found")
+	if res.JSON201 == nil {
+		return nil, fmt.Errorf("Error creating the source")
 	}
 
-	for _, agent := range *res.JSON200 {
-		if agent.CredentialUrl == credentialUrl {
-			return &agent, nil
-		}
-	}
-
-	return nil, fmt.Errorf("No agents found")
+	return res.JSON201, nil
 }
 
-func (s *plannerService) GetSource() (*api.Source, error) {
-	ctx := context.TODO()
-	includeDefault := true
-	params := v1alpha1.ListSourcesParams{IncludeDefault: &includeDefault}
-	res, err := s.c.ListSourcesWithResponse(ctx, &params)
+func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewUserContext(context.TODO(), user)
+
+	res, err := s.c.GetSourceWithResponse(ctx, id)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("Error listing sources")
 	}
 
-	if len(*res.JSON200) == 1 {
-		return nil, fmt.Errorf("No sources found")
-	}
-
-	nullUuid := uuid.UUID{}
-	for _, source := range *res.JSON200 {
-		if source.Id != nullUuid {
-			return &source, nil
-		}
-	}
-
-	return nil, fmt.Errorf("No sources found")
-}
-
-func (s *plannerService) RemoveAgent(UUID string) error {
-	parsedUUID, err1 := uuid.Parse(UUID)
-	if err1 != nil {
-		return err1
-	}
-	_, err2 := s.c.DeleteAgentWithResponse(context.TODO(), parsedUUID)
-	if err2 != nil {
-		return err2
-	}
-	return nil
+	return res.JSON200, nil
 }
 
 func (s *plannerService) RemoveSources() error {
-	_, err := s.c.DeleteSourcesWithResponse(context.TODO())
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewUserContext(context.TODO(), user)
+
+	_, err := s.c.DeleteSourcesWithResponse(ctx)
 	return err
 }
 

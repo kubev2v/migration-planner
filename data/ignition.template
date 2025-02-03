@@ -109,6 +109,7 @@ storage:
           www-dir: /app/www
           log-level: debug
           update-interval: 5s
+          source-id: {{.SourceID}}
           planner-service:
             service:
               server: {{.PlannerService}}

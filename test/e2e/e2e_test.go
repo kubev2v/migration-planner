@@ -18,12 +18,19 @@ var _ = Describe("e2e", func() {
 		agentIP  string
 		err      error
 		systemIP = os.Getenv("PLANNER_IP")
+		source   *v1alpha1.Source
 	)
 
 	BeforeEach(func() {
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
-		agent, err = NewPlannerAgent(defaultConfigPath, vmName)
+
+		// create the source
+		source, err = svc.CreateSource("source")
+		Expect(err).To(BeNil())
+		Expect(source).NotTo(BeNil())
+
+		agent, err = NewPlannerAgent(defaultConfigPath, source.Id, vmName)
 		Expect(err).To(BeNil(), "Failed to create PlannerAgent")
 		err = agent.Run()
 		Expect(err).To(BeNil(), "Failed to run PlannerAgent")
@@ -33,19 +40,22 @@ var _ = Describe("e2e", func() {
 				return ""
 			}
 			return agentIP
-		}, "1m", "3s").ShouldNot(BeEmpty())
+		}, "3m", "3s").ShouldNot(BeEmpty())
 		Expect(agentIP).ToNot(BeEmpty())
 		Eventually(func() bool {
 			return agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())
 
 		Eventually(func() string {
-			s, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
+			s, err := svc.GetSource(source.Id)
 			if err != nil {
 				return ""
 			}
-			if s.CredentialUrl != "N/A" && s.CredentialUrl != "" {
-				return s.CredentialUrl
+			if s.Agent == nil {
+				return ""
+			}
+			if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
+				return s.Agent.CredentialUrl
 			}
 
 			return ""
@@ -57,12 +67,6 @@ var _ = Describe("e2e", func() {
 	})
 
 	AfterEach(func() {
-		s, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
-		if err != nil {
-			s = nil
-		}
-		_ = svc.RemoveAgent(s.Id) // remove the agent created within the 'BeforeEach' block from the DB
-
 		_ = svc.RemoveSources()
 		_ = agent.Remove()
 	})
@@ -72,13 +76,10 @@ var _ = Describe("e2e", func() {
 	})
 
 	Context("Check Vcenter login behavior", func() {
-
 		It("should successfully login with valid credentials", func() {
-
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-
 		})
 
 		It("Two test combined: should return BadRequest due to an empty username"+
@@ -91,23 +92,18 @@ var _ = Describe("e2e", func() {
 			res2, err2 := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "user", "")
 			Expect(err2).To(BeNil())
 			Expect(res2.StatusCode).To(Equal(http.StatusBadRequest))
-
 		})
 
 		It("should return Unauthorized due to invalid credentials", func() {
-
 			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "invalid", "cred")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
-
 		})
 
 		It("should return badRequest due to an invalid URL", func() {
-
 			res, err := agent.Login(fmt.Sprintf("https://%s", systemIP), "user", "pass") // bad link to Vcenter environment
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-
 		})
 
 	})
@@ -119,11 +115,11 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
 			Eventually(func() bool {
-				apiAgent, err := svc.GetAgent(fmt.Sprintf("https://%s:3333", agentIP))
+				source, err := svc.GetSource(source.Id)
 				if err != nil {
 					return false
 				}
-				return apiAgent.Status == v1alpha1.AgentStatusUpToDate
+				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
 		})
 	})

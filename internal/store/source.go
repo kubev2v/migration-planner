@@ -58,7 +58,7 @@ func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (mode
 }
 
 func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.Source, error) {
-	result := s.getDB(ctx).Create(&source)
+	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&source)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -93,11 +93,7 @@ func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *SourceStore) Update(ctx context.Context, source model.Source) (*model.Source, error) {
-	selectFields := []string{}
-	if source.Inventory != nil {
-		selectFields = append(selectFields, "inventory")
-	}
-	result := s.getDB(ctx).Model(&source).Clauses(clause.Returning{}).Select(selectFields).Updates(&source)
+	result := s.getDB(ctx).Model(&source).Clauses(clause.Returning{}).Updates(&source)
 	if result.Error != nil {
 		return nil, result.Error
 	}

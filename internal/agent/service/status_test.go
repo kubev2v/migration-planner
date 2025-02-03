@@ -22,9 +22,13 @@ const (
 )
 
 var _ = Describe("Status", func() {
-	var agentID uuid.UUID
+	var (
+		agentID  uuid.UUID
+		sourceID uuid.UUID
+	)
 	BeforeEach(func() {
 		agentID, _ = uuid.NewUUID()
+		sourceID, _ = uuid.NewUUID()
 	})
 
 	Context("update status", func() {
@@ -32,6 +36,7 @@ var _ = Describe("Status", func() {
 			client := client.PlannerMock{
 				UpdateAgentStatusFunc: func(ctx context.Context, id uuid.UUID, params v1alpha1.AgentStatusUpdate) error {
 					Expect(id).To(Equal(agentID))
+					Expect(sourceID).To(Equal(params.SourceId))
 					Expect(params.Version).To(Equal("best_version"))
 					Expect(params.Status).To(Equal("up-to-date"))
 					Expect(params.CredentialUrl).To(Equal("www-cred-url"))
@@ -40,7 +45,7 @@ var _ = Describe("Status", func() {
 				},
 			}
 
-			statusUpdater := service.NewStatusUpdater(agentID, "best_version", "www-cred-url", &config.Config{}, &client)
+			statusUpdater := service.NewStatusUpdater(sourceID, agentID, "best_version", "www-cred-url", &config.Config{}, &client)
 			Expect(statusUpdater.UpdateStatus(context.TODO(), api.AgentStatusUpToDate, "status_info", "www-cred-url"))
 		})
 	})
@@ -62,6 +67,7 @@ var _ = Describe("Status", func() {
 
 		It("compute status returns Waiting for credentials", func() {
 			statusUpdater := service.NewStatusUpdater(
+				sourceID,
 				agentID,
 				"best_version",
 				"www-cred-url",
@@ -84,6 +90,7 @@ var _ = Describe("Status", func() {
 			creds.Close()
 
 			statusUpdater := service.NewStatusUpdater(
+				sourceID,
 				agentID,
 				"best_version",
 				"www-cred-url",
@@ -112,6 +119,7 @@ var _ = Describe("Status", func() {
 			Expect(err).To(BeNil())
 
 			statusUpdater := service.NewStatusUpdater(
+				sourceID,
 				agentID,
 				"best_version",
 				"www-cred-url",

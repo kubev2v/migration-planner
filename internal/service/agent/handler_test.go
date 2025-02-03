@@ -22,14 +22,13 @@ import (
 )
 
 const (
-	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, version) VALUES ('%s', '%s', '%s', '%s', 'version_1');"
-	insertAgentWithUsernameStm  = "INSERT INTO agents (id, status, status_info, cred_url,username, org_id, version) VALUES ('%s', '%s', '%s', '%s','%s','%s', 'version_1');"
-	insertAgentWithSourceStm    = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
+	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
+	insertAgentWithUsernameStm  = "INSERT INTO agents (id, status, status_info, cred_url, source_id, username, org_id, version) VALUES ('%s', '%s', '%s', '%s', '%s','%s','%s', 'version_1');"
+	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
-	insertAgentWithDeletedAtStm = "INSERT INTO agents (id, status, status_info, cred_url,created_at, updated_at, deleted_at, version) VALUES ('%s', '%s', '%s', '%s', '%s','%s','%s', 'version_1');"
 )
 
-var _ = Describe("agent store", Ordered, func() {
+var _ = Describe("agent service", Ordered, func() {
 	var (
 		s      store.Store
 		gormdb *gorm.DB
@@ -50,39 +49,9 @@ var _ = Describe("agent store", Ordered, func() {
 
 	Context("Update agent status", func() {
 		It("successfully creates the agent", func() {
-			agentID := uuid.New()
-
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
-				Id: agentID,
-				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
-					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
-					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
-					Version:       "version-1",
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus201Response{}))
-
-			count := -1
-			tx := gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(1))
-
-			status := ""
-			tx = gormdb.Raw(fmt.Sprintf("SELECT status from agents WHERE id = '%s';", agentID)).Scan(&status)
-			Expect(tx.Error).To(BeNil())
-			Expect(status).To(Equal("waiting-for-credentials"))
-
-			// should find one event
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
-		})
-
-		It("successfully creates the agent -- under username scope", func() {
 			agentID := uuid.New()
 
 			user := auth.User{
@@ -96,46 +65,59 @@ var _ = Describe("agent store", Ordered, func() {
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
 					CredentialUrl: "creds-url",
 					Version:       "version-1",
+					SourceId:      sourceID,
 				},
 			})
 			Expect(err).To(BeNil())
 			Expect(resp).To(Equal(server.UpdateAgentStatus201Response{}))
 
 			count := -1
-			tx := gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
 
-			d := struct {
-				Username string
-				Status   string
-			}{}
-			tx = gormdb.Raw(fmt.Sprintf("SELECT username,status from agents WHERE id = '%s';", agentID)).Scan(&d)
+			status := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT status from agents WHERE id = '%s';", agentID)).Scan(&status)
 			Expect(tx.Error).To(BeNil())
-			Expect(d.Status).To(Equal("waiting-for-credentials"))
-			Expect(d.Username).To(Equal("admin"))
+			Expect(status).To(Equal("waiting-for-credentials"))
+
+			status_info := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT status_info from agents WHERE id = '%s';", agentID)).Scan(&status_info)
+			Expect(tx.Error).To(BeNil())
+			Expect(status).To(Equal("waiting-for-credentials"))
+
+			credsUrl := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
+			Expect(tx.Error).To(BeNil())
+			Expect(credsUrl).To(Equal("creds-url"))
 
 			// should find one event
 			<-time.After(500 * time.Millisecond)
 			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
-
 		It("successfully updates the agent", func() {
+			sourceID := uuid.NewString()
 			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
+			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
 					CredentialUrl: "creds-url",
@@ -155,50 +137,15 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			Expect(status).To(Equal("waiting-for-credentials"))
 
-			// should find one event
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
-		})
-
-		It("successfully updates the agent -- under agent scope", func() {
-			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			status_info := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT status_info from agents WHERE id = '%s';", agentID)).Scan(&status_info)
 			Expect(tx.Error).To(BeNil())
+			Expect(status).To(Equal("waiting-for-credentials"))
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewUserContext(context.TODO(), user)
-
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
-				Id: agentID,
-				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
-					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
-					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
-					Version:       "version-1",
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus200Response{}))
-
-			count := -1
-			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			credsUrl := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
 			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(1))
-
-			d := struct {
-				Username string
-				Status   string
-			}{}
-			tx = gormdb.Raw(fmt.Sprintf("SELECT username,status from agents WHERE id = '%s';", agentID)).Scan(&d)
-			Expect(tx.Error).To(BeNil())
-			Expect(d.Status).To(Equal("waiting-for-credentials"))
-			Expect(d.Username).To(Equal("admin"))
+			Expect(credsUrl).To(Equal("creds-url"))
 
 			// should find one event
 			<-time.After(500 * time.Millisecond)
@@ -206,13 +153,16 @@ var _ = Describe("agent store", Ordered, func() {
 		})
 
 		It("failed to update the agent -- username is different", func() {
+			sourceID := uuid.NewString()
 			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "user", "user"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+				Username:     "batman",
+				Organization: "wayne_enterprises",
 			}
 			ctx := auth.NewUserContext(context.TODO(), user)
 
@@ -221,7 +171,6 @@ var _ = Describe("agent store", Ordered, func() {
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
 					CredentialUrl: "creds-url",
@@ -232,76 +181,47 @@ var _ = Describe("agent store", Ordered, func() {
 			Expect(resp).To(Equal(server.UpdateAgentStatus403JSONResponse{}))
 		})
 
-		It("should receive 410 when agent is soft deleted", func() {
-			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithDeletedAtStm, agentID, "not-connected", "status-info-1", "cred_url-1", time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339), time.Now().Format(time.RFC3339)))
+		It("failed to update agent -- source id is missing", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "batman",
+				Organization: "wayne_enterprises",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.UpdateAgentStatus(context.TODO(), server.UpdateAgentStatusRequestObject{
-				Id: agentID,
+			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
+				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Id:            agentID.String(),
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
 					CredentialUrl: "creds-url",
 					Version:       "version-1",
+					SourceId:      uuid.New(),
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus410JSONResponse{}))
+			Expect(resp).To(Equal(server.UpdateAgentStatus400JSONResponse{}))
 		})
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
 
 	Context("Update source", func() {
-		It("successfully creates the source", func() {
-			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
-			Expect(tx.Error).To(BeNil())
-
+		It("successfully updates the source", func() {
 			sourceID := uuid.New()
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
-				Id: sourceID,
-				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   agentID,
-					Inventory: v1alpha1.Inventory{},
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus200JSONResponse{})))
-
-			// according to the multi source model the agent should be associated with the source
-			agent, err := s.Agent().Get(context.TODO(), agentID.String())
-			Expect(err).To(BeNil())
-			Expect(agent.Associated).To(BeTrue())
-
-			// the source should have the agent associated
-			source, err := s.Source().Get(context.TODO(), sourceID)
-			Expect(err).To(BeNil())
-			Expect(source.Agents).ToNot(BeNil())
-			Expect(source.Agents).To(HaveLen(1))
-			Expect(source.Agents[0].ID).To(Equal(agentID.String()))
-
-			// should have one 1 event only
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
-		})
-
-		It("successfully creates the source -- under user's scope", func() {
 			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "admin", "admin"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-
-			sourceID := uuid.New()
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -309,41 +229,44 @@ var _ = Describe("agent store", Ordered, func() {
 			}
 			ctx := auth.NewUserContext(context.TODO(), user)
 
-			resp, err := srv.ReplaceSourceStatus(ctx, server.ReplaceSourceStatusRequestObject{
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   agentID,
-					Inventory: v1alpha1.Inventory{},
+					AgentId: agentID,
+					Inventory: v1alpha1.Inventory{
+						Vcenter: v1alpha1.VCenter{
+							Id: "vcenter",
+						},
+					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus200JSONResponse{})))
-
-			// according to the multi source model the agent should be associated with the source
-			agent, err := s.Agent().Get(context.TODO(), agentID.String())
-			Expect(err).To(BeNil())
-			Expect(agent.Associated).To(BeTrue())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory200JSONResponse{}).String()))
 
 			// the source should have the agent associated
-			source, err := s.Source().Get(context.TODO(), sourceID)
+			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
-			Expect(source.Agents).ToNot(BeNil())
-			Expect(source.Agents).To(HaveLen(1))
-			Expect(source.Agents[0].ID).To(Equal(agentID.String()))
+			Expect(source.Inventory.Data.Vcenter.Id).To(Equal("vcenter"))
 
 			// should have one 1 event only
 			<-time.After(500 * time.Millisecond)
 			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
-		It("fail to creates the source -- under user's scope", func() {
+		It("successfully updates the source - two agents", func() {
+			sourceID := uuid.New()
 			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", "user", "user"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			sourceID := uuid.New()
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			secondAgentID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -351,69 +274,125 @@ var _ = Describe("agent store", Ordered, func() {
 			}
 			ctx := auth.NewUserContext(context.TODO(), user)
 
-			resp, err := srv.ReplaceSourceStatus(ctx, server.ReplaceSourceStatusRequestObject{
+			// first agent request
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   agentID,
-					Inventory: v1alpha1.Inventory{},
+					AgentId: agentID,
+					Inventory: v1alpha1.Inventory{
+						Vcenter: v1alpha1.VCenter{
+							Id: "vcenter",
+						},
+					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus403JSONResponse{})))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory200JSONResponse{}).String()))
+
+			// the source should have the agent associated
+			source, err := s.Source().Get(ctx, sourceID)
+			Expect(err).To(BeNil())
+			Expect(source.Inventory.Data.Vcenter.Id).To(Equal("vcenter"))
+
+			// second agent request
+			resp, err = srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
+				Id: sourceID,
+				Body: &apiAgent.SourceStatusUpdate{
+					AgentId: secondAgentID,
+					Inventory: v1alpha1.Inventory{
+						Vcenter: v1alpha1.VCenter{
+							Id: "vcenter",
+						},
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory200JSONResponse{}).String()))
+
+			// should have one 1 event only
+			<-time.After(500 * time.Millisecond)
+			Expect(eventWriter.Messages).To(HaveLen(2))
 		})
 
 		It("agents not associated with the source are not allowed to update inventory", func() {
-			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			sourceID := uuid.New()
+			secondSourceID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
-			resp, err := srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
-				Id: sourceID,
+			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
+				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   agentID,
+					AgentId:   secondSourceID,
 					Inventory: v1alpha1.Inventory{},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus200JSONResponse{})))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory400JSONResponse{}).String()))
+		})
 
-			// should have 1 event (inventory)
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
-
-			// according to the multi source model the agent should be associated with the source
-			agent, err := s.Agent().Get(context.TODO(), agentID.String())
-			Expect(err).To(BeNil())
-			Expect(agent.Associated).To(BeTrue())
-
-			// the source should have the agent associated
-			source, err := s.Source().Get(context.TODO(), sourceID)
-			Expect(err).To(BeNil())
-			Expect(source.Agents).ToNot(BeNil())
-			Expect(source.Agents).To(HaveLen(1))
-			Expect(source.Agents[0].ID).To(Equal(agentID.String()))
-
-			//			 make another request from another agent
-			secondAgentID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1"))
+		It("updates with a different vCenter are not allowed", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			resp, err = srv.ReplaceSourceStatus(context.TODO(), server.ReplaceSourceStatusRequestObject{
-				Id: sourceID,
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			eventWriter := newTestWriter()
+			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
+				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   secondAgentID,
-					Inventory: v1alpha1.Inventory{},
+					AgentId: firstAgentID,
+					Inventory: v1alpha1.Inventory{
+						Vcenter: v1alpha1.VCenter{
+							Id: "vcenter",
+						},
+					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.ReplaceSourceStatus400JSONResponse{})))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory200JSONResponse{}).String()))
 
-			// should have one 1 event only
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
+			resp, err = srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
+				Id: firstSourceID,
+				Body: &apiAgent.SourceStatusUpdate{
+					AgentId: firstSourceID,
+					Inventory: v1alpha1.Inventory{
+						Vcenter: v1alpha1.VCenter{
+							Id: "anotherVCenterID",
+						},
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory400JSONResponse{}).String()))
+
 		})
 
 		AfterEach(func() {

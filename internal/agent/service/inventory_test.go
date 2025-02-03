@@ -38,7 +38,7 @@ var _ = Describe("Inventory", func() {
 				Vms:     api.VMs{Total: 2},
 				Vcenter: api.VCenter{Id: sourceID.String()},
 			}
-			inventoryUpdater := service.NewInventoryUpdater(agentID, &client)
+			inventoryUpdater := service.NewInventoryUpdater(sourceID, agentID, &client)
 			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), inventory)
 		})
 	})

@@ -14,9 +14,9 @@ import (
 )
 
 const (
-	insertSourceStm             = "INSERT INTO sources (id) VALUES ('%s');"
-	insertSourceWithUsernameStm = "INSERT INTO sources (id, username, org_id) VALUES ('%s', '%s', '%s');"
-	insertSourceOnPremisesStm   = "INSERT INTO sources (id,username, org_id, on_premises) VALUES ('%s', '%s', '%s', TRUE);"
+	insertSourceStm             = "INSERT INTO sources (id, name) VALUES ('%s', '%s');"
+	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', '%s', '%s', '%s');"
+	insertSourceOnPremisesStm   = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s','%s', '%s', '%s', TRUE);"
 )
 
 var _ = Describe("source store", Ordered, func() {
@@ -39,9 +39,9 @@ var _ = Describe("source store", Ordered, func() {
 
 	Context("list", func() {
 		It("successfully list all the sources", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source1"))
 			Expect(tx.Error).To(BeNil())
 
 			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
@@ -49,22 +49,40 @@ var _ = Describe("source store", Ordered, func() {
 			Expect(sources).To(HaveLen(2))
 		})
 
-		It("successfully list all the sources -- with agents", func() {
+		It("successfully list all the sources -- with one agent", func() {
 			sourceID := uuid.NewString()
 			agentID := uuid.NewString()
-			tx := gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1"))
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf("UPDATE agents set source_id = '%s';", sourceID))
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(sources).To(HaveLen(1))
-			agents := sources[0].Agents
-			Expect(agents).To(HaveLen(1))
-			Expect(agents[0].ID).To(Equal(agentID))
+			Expect(sources[0].Agents).To(HaveLen(1))
+			Expect(sources[0].Agents[0].ID.String()).To(Equal(agentID))
+		})
+
+		It("successfully list all the sources -- with multiple agents", func() {
+			sourceID := uuid.NewString()
+			agentID := uuid.NewString()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1"))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.NewString(), "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(1))
+			Expect(sources[0].Agents).To(HaveLen(2))
 		})
 
 		It("list all sources -- no sources", func() {
@@ -74,9 +92,9 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		It("successfully list the user's sources", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "source1", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "user", "user"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "source2", "user", "user"))
 			Expect(tx.Error).To(BeNil())
 
 			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter().ByUsername("admin"))
@@ -86,11 +104,11 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		It("successfully list the source on prem", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "source1", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, uuid.NewString(), "source2", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, uuid.NewString(), "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, uuid.NewString(), "source3", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
 			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter().ByUsername("admin").ByOnPremises(false))
@@ -111,21 +129,29 @@ var _ = Describe("source store", Ordered, func() {
 	Context("get", func() {
 		It("successfully get a source", func() {
 			id := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "source1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+
+			agentID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", id.String()))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source2"))
 			Expect(tx.Error).To(BeNil())
 
 			source, err := s.Source().Get(context.TODO(), id)
 			Expect(err).To(BeNil())
 			Expect(source).ToNot(BeNil())
+			Expect(source.Agents).To(HaveLen(1))
+			Expect(source.Agents[0].ID.String()).To(Equal(agentID.String()))
 		})
 
 		It("failed get a source -- source does not exists", func() {
 			id := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source2"))
 			Expect(tx.Error).To(BeNil())
 
 			source, err := s.Source().Get(context.TODO(), id)
@@ -135,6 +161,7 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE from agents;")
 			gormdb.Exec("DELETE from sources;")
 		})
 
@@ -156,24 +183,8 @@ var _ = Describe("source store", Ordered, func() {
 				Expect(count).To(Equal(1))
 			})
 
-			It("successfully creates one source without sshkey", func() {
-				sourceID := uuid.New()
-				m := model.Source{
-					ID:       sourceID,
-					Username: "admin",
-					OrgID:    "org",
-				}
-				source, err := s.Source().Create(context.TODO(), m)
-				Expect(err).To(BeNil())
-				Expect(source).NotTo(BeNil())
-
-				var count int
-				tx := gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
-				Expect(tx.Error).To(BeNil())
-				Expect(count).To(Equal(1))
-			})
-
 			AfterEach(func() {
+				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")
 			})
 		})
@@ -181,9 +192,9 @@ var _ = Describe("source store", Ordered, func() {
 		Context("delete", func() {
 			It("successfully delete a source", func() {
 				id := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "source1"))
 				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source1"))
 				Expect(tx.Error).To(BeNil())
 
 				err := s.Source().Delete(context.TODO(), id)
@@ -197,9 +208,13 @@ var _ = Describe("source store", Ordered, func() {
 
 			It("successfully delete all sources", func() {
 				id := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id))
+				agentID := uuid.New()
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "source1"))
 				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString()))
+				tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", id))
+
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source1"))
 				Expect(tx.Error).To(BeNil())
 
 				err := s.Source().DeleteAll(context.TODO())
@@ -209,9 +224,15 @@ var _ = Describe("source store", Ordered, func() {
 				tx = gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
 				Expect(tx.Error).To(BeNil())
 				Expect(count).To(Equal(0))
+
+				count = 1
+				tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+				Expect(tx.Error).To(BeNil())
+				Expect(count).To(Equal(0))
 			})
 
 			AfterEach(func() {
+				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")
 			})
 		})

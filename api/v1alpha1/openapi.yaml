@@ -12,7 +12,7 @@ paths:
     get:
       tags:
         - source
-      description: list sources
+      description: List sources
       operationId: listSources
       parameters:
         - name: include_default
@@ -37,7 +37,7 @@ paths:
     post:
       tags:
         - source
-      description: create a source from inventory file
+      description: Create a source
       operationId: createSource
       requestBody:
         content:
@@ -47,7 +47,7 @@ paths:
         required: true
       responses:
         "201":
-          description: OK
+          description: Created
           content:
             application/json:
               schema:
@@ -64,20 +64,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "404":
-          description: NotFound
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
         "500":
-          description: Internal Server Error
+          description: Internal error
           content:
             application/json:
               schema:
@@ -100,12 +88,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}:
     get:
       tags:
         - source
-      description: read the specified source
-      operationId: readSource
+      description: Get the specified source
+      operationId: getSource
       parameters:
         - name: id
           in: path
@@ -145,10 +139,72 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+        - source
+      description: Update a source from inventory file
+      operationId: updateSource
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceUpdateOnPrem'
+        required: true
+      responses:
+        "200":
+          description: An OVA image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     delete:
       tags:
         - source
-      description: delete a source
+      description: Delete a source
       operationId: deleteSource
       parameters:
         - name: id
@@ -189,26 +245,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/image:
+        "500":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/sources/{id}/image:
     head:
       tags:
         - image
-      description: head the OVA image
+      description: Head the OVA image
       operationId: headImage
       parameters:
-        - name: sshKey
-          in: query
-          description: public SSH key
-          required: false
+        - name: id
+          in: path
+          description: Id of the source
+          required: true
           schema:
             type: string
+            format: uuid
       responses:
         "200":
-          description: An OVA image
+          description: OK
         "400":
           description: Bad Request
         "401":
           description: Unauthorized
+        "403":
+          description: Forbidden
         "404":
           description: NotFound
         "500":
@@ -216,12 +281,19 @@ paths:
     get:
       tags:
         - image
-      description: get the OVA image
+      description: Get the OVA image
       operationId: getImage
       parameters:
+        - name: id
+          in: path
+          description: id of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
         - name: sshKey
           in: query
-          description: public SSH key
+          description: Public SSH key
           required: false
           schema:
             type: string
@@ -257,101 +329,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
-  /api/v1/agents:
-    get:
-      tags:
-        - agent
-      description: list agents
-      operationId: listAgents
-      parameters:
-        - name: include_default
-          in: query
-          description: control whatever the default report should be added to the result
-          required: false
-          schema:
-            type: boolean
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/AgentList"
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/agents/{id}:
-    delete:
-      tags:
-        - agent
-      description: delete an agent
-      operationId: deleteAgent
-      parameters:
-        - name: id
-          in: path
-          description: ID of the agent
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Agent"
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "404":
-          description: NotFound
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
   /api/v1/events:
     post:
       tags:
         - ui events
-      description: pass events from ui to kafka
+      description: Pass events from ui to kafka
       operationId: pushEvents
       requestBody:
         content:
@@ -391,7 +374,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
-
   /health:
     get:
       tags:
@@ -410,6 +392,8 @@ components:
         id:
           type: string
           format: uuid
+        name:
+          type: string
         inventory:
           $ref: '#/components/schemas/Inventory'
         createdAt:
@@ -418,16 +402,13 @@ components:
         updatedAt:
           type: string
           format: date-time
-        name:
-          type: string
         onPremises:
           type: boolean
-        agents:
-          type: array
-          items:
-            $ref: '#/components/schemas/SourceAgentItem'
+        agent:
+          $ref: '#/components/schemas/Agent'
       required:
         - id
+        - name
         - createdAt
         - updatedAt
         - onPremises
@@ -435,28 +416,30 @@ components:
     SourceCreate:
       type: object
       properties:
+        name:
+          type: string
+        sshPublicKey:
+          type: string
+      required:
+        - name
+
+    SourceUpdateOnPrem:
+      type: object
+      properties:
+        agent_id:
+          type: string
+          format: uuid
         inventory:
           $ref: '#/components/schemas/Inventory'
       required:
         - inventory
+        - agent_id
 
     SourceList:
       type: array
       items:
         $ref: '#/components/schemas/Source'
     
-    SourceAgentItem:
-      type: object
-      properties:
-        id:
-          type: string
-          format: uuid
-        associated:
-          type: boolean
-      required:
-        - id
-        - associated
-
     Error:
       properties:
         message:
@@ -659,6 +642,7 @@ components:
       properties:
         id:
           type: string
+          format: uuid
         status:
           type: string
           enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
@@ -666,19 +650,12 @@ components:
           type: string
         credentialUrl:
           type: string
-        sourceId:
-          type: string
         createdAt:
           type: string
           format: date-time
         updatedAt:
           type: string
           format: date-time
-        deletedAt:
-          type: string
-          format: date-time
-        associated:
-          type: boolean
         version:
           type: string
       required:
@@ -688,13 +665,7 @@ components:
         - credentialUrl
         - createdAt
         - updatedAt
-        - associated
         - version
-
-    AgentList:
-      type: array
-      items:
-        $ref: '#/components/schemas/Agent'
 
     EventData:
       type: object

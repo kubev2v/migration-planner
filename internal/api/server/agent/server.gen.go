@@ -24,7 +24,7 @@ type ServerInterface interface {
 	UpdateAgentStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/sources/{id}/status)
-	ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -40,7 +40,7 @@ func (_ Unimplemented) UpdateAgentStatus(w http.ResponseWriter, r *http.Request,
 }
 
 // (PUT /api/v1/sources/{id}/status)
-func (_ Unimplemented) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (_ Unimplemented) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -84,8 +84,8 @@ func (siw *ServerInterfaceWrapper) UpdateAgentStatus(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// ReplaceSourceStatus operation middleware
-func (siw *ServerInterfaceWrapper) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request) {
+// UpdateSourceInventory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSourceInventory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -100,7 +100,7 @@ func (siw *ServerInterfaceWrapper) ReplaceSourceStatus(w http.ResponseWriter, r 
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ReplaceSourceStatus(w, r, id)
+		siw.Handler.UpdateSourceInventory(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -242,7 +242,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/agents/{id}/status", wrapper.UpdateAgentStatus)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.ReplaceSourceStatus)
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.UpdateSourceInventory)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
@@ -303,11 +303,11 @@ func (response UpdateAgentStatus403JSONResponse) VisitUpdateAgentStatusResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAgentStatus410JSONResponse externalRef0.Error
+type UpdateAgentStatus404JSONResponse externalRef0.Error
 
-func (response UpdateAgentStatus410JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+func (response UpdateAgentStatus404JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(410)
+	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -321,63 +321,63 @@ func (response UpdateAgentStatus500JSONResponse) VisitUpdateAgentStatusResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatusRequestObject struct {
+type UpdateSourceInventoryRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *ReplaceSourceStatusJSONRequestBody
+	Body *UpdateSourceInventoryJSONRequestBody
 }
 
-type ReplaceSourceStatusResponseObject interface {
-	VisitReplaceSourceStatusResponse(w http.ResponseWriter) error
+type UpdateSourceInventoryResponseObject interface {
+	VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error
 }
 
-type ReplaceSourceStatus200JSONResponse externalRef0.Source
+type UpdateSourceInventory200JSONResponse externalRef0.Source
 
-func (response ReplaceSourceStatus200JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory200JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatus400JSONResponse externalRef0.Error
+type UpdateSourceInventory400JSONResponse externalRef0.Error
 
-func (response ReplaceSourceStatus400JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory400JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatus401JSONResponse externalRef0.Error
+type UpdateSourceInventory401JSONResponse externalRef0.Error
 
-func (response ReplaceSourceStatus401JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory401JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatus403JSONResponse externalRef0.Error
+type UpdateSourceInventory403JSONResponse externalRef0.Error
 
-func (response ReplaceSourceStatus403JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory403JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatus404JSONResponse externalRef0.Error
+type UpdateSourceInventory404JSONResponse externalRef0.Error
 
-func (response ReplaceSourceStatus404JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory404JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type ReplaceSourceStatus500JSONResponse externalRef0.Error
+type UpdateSourceInventory500JSONResponse externalRef0.Error
 
-func (response ReplaceSourceStatus500JSONResponse) VisitReplaceSourceStatusResponse(w http.ResponseWriter) error {
+func (response UpdateSourceInventory500JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -406,7 +406,7 @@ type StrictServerInterface interface {
 	UpdateAgentStatus(ctx context.Context, request UpdateAgentStatusRequestObject) (UpdateAgentStatusResponseObject, error)
 
 	// (PUT /api/v1/sources/{id}/status)
-	ReplaceSourceStatus(ctx context.Context, request ReplaceSourceStatusRequestObject) (ReplaceSourceStatusResponseObject, error)
+	UpdateSourceInventory(ctx context.Context, request UpdateSourceInventoryRequestObject) (UpdateSourceInventoryResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -474,13 +474,13 @@ func (sh *strictHandler) UpdateAgentStatus(w http.ResponseWriter, r *http.Reques
 	}
 }
 
-// ReplaceSourceStatus operation middleware
-func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request ReplaceSourceStatusRequestObject
+// UpdateSourceInventory operation middleware
+func (sh *strictHandler) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateSourceInventoryRequestObject
 
 	request.Id = id
 
-	var body ReplaceSourceStatusJSONRequestBody
+	var body UpdateSourceInventoryJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -488,18 +488,18 @@ func (sh *strictHandler) ReplaceSourceStatus(w http.ResponseWriter, r *http.Requ
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.ReplaceSourceStatus(ctx, request.(ReplaceSourceStatusRequestObject))
+		return sh.ssi.UpdateSourceInventory(ctx, request.(UpdateSourceInventoryRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "ReplaceSourceStatus")
+		handler = middleware(handler, "UpdateSourceInventory")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(ReplaceSourceStatusResponseObject); ok {
-		if err := validResponse.VisitReplaceSourceStatusResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateSourceInventoryResponseObject); ok {
+		if err := validResponse.VisitUpdateSourceInventoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

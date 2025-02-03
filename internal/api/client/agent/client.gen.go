@@ -97,10 +97,10 @@ type ClientInterface interface {
 
 	UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ReplaceSourceStatusWithBody request with any body
-	ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpdateSourceInventoryWithBody request with any body
+	UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// Health request
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -130,8 +130,8 @@ func (c *Client) UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, b
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceSourceStatusRequestWithBody(c.Server, id, contentType, body)
+func (c *Client) UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceInventoryRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -142,8 +142,8 @@ func (c *Client) ReplaceSourceStatusWithBody(ctx context.Context, id openapi_typ
 	return c.Client.Do(req)
 }
 
-func (c *Client) ReplaceSourceStatus(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewReplaceSourceStatusRequest(c.Server, id, body)
+func (c *Client) UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceInventoryRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -213,19 +213,19 @@ func NewUpdateAgentStatusRequestWithBody(server string, id openapi_types.UUID, c
 	return req, nil
 }
 
-// NewReplaceSourceStatusRequest calls the generic ReplaceSourceStatus builder with application/json body
-func NewReplaceSourceStatusRequest(server string, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody) (*http.Request, error) {
+// NewUpdateSourceInventoryRequest calls the generic UpdateSourceInventory builder with application/json body
+func NewUpdateSourceInventoryRequest(server string, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewReplaceSourceStatusRequestWithBody(server, id, "application/json", bodyReader)
+	return NewUpdateSourceInventoryRequestWithBody(server, id, "application/json", bodyReader)
 }
 
-// NewReplaceSourceStatusRequestWithBody generates requests for ReplaceSourceStatus with any type of body
-func NewReplaceSourceStatusRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpdateSourceInventoryRequestWithBody generates requests for UpdateSourceInventory with any type of body
+func NewUpdateSourceInventoryRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -335,10 +335,10 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAgentStatusWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentStatusResponse, error)
 
-	// ReplaceSourceStatusWithBodyWithResponse request with any body
-	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
+	// UpdateSourceInventoryWithBodyWithResponse request with any body
+	UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
 
-	ReplaceSourceStatusWithResponse(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
+	UpdateSourceInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
 
 	// HealthWithResponse request
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
@@ -350,7 +350,7 @@ type UpdateAgentStatusResponse struct {
 	JSON400      *externalRef0.Error
 	JSON401      *externalRef0.Error
 	JSON403      *externalRef0.Error
-	JSON410      *externalRef0.Error
+	JSON404      *externalRef0.Error
 	JSON500      *externalRef0.Error
 }
 
@@ -370,7 +370,7 @@ func (r UpdateAgentStatusResponse) StatusCode() int {
 	return 0
 }
 
-type ReplaceSourceStatusResponse struct {
+type UpdateSourceInventoryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *externalRef0.Source
@@ -382,7 +382,7 @@ type ReplaceSourceStatusResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r ReplaceSourceStatusResponse) Status() string {
+func (r UpdateSourceInventoryResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -390,7 +390,7 @@ func (r ReplaceSourceStatusResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r ReplaceSourceStatusResponse) StatusCode() int {
+func (r UpdateSourceInventoryResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -435,21 +435,21 @@ func (c *ClientWithResponses) UpdateAgentStatusWithResponse(ctx context.Context,
 	return ParseUpdateAgentStatusResponse(rsp)
 }
 
-// ReplaceSourceStatusWithBodyWithResponse request with arbitrary body returning *ReplaceSourceStatusResponse
-func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
-	rsp, err := c.ReplaceSourceStatusWithBody(ctx, id, contentType, body, reqEditors...)
+// UpdateSourceInventoryWithBodyWithResponse request with arbitrary body returning *UpdateSourceInventoryResponse
+func (c *ClientWithResponses) UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error) {
+	rsp, err := c.UpdateSourceInventoryWithBody(ctx, id, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseReplaceSourceStatusResponse(rsp)
+	return ParseUpdateSourceInventoryResponse(rsp)
 }
 
-func (c *ClientWithResponses) ReplaceSourceStatusWithResponse(ctx context.Context, id openapi_types.UUID, body ReplaceSourceStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
-	rsp, err := c.ReplaceSourceStatus(ctx, id, body, reqEditors...)
+func (c *ClientWithResponses) UpdateSourceInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error) {
+	rsp, err := c.UpdateSourceInventory(ctx, id, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseReplaceSourceStatusResponse(rsp)
+	return ParseUpdateSourceInventoryResponse(rsp)
 }
 
 // HealthWithResponse request returning *HealthResponse
@@ -496,12 +496,12 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 		}
 		response.JSON403 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON410 = &dest
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest externalRef0.Error
@@ -515,15 +515,15 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 	return response, nil
 }
 
-// ParseReplaceSourceStatusResponse parses an HTTP response from a ReplaceSourceStatusWithResponse call
-func ParseReplaceSourceStatusResponse(rsp *http.Response) (*ReplaceSourceStatusResponse, error) {
+// ParseUpdateSourceInventoryResponse parses an HTTP response from a UpdateSourceInventoryWithResponse call
+func ParseUpdateSourceInventoryResponse(rsp *http.Response) (*UpdateSourceInventoryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &ReplaceSourceStatusResponse{
+	response := &UpdateSourceInventoryResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
