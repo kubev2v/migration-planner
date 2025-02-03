@@ -26,6 +26,7 @@ jobs:
           echo "REGISTRY_IP=${REGISTRY_IP}" >> $GITHUB_ENV
           echo "MIGRATION_PLANNER_AGENT_IMAGE=${REGISTRY_IP}:5000/agent" >> $GITHUB_ENV
           echo "INSECURE_REGISTRY=${REGISTRY_IP}:5000" >> $GITHUB_ENV
+          echo "PERSISTENT_DISK_DEVICE:/dev/vda" >> $GITHUB_ENV
 
       - name: Ignore insecure registry
         run: |
