@@ -13,6 +13,7 @@ jobs:
     env:
       MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
       MIGRATION_PLANNER_API_IMAGE_PULL_POLICY: "Never"
+      PERSISTENT_DISK_DEVICE: /dev/vda
       PODMAN: "docker"
 
     steps:
@@ -66,7 +67,7 @@ jobs:
       - name: Build assisted-migration containers
         run: |
           make migration-planner-agent-container MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE
-          export PERSISTENT_DISK_DEVICE=/dev/vda && make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE
+          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE PERSISTENT_DISK_DEVICE=$PERSISTENT_DISK_DEVICE
           docker push $MIGRATION_PLANNER_AGENT_IMAGE
           kind load docker-image $MIGRATION_PLANNER_API_IMAGE
           docker rmi $MIGRATION_PLANNER_API_IMAGE
