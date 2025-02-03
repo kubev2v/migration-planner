@@ -35,8 +35,6 @@ var _ = Describe("e2e", func() {
 			return agentIP
 		}, "1m", "3s").ShouldNot(BeEmpty())
 		Expect(agentIP).ToNot(BeEmpty())
-		fmt.Println("agentip: ")
-		fmt.Println(agentIP)
 		Eventually(func() bool {
 			return agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())

@@ -103,7 +103,6 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 			return fmt.Errorf("creating default base path: %w", err)
 		}
 	}
-	//defer os.Remove(defaultBasePath)
 
 	// Download OVA
 	res, err := p.c.GetImage(context.TODO(), &api.GetImageParams{})

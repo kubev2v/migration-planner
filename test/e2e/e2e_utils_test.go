@@ -103,7 +103,6 @@ func CreateVm(c *libvirt.Connect) error {
 	if err != nil {
 		return fmt.Errorf("failed to read VM XML file: %v", err)
 	}
-	fmt.Println(string(vmXMLBytes))
 	domain, err := c.DomainDefineXML(string(vmXMLBytes))
 	if err != nil {
 		return fmt.Errorf("failed to define domain: %v", err)
@@ -111,7 +110,7 @@ func CreateVm(c *libvirt.Connect) error {
 	defer func() {
 		_ = domain.Free()
 	}()
-	//domain.Free()
+	domain.Free()
 	// Start the domain
 	if err := domain.Create(); err != nil {
 		return fmt.Errorf("failed to create domain: %v", err)

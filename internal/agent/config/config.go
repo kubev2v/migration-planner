@@ -107,8 +107,6 @@ func (cfg *Config) Validate() error {
 	if err := cfg.PlannerService.Validate(); err != nil {
 		return err
 	}
-	fmt.Println("config dir")
-	fmt.Println(cfg.ConfigDir)
 	requiredFields := []struct {
 		value     string
 		name      string
