@@ -13,7 +13,7 @@ jobs:
     env:
       MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
       MIGRATION_PLANNER_API_IMAGE_PULL_POLICY: "Never"
-      PERSISTENT_DISK_DEVICE: /dev/vda
+      PERSISTENT_DISK_DEVICE: "/dev/vda"
       PODMAN: "docker"
 
     steps:
