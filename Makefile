@@ -111,7 +111,8 @@ build-containers: migration-planner-api-container migration-planner-agent-contai
 .PHONY: build-containers
 
 quay-login:
-	if [ ! -f $(DOCKER_AUTH_FILE) ] && [ -n $(QUAY_USER) ] && [ -n $(QUAY_TOKEN) ]; then \
+	@if [ ! -f $(DOCKER_AUTH_FILE) ] && [ $(QUAY_USER) ] && [ $(QUAY_TOKEN) ]; then \
+		$(info Create Auth File: $(DOCKER_AUTH_FILE)) \
 		mkdir -p "$(DOCKER_CONF)"; \
 		$(PODMAN) login --authfile $(DOCKER_AUTH_FILE) -u=$(QUAY_USER) -p=$(QUAY_TOKEN) quay.io; \
 	fi;
