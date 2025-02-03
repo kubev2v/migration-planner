@@ -76,7 +76,7 @@ func (a *agentCmd) Execute() error {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	agentID, err := a.readFileFromVolatile(agentFilename)
+	agentID, err := a.readFileFromPersistent(agentFilename)
 	if err != nil {
 		zap.S().Fatalf("failed to retreive agent_id: %v", err)
 	}
