@@ -79,7 +79,6 @@ func Untar(file *os.File, destFile string, fileName string) error {
 		switch header.Typeflag {
 		case tar.TypeReg:
 			if header.Name == fileName {
-				fmt.Printf("dest: %s", destFile)
 				outFile, err := os.Create(destFile)
 				if err != nil {
 					return fmt.Errorf("error creating file: %w", err)
@@ -110,7 +109,7 @@ func CreateVm(c *libvirt.Connect) error {
 	defer func() {
 		_ = domain.Free()
 	}()
-	domain.Free()
+
 	// Start the domain
 	if err := domain.Create(); err != nil {
 		return fmt.Errorf("failed to create domain: %v", err)
