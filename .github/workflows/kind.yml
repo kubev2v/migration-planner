@@ -16,16 +16,6 @@ jobs:
       PODMAN: "docker"
 
     steps:
-      - name: Free Disk Space (Ubuntu)
-        uses: jlumbroso/free-disk-space@main
-        with:
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-
       - name: Checkout the code
         uses: actions/checkout@v2
 
