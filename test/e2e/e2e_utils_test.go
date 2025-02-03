@@ -107,7 +107,10 @@ func CreateVm(c *libvirt.Connect) error {
 		return fmt.Errorf("failed to define domain: %v", err)
 	}
 	defer func() {
-		_ = domain.Free()
+		err = domain.Free()
+		if err != nil {
+			fmt.Printf("failed to free domain: %v", err)
+		}
 	}()
 
 	// Start the domain
