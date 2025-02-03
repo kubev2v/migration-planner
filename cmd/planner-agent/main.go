@@ -112,19 +112,6 @@ func (a *agentCmd) readFileFromVolatile(filename string) (string, error) {
 	return a.readFile(a.config.DataDir, filename)
 }
 
-//func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
-//return a.readFile(a.config.PersistentDataDir, filename)
-//}
-//func (a *agentCmd) readFile(filename string) (string, error) {
-//	// look for it in data dir
-//	confDirPath := path.Join(a.config.DataDir, filename)
-//	if _, err := os.Stat(confDirPath); err == nil {
-//		content, err := os.ReadFile(confDirPath)
-//		if err != nil {
-//			return "", err
-//		}
-//		return string(bytes.TrimSpace(content)), nil
-//	}
-//
-//	return "", errors.New("agent_id not found")
-//}
+func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
+	return a.readFile(a.config.PersistentDataDir, filename)
+}
