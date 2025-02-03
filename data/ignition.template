@@ -38,7 +38,7 @@ systemd:
 storage:
   filesystems:
     - path: /var/lib/data
-      device: {{.PersistentDiskDevice}}
+      device: /dev/vda
       format: ext4
       label: "DATA"
 
