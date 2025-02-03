@@ -144,7 +144,7 @@ deploy-on-kind:
 	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
              s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
              s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g" \
+             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
              s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
