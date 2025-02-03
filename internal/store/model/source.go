@@ -4,21 +4,22 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"gorm.io/gorm"
 )
 
 type Source struct {
-	ID         openapi_types.UUID `json:"id" gorm:"primaryKey"`
+	ID         uuid.UUID `gorm:"primaryKey; not null"`
+	Name       string    `gorm:"not null"`
 	Username   string
 	OrgID      string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
-	DeletedAt  gorm.DeletedAt            `gorm:"index"`
+	DeletedAt  gorm.DeletedAt
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	OnPremises bool
-	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`
+	Agent      *Agent
 }
 
 type SourceList []Source

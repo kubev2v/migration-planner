@@ -10,11 +10,11 @@ import (
 
 // AgentStatusUpdate defines model for AgentStatusUpdate.
 type AgentStatusUpdate struct {
-	CredentialUrl string `json:"credentialUrl"`
-	Id            string `json:"id"`
-	Status        string `json:"status"`
-	StatusInfo    string `json:"statusInfo"`
-	Version       string `json:"version"`
+	CredentialUrl string             `json:"credentialUrl"`
+	SourceId      openapi_types.UUID `json:"source_id"`
+	Status        string             `json:"status"`
+	StatusInfo    string             `json:"statusInfo"`
+	Version       string             `json:"version"`
 }
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.

@@ -39,12 +39,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 		return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
 	}
 
-	username, orgID := "", ""
-	if user, found := auth.UserFromContext(ctx); found {
-		username, orgID = user.Username, user.Organization
-	}
-
-	agent, err := h.store.Agent().Get(ctx, request.Body.AgentId.String())
+	agent, err := h.store.Agent().Get(ctx, request.Body.AgentId)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}
@@ -53,45 +48,20 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}
 
-	if username != agent.Username {
+	if auth.MustHaveUser(ctx).Organization != agent.OrgID {
 		return agentServer.ReplaceSourceStatus403JSONResponse{}, nil
 	}
 
-	source, err := h.store.Source().Get(ctx, request.Id)
-	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-	}
-
-	associated := false
-	if source == nil {
-		source, err = h.store.Source().Create(ctx, mappers.SourceFromApi(request.Id, username, orgID, nil, false))
-		if err != nil {
-			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-		}
-		associated = true
-	}
-
-	// connect the agent to the source
-	// If agent is already connected to a source but the source is different from the current one, connect it anyway.
-	// An agent is allowed to change sources.
-	if agent.SourceID == nil || *agent.SourceID != source.ID.String() {
-		if agent, err = h.store.Agent().UpdateSourceID(ctx, agent.ID, request.Id.String(), associated); err != nil {
-			_, _ = store.Rollback(ctx)
-			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-		}
-	}
-
-	// We are not allowing updates from agents not associated with the source ("first come first serve").
-	if !agent.Associated {
-		zap.S().Errorf("Failed to update status of source %s from agent %s. Agent is not the associated with the source", source.ID, agent.ID)
-		if _, err := store.Commit(ctx); err != nil {
-			return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
+	source, err := h.store.Source().Get(ctx, agent.SourceID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return agentServer.ReplaceSourceStatus404JSONResponse{}, nil
 		}
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
 	}
 
-	newSource := mappers.SourceFromApi(request.Id, username, "", &request.Body.Inventory, false)
-	result, err := h.store.Source().Update(ctx, newSource)
+	source = mappers.UpdateSourceFromApi(source, request.Body.Inventory)
+	result, err := h.store.Source().Update(ctx, *source)
 	if err != nil {
 		_, _ = store.Rollback(ctx)
 		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
@@ -120,44 +90,20 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
-	username, orgID := "", ""
-	if user, found := auth.UserFromContext(ctx); found {
-		username, orgID = user.Username, user.Organization
+	agent, err := h.store.Agent().Get(ctx, request.Id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return agentServer.UpdateAgentStatus404JSONResponse{}, nil
+		}
+		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
-	agent, err := h.store.Agent().Get(ctx, request.Id.String())
-	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
-	}
-
-	if agent == nil {
-		newAgent := mappers.AgentFromApi(username, orgID, request.Body)
-		a, err := h.store.Agent().Create(ctx, newAgent)
-		if err != nil {
-			return agentServer.UpdateAgentStatus400JSONResponse{}, nil
-		}
-		if _, err := store.Commit(ctx); err != nil {
-			return agentServer.UpdateAgentStatus500JSONResponse{}, nil
-		}
-
-		kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*a))
-		if err := h.eventWriter.Write(ctx, kind, agentEvent); err != nil {
-			zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
-		}
-
-		return agentServer.UpdateAgentStatus201Response{}, nil
-	}
-
-	if username != agent.Username {
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != agent.OrgID {
 		return agentServer.UpdateAgentStatus403JSONResponse{}, nil
 	}
 
-	// check if agent is marked for deletion
-	if agent.DeletedAt.Valid {
-		return agentServer.UpdateAgentStatus410JSONResponse{}, nil
-	}
-
-	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(username, orgID, request.Body)); err != nil {
+	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, user, request.Body)); err != nil {
 		_, _ = store.Rollback(ctx)
 		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
 	}
@@ -209,7 +155,7 @@ func (h *AgentServiceHandler) updateMetrics() {
 
 func (h *AgentServiceHandler) newAgentEvent(agent api.Agent) (string, io.Reader) {
 	event := events.AgentEvent{
-		AgentID:   agent.Id,
+		AgentID:   agent.Id.String(),
 		State:     string(agent.Status),
 		StateInfo: agent.StatusInfo,
 	}

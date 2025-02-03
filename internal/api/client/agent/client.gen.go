@@ -350,7 +350,7 @@ type UpdateAgentStatusResponse struct {
 	JSON400      *externalRef0.Error
 	JSON401      *externalRef0.Error
 	JSON403      *externalRef0.Error
-	JSON410      *externalRef0.Error
+	JSON404      *externalRef0.Error
 	JSON500      *externalRef0.Error
 }
 
@@ -496,12 +496,12 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 		}
 		response.JSON403 = &dest
 
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 410:
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
-		response.JSON410 = &dest
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest externalRef0.Error

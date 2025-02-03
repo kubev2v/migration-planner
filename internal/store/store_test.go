@@ -94,16 +94,11 @@ var _ = Describe("Store", Ordered, func() {
 			err = gormDB.Raw("SELECT COUNT(*) from sources;").Scan(&count).Error
 			Expect(err).To(BeNil())
 			Expect(count).To(Equal(1))
-
-			count = 0
-			err = gormDB.Raw("SELECT COUNT(*) from agents;").Scan(&count).Error
-			Expect(err).To(BeNil())
-			Expect(count).To(Equal(1))
 		})
 
 		AfterEach(func() {
-			gormDB.Exec("DELETE from sources;")
 			gormDB.Exec("DELETE from agents;")
+			gormDB.Exec("DELETE from sources;")
 		})
 	})
 })

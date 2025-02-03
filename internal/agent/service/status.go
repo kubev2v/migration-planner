@@ -42,11 +42,11 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 	defer cancel()
 
 	bodyParameters := agentapi.AgentStatusUpdate{
-		Id:            s.agentID.String(),
 		Status:        string(status),
 		StatusInfo:    statusInfo,
 		CredentialUrl: credUrl,
 		Version:       s.version,
+		SourceId:      uuid.MustParse(s.config.SourceID),
 	}
 
 	return s.client.UpdateAgentStatus(ctx, s.agentID, bodyParameters)

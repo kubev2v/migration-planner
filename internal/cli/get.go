@@ -107,7 +107,7 @@ func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: 
 	}
 	switch {
 	case kind == SourceKind && id != nil:
-		response, err = c.ReadSourceWithResponse(ctx, *id)
+		response, err = c.GetSourceWithResponse(ctx, *id)
 	case kind == SourceKind && id == nil:
 		params := v1alpha1.ListSourcesParams{}
 		response, err = c.ListSourcesWithResponse(ctx, &params)
@@ -158,7 +158,7 @@ func printTable(response interface{}, kind string, id *uuid.UUID) error {
 	case kind == SourceKind && id == nil:
 		printSourcesTable(w, *(response.(*apiclient.ListSourcesResponse).JSON200)...)
 	case kind == SourceKind && id != nil:
-		printSourcesTable(w, *(response.(*apiclient.ReadSourceResponse).JSON200))
+		printSourcesTable(w, *(response.(*apiclient.GetSourceResponse).JSON200))
 	default:
 		return fmt.Errorf("unknown resource type %s", kind)
 	}

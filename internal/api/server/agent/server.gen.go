@@ -303,11 +303,11 @@ func (response UpdateAgentStatus403JSONResponse) VisitUpdateAgentStatusResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAgentStatus410JSONResponse externalRef0.Error
+type UpdateAgentStatus404JSONResponse externalRef0.Error
 
-func (response UpdateAgentStatus410JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+func (response UpdateAgentStatus404JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(410)
+	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
