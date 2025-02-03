@@ -71,6 +71,7 @@ var _ = Describe("Agent", func() {
 				PersistentDataDir:   agentTmpFolder,
 				ConfigDir:           agentTmpFolder,
 				UpdateInterval:      util.Duration{Duration: updateInterval},
+				SourceID:            uuid.NewString(),
 				HealthCheckInterval: 10,
 			}
 			config.PlannerService.Service.Server = testHttpServer.URL

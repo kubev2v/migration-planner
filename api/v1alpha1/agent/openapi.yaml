@@ -12,8 +12,8 @@ paths:
     put:
       tags:
         - source
-      description: replace status of the specified source
-      operationId: replaceSourceStatus
+      description: Updates the inventory of a source
+      operationId: updateSourceInventory
       parameters:
         - name: id
           in: path
@@ -69,7 +69,7 @@ paths:
     put:
       tags:
         - agent
-      description: update status of the agent
+      description: Update status of the agent
       operationId: updateAgentStatus
       parameters:
         - name: id
@@ -107,8 +107,8 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
-        "410":
-          description: Gone
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
@@ -123,7 +123,7 @@ paths:
     get:
       tags:
         - health
-      description: health check
+      description: Health check
       operationId: health
       responses:
         "200":
@@ -142,11 +142,10 @@ components:
       required:
         - inventory
         - agentId
+
     AgentStatusUpdate:
       type: object
       properties:
-        id:
-          type: string
         status:
           type: string
         statusInfo:
@@ -155,9 +154,12 @@ components:
           type: string
         version:
           type: string
+        sourceId:
+          type: string
+          format: uuid
       required:
         - status
         - statusInfo
         - credentialUrl
-        - id
         - version
+        - sourceId

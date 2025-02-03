@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -65,7 +64,6 @@ func (s *DataStore) InitialMigration() error {
 
 func (s *DataStore) Seed() error {
 	sourceUuid := uuid.UUID{}
-	sourceUuidStr := sourceUuid.String()
 
 	tx, err := newTransaction(s.db)
 	if err != nil {
@@ -80,21 +78,6 @@ func (s *DataStore) Seed() error {
 	if err := tx.tx.Clauses(clause.OnConflict{
 		UpdateAll: true,
 	}).Create(&source).Error; err != nil {
-		_ = tx.Rollback()
-	}
-
-	// Create/update default agent
-	agent := model.Agent{
-		ID:         sourceUuidStr,
-		Status:     string(api.AgentStatusUpToDate),
-		StatusInfo: "Inventory successfully collected",
-		CredUrl:    "Example report",
-		SourceID:   &sourceUuidStr,
-		Associated: true,
-	}
-	if err := tx.tx.Clauses(clause.OnConflict{
-		UpdateAll: true,
-	}).Create(&agent).Error; err != nil {
 		_ = tx.Rollback()
 	}
 

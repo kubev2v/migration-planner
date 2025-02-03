@@ -21,6 +21,7 @@ const (
 
 type StatusUpdater struct {
 	agentID       uuid.UUID
+	sourceID      uuid.UUID
 	version       string
 	config        *config.Config
 	client        client.Planner
@@ -28,13 +29,14 @@ type StatusUpdater struct {
 	HealthChecker *HealthChecker
 }
 
-func NewStatusUpdater(agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
+func NewStatusUpdater(sourceID, agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
 	return &StatusUpdater{
-		client:  client,
-		config:  config,
-		agentID: agentID,
-		credUrl: credUrl,
-		version: version,
+		client:   client,
+		config:   config,
+		agentID:  agentID,
+		sourceID: sourceID,
+		credUrl:  credUrl,
+		version:  version,
 	}
 }
 
@@ -43,11 +45,11 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 	defer cancel()
 
 	bodyParameters := agentapi.AgentStatusUpdate{
-		Id:            s.agentID.String(),
 		Status:        string(status),
 		StatusInfo:    statusInfo,
 		CredentialUrl: credUrl,
 		Version:       s.version,
+		SourceId:      s.sourceID,
 	}
 
 	return s.client.UpdateAgentStatus(ctx, s.agentID, bodyParameters)

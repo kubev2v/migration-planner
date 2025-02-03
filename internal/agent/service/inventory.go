@@ -15,6 +15,7 @@ import (
 type InventoryUpdater struct {
 	client     client.Planner
 	agentID    uuid.UUID
+	sourceID   uuid.UUID
 	prevStatus []byte
 }
 
@@ -23,10 +24,11 @@ type InventoryData struct {
 	Error     string        `json:"error"`
 }
 
-func NewInventoryUpdater(agentID uuid.UUID, client client.Planner) *InventoryUpdater {
+func NewInventoryUpdater(sourceID, agentID uuid.UUID, client client.Planner) *InventoryUpdater {
 	updater := &InventoryUpdater{
 		client:     client,
 		agentID:    agentID,
+		sourceID:   sourceID,
 		prevStatus: []byte{},
 	}
 	return updater
@@ -47,7 +49,7 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, inven
 		return
 	}
 
-	err = u.client.UpdateSourceStatus(ctx, uuid.MustParse(inventory.Vcenter.Id), update)
+	err = u.client.UpdateSourceStatus(ctx, u.sourceID, update)
 	if err != nil {
 		zap.S().Named("inventory").Errorf("failed updating status: %v", err)
 		return

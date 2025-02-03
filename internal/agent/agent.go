@@ -96,8 +96,8 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
-	inventoryUpdater := service.NewInventoryUpdater(a.id, plannerClient)
-	statusUpdater := service.NewStatusUpdater(a.id, version, a.credUrl, a.config, plannerClient)
+	inventoryUpdater := service.NewInventoryUpdater(uuid.MustParse(a.config.SourceID), a.id, plannerClient)
+	statusUpdater := service.NewStatusUpdater(uuid.MustParse(a.config.SourceID), a.id, version, a.credUrl, a.config, plannerClient)
 
 	// insert jwt into the context if any
 	if a.jwt != "" {
