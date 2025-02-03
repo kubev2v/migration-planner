@@ -45,6 +45,8 @@ spec:
               value: @MIGRATION_PLANNER_AGENT_IMAGE@
             - name:  INSECURE_REGISTRY
               value: "@INSECURE_REGISTRY@"
+            - name: PERSISTENT_DISK_DEVICE
+              value: "@PERSISTENT_DISK_DEVICE@"
           volumeMounts:
           volumeMounts:
             - name: migration-planner-config
