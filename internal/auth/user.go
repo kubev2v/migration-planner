@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/golang-jwt/jwt/v5"
+	"go.uber.org/zap"
 )
 
 type usernameKeyType struct{}
@@ -18,6 +19,14 @@ func UserFromContext(ctx context.Context) (User, bool) {
 		return User{}, false
 	}
 	return val.(User), true
+}
+
+func MustHaveUser(ctx context.Context) User {
+	user, found := UserFromContext(ctx)
+	if !found {
+		zap.S().Named("auth").Panicf("failed to find user in context")
+	}
+	return user
 }
 
 func NewUserContext(ctx context.Context, u User) context.Context {

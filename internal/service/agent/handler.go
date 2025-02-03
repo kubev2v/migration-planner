@@ -58,7 +58,7 @@ func (h *AgentServiceHandler) GetImageByToken(ctx context.Context, req agentServ
 		return agentServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
 	}
 
-	ova := &image.Ova{Source: source, Writer: writer}
+	ova := &image.Ova{SourceID: source.ID, SshKey: source.SshPublicKey, Writer: writer}
 
 	// Calculate the size of the OVA, so the download show estimated time:
 	size, err := ova.OvaSize()
@@ -69,6 +69,7 @@ func (h *AgentServiceHandler) GetImageByToken(ctx context.Context, req agentServ
 	// Set proper headers of the OVA file:
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("Content-Length", strconv.Itoa(size))
+	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename='%s'", req.Imagename))
 
 	// Generate the OVA image
 	if err := ova.Generate(); err != nil {
@@ -81,73 +82,74 @@ func (h *AgentServiceHandler) GetImageByToken(ctx context.Context, req agentServ
 	return agentServer.GetImageByToken200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
 }
 
-func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request agentServer.ReplaceSourceStatusRequestObject) (agentServer.ReplaceSourceStatusResponseObject, error) {
+/*
+UpdateSourceInventory updates source inventory
+
+This implements the SingleModel logic:
+- Only updates for a single vCenterID are allowed
+- allow two agents trying to update the source with same vCenterID
+- don't allow updates from agents not belonging to the source
+- don't allow updates if source is missing. (i.g the source is created as per MultiSource logic). It fails anyway because an agent always has a source.
+- if the source has no inventory yet, set the vCenterID and AssociatedAgentID to this source.
+*/
+func (h *AgentServiceHandler) UpdateSourceInventory(ctx context.Context, request agentServer.UpdateSourceInventoryRequestObject) (agentServer.UpdateSourceInventoryResponseObject, error) {
 	// start new transaction
 	ctx, err := h.store.NewTransactionContext(ctx)
 	if err != nil {
-		return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
-	}
-
-	username, orgID := "", ""
-	if user, found := auth.UserFromContext(ctx); found {
-		username, orgID = user.Username, user.Organization
-	}
-
-	agent, err := h.store.Agent().Get(ctx, request.Body.AgentId.String())
-	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-	}
-
-	if agent == nil {
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-	}
-
-	if username != agent.Username {
-		return agentServer.ReplaceSourceStatus403JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
 	source, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		if errors.Is(store.ErrRecordNotFound, err) {
+			return agentServer.UpdateSourceInventory404JSONResponse{}, nil
+		}
+		return agentServer.UpdateSourceInventory500JSONResponse{}, nil
+	}
+
+	agent, err := h.store.Agent().Get(ctx, request.Body.AgentId)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
-	associated := false
-	if source == nil {
-		source, err = h.store.Source().Create(ctx, mappers.SourceFromApi(request.Id, username, orgID, nil, false))
-		if err != nil {
-			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-		}
-		associated = true
+	if agent == nil {
+		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
-	// connect the agent to the source
-	// If agent is already connected to a source but the source is different from the current one, connect it anyway.
-	// An agent is allowed to change sources.
-	if agent.SourceID == nil || *agent.SourceID != source.ID.String() {
-		if agent, err = h.store.Agent().UpdateSourceID(ctx, agent.ID, request.Id.String(), associated); err != nil {
-			_, _ = store.Rollback(ctx)
-			return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
-		}
+	// agent must be under organization's scope
+	if auth.MustHaveUser(ctx).Organization != agent.OrgID {
+		return agentServer.UpdateSourceInventory403JSONResponse{}, nil
 	}
 
-	// We are not allowing updates from agents not associated with the source ("first come first serve").
-	if !agent.Associated {
-		zap.S().Errorf("Failed to update status of source %s from agent %s. Agent is not the associated with the source", source.ID, agent.ID)
-		if _, err := store.Commit(ctx); err != nil {
-			return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
-		}
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
+	// don't allow updates of sources not associated with this agent
+	if request.Id != agent.SourceID {
+		return agentServer.UpdateSourceInventory400JSONResponse{Message: "sss"}, nil
 	}
 
-	newSource := mappers.SourceFromApi(request.Id, username, "", &request.Body.Inventory, false)
-	result, err := h.store.Source().Update(ctx, newSource)
+	// if source has already a vCenter check if it's the same
+	if source.VCenterID != nil && *source.VCenterID != request.Body.Inventory.Vcenter.Id {
+		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
+	}
+
+	source = mappers.UpdateSourceFromApi(source, request.Body.Inventory)
+	// if this is the first time updating the source
+	// associate this agent with source and set vCenterID
+	if source.AssociatedAgentID == nil {
+		source.AssociatedAgentID = &request.Body.AgentId
+	}
+
+	if source.VCenterID == nil {
+		source.VCenterID = &request.Body.Inventory.Vcenter.Id
+	}
+
+	updatedSource, err := h.store.Source().Update(ctx, *source)
 	if err != nil {
 		_, _ = store.Rollback(ctx)
-		return agentServer.ReplaceSourceStatus400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return agentServer.ReplaceSourceStatus500JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
 	kind, inventoryEvent := h.newInventoryEvent(request.Id.String(), request.Body.Inventory)
@@ -155,7 +157,7 @@ func (h *AgentServiceHandler) ReplaceSourceStatus(ctx context.Context, request a
 		zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
 	}
 
-	return agentServer.ReplaceSourceStatus200JSONResponse(mappers.SourceToApi(*result)), nil
+	return agentServer.UpdateSourceInventory200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
 }
 
 func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.HealthRequestObject) (agentServer.HealthResponseObject, error) {
@@ -163,28 +165,45 @@ func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.He
 	return nil, nil
 }
 
+// UpdateAgentStatus updates or creates a new agent resource
+// If the source has not agent than the agent is created.
 func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request agentServer.UpdateAgentStatusRequestObject) (agentServer.UpdateAgentStatusResponseObject, error) {
 	ctx, err := h.store.NewTransactionContext(ctx)
 	if err != nil {
 		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
-	username, orgID := "", ""
-	if user, found := auth.UserFromContext(ctx); found {
-		username, orgID = user.Username, user.Organization
+	user := auth.MustHaveUser(ctx)
+
+	source, err := h.store.Source().Get(ctx, request.Body.SourceId)
+	if err != nil {
+		if errors.Is(store.ErrRecordNotFound, err) {
+			return agentServer.UpdateAgentStatus400JSONResponse{}, nil
+		}
+		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
-	agent, err := h.store.Agent().Get(ctx, request.Id.String())
+	agent, err := h.store.Agent().Get(ctx, request.Id)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
+		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
 	if agent == nil {
-		newAgent := mappers.AgentFromApi(username, orgID, request.Body)
+		// try to find the source and check if
+		newAgent := mappers.AgentFromApi(request.Id, user, request.Body)
 		a, err := h.store.Agent().Create(ctx, newAgent)
 		if err != nil {
 			return agentServer.UpdateAgentStatus400JSONResponse{}, nil
 		}
+
+		// if this is the first created agent registered with the source id
+		id := uuid.MustParse(request.Id.String())
+		source.AssociatedAgentID = &id
+		if _, err := h.store.Source().Update(ctx, *source); err != nil {
+			_, _ = store.Rollback(ctx)
+			return agentServer.UpdateAgentStatus500JSONResponse{}, nil
+		}
+
 		if _, err := store.Commit(ctx); err != nil {
 			return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 		}
@@ -197,27 +216,22 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 		return agentServer.UpdateAgentStatus201Response{}, nil
 	}
 
-	if username != agent.Username {
+	if user.Organization != agent.OrgID {
 		return agentServer.UpdateAgentStatus403JSONResponse{}, nil
 	}
 
-	// check if agent is marked for deletion
-	if agent.DeletedAt.Valid {
-		return agentServer.UpdateAgentStatus410JSONResponse{}, nil
-	}
-
-	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(username, orgID, request.Body)); err != nil {
+	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, user, request.Body)); err != nil {
 		_, _ = store.Rollback(ctx)
 		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
-	}
-
-	if _, err := store.Commit(ctx); err != nil {
-		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
 	kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*agent))
 	if err := h.eventWriter.Write(ctx, kind, agentEvent); err != nil {
 		zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
 	}
 
 	// must not block here.
@@ -258,7 +272,7 @@ func (h *AgentServiceHandler) updateMetrics() {
 
 func (h *AgentServiceHandler) newAgentEvent(agent api.Agent) (string, io.Reader) {
 	event := events.AgentEvent{
-		AgentID:   agent.Id,
+		AgentID:   agent.Id.String(),
 		State:     string(agent.Status),
 		StateInfo: agent.StatusInfo,
 	}

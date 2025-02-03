@@ -8,7 +8,7 @@ info:
 servers:
   - url: /
 paths:
-  /api/v1/image/bytoken/{token}:
+  /api/v1/image/bytoken/{token}/{imagename}:
     get:
       tags:
         - image
@@ -18,6 +18,12 @@ paths:
         - name: token
           in: path
           description: User token
+          required: true
+          schema:
+            type: string
+        - name: imagename
+          in: path
+          description: Image name
           required: true
           schema:
             type: string
@@ -57,8 +63,8 @@ paths:
     put:
       tags:
         - source
-      description: replace status of the specified source
-      operationId: replaceSourceStatus
+      description: updates the inventory of a source
+      operationId: updateSourceInventory
       parameters:
         - name: id
           in: path
@@ -152,8 +158,8 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
-        "410":
-          description: Gone
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
@@ -187,11 +193,10 @@ components:
       required:
         - inventory
         - agentId
+
     AgentStatusUpdate:
       type: object
       properties:
-        id:
-          type: string
         status:
           type: string
         statusInfo:
@@ -200,9 +205,12 @@ components:
           type: string
         version:
           type: string
+        source_id:
+          type: string
+          format: uuid
       required:
         - status
         - statusInfo
         - credentialUrl
-        - id
         - version
+        - source_id

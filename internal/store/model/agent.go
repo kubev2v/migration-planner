@@ -3,21 +3,20 @@ package model
 import (
 	"encoding/json"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type Agent struct {
 	gorm.Model
-	ID         string `json:"id" gorm:"primaryKey"`
+	ID         uuid.UUID `json:"id" gorm:"primaryKey"`
 	Username   string
 	OrgID      string
 	Status     string
 	StatusInfo string
 	CredUrl    string
-	SourceID   *string
-	Source     *Source
 	Version    string
-	Associated bool
+	SourceID   uuid.UUID
 }
 
 type AgentList []Agent
@@ -27,6 +26,6 @@ func (a Agent) String() string {
 	return string(v)
 }
 
-func NewAgentFromID(id string) *Agent {
+func NewAgentFromID(id uuid.UUID) *Agent {
 	return &Agent{ID: id}
 }

@@ -2,24 +2,24 @@ package model
 
 import (
 	"encoding/json"
-	"time"
 
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	"gorm.io/gorm"
 )
 
 type Source struct {
-	ID         openapi_types.UUID `json:"id" gorm:"primaryKey"`
-	Username   string
-	OrgID      string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	SshKey     *string
-	DeletedAt  gorm.DeletedAt            `gorm:"index"`
-	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	OnPremises bool
-	Agents     []Agent `gorm:"constraint:OnDelete:SET NULL;"`
+	gorm.Model
+	ID                uuid.UUID `gorm:"primaryKey; not null"`
+	Name              string    `gorm:"not null"`
+	VCenterID         *string
+	Username          string
+	OrgID             string
+	Inventory         *JSONField[api.Inventory] `gorm:"type:jsonb"`
+	OnPremises        bool
+	SshPublicKey      *string
+	AssociatedAgentID *uuid.UUID
+	Agents            []Agent `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 type SourceList []Source

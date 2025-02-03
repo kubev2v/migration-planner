@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -37,10 +38,9 @@ func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 
 func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
 	// Get user content
-	filter := store.NewSourceQueryFilter()
-	if user, found := auth.UserFromContext(ctx); found {
-		filter = filter.ByUsername(user.Username)
-	}
+	user := auth.MustHaveUser(ctx)
+	filter := store.NewSourceQueryFilter().ByUsername(user.Username)
+
 	userResult, err := h.store.Source().List(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -59,25 +59,57 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 	return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult)), nil
 }
 
-func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
-	err := h.store.Source().DeleteAll(ctx)
+func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
+	user := auth.MustHaveUser(ctx)
+
+	source := mappers.SourceFromApi(uuid.New(), user, request.Body)
+	result, err := h.store.Source().Create(ctx, source)
 	if err != nil {
-		return nil, err
+		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
 	}
+
+	return server.CreateSource201JSONResponse(mappers.SourceToApi(*result)), nil
+}
+
+func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
+	ctx, err := h.store.NewTransactionContext(ctx)
+	if err != nil {
+		return server.DeleteSources500JSONResponse{}, nil
+	}
+
+	if err := h.store.Agent().DeleteAll(ctx); err != nil {
+		return server.DeleteSources500JSONResponse{}, nil
+	}
+
+	if err := h.store.Source().DeleteAll(ctx); err != nil {
+		if _, err := store.Rollback(ctx); err != nil {
+			return nil, err
+		}
+		return server.DeleteSources500JSONResponse{}, nil
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return server.DeleteSources500JSONResponse{}, nil
+	}
+
 	return server.DeleteSources200JSONResponse{}, nil
 }
 
-func (h *ServiceHandler) ReadSource(ctx context.Context, request server.ReadSourceRequestObject) (server.ReadSourceResponseObject, error) {
+func (h *ServiceHandler) GetSource(ctx context.Context, request server.GetSourceRequestObject) (server.GetSourceResponseObject, error) {
 	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
-		return server.ReadSource404JSONResponse{}, nil
-	}
-	if user, found := auth.UserFromContext(ctx); found {
-		if user.Username != source.Username {
-			return server.ReadSource403JSONResponse{}, nil
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.GetSource404JSONResponse{}, nil
 		}
+		return server.GetSource500JSONResponse{}, nil
 	}
-	return server.ReadSource200JSONResponse(mappers.SourceToApi(*source)), nil
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return server.GetSource403JSONResponse{}, nil
+	}
+
+	return server.GetSource200JSONResponse(mappers.SourceToApi(*source)), nil
 }
 
 func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
@@ -91,62 +123,50 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	if err != nil {
 		return server.DeleteSource404JSONResponse{}, nil
 	}
-	if user, found := auth.UserFromContext(ctx); found {
-		if user.Username != source.Username {
-			return server.DeleteSource403JSONResponse{}, nil
-		}
-	}
 
-	// TODO check if user is admin
-	agentFilter := store.NewAgentQueryFilter().BySourceID(request.Id.String())
-	if user, found := auth.UserFromContext(ctx); found {
-		agentFilter = agentFilter.ByUsername(user.Username)
-	}
-
-	agents, err := h.store.Agent().List(ctx, agentFilter, store.NewAgentQueryOptions())
-	if err != nil {
-		return server.DeleteSource400JSONResponse{}, nil
-	}
-
-	for _, agent := range agents {
-		if err := h.store.Agent().Delete(ctx, agent.ID, true); err != nil {
-			_, _ = store.Rollback(ctx)
-			return server.DeleteSource400JSONResponse{}, nil
-		}
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return server.DeleteSource403JSONResponse{}, nil
 	}
 
 	if err := h.store.Source().Delete(ctx, request.Id); err != nil {
-		_, _ = store.Rollback(ctx)
+		if _, err = store.Rollback(ctx); err != nil {
+			return server.DeleteSource500JSONResponse{}, nil
+		}
 		return server.DeleteSource404JSONResponse{}, nil
 	}
 
-	_, _ = store.Commit(ctx)
+	if _, err = store.Commit(ctx); err != nil {
+		return server.DeleteSource500JSONResponse{}, nil
+	}
+
 	return server.DeleteSource200JSONResponse{}, nil
 }
 
-func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
-	username, orgID := "", ""
-	if user, found := auth.UserFromContext(ctx); found {
-		username, orgID = user.Username, user.Organization
-	}
-
-	inventory := request.Body.Inventory
-	id, err := uuid.Parse(inventory.Vcenter.Id)
+func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
+	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
-		return server.CreateSource500JSONResponse{}, nil
+		return server.UpdateSource500JSONResponse{}, nil
 	}
 
-	source, err := h.store.Source().Get(ctx, id)
-	if err == nil && source != nil {
-		if _, err = h.store.Source().Update(ctx, mappers.SourceFromApi(id, username, orgID, &inventory, true)); err != nil {
-			return server.CreateSource500JSONResponse{}, nil
-		}
-		return server.CreateSource201JSONResponse{}, nil
+	if source == nil {
+		return server.UpdateSource404JSONResponse{}, nil
 	}
 
-	if _, err = h.store.Source().Create(ctx, mappers.SourceFromApi(id, username, orgID, &inventory, true)); err != nil {
-		return server.CreateSource500JSONResponse{}, nil
+	user := auth.MustHaveUser(ctx)
+	if source.OrgID != user.Organization {
+		return server.UpdateSource403JSONResponse{}, nil
 	}
 
-	return server.CreateSource201JSONResponse{}, nil
+	if source.VCenterID != nil && *source.VCenterID != request.Body.Inventory.Vcenter.Id {
+		return server.UpdateSource400JSONResponse{}, nil
+	}
+
+	source = mappers.UpdateSourceOnPrem(source, request.Body.Inventory)
+
+	if _, err = h.store.Source().Update(ctx, *source); err != nil {
+		return server.UpdateSource500JSONResponse{}, nil
+	}
+
+	return server.UpdateSource200JSONResponse{}, nil
 }

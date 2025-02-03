@@ -22,59 +22,10 @@ func (qf *AgentQueryFilter) BySourceID(sourceID string) *AgentQueryFilter {
 	return qf
 }
 
-func (qf *AgentQueryFilter) ByUsername(username string) *AgentQueryFilter {
-	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("username = ?", username)
-	})
-	return qf
-}
-
-func (qf *AgentQueryFilter) ByOrgID(id string) *AgentQueryFilter {
-	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("org_id = ?", id)
-	})
-	return qf
-}
-
-func (qf *AgentQueryFilter) ByDefaultInventory() *AgentQueryFilter {
-	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id = ?", uuid.UUID{})
-	})
-	return qf
-}
-
-func (qf *AgentQueryFilter) BySoftDeleted(isSoftDeleted bool) *AgentQueryFilter {
-	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		if isSoftDeleted {
-			return tx.Unscoped().Where("deleted_at IS NOT NULL")
-		}
-		return tx
-	})
-	return qf
-}
-
 type AgentQueryOptions BaseQuerier
 
 func NewAgentQueryOptions() *AgentQueryOptions {
 	return &AgentQueryOptions{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
-}
-
-func (o *AgentQueryOptions) WithIncludeSoftDeleted(includeSoftDeleted bool) *AgentQueryOptions {
-	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		if includeSoftDeleted {
-			return tx.Unscoped()
-		}
-		return tx
-	})
-	return o
-}
-
-func (o *AgentQueryOptions) ExcludeDefaultInventory() *AgentQueryOptions {
-	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		// Exclude the default inventory agent by its unique zero UUID
-		return tx.Where("id != ?", uuid.UUID{}.String())
-	})
-	return o
 }
 
 func (qf *AgentQueryFilter) ByID(ids []string) *AgentQueryFilter {

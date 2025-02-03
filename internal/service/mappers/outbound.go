@@ -1,7 +1,6 @@
 package mappers
 
 import (
-	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
@@ -13,14 +12,21 @@ func SourceToApi(s model.Source) api.Source {
 		CreatedAt:  s.CreatedAt,
 		UpdatedAt:  s.UpdatedAt,
 		OnPremises: s.OnPremises,
+		Name:       s.Name,
 	}
 
-	if len(s.Agents) > 0 {
-		agents := make([]api.SourceAgentItem, 0, len(s.Agents))
+	// We are mapping only the associated agent and ignore the rest for now.
+	// Remark: If multiple agents are deployed,
+	// the associated agent (i.g. the first come first serve) could be in waiting-for-creds state
+	// while other agents in up-to-date states exists.
+	// Which one should be presented in the API response?
+	if s.AssociatedAgentID != nil {
 		for _, a := range s.Agents {
-			agents = append(agents, api.SourceAgentItem{Id: uuid.MustParse(a.ID), Associated: a.Associated})
+			if a.ID == *s.AssociatedAgentID {
+				agent := AgentToApi(a)
+				source.Agent = &agent
+			}
 		}
-		source.Agents = &agents
 	}
 
 	if s.Inventory != nil {
@@ -40,7 +46,7 @@ func SourceListToApi(sources ...model.SourceList) api.SourceList {
 }
 
 func AgentToApi(a model.Agent) api.Agent {
-	agent := api.Agent{
+	return api.Agent{
 		Id:            a.ID,
 		Status:        api.StringToAgentStatus(a.Status),
 		StatusInfo:    a.StatusInfo,
@@ -48,26 +54,5 @@ func AgentToApi(a model.Agent) api.Agent {
 		UpdatedAt:     a.UpdatedAt,
 		CredentialUrl: a.CredUrl,
 		Version:       a.Version,
-		Associated:    a.Associated,
 	}
-
-	if a.DeletedAt.Valid {
-		agent.DeletedAt = &a.DeletedAt.Time
-	}
-
-	if a.SourceID != nil {
-		agent.SourceId = a.SourceID
-	}
-
-	return agent
-}
-
-func AgentListToApi(agents ...model.AgentList) api.AgentList {
-	agentList := []api.Agent{}
-	for _, agent := range agents {
-		for _, a := range agent {
-			agentList = append(agentList, AgentToApi(a))
-		}
-	}
-	return agentList
 }
