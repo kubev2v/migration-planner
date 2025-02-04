@@ -29,13 +29,15 @@ import (
 )
 
 type Collector struct {
-	dataDir string
-	once    sync.Once
+	dataDir        string
+	credentialsDir string
+	once           sync.Once
 }
 
-func NewCollector(dataDir string) *Collector {
+func NewCollector(dataDir string, credentialsDir string) *Collector {
 	return &Collector{
-		dataDir: dataDir,
+		dataDir:        dataDir,
+		credentialsDir: credentialsDir,
 	}
 }
 
@@ -56,7 +58,7 @@ func (c *Collector) Collect(ctx context.Context) {
 }
 
 func (c *Collector) run() {
-	credentialsFilePath := filepath.Join(c.dataDir, config.CredentialsFile)
+	credentialsFilePath := filepath.Join(c.credentialsDir, config.CredentialsFile)
 	zap.S().Named("collector").Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 

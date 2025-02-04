@@ -68,6 +68,7 @@ var _ = Describe("Agent", func() {
 			config := config.Config{
 				PlannerService:      config.PlannerService{Config: *client.NewDefault()},
 				DataDir:             agentTmpFolder,
+				PersistentDataDir:   agentTmpFolder,
 				ConfigDir:           agentTmpFolder,
 				UpdateInterval:      util.Duration{Duration: updateInterval},
 				HealthCheckInterval: 10,

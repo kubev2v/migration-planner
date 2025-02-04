@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -77,7 +76,7 @@ func (a *agentCmd) Execute() error {
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
-	agentID, err := a.readFile(agentFilename)
+	agentID, err := a.readFileFromPersistent(agentFilename)
 	if err != nil {
 		zap.S().Fatalf("failed to retreive agent_id: %v", err)
 	}
@@ -85,7 +84,7 @@ func (a *agentCmd) Execute() error {
 	// Try to read jwt from file.
 	// We're assuming the jwt is valid.
 	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
-	jwt, err := a.readFile(jwtFilename)
+	jwt, err := a.readFileFromVolatile(jwtFilename)
 	if err != nil {
 		zap.S().Errorf("failed to read jwt: %v", err)
 	}
@@ -97,16 +96,23 @@ func (a *agentCmd) Execute() error {
 	return nil
 }
 
-func (a *agentCmd) readFile(filename string) (string, error) {
-	// look for it in data dir
-	confDirPath := path.Join(a.config.DataDir, filename)
-	if _, err := os.Stat(confDirPath); err == nil {
-		content, err := os.ReadFile(confDirPath)
+func (a *agentCmd) readFile(baseDir string, filename string) (string, error) {
+	filePath := path.Join(baseDir, filename)
+	if _, err := os.Stat(filePath); err == nil {
+		content, err := os.ReadFile(filePath)
 		if err != nil {
 			return "", err
 		}
 		return string(bytes.TrimSpace(content)), nil
 	}
 
-	return "", errors.New("agent_id not found")
+	return "", fmt.Errorf("file not found: %s", filePath)
+}
+
+func (a *agentCmd) readFileFromVolatile(filename string) (string, error) {
+	return a.readFile(a.config.DataDir, filename)
+}
+
+func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
+	return a.readFile(a.config.PersistentDataDir, filename)
 }

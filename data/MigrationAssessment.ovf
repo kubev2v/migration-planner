@@ -1,8 +1,13 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" xmlns:vmw="http://www.vmware.com/schema/ovf" xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData" xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData">
   <References>
-    <File ovf:id="file1" ovf:href="MigrationAssessment.iso" ovf:size="1220542464"/>
+    <File ovf:href="MigrationAssessment.iso" ovf:id="file1" ovf:size="1244659712"/>
+    <File ovf:href="persistence-disk.vmdk" ovf:id="file2" ovf:size="68096"/>
   </References>
+  <DiskSection>
+    <Info>Virtual disk information</Info>
+    <Disk ovf:capacity="50" ovf:capacityAllocationUnits="byte * 2^20" ovf:diskId="vmdisk1" ovf:fileRef="file2" ovf:format="http://www.vmware.com/interfaces/specifications/vmdk.html#streamOptimized" ovf:populatedSize="0"/>
+  </DiskSection>
   <NetworkSection>
     <Info>The list of logical networks</Info>
     <Network ovf:name="routable-network">
@@ -12,15 +17,16 @@
   <VirtualSystem ovf:id="MigrationAssessment">
     <Info>A Virtual system</Info>
     <Name>MigrationAssessment</Name>
-    <OperatingSystemSection ovf:id="80" ovf:version="8" vmw:osType="rhel9_64Guest">
-      <Info>The operating system installed</Info>
-      <Description>Other Linux (64-bit)</Description>
+    <OperatingSystemSection ovf:id="80" ovf:version="9" vmw:osType="rhel9_64Guest">
+      <Info>The kind of installed guest operating system</Info>
+      <Description>Red Hat Enterprise Linux 9 (64-bit)</Description>
     </OperatingSystemSection>
     <VirtualHardwareSection>
       <Info>Virtual hardware requirements</Info>
       <System>
         <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
         <vssd:InstanceID>0</vssd:InstanceID>
+        <vssd:VirtualSystemIdentifier>MigrationAssessment</vssd:VirtualSystemIdentifier>
         <vssd:VirtualSystemType>vmx-20</vssd:VirtualSystemType>
       </System>
       <Item>
@@ -44,11 +50,12 @@
         <rasd:Description>SCSI Controller</rasd:Description>
         <rasd:ElementName>SCSI Controller 1</rasd:ElementName>
         <rasd:InstanceID>3</rasd:InstanceID>
+        <rasd:ResourceSubType>VirtualSCSI</rasd:ResourceSubType>
         <rasd:ResourceType>6</rasd:ResourceType>
         <vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="16"/>
       </Item>
       <Item>
-        <rasd:Address>0</rasd:Address>
+        <rasd:Address>1</rasd:Address>
         <rasd:Description>IDE Controller</rasd:Description>
         <rasd:ElementName>IDE Controller 1</rasd:ElementName>
         <rasd:InstanceID>4</rasd:InstanceID>
@@ -75,6 +82,17 @@
         <vmw:Config ovf:required="false" vmw:key="slotInfo.pciSlotNumber" vmw:value="32"/>
         <vmw:Config ovf:required="false" vmw:key="wakeOnLanEnabled" vmw:value="true"/>
         <vmw:Config ovf:required="false" vmw:key="connectable.allowGuestControl" vmw:value="false"/>
+      </Item>
+      <Item>
+        <rasd:AddressOnParent>0</rasd:AddressOnParent>
+        <rasd:ElementName>Hard disk 1</rasd:ElementName>
+        <rasd:HostResource>ovf:/disk/vmdisk1</rasd:HostResource>
+        <rasd:InstanceID>10</rasd:InstanceID>
+        <rasd:Parent>3</rasd:Parent>
+        <rasd:ResourceType>17</rasd:ResourceType>
+        <vmw:Config ovf:required="false" vmw:key="backing.writeThrough" vmw:value="false"/>
+        <vmw:Config ovf:required="false" vmw:key="backing.diskMode" vmw:value="independent_persistent"/>
+        <vmw:Config ovf:required="false" vmw:key="guestReadOnly" vmw:value="false"/>
       </Item>
       <Item ovf:required="false">
         <rasd:ElementName>Video card</rasd:ElementName>

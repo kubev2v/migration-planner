@@ -26,6 +26,8 @@ const (
 	DefaultConfigFile = DefaultConfigDir + "/config.yaml"
 	// DefaultDataDir is the default directory where the agent's data is stored
 	DefaultDataDir = "/var/lib/planner"
+	// DefaultPersistentDataDir is the default directory where the agent's data is stored
+	DefaultPersistentDataDir = "/var/lib/data"
 	// DefaultWwwDir is the default directory from which the agent serves static files
 	DefaultWwwDir = "/var/www/planner"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
@@ -48,6 +50,8 @@ type Config struct {
 	ConfigDir string `json:"config-dir"`
 	// DataDir is the directory where the agent's data is stored
 	DataDir string `json:"data-dir"`
+	// PersistentDataDir is the directory where persistent data is stored
+	PersistentDataDir string `json:"persistent-data-dir"`
 	// WwwDir is the directory from which the agent serves static files
 	WwwDir string `json:"www-dir"`
 	// SourceID is the ID of this source in the planner
@@ -85,6 +89,7 @@ func NewDefault() *Config {
 	c := &Config{
 		ConfigDir:           DefaultConfigDir,
 		DataDir:             DefaultDataDir,
+		PersistentDataDir:   DefaultPersistentDataDir,
 		WwwDir:              DefaultWwwDir,
 		PlannerService:      PlannerService{Config: *client.NewDefault()},
 		UpdateInterval:      util.Duration{Duration: DefaultUpdateInterval},
@@ -102,7 +107,6 @@ func (cfg *Config) Validate() error {
 	if err := cfg.PlannerService.Validate(); err != nil {
 		return err
 	}
-
 	requiredFields := []struct {
 		value     string
 		name      string
@@ -110,6 +114,7 @@ func (cfg *Config) Validate() error {
 	}{
 		{cfg.ConfigDir, "config-dir", true},
 		{cfg.DataDir, "data-dir", true},
+		{cfg.PersistentDataDir, "persistent-data-dir", true},
 	}
 
 	for _, field := range requiredFields {

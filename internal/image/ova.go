@@ -36,6 +36,7 @@ type IgnitionData struct {
 	MigrationPlannerAgentImage string
 	InsecureRegistry           string
 	Token                      string
+	PersistentDiskDevice       string
 }
 
 type Image interface {
@@ -73,7 +74,11 @@ func (o *Ova) OvaSize() (int, error) {
 		return -1, err
 	}
 
-	return ovfSize + isoSize, nil
+	diskSize, err := o.diskSize()
+	if err != nil {
+		return -1, err
+	}
+	return ovfSize + isoSize + diskSize, nil
 }
 
 func (o *Ova) Generate() error {
@@ -86,6 +91,10 @@ func (o *Ova) Generate() error {
 
 	// Write OVF to TAR
 	if err := writeOvf(tw); err != nil {
+		return err
+	}
+
+	if err := writePersistenceDisk(tw); err != nil {
 		return err
 	}
 
@@ -179,6 +188,20 @@ func (o *Ova) ovfSize() (int, error) {
 	return calculateTarSize(int(fileInfo.Size())), nil
 }
 
+func (o *Ova) diskSize() (int, error) {
+	file, err := os.Open("data/persistence-disk.vmdk")
+	if err != nil {
+		return -1, err
+	}
+	defer file.Close()
+	fileInfo, err := file.Stat()
+	if err != nil {
+		return -1, err
+	}
+
+	return calculateTarSize(int(fileInfo.Size())), nil
+}
+
 func writeOvf(tw *tar.Writer) error {
 	ovfContent, err := os.ReadFile("data/MigrationAssessment.ovf")
 	if err != nil {
@@ -203,11 +226,35 @@ func writeOvf(tw *tar.Writer) error {
 	return nil
 }
 
+func writePersistenceDisk(tw *tar.Writer) error {
+	diskContent, err := os.ReadFile("data/persistence-disk.vmdk")
+	if err != nil {
+		return err
+	}
+
+	header := &tar.Header{
+		Name:    "persistence-disk.vmdk",
+		Size:    int64(len(diskContent)),
+		Mode:    0600,
+		ModTime: time.Now(),
+	}
+
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
+	if _, err := tw.Write([]byte(diskContent)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (o *Ova) generateIgnition() (string, error) {
 	ignData := IgnitionData{
 		PlannerService:             util.GetEnv("CONFIG_SERVER", "http://127.0.0.1:7443"),
 		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", "http://localhost:3000/migrate/wizard"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
+		PersistentDiskDevice:       util.GetEnv("PERSISTENT_DISK_DEVICE", "/dev/sda"),
 	}
 	if o.SshKey != nil {
 		ignData.SshKey = *o.SshKey

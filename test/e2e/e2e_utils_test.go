@@ -12,11 +12,12 @@ import (
 	libvirt "github.com/libvirt/libvirt-go"
 )
 
-func Untar(file *os.File, destFile string, fileName string) error {
+func ValidateTar(file *os.File) error {
 	_, _ = file.Seek(0, 0)
 	tarReader := tar.NewReader(file)
 	containsOvf := false
-
+	containsVmdk := false
+	containsIso := false
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -28,6 +29,9 @@ func Untar(file *os.File, destFile string, fileName string) error {
 
 		switch header.Typeflag {
 		case tar.TypeReg:
+			if strings.HasSuffix(header.Name, ".vmdk") {
+				containsVmdk = true
+			}
 			if strings.HasSuffix(header.Name, ".ovf") {
 				// Validate OVF file
 				ovfContent, err := io.ReadAll(tarReader)
@@ -42,6 +46,38 @@ func Untar(file *os.File, destFile string, fileName string) error {
 				}
 				containsOvf = true
 			}
+			if strings.HasSuffix(header.Name, ".iso") {
+				containsIso = true
+			}
+		}
+	}
+	if !containsOvf {
+		return fmt.Errorf("error ova image don't contain file with ovf suffix")
+	}
+	if !containsVmdk {
+		return fmt.Errorf("error ova image don't contain file with vmdk suffix")
+	}
+	if !containsIso {
+		return fmt.Errorf("error ova image don't contain file with iso suffix")
+	}
+
+	return nil
+}
+
+func Untar(file *os.File, destFile string, fileName string) error {
+	_, _ = file.Seek(0, 0)
+	tarReader := tar.NewReader(file)
+	for {
+		header, err := tarReader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("error reading tar header: %w", err)
+		}
+
+		switch header.Typeflag {
+		case tar.TypeReg:
 			if header.Name == fileName {
 				outFile, err := os.Create(destFile)
 				if err != nil {
@@ -52,14 +88,12 @@ func Untar(file *os.File, destFile string, fileName string) error {
 				if _, err := io.Copy(outFile, tarReader); err != nil {
 					return fmt.Errorf("error writing file: %w", err)
 				}
+				return nil
 			}
 		}
 	}
-	if !containsOvf {
-		return fmt.Errorf("error ova image don't contain file with ovf suffix")
-	}
 
-	return nil
+	return fmt.Errorf("file %s not found", fileName)
 }
 
 func CreateVm(c *libvirt.Connect) error {
@@ -68,7 +102,6 @@ func CreateVm(c *libvirt.Connect) error {
 	if err != nil {
 		return fmt.Errorf("failed to read VM XML file: %v", err)
 	}
-
 	domain, err := c.DomainDefineXML(string(vmXMLBytes))
 	if err != nil {
 		return fmt.Errorf("failed to define domain: %v", err)
@@ -81,7 +114,6 @@ func CreateVm(c *libvirt.Connect) error {
 	if err := domain.Create(); err != nil {
 		return fmt.Errorf("failed to create domain: %v", err)
 	}
-
 	return nil
 }
 
