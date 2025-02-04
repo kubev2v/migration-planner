@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/butane/config"
 	"github.com/coreos/butane/config/common"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -24,7 +25,7 @@ const ResponseWriterKey Key = 0
 
 type Ova struct {
 	Writer io.Writer
-	SshKey *string
+	Source *model.Source
 	Jwt    *jwt.Token
 }
 
@@ -209,8 +210,8 @@ func (o *Ova) generateIgnition() (string, error) {
 		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", "http://localhost:3000/migrate/wizard"),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", "quay.io/kubev2v/migration-planner-agent"),
 	}
-	if o.SshKey != nil {
-		ignData.SshKey = *o.SshKey
+	if o.Source.SshKey != nil {
+		ignData.SshKey = *o.Source.SshKey
 	}
 	if o.Jwt != nil {
 		ignData.Token = o.Jwt.Raw

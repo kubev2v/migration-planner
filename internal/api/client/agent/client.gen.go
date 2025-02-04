@@ -97,6 +97,9 @@ type ClientInterface interface {
 
 	UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetImageByToken request
+	GetImageByToken(ctx context.Context, token string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ReplaceSourceStatusWithBody request with any body
 	ReplaceSourceStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -120,6 +123,18 @@ func (c *Client) UpdateAgentStatusWithBody(ctx context.Context, id openapi_types
 
 func (c *Client) UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAgentStatusRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetImageByToken(ctx context.Context, token string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetImageByTokenRequest(c.Server, token)
 	if err != nil {
 		return nil, err
 	}
@@ -209,6 +224,40 @@ func NewUpdateAgentStatusRequestWithBody(server string, id openapi_types.UUID, c
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetImageByTokenRequest generates requests for GetImageByToken
+func NewGetImageByTokenRequest(server string, token string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "token", runtime.ParamLocationPath, token)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/image/bytoken/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -335,6 +384,9 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAgentStatusWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentStatusResponse, error)
 
+	// GetImageByTokenWithResponse request
+	GetImageByTokenWithResponse(ctx context.Context, token string, reqEditors ...RequestEditorFn) (*GetImageByTokenResponse, error)
+
 	// ReplaceSourceStatusWithBodyWithResponse request with any body
 	ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error)
 
@@ -364,6 +416,31 @@ func (r UpdateAgentStatusResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateAgentStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetImageByTokenResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *externalRef0.Error
+	JSON401      *externalRef0.Error
+	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetImageByTokenResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetImageByTokenResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -435,6 +512,15 @@ func (c *ClientWithResponses) UpdateAgentStatusWithResponse(ctx context.Context,
 	return ParseUpdateAgentStatusResponse(rsp)
 }
 
+// GetImageByTokenWithResponse request returning *GetImageByTokenResponse
+func (c *ClientWithResponses) GetImageByTokenWithResponse(ctx context.Context, token string, reqEditors ...RequestEditorFn) (*GetImageByTokenResponse, error) {
+	rsp, err := c.GetImageByToken(ctx, token, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetImageByTokenResponse(rsp)
+}
+
 // ReplaceSourceStatusWithBodyWithResponse request with arbitrary body returning *ReplaceSourceStatusResponse
 func (c *ClientWithResponses) ReplaceSourceStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ReplaceSourceStatusResponse, error) {
 	rsp, err := c.ReplaceSourceStatusWithBody(ctx, id, contentType, body, reqEditors...)
@@ -502,6 +588,53 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 			return nil, err
 		}
 		response.JSON410 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetImageByTokenResponse parses an HTTP response from a GetImageByTokenWithResponse call
+func ParseGetImageByTokenResponse(rsp *http.Response) (*GetImageByTokenResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetImageByTokenResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest externalRef0.Error

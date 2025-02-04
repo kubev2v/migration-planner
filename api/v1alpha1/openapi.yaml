@@ -189,6 +189,51 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/image/{id}/image-url:
+    get:
+      tags:
+        - image
+      description: Get the OVA image via URL
+      operationId: GetSourceDownloadURL
+      parameters:
+        - name: id
+          in: path
+          description: Source id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: URL to download OVA image
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/presigned-url'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/image:
     head:
       tags:
@@ -404,6 +449,18 @@ paths:
 
 components:
   schemas:
+    presigned-url:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: Pre-signed URL for downloading the infra-env discovery image.
+        expires_at:
+          type: string
+          format: date-time
+          description: Expiration time for the URL token.
     Source:
       type: object
       properties:

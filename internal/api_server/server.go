@@ -55,7 +55,7 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 }
 
 // Middleware to inject ResponseWriter into context
-func withResponseWriter(next http.Handler) http.Handler {
+func WithResponseWriter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Add ResponseWriter to context
 		ctx := context.WithValue(r.Context(), image.ResponseWriterKey, w)
@@ -94,10 +94,10 @@ func (s *Server) Run(ctx context.Context) error {
 		zapchi.Logger(zap.S(), "router_api"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		withResponseWriter,
+		WithResponseWriter,
 	)
 
-	h := service.NewServiceHandler(s.store, s.evWriter)
+	h := service.NewServiceHandler(s.store, s.evWriter, s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

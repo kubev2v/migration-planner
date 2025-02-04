@@ -15,6 +15,7 @@ type Source struct {
 	OrgID      string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	SshKey     *string
 	DeletedAt  gorm.DeletedAt            `gorm:"index"`
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	OnPremises bool
