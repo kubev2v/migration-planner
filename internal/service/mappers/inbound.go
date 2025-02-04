@@ -2,37 +2,52 @@ package mappers
 
 import (
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
-func AgentFromApi(username string, orgID string, resource *apiAgent.AgentStatusUpdate) model.Agent {
+func AgentFromSource(id uuid.UUID, user auth.User, source model.Source) model.Agent {
 	return model.Agent{
-		ID:         resource.Id,
-		Status:     resource.Status,
-		StatusInfo: resource.StatusInfo,
-		Username:   username,
-		OrgID:      orgID,
-		CredUrl:    resource.CredentialUrl,
-		Version:    resource.Version,
+		ID:         id,
+		Status:     string(v1alpha1.AgentStatusNotConnected),
+		StatusInfo: string(v1alpha1.AgentStatusNotConnected),
+		Username:   user.Username,
+		OrgID:      user.Organization,
+		SourceID:   source.ID,
 	}
 }
 
-func SourceFromApi(id uuid.UUID, username string, orgID string, inventory *api.Inventory, onPremises bool) model.Source {
-	source := model.Source{
+func AgentFromApi(id uuid.UUID, user auth.User, resource *apiAgent.AgentStatusUpdate) model.Agent {
+	return model.Agent{
 		ID:         id,
-		Username:   username,
-		OrgID:      orgID,
-		OnPremises: onPremises,
+		Status:     resource.Status,
+		Username:   user.Username,
+		OrgID:      user.Organization,
+		StatusInfo: resource.StatusInfo,
+		CredUrl:    resource.CredentialUrl,
+		Version:    resource.Version,
+		SourceID:   resource.SourceId,
 	}
+}
 
-	if inventory != nil {
-		source.Inventory = model.MakeJSONField(*inventory)
+func SourceFromApi(id uuid.UUID, user auth.User, name string) model.Source {
+	source := model.Source{
+		ID:       id,
+		Username: user.Username,
+		OrgID:    user.Organization,
+		Name:     name,
 	}
 
 	return source
+}
+
+func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {
+	m.Inventory = model.MakeJSONField(inventory)
+	return m
 }
 
 func UIEventFromApi(apiEvent api.Event) events.UIEvent {

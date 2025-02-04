@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,6 +11,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 )
 
@@ -18,8 +20,16 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	if !ok {
 		return server.GetImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
-	ova := &image.Ova{SshKey: request.Params.SshKey, Writer: writer}
 
+	source, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.GetImage404JSONResponse{}, nil
+		}
+		return server.GetImage500JSONResponse{}, nil
+	}
+
+	ova := &image.Ova{SourceID: source.ID, SshKey: request.Params.SshKey, Writer: writer}
 	// get token if any
 	if user, found := auth.UserFromContext(ctx); found {
 		ova.Jwt = user.Token
@@ -49,9 +59,18 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 func (h *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
 	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
 	if !ok {
+		return server.HeadImage400Response{}, nil
+	}
+
+	_, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.HeadImage404Response{}, nil
+		}
 		return server.HeadImage500Response{}, nil
 	}
-	ova := &image.Ova{SshKey: request.Params.SshKey, Writer: writer}
+
+	ova := &image.Ova{SourceID: request.Id, SshKey: request.Params.SshKey, Writer: writer}
 	if err := ova.Validate(); err != nil {
 		return server.HeadImage500Response{}, nil
 	}

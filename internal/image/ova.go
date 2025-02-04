@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/butane/config"
 	"github.com/coreos/butane/config/common"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -23,9 +24,10 @@ type Key int
 const ResponseWriterKey Key = 0
 
 type Ova struct {
-	Writer io.Writer
-	SshKey *string
-	Jwt    *jwt.Token
+	Writer   io.Writer
+	SshKey   *string
+	SourceID uuid.UUID
+	Jwt      *jwt.Token
 }
 
 // IgnitionData defines modifiable fields in ignition config

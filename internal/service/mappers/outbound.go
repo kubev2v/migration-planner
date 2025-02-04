@@ -1,7 +1,6 @@
 package mappers
 
 import (
-	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
@@ -15,12 +14,9 @@ func SourceToApi(s model.Source) api.Source {
 		OnPremises: s.OnPremises,
 	}
 
-	if len(s.Agents) > 0 {
-		agents := make([]api.SourceAgentItem, 0, len(s.Agents))
-		for _, a := range s.Agents {
-			agents = append(agents, api.SourceAgentItem{Id: uuid.MustParse(a.ID), Associated: a.Associated})
-		}
-		source.Agents = &agents
+	if s.Agent != nil {
+		agent := AgentToApi(*s.Agent)
+		source.Agent = &agent
 	}
 
 	if s.Inventory != nil {
@@ -40,7 +36,7 @@ func SourceListToApi(sources ...model.SourceList) api.SourceList {
 }
 
 func AgentToApi(a model.Agent) api.Agent {
-	agent := api.Agent{
+	return api.Agent{
 		Id:            a.ID,
 		Status:        api.StringToAgentStatus(a.Status),
 		StatusInfo:    a.StatusInfo,
@@ -48,26 +44,5 @@ func AgentToApi(a model.Agent) api.Agent {
 		UpdatedAt:     a.UpdatedAt,
 		CredentialUrl: a.CredUrl,
 		Version:       a.Version,
-		Associated:    a.Associated,
 	}
-
-	if a.DeletedAt.Valid {
-		agent.DeletedAt = &a.DeletedAt.Time
-	}
-
-	if a.SourceID != nil {
-		agent.SourceId = a.SourceID
-	}
-
-	return agent
-}
-
-func AgentListToApi(agents ...model.AgentList) api.AgentList {
-	agentList := []api.Agent{}
-	for _, agent := range agents {
-		for _, a := range agent {
-			agentList = append(agentList, AgentToApi(a))
-		}
-	}
-	return agentList
 }

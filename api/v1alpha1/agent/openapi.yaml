@@ -107,8 +107,8 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
-        "410":
-          description: Gone
+        "404":
+          description: Not found
           content:
             application/json:
               schema:
@@ -142,11 +142,10 @@ components:
       required:
         - inventory
         - agentId
+
     AgentStatusUpdate:
       type: object
       properties:
-        id:
-          type: string
         status:
           type: string
         statusInfo:
@@ -155,9 +154,12 @@ components:
           type: string
         version:
           type: string
+        source_id:
+          type: string
+          format: uuid
       required:
         - status
         - statusInfo
         - credentialUrl
-        - id
         - version
+        - source_id
