@@ -120,7 +120,14 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	if a.server.tlsConfig != nil {
 		protocol = "https"
 	}
-	a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrl.IP.String(), defaultAgentPort)
+
+	credUrlIP := "N/A"
+	if credUrl != nil {
+		credUrlIP = credUrl.IP.String()
+		a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrlIP, defaultAgentPort)
+	} else {
+		a.credUrl = credUrlIP
+	}
 	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
 	// start the health check
