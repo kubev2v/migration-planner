@@ -28,5 +28,7 @@ jobs:
       - name: Build and push images to quay.io
         run: |
           cd ${GITHUB_WORKSPACE}
-          make build-containers
-          make push-containers
+          make build-containers REGISTRY_TAG=latest
+          make build-containers REGISTRY_TAG=$REGISTRY_TAG LABEL="quay.expires-after=10d"
+          make push-containers REGISTRY_TAG=latest
+          make push-containers REGISTRY_TAG=$REGISTRY_TAG LABEL="quay.expires-after=10d"
