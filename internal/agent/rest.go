@@ -31,7 +31,11 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 	})
 	router.Get("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		status, statusInfo, _ := statusUpdater.CalculateStatus()
-		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo})
+		environmentStatus := true
+		if statusUpdater.HealthChecker != nil && statusUpdater.HealthChecker.State() == service.HealthCheckStateConsoleUnreachable {
+			environmentStatus = false
+		}
+		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo, Connected: fmt.Sprintf("%t", environmentStatus)})
 	})
 	router.Get("/api/v1/url", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ServiceUIReply{URL: configuration.PlannerService.Service.UI})
@@ -56,6 +60,7 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 
 type StatusReply struct {
 	Status     string `json:"status"`
+	Connected  string `json:"connected"`
 	StatusInfo string `json:"statusInfo"`
 }
 

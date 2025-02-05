@@ -139,6 +139,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 	// TODO refactor health checker to call it from the main goroutine
 	healthChecker.Start(ctx, a.healtCheckStopCh)
+	statusUpdater.HealthChecker = healthChecker
 
 	collector := service.NewCollector(a.config.DataDir)
 	collector.Collect(ctx)
