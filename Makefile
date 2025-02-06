@@ -11,6 +11,7 @@ MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
+PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= true
 REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
@@ -157,7 +158,8 @@ deploy-on-openshift:
 	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
              s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
              s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g" \
+             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
+             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
              deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
 	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
 	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
