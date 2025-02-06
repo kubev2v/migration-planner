@@ -141,7 +141,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	healthChecker.Start(ctx, a.healtCheckStopCh)
 	statusUpdater.HealthChecker = healthChecker
 
-	collector := service.NewCollector(a.config.DataDir)
+	collector := service.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
 	collector.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})

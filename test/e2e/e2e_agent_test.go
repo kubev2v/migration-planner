@@ -27,7 +27,9 @@ const (
 var (
 	home              string = os.Getenv("HOME")
 	defaultConfigPath string = filepath.Join(home, ".config/planner/client.yaml")
-	defaultIsoPath    string = "/tmp/agent.iso"
+	defaultBasePath   string = "/tmp/untarova/"
+	defaultIsoPath           = filepath.Join(defaultBasePath, "agent.iso")
+	defaultVmdkName          = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
 	defaultOvaPath    string = filepath.Join(home, "myimage.ova")
 	defaultServiceUrl string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
 )
@@ -90,11 +92,17 @@ func (p *plannerAgentLibvirt) Run() error {
 
 func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
-	file, err := os.Create(defaultOvaPath)
+	ovaFile, err := os.Create(defaultOvaPath)
 	if err != nil {
 		return err
 	}
-	defer os.Remove(file.Name())
+	defer os.Remove(ovaFile.Name())
+
+	if err = os.Mkdir(defaultBasePath, os.ModePerm); err != nil {
+		if !os.IsExist(err) {
+			return fmt.Errorf("creating default base path: %w", err)
+		}
+	}
 
 	// Download OVA
 	res, err := p.c.GetImage(context.TODO(), &api.GetImageParams{})
@@ -103,12 +111,21 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	}
 	defer res.Body.Close()
 
-	if _, err = io.Copy(file, res.Body); err != nil {
+	if _, err = io.Copy(ovaFile, res.Body); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}
 
+	if err = ValidateTar(ovaFile); err != nil {
+		return fmt.Errorf("error validating tar: %w", err)
+	}
+
 	// Untar ISO from OVA
-	if err = Untar(file, defaultIsoPath, "MigrationAssessment.iso"); err != nil {
+	if err = Untar(ovaFile, defaultIsoPath, "MigrationAssessment.iso"); err != nil {
+		return fmt.Errorf("error uncompressing the file: %w", err)
+	}
+
+	// Untar VMDK from OVA
+	if err = Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
