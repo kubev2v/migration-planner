@@ -84,13 +84,13 @@ func (o *Ova) OvaSize() (int, error) {
 func (o *Ova) Generate() error {
 	tw := tar.NewWriter(o.Writer)
 
-	// Write ISO to TAR
-	if err := o.writeIso(tw); err != nil {
+	// OVF Must be first file in OVA, to support URL download
+	if err := writeOvf(tw); err != nil {
 		return err
 	}
 
-	// Write OVF to TAR
-	if err := writeOvf(tw); err != nil {
+	// Write ISO to TAR
+	if err := o.writeIso(tw); err != nil {
 		return err
 	}
 
