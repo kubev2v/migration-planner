@@ -123,4 +123,33 @@ var _ = Describe("e2e", func() {
 			}, "1m", "2s").Should(BeTrue())
 		})
 	})
+
+	Context("Edge cases", func() {
+		It("VM reboot", func() {
+			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+
+			// Restarting the VM
+			err = agent.Restart()
+			Expect(err).To(BeNil())
+
+			// Remove old ssh key
+			err = RemoveSSHKey(agentIP)
+			Expect(err).To(BeNil())
+
+			// Check that planner-agent service is running
+			Eventually(func() bool {
+				return agent.IsServiceRunning(agentIP, "planner-agent")
+			}, "3m").Should(BeTrue())
+
+			Eventually(func() bool {
+				source, err := svc.GetSource(source.Id)
+				if err != nil {
+					return false
+				}
+				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+			}, "2m").Should(BeTrue())
+		})
+	})
 })
