@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"time"
+  "strconv"
 )
 
 type StringerWithError func() (string, error)
@@ -51,8 +52,20 @@ func (duration *Duration) UnmarshalJSON(b []byte) error {
 }
 
 func GetEnv(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
+	if value, exists := os.LookupEnv(key); exists && len(value) > 0 {
 		return value
 	}
 	return defaultValue
+}
+
+
+func GetIntEnv(key string, defaultValue uint) (uint, error) {
+  if value, exists := os.LookupEnv(key); exists && len(value) > 0 {
+    u64, err := strconv.ParseUint(value, 10, 32)
+    if err != nil {
+        return 0, err
+    }
+    return uint(u64), nil
+  }
+  return defaultValue, nil
 }

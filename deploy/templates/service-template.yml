@@ -1,0 +1,149 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: assisted-migration-service
+parameters:
+  - name: MIGRATION_PLANNER_IMAGE
+    required: true
+  - name: IMAGE_TAG
+    value: latest
+  - name: MIGRATION_PLANNER_REPLICAS
+    description: Number of replicas of the service to run.
+    value: "3"
+  - name: MIGRATION_PLANNER_MEMORY_REQUEST
+    description: Memory request for the API pods.
+    value: "400Mi"
+  - name: MIGRATION_PLANNER_MEMORY_LIMIT
+    description: Memory limit for the API pods.
+    value: "2000Mi"
+  - name: MIGRATION_PLANNER_CPU_REQUEST
+    description: CPU request for the API pods.
+    value: "300m"
+  - name: MIGRATION_PLANNER_CPU_LIMIT
+    description: CPU limit for the API pods.
+    value: "500m"
+  - name: MIGRATION_PLANNER_AGENT_IMAGE
+    description: Migration Discovery Service image
+    required: true
+  - name: MIGRATION_PLANNER_URL
+    description: The API URL of the migration assessment
+    required: true
+  - name: MIGRATION_PLANNER_UI_URL
+    description: The console URL of the migration assessment
+    required: true
+  - name: DB_SECRET_NAME
+    description: The name of the OpenShift Secret used for the database.
+    displayName: Database Secret Name
+    value: migration-planner-db
+
+objects:
+  - kind: ServiceAccount
+    apiVersion: v1
+    metadata:
+      name: migration-planner
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
+      name: migration-planner
+    spec:
+      ports:
+        - name: migration-planner
+          port: 3443
+          protocol: TCP
+          targetPort: 3443
+      selector:
+        app: migration-planner
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
+      name: migration-planner-agent
+    spec:
+      ports:
+        - name: migration-planner-agent
+          port: 7443
+          protocol: TCP
+          targetPort: 7443
+      selector:
+        app: migration-planner
+  - kind: Deployment
+    apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
+    metadata:
+      name: migration-planner
+    spec:
+      selector:
+        matchLabels:
+          app: migration-planner
+      replicas: ${{MIGRATION_PLANNER_REPLICAS}}
+      template:
+        metadata:
+          labels:
+            app: migration-planner
+        spec:
+          containers:
+            - name: migration-planner
+              resources:
+                requests:
+                  cpu: ${MIGRATION_PLANNER_CPU_REQUEST}
+                  memory: ${MIGRATION_PLANNER_MEMORY_REQUEST}
+                limits:
+                  cpu: ${MIGRATION_PLANNER_CPU_LIMIT}
+                  memory: ${MIGRATION_PLANNER_MEMORY_LIMIT}
+              image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: Always
+              ports:
+                - containerPort: 3443
+                  name: api-port
+                - containerPort: 7443
+                  name: agent-api-port
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 3443
+                initialDelaySeconds: 30
+              env:
+                - name: CONFIG_SERVER
+                  value: ${MIGRATION_PLANNER_URL}
+                - name: CONFIG_SERVER_UI
+                  value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
+                - name: MIGRATION_PLANNER_AGENT_IMAGE
+                  value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
+                - name:  BASE_AGENT_ENDPOINT_URL
+                  value: ${MIGRATION_PLANNER_URL}
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.host
+                - name: DB_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.name
+                - name: DB_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.password
+                - name: DB_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.port
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.user
+              volumeMounts:
+                - name: migration-planner-dir
+                  mountPath: "/.migration-planner"
+          serviceAccountName: migration-planner
+          volumes:
+            - name: migration-planner-dir
+              emptyDir:
+                sizeLimit: 500Mi

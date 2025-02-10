@@ -65,25 +65,29 @@ func ClientConfigFile() string {
 	return filepath.Join(ConfigDir(), "client.yaml")
 }
 
-func NewDefault() *Config {
+func NewDefault() (*Config, error) {
+  port, err := util.GetIntEnv("DB_PORT", 5432)
+  if err != nil {
+    return nil, err
+  }
 	c := &Config{
 		Database: &dbConfig{
 			Type:     "pgsql",
-			Hostname: "localhost",
-			Port:     5432,
-			Name:     "planner",
-			User:     "admin",
-			Password: "adminpass",
+			Hostname: util.GetEnv("DB_HOST", "localhost"),
+			Port:     port,
+			Name:     util.GetEnv("DB_NAME", "planner"),
+			User:     util.GetEnv("DB_USER", "admin"),
+			Password: util.GetEnv("DB_PASS", "adminpass"),
 		},
 		Service: &svcConfig{
 			Address:              ":3443",
 			AgentEndpointAddress: ":7443",
 			BaseUrl:              "https://localhost:3443",
-			BaseAgentEndpointUrl: "https://localhost:7443",
+			BaseAgentEndpointUrl: util.GetEnv("BASE_AGENT_ENDPOINT_URL", "https://localhost:7443"),
 			LogLevel:             "info",
 		},
 	}
-	return c
+	return c, nil
 }
 
 func NewFromFile(cfgFile string) (*Config, error) {
@@ -102,7 +106,11 @@ func LoadOrGenerate(cfgFile string) (*Config, error) {
 		if err := os.MkdirAll(filepath.Dir(cfgFile), os.FileMode(0755)); err != nil {
 			return nil, fmt.Errorf("creating directory for config file: %v", err)
 		}
-		if err := Save(NewDefault(), cfgFile); err != nil {
+		cfg, err := NewDefault()
+		if err != nil {
+			return nil, err
+		}
+		if err := Save(cfg, cfgFile); err != nil {
 			return nil, err
 		}
 	}
