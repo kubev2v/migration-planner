@@ -35,7 +35,9 @@ var _ = Describe("agent service", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		db, err := store.InitDB(config.NewDefault())
+		cfg, err := config.NewDefault()
+		Expect(err).To(BeNil())
+		db, err := store.InitDB(cfg)
 		Expect(err).To(BeNil())
 
 		s = store.NewStore(db)

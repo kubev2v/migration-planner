@@ -19,7 +19,8 @@ var _ = Describe("Store", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		cfg := config.NewDefault()
+		cfg, err := config.NewDefault()
+		Expect(err).To(BeNil())
 		db, err := st.InitDB(cfg)
 		Expect(err).To(BeNil())
 		gormDB = db

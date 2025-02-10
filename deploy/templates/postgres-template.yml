@@ -1,0 +1,140 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: migration-planner-db
+parameters:
+  - name: DB_SERVICE_NAME
+    description: The name of the OpenShift Service exposed for the database.
+    displayName: Database Service Name
+    value: migration-planner-postgres
+  - name: DB_SECRET_NAME
+    description: The name of the OpenShift Secret used for the database.
+    displayName: Database Secret Name
+    value: migration-planner-db
+  - name: DB_USER
+    description: Username for PostgreSQL user that will be used for accessing the database.
+    displayName: PostgreSQLUsername
+    value: admin
+  - name: DB_PASSWORD
+    description: Password for the PostgreSQL connection user.
+    displayName: PostgreSQL Password
+    value: adminpass
+  - name: DB_NAME
+    description: Name of the PostgreSQL database accessed.
+    displayName: PostgreSQL Database Name
+    value: planner
+  - name: POSTGRES_IMAGE
+    description: Postgres image (14 or latest).
+    displayName: Postgres Image
+    value: quay.io/sclorg/postgresql-12-c8s
+  - name: DB_VOLUME_CAPACITY
+    description: Volume space available for data, e.g. 512Mi, 2Gi.
+    displayName: Volume Capacity
+    value: 512Mi
+
+objects:
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      name: ${DB_SERVICE_NAME}
+      labels:
+        app: ${DB_SERVICE_NAME}
+    spec:
+      ports:
+        - port: 5432
+          targetPort: 5432
+          protocol: TCP
+      selector:
+        app: ${DB_SERVICE_NAME}
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: ${DB_SERVICE_NAME}
+    spec:
+      selector:
+        matchLabels:
+          app: ${DB_SERVICE_NAME}
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: ${DB_SERVICE_NAME}
+        spec:
+          containers:
+            - name: postgres
+              image: ${POSTGRES_IMAGE}
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              env:
+                - name: POSTGRESQL_DATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.name
+                - name: POSTGRESQL_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.user
+                - name: POSTGRESQL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.password
+              volumeMounts:
+                - mountPath: /var/lib/pgsql/data
+                  name: ${DB_SERVICE_NAME}-data
+              resources:
+                limits:
+                  memory: 500Mi
+                requests:
+                  cpu: 100m
+                  memory: 400Mi
+              livenessProbe:
+                tcpSocket:
+                  port: 5432
+                initialDelaySeconds: 120
+                timeoutSeconds: 10
+              readinessProbe:
+                exec:
+                  command:
+                  - /bin/sh
+                  - -c
+                  - exec /usr/bin/pg_isready -U $POSTGRESQL_USER -d $POSTGRESQL_DATABASE -h localhost -p 5432
+                initialDelaySeconds: 5
+                timeoutSeconds: 1
+              securityContext:
+                capabilities: {}
+                privileged: false
+              terminationMessagePath: /dev/termination-log
+              capabilities: {}
+          dnsPolicy: ClusterFirst
+          restartPolicy: Always
+          volumes:
+            - name: ${DB_SERVICE_NAME}-data
+              persistentVolumeClaim:
+                claimName: ${DB_SERVICE_NAME}-data
+  - kind: Secret
+    apiVersion: v1
+    metadata:
+      name: ${DB_SECRET_NAME}
+    type: Opaque
+    stringData:
+      db.host: ${DB_SERVICE_NAME}
+      db.port: "5432"
+      db.name: ${DB_NAME}
+      db.user: ${DB_USER}
+      db.password: ${DB_PASSWORD}
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: ${DB_SERVICE_NAME}-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: ${DB_VOLUME_CAPACITY}
