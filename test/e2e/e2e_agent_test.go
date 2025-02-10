@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -39,6 +40,7 @@ type PlannerAgent interface {
 	Run() error
 	Login(url string, user string, pass string) (*http.Response, error)
 	Version() (string, error)
+	Restart() error
 	Remove() error
 	GetIp() (string, error)
 	IsServiceRunning(string, string) bool
@@ -219,6 +221,61 @@ func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http
 
 func (p *plannerAgentLibvirt) RestartService() error {
 	return nil
+}
+
+func (p *plannerAgentLibvirt) Restart() error {
+	domain, err := p.con.LookupDomainByName(p.name)
+	if err != nil {
+		return fmt.Errorf("failed to find vm: %w", err)
+	}
+
+	defer func() {
+		_ = domain.Free()
+	}()
+
+	// power off the vm
+	if err = domain.Shutdown(); err != nil {
+		return fmt.Errorf("failed to shutdown vm: %w", err)
+	}
+
+	// Wait for shutdown with timeout
+	if err = waitForDomainState(30*time.Second, domain, libvirt.DOMAIN_SHUTOFF); err != nil {
+		return fmt.Errorf("failed to reach shutdown state: %w", err)
+	}
+
+	// start the vm
+	err = domain.Create()
+	if err != nil {
+		return fmt.Errorf("failed to start vm: %w", err)
+	}
+
+	// Wait for startup with timeout
+	if err = waitForDomainState(30*time.Second, domain, libvirt.DOMAIN_RUNNING); err != nil {
+		return fmt.Errorf("failed to reach running state: %w", err)
+	}
+
+	return nil
+}
+
+func waitForDomainState(duration time.Duration, domain *libvirt.Domain, desiredState libvirt.DomainState) error {
+	timeout := time.After(duration)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for desired state")
+		case <-ticker.C:
+			state, _, err := domain.GetState()
+			if err != nil {
+				return fmt.Errorf("failed to get VM state: %w", err)
+			}
+			if state == desiredState {
+				return nil
+			}
+		}
+	}
 }
 
 func (p *plannerAgentLibvirt) Remove() error {
