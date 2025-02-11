@@ -61,7 +61,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -114,7 +114,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -167,7 +167,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -193,7 +193,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -230,7 +230,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -276,7 +276,7 @@ var _ = Describe("agent service", Ordered, func() {
 
 			// first agent request
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -337,7 +337,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -364,7 +364,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewUserContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{

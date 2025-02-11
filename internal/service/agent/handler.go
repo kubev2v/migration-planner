@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -46,39 +47,39 @@ func (h *AgentServiceHandler) UpdateSourceInventory(ctx context.Context, request
 	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			return agentServer.UpdateSourceInventory404JSONResponse{}, nil
+			return agentServer.UpdateSourceInventory404JSONResponse{}, fmt.Errorf("failed to find source with id: %s", request.Id)
 		}
-		return agentServer.UpdateSourceInventory500JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory500JSONResponse{}, fmt.Errorf("failed to fetch source: %s", err)
 	}
 
 	agent, err := h.store.Agent().Get(ctx, request.Body.AgentId)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("failed to fetch the agent: %s", err)
 	}
 
 	if agent == nil {
-		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("failed to find agent %s", request.Body.AgentId)
 	}
 
 	// agent must be under organization's scope
 	if auth.MustHaveUser(ctx).Organization != agent.OrgID {
-		return agentServer.UpdateSourceInventory403JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory403JSONResponse{}, fmt.Errorf("user does not below to the same organization as the agent %q", agent.OrgID)
 	}
 
 	// don't allow updates of sources not associated with this agent
 	if request.Id != agent.SourceID {
-		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("request id %q does not match the agent source id %q", request.Id, agent.SourceID)
 	}
 
 	// if source has already a vCenter check if it's the same
 	if source.VCenterID != "" && source.VCenterID != request.Body.Inventory.Vcenter.Id {
-		return agentServer.UpdateSourceInventory400JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("source's vCenter %q does not match the new inventory vCenterID %q", source.VCenterID, request.Body.Inventory.Vcenter.Id)
 	}
 
 	source = mappers.UpdateSourceFromApi(source, request.Body.Inventory)
 	updatedSource, err := h.store.Source().Update(ctx, *source)
 	if err != nil {
-		return agentServer.UpdateSourceInventory500JSONResponse{}, nil
+		return agentServer.UpdateSourceInventory500JSONResponse{}, fmt.Errorf("failed to update source: %s", err)
 	}
 
 	kind, inventoryEvent := h.newInventoryEvent(request.Id.String(), request.Body.Inventory)
@@ -102,21 +103,21 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 	_, err := h.store.Source().Get(ctx, request.Body.SourceId)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			return agentServer.UpdateAgentStatus400JSONResponse{}, nil
+			return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to find source with id: %s", request.Id)
 		}
-		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
+		return agentServer.UpdateAgentStatus500JSONResponse{}, fmt.Errorf("failed to fetch source: %s", err)
 	}
 
 	agent, err := h.store.Agent().Get(ctx, request.Id)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return agentServer.UpdateAgentStatus500JSONResponse{}, nil
+		return agentServer.UpdateAgentStatus500JSONResponse{}, fmt.Errorf("failed to fetch the agent: %s", err)
 	}
 
 	if agent == nil {
 		newAgent := mappers.AgentFromApi(request.Id, user, request.Body)
 		a, err := h.store.Agent().Create(ctx, newAgent)
 		if err != nil {
-			return agentServer.UpdateAgentStatus400JSONResponse{}, nil
+			return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to create the agent: %s", err)
 		}
 
 		kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*a))
@@ -128,11 +129,11 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 	}
 
 	if user.Organization != agent.OrgID {
-		return agentServer.UpdateAgentStatus403JSONResponse{}, nil
+		return agentServer.UpdateAgentStatus403JSONResponse{}, fmt.Errorf("user does not below to the same organization as the agent %q", agent.OrgID)
 	}
 
 	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, user, request.Body)); err != nil {
-		return agentServer.UpdateAgentStatus400JSONResponse{}, nil
+		return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to update agent: %s", err)
 	}
 
 	kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*agent))
