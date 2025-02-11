@@ -72,6 +72,7 @@ func (s *DataStore) Seed() error {
 	// Create/update default source
 	source := model.Source{
 		ID:        sourceUuid,
+		Name:      "Example",
 		Inventory: model.MakeJSONField(GenerateDefaultInventory()),
 	}
 
