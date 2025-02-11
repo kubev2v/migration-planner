@@ -172,12 +172,6 @@ type ListSourcesParams struct {
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
 
-// GetImageParams defines parameters for GetImage.
-type GetImageParams struct {
-	// SshKey Public SSH key
-	SshKey *string `form:"sshKey,omitempty" json:"sshKey,omitempty"`
-}
-
 // PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
 type PushEventsJSONRequestBody = Event
 

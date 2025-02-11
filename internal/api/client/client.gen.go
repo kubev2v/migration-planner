@@ -119,7 +119,7 @@ type ClientInterface interface {
 	UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetImage request
-	GetImage(ctx context.Context, id openapi_types.UUID, params *GetImageParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// HeadImage request
 	HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -248,8 +248,8 @@ func (c *Client) UpdateSource(ctx context.Context, id openapi_types.UUID, body U
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetImage(ctx context.Context, id openapi_types.UUID, params *GetImageParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetImageRequest(c.Server, id, params)
+func (c *Client) GetImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetImageRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -556,7 +556,7 @@ func NewUpdateSourceRequestWithBody(server string, id openapi_types.UUID, conten
 }
 
 // NewGetImageRequest generates requests for GetImage
-func NewGetImageRequest(server string, id openapi_types.UUID, params *GetImageParams) (*http.Request, error) {
+func NewGetImageRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -579,28 +579,6 @@ func NewGetImageRequest(server string, id openapi_types.UUID, params *GetImagePa
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.SshKey != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sshKey", runtime.ParamLocationQuery, *params.SshKey); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -743,7 +721,7 @@ type ClientWithResponsesInterface interface {
 	UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
 
 	// GetImageWithResponse request
-	GetImageWithResponse(ctx context.Context, id openapi_types.UUID, params *GetImageParams, reqEditors ...RequestEditorFn) (*GetImageResponse, error)
+	GetImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetImageResponse, error)
 
 	// HeadImageWithResponse request
 	HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error)
@@ -1086,8 +1064,8 @@ func (c *ClientWithResponses) UpdateSourceWithResponse(ctx context.Context, id o
 }
 
 // GetImageWithResponse request returning *GetImageResponse
-func (c *ClientWithResponses) GetImageWithResponse(ctx context.Context, id openapi_types.UUID, params *GetImageParams, reqEditors ...RequestEditorFn) (*GetImageResponse, error) {
-	rsp, err := c.GetImage(ctx, id, params, reqEditors...)
+func (c *ClientWithResponses) GetImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetImageResponse, error) {
+	rsp, err := c.GetImage(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

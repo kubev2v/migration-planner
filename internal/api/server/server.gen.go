@@ -42,7 +42,7 @@ type ServerInterface interface {
 	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id}/image)
-	GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetImageParams)
+	GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (HEAD /api/v1/sources/{id}/image)
 	HeadImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -91,7 +91,7 @@ func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id o
 }
 
 // (GET /api/v1/sources/{id}/image)
-func (_ Unimplemented) GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetImageParams) {
+func (_ Unimplemented) GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -280,19 +280,8 @@ func (siw *ServerInterfaceWrapper) GetImage(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetImageParams
-
-	// ------------- Optional query parameter "sshKey" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "sshKey", r.URL.Query(), &params.SshKey)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sshKey", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetImage(w, r, id, params)
+		siw.Handler.GetImage(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -835,8 +824,7 @@ func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.Res
 }
 
 type GetImageRequestObject struct {
-	Id     openapi_types.UUID `json:"id"`
-	Params GetImageParams
+	Id openapi_types.UUID `json:"id"`
 }
 
 type GetImageResponseObject interface {
@@ -1230,11 +1218,10 @@ func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id
 }
 
 // GetImage operation middleware
-func (sh *strictHandler) GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetImageParams) {
+func (sh *strictHandler) GetImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request GetImageRequestObject
 
 	request.Id = id
-	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetImage(ctx, request.(GetImageRequestObject))
