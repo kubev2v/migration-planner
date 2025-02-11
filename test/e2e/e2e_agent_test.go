@@ -113,7 +113,7 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 
 	// Download OVA
 
-	res, err := p.c.GetImage(ctx, sourceID, &api.GetImageParams{})
+	res, err := p.c.GetImage(ctx, sourceID)
 	if err != nil {
 		return fmt.Errorf("error getting source image: %w", err)
 	}

@@ -291,12 +291,6 @@ paths:
           schema:
             type: string
             format: uuid
-        - name: sshKey
-          in: query
-          description: Public SSH key
-          required: false
-          schema:
-            type: string
       responses:
         "200":
           description: An OVA image
