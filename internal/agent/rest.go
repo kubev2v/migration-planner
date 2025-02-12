@@ -54,7 +54,7 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 			return
 		}
 		w.Header().Add("Content-Disposition", "attachment")
-		_ = render.Render(w, r, InventoryReply{Inventory: data.Inventory})
+		_ = render.Render(w, r, InventoryReply{AgentID: statusUpdater.AgentID.String(), Inventory: data.Inventory})
 	})
 }
 
@@ -73,6 +73,7 @@ type ServiceUIReply struct {
 }
 
 type InventoryReply struct {
+	AgentID   string        `json:"agentId"`
 	Inventory api.Inventory `json:"inventory"`
 }
 
