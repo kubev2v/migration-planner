@@ -117,7 +117,7 @@ type SourceList = []Source
 
 // SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
 type SourceUpdateOnPrem struct {
-	AgentId   openapi_types.UUID `json:"agent_id"`
+	AgentId   openapi_types.UUID `json:"agentId"`
 	Inventory Inventory          `json:"inventory"`
 }
 

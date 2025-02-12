@@ -20,7 +20,7 @@ const (
 )
 
 type StatusUpdater struct {
-	agentID       uuid.UUID
+	AgentID       uuid.UUID
 	sourceID      uuid.UUID
 	version       string
 	config        *config.Config
@@ -33,7 +33,7 @@ func NewStatusUpdater(sourceID, agentID uuid.UUID, version, credUrl string, conf
 	return &StatusUpdater{
 		client:   client,
 		config:   config,
-		agentID:  agentID,
+		AgentID:  agentID,
 		sourceID: sourceID,
 		credUrl:  credUrl,
 		version:  version,
@@ -52,7 +52,7 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 		SourceId:      s.sourceID,
 	}
 
-	return s.client.UpdateAgentStatus(ctx, s.agentID, bodyParameters)
+	return s.client.UpdateAgentStatus(ctx, s.AgentID, bodyParameters)
 }
 
 func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Inventory) {

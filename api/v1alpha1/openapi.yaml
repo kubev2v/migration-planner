@@ -420,14 +420,14 @@ components:
     SourceUpdateOnPrem:
       type: object
       properties:
-        agent_id:
+        agentId:
           type: string
           format: uuid
         inventory:
           $ref: '#/components/schemas/Inventory'
       required:
         - inventory
-        - agent_id
+        - agentId
 
     SourceList:
       type: array
