@@ -95,6 +95,9 @@ build-api: bin
 build-agent: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent ...
 
+build-cli: bin
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner ...
+
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
