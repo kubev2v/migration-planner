@@ -50,7 +50,10 @@ func (c *Collector) Collect(ctx context.Context) {
 					return
 				default:
 					c.run()
-					return
+					if c.getOpaServerStatus() {
+						return
+					}
+					c.waitUntilOpaIsRunning()
 				}
 			}
 		}()
@@ -73,22 +76,11 @@ func (c *Collector) run() {
 		zap.S().Named("collector").Errorf("Error parsing credentials JSON: %v\n", err)
 		return
 	}
-
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
 	zap.S().Named("collector").Infof("Create Provider")
 	provider := getProvider(creds)
 
 	zap.S().Named("collector").Infof("Create Secret")
 	secret := getSecret(creds)
-
-	zap.S().Named("collector").Infof("Check if opaServer is responding")
-	resp, err := http.Get("http://" + opaServer + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
-		return
-	}
-	defer resp.Body.Close()
-
 	zap.S().Named("collector").Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
@@ -141,11 +133,15 @@ func (c *Collector) run() {
 
 	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
 
-	zap.S().Named("collector").Infof("Run the validation of VMs")
-	vms, err = validation(vms, opaServer)
-	if err != nil {
-		zap.S().Named("collector").Errorf("Error running validation: %s", err)
-		return
+	opaServerAlive := c.getOpaServerStatus()
+	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
+	if opaServerAlive {
+		zap.S().Named("collector").Infof("Run the validation of VMs")
+		vms, err = validation(vms, opaServer)
+		if err != nil {
+			zap.S().Named("collector").Errorf("Error running validation: %s", err)
+			return
+		}
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
@@ -588,6 +584,28 @@ func waitForFile(filename string) {
 		} else {
 			return
 		}
+	}
+}
+
+func (c *Collector) getOpaServerStatus() bool {
+	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
+	zap.S().Named("collector").Infof("Check if opaServer is responding")
+	resp, err := http.Get("http://" + opaServer + "/health")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
+		return false
+	}
+	defer resp.Body.Close()
+	zap.S().Named("collector").Infof("OPA server %s is alive", opaServer)
+	return true
+}
+
+func (c *Collector) waitUntilOpaIsRunning() {
+	for {
+		if c.getOpaServerStatus() {
+			break
+		}
+		time.Sleep(2 * time.Second)
 	}
 }
 
