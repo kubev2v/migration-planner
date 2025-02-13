@@ -161,7 +161,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			case <-updateTicker.C:
 			}
 
-			// calculate status regardless if we have connectivity withe the backend.
+			// calculate status regardless if we have connectivity with the backend.
 			status, statusInfo, inventory := statusUpdater.CalculateStatus()
 
 			//	check for health. Send requests only if we have connectivity
