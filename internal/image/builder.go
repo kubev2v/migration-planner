@@ -18,6 +18,13 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
 
+type ImageType int
+
+const (
+	OVAImageType ImageType = iota
+	QemuImageType
+)
+
 const (
 	defaultAgentImage            = "quay.io/kubev2v/migration-planner-agent"
 	defaultPlannerService        = "http://127.0.0.1:7443"
@@ -46,6 +53,7 @@ type ImageBuilder struct {
 	OvfName                    string
 	Template                   string
 	RHCOSImage                 string
+	imageType                  ImageType
 }
 
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
@@ -61,6 +69,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 		OvfName:                    defaultOvfName,
 		Template:                   defaultTemplate,
 		RHCOSImage:                 defaultRHCOSImage,
+		imageType:                  OVAImageType,
 	}
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {
@@ -85,6 +94,14 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) (int, error) {
 	size, err := b.computeSize(reader)
 	if err != nil {
 		return -1, err
+	}
+
+	// write only the iso in case of qemu
+	if b.imageType == QemuImageType {
+		if _, err := io.Copy(w, reader); err != nil {
+			return 0, err
+		}
+		return size, nil
 	}
 
 	tw := tar.NewWriter(w)
@@ -276,6 +293,11 @@ func (b *ImageBuilder) WithPlannerServiceUI(uiUrl string) *ImageBuilder {
 	return b
 }
 
+func (b *ImageBuilder) WithPlannerService(url string) *ImageBuilder {
+	b.PlannerService = url
+	return b
+}
+
 func (b *ImageBuilder) WithPersistenceDiskDevice(persistenceDevice string) *ImageBuilder {
 	b.PersistentDiskDevice = persistenceDevice
 	return b
@@ -318,5 +340,10 @@ func (b *ImageBuilder) WithOvfName(ovfName string) *ImageBuilder {
 
 func (b *ImageBuilder) WithRHCOSImage(image string) *ImageBuilder {
 	b.RHCOSImage = image
+	return b
+}
+
+func (b *ImageBuilder) WithImageType(imageType ImageType) *ImageBuilder {
+	b.imageType = imageType
 	return b
 }
