@@ -134,10 +134,6 @@ var _ = Describe("e2e", func() {
 			err = agent.Restart()
 			Expect(err).To(BeNil())
 
-			// Remove old ssh key
-			err = RemoveSSHKey(agentIP)
-			Expect(err).To(BeNil())
-
 			// Check that planner-agent service is running
 			Eventually(func() bool {
 				return agent.IsServiceRunning(agentIP, "planner-agent")
