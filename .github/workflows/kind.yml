@@ -19,9 +19,6 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
 
-      - name: Install qemu-img
-        run: sudo apt update && sudo apt install -y qemu-utils
-
       - name: Set env variables
         run: |
           export "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')"
@@ -29,60 +26,9 @@ jobs:
           echo "MIGRATION_PLANNER_AGENT_IMAGE=${REGISTRY_IP}:5000/agent" >> $GITHUB_ENV
           echo "INSECURE_REGISTRY=${REGISTRY_IP}:5000" >> $GITHUB_ENV
 
-      - name: Ignore insecure registry
-        run: |
-          cat << EOF > daemon.json
-          {
-            "insecure-registries" : [ "${INSECURE_REGISTRY}" ]
-          }
-          EOF
-          sudo mv daemon.json /etc/docker/daemon.json
-          sudo systemctl daemon-reload
-          sudo systemctl restart docker
-
-      - name: Install kubectl
-        uses: azure/setup-kubectl@v4
-
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1
-        with:
-          cluster_name: kind
-
-      - name: Setup libvirt
-        run: |
-          sudo apt update
-          sudo apt install sshpass libvirt-dev libvirt-daemon libvirt-daemon-system
-          sudo systemctl restart libvirtd
-
-      - name: Deploy vcsim
-        run: |
-          make deploy-vsphere-simulator
-          kubectl wait --for=condition=Ready pods --all --timeout=240s
-          kubectl port-forward --address 0.0.0.0 deploy/vcsim 8989:8989 &
-
-      - name: Deploy registry
-        run: |
-          kubectl create deployment registry --image=docker.io/registry
-          kubectl wait --for=condition=Ready pods --all --timeout=240s
-          kubectl port-forward --address 0.0.0.0 deploy/registry 5000:5000 &
-
-      - name: Build assisted-migration containers
-        run: |
-          make migration-planner-agent-container MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE
-          make migration-planner-api-container MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE
-          docker push $MIGRATION_PLANNER_AGENT_IMAGE
-          kind load docker-image $MIGRATION_PLANNER_API_IMAGE
-          docker rmi $MIGRATION_PLANNER_API_IMAGE
-
-      - name: Deploy assisted-migration
-        run: |
-          make deploy-on-kind MIGRATION_PLANNER_API_IMAGE=$MIGRATION_PLANNER_API_IMAGE MIGRATION_PLANNER_AGENT_IMAGE=$MIGRATION_PLANNER_AGENT_IMAGE MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=$MIGRATION_PLANNER_API_IMAGE_PULL_POLICY INSECURE_REGISTRY=$INSECURE_REGISTRY MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda
-          kubectl wait --for=condition=Ready pods --all --timeout=240s
-          kubectl port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
-          kubectl port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
+      - name: Prepare e2e test environment
+        run: make deploy-e2e-environment
 
       - name: Run test
         run: |
-          mkdir /tmp/untarova
-          qemu-img convert -f vmdk -O qcow2 data/persistence-disk.vmdk /tmp/untarova/persistence-disk.qcow2
           sudo make integration-test PLANNER_IP=${REGISTRY_IP}
