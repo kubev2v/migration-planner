@@ -52,7 +52,7 @@ type kafkaConfig struct {
 
 type Auth struct {
 	AuthenticationType string `json:"type"`
-	JwtCertUrl         string `json:"jwt_cert_url"`
+	JwkCertURL         string `json:"jwk_cert_url"`
 }
 
 func ConfigDir() string {
@@ -68,10 +68,10 @@ func ClientConfigFile() string {
 }
 
 func NewDefault() (*Config, error) {
-  port, err := util.GetIntEnv("DB_PORT", 5432)
-  if err != nil {
-    return nil, err
-  }
+	port, err := util.GetIntEnv("DB_PORT", 5432)
+	if err != nil {
+		return nil, err
+	}
 	c := &Config{
 		Database: &dbConfig{
 			Type:     "pgsql",
@@ -89,6 +89,10 @@ func NewDefault() (*Config, error) {
 			BaseAgentEndpointUrl: "https://localhost:7443",
 			BaseImageEndpointUrl: "https://localhost:11443",
 			LogLevel:             "info",
+			Auth: Auth{
+				AuthenticationType: util.GetEnv("MIGRATION_PLANNER_AUTH", "none"),
+				JwkCertURL:         util.GetEnv("MIGRATION_PLANNER_JWK_URL", ""),
+			},
 		},
 	}
 	return c, nil
