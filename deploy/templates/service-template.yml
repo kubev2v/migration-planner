@@ -32,6 +32,10 @@ parameters:
   - name: MIGRATION_PLANNER_UI_URL
     description: The console URL of the migration assessment
     required: true
+  - name: MIGRATION_PLANNER_JWK_URL
+    description: URL of the x.509 certificate chain that was used to verify the digital signature of the JWT
+  - name: MIGRATION_PLANNER_AUTH
+    description: Define the backend authentication mechanism
   - name: DB_SECRET_NAME
     description: The name of the OpenShift Secret used for the database.
     displayName: Database Secret Name
@@ -114,6 +118,10 @@ objects:
                   value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
                 - name:  BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
+                - name: MIGRATION_PLANNER_AUTH
+                  value: ${MIGRATION_PLANNER_AUTH}
+                - name: MIGRATION_PLANNER_JWK_URL
+                  value: ${MIGRATION_PLANNER_JWK_URL}
                 - name: DB_HOST
                   valueFrom:
                     secretKeyRef:

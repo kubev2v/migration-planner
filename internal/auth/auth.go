@@ -21,7 +21,7 @@ func NewAuthenticator(authConfig config.Auth) (Authenticator, error) {
 
 	switch authConfig.AuthenticationType {
 	case RHSSOAuthentication:
-		return NewRHSSOAuthenticator(authConfig.JwtCertUrl)
+		return NewRHSSOAuthenticator(authConfig.JwkCertURL)
 	default:
 		return NewNoneAuthenticator()
 	}
