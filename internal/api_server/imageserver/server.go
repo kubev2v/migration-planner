@@ -28,7 +28,7 @@ const (
 )
 
 type ImageServer struct {
-	cfg      *config.Config
+	svcCfg   *config.SvcConfig
 	store    store.Store
 	listener net.Listener
 	evWriter *events.EventProducer
@@ -36,13 +36,13 @@ type ImageServer struct {
 
 // New returns a new instance of a migration-planner server.
 func New(
-	cfg *config.Config,
+	svcCfg *config.SvcConfig,
 	store store.Store,
 	ew *events.EventProducer,
 	listener net.Listener,
 ) *ImageServer {
 	return &ImageServer{
-		cfg:      cfg,
+		svcCfg:   svcCfg,
 		store:    store,
 		evWriter: ew,
 		listener: listener,
@@ -80,9 +80,9 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		apiserver.WithResponseWriter,
 	)
 
-	h := service.NewImageHandler(s.store, s.evWriter, s.cfg)
+	h := service.NewImageHandler(s.store, s.evWriter)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
-	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
+	srv := http.Server{Addr: s.svcCfg.Address, Handler: router}
 
 	go func() {
 		<-ctx.Done()
