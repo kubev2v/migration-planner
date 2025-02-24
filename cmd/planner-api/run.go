@@ -28,15 +28,12 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		defer zap.S().Info("API service stopped")
 
-		if configFile == "" {
-			configFile = config.ConfigFile()
-		}
-		cfg, err := config.LoadOrGenerate(configFile)
+		envConfig, err := config.New()
 		if err != nil {
-			zap.S().Fatalf("reading configuration: %v", err)
+			zap.S().Fatalf("reading environment options: %v", err)
 		}
 
-		logLvl, err := zap.ParseAtomicLevel(cfg.Service.LogLevel)
+		logLvl, err := zap.ParseAtomicLevel(envConfig.Svc.LogLevel)
 		if err != nil {
 			logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 		}
@@ -50,7 +47,8 @@ var runCmd = &cobra.Command{
 		zap.S().Info("Starting API service...")
 		zap.S().Infof("Build from git commit: %s", version.Get().GitCommit)
 		zap.S().Info("Initializing data store")
-		db, err := store.InitDB(cfg)
+
+		db, err := store.InitDB(&envConfig.DB)
 		if err != nil {
 			zap.S().Fatalf("initializing data store: %v", err)
 		}
@@ -70,17 +68,17 @@ var runCmd = &cobra.Command{
 		}
 
 		// initilize event writer
-		ep, _ := getEventProducer(cfg)
+		ep, _ := getEventProducer(envConfig.Kafka)
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		go func() {
 			defer cancel()
-			listener, err := newListener(cfg.Service.Address)
+			listener, err := newListener(envConfig.Svc.Address)
 			if err != nil {
 				zap.S().Fatalf("creating listener: %s", err)
 			}
 
-			server := apiserver.New(cfg, store, ep, listener)
+			server := apiserver.New(&envConfig.Svc, envConfig.Auth, store, ep, listener)
 			if err := server.Run(ctx); err != nil {
 				zap.S().Fatalf("Error running server: %s", err)
 			}
@@ -88,12 +86,12 @@ var runCmd = &cobra.Command{
 
 		go func() {
 			defer cancel()
-			listener, err := newListener(cfg.Service.AgentEndpointAddress)
+			listener, err := newListener(envConfig.Svc.AgentEndpointAddress)
 			if err != nil {
 				zap.S().Fatalf("creating listener: %s", err)
 			}
 
-			agentserver := agentserver.New(cfg, store, ep, listener)
+			agentserver := agentserver.New(&envConfig.Svc, envConfig.Auth, store, ep, listener)
 			if err := agentserver.Run(ctx); err != nil {
 				zap.S().Fatalf("Error running server: %s", err)
 			}
@@ -101,12 +99,12 @@ var runCmd = &cobra.Command{
 
 		go func() {
 			defer cancel()
-			listener, err := newListener(cfg.Service.ImageEndpointAddress)
+			listener, err := newListener(envConfig.Svc.ImageEndpointAddress)
 			if err != nil {
 				zap.S().Fatalf("creating listener: %s", err)
 			}
 
-			imageserver := imageserver.New(cfg, store, ep, listener)
+			imageserver := imageserver.New(&envConfig.Svc, store, ep, listener)
 			if err := imageserver.Run(ctx); err != nil {
 				zap.S().Fatalf("Error running server: %s", err)
 			}
@@ -138,28 +136,28 @@ func newListener(address string) (net.Listener, error) {
 	return net.Listen("tcp", address)
 }
 
-func getEventProducer(cfg *config.Config) (*events.EventProducer, error) {
-	if len(cfg.Service.Kafka.Brokers) == 0 {
+func getEventProducer(kafkaCfg config.KafkaConfig) (*events.EventProducer, error) {
+	if len(kafkaCfg.Brokers) == 0 {
 		stdWriter := &events.StdoutWriter{}
 		ew := events.NewEventProducer(stdWriter)
 		return ew, nil
 	}
 
 	saramaConfig := sarama.NewConfig()
-	if cfg.Service.Kafka.SaramaConfig != nil {
-		saramaConfig = cfg.Service.Kafka.SaramaConfig
+	if kafkaCfg.SaramaConfig != nil {
+		saramaConfig = kafkaCfg.SaramaConfig
 	}
 	saramaConfig.Version = sarama.V3_6_0_0
 
-	kp, err := pkgKafka.NewKafkaProducer(cfg.Service.Kafka.Brokers, saramaConfig)
+	kp, err := pkgKafka.NewKafkaProducer(kafkaCfg.Brokers, saramaConfig)
 	if err != nil {
 		return nil, err
 	}
 
-	zap.S().Named("planner-api").Infof("connected to kafka: %v", cfg.Service.Kafka.Brokers)
+	zap.S().Named("planner-api").Infof("connected to kafka: %v", kafkaCfg.Brokers)
 
-	if cfg.Service.Kafka.Topic != "" {
-		return events.NewEventProducer(kp, events.WithOutputTopic(cfg.Service.Kafka.Topic)), nil
+	if kafkaCfg.Topic != "" {
+		return events.NewEventProducer(kp, events.WithOutputTopic(kafkaCfg.Topic)), nil
 	}
 
 	return events.NewEventProducer(kp), nil

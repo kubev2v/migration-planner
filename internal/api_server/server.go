@@ -29,7 +29,8 @@ const (
 )
 
 type Server struct {
-	cfg      *config.Config
+	svcCfg   *config.SvcConfig
+	authCfg  auth.Config
 	store    store.Store
 	listener net.Listener
 	evWriter *events.EventProducer
@@ -37,13 +38,15 @@ type Server struct {
 
 // New returns a new instance of a migration-planner server.
 func New(
-	cfg *config.Config,
+	svcCfg *config.SvcConfig,
+	authCfg auth.Config,
 	store store.Store,
 	ew *events.EventProducer,
 	listener net.Listener,
 ) *Server {
 	return &Server{
-		cfg:      cfg,
+		svcCfg:   svcCfg,
+		authCfg:  authCfg,
 		store:    store,
 		listener: listener,
 		evWriter: ew,
@@ -77,7 +80,7 @@ func (s *Server) Run(ctx context.Context) error {
 		ErrorHandler: oapiErrorHandler,
 	}
 
-	authenticator, err := auth.NewAuthenticator(s.cfg.Service.Auth)
+	authenticator, err := auth.NewAuthenticator(s.authCfg)
 	if err != nil {
 		return fmt.Errorf("failed to create authenticator: %w", err)
 	}
@@ -99,7 +102,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	h := service.NewServiceHandler(s.store, s.evWriter)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
-	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
+	srv := http.Server{Addr: s.svcCfg.Address, Handler: router}
 
 	go func() {
 		<-ctx.Done()

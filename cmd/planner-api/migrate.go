@@ -18,18 +18,14 @@ var migrateCmd = &cobra.Command{
 		undo := zap.ReplaceGlobals(logger)
 		defer undo()
 
-		if configFile == "" {
-			configFile = config.ConfigFile()
-		}
-
-		cfg, err := config.Load(configFile)
+		envConfig, err := config.New()
 		if err != nil {
 			zap.S().Fatalf("reading configuration: %v", err)
 		}
-		zap.S().Infof("Using config: %s", cfg)
+		zap.S().Infof("Using config: %s", envConfig)
 
 		zap.S().Info("Initializing data store")
-		db, err := store.InitDB(cfg)
+		db, err := store.InitDB(&envConfig.DB)
 		if err != nil {
 			zap.S().Fatalf("initializing data store: %v", err)
 		}

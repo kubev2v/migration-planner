@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -13,22 +12,31 @@ import (
 	"gorm.io/gorm/logger"
 )
 
-func InitDB(cfg *config.Config) (*gorm.DB, error) {
+type Config struct {
+	Type     string `envconfig:"DB_TYPE" default:"pgsql"`
+	Hostname string `envconfig:"DB_HOST" default:"localhost"`
+	Port     string `envconfig:"DB_PORT" default:"5432"`
+	Name     string `envconfig:"DB_NAME" default:"planner"`
+	User     string `envconfig:"DB_USER" default:"admin"`
+	Password string `envconfig:"DB_PASS" default:"adminpass"`
+}
+
+func InitDB(cfg *Config) (*gorm.DB, error) {
 	var dia gorm.Dialector
 
-	if cfg.Database.Type == "pgsql" {
-		dsn := fmt.Sprintf("host=%s user=%s password=%s port=%d",
-			cfg.Database.Hostname,
-			cfg.Database.User,
-			cfg.Database.Password,
-			cfg.Database.Port,
+	if cfg.Type == "pgsql" {
+		dsn := fmt.Sprintf("host=%s user=%s password=%s port=%s",
+			cfg.Hostname,
+			cfg.User,
+			cfg.Password,
+			cfg.Port,
 		)
-		if cfg.Database.Name != "" {
-			dsn = fmt.Sprintf("%s dbname=%s", dsn, cfg.Database.Name)
+		if cfg.Name != "" {
+			dsn = fmt.Sprintf("%s dbname=%s", dsn, cfg.Name)
 		}
 		dia = postgres.Open(dsn)
 	} else {
-		dia = sqlite.Open(cfg.Database.Name)
+		dia = sqlite.Open(cfg.Name)
 	}
 
 	newLogger := logger.New(
@@ -56,7 +64,7 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 	sqlDB.SetMaxIdleConns(10)
 	sqlDB.SetMaxOpenConns(100)
 
-	if cfg.Database.Type == "pgsql" {
+	if cfg.Type == "pgsql" {
 		var minorVersion string
 		if result := newDB.Raw("SELECT version()").Scan(&minorVersion); result.Error != nil {
 			zap.S().Named("gorm").Infoln(result.Error.Error())
