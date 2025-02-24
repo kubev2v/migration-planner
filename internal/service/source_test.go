@@ -21,9 +21,8 @@ import (
 
 const (
 	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url,source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
-	insertSourceStm             = "INSERT INTO sources (id, name) VALUES ('%s', '%s');"
 	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
-	insertSourceOnPremisesStm   = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s', 'source_name', '%s', '%s', TRUE);"
+	insertSourceOnPremisesStm   = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s', '%s', '%s', '%s', TRUE);"
 )
 
 var _ = Describe("source handler", Ordered, func() {
@@ -78,13 +77,13 @@ var _ = Describe("source handler", Ordered, func() {
 
 		It("successfully list all the sources -- on premises", func() {
 			sourceID := uuid.NewString()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, sourceID, "admin", "admin"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, sourceID, "source1", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			sourceID = uuid.NewString()
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, sourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceOnPremisesStm, sourceID, "source2", "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
