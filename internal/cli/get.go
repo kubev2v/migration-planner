@@ -14,7 +14,6 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiclient "github.com/kubev2v/migration-planner/internal/api/client"
-	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/thoas/go-funk"
@@ -94,7 +93,7 @@ func (o *GetOptions) Validate(args []string) error {
 }
 
 func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: gocyclo
-	c, err := client.NewFromConfigFile(o.ConfigFilePath)
+	c, err := o.Client()
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}

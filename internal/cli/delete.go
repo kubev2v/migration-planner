@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -65,7 +64,7 @@ func (o *DeleteOptions) Validate(args []string) error {
 }
 
 func (o *DeleteOptions) Run(ctx context.Context, args []string) error {
-	c, err := client.NewFromConfigFile(o.ConfigFilePath)
+	c, err := o.Client()
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}
