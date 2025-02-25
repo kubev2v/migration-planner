@@ -75,13 +75,10 @@ func (h *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
 	}
 
-	if request.Body.Proxy != nil || request.Body.CertificateChain != nil {
-		imageInfra := mappers.ImageInfraFromApi(source.ID, request.Body)
-		_, err := h.store.ImageInfra().Create(ctx, imageInfra)
-		if err != nil {
-			_, _ = store.Rollback(ctx)
-			return server.CreateSource500JSONResponse{}, nil
-		}
+	imageInfra := mappers.ImageInfraFromApi(source.ID, imageTokenKey, request.Body)
+	if _, err := h.store.ImageInfra().Create(ctx, imageInfra); err != nil {
+		_, _ = store.Rollback(ctx)
+		return server.CreateSource500JSONResponse{}, nil
 	}
 
 	if _, err := store.Commit(ctx); err != nil {

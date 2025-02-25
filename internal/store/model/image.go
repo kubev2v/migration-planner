@@ -12,4 +12,6 @@ type ImageInfra struct {
 	HttpsProxyUrl    string
 	NoProxyDomains   string
 	CertificateChain string
+	SshPublicKey     string
+	ImageTokenKey    string
 }

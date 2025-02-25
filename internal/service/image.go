@@ -33,8 +33,8 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 
 	imageBuilder := image.NewImageBuilder(source.ID)
 
-	if source.SshPublicKey != nil {
-		imageBuilder = imageBuilder.WithSshKey(*source.SshPublicKey)
+	if source.ImageInfra.SshPublicKey != "" {
+		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
 	if user, found := auth.UserFromContext(ctx); found {
@@ -70,8 +70,8 @@ func (h *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImage
 
 	imageBuilder := image.NewImageBuilder(source.ID)
 
-	if source.SshPublicKey != nil {
-		imageBuilder = imageBuilder.WithSshKey(*source.SshPublicKey)
+	if source.ImageInfra.SshPublicKey != "" {
+		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
 	// get token if any
