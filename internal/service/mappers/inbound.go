@@ -36,23 +36,23 @@ func AgentFromApi(id uuid.UUID, user auth.User, resource *apiAgent.AgentStatusUp
 
 func SourceFromApi(id uuid.UUID, user auth.User, imageTokenKey string, resource *v1alpha1.CreateSourceJSONRequestBody) model.Source {
 	source := model.Source{
-		ID:            id,
-		Username:      user.Username,
-		OrgID:         user.Organization,
-		Name:          resource.Name,
-		ImageTokenKey: imageTokenKey,
-	}
-
-	if resource.SshPublicKey != nil {
-		source.SshPublicKey = resource.SshPublicKey
+		ID:       id,
+		Username: user.Username,
+		OrgID:    user.Organization,
+		Name:     resource.Name,
 	}
 
 	return source
 }
 
-func ImageInfraFromApi(sourceID uuid.UUID, resource *v1alpha1.CreateSourceJSONRequestBody) model.ImageInfra {
+func ImageInfraFromApi(sourceID uuid.UUID, imageTokenKey string, resource *v1alpha1.CreateSourceJSONRequestBody) model.ImageInfra {
 	imageInfra := model.ImageInfra{
-		SourceID: sourceID,
+		SourceID:      sourceID,
+		ImageTokenKey: imageTokenKey,
+	}
+
+	if resource.SshPublicKey != nil {
+		imageInfra.SshPublicKey = *resource.SshPublicKey
 	}
 
 	if resource.Proxy != nil {

@@ -134,6 +134,11 @@ var _ = Describe("source handler", Ordered, func() {
 			source, ok := resp.(server.CreateSource201JSONResponse)
 			Expect(ok).To(BeTrue())
 			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM image_infras;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {

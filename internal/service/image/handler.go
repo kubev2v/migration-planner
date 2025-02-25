@@ -60,8 +60,8 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	}
 
 	imageBuilder := image.NewImageBuilder(source.ID)
-	if source.SshPublicKey != nil {
-		imageBuilder = imageBuilder.WithSshKey(*source.SshPublicKey)
+	if source.ImageInfra.SshPublicKey != "" {
+		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
 	// TODO: We need to fetch the pull-secret from source
@@ -98,7 +98,7 @@ func (h *ImageHandler) getSourceKey(token *jwt.Token) (interface{}, error) {
 		return imageServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
 	}
 
-	return []byte(source.ImageTokenKey), nil
+	return []byte(source.ImageInfra.ImageTokenKey), nil
 }
 
 func (h *ImageHandler) getSource(ctx context.Context, sourceId string) (*model.Source, error) {

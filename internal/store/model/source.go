@@ -10,17 +10,15 @@ import (
 
 type Source struct {
 	gorm.Model
-	ID            uuid.UUID `gorm:"primaryKey; not null"`
-	Name          string    `gorm:"uniqueIndex:name_org_id;not null"`
-	VCenterID     string
-	Username      string
-	OrgID         string                    `gorm:"uniqueIndex:name_org_id;not null"`
-	Inventory     *JSONField[api.Inventory] `gorm:"type:jsonb"`
-	OnPremises    bool
-	SshPublicKey  *string
-	ImageTokenKey string
-	Agents        []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
-	ImageInfra    ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
+	ID         uuid.UUID `gorm:"primaryKey; not null"`
+	Name       string    `gorm:"uniqueIndex:name_org_id;not null"`
+	VCenterID  string
+	Username   string
+	OrgID      string                    `gorm:"uniqueIndex:name_org_id;not null"`
+	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
+	OnPremises bool
+	Agents     []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
+	ImageInfra ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 type SourceList []Source

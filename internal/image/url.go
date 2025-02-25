@@ -30,7 +30,7 @@ const (
 )
 
 func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
-	token, err := JWTForSymmetricKey([]byte(source.ImageTokenKey), ImageExpirationTime, source.ID.String())
+	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String())
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to sign image URL")
 	}
