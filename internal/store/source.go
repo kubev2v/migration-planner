@@ -42,7 +42,7 @@ func (s *SourceStore) InitialMigration(ctx context.Context) error {
 
 func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error) {
 	var sources model.SourceList
-	tx := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents")
+	tx := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents").Preload("ImageInfra")
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -72,7 +72,7 @@ func (s *SourceStore) DeleteAll(ctx context.Context) error {
 
 func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, error) {
 	source := model.Source{ID: id}
-	result := s.getDB(ctx).Preload("Agents").First(&source)
+	result := s.getDB(ctx).Preload("Agents").Preload("ImageInfra").First(&source)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrRecordNotFound

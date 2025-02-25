@@ -13,22 +13,25 @@ type Store interface {
 	NewTransactionContext(ctx context.Context) (context.Context, error)
 	Agent() Agent
 	Source() Source
+	ImageInfra() ImageInfra
 	Seed() error
 	InitialMigration() error
 	Close() error
 }
 
 type DataStore struct {
-	agent  Agent
-	db     *gorm.DB
-	source Source
+	agent      Agent
+	db         *gorm.DB
+	source     Source
+	imageInfra ImageInfra
 }
 
 func NewStore(db *gorm.DB) Store {
 	return &DataStore{
-		agent:  NewAgentSource(db),
-		source: NewSource(db),
-		db:     db,
+		agent:      NewAgentSource(db),
+		source:     NewSource(db),
+		imageInfra: NewImageInfraStore(db),
+		db:         db,
 	}
 }
 
@@ -42,6 +45,10 @@ func (s *DataStore) Source() Source {
 
 func (s *DataStore) Agent() Agent {
 	return s.agent
+}
+
+func (s *DataStore) ImageInfra() ImageInfra {
+	return s.imageInfra
 }
 
 func (s *DataStore) InitialMigration() error {
@@ -58,6 +65,11 @@ func (s *DataStore) InitialMigration() error {
 	if err := s.Agent().InitialMigration(ctx); err != nil {
 		return err
 	}
+
+	if err := s.ImageInfra().InitialMigration(ctx); err != nil {
+		return err
+	}
+
 	_, err = Commit(ctx)
 	return err
 }

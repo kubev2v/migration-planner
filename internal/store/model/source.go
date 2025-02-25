@@ -19,7 +19,8 @@ type Source struct {
 	OnPremises    bool
 	SshPublicKey  *string
 	ImageTokenKey string
-	Agents        []Agent `gorm:"constraint:OnDelete:CASCADE;"`
+	Agents        []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
+	ImageInfra    ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
 }
 
 type SourceList []Source

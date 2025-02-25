@@ -40,6 +40,9 @@ type IgnitionData struct {
 	Token                      string
 	PersistentDiskDevice       string
 	SourceID                   string
+	HttpProxyUrl               string
+	HttpsProxyUrl              string
+	NoProxyDomain              string
 }
 
 type Image interface {
