@@ -7,7 +7,6 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -99,7 +98,7 @@ func (o *GenerateOptions) Bind(fs *pflag.FlagSet) {
 }
 
 func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
-	c, err := client.NewFromConfigFile(o.ConfigFilePath)
+	c, err := o.Client()
 	if err != nil {
 		return fmt.Errorf("creating client: %w", err)
 	}

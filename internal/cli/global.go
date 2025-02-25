@@ -1,38 +1,29 @@
 package cli
 
 import (
-	"log"
-	"os"
-	"path/filepath"
+	"context"
+	"net/http"
 
+	"github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
 
-const (
-	appName               = "planner"
-	defaultConfigFileName = "client"
-	defaultConfigFileExt  = "yaml"
-)
-
 type GlobalOptions struct {
-	ConfigFilePath string
-	Context        string
+	ServerUrl string
 }
 
 func DefaultGlobalOptions() GlobalOptions {
 	return GlobalOptions{
-		ConfigFilePath: ConfigFilePath(""),
-		Context:        "",
+		ServerUrl: "http://localhost:3443",
 	}
 }
 
 func (o *GlobalOptions) Bind(fs *pflag.FlagSet) {
-	fs.StringVarP(&o.Context, "context", "c", o.Context, "Read client config from 'client_<context>.yaml' instead of 'client.yaml'.")
+	fs.StringVarP(&o.ServerUrl, "server-url", "u", o.ServerUrl, "Address of the server")
 }
 
 func (o *GlobalOptions) Complete(cmd *cobra.Command, args []string) error {
-	o.ConfigFilePath = ConfigFilePath(o.Context)
 	return nil
 }
 
@@ -40,17 +31,10 @@ func (o *GlobalOptions) Validate(args []string) error {
 	return nil
 }
 
-func ConfigFilePath(context string) string {
-	if len(context) > 0 && context != "default" {
-		return filepath.Join(ConfigDir(), defaultConfigFileName+"_"+context+"."+defaultConfigFileExt)
-	}
-	return filepath.Join(ConfigDir(), defaultConfigFileName+"."+defaultConfigFileExt)
-}
-
-func ConfigDir() string {
-	configRoot, err := os.UserConfigDir()
-	if err != nil {
-		log.Fatal("Could not find the user config directory because ", err)
-	}
-	return filepath.Join(configRoot, appName)
+func (o *GlobalOptions) Client() (*client.ClientWithResponses, error) {
+	return client.NewClientWithResponses(
+		o.ServerUrl,
+		client.WithHTTPClient(&http.Client{}),
+		client.WithRequestEditorFn(func(ctx context.Context, req *http.Request) error { return nil }),
+	)
 }
