@@ -18,6 +18,11 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
 
+type Key int
+
+// Key to store the ResponseWriter in the context of openapi
+const ResponseWriterKey Key = 0
+
 type ImageType int
 
 const (
@@ -37,6 +42,21 @@ const (
 	defaultIsoImageName          = "MigrationAssessment.iso"
 	defaultRHCOSImage            = "rhcos-live.x86_64.iso"
 )
+
+// IgnitionData defines modifiable fields in ignition config
+type IgnitionData struct {
+	SshKey                     string
+	PlannerServiceUI           string
+	PlannerService             string
+	MigrationPlannerAgentImage string
+	InsecureRegistry           string
+	Token                      string
+	PersistentDiskDevice       string
+	SourceID                   string
+	HttpProxyUrl               string
+	HttpsProxyUrl              string
+	NoProxyDomain              string
+}
 
 type Proxy struct {
 	HttpUrl       string
@@ -124,7 +144,7 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) (int, error) {
 		return -1, err
 	}
 
-	if err := writePersistenceDisk(tw); err != nil {
+	if err := b.writePersistenceDisk(tw); err != nil {
 		return -1, err
 	}
 
@@ -245,7 +265,7 @@ func (b *ImageBuilder) ovfSize() (int, error) {
 		return -1, err
 	}
 
-	return calculateTarSize(int(fileInfo.Size())), nil
+	return b.calculateTarSize(int(fileInfo.Size())), nil
 }
 
 func (b *ImageBuilder) diskSize() (int, error) {
@@ -259,7 +279,7 @@ func (b *ImageBuilder) diskSize() (int, error) {
 		return -1, err
 	}
 
-	return calculateTarSize(int(fileInfo.Size())), nil
+	return b.calculateTarSize(int(fileInfo.Size())), nil
 }
 
 func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (int, error) {
@@ -274,7 +294,7 @@ func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (int, error) {
 		return -1, err
 	}
 
-	isoSize := calculateTarSize(int(length))
+	isoSize := b.calculateTarSize(int(length))
 
 	ovfSize, err := b.ovfSize()
 	if err != nil {
@@ -367,4 +387,39 @@ func (b *ImageBuilder) WithProxy(proxy Proxy) *ImageBuilder {
 func (b *ImageBuilder) WithCertificateChain(certs string) *ImageBuilder {
 	b.CertificateChain = certs
 	return b
+}
+
+func (b *ImageBuilder) calculateTarSize(contentSize int) int {
+	const blockSize = 512
+
+	// Size of the tar header block
+	size := blockSize
+
+	// Size of the file content, rounded up to nearest 512 bytes
+	size += ((contentSize + blockSize - 1) / blockSize) * blockSize
+
+	return size
+}
+
+func (b *ImageBuilder) writePersistenceDisk(tw *tar.Writer) error {
+	diskContent, err := os.ReadFile("data/persistence-disk.vmdk")
+	if err != nil {
+		return err
+	}
+
+	header := &tar.Header{
+		Name:    "persistence-disk.vmdk",
+		Size:    int64(len(diskContent)),
+		Mode:    0600,
+		ModTime: time.Now(),
+	}
+
+	if err := tw.WriteHeader(header); err != nil {
+		return err
+	}
+	if _, err := tw.Write([]byte(diskContent)); err != nil {
+		return err
+	}
+
+	return nil
 }
