@@ -137,6 +137,15 @@ storage:
           Volume=/home/core/.migration-planner:/agent:Z
           Volume=/var/lib/data:/agent/persistent-data:Z
           Environment=OPA_SERVER=127.0.0.1:8181
+{{ if .HttpProxyUrl }}
+          Environment=HTTP_PROXY={{ .HttpProxyUrl }}
+{{ end }}
+{{ if .HttpsProxyUrl }}
+          Environment=HTTPS_PROXY={{ .HttpsProxyUrl }}
+{{ end }}
+{{ if .NoProxyDomain }}
+          Environment=NO_PROXY={{ .NoProxyDomain }}
+{{ end }}
           Network=host
           UserNS=keep-id:uid=1001
 

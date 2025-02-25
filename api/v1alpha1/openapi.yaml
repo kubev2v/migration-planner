@@ -457,12 +457,26 @@ components:
         - updatedAt
         - onPremises
 
+    AgentProxy:
+      type: object
+      properties:
+        httpUrl:
+          type: string
+        httpsUrl:
+          type: string
+        noProxy:
+          type: string
+
     SourceCreate:
       type: object
       properties:
         name:
           type: string
         sshPublicKey:
+          type: string
+        proxy:
+          $ref: '#/components/schemas/AgentProxy'
+        certificateChain:
           type: string
       required:
         - name

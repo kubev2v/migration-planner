@@ -41,6 +41,13 @@ type Agent struct {
 // AgentStatus defines model for Agent.Status.
 type AgentStatus string
 
+// AgentProxy defines model for AgentProxy.
+type AgentProxy struct {
+	HttpUrl  *string `json:"httpUrl,omitempty"`
+	HttpsUrl *string `json:"httpsUrl,omitempty"`
+	NoProxy  *string `json:"noProxy,omitempty"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	// Message Error message
@@ -108,8 +115,10 @@ type Source struct {
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	Name         string  `json:"name"`
-	SshPublicKey *string `json:"sshPublicKey,omitempty"`
+	CertificateChain *string     `json:"certificateChain,omitempty"`
+	Name             string      `json:"name"`
+	Proxy            *AgentProxy `json:"proxy,omitempty"`
+	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
 }
 
 // SourceList defines model for SourceList.

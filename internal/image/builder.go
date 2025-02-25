@@ -38,9 +38,17 @@ const (
 	defaultRHCOSImage            = "rhcos-live.x86_64.iso"
 )
 
+type Proxy struct {
+	HttpUrl       string
+	HttpsUrl      string
+	NoProxyDomain string
+}
+
 type ImageBuilder struct {
 	SourceID                   string
 	SshKey                     string
+	Proxy                      Proxy
+	CertificateChain           string
 	PlannerServiceUI           string
 	PlannerService             string
 	MigrationPlannerAgentImage string
@@ -149,6 +157,9 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		InsecureRegistry:           b.InsecureRegistry,
 		Token:                      b.Token,
 		PersistentDiskDevice:       b.PersistentDiskDevice,
+		HttpProxyUrl:               b.Proxy.HttpUrl,
+		HttpsProxyUrl:              b.Proxy.HttpsUrl,
+		NoProxyDomain:              b.Proxy.NoProxyDomain,
 	}
 
 	var buf bytes.Buffer
@@ -345,5 +356,15 @@ func (b *ImageBuilder) WithRHCOSImage(image string) *ImageBuilder {
 
 func (b *ImageBuilder) WithImageType(imageType ImageType) *ImageBuilder {
 	b.imageType = imageType
+	return b
+}
+
+func (b *ImageBuilder) WithProxy(proxy Proxy) *ImageBuilder {
+	b.Proxy = proxy
+	return b
+}
+
+func (b *ImageBuilder) WithCertificateChain(certs string) *ImageBuilder {
+	b.CertificateChain = certs
 	return b
 }

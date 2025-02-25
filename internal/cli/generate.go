@@ -19,6 +19,9 @@ type GenerateOptions struct {
 	AgentImageURL       string
 	ServiceIP           string
 	OutputImageFilePath string
+	HttpProxyUrl        string
+	HttpsProxyUrl       string
+	NoProxyDomain       string
 }
 
 func DefaultGenerateOptions() *GenerateOptions {
@@ -90,6 +93,9 @@ func (o *GenerateOptions) Bind(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.ImageType, "image-type", "t", "ova", "Type of the image. Only accepts ova and iso")
 	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "u", "quay.io/kubev2v/migration-planner-agent:latest", "Quay url of the agent's image. Defaults to quay.io/kubev2v/migration-planner-agent:latest")
 	fs.StringVarP(&o.OutputImageFilePath, "output-file", "o", "", "Output image file path")
+	fs.StringVarP(&o.HttpProxyUrl, "http-proxy", "", "", "Url of HTTP_PROXY")
+	fs.StringVarP(&o.HttpsProxyUrl, "https-proxy", "", "", "Url of HTTPS_PROXY")
+	fs.StringVarP(&o.NoProxyDomain, "no-proxy", "", "", "list of domains without proxy")
 }
 
 func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
@@ -109,7 +115,14 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 
 	source := *resp.JSON200
 
-	imageBuilder := image.NewImageBuilder(source.Id).WithPlannerAgentImage(o.AgentImageURL).WithPlannerService(o.ServiceIP)
+	imageBuilder := image.NewImageBuilder(source.Id).
+		WithPlannerAgentImage(o.AgentImageURL).
+		WithPlannerService(o.ServiceIP).
+		WithProxy(image.Proxy{
+			HttpUrl:       o.HttpProxyUrl,
+			HttpsUrl:      o.HttpsProxyUrl,
+			NoProxyDomain: o.NoProxyDomain,
+		})
 
 	switch o.ImageType {
 	case "iso":

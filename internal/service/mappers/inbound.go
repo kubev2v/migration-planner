@@ -50,6 +50,30 @@ func SourceFromApi(id uuid.UUID, user auth.User, imageTokenKey string, resource 
 	return source
 }
 
+func ImageInfraFromApi(sourceID uuid.UUID, resource *v1alpha1.CreateSourceJSONRequestBody) model.ImageInfra {
+	imageInfra := model.ImageInfra{
+		SourceID: sourceID,
+	}
+
+	if resource.Proxy != nil {
+		if resource.Proxy.HttpUrl != nil {
+			imageInfra.HttpProxyUrl = *resource.Proxy.HttpUrl
+		}
+		if resource.Proxy.HttpsUrl != nil {
+			imageInfra.HttpsProxyUrl = *resource.Proxy.HttpsUrl
+		}
+		if resource.Proxy.NoProxy != nil {
+			imageInfra.NoProxyDomains = *resource.Proxy.NoProxy
+		}
+	}
+
+	if resource.CertificateChain != nil {
+		imageInfra.CertificateChain = *resource.CertificateChain
+	}
+
+	return imageInfra
+}
+
 func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {
 	m.Inventory = model.MakeJSONField(inventory)
 	m.VCenterID = inventory.Vcenter.Id

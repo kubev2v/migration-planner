@@ -57,7 +57,13 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
+	ctx, err := h.store.NewTransactionContext(ctx)
+	if err != nil {
+		return server.CreateSource500JSONResponse{}, nil
+	}
+
 	// Generate a signing key for tokens for the source
+	// TODO: merge imageTokenKey and sshPublickKey with the rest of image infra
 	imageTokenKey, err := image.HMACKey(32)
 	if err != nil {
 		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
@@ -67,6 +73,19 @@ func (h *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 	result, err := h.store.Source().Create(ctx, source)
 	if err != nil {
 		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
+	}
+
+	if request.Body.Proxy != nil || request.Body.CertificateChain != nil {
+		imageInfra := mappers.ImageInfraFromApi(source.ID, request.Body)
+		_, err := h.store.ImageInfra().Create(ctx, imageInfra)
+		if err != nil {
+			_, _ = store.Rollback(ctx)
+			return server.CreateSource500JSONResponse{}, nil
+		}
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return server.CreateSource500JSONResponse{}, nil
 	}
 
 	return server.CreateSource201JSONResponse(mappers.SourceToApi(*result)), nil

@@ -136,6 +136,72 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(source.Name).To(Equal("test"))
 		})
 
+		It("successfully creates a source -- with proxy paramters defined", func() {
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			toStrPtr := func(s string) *string {
+				return &s
+			}
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "test",
+					Proxy: &v1alpha1.AgentProxy{
+						HttpUrl:  toStrPtr("http"),
+						HttpsUrl: toStrPtr("https"),
+						NoProxy:  toStrPtr("noproxy"),
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			source, ok := resp.(server.CreateSource201JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM image_infras;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+		})
+
+		It("successfully creates a source -- with certificate chain defined", func() {
+			eventWriter := newTestWriter()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewUserContext(context.TODO(), user)
+
+			toStrPtr := func(s string) *string {
+				return &s
+			}
+
+			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name:             "test",
+					CertificateChain: toStrPtr("chain"),
+				},
+			})
+			Expect(err).To(BeNil())
+			source, ok := resp.(server.CreateSource201JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM image_infras;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
