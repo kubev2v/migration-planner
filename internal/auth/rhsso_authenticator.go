@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	keyfunc "github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -21,10 +19,7 @@ func NewRHSSOAuthenticatorWithKeyFn(keyFn func(t *jwt.Token) (any, error)) (*RHS
 }
 
 func NewRHSSOAuthenticator(jwkCertUrl string) (*RHSSOAuthenticator, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	k, err := keyfunc.NewDefaultCtx(ctx, []string{jwkCertUrl})
+	k, err := keyfunc.NewDefault([]string{jwkCertUrl})
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sso public keys: %w", err)
 	}
