@@ -15,6 +15,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.6.0
+	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/konveyor/forklift-controller v0.0.0-20221102112227-e73b65a01cda
 	github.com/kubev2v/migration-event-streamer v0.0.0-20241125102656-9cdf9e64a16b
 	github.com/leosunmo/zapchi v0.2.0
