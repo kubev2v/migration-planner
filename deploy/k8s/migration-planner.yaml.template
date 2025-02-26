@@ -28,8 +28,7 @@ spec:
             - containerPort: 7443
             - containerPort: 11443
           livenessProbe:
-            httpGet:
-              path: /health
+            tcpSocket:
               port: 3443
             initialDelaySeconds: 30
           env:

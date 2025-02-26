@@ -105,8 +105,7 @@ objects:
                 - containerPort: 7443
                   name: agent-api-port
               livenessProbe:
-                httpGet:
-                  path: /health
+                tcpSocket:
                   port: 3443
                 initialDelaySeconds: 30
               env:
