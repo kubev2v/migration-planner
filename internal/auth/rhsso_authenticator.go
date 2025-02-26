@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 
+	"github.com/MicahParks/jwkset"
 	keyfunc "github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
 	"go.uber.org/zap"
@@ -18,10 +20,26 @@ func NewRHSSOAuthenticatorWithKeyFn(keyFn func(t *jwt.Token) (any, error)) (*RHS
 	return &RHSSOAuthenticator{keyFn: keyFn}, nil
 }
 
-func NewRHSSOAuthenticator(jwkCertUrl string) (*RHSSOAuthenticator, error) {
-	k, err := keyfunc.NewDefault([]string{jwkCertUrl})
+func NewRHSSOAuthenticator(ctx context.Context, jwkCertUrl string) (*RHSSOAuthenticator, error) {
+	jwks, err := jwkset.NewDefaultHTTPClient([]string{jwkCertUrl})
 	if err != nil {
-		return nil, fmt.Errorf("failed to get sso public keys: %w", err)
+		return nil, fmt.Errorf("failed to create client jwk set: %s", err)
+	}
+
+	k, err := keyfunc.New(keyfunc.Options{
+		Storage: jwks,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get sso public keys: %s", err)
+	}
+
+	m, err := k.Storage().Marshal(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal keys: %s", err)
+	}
+
+	for _, k := range m.Keys {
+		zap.S().Debugw("key read from sso:", "alg", k.ALG.String(), "kid", k.KID)
 	}
 
 	return &RHSSOAuthenticator{keyFn: k.Keyfunc}, nil

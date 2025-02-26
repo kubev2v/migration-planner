@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -21,7 +22,7 @@ func NewAuthenticator(authConfig config.Auth) (Authenticator, error) {
 
 	switch authConfig.AuthenticationType {
 	case RHSSOAuthentication:
-		return NewRHSSOAuthenticator(authConfig.JwkCertURL)
+		return NewRHSSOAuthenticator(context.Background(), authConfig.JwkCertURL)
 	default:
 		return NewNoneAuthenticator()
 	}

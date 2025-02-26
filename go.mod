@@ -4,6 +4,7 @@ go 1.22.2
 
 require (
 	github.com/IBM/sarama v1.43.3
+	github.com/MicahParks/jwkset v0.5.19
 	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/coreos/butane v0.22.0
@@ -45,7 +46,6 @@ require (
 )
 
 require (
-	github.com/MicahParks/jwkset v0.5.19 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
