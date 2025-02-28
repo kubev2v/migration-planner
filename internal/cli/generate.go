@@ -14,6 +14,7 @@ import (
 
 type GenerateOptions struct {
 	GlobalOptions
+	RHCOSImage          string
 	ImageType           string
 	AgentImageURL       string
 	ServiceIP           string
@@ -56,6 +57,14 @@ func (o *GenerateOptions) Validate(args []string) error {
 		o.ServiceIP = fmt.Sprintf("http://%s:7443", localIP.String())
 	}
 
+	if o.RHCOSImage != "" {
+		rhcosFile, err := os.Open(o.RHCOSImage)
+		if err != nil {
+			return fmt.Errorf("failed to open rhcos base image file: %s", err)
+		}
+		rhcosFile.Close()
+	}
+
 	switch o.ImageType {
 	case "ova":
 		fallthrough
@@ -89,12 +98,13 @@ func NewCmdGenerate() *cobra.Command {
 }
 
 func (o *GenerateOptions) Bind(fs *pflag.FlagSet) {
-	fs.StringVarP(&o.ImageType, "image-type", "t", "ova", "Type of the image. Only accepts ova and iso")
+	fs.StringVarP(&o.ImageType, "image-type", "t", "iso", "Type of the image. Only accepts ova and iso")
 	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "u", "quay.io/kubev2v/migration-planner-agent:latest", "Quay url of the agent's image. Defaults to quay.io/kubev2v/migration-planner-agent:latest")
 	fs.StringVarP(&o.OutputImageFilePath, "output-file", "o", "", "Output image file path")
 	fs.StringVarP(&o.HttpProxyUrl, "http-proxy", "", "", "Url of HTTP_PROXY")
 	fs.StringVarP(&o.HttpsProxyUrl, "https-proxy", "", "", "Url of HTTPS_PROXY")
 	fs.StringVarP(&o.NoProxyDomain, "no-proxy", "", "", "list of domains without proxy")
+	fs.StringVarP(&o.RHCOSImage, "rhcos-base-image", "", "", "path to the rhcos base image")
 }
 
 func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
@@ -125,7 +135,12 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 
 	switch o.ImageType {
 	case "iso":
-		imageBuilder = imageBuilder.WithImageType(image.QemuImageType).WithPersistenceDiskDevice("/dev/vda")
+		imageBuilder = imageBuilder.
+			WithImageType(image.QemuImageType).
+			WithPersistenceDiskDevice("/dev/vda")
+		if o.RHCOSImage != "" {
+			imageBuilder = imageBuilder.WithRHCOSImage(o.RHCOSImage)
+		}
 	default:
 	}
 
