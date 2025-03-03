@@ -53,6 +53,7 @@ type kafkaConfig struct {
 type Auth struct {
 	AuthenticationType string `json:"type"`
 	JwkCertURL         string `json:"jwk_cert_url"`
+	LocalPrivateKey    string `json:"localPrivateKey"`
 }
 
 func ConfigDir() string {
@@ -92,6 +93,7 @@ func NewDefault() (*Config, error) {
 			Auth: Auth{
 				AuthenticationType: util.GetEnv("MIGRATION_PLANNER_AUTH", "none"),
 				JwkCertURL:         util.GetEnv("MIGRATION_PLANNER_JWK_URL", ""),
+				LocalPrivateKey:    util.GetEnv("MIGRATION_PLANNER_PRIVATE_KEY", ""),
 			},
 		},
 	}
