@@ -121,10 +121,10 @@ func NewCmdDeploy() *cobra.Command {
 func (o *DeployOptions) Bind(fs *pflag.FlagSet) {
 	o.GlobalOptions.Bind(fs)
 
-	fs.StringVarP(&o.ImageFile, "image-file", "f", o.ImageFile, "Path the iso image. If not set the image will be generated with default values.")
+	fs.StringVarP(&o.ImageFile, "image-file", "", o.ImageFile, "Path the iso image. If not set the image will be generated with default values.")
 	fs.StringVarP(&o.Name, "name", "", o.Name, "Name of the vm")
 	fs.StringVarP(&o.NetworkName, "network", "", "default", "Name of the network")
-	fs.StringVarP(&o.QemuUrl, "qemu-url", "p", "qemu:///session", "Url of qemu")
+	fs.StringVarP(&o.QemuUrl, "qemu-url", "", "qemu:///session", "Url of qemu")
 	fs.StringVarP(&o.StoragePool, "storage-pool", "", "default", "Name of the storage pool")
 }
 
