@@ -20,6 +20,7 @@ IFACE ?= eth0
 PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
+PKG_MANAGER ?= apt
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -196,3 +197,4 @@ $(GOBIN)/golangci-lint:
 
 # include the deployment targets
 include deploy/deploy.mk
+include deploy/e2e.mk
