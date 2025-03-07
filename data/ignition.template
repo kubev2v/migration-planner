@@ -85,11 +85,15 @@ storage:
           insecure = true
     {{end}}
     {{ if .Token }}
-    - path: /home/core/.migration-planner/config/jwt.json
+    - path: /home/core/.migration-planner/data/jwt.json
       mode: 0644
       contents:
         inline: |
           {{ .Token }}
+      user:
+        name: core
+      group:
+        name: core
     {{ end }}
     - path: /var/lib/systemd/linger/core
       mode: 0644

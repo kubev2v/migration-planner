@@ -66,7 +66,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
@@ -94,7 +94,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
@@ -122,7 +122,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
@@ -148,7 +148,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			toStrPtr := func(s string) *string {
 				return &s
@@ -183,7 +183,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			toStrPtr := func(s string) *string {
 				return &s
@@ -232,7 +232,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -264,7 +264,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -291,7 +291,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "joker",
 				Organization: "joker",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -345,7 +345,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -377,7 +377,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "user",
 				Organization: "user",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
@@ -401,7 +401,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -445,7 +445,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
@@ -496,7 +496,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))

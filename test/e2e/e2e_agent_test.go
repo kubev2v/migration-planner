@@ -111,7 +111,7 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 		Username:     "admin",
 		Organization: "admin",
 	}
-	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx := auth.NewTokenContext(context.TODO(), user)
 
 	// Download OVA
 
@@ -358,7 +358,7 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 		Username:     "admin",
 		Organization: "admin",
 	}
-	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx := auth.NewTokenContext(context.TODO(), user)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
 	res, err := s.c.CreateSourceWithResponse(ctx, params)
@@ -378,7 +378,7 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 		Username:     "admin",
 		Organization: "admin",
 	}
-	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx := auth.NewTokenContext(context.TODO(), user)
 
 	res, err := s.c.GetSourceWithResponse(ctx, id)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
@@ -393,7 +393,7 @@ func (s *plannerService) RemoveSources() error {
 		Username:     "admin",
 		Organization: "admin",
 	}
-	ctx := auth.NewUserContext(context.TODO(), user)
+	ctx := auth.NewTokenContext(context.TODO(), user)
 
 	_, err := s.c.DeleteSourcesWithResponse(ctx)
 	return err

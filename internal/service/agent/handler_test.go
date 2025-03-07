@@ -23,7 +23,6 @@ import (
 
 const (
 	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
-	insertAgentWithUsernameStm  = "INSERT INTO agents (id, status, status_info, cred_url, source_id, username, org_id, version) VALUES ('%s', '%s', '%s', '%s', '%s','%s','%s', 'version_1');"
 	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 )
@@ -60,7 +59,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
@@ -106,14 +105,14 @@ var _ = Describe("agent service", Ordered, func() {
 			agentID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
@@ -154,35 +153,6 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
-		It("failed to update the agent -- username is different", func() {
-			sourceID := uuid.NewString()
-			agentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
-			Expect(tx.Error).To(BeNil())
-
-			user := auth.User{
-				Username:     "batman",
-				Organization: "wayne_enterprises",
-			}
-			ctx := auth.NewUserContext(context.TODO(), user)
-
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
-			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
-				Id: agentID,
-				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
-					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
-					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
-					Version:       "version-1",
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus403JSONResponse{}))
-		})
-
 		It("failed to update agent -- source id is missing", func() {
 			sourceID := uuid.NewString()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
@@ -192,7 +162,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Username:     "batman",
 				Organization: "wayne_enterprises",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
@@ -222,14 +192,14 @@ var _ = Describe("agent service", Ordered, func() {
 			agentID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
@@ -263,18 +233,18 @@ var _ = Describe("agent service", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			secondAgentID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", sourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			// first agent request
 			eventWriter := newTestWriter()
@@ -336,7 +306,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
@@ -356,14 +326,14 @@ var _ = Describe("agent service", Ordered, func() {
 			firstAgentID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentWithUsernameStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID, "admin", "admin"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
-			ctx := auth.NewUserContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			eventWriter := newTestWriter()
 			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
