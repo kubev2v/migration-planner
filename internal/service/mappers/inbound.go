@@ -15,18 +15,14 @@ func AgentFromSource(id uuid.UUID, user auth.User, source model.Source) model.Ag
 		ID:         id,
 		Status:     string(v1alpha1.AgentStatusNotConnected),
 		StatusInfo: string(v1alpha1.AgentStatusNotConnected),
-		Username:   user.Username,
-		OrgID:      user.Organization,
 		SourceID:   source.ID,
 	}
 }
 
-func AgentFromApi(id uuid.UUID, user auth.User, resource *apiAgent.AgentStatusUpdate) model.Agent {
+func AgentFromApi(id uuid.UUID, resource *apiAgent.AgentStatusUpdate) model.Agent {
 	return model.Agent{
 		ID:         id,
 		Status:     resource.Status,
-		Username:   user.Username,
-		OrgID:      user.Organization,
 		StatusInfo: resource.StatusInfo,
 		CredUrl:    resource.CredentialUrl,
 		Version:    resource.Version,

@@ -10,8 +10,6 @@ import (
 type Agent struct {
 	gorm.Model
 	ID         uuid.UUID `json:"id" gorm:"primaryKey"`
-	Username   string
-	OrgID      string
 	Status     string
 	StatusInfo string
 	CredUrl    string
@@ -29,8 +27,6 @@ func (a Agent) String() string {
 func NewAgentForSource(id uuid.UUID, source Source) Agent {
 	return Agent{
 		ID:       id,
-		Username: source.Username,
-		OrgID:    source.OrgID,
 		SourceID: source.ID,
 	}
 }

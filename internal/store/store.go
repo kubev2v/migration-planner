@@ -14,6 +14,7 @@ type Store interface {
 	Agent() Agent
 	Source() Source
 	ImageInfra() ImageInfra
+	PrivateKey() PrivateKey
 	Seed() error
 	InitialMigration() error
 	Close() error
@@ -24,6 +25,7 @@ type DataStore struct {
 	db         *gorm.DB
 	source     Source
 	imageInfra ImageInfra
+	privateKey PrivateKey
 }
 
 func NewStore(db *gorm.DB) Store {
@@ -31,6 +33,7 @@ func NewStore(db *gorm.DB) Store {
 		agent:      NewAgentSource(db),
 		source:     NewSource(db),
 		imageInfra: NewImageInfraStore(db),
+		privateKey: NewCachePrivateKeyStore(NewPrivateKey(db)),
 		db:         db,
 	}
 }
@@ -45,6 +48,10 @@ func (s *DataStore) Source() Source {
 
 func (s *DataStore) Agent() Agent {
 	return s.agent
+}
+
+func (s *DataStore) PrivateKey() PrivateKey {
+	return s.privateKey
 }
 
 func (s *DataStore) ImageInfra() ImageInfra {
@@ -67,6 +74,10 @@ func (s *DataStore) InitialMigration() error {
 	}
 
 	if err := s.ImageInfra().InitialMigration(ctx); err != nil {
+		return err
+	}
+
+	if err := s.PrivateKey().InitialMigration(ctx); err != nil {
 		return err
 	}
 

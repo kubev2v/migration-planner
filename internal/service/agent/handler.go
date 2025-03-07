@@ -10,7 +10,6 @@ import (
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
-	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -61,11 +60,6 @@ func (h *AgentServiceHandler) UpdateSourceInventory(ctx context.Context, request
 		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("failed to find agent %s", request.Body.AgentId)
 	}
 
-	// agent must be under organization's scope
-	if auth.MustHaveUser(ctx).Organization != agent.OrgID {
-		return agentServer.UpdateSourceInventory403JSONResponse{}, fmt.Errorf("user does not below to the same organization as the agent %q", agent.OrgID)
-	}
-
 	// don't allow updates of sources not associated with this agent
 	if request.Id != agent.SourceID {
 		return agentServer.UpdateSourceInventory400JSONResponse{}, fmt.Errorf("request id %q does not match the agent source id %q", request.Id, agent.SourceID)
@@ -98,8 +92,6 @@ func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.He
 // UpdateAgentStatus updates or creates a new agent resource
 // If the source has not agent than the agent is created.
 func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request agentServer.UpdateAgentStatusRequestObject) (agentServer.UpdateAgentStatusResponseObject, error) {
-	user := auth.MustHaveUser(ctx)
-
 	_, err := h.store.Source().Get(ctx, request.Body.SourceId)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -114,7 +106,7 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 	}
 
 	if agent == nil {
-		newAgent := mappers.AgentFromApi(request.Id, user, request.Body)
+		newAgent := mappers.AgentFromApi(request.Id, request.Body)
 		a, err := h.store.Agent().Create(ctx, newAgent)
 		if err != nil {
 			return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to create the agent: %s", err)
@@ -128,11 +120,7 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 		return agentServer.UpdateAgentStatus201Response{}, nil
 	}
 
-	if user.Organization != agent.OrgID {
-		return agentServer.UpdateAgentStatus403JSONResponse{}, fmt.Errorf("user does not below to the same organization as the agent %q", agent.OrgID)
-	}
-
-	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, user, request.Body)); err != nil {
+	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, request.Body)); err != nil {
 		return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to update agent: %s", err)
 	}
 

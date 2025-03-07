@@ -5,12 +5,14 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 func InitDB(cfg *config.Config) (*gorm.DB, error) {
@@ -47,6 +49,7 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 		zap.S().Named("gorm").Fatalf("failed to connect database: %v", err)
 		return nil, err
 	}
+	schema.RegisterSerializer("key_serializer", model.KeySerializer{})
 
 	sqlDB, err := newDB.DB()
 	if err != nil {
