@@ -37,10 +37,26 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
-	if user, found := auth.UserFromContext(ctx); found {
-		if user.Token != nil {
-			imageBuilder = imageBuilder.WithAgentToken(user.Token.Raw)
+	// get the key associated with source orgID to generate agent token
+	key, err := h.store.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return server.GetImage500JSONResponse{}, nil
 		}
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		if err != nil {
+			return server.GetImage500JSONResponse{}, nil
+		}
+		if _, err := h.store.PrivateKey().Create(ctx, *newKey); err != nil {
+			return server.GetImage500JSONResponse{}, nil
+		}
+		imageBuilder = imageBuilder.WithAgentToken(token)
+	} else {
+		token, err := auth.GenerateAgentJWT(key, source)
+		if err != nil {
+			return server.GetImage500JSONResponse{}, nil
+		}
+		imageBuilder = imageBuilder.WithAgentToken(token)
 	}
 
 	size, err := imageBuilder.Generate(ctx, writer)

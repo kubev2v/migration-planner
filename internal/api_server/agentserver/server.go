@@ -66,11 +66,6 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		ErrorHandler: oapiErrorHandler,
 	}
 
-	authenticator, err := auth.NewAuthenticator(s.cfg.Service.Auth)
-	if err != nil {
-		return fmt.Errorf("failed to create authenticator: %w", err)
-	}
-
 	router := chi.NewRouter()
 
 	metricMiddleware := chiprometheus.New("agent_server")
@@ -78,7 +73,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 
 	router.Use(
 		metricMiddleware.Handler,
-		authenticator.Authenticator,
+		auth.NewAgentAuthenticator(s.store).Authenticator,
 		middleware.RequestID,
 		zapchi.Logger(zap.S(), "router_agent"),
 		middleware.Recoverer,
