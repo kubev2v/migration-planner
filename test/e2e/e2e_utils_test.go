@@ -117,27 +117,8 @@ func CreateVm(c *libvirt.Connect) error {
 	return nil
 }
 
-func RemoveSSHKey(ip string) error {
-	// Check if the key exists in known_hosts
-	cmd := exec.Command("ssh-keygen", "-F", ip)
-	var Stdout bytes.Buffer
-	cmd.Stdout = &Stdout
-
-	if err := cmd.Run(); err != nil || Stdout.Len() == 0 {
-		return nil
-	}
-
-	// Key found, remove it
-	removeCmd := exec.Command("ssh-keygen", "-R", ip)
-	if err := removeCmd.Run(); err != nil {
-		return fmt.Errorf("failed to remove SSH key for %s: %v", ip, err)
-	}
-
-	return nil
-}
-
 func RunCommand(ip string, command string) (string, error) {
-	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", fmt.Sprintf("core@%s", ip), command)
+	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", fmt.Sprintf("core@%s", ip), command)
 
 	var stdout, stderr bytes.Buffer
 	sshCmd.Stdout = &stdout
