@@ -82,6 +82,7 @@ objects:
         port: metrics
       annotations:
         description: Expose the migration planner metrics endpoint
+      name: migration-planner-metrics
     specs:
       selector:
         app: migration-planner
