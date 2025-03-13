@@ -122,6 +122,25 @@ var _ = Describe("e2e", func() {
 				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
 			}, "1m", "2s").Should(BeTrue())
 		})
+
+		It("Source removal", func() {
+			res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), "core", "123456")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+			Eventually(func() bool {
+				source, err := svc.GetSource(source.Id)
+				if err != nil {
+					return false
+				}
+				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+			}, "1m", "2s").Should(BeTrue())
+
+			err = svc.RemoveSource(source.Id)
+			Expect(err).To(BeNil())
+
+			_, err = svc.GetSource(source.Id)
+			Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("code: %d", http.StatusNotFound))))
+		})
 	})
 
 	Context("Edge cases", func() {

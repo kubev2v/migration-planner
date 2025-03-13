@@ -49,6 +49,7 @@ type PlannerAgent interface {
 
 type PlannerService interface {
 	RemoveSources() error
+	RemoveSource(id uuid.UUID) error
 	GetSource(id uuid.UUID) (*api.Source, error)
 	CreateSource(name string) (*api.Source, error)
 }
@@ -382,7 +383,7 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 
 	res, err := s.c.GetSourceWithResponse(ctx, id)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("Error listing sources")
+		return nil, fmt.Errorf("error listing sources. response status code: %d", res.HTTPResponse.StatusCode)
 	}
 
 	return res.JSON200, nil
@@ -396,6 +397,17 @@ func (s *plannerService) RemoveSources() error {
 	ctx := auth.NewTokenContext(context.TODO(), user)
 
 	_, err := s.c.DeleteSourcesWithResponse(ctx)
+	return err
+}
+
+func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
+	user := auth.User{
+		Username:     "admin",
+		Organization: "admin",
+	}
+	ctx := auth.NewTokenContext(context.TODO(), user)
+
+	_, err := s.c.DeleteSourceWithResponse(ctx, uuid)
 	return err
 }
 
