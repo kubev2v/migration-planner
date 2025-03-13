@@ -17,6 +17,7 @@ type Store interface {
 	PrivateKey() PrivateKey
 	Seed() error
 	InitialMigration() error
+	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
 }
 
@@ -83,6 +84,14 @@ func (s *DataStore) InitialMigration() error {
 
 	_, err = Commit(ctx)
 	return err
+}
+
+func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
+	sources, err := s.Source().List(ctx, NewSourceQueryFilter().WithoutDefaultInventory())
+	if err != nil {
+		return model.InventoryStats{}, err
+	}
+	return model.NewInventoryStats(sources), nil
 }
 
 func (s *DataStore) Seed() error {

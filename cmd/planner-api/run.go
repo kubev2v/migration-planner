@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -85,6 +86,9 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalf("Error running server: %s", err)
 			}
 		}()
+
+		// register metrics
+		metrics.RegisterMetrics(store)
 
 		go func() {
 			defer cancel()
