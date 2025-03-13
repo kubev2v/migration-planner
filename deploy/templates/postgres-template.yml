@@ -110,7 +110,6 @@ objects:
                 capabilities: {}
                 privileged: false
               terminationMessagePath: /dev/termination-log
-              capabilities: {}
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           volumes:

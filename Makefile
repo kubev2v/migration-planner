@@ -8,15 +8,19 @@ TIMEOUT ?= 30m
 VERBOSE ?= false
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
+MIGRATION_PLANNER_API_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
+MIGRATION_PLANNER_UI_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
+MIGRATION_PLANNER_REPLICAS ?= 1
 PERSISTENT_DISK_DEVICE ?= /dev/sda
-INSECURE_REGISTRY ?= true
+INSECURE_REGISTRY ?= "true"
 REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
+GREP ?= grep
 PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
@@ -55,7 +59,7 @@ help:
 	@echo "    clean:           clean up all containers and volumes"
 
 GOBIN = $(shell pwd)/bin
-GINKGO = $(GOBIN)/ginkgo
+GINKGO ?= $(GOBIN)/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 ifeq (, $(shell which ginkgo 2> /dev/null))
 	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
@@ -136,49 +140,92 @@ push-agent-container: migration-planner-agent-container quay-login
 
 push-containers: push-api-container push-agent-container
 
-deploy-on-kind:
-	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
-             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
-             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
-             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
-	config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	migration_planner_image_url=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server:7443 --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/k8s/
-
 deploy-on-openshift:
-	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
-             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
-             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
-             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
-	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
-	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
-	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
-	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
-	oc expose service migration-planner-image -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-image || true
-	config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
-	migration_planner_image_url=$$(oc get route planner-image -o jsonpath='{.spec.host}'); \
-	config_server_ui=$$(oc get route planner -o jsonpath='{.spec.host}'); \
-	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
-	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
+	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
+	openshift_project=$$(oc project -q); \
+	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
+	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
+	oc process -f deploy/templates/service-template.yml \
+       -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
+       -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
+       -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
+       -p IMAGE_TAG=$(MIGRATION_PLANNER_API_IMAGE_TAG) \
+       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+	   | oc apply -f -; \
+	oc process -f https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml \
+     -p MIGRATION_PLANNER_UI_IMAGE=$(MIGRATION_PLANNER_UI_IMAGE) \
+     -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
+     -p IMAGE_TAG=$(MIGRATION_PLANNER_UI_IMAGE_TAG) \
+	   | oc apply -f -; \
+	oc expose service migration-planner-agent --name planner-agent; \
+	oc expose service migration-planner-ui --name planner-ui; \
+	oc expose service migration-planner-image --name planner-image; \
+	echo "*** Migration Planner has been deployed successfully on Openshift ***"; \
+	echo "*** Open UI: http://planner-ui-$${openshift_project}.apps.$${openshift_base_url}"
+
+delete-from-openshift:
+	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
+	openshift_project=$$(oc project -q); \
+	echo "*** Delete Migration Planner from Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***"; \
+	oc process -f https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml \
+     -p MIGRATION_PLANNER_UI_IMAGE=$(MIGRATION_PLANNER_UI_IMAGE) \
+     -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
+     -p IMAGE_TAG=$(MIGRATION_PLANNER_UI_IMAGE_TAG) \
+	   | oc delete -f -; \
+	openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
+	openshift_project=$$(oc project -q); \
+	oc process -f deploy/templates/service-template.yml \
+       -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
+       -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
+       -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
+       -p IMAGE_TAG=$(MIGRATION_PLANNER_API_IMAGE_TAG) \
+       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+	   | oc delete -f -; \
+	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
+	oc delete route planner-agent planner-ui planner-image; \
+	echo "*** Migration Planner has been deleted successfully from Openshift ***"
+
+deploy-on-kind:
+	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+		echo "*** Deploy Migration Planner on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
+	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/service-template.yml \
+	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
+	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
+	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
+	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
+	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
+	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
+	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
+	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
+	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
+	   | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	echo "*** Migration Planner has been deployed successfully on Kind ***"
+
+delete-from-kind:
+	inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+	oc process --local -f deploy/templates/service-template.yml \
+	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
+	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
+	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
+	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
+	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
+	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
+	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
+	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
+	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
+	   | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml
 
 undeploy-local-obs:
 	@podman kube down deploy/observability.yml
-
-undeploy-on-openshift:
-	oc delete route planner || true
-	oc delete route planner-agent || true
-	oc delete secret migration-planner-secret || true
-	oc delete -f deploy/k8s || true
 
 bin:
 	mkdir -p bin
