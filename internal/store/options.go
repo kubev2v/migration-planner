@@ -78,6 +78,13 @@ func (sf *SourceQueryFilter) ByDefaultInventory() *SourceQueryFilter {
 	return sf
 }
 
+func (sf *SourceQueryFilter) WithoutDefaultInventory() *SourceQueryFilter {
+	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id != ?", uuid.UUID{})
+	})
+	return sf
+}
+
 func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter {
 	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		if isOnPremises {
