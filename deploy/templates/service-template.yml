@@ -6,8 +6,22 @@ metadata:
 parameters:
   - name: MIGRATION_PLANNER_IMAGE
     required: true
+  - name: MIGRATION_PLANNER_API_IMAGE_PULL_POLICY
+    value: Always
   - name: IMAGE_TAG
     value: latest
+  - name: MIGRATION_PLANNER_URL
+    description: The API URL of the migration assessment
+    required: true
+  - name: MIGRATION_PLANNER_UI_URL
+    description: The console URL of the migration assessment
+    required: true
+  - name: MIGRATION_PLANNER_IMAGE_URL
+    description: The URL for the Agent OVA file
+    required: true
+  - name: MIGRATION_PLANNER_AGENT_IMAGE
+    description: Migration Discovery Service image
+    required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
     value: "3"
@@ -23,23 +37,39 @@ parameters:
   - name: MIGRATION_PLANNER_CPU_LIMIT
     description: CPU limit for the API pods.
     value: "500m"
-  - name: MIGRATION_PLANNER_AGENT_IMAGE
-    description: Migration Discovery Service image
-    required: true
-  - name: MIGRATION_PLANNER_URL
-    description: The API URL of the migration assessment
-    required: true
-  - name: MIGRATION_PLANNER_UI_URL
-    description: The console URL of the migration assessment
-    required: true
-  - name: MIGRATION_PLANNER_JWK_URL
-    description: URL of the x.509 certificate chain that was used to verify the digital signature of the JWT
-  - name: MIGRATION_PLANNER_AUTH
-    description: Define the backend authentication mechanism
   - name: DB_SECRET_NAME
     description: The name of the OpenShift Secret used for the database.
     displayName: Database Secret Name
     value: migration-planner-db
+  - name: PERSISTENT_DISK_DEVICE
+    value: /dev/sda
+  - name: INSECURE_REGISTRY
+    value: "false"
+  # Svc Config values
+  - name: MIGRATION_PLANNER_ADDRESS
+    value: ":3443"
+  - name: MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS
+    value: ":7443"
+  - name: MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS
+    value: ":11443"
+  - name: MIGRATION_PLANNER_BASE_URL
+    value: "https://localhost:3443"
+  - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
+    value: "https://localhost:7443"
+  - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
+    value: "https://localhost:11443"
+  - name: MIGRATION_PLANNER_LOG_LEVEL
+    value: "info"
+  # Kafka Config values
+  - name: MIGRATION_PLANNER_KAFKA_BROKERS
+  - name: MIGRATION_PLANNER_KAFKA_TOPIC
+  - name: MIGRATION_PLANNER_KAFKA_VERSION
+  - name: MIGRATION_PLANNER_KAFKA_CLIENT_ID
+  # Auth Config values
+  - name: MIGRATION_PLANNER_AUTH
+    description: Define the backend authentication mechanism
+  - name: MIGRATION_PLANNER_JWK_URL
+    description: URL of the x.509 certificate chain that was used to verify the digital signature of the JWT
 
 objects:
   - kind: ServiceAccount
@@ -105,6 +135,20 @@ objects:
           port: 8080
           protocol: TCP
           targetPort: 8080
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
+      name: migration-planner-image
+    spec:
+      ports:
+        - name: migration-planner-image
+          port: 11443
+          protocol: TCP
+          targetPort: 11443
+      selector:
+        app: migration-planner
   - kind: Deployment
     apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
     metadata:
@@ -129,7 +173,7 @@ objects:
                   cpu: ${MIGRATION_PLANNER_CPU_LIMIT}
                   memory: ${MIGRATION_PLANNER_MEMORY_LIMIT}
               image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
-              imagePullPolicy: Always
+              imagePullPolicy: ${MIGRATION_PLANNER_API_IMAGE_PULL_POLICY}
               ports:
                 - containerPort: 3443
                   name: api-port
@@ -144,14 +188,46 @@ objects:
                   value: ${MIGRATION_PLANNER_URL}
                 - name: CONFIG_SERVER_UI
                   value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
+                - name: MIGRATION_PLANNER_IMAGE_URL
+                  value: ${MIGRATION_PLANNER_IMAGE_URL}
                 - name: MIGRATION_PLANNER_AGENT_IMAGE
                   value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
-                - name:  BASE_AGENT_ENDPOINT_URL
+                - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
+                - name: PERSISTENT_DISK_DEVICE
+                  value: ${PERSISTENT_DISK_DEVICE}
+                - name:  INSECURE_REGISTRY
+                  value: ${INSECURE_REGISTRY}
+                # Svc Config values
+                - name: MIGRATION_PLANNER_ADDRESS
+                  value: ${MIGRATION_PLANNER_ADDRESS}
+                - name: MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS
+                  value: ${MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS}
+                - name: MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS
+                  value: ${MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS}
+                - name: MIGRATION_PLANNER_BASE_URL
+                  value: ${MIGRATION_PLANNER_BASE_URL}
+                - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
+                  value: ${MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL}
+                - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
+                  value: ${MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL}
+                - name: MIGRATION_PLANNER_LOG_LEVEL
+                  value: ${MIGRATION_PLANNER_LOG_LEVEL}
+                # Kafka Config values
+                - name: MIGRATION_PLANNER_KAFKA_BROKERS
+                  value: ${MIGRATION_PLANNER_KAFKA_BROKERS}
+                - name: MIGRATION_PLANNER_KAFKA_TOPIC
+                  value: ${MIGRATION_PLANNER_KAFKA_TOPIC}
+                - name: MIGRATION_PLANNER_KAFKA_VERSION
+                  value: ${MIGRATION_PLANNER_KAFKA_VERSION}
+                - name: MIGRATION_PLANNER_KAFKA_CLIENT_ID
+                  value: ${MIGRATION_PLANNER_KAFKA_CLIENT_ID}
+                # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}
                 - name: MIGRATION_PLANNER_JWK_URL
                   value: ${MIGRATION_PLANNER_JWK_URL}
+                # DB Config values
                 - name: DB_HOST
                   valueFrom:
                     secretKeyRef:

@@ -19,7 +19,7 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 	var dia gorm.Dialector
 
 	if cfg.Database.Type == "pgsql" {
-		dsn := fmt.Sprintf("host=%s user=%s password=%s port=%d",
+		dsn := fmt.Sprintf("host=%s user=%s password=%s port=%s",
 			cfg.Database.Hostname,
 			cfg.Database.User,
 			cfg.Database.Password,

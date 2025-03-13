@@ -18,11 +18,7 @@ var migrateCmd = &cobra.Command{
 		undo := zap.ReplaceGlobals(logger)
 		defer undo()
 
-		if configFile == "" {
-			configFile = config.ConfigFile()
-		}
-
-		cfg, err := config.Load(configFile)
+		cfg, err := config.New()
 		if err != nil {
 			zap.S().Fatalf("reading configuration: %v", err)
 		}

@@ -30,12 +30,12 @@ var _ = Describe("e2e", func() {
 	}
 
 	createAgent := func(configPath string, idForTest string, uuid uuid.UUID, vmName string) PlannerAgent {
-		agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
+    newAgent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
 		Expect(err).To(BeNil(), "Failed to create PlannerAgent")
-		err = agent.Run()
+		err = newAgent.Run()
 		Expect(err).To(BeNil(), "Failed to run PlannerAgent")
 		Eventually(func() string {
-			agentIP, err = agent.GetIp()
+			agentIP, err = newAgent.GetIp()
 			if err != nil {
 				return ""
 			}
@@ -43,9 +43,9 @@ var _ = Describe("e2e", func() {
 		}, "3m").ShouldNot(BeEmpty())
 		Expect(agentIP).ToNot(BeEmpty())
 		Eventually(func() bool {
-			return agent.IsServiceRunning(agentIP, "planner-agent")
+			return newAgent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m").Should(BeTrue())
-		return agent
+		return newAgent
 	}
 
 	loginToVsphere := func(username string, password string, expectedStatusCode int) {
