@@ -25,7 +25,7 @@ var _ = Describe("source store", Ordered, func() {
 	)
 
 	BeforeAll(func() {
-		cfg, err := config.NewDefault()
+		cfg, err := config.New()
 		Expect(err).To(BeNil())
 		db, err := store.InitDB(cfg)
 		Expect(err).To(BeNil())

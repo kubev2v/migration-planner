@@ -17,6 +17,7 @@ REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
+GREP ?= grep
 PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
@@ -139,49 +140,81 @@ push-containers: push-api-container push-agent-container
 deploy-vsphere-simulator:
 	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
 
-deploy-on-kind:
-	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
-             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
-             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
-             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-service.yaml'
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f 'deploy/k8s/*-secret.yaml'
-	config_server=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	migration_planner_image_url=$$(ip addr show ${IFACE}| grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	$(KUBECTL) create secret generic migration-planner-secret -n "${MIGRATION_PLANNER_NAMESPACE}" --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server:7443 --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
-	$(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/k8s/
+define service_template_values
+MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE)
+MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE)
+MIGRATION_PLANNER_REPLICAS=1
+IMAGE_TAG=latest
+endef
+export service_template_values
 
-deploy-on-openshift:
-	sed "s|@MIGRATION_PLANNER_AGENT_IMAGE@|$(MIGRATION_PLANNER_AGENT_IMAGE)|g; \
-             s|@INSECURE_REGISTRY@|$(INSECURE_REGISTRY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE_PULL_POLICY@|$(MIGRATION_PLANNER_API_IMAGE_PULL_POLICY)|g; \
-             s|@MIGRATION_PLANNER_API_IMAGE@|$(MIGRATION_PLANNER_API_IMAGE)|g; \
-             s|@PERSISTENT_DISK_DEVICE@|$(PERSISTENT_DISK_DEVICE)|g" \
-             deploy/k8s/migration-planner.yaml.template > deploy/k8s/migration-planner.yaml
-	sed 's|@MIGRATION_PLANNER_UI_IMAGE@|$(MIGRATION_PLANNER_UI_IMAGE)|g' deploy/k8s/migration-planner-ui.yaml.template > deploy/k8s/migration-planner-ui.yaml
-	ls deploy/k8s | awk '/secret|service/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
-	oc create route edge planner --service=migration-planner-ui -n ${MIGRATION_PLANNER_NAMESPACE} || true
-	oc expose service migration-planner-agent -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-agent || true
-	oc expose service migration-planner-image -n ${MIGRATION_PLANNER_NAMESPACE} --name planner-image || true
-	config_server=$$(oc get route planner-agent -o jsonpath='{.spec.host}'); \
-	migration_planner_image_url=$$(oc get route planner-image -o jsonpath='{.spec.host}'); \
-	config_server_ui=$$(oc get route planner -o jsonpath='{.spec.host}'); \
-	oc create secret generic migration-planner-secret -n ${MIGRATION_PLANNER_NAMESPACE} --from-literal=migration_planner_image_url=http://$$migration_planner_image_url --from-literal=config_server=http://$$config_server --from-literal=config_server_ui=https://$$config_server_ui/migrate/wizard || true
-	ls deploy/k8s | awk '! /secret|service|template/' | xargs -I {} oc apply -n ${MIGRATION_PLANNER_NAMESPACE} -f deploy/k8s/{}
+deploy/templates/service-template-values:
+	@printf "%s\n" "$$service_template_values" > deploy/templates/service-template-values
+
+define ui_template_values
+MIGRATION_PLANNER_UI_IMAGE=$(MIGRATION_PLANNER_UI_IMAGE)
+MIGRATION_PLANNER_REPLICAS=1
+IMAGE_TAG=latest
+endef
+export ui_template_values
+
+deploy/templates/ui-template-values:
+	@printf "%s\n" "$$ui_template_values" > deploy/templates/ui-template-values
+
+
+deploy-on-openshift: deploy/templates/service-template-values deploy/templates/ui-template-values
+	# Deploy api resources
+	oc process -f deploy/templates/postgres-template.yml | oc apply -f -
+	openshift_base_url := $(shell oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
+	openshift_project := $(shell oc project -q); \
+	oc process -f deploy/templates/service-template.yml --param-file deploy/templates/service-template-values \
+       -p MIGRATION_PLANNER_URL=http://planner-agent-$(openshift_project).apps.$(openshift_base_url) \
+       -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$(openshift_project).apps.$(openshift_base_url) \
+       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$(openshift_project).apps.$(openshift_base_url) \
+	   | oc apply -f -
+	# Deploy UI resources
+	oc process -f https://raw.githubusercontent.com/nirarg/migration-planner-ui/refs/heads/template-change/deploy/templates/ui-template.yml \
+	   --param-file deploy/templates/ui-template-values | oc apply -f -
+	# Create Route
+	oc expose service migration-planner-agent --name planner-agent
+	oc expose service migration-planner-ui --name planner-ui
+	oc expose service migration-planner-image --name planner-image
+
+delete-from-openshift: deploy/templates/service-template-values deploy/templates/ui-template-values
+	oc process -f https://raw.githubusercontent.com/nirarg/migration-planner-ui/refs/heads/template-change/deploy/templates/ui-template.yml \
+	   --param-file deploy/templates/ui-template-values | oc delete -f -
+	oc process -f deploy/templates/service-template.yml --param-file deploy/templates/service-template-values \
+       -p MIGRATION_PLANNER_URL="empty" \
+       -p MIGRATION_PLANNER_UI_URL="empty" \
+	   | oc delete -f -
+	oc process -f deploy/templates/postgres-template.yml | oc delete -f -
+	oc delete route planner-agent planner-ui
+
+deploy-on-kind: deploy/templates/service-template-values deploy/templates/ui-template-values
+	@deploy/templates/convert_template_to_manifests.sh deploy/templates/postgres-template.yml deploy/templates/postgres-manifest.yml; \
+    $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/templates/postgres-manifest.yml; \
+	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+	deploy/templates/convert_template_to_manifests.sh deploy/templates/service-template.yml deploy/templates/service-manifest.yml deploy/templates/service-template-values \
+	-p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
+	-p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
+	-p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443; \
+    $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/templates/service-manifest.yml
+
+delete-from-kind: deploy/templates/service-template-values deploy/templates/ui-template-values
+	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
+	deploy/templates/convert_template_to_manifests.sh deploy/templates/service-template.yml deploy/templates/service-manifest.yml deploy/templates/service-template-values \
+	-p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
+	-p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
+	-p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443; \
+    $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/templates/service-manifest.yml; \
+	deploy/templates/convert_template_to_manifests.sh deploy/templates/postgres-template.yml deploy/templates/postgres-manifest.yml; \
+    $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f deploy/templates/postgres-manifest.yml
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml
 
 undeploy-local-obs:
 	@podman kube down deploy/observability.yml
-
-undeploy-on-openshift:
-	oc delete route planner || true
-	oc delete route planner-agent || true
-	oc delete secret migration-planner-secret || true
-	oc delete -f deploy/k8s || true
 
 bin:
 	mkdir -p bin
