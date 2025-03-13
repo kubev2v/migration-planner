@@ -40,9 +40,19 @@ deploy_registry:
 
 .PHONY: deploy_vcsim
 deploy_vcsim:
-	make deploy-vsphere-simulator
+	sed "s|@APP-NAME@|"vcsim1"|g; \
+		  s|@PORT@|"8989"|g" \
+			deploy/k8s/vcsim.yaml.template > deploy/k8s/vcsim.yaml
+	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
+
+	sed "s|@APP-NAME@|"vcsim2"|g; \
+		  s|@PORT@|"8990"|g" \
+			deploy/k8s/vcsim.yaml.template > deploy/k8s/vcsim.yaml
+	$(KUBECTL) apply -f 'deploy/k8s/vcsim.yaml'
+
 	$(KUBECTL) wait --for=condition=Ready pods --all --timeout=240s
-	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim 8989:8989 &
+	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 &
+	$(KUBECTL) port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 &
 
 .PHONY: build_assisted_migration_containers
 build_assisted_migration_containers:
@@ -64,6 +74,7 @@ deploy_assisted_migration:
 persistent_disk:
 	mkdir -p /tmp/untarova
 	qemu-img convert -f vmdk -O qcow2 data/persistence-disk.vmdk /tmp/untarova/persistence-disk.qcow2
+	cp /tmp/untarova/persistence-disk.qcow2 /tmp/untarova/persistence-disk-vm-2.qcow2
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:

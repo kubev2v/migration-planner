@@ -27,13 +27,13 @@ const (
 )
 
 var (
-	home              string = os.Getenv("HOME")
-	defaultConfigPath string = filepath.Join(home, ".config/planner/client.yaml")
-	defaultBasePath   string = "/tmp/untarova/"
-	defaultIsoPath           = filepath.Join(defaultBasePath, "agent.iso")
-	defaultVmdkName          = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
-	defaultOvaPath    string = filepath.Join(home, "myimage.ova")
-	defaultServiceUrl string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
+	home               string = os.Getenv("HOME")
+	defaultConfigPath  string = filepath.Join(home, ".config/planner/client.yaml")
+	defaultBasePath    string = "/tmp/untarova/"
+	defaultVmdkName           = filepath.Join(defaultBasePath, "persistence-disk.vmdk")
+	defaultOvaPath     string = filepath.Join(home, "myimage.ova")
+	defaultServiceUrl  string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
+	defaultAgentTestID string = "1"
 )
 
 type PlannerAgent interface {
@@ -59,13 +59,14 @@ type plannerService struct {
 }
 
 type plannerAgentLibvirt struct {
-	c        *internalclient.ClientWithResponses
-	name     string
-	con      *libvirt.Connect
-	sourceID uuid.UUID
+	c                   *internalclient.ClientWithResponses
+	name                string
+	con                 *libvirt.Connect
+	sourceID            uuid.UUID
+	agentEndToEndTestID string
 }
 
-func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string) (*plannerAgentLibvirt, error) {
+func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTest string) (*plannerAgentLibvirt, error) {
 	_ = createConfigFile(configPath)
 
 	c, err := client.NewFromConfigFile(configPath)
@@ -78,7 +79,7 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string) (*plann
 		return nil, fmt.Errorf("failed to connect to hypervisor: %v", err)
 	}
 
-	return &plannerAgentLibvirt{c: c, name: name, con: conn, sourceID: sourceID}, nil
+	return &plannerAgentLibvirt{c: c, name: name, con: conn, sourceID: sourceID, agentEndToEndTestID: idForTest}, nil
 }
 
 func (p *plannerAgentLibvirt) Run() error {
@@ -86,7 +87,7 @@ func (p *plannerAgentLibvirt) Run() error {
 		return err
 	}
 
-	err := CreateVm(p.con)
+	err := p.CreateVm()
 	if err != nil {
 		return err
 	}
@@ -131,7 +132,7 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 	}
 
 	// Untar ISO from OVA
-	if err = Untar(ovaFile, defaultIsoPath, "MigrationAssessment.iso"); err != nil {
+	if err = Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
@@ -300,8 +301,9 @@ func (p *plannerAgentLibvirt) Remove() error {
 	}
 
 	// Remove the ISO file if it exists
-	if _, err := os.Stat(defaultIsoPath); err == nil {
-		if err := os.Remove(defaultIsoPath); err != nil {
+	isoPath := p.getIsoPath()
+	if _, err := os.Stat(isoPath); err == nil {
+		if err := os.Remove(isoPath); err != nil {
 			return fmt.Errorf("failed to remove ISO file: %w", err)
 		}
 	}
@@ -364,11 +366,11 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
 	res, err := s.c.CreateSourceWithResponse(ctx, params)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
-		return nil, fmt.Errorf("Error creating the source: %s", err)
+		return nil, fmt.Errorf("error creating the source: %v", err)
 	}
 
 	if res.JSON201 == nil {
-		return nil, fmt.Errorf("Error creating the source")
+		return nil, fmt.Errorf("error creating the source")
 	}
 
 	return res.JSON201, nil
@@ -424,4 +426,19 @@ func createConfigFile(configPath string) error {
 	}
 
 	return nil
+}
+
+func (p *plannerAgentLibvirt) getConfigXmlVMPath() string {
+	if p.agentEndToEndTestID == defaultAgentTestID {
+		return "data/vm.xml"
+	}
+	return fmt.Sprintf("data/vm-%s.xml", p.agentEndToEndTestID)
+}
+
+func (p *plannerAgentLibvirt) getIsoPath() string {
+	if p.agentEndToEndTestID == defaultAgentTestID {
+		return filepath.Join(defaultBasePath, "agent.iso")
+	}
+	fileName := fmt.Sprintf("agent-%s.iso", p.agentEndToEndTestID)
+	return filepath.Join(defaultBasePath, fileName)
 }
