@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/MicahParks/jwkset"
 	keyfunc "github.com/MicahParks/keyfunc/v3"
@@ -67,9 +68,14 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
 		return User{}, errors.New("failed to parse jwt token claims")
 	}
 
+	orgID, err := rh.getOrgID(claims)
+	if err != nil {
+		return User{}, err
+	}
+
 	return User{
 		Username:     claims["preffered_username"].(string),
-		Organization: claims["org_id"].(string),
+		Organization: orgID,
 		Token:        userToken,
 	}, nil
 }
@@ -92,4 +98,25 @@ func (rh *RHSSOAuthenticator) Authenticator(next http.Handler) http.Handler {
 		ctx := NewTokenContext(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+func (rh *RHSSOAuthenticator) getOrgID(claims jwt.MapClaims) (string, error) {
+	if v, found := claims["org_id"]; found {
+		if orgID, ok := v.(string); ok {
+			return orgID, nil
+		}
+	}
+
+	// get orgID from username if possible
+	username := claims["preffered_username"].(string)
+	if strings.Contains(username, "@") {
+		orgID := strings.Split(username, "@")[1]
+		if strings.TrimSpace(orgID) == "" {
+			return "", fmt.Errorf("preffered_username %q is malformatted", username)
+		}
+
+		return orgID, nil
+	}
+
+	return "", fmt.Errorf("organization id not found in the claims")
 }
