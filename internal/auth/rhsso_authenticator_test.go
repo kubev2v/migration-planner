@@ -46,6 +46,36 @@ var _ = Describe("sso authentication", func() {
 			_, err = authenticator.Authenticate(sToken)
 			Expect(err).ToNot(BeNil())
 		})
+
+		It("successfully validate the token -- no orgID", func() {
+			sToken, keyFn := generateCustomToken("user@company.com", nil)
+			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
+			Expect(err).To(BeNil())
+
+			user, err := authenticator.Authenticate(sToken)
+			Expect(err).To(BeNil())
+			Expect(user.Username).To(Equal("user@company.com"))
+			Expect(user.Organization).To(Equal("company.com"))
+		})
+
+		It("failed validate the token -- username malformatted", func() {
+			sToken, keyFn := generateCustomToken("user@", nil)
+			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
+			Expect(err).To(BeNil())
+
+			_, err = authenticator.Authenticate(sToken)
+			Expect(err).ToNot(BeNil())
+		})
+
+		It("successfully validate the token -- username malformatted", func() {
+			sToken, keyFn := generateCustomToken("@user", nil)
+			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
+			Expect(err).To(BeNil())
+
+			user, err := authenticator.Authenticate(sToken)
+			Expect(err).To(BeNil())
+			Expect(user.Organization).To(Equal("user"))
+		})
 	})
 	Context("rh auth middleware", func() {
 		It("successfully authenticate", func() {
@@ -196,6 +226,46 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 	Expect(err).To(BeNil())
 
 	token := jwt.NewWithClaims(jwt.SigningMethodES256, claims)
+	ss, err := token.SignedString(privateKey)
+	Expect(err).To(BeNil())
+
+	return ss, func(t *jwt.Token) (any, error) {
+		return privateKey.Public(), nil
+	}
+}
+
+func generateCustomToken(username string, orgID *string) (string, func(t *jwt.Token) (any, error)) {
+	type TokenClaims struct {
+		Username string `json:"preffered_username"`
+		OrgID    string `json:"org_id,omitempty"`
+		jwt.RegisteredClaims
+	}
+
+	o := ""
+	if orgID != nil {
+		o = *orgID
+	}
+
+	// Create claims with multiple fields populated
+	claims := TokenClaims{
+		username,
+		o,
+		jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "test",
+			Subject:   "somebody",
+			ID:        "1",
+			Audience:  []string{"somebody_else"},
+		},
+	}
+
+	// generate a pair of keys RSA
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	Expect(err).To(BeNil())
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	ss, err := token.SignedString(privateKey)
 	Expect(err).To(BeNil())
 
