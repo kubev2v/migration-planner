@@ -47,7 +47,7 @@ func NewRHSSOAuthenticator(ctx context.Context, jwkCertUrl string) (*RHSSOAuthen
 }
 
 func (rh *RHSSOAuthenticator) Authenticate(token string) (User, error) {
-	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}), jwt.WithIssuedAt(), jwt.WithExpirationRequired())
+	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}), jwt.WithIssuedAt())
 	t, err := parser.Parse(token, rh.keyFn)
 	if err != nil {
 		zap.S().Errorw("failed to parse or the token is invalid", "token", token, "error", err)

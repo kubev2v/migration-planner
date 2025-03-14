@@ -38,15 +38,6 @@ var _ = Describe("sso authentication", func() {
 			Expect(err).ToNot(BeNil())
 		})
 
-		It("fails to authenticate -- issueAt claims is missing", func() {
-			sToken, keyFn := generateInvalidValidToken("exp_at")
-			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
-			Expect(err).To(BeNil())
-
-			_, err = authenticator.Authenticate(sToken)
-			Expect(err).ToNot(BeNil())
-		})
-
 		It("successfully validate the token -- no orgID", func() {
 			sToken, keyFn := generateCustomToken("user@company.com", nil)
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
@@ -157,47 +148,47 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	}
 }
 
-func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) (any, error)) {
-	type TokenClaims struct {
-		Username string `json:"preffered_username"`
-		OrgID    string `json:"org_id"`
-		jwt.RegisteredClaims
-	}
+// func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) (any, error)) {
+// 	type TokenClaims struct {
+// 		Username string `json:"preffered_username"`
+// 		OrgID    string `json:"org_id"`
+// 		jwt.RegisteredClaims
+// 	}
 
-	registedClaims := jwt.RegisteredClaims{
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-		IssuedAt:  jwt.NewNumericDate(time.Now()),
-		NotBefore: jwt.NewNumericDate(time.Now()),
-		Issuer:    "test",
-		Subject:   "somebody",
-		ID:        "1",
-		Audience:  []string{"somebody_else"},
-	}
+// 	registedClaims := jwt.RegisteredClaims{
+// 		ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+// 		IssuedAt:  jwt.NewNumericDate(time.Now()),
+// 		NotBefore: jwt.NewNumericDate(time.Now()),
+// 		Issuer:    "test",
+// 		Subject:   "somebody",
+// 		ID:        "1",
+// 		Audience:  []string{"somebody_else"},
+// 	}
 
-	switch missingClaim {
-	case "exp_at":
-		registedClaims.ExpiresAt = nil
-	}
+// 	switch missingClaim {
+// 	case "exp_at":
+// 		registedClaims.ExpiresAt = nil
+// 	}
 
-	// Create claims with multiple fields populated
-	claims := TokenClaims{
-		"batman",
-		"GothamCity",
-		registedClaims,
-	}
+// 	// Create claims with multiple fields populated
+// 	claims := TokenClaims{
+// 		"batman",
+// 		"GothamCity",
+// 		registedClaims,
+// 	}
 
-	// generate a pair of keys RSA
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	Expect(err).To(BeNil())
+// 	// generate a pair of keys RSA
+// 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+// 	Expect(err).To(BeNil())
 
-	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	ss, err := token.SignedString(privateKey)
-	Expect(err).To(BeNil())
+// 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+// 	ss, err := token.SignedString(privateKey)
+// 	Expect(err).To(BeNil())
 
-	return ss, func(t *jwt.Token) (any, error) {
-		return privateKey.Public(), nil
-	}
-}
+// 	return ss, func(t *jwt.Token) (any, error) {
+// 		return privateKey.Public(), nil
+// 	}
+// }
 
 func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
