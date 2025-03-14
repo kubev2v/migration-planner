@@ -29,10 +29,7 @@ var runCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		defer zap.S().Info("API service stopped")
 
-		if configFile == "" {
-			configFile = config.ConfigFile()
-		}
-		cfg, err := config.LoadOrGenerate(configFile)
+		cfg, err := config.New()
 		if err != nil {
 			zap.S().Fatalf("reading configuration: %v", err)
 		}

@@ -12,4 +12,7 @@ examples/config.yaml
 /tmp/
 cover.out
 /docker-config/
-deploy/k8s/migration-planner.yaml
+deploy/templates/service-template-values
+deploy/templates/service-manifest.yml
+deploy/templates/ui-template-values
+deploy/templates/postgres-manifest.yml

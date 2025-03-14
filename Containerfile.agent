@@ -6,7 +6,7 @@ RUN mkdir /app/www && \
      tar xf /tmp/agent-latest.tgz -C /app/www
 
 # Builder container
-FROM registry.access.redhat.com/ubi9/go-toolset as builder
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset as builder
 
 WORKDIR /app
 COPY go.mod go.sum ./

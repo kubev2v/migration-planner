@@ -15,7 +15,7 @@ The deployment process deploys all relevant parts of the project, including the 
 
 To undeploy the project, which removes all the relevant parts, run:
 ```
-make undeploy-on-openshift
+make delete-from-openshift
 ```
 
 ## Using custom images for the Assisted Migration Service API, UI and agent

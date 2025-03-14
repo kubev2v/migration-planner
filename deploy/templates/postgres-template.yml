@@ -37,33 +37,33 @@ objects:
   - kind: Service
     apiVersion: v1
     metadata:
-      name: ${DB_SERVICE_NAME}
+      name: "${DB_SERVICE_NAME}"
       labels:
-        app: ${DB_SERVICE_NAME}
+        app: "${DB_SERVICE_NAME}"
     spec:
       ports:
         - port: 5432
           targetPort: 5432
           protocol: TCP
       selector:
-        app: ${DB_SERVICE_NAME}
+        app: "${DB_SERVICE_NAME}"
   - kind: Deployment
     apiVersion: apps/v1
     metadata:
-      name: ${DB_SERVICE_NAME}
+      name: "${DB_SERVICE_NAME}"
     spec:
       selector:
         matchLabels:
-          app: ${DB_SERVICE_NAME}
+          app: "${DB_SERVICE_NAME}"
       replicas: 1
       template:
         metadata:
           labels:
-            app: ${DB_SERVICE_NAME}
+            app: "${DB_SERVICE_NAME}"
         spec:
           containers:
             - name: postgres
-              image: ${POSTGRES_IMAGE}
+              image: "${POSTGRES_IMAGE}"
               imagePullPolicy: IfNotPresent
               ports:
                 - containerPort: 5432
@@ -72,21 +72,21 @@ objects:
                 - name: POSTGRESQL_DATABASE
                   valueFrom:
                     secretKeyRef:
-                      name: ${DB_SECRET_NAME}
+                      name: "${DB_SECRET_NAME}"
                       key: db.name
                 - name: POSTGRESQL_USER
                   valueFrom:
                     secretKeyRef:
-                      name: ${DB_SECRET_NAME}
+                      name: "${DB_SECRET_NAME}"
                       key: db.user
                 - name: POSTGRESQL_PASSWORD
                   valueFrom:
                     secretKeyRef:
-                      name: ${DB_SECRET_NAME}
+                      name: "${DB_SECRET_NAME}"
                       key: db.password
               volumeMounts:
                 - mountPath: /var/lib/pgsql/data
-                  name: ${DB_SERVICE_NAME}-data
+                  name: "${DB_SERVICE_NAME}-data"
               resources:
                 limits:
                   memory: 500Mi
@@ -110,31 +110,30 @@ objects:
                 capabilities: {}
                 privileged: false
               terminationMessagePath: /dev/termination-log
-              capabilities: {}
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           volumes:
-            - name: ${DB_SERVICE_NAME}-data
+            - name: "${DB_SERVICE_NAME}-data"
               persistentVolumeClaim:
-                claimName: ${DB_SERVICE_NAME}-data
+                claimName: "${DB_SERVICE_NAME}-data"
   - kind: Secret
     apiVersion: v1
     metadata:
-      name: ${DB_SECRET_NAME}
+      name: "${DB_SECRET_NAME}"
     type: Opaque
     stringData:
-      db.host: ${DB_SERVICE_NAME}
+      db.host: "${DB_SERVICE_NAME}"
       db.port: "5432"
-      db.name: ${DB_NAME}
-      db.user: ${DB_USER}
-      db.password: ${DB_PASSWORD}
+      db.name: "${DB_NAME}"
+      db.user: "${DB_USER}"
+      db.password: "${DB_PASSWORD}"
   - kind: PersistentVolumeClaim
     apiVersion: v1
     metadata:
-      name: ${DB_SERVICE_NAME}-data
+      name: "${DB_SERVICE_NAME}-data"
     spec:
       accessModes:
         - ReadWriteOnce
       resources:
         requests:
-          storage: ${DB_VOLUME_CAPACITY}
+          storage: "${DB_VOLUME_CAPACITY}"

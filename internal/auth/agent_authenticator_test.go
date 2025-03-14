@@ -30,7 +30,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 	)
 
 	BeforeEach(func() {
-		cfg, err := config.NewDefault()
+		cfg, err := config.New()
 		Expect(err).To(BeNil())
 		db, err := store.InitDB(cfg)
 		Expect(err).To(BeNil())
