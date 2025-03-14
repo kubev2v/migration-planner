@@ -98,7 +98,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 
 func generateToken(username, organization string, privateKey *rsa.PrivateKey) (string, error) {
 	type TokenClaims struct {
-		Username string `json:"preffered_username"`
+		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
