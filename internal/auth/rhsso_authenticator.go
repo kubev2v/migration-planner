@@ -74,7 +74,7 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
 	}
 
 	return User{
-		Username:     claims["preffered_username"].(string),
+		Username:     claims["preferred_username"].(string),
 		Organization: orgID,
 		Token:        userToken,
 	}, nil
@@ -108,11 +108,11 @@ func (rh *RHSSOAuthenticator) getOrgID(claims jwt.MapClaims) (string, error) {
 	}
 
 	// get orgID from username if possible
-	username := claims["preffered_username"].(string)
+	username := claims["preferred_username"].(string)
 	if strings.Contains(username, "@") {
 		orgID := strings.Split(username, "@")[1]
 		if strings.TrimSpace(orgID) == "" {
-			return "", fmt.Errorf("preffered_username %q is malformatted", username)
+			return "", fmt.Errorf("preferred_username %q is malformatted", username)
 		}
 
 		return orgID, nil

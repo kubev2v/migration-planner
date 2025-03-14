@@ -115,7 +115,7 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preffered_username"`
+		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
@@ -150,7 +150,7 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 
 // func generateInvalidValidToken(missingClaim string) (string, func(t *jwt.Token) (any, error)) {
 // 	type TokenClaims struct {
-// 		Username string `json:"preffered_username"`
+// 		Username string `json:"preferred_username"`
 // 		OrgID    string `json:"org_id"`
 // 		jwt.RegisteredClaims
 // 	}
@@ -192,7 +192,7 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 
 func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preffered_username"`
+		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
@@ -227,7 +227,7 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 
 func generateCustomToken(username string, orgID *string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preffered_username"`
+		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id,omitempty"`
 		jwt.RegisteredClaims
 	}
