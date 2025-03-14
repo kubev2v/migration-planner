@@ -20,7 +20,7 @@ type inventoryStatsCollector struct {
 
 func newInventoryStatsCollector(s store.Store) prometheus.Collector {
 	fqName := func(name string) string {
-		return fmt.Sprintf("inventory_%s", name)
+		return fmt.Sprintf("%s_inventory_%s", assistedMigration, name)
 	}
 
 	return &inventoryStatsCollector{
