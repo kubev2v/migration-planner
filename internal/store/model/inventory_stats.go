@@ -35,6 +35,9 @@ func computeVmStats(sources []Source) VmStats {
 	os := make(map[string]int)
 	orgTotal := make(map[string]int)
 	for _, s := range sources {
+		if s.Inventory == nil {
+			continue
+		}
 		total += s.Inventory.Data.Vms.Total
 		for k, v := range s.Inventory.Data.Vms.Os {
 			if oldValue, found := os[k]; found {
@@ -57,6 +60,9 @@ func computeVmStats(sources []Source) VmStats {
 func computeOsStats(sources []Source) OsStats {
 	os := make(map[string]any)
 	for _, s := range sources {
+		if s.Inventory == nil {
+			continue
+		}
 		for k := range s.Inventory.Data.Vms.Os {
 			os[k] = struct{}{}
 		}
