@@ -49,12 +49,12 @@ func (rh *RHSSOAuthenticator) Authenticate(token string) (User, error) {
 	parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}), jwt.WithIssuedAt(), jwt.WithExpirationRequired())
 	t, err := parser.Parse(token, rh.keyFn)
 	if err != nil {
-		zap.S().Errorw("failed to parse or the token is invalid", "token", token)
+		zap.S().Errorw("failed to parse or the token is invalid", "token", token, "error", err)
 		return User{}, fmt.Errorf("failed to authenticate token: %w", err)
 	}
 
 	if !t.Valid {
-		zap.S().Errorw("failed to parse or the token is invalid", "token", token)
+		zap.S().Errorw("failed to parse or the token is invalid", "token", token, "error", err)
 		return User{}, fmt.Errorf("failed to parse or validate token")
 	}
 
