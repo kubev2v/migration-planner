@@ -1,6 +1,6 @@
 apiVersion: v1
 data:
-  service-dashboards.json: |
+  service-dashboards.json: |-
     {
       "annotations": {
         "list": [
@@ -21,7 +21,6 @@ data:
       "editable": true,
       "fiscalYearStartMonth": 0,
       "graphTooltip": 0,
-      "id": 2,
       "links": [],
       "panels": [
         {
@@ -40,7 +39,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -88,13 +87,20 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
-              "expr": "assisted_migration_inventory_customers_total",
-              "legendFormat": "__auto",
-              "range": true,
+              "exemplar": false,
+              "expr": "max by (service) (assisted_migration_inventory_customers_total{service=\"migration-planner-metrics\"})",
+              "format": "time_series",
+              "instant": true,
+              "legendFormat": "{{service}}",
+              "range": false,
               "refId": "A"
             }
           ],
@@ -104,7 +110,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -148,11 +154,15 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
-              "expr": "assisted_migration_inventory_vms_total",
+              "expr": "max by (service) (assisted_migration_inventory_vms_total)",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -164,7 +174,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -212,11 +222,15 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
-              "expr": "assisted_migration_inventory_inventories_total",
+              "expr": "max by (service) (assisted_migration_inventory_inventories_total)",
               "legendFormat": "__auto",
               "range": true,
               "refId": "A"
@@ -228,7 +242,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -276,9 +290,13 @@ data:
             "textMode": "auto",
             "wideLayout": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "expr": "count (group(assisted_migration_inventory_vms_by_os_total) by (os))",
               "legendFormat": "__auto",
@@ -305,7 +323,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -353,6 +371,10 @@ data:
           "pluginVersion": "11.5.2",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "exemplar": false,
               "expr": "topk(5, assisted_migration_inventory_vms_by_os_total)",
@@ -368,7 +390,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -394,6 +416,9 @@ data:
           },
           "id": 12,
           "options": {
+            "displayLabels": [
+              "value"
+            ],
             "legend": {
               "displayMode": "list",
               "placement": "right",
@@ -416,6 +441,10 @@ data:
           "pluginVersion": "11.5.2",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "expr": "topk(5, assisted_migration_inventory_vms_by_customer_total)",
               "legendFormat": "{{org_id}}",
@@ -429,7 +458,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -478,6 +507,10 @@ data:
           "pluginVersion": "11.5.2",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "expr": "topk(5, sum by (org_id) (assisted_migration_inventory_storage_by_customer_total))",
               "legendFormat": "{{org_id}}",
@@ -504,7 +537,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -583,7 +616,7 @@ data:
             {
               "datasource": {
                 "type": "prometheus",
-                "uid": "fe9y7urz5l5hcc"
+                "uid": "${Datasource}"
               },
               "editorMode": "code",
               "exemplar": false,
@@ -600,7 +633,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -650,12 +683,16 @@ data:
             },
             "showHeader": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "sort_desc(assisted_migration_inventory_vms_by_customer_total)",
+              "expr": "max by (service,org_id) (assisted_migration_inventory_vms_by_customer_total{namespace=\"assisted-migration-stage\"})",
               "format": "table",
               "instant": true,
               "legendFormat": "{{org_id}}",
@@ -671,8 +708,11 @@ data:
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
+                  "endpoint": true,
                   "instance": true,
-                  "job": true
+                  "job": true,
+                  "pod": true,
+                  "service": true
                 },
                 "includeByName": {},
                 "indexByName": {},
@@ -688,7 +728,7 @@ data:
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "fieldConfig": {
             "defaults": {
@@ -751,12 +791,16 @@ data:
             },
             "showHeader": true
           },
-          "pluginVersion": "11.5.2",
+          "pluginVersion": "10.4.1",
           "targets": [
             {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "sort_desc(assisted_migration_inventory_storage_by_customer_total)",
+              "expr": "max by (org_id,type) (assisted_migration_inventory_storage_by_customer_total{service=\"migration-planner-metrics\"})",
               "format": "table",
               "instant": true,
               "legendFormat": "{{org_id}}",
@@ -772,8 +816,12 @@ data:
                 "excludeByName": {
                   "Time": true,
                   "__name__": true,
+                  "endpoint": true,
                   "instance": true,
-                  "job": true
+                  "job": true,
+                  "namespace": true,
+                  "pod": true,
+                  "service": true
                 },
                 "includeByName": {},
                 "indexByName": {},
@@ -787,24 +835,58 @@ data:
           "type": "table"
         }
       ],
-      "preload": false,
       "refresh": "",
-      "schemaVersion": 40,
+      "schemaVersion": 39,
       "tags": [],
       "templating": {
         "list": [
           {
             "current": {
-              "text": "",
-              "value": ""
+              "selected": false,
+              "text": "crcs02ue1-prometheus",
+              "value": "PDD8BE47D10408F45"
             },
+            "hide": 0,
+            "includeAll": false,
             "label": "Datasource",
+            "multi": false,
             "name": "Datasource",
             "options": [],
-            "query": "",
+            "query": "prometheus",
+            "queryValue": "",
             "refresh": 1,
             "regex": "/crcs02ue1-prometheus/",
+            "skipUrlSync": false,
             "type": "datasource"
+          },
+          {
+            "allValue": "All",
+            "current": {
+              "selected": true,
+              "text": "All",
+              "value": "$__all"
+            },
+            "datasource": {
+              "type": "prometheus",
+              "uid": "${Datasource}"
+            },
+            "definition": "label_values(assisted_migration_inventory_customers_total,pod)",
+            "hide": 0,
+            "includeAll": true,
+            "label": "Pod",
+            "multi": false,
+            "name": "pod",
+            "options": [],
+            "query": {
+              "qryType": 1,
+              "query": "label_values(assisted_migration_inventory_customers_total,pod)",
+              "refId": "PrometheusVariableQueryEditor-VariableQuery"
+            },
+            "refresh": 1,
+            "regex": "",
+            "skipUrlSync": false,
+            "sort": 0,
+            "type": "query"
           }
         ]
       },
@@ -816,7 +898,7 @@ data:
       "timezone": "browser",
       "title": "Service Dashboards",
       "uid": "deg3jpmyvl7gga",
-      "version": 19,
+      "version": 1,
       "weekStart": ""
     }
 kind: ConfigMap
