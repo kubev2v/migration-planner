@@ -1,4 +1,4 @@
-
+{
   "annotations": {
     "list": [
       {
@@ -440,7 +440,8 @@
               "viz": false
             }
           },
-          "mappings": []
+          "mappings": [],
+          "unit": "decgbytes"
         },
         "overrides": []
       },
@@ -788,7 +789,21 @@
   "schemaVersion": 40,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "text": "",
+          "value": ""
+        },
+        "label": "Datasource",
+        "name": "Datasource",
+        "options": [],
+        "query": "",
+        "refresh": 1,
+        "regex": "/crcs02ue1-prometheus/",
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
     "from": "now-15m",
@@ -798,6 +813,6 @@
   "timezone": "browser",
   "title": "Service Dashboards",
   "uid": "deg3jpmyvl7gga",
-  "version": 17,
+  "version": 19,
   "weekStart": ""
 }
