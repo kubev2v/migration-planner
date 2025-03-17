@@ -8,8 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"strings"
-
-	libvirt "github.com/libvirt/libvirt-go"
 )
 
 func ValidateTar(file *os.File) error {
@@ -96,13 +94,13 @@ func Untar(file *os.File, destFile string, fileName string) error {
 	return fmt.Errorf("file %s not found", fileName)
 }
 
-func CreateVm(c *libvirt.Connect) error {
+func (p *plannerAgentLibvirt) CreateVm() error {
 	// Read VM XML definition from file
-	vmXMLBytes, err := os.ReadFile("data/vm.xml")
+	vmXMLBytes, err := os.ReadFile(p.getConfigXmlVMPath())
 	if err != nil {
 		return fmt.Errorf("failed to read VM XML file: %v", err)
 	}
-	domain, err := c.DomainDefineXML(string(vmXMLBytes))
+	domain, err := p.con.DomainDefineXML(string(vmXMLBytes))
 	if err != nil {
 		return fmt.Errorf("failed to define domain: %v", err)
 	}
