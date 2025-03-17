@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  service-dashboards.json: |2
-
+  service-dashboards.json: |
+    {
       "annotations": {
         "list": [
           {
@@ -443,7 +443,8 @@ data:
                   "viz": false
                 }
               },
-              "mappings": []
+              "mappings": [],
+              "unit": "decgbytes"
             },
             "overrides": []
           },
@@ -791,7 +792,21 @@ data:
       "schemaVersion": 40,
       "tags": [],
       "templating": {
-        "list": []
+        "list": [
+          {
+            "current": {
+              "text": "",
+              "value": ""
+            },
+            "label": "Datasource",
+            "name": "Datasource",
+            "options": [],
+            "query": "",
+            "refresh": 1,
+            "regex": "/crcs02ue1-prometheus/",
+            "type": "datasource"
+          }
+        ]
       },
       "time": {
         "from": "now-15m",
@@ -801,13 +816,13 @@ data:
       "timezone": "browser",
       "title": "Service Dashboards",
       "uid": "deg3jpmyvl7gga",
-      "version": 17,
+      "version": 19,
       "weekStart": ""
     }
 kind: ConfigMap
 metadata:
   creationTimestamp: null
-  name: grafana-dashboard-service-dashboards
+  name: grafana-dashboard-service-dashboard
   labels:
     grafana_dashboard: "true"
   annotations:
