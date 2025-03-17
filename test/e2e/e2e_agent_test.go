@@ -83,7 +83,7 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTe
 }
 
 func (p *plannerAgentLibvirt) Run() error {
-	if err := p.prepareImage(p.sourceID); err != nil {
+	if err := p.prepareImage(); err != nil {
 		return err
 	}
 
@@ -95,7 +95,7 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
+func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
 	ovaFile, err := os.Create(defaultOvaPath)
 	if err != nil {
@@ -114,30 +114,74 @@ func (p *plannerAgentLibvirt) prepareImage(sourceID uuid.UUID) error {
 		Organization: "admin",
 	}
 	ctx := auth.NewTokenContext(context.TODO(), user)
+	var res *http.Response
 
-	// Download OVA
+	if testOptions.downloadImageByUrl {
+		url, err := p.getDownloadURL(ctx)
+		if err != nil {
+			return err
+		}
 
-	res, err := p.c.GetImage(ctx, sourceID)
-	if err != nil {
-		return fmt.Errorf("error getting source image: %w", err)
+		res, err = http.Get(url) // Download OVA from the extracted URL
+		if err != nil {
+			return err
+		}
+	} else {
+		res, err = p.c.GetImage(ctx, p.sourceID) // Stream the OVA directly to res
+		if err != nil {
+			return fmt.Errorf("error getting source image: %w", err)
+		}
 	}
+
 	defer res.Body.Close()
 
 	if _, err = io.Copy(ovaFile, res.Body); err != nil {
 		return fmt.Errorf("error writing to file: %w", err)
 	}
 
-	if err = ValidateTar(ovaFile); err != nil {
+	if err := p.ovaValidateAndExtract(ovaFile); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error) {
+	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID)
+	if err != nil {
+		return "", fmt.Errorf("error getting source url: %w", err)
+	}
+	defer res.Body.Close()
+
+	var result struct {
+		ExpiresAt string `json:"expires_at"`
+		URL       string `json:"url"`
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return "", fmt.Errorf("error reading response body: %w", err)
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return "", fmt.Errorf("error decoding JSON: %w", err)
+	}
+
+	return result.URL, nil
+}
+
+func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
+	if err := ValidateTar(ovaFile); err != nil {
 		return fmt.Errorf("error validating tar: %w", err)
 	}
 
 	// Untar ISO from OVA
-	if err = Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
+	if err := Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
 	// Untar VMDK from OVA
-	if err = Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
+	if err := Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("error uncompressing the file: %w", err)
 	}
 
@@ -284,7 +328,7 @@ func (p *plannerAgentLibvirt) Remove() error {
 	defer p.con.Close()
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
-		return err
+		return fmt.Errorf("unable to find domain: %v", err)
 	}
 	defer func() {
 		_ = domain.Free()
@@ -292,12 +336,12 @@ func (p *plannerAgentLibvirt) Remove() error {
 
 	if state, _, err := domain.GetState(); err == nil && state == libvirt.DOMAIN_RUNNING {
 		if err := domain.Destroy(); err != nil {
-			return err
+			return fmt.Errorf("unable to destroy domain: %v", err)
 		}
 	}
 
 	if err := domain.Undefine(); err != nil {
-		return err
+		return fmt.Errorf("unable to undefine domain: %v", err)
 	}
 
 	// Remove the ISO file if it exists
