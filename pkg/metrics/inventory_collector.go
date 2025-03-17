@@ -10,12 +10,13 @@ import (
 )
 
 type inventoryStatsCollector struct {
-	store             store.Store
-	totalVm           *prometheus.Desc
-	totalCustomers    *prometheus.Desc
-	totalInventories  *prometheus.Desc
-	totalVmByOs       *prometheus.Desc
-	totalVmByCustomer *prometheus.Desc // WARN: possible high cadinality
+	store                  store.Store
+	totalVm                *prometheus.Desc
+	totalCustomers         *prometheus.Desc
+	totalInventories       *prometheus.Desc
+	totalVmByOs            *prometheus.Desc
+	totalVmByCustomer      *prometheus.Desc // WARN: possible high cadinality
+	totalStorageByCustomer *prometheus.Desc // WARN: possible high cadinality
 }
 
 func newInventoryStatsCollector(s store.Store) prometheus.Collector {
@@ -55,6 +56,12 @@ func newInventoryStatsCollector(s store.Store) prometheus.Collector {
 			[]string{"org_id"},
 			prometheus.Labels{},
 		),
+		totalStorageByCustomer: prometheus.NewDesc(
+			fqName("storage_by_customer_total"),
+			"Total storage by customer",
+			[]string{"org_id", "type"},
+			prometheus.Labels{},
+		),
 	}
 }
 
@@ -64,6 +71,7 @@ func (c *inventoryStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.totalInventories
 	ch <- c.totalVmByOs
 	ch <- c.totalVmByCustomer
+	ch <- c.totalStorageByCustomer
 }
 
 // Collect implements Collector.
@@ -83,5 +91,11 @@ func (c *inventoryStatsCollector) Collect(ch chan<- prometheus.Metric) {
 
 	for orgID, total := range stats.Vms.TotalByCustomer {
 		ch <- prometheus.MustNewConstMetric(c.totalVmByCustomer, prometheus.GaugeValue, float64(total), orgID)
+	}
+
+	for _, storage := range stats.Storage {
+		for k, v := range storage.TotalByProvider {
+			ch <- prometheus.MustNewConstMetric(c.totalStorageByCustomer, prometheus.GaugeValue, float64(v), storage.OrgID, k)
+		}
 	}
 }
