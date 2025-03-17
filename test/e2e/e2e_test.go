@@ -2,7 +2,6 @@ package e2e_test
 
 import (
 	"fmt"
-	"github.com/google/uuid"
 	"net/http"
 	"os"
 
@@ -11,92 +10,41 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+var (
+	svc      PlannerService
+	agent    PlannerAgent
+	agentIP  string
+	err      error
+	systemIP = os.Getenv("PLANNER_IP")
+	source   *v1alpha1.Source
+)
+
+var testOptions = struct {
+	downloadImageByUrl bool
+}{}
+
 var _ = Describe("e2e", func() {
 
-	var (
-		svc      PlannerService
-		agent    PlannerAgent
-		agentIP  string
-		err      error
-		systemIP = os.Getenv("PLANNER_IP")
-		source   *v1alpha1.Source
-	)
-
-	createSource := func(name string) *v1alpha1.Source {
-		source, err := svc.CreateSource(name)
-		Expect(err).To(BeNil())
-		Expect(source).NotTo(BeNil())
-		return source
-	}
-
-	createAgent := func(configPath string, idForTest string, uuid uuid.UUID, vmName string) PlannerAgent {
-    newAgent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
-		Expect(err).To(BeNil(), "Failed to create PlannerAgent")
-		err = newAgent.Run()
-		Expect(err).To(BeNil(), "Failed to run PlannerAgent")
-		Eventually(func() string {
-			agentIP, err = newAgent.GetIp()
-			if err != nil {
-				return ""
-			}
-			return agentIP
-		}, "3m").ShouldNot(BeEmpty())
-		Expect(agentIP).ToNot(BeEmpty())
-		Eventually(func() bool {
-			return newAgent.IsServiceRunning(agentIP, "planner-agent")
-		}, "3m").Should(BeTrue())
-		return newAgent
-	}
-
-	loginToVsphere := func(username string, password string, expectedStatusCode int) {
-		res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
-		Expect(err).To(BeNil())
-		Expect(res.StatusCode).To(Equal(expectedStatusCode))
-	}
-
-	WaitForAgentToBeUpToDate := func(uuid uuid.UUID) {
-		Eventually(func() bool {
-			source, err := svc.GetSource(uuid)
-			if err != nil {
-				return false
-			}
-			return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-		}, "3m").Should(BeTrue())
-	}
-
-	waitForValidCredentialURL := func(uuid uuid.UUID, agentIP string) {
-		Eventually(func() string {
-			s, err := svc.GetSource(uuid)
-			if err != nil {
-				return ""
-			}
-			if s.Agent == nil {
-				return ""
-			}
-			if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
-				return s.Agent.CredentialUrl
-			}
-
-			return ""
-		}, "3m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
-	}
-
 	BeforeEach(func() {
+		testOptions.downloadImageByUrl = false
+
 		svc, err = NewPlannerService(defaultConfigPath)
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
-		source = createSource("source")
+		source = CreateSource("source")
 
-		agent = createAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
+		agent, agentIP = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
 
-		waitForValidCredentialURL(source.Id, agentIP)
+		WaitForValidCredentialURL(source.Id, agentIP)
 
 		Expect(agent.IsServiceRunning(agentIP, "planner-agent")).To(BeTrue())
 	})
 
 	AfterEach(func() {
-		_ = svc.RemoveSources()
-		_ = agent.Remove()
+		err = svc.RemoveSources()
+		Expect(err).To(BeNil(), "Failed to remove sources from DB")
+		err = agent.Remove()
+		Expect(err).To(BeNil(), "Failed to remove vm and iso")
 	})
 
 	AfterFailed(func() {
@@ -105,17 +53,17 @@ var _ = Describe("e2e", func() {
 
 	Context("Check Vcenter login behavior", func() {
 		It("should successfully login with valid credentials", func() {
-			loginToVsphere("core", "123456", http.StatusNoContent)
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 		})
 
 		It("Two test combined: should return BadRequest due to an empty username"+
 			" and BadRequest due to an empty password", func() {
-			loginToVsphere("", "pass", http.StatusBadRequest)
-			loginToVsphere("user", "", http.StatusBadRequest)
+			LoginToVsphere("", "pass", http.StatusBadRequest)
+			LoginToVsphere("user", "", http.StatusBadRequest)
 		})
 
 		It("should return Unauthorized due to invalid credentials", func() {
-			loginToVsphere("invalid", "cred", http.StatusUnauthorized)
+			LoginToVsphere("invalid", "cred", http.StatusUnauthorized)
 		})
 
 		It("should return badRequest due to an invalid URL", func() {
@@ -128,20 +76,13 @@ var _ = Describe("e2e", func() {
 
 	Context("Flow", func() {
 		It("Up to date", func() {
-			// Put the vCenter credentials and check that source is up to date eventually
-			loginToVsphere("core", "123456", http.StatusNoContent)
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 
-			Eventually(func() bool {
-				source, err := svc.GetSource(source.Id)
-				if err != nil {
-					return false
-				}
-				return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-			}, "1m", "2s").Should(BeTrue())
+			WaitForAgentToBeUpToDate(source.Id)
 		})
 
 		It("Source removal", func() {
-			loginToVsphere("core", "123456", http.StatusNoContent)
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 
 			WaitForAgentToBeUpToDate(source.Id)
 
@@ -154,16 +95,16 @@ var _ = Describe("e2e", func() {
 
 		It("Two agents, Two VSphere's", func() {
 
-			loginToVsphere("core", "123456", http.StatusNoContent)
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 			WaitForAgentToBeUpToDate(source.Id)
 
-			source2 := createSource("source-2")
+			source2 := CreateSource("source-2")
 
-			agent2 := createAgent(defaultConfigPath, "2", source2.Id, vmName+"-2")
+			agent2, agentIP2 := CreateAgent(defaultConfigPath, "2", source2.Id, vmName+"-2")
 
-			waitForValidCredentialURL(source2.Id, agentIP)
+			WaitForValidCredentialURL(source2.Id, agentIP2)
 
-			Expect(agent2.IsServiceRunning(agentIP, "planner-agent")).To(BeTrue())
+			Expect(agent2.IsServiceRunning(agentIP2, "planner-agent")).To(BeTrue())
 
 			// Login to Vcsim2
 			res, err := agent2.Login(fmt.Sprintf("https://%s:8990/sdk", systemIP), "core", "123456")
@@ -172,13 +113,14 @@ var _ = Describe("e2e", func() {
 
 			WaitForAgentToBeUpToDate(source2.Id)
 
-			_ = agent2.Remove()
+			err = agent2.Remove()
+			Expect(err).To(BeNil())
 		})
 	})
 
 	Context("Edge cases", func() {
 		It("VM reboot", func() {
-			loginToVsphere("core", "123456", http.StatusNoContent)
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 
 			// Restarting the VM
 			err = agent.Restart()
@@ -187,7 +129,44 @@ var _ = Describe("e2e", func() {
 			// Check that planner-agent service is running
 			Eventually(func() bool {
 				return agent.IsServiceRunning(agentIP, "planner-agent")
-			}, "3m").Should(BeTrue())
+			}, "6m").Should(BeTrue())
+
+			WaitForAgentToBeUpToDate(source.Id)
+		})
+	})
+})
+
+var _ = Describe("e2e-download-ova-from-url", func() {
+
+	BeforeEach(func() {
+		testOptions.downloadImageByUrl = true
+
+		svc, err = NewPlannerService(defaultConfigPath)
+		Expect(err).To(BeNil(), "Failed to create PlannerService")
+
+		source = CreateSource("source")
+
+		agent, agentIP = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
+
+		WaitForValidCredentialURL(source.Id, agentIP)
+
+		Expect(agent.IsServiceRunning(agentIP, "planner-agent")).To(BeTrue())
+	})
+
+	AfterEach(func() {
+		err = svc.RemoveSources()
+		Expect(err).To(BeNil(), "Failed to remove sources from DB")
+		err = agent.Remove()
+		Expect(err).To(BeNil(), "Failed to remove vm and iso")
+	})
+
+	AfterFailed(func() {
+		agent.DumpLogs(agentIP)
+	})
+
+	Context("Flow", func() {
+		It("Downloads OVA file from URL", func() {
+			LoginToVsphere("core", "123456", http.StatusNoContent)
 
 			WaitForAgentToBeUpToDate(source.Id)
 		})

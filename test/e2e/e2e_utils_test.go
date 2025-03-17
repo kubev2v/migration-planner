@@ -4,11 +4,79 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	. "github.com/onsi/gomega"
 	"io"
 	"os"
 	"os/exec"
 	"strings"
 )
+
+// Create a source in the DB using the API
+func CreateSource(name string) *v1alpha1.Source {
+	source, err := svc.CreateSource(name)
+	Expect(err).To(BeNil())
+	Expect(source).NotTo(BeNil())
+	return source
+}
+
+// Create VM with the UUID of the source created
+func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, string) {
+	agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
+	Expect(err).To(BeNil(), "Failed to create PlannerAgent")
+	err = agent.Run()
+	Expect(err).To(BeNil(), "Failed to run PlannerAgent")
+	var agentIP string
+	Eventually(func() string {
+		agentIP, err = agent.GetIp()
+		if err != nil {
+			return ""
+		}
+		return agentIP
+	}, "3m").ShouldNot(BeEmpty())
+	Expect(agentIP).ToNot(BeEmpty())
+	Eventually(func() bool {
+		return agent.IsServiceRunning(agentIP, "planner-agent")
+	}, "3m").Should(BeTrue())
+	return agent, agentIP
+}
+
+// Login to VSphere and put the credentials
+func LoginToVsphere(username string, password string, expectedStatusCode int) {
+	res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
+	Expect(err).To(BeNil())
+	Expect(res.StatusCode).To(Equal(expectedStatusCode))
+}
+
+// check that source is up to date eventually
+func WaitForAgentToBeUpToDate(uuid uuid.UUID) {
+	Eventually(func() bool {
+		source, err := svc.GetSource(uuid)
+		if err != nil {
+			return false
+		}
+		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
+	}, "3m").Should(BeTrue())
+}
+
+// Wait for the service to return correct credential url for a source by UUID
+func WaitForValidCredentialURL(uuid uuid.UUID, agentIP string) {
+	Eventually(func() string {
+		s, err := svc.GetSource(uuid)
+		if err != nil {
+			return ""
+		}
+		if s.Agent == nil {
+			return ""
+		}
+		if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
+			return s.Agent.CredentialUrl
+		}
+
+		return ""
+	}, "3m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+}
 
 func ValidateTar(file *os.File) error {
 	_, _ = file.Seek(0, 0)

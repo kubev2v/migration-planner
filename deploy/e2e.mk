@@ -69,6 +69,7 @@ deploy_assisted_migration:
 	sleep 30
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 &
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner 3443:3443 &
+	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 &
 
 .PHONY: persistent_disk
 persistent_disk:
