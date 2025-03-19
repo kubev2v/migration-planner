@@ -31,7 +31,7 @@ func NewInventoryStats(sources []Source) InventoryStats {
 	return InventoryStats{
 		Vms:              computeVmStats(sources),
 		Os:               computeOsStats(sources),
-		TotalInventories: len(sources),
+		TotalInventories: computeInventories(sources),
 		TotalCustomers:   computeTotalCustomers(sources),
 		Storage:          computeStorateStats(sources),
 	}
@@ -137,6 +137,17 @@ func computeSourceStorageStats(source Source) map[string]int {
 	}
 
 	return totalByProvider
+}
+
+func computeInventories(sources []Source) int {
+	total := 0
+	for _, s := range sources {
+		if s.Inventory == nil {
+			continue
+		}
+		total += 1
+	}
+	return total
 }
 
 func sum(m1, m2 map[string]int) map[string]int {
