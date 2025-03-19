@@ -99,7 +99,7 @@ func (c *Collector) run() {
 
 	zap.S().Named("collector").Infof("List VMs")
 	vms := &[]vspheremodel.VM{}
-	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1})
+	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1, Predicate: libmodel.Eq("IsTemplate", false)})
 	if err != nil {
 		zap.S().Named("collector").Errorf("Error list database: %s", err)
 		return
