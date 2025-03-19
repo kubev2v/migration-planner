@@ -1,5 +1,7 @@
 package model
 
+import "github.com/google/uuid"
+
 type VmStats struct {
 	// Total is the total number of vms
 	Total int
@@ -42,7 +44,7 @@ func computeVmStats(sources []Source) VmStats {
 	os := make(map[string]int)
 	orgTotal := make(map[string]int)
 	for _, s := range sources {
-		if s.Inventory == nil {
+		if s.Inventory == nil || s.ID == uuid.Nil {
 			continue
 		}
 		total += s.Inventory.Data.Vms.Total
@@ -67,7 +69,7 @@ func computeVmStats(sources []Source) VmStats {
 func computeOsStats(sources []Source) OsStats {
 	os := make(map[string]any)
 	for _, s := range sources {
-		if s.Inventory == nil {
+		if s.Inventory == nil || s.ID == uuid.Nil {
 			continue
 		}
 		for k := range s.Inventory.Data.Vms.Os {
@@ -86,6 +88,11 @@ func computeOsStats(sources []Source) OsStats {
 func computeTotalCustomers(sources []Source) int {
 	orgIDs := make(map[string]any)
 	for _, s := range sources {
+		// Ignore example inventory report:
+		if s.ID == uuid.Nil {
+			continue
+		}
+
 		orgIDs[s.OrgID] = struct{}{}
 	}
 
@@ -101,7 +108,7 @@ func computeStorateStats(sources []Source) []StorageCustomerStats {
 	stats := make([]StorageCustomerStats, 0, len(sources))
 	statsPerCustomer := make(map[string]StorageCustomerStats)
 	for _, s := range sources {
-		if s.Inventory == nil {
+		if s.Inventory == nil || s.ID == uuid.Nil {
 			continue
 		}
 
