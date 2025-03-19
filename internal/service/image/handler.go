@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/image"
+	internalService "github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -64,7 +65,10 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
-	// TODO: We need to fetch the pull-secret from source
+	if err := internalService.GenerateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
+		return imageServer.GetImageByToken500JSONResponse{}, nil
+	}
+
 	size, err := imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")

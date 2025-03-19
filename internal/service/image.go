@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"net/http"
 	"strconv"
 
@@ -15,6 +16,31 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"go.uber.org/zap"
 )
+
+func GenerateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {
+	// get the key associated with source orgID to generate agent token
+	key, err := storeInstance.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return err
+		}
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		if err != nil {
+			return err
+		}
+		if _, err := storeInstance.PrivateKey().Create(ctx, *newKey); err != nil {
+			return err
+		}
+		imageBuilder.WithAgentToken(token)
+	} else {
+		token, err := auth.GenerateAgentJWT(key, source)
+		if err != nil {
+			return err
+		}
+		imageBuilder.WithAgentToken(token)
+	}
+	return nil
+}
 
 func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRequestObject) (server.GetImageResponseObject, error) {
 	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
@@ -37,26 +63,8 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
 	}
 
-	// get the key associated with source orgID to generate agent token
-	key, err := h.store.PrivateKey().Get(ctx, source.OrgID)
-	if err != nil {
-		if !errors.Is(err, store.ErrRecordNotFound) {
-			return server.GetImage500JSONResponse{}, nil
-		}
-		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
-		if err != nil {
-			return server.GetImage500JSONResponse{}, nil
-		}
-		if _, err := h.store.PrivateKey().Create(ctx, *newKey); err != nil {
-			return server.GetImage500JSONResponse{}, nil
-		}
-		imageBuilder = imageBuilder.WithAgentToken(token)
-	} else {
-		token, err := auth.GenerateAgentJWT(key, source)
-		if err != nil {
-			return server.GetImage500JSONResponse{}, nil
-		}
-		imageBuilder = imageBuilder.WithAgentToken(token)
+	if err := GenerateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
+		return server.GetImage500JSONResponse{}, nil
 	}
 
 	size, err := imageBuilder.Generate(ctx, writer)
