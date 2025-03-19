@@ -79,6 +79,20 @@ objects:
     metadata:
       labels:
         app: migration-planner
+      name: migration-planner-image
+    spec:
+      ports:
+        - name: migration-planner-image
+          port: 11443
+          protocol: TCP
+          targetPort: 11443
+      selector:
+        app: migration-planner
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
         port: metrics
       annotations:
         description: Expose the migration planner metrics endpoint
