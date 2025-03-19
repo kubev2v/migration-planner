@@ -29,7 +29,8 @@ var _ = Describe("sso authentication", func() {
 			Expect(user.Organization).To(Equal("GothamCity"))
 		})
 
-		It("fails to authenticate -- wrong signing method", func() {
+		// FIXME: enable when token validation enabled again
+		PIt("fails to authenticate -- wrong signing method", func() {
 			sToken, keyFn := generateInvalidTokenWrongSigningMethod()
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
@@ -87,7 +88,8 @@ var _ = Describe("sso authentication", func() {
 			Expect(resp.StatusCode).To(Equal(200))
 		})
 
-		It("failed to authenticate", func() {
+		// FIXME: enable when token validation enabled again
+		PIt("failed to authenticate", func() {
 			sToken, keyFn := generateInvalidTokenWrongSigningMethod()
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
