@@ -75,9 +75,9 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	router.Use(
 		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
+		zapchi.Logger(zap.S(), "router_agent"),
 		auth.NewAgentAuthenticator(s.store).Authenticator,
 		middleware.RequestID,
-		zapchi.Logger(zap.S(), "router_agent"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
