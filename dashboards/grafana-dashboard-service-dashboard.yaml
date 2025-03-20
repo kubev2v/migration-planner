@@ -1,6 +1,6 @@
 apiVersion: v1
 data:
-  service-dashboards.json: |-
+  service-dashboard.json: |-
     {
       "annotations": {
         "list": [
@@ -41,6 +41,31 @@ data:
             "type": "prometheus",
             "uid": "${Datasource}"
           },
+          "gridPos": {
+            "h": 5,
+            "w": 5,
+            "x": 0,
+            "y": 1
+          },
+          "id": 15,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "Number total of customers including those without any assestements.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.4.1",
+          "title": "# No of customers",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -66,7 +91,7 @@ data:
           "gridPos": {
             "h": 5,
             "w": 3,
-            "x": 0,
+            "x": 5,
             "y": 1
           },
           "id": 4,
@@ -112,6 +137,31 @@ data:
             "type": "prometheus",
             "uid": "${Datasource}"
           },
+          "gridPos": {
+            "h": 5,
+            "w": 5,
+            "x": 0,
+            "y": 6
+          },
+          "id": 16,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "Total number of vm of all customers.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.4.1",
+          "title": "# No of vms",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "fieldConfig": {
             "defaults": {
               "color": {
@@ -133,8 +183,8 @@ data:
           "gridPos": {
             "h": 5,
             "w": 3,
-            "x": 3,
-            "y": 1
+            "x": 5,
+            "y": 6
           },
           "id": 5,
           "options": {
@@ -176,68 +226,25 @@ data:
             "type": "prometheus",
             "uid": "${Datasource}"
           },
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "thresholds"
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green",
-                    "value": null
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": []
-          },
           "gridPos": {
             "h": 5,
-            "w": 3,
-            "x": 6,
-            "y": 1
+            "w": 5,
+            "x": 0,
+            "y": 11
           },
-          "id": 6,
+          "id": 17,
           "options": {
-            "colorMode": "value",
-            "graphMode": "none",
-            "justifyMode": "auto",
-            "orientation": "auto",
-            "percentChangeColorMode": "standard",
-            "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
-              "fields": "",
-              "values": false
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
             },
-            "showPercentChange": false,
-            "textMode": "auto",
-            "wideLayout": true
+            "content": "Number of distinct operating systems.",
+            "mode": "markdown"
           },
           "pluginVersion": "10.4.1",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${Datasource}"
-              },
-              "editorMode": "code",
-              "expr": "max by (service) (assisted_migration_inventory_inventories_total)",
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "A"
-            }
-          ],
-          "title": "No of Discovery reports",
-          "type": "stat"
+          "title": "# No of Operating System",
+          "type": "text"
         },
         {
           "datasource": {
@@ -269,8 +276,8 @@ data:
           "gridPos": {
             "h": 5,
             "w": 3,
-            "x": 9,
-            "y": 1
+            "x": 5,
+            "y": 11
           },
           "id": 7,
           "options": {
@@ -308,12 +315,105 @@ data:
           "type": "stat"
         },
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 5,
+            "x": 0,
+            "y": 16
+          },
+          "id": 18,
+          "options": {
+            "code": {
+              "language": "plaintext",
+              "showLineNumbers": false,
+              "showMiniMap": false
+            },
+            "content": "Total number of discovery reports from all the customers.",
+            "mode": "markdown"
+          },
+          "pluginVersion": "10.4.1",
+          "title": "# No of Discovery Reports",
+          "type": "text"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  {
+                    "color": "green",
+                    "value": null
+                  },
+                  {
+                    "color": "red",
+                    "value": 80
+                  }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": {
+            "h": 5,
+            "w": 3,
+            "x": 5,
+            "y": 16
+          },
+          "id": 6,
+          "options": {
+            "colorMode": "value",
+            "graphMode": "none",
+            "justifyMode": "auto",
+            "orientation": "auto",
+            "percentChangeColorMode": "standard",
+            "reduceOptions": {
+              "calcs": [
+                "lastNotNull"
+              ],
+              "fields": "",
+              "values": false
+            },
+            "showPercentChange": false,
+            "textMode": "auto",
+            "wideLayout": true
+          },
+          "pluginVersion": "10.4.1",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${Datasource}"
+              },
+              "editorMode": "code",
+              "expr": "max by (service) (assisted_migration_inventory_inventories_total)",
+              "legendFormat": "__auto",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "No of Discovery reports",
+          "type": "stat"
+        },
+        {
           "collapsed": false,
           "gridPos": {
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 6
+            "y": 21
           },
           "id": 8,
           "panels": [],
@@ -345,7 +445,7 @@ data:
             "h": 11,
             "w": 8,
             "x": 0,
-            "y": 7
+            "y": 22
           },
           "id": 2,
           "options": {
@@ -377,7 +477,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "topk(5, assisted_migration_inventory_vms_by_os_total)",
+              "expr": "topk(5, sum by (os) (assisted_migration_inventory_vms_by_os_total) / 3)",
               "instant": true,
               "legendFormat": "{{os}}",
               "range": false,
@@ -412,13 +512,11 @@ data:
             "h": 11,
             "w": 7,
             "x": 8,
-            "y": 7
+            "y": 22
           },
           "id": 12,
           "options": {
-            "displayLabels": [
-              "value"
-            ],
+            "displayLabels": [],
             "legend": {
               "displayMode": "list",
               "placement": "right",
@@ -446,7 +544,7 @@ data:
                 "uid": "${Datasource}"
               },
               "editorMode": "code",
-              "expr": "topk(5, assisted_migration_inventory_vms_by_customer_total)",
+              "expr": "topk(5, (max by (org_id) (assisted_migration_inventory_vms_by_customer_total{service=\"migration-planner-metrics\"})))",
               "legendFormat": "{{org_id}}",
               "range": true,
               "refId": "A"
@@ -481,7 +579,7 @@ data:
             "h": 11,
             "w": 7,
             "x": 15,
-            "y": 7
+            "y": 22
           },
           "id": 13,
           "options": {
@@ -527,7 +625,7 @@ data:
             "h": 1,
             "w": 24,
             "x": 0,
-            "y": 18
+            "y": 33
           },
           "id": 11,
           "panels": [],
@@ -586,14 +684,14 @@ data:
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 19
+            "y": 34
           },
           "id": 1,
           "options": {
             "barRadius": 0,
-            "barWidth": 0.97,
+            "barWidth": 0.88,
             "fullHighlight": false,
-            "groupWidth": 0.7,
+            "groupWidth": 1,
             "legend": {
               "calcs": [],
               "displayMode": "list",
@@ -620,7 +718,7 @@ data:
               },
               "editorMode": "code",
               "exemplar": false,
-              "expr": "sort_desc(assisted_migration_inventory_vms_by_os_total)",
+              "expr": "sort_desc(sum by (os) (assisted_migration_inventory_vms_by_os_total{}) / 3)",
               "instant": true,
               "legendFormat": "{{os}}",
               "range": false,
@@ -668,7 +766,7 @@ data:
             "h": 11,
             "w": 12,
             "x": 12,
-            "y": 19
+            "y": 34
           },
           "id": 3,
           "options": {
@@ -776,7 +874,7 @@ data:
             "h": 11,
             "w": 12,
             "x": 0,
-            "y": 30
+            "y": 45
           },
           "id": 14,
           "options": {
@@ -898,7 +996,7 @@ data:
       "timezone": "browser",
       "title": "Service Dashboards",
       "uid": "deg3jpmyvl7gga",
-      "version": 1,
+      "version": 2,
       "weekStart": ""
     }
 kind: ConfigMap
