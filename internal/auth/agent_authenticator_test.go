@@ -147,7 +147,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 			req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
 			Expect(err).To(BeNil())
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
+			req.Header.Add(auth.AgentTokenHeader, token)
 
 			resp, rerr := http.DefaultClient.Do(req)
 			Expect(rerr).To(BeNil())

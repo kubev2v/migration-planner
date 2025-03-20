@@ -2,10 +2,10 @@ package cli
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 
 	"github.com/kubev2v/migration-planner/internal/api/client"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -42,7 +42,7 @@ func (o *GlobalOptions) Client() (*client.ClientWithResponses, error) {
 			if o.Token == "" {
 				return nil
 			}
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", o.Token))
+			req.Header.Add(auth.AgentTokenHeader, o.Token)
 			return nil
 		}),
 	)
