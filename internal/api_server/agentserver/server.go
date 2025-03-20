@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	chiprometheus "github.com/toshi0607/chi-prometheus"
@@ -72,6 +73,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	metricMiddleware.MustRegisterDefault()
 
 	router.Use(
+		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
 		auth.NewAgentAuthenticator(s.store).Authenticator,
 		middleware.RequestID,
