@@ -13,12 +13,12 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/chilogger"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	chiprometheus "github.com/toshi0607/chi-prometheus"
 	"go.uber.org/zap"
@@ -91,7 +91,7 @@ func (s *Server) Run(ctx context.Context) error {
 		metricMiddleware.Handler,
 		authenticator.Authenticator,
 		middleware.RequestID,
-		zapchi.Logger(zap.S(), "router_api"),
+		chilogger.Logger(zap.S(), "router_api"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,
