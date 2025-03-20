@@ -10,6 +10,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/common"
 	client "github.com/kubev2v/migration-planner/internal/api/client/agent"
+	"github.com/kubev2v/migration-planner/internal/auth"
 )
 
 var _ Planner = (*planner)(nil)
@@ -32,7 +33,7 @@ type planner struct {
 func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error {
 	resp, err := p.client.UpdateSourceInventoryWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
 		if jwt, found := p.jwtFromContext(ctx); found {
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+			req.Header.Add(auth.AgentTokenHeader, jwt)
 		}
 		return nil
 	})
@@ -52,7 +53,7 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 func (p *planner) Health(ctx context.Context) error {
 	resp, err := p.client.HealthWithResponse(ctx, func(ctx context.Context, req *http.Request) error {
 		if jwt, found := p.jwtFromContext(ctx); found {
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+			req.Header.Add(auth.AgentTokenHeader, jwt)
 		}
 		return nil
 	})
@@ -72,7 +73,7 @@ func (p *planner) Health(ctx context.Context) error {
 func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
 	resp, err := p.client.UpdateAgentStatusWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
 		if jwt, found := p.jwtFromContext(ctx); found {
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+			req.Header.Add(auth.AgentTokenHeader, jwt)
 		}
 		return nil
 	})

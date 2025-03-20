@@ -18,6 +18,7 @@ import (
 
 const (
 	defaultExpirationPeriod = 3 * 30 * 24 // 3 months
+	AgentTokenHeader        = "X-Agent-Token"
 )
 
 func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
@@ -115,13 +116,12 @@ func (aa *AgentAuthenticator) Authenticate(token string) (AgentJWT, error) {
 
 func (aa *AgentAuthenticator) Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		accessToken := r.Header.Get("Authorization")
-		if accessToken == "" || len(accessToken) < len("Bearer ") {
+		accessToken := r.Header.Get(AgentTokenHeader)
+		if accessToken == "" {
 			http.Error(w, "No token provided", http.StatusUnauthorized)
 			return
 		}
 
-		accessToken = accessToken[len("Bearer "):]
 		agentJwt, err := aa.Authenticate(accessToken)
 		if err != nil {
 			http.Error(w, "authentication failed", http.StatusUnauthorized)
