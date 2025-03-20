@@ -166,12 +166,12 @@ func printTable(response interface{}, kind string, id *uuid.UUID) error {
 }
 
 func printSourcesTable(w *tabwriter.Writer, sources ...api.Source) {
-	fmt.Fprintln(w, "ID\tName\tAgent ID\tAgent Status")
+	fmt.Fprintln(w, "ID\tName\tAgent ID\tAgent Status\tHas inventory")
 	for _, s := range sources {
 		if s.Agent != nil {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n", s.Id, s.Name, s.Agent.Id, s.Agent.Status)
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, s.Agent.Id, s.Agent.Status, s.Inventory != nil)
 			continue
 		}
-		fmt.Fprintf(w, "%s\t%s\n", s.Id, s.Name)
+		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, "", "", s.Inventory != nil)
 	}
 }
