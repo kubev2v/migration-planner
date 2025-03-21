@@ -19,11 +19,6 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
 
-      - name: Setup oc
-        uses: redhat-actions/openshift-tools-installer@v1
-        with:
-          oc: "4"
-
       - name: Set env variables
         run: |
           export "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')"
