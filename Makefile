@@ -65,6 +65,24 @@ ifeq (, $(shell which ginkgo 2> /dev/null))
 	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
 endif
 
+OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+OC_VERSION ?= 4.17.9
+OC_BIN := $(shell command -v oc)
+oc: # Verify oc installed, in linux install it if not already installed
+ifeq ($(OC_BIN),)
+	@if [ "$(OS)" = "darwin" ]; then \
+		echo "Error: macOS detected. Please install oc manually from https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$(OC_VERSION)/"; \
+		exit 1; \
+	fi
+	@echo "oc not found. Installing for Linux..."
+	@curl -sL "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/$(OC_VERSION)/openshift-client-linux.tar.gz" | tar -xz
+	@chmod +x oc kubectl
+	@sudo mv oc kubectl /usr/local/bin/
+	@echo "oc installed successfully."
+else
+	@echo "oc is already installed at $(OC_BIN)"
+endif
+
 TEST_PACKAGES := ./...
 GINKGO_OPTIONS ?= --skip e2e
 test: ginkgo
@@ -140,7 +158,7 @@ push-agent-container: migration-planner-agent-container quay-login
 
 push-containers: push-api-container push-agent-container
 
-deploy-on-openshift:
+deploy-on-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
 	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
@@ -165,7 +183,7 @@ deploy-on-openshift:
 	echo "*** Migration Planner has been deployed successfully on Openshift ***"; \
 	echo "*** Open UI: http://planner-ui-$${openshift_project}.apps.$${openshift_base_url}"
 
-delete-from-openshift:
+delete-from-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
 	echo "*** Delete Migration Planner from Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***"; \
@@ -189,7 +207,7 @@ delete-from-openshift:
 	oc delete route planner-agent planner-ui planner-image; \
 	echo "*** Migration Planner has been deleted successfully from Openshift ***"
 
-deploy-on-kind:
+deploy-on-kind: oc
 	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
 		echo "*** Deploy Migration Planner on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
 	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
@@ -206,7 +224,7 @@ deploy-on-kind:
 	   | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** Migration Planner has been deployed successfully on Kind ***"
 
-delete-from-kind:
+delete-from-kind: oc
 	inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
