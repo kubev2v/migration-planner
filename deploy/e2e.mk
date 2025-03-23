@@ -1,5 +1,7 @@
+E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
+
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -30,6 +32,15 @@ setup_libvirt:
 		sudo dnf install -y sshpass libvirt-devel libvirt-daemon libvirt-daemon-config-network; \
 	fi
 	sudo systemctl restart libvirtd
+
+.PHONY: generate_private_key
+generate_private_key:
+	sudo mkdir -p $(E2E_PRIVATE_KEY_FOLDER_PATH) && \
+	sudo chown -R $(shell whoami):$(shell whoami) $(E2E_PRIVATE_KEY_FOLDER_PATH); \
+	if [ ! -f $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key ]; then \
+		openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key; \
+		openssl rsa -in $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key -out $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key -traditional; \
+	fi
 
 .PHONY: deploy_registry
 deploy_registry:

@@ -6,6 +6,8 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"io"
 	"net/http"
 	"os"
@@ -23,7 +25,9 @@ import (
 )
 
 const (
-	vmName string = "coreos-vm"
+	vmName              string = "coreos-vm"
+	defaultUsername     string = "admin"
+	defaultOrganization string = "admin"
 )
 
 var (
@@ -34,6 +38,7 @@ var (
 	defaultOvaPath     string = filepath.Join(home, "myimage.ova")
 	defaultServiceUrl  string = fmt.Sprintf("http://%s:3443", os.Getenv("PLANNER_IP"))
 	defaultAgentTestID string = "1"
+	privateKeyPath     string = filepath.Join(os.Getenv("E2E_PRIVATE_KEY_FOLDER_PATH"), "private-key")
 )
 
 type PlannerAgent interface {
@@ -109,11 +114,11 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 		}
 	}
 
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
+	user, err := defaultUserAuth()
+	if err != nil {
+		return err
 	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 	var res *http.Response
 
 	if testOptions.downloadImageByUrl {
@@ -127,7 +132,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 			return err
 		}
 	} else {
-		res, err = p.c.GetImage(ctx, p.sourceID) // Stream the OVA directly to res
+		res, err = p.c.GetImage(ctx, p.sourceID, attachJWT) // Stream the OVA directly to res
 		if err != nil {
 			return fmt.Errorf("failed to get source image: %w", err)
 		}
@@ -147,7 +152,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 }
 
 func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error) {
-	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID)
+	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID, attachJWT)
 	if err != nil {
 		return "", fmt.Errorf("failed to get source url: %w", err)
 	}
@@ -401,14 +406,14 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 }
 
 func (s *plannerService) CreateSource(name string) (*api.Source, error) {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
+	user, err := defaultUserAuth()
+	if err != nil {
+		return nil, err
 	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
-	res, err := s.c.CreateSourceWithResponse(ctx, params)
+	res, err := s.c.CreateSourceWithResponse(ctx, params, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
 		return nil, fmt.Errorf("failed to create the source: %v", err)
 	}
@@ -421,13 +426,13 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 }
 
 func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
+	user, err := defaultUserAuth()
+	if err != nil {
+		return nil, err
 	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
-	res, err := s.c.GetSourceWithResponse(ctx, id)
+	res, err := s.c.GetSourceWithResponse(ctx, id, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
 		return nil, fmt.Errorf("failed to list sources. response status code: %d", res.HTTPResponse.StatusCode)
 	}
@@ -436,24 +441,24 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 }
 
 func (s *plannerService) RemoveSources() error {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
+	user, err := defaultUserAuth()
+	if err != nil {
+		return err
 	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
-	_, err := s.c.DeleteSourcesWithResponse(ctx)
+	_, err = s.c.DeleteSourcesWithResponse(ctx, attachJWT)
 	return err
 }
 
 func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
-	user := auth.User{
-		Username:     "admin",
-		Organization: "admin",
+	user, err := defaultUserAuth()
+	if err != nil {
+		return err
 	}
-	ctx := auth.NewTokenContext(context.TODO(), user)
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
-	_, err := s.c.DeleteSourceWithResponse(ctx, uuid)
+	_, err = s.c.DeleteSourceWithResponse(ctx, uuid, attachJWT)
 	return err
 }
 
@@ -485,4 +490,37 @@ func (p *plannerAgentLibvirt) getIsoPath() string {
 	}
 	fileName := fmt.Sprintf("agent-%s.iso", p.agentEndToEndTestID)
 	return filepath.Join(defaultBasePath, fileName)
+}
+
+func defaultUserAuth() (*auth.User, error) {
+	tokenVal, err := getToken(defaultUsername, defaultOrganization)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create user: %v", err)
+	}
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Raw = tokenVal
+	return &auth.User{
+		Username:     defaultUsername,
+		Organization: defaultOrganization,
+		Token:        token,
+	}, nil
+}
+
+func attachJWT(ctx context.Context, req *http.Request) error {
+	if jwt, found := jwtFromContext(ctx); found {
+		req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwt))
+	}
+	return nil
+}
+
+func jwtFromContext(ctx context.Context) (string, bool) {
+	val := ctx.Value(common.JwtKey)
+	if val == nil {
+		return "", false
+	}
+	return val.(string), true
+}
+
+func contextWithJWT(ctx context.Context, jwt string) context.Context {
+	return context.WithValue(ctx, common.JwtKey, jwt)
 }

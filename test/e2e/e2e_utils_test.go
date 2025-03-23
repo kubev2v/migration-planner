@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/cli"
 	. "github.com/onsi/gomega"
 	"io"
 	"os"
@@ -195,4 +196,23 @@ func RunCommand(ip string, command string) (string, error) {
 	}
 
 	return stdout.String(), nil
+}
+
+func getToken(username string, organization string) (string, error) {
+	privateKeyString, err := os.ReadFile(privateKeyPath)
+	if err != nil {
+		return "", fmt.Errorf("error, unable to read the private key: %v", err)
+	}
+
+	privateKey, err := cli.ParsePrivateKey(string(privateKeyString))
+	if err != nil {
+		return "", fmt.Errorf("error with parsing the private key: %v", err)
+	}
+
+	token, err := cli.GenerateToken(username, organization, privateKey)
+	if err != nil {
+		return "", fmt.Errorf("error, unable to generate token: %v", err)
+	}
+
+	return token, nil
 }
