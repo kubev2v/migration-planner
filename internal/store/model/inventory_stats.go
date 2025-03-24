@@ -23,6 +23,7 @@ type InventoryStats struct {
 	Vms              VmStats
 	Os               OsStats
 	TotalCustomers   int
+	TotalAssessments int
 	TotalInventories int
 	Storage          []StorageCustomerStats
 }
@@ -32,6 +33,7 @@ func NewInventoryStats(sources []Source) InventoryStats {
 		Vms:              computeVmStats(sources),
 		Os:               computeOsStats(sources),
 		TotalInventories: computeInventories(sources),
+		TotalAssessments: len(sources),
 		TotalCustomers:   computeTotalCustomers(sources),
 		Storage:          computeStorateStats(sources),
 	}

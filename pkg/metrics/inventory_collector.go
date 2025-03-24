@@ -14,6 +14,7 @@ type inventoryStatsCollector struct {
 	totalVm                *prometheus.Desc
 	totalCustomers         *prometheus.Desc
 	totalInventories       *prometheus.Desc
+	totalAssessments       *prometheus.Desc
 	totalVmByOs            *prometheus.Desc
 	totalVmByCustomer      *prometheus.Desc // WARN: possible high cadinality
 	totalStorageByCustomer *prometheus.Desc // WARN: possible high cadinality
@@ -44,6 +45,12 @@ func newInventoryStatsCollector(s store.Store) prometheus.Collector {
 			nil,
 			prometheus.Labels{},
 		),
+		totalAssessments: prometheus.NewDesc(
+			fqName("assessments_total"),
+			"Total number of assessments",
+			nil,
+			prometheus.Labels{},
+		),
 		totalVmByOs: prometheus.NewDesc(
 			fqName("vms_by_os_total"),
 			"Total VMs by OS type",
@@ -69,6 +76,7 @@ func (c *inventoryStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.totalVm
 	ch <- c.totalCustomers
 	ch <- c.totalInventories
+	ch <- c.totalAssessments
 	ch <- c.totalVmByOs
 	ch <- c.totalVmByCustomer
 	ch <- c.totalStorageByCustomer
@@ -83,6 +91,7 @@ func (c *inventoryStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	ch <- prometheus.MustNewConstMetric(c.totalVm, prometheus.GaugeValue, float64(stats.Vms.Total))
 	ch <- prometheus.MustNewConstMetric(c.totalInventories, prometheus.GaugeValue, float64(stats.TotalInventories))
+	ch <- prometheus.MustNewConstMetric(c.totalAssessments, prometheus.GaugeValue, float64(stats.TotalAssessments))
 	ch <- prometheus.MustNewConstMetric(c.totalCustomers, prometheus.GaugeValue, float64(stats.TotalCustomers))
 
 	for osType, total := range stats.Vms.TotalByOS {
