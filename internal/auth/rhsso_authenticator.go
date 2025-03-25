@@ -49,6 +49,7 @@ func NewRHSSOAuthenticator(ctx context.Context, jwkCertUrl string) (*RHSSOAuthen
 func (rh *RHSSOAuthenticator) Authenticate(token string) (User, error) {
 	// TODO: FIXME
 	//parser := jwt.NewParser(jwt.WithValidMethods([]string{jwt.SigningMethodRS256.Name}), jwt.WithIssuedAt(), jwt.WithExpirationRequired())
+	var user User
 	parser := jwt.NewParser(jwt.WithoutClaimsValidation())
 	t, err := parser.Parse(token, rh.keyFn)
 	if err != nil {
@@ -61,7 +62,12 @@ func (rh *RHSSOAuthenticator) Authenticate(token string) (User, error) {
 		return User{}, fmt.Errorf("failed to parse or validate token")
 	}
 
-	return rh.parseToken(t)
+	if user, err = rh.parseToken(t); err != nil {
+		zap.S().Errorw("failed to parse or the token is invalid", "token", token, "error", err)
+		return User{}, fmt.Errorf("failed to authenticate token: %w", err)
+	}
+
+	return user, nil
 }
 
 func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
@@ -106,6 +112,16 @@ func (rh *RHSSOAuthenticator) getOrgID(claims jwt.MapClaims) (string, error) {
 	if v, found := claims["org_id"]; found {
 		if orgID, ok := v.(string); ok {
 			return orgID, nil
+		}
+	}
+
+	if v, found := claims["organization"]; found {
+		if orgMap, ok := v.(map[string]any); ok {
+			if orgID, found := orgMap["id"]; found {
+				if orgIDStr, ok := orgID.(string); ok {
+					return orgIDStr, nil
+				}
+			}
 		}
 	}
 
