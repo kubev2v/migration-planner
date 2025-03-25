@@ -18,11 +18,11 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1,
+  "id": 1001605,
   "links": [],
   "panels": [
     {
-      "collapsed": true,
+      "collapsed": false,
       "gridPos": {
         "h": 1,
         "w": 24,
@@ -37,7 +37,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The percentage of time that the API is available (not returning 500 Internal Service Errors).",
       "fieldConfig": {
@@ -90,11 +90,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(increase(chi_requests_total{service=\"api_server\",code!~\"5..|0\"}[$__range]))\n/\nsum(increase(chi_requests_total{service=\"api_server\"}[$__range]))",
+          "expr": "sum(increase(chi_requests_total{service=\"migration-planner-metrics\",code!~\"5..|0\"}[$__range]))\n/\nsum(increase(chi_requests_total{service=\"migration-planner-metrics\"}[$__range]))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -106,7 +110,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Number of requests per second based on response code",
       "fieldConfig": {
@@ -121,7 +125,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -188,8 +191,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum by (code) (rate(chi_requests_total{service=\"api_server\"}[$__range]))",
+          "expr": "sum by (code) (rate(chi_requests_total{service=\"migration-planner-metrics\",path!~\"/health\"}[$__range]))",
           "legendFormat": "{{code}}",
           "range": true,
           "refId": "A"
@@ -201,7 +208,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Number of requests per second based on response code",
       "fieldConfig": {
@@ -216,7 +223,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -281,8 +287,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(rate(chi_requests_total{service=\"api_server\", code!~\"2..\"}[$__range])) / sum(rate(chi_requests_total{service=\"api_server\"}[$__range]))",
+          "expr": "sum(rate(chi_requests_total{service=\"migration-planner-metrics\", code!~\"2..\"}[$__range])) / sum(rate(chi_requests_total{service=\"migration-planner-metrics\"}[$__range]))",
           "legendFormat": "non 2xx",
           "range": true,
           "refId": "A"
@@ -290,10 +300,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(chi_requests_total{service=\"api_server\", code=~\"5.0\"}[$__range])) / sum(rate(chi_requests_total{service=\"api_server\"}[$__range]))",
+          "expr": "sum(rate(chi_requests_total{service=\"migration-planner-metrics\", code=~\"5.0\"}[$__range])) / sum(rate(chi_requests_total{service=\"migration-planner-metrics\"}[$__range]))",
           "hide": false,
           "instant": false,
           "legendFormat": "5xx",
@@ -307,7 +317,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The request duration within which the API have served 99%, 95%, 50% of requests",
       "fieldConfig": {
@@ -322,7 +332,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -388,8 +397,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"api_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", code!~\"5..|0\"}[5m])))",
           "legendFormat": "99th",
           "range": true,
           "refId": "A"
@@ -397,10 +410,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"api_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", code!~\"5..|0\"}[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "90th",
@@ -410,10 +423,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"api_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", code!~\"5..|0\"}[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "50th",
@@ -427,7 +440,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The percentage of time that the API responds within 300ms.",
       "fieldConfig": {
@@ -480,11 +493,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(increase(chi_request_duration_milliseconds_bucket{service=\"api_server\", code!~\"5..|0\",le=\"300.0\"}[$__range]))\n/\nsum(increase(chi_request_duration_milliseconds_count{service=\"api_server\", code!~\"5..|0\"}[$__range]))",
+          "expr": "sum(increase(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", code!~\"5..|0\",le=\"300\"}[$__range]))\n/\nsum(increase(chi_request_duration_milliseconds_count{service=\"migration-planner-metrics\", code!~\"5..|0\"}[$__range]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -509,7 +526,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The percentage of time that the API is available (not returning 500 Internal Service Errors).",
       "fieldConfig": {
@@ -562,11 +579,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(increase(chi_requests_total{service=~\"agent_server\",code!~\"5..|0\",path!~\"/health\"}[$__range]))\n/\nsum(increase(chi_requests_total{service=~\"agent_server\",path!~\"/health\"}[$__range]))",
+          "expr": "sum(increase(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",code!~\"5..|0\",path!~\"/health\"}[$__range]))\n/\nsum(increase(chi_requests_total{service=\"migration-planner-metrics\",exported_service=\"agent_server\",path!~\"/health\"}[$__range]))",
           "legendFormat": "",
           "range": true,
           "refId": "A"
@@ -578,7 +599,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Number of requests per second based on response code",
       "fieldConfig": {
@@ -593,7 +614,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -660,8 +680,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum by (code) (rate(chi_requests_total{service=\"agent_server\",path!~\"/health\"}[$__range]))",
+          "expr": "sum by (code) (rate(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",path!~\"/health\"}[$__range]))",
           "legendFormat": "{{code}}",
           "range": true,
           "refId": "A"
@@ -673,7 +697,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Number of requests per second based on response code",
       "fieldConfig": {
@@ -688,7 +712,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -753,8 +776,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(rate(chi_requests_total{service=\"agent_server\",path!~\"/health\", code!~\"2..\"}[$__range])) / sum(rate(chi_requests_total{service=\"agent_server\",path!~\"/health\"}[$__range]))",
+          "expr": "sum(rate(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",path!~\"/health\", code!~\"2..\"}[$__range])) / sum(rate(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",path!~\"/health\"}[$__range]))",
           "legendFormat": "non 2xx",
           "range": true,
           "refId": "A"
@@ -762,10 +789,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(chi_requests_total{service=\"agent_server\",path!~\"/health\", code=~\"5.0\"}[$__range])) / sum(rate(chi_requests_total{service=\"agent_server\",path!~\"/health\"}[$__range]))",
+          "expr": "sum(rate(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",path!~\"/health\", code=~\"5..0\"}[$__range])) / sum(rate(chi_requests_total{service=\"migration-planner-metrics\", exported_service=\"agent_server\",path!~\"/health\"}[$__range]))",
           "hide": false,
           "instant": false,
           "legendFormat": "5xx",
@@ -779,7 +806,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The request duration within which the API have served 99%, 95%, 50% of requests",
       "fieldConfig": {
@@ -794,7 +821,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 4,
             "gradientMode": "none",
@@ -860,8 +886,12 @@
       "pluginVersion": "11.4.0",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.99, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"agent_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", exported_service=\"agent_server\", code!~\"5..|0\"}[5m])))",
           "legendFormat": "99th",
           "range": true,
           "refId": "A"
@@ -869,10 +899,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.90, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"agent_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.90, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", exported_service=\"agent_server\", code!~\"5..|0\"}[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "90th",
@@ -882,10 +912,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.50, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"agent_server\", code!~\"5..|0\"}[5m])))",
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", exported_service=\"agent_server\", code!~\"5..|0\"}[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "50th",
@@ -899,7 +929,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "The percentage of time that the API responds within 300ms.",
       "fieldConfig": {
@@ -952,11 +982,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "sum(increase(chi_request_duration_milliseconds_bucket{service=\"agent_server\", code!~\"5..|0\",path!~\"/health\",le=\"300.0\"}[$__range]))\n/\nsum(increase(chi_request_duration_milliseconds_count{service=\"agent_server\", code!~\"5..|0\",path!~\"/health\"}[$__range]))",
+          "expr": "sum(increase(chi_request_duration_milliseconds_bucket{service=\"migration-planner-metrics\", exported_service=\"agent_server\", code!~\"5..|0\",path!~\"/health\",le=\"300\"}[$__range]))\n/\nsum(increase(chi_request_duration_milliseconds_count{service=\"migration-planner-metrics\", exported_service=\"agent_server\", code!~\"5..|0\",path!~\"/health\"}[$__range]))",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -973,240 +1007,6 @@
         "x": 0,
         "y": 18
       },
-      "id": 7,
-      "panels": [],
-      "title": "Ova download metrics",
-      "type": "row"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "decimals": 0,
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 19
-      },
-      "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "increase(assisted_migration_ova_downloads{state=\"successful\"}[5m])",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Total downloads in the last 5m",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisBorderShow": false,
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "barWidthFactor": 0.6,
-            "drawStyle": "line",
-            "fillOpacity": 4,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "insertNulls": false,
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 20,
-        "x": 4,
-        "y": 19
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "increase(assisted_migration_ova_downloads{state=\"successful\"}[$__range])",
-          "legendFormat": "{{state}}",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Ova downloads over time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 4,
-        "x": 0,
-        "y": 23
-      },
-      "id": 8,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "11.4.0",
-      "targets": [
-        {
-          "editorMode": "code",
-          "expr": "max_over_time(assisted_migration_ova_downloads{state=\"successful\"}[24h])",
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Successfull downloads in the last 24h",
-      "type": "stat"
-    },
-    {
-      "collapsed": false,
-      "gridPos": {
-        "h": 1,
-        "w": 24,
-        "x": 0,
-        "y": 27
-      },
       "id": 2,
       "panels": [],
       "title": "Agent metrics",
@@ -1215,7 +1015,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Current number of agents in up-to-date state",
       "fieldConfig": {
@@ -1244,7 +1044,7 @@
         "h": 4,
         "w": 3,
         "x": 0,
-        "y": 28
+        "y": 19
       },
       "id": 3,
       "options": {
@@ -1264,11 +1064,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "assisted_migration_agent_status_count{state=\"up-to-date\"}",
+          "expr": "max by (service) (assisted_migration_agent_status_count{state=\"up-to-date\",service=\"migration-planner-metrics\"})",
           "legendFormat": "{{state}}",
           "range": true,
           "refId": "A"
@@ -1280,7 +1084,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Current number of agents in gathering-inventory state",
       "fieldConfig": {
@@ -1309,7 +1113,7 @@
         "h": 4,
         "w": 3,
         "x": 3,
-        "y": 28
+        "y": 19
       },
       "id": 5,
       "options": {
@@ -1332,11 +1136,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "assisted_migration_agent_status_count{state=\"gathering-initial-inventory\"}",
+          "expr": "max by (service) (assisted_migration_agent_status_count{state=\"gathering-initial-inventory\", service=\"migration-planner-metrics\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1348,7 +1156,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "fieldConfig": {
         "defaults": {
@@ -1362,7 +1170,6 @@
             "axisLabel": "",
             "axisPlacement": "auto",
             "barAlignment": 0,
-            "barWidthFactor": 0.6,
             "drawStyle": "line",
             "fillOpacity": 3,
             "gradientMode": "none",
@@ -1409,7 +1216,7 @@
         "h": 8,
         "w": 18,
         "x": 6,
-        "y": 28
+        "y": 19
       },
       "id": 1,
       "options": {
@@ -1429,10 +1236,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "fe9y7urz5l5hcc"
+            "uid": "${Datasource}"
           },
           "editorMode": "code",
-          "expr": "assisted_migration_agent_status_count",
+          "expr": "max by (state) (assisted_migration_agent_status_count{service=\"migration-planner-metrics\", state!=\"\"})",
           "legendFormat": "{{state}}",
           "range": true,
           "refId": "A"
@@ -1444,7 +1251,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Current number of agents in waiting-for-credential state",
       "fieldConfig": {
@@ -1473,7 +1280,7 @@
         "h": 4,
         "w": 3,
         "x": 0,
-        "y": 32
+        "y": 23
       },
       "id": 6,
       "options": {
@@ -1493,11 +1300,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "assisted_migration_agent_status_count{state=\"waiting-for-credentials\"}",
+          "expr": "max by (service) (assisted_migration_agent_status_count{state=\"waiting-for-credentials\", service=\"migration-planner-metrics\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1509,7 +1320,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "fe9y7urz5l5hcc"
+        "uid": "${Datasource}"
       },
       "description": "Current number of agents in error state",
       "fieldConfig": {
@@ -1538,7 +1349,7 @@
         "h": 4,
         "w": 3,
         "x": 3,
-        "y": 32
+        "y": 23
       },
       "id": 4,
       "options": {
@@ -1558,11 +1369,15 @@
         "textMode": "auto",
         "wideLayout": true
       },
-      "pluginVersion": "11.4.0",
+      "pluginVersion": "10.4.1",
       "targets": [
         {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${Datasource}"
+          },
           "editorMode": "code",
-          "expr": "assisted_migration_agent_status_count{state=\"error\"}",
+          "expr": "max by (service) (assisted_migration_agent_status_count{state=\"error\", service=\"migration-planner-metrics\"})",
           "legendFormat": "__auto",
           "range": true,
           "refId": "A"
@@ -1572,22 +1387,40 @@
       "type": "stat"
     }
   ],
-  "preload": false,
-  "refresh": "5s",
-  "schemaVersion": 40,
+  "refresh": "30s",
+  "schemaVersion": 39,
   "tags": [],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "crcs02ue1-prometheus",
+          "value": "PDD8BE47D10408F45"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "Datasource",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "/crcs02ue1-prometheus/",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "assisted_migrations",
-  "uid": "de9yb0qpl8dmoc",
-  "version": 33,
+  "title": "assisted_migrations_test",
+  "uid": "de9yb0qpl8dmo",
+  "version": 6,
   "weekStart": ""
 }
-
