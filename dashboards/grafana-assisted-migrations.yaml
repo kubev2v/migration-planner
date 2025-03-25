@@ -1422,7 +1422,7 @@ data:
       },
       "timepicker": {},
       "timezone": "browser",
-      "title": "assisted_migrations_test",
+      "title": "Assisted Migrations",
       "uid": "de9yb0qpl8dmo",
       "version": 6,
       "weekStart": ""
