@@ -9,6 +9,7 @@ VERBOSE ?= false
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
+MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 MIGRATION_PLANNER_UI_IMAGE_TAG ?= latest
@@ -17,7 +18,6 @@ MIGRATION_PLANNER_REPLICAS ?= 1
 MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
-REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
@@ -124,10 +124,10 @@ build-cli: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
+	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f $(if $(DEBUG_MODE),Containerfile.agent-debug,Containerfile.agent) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG)
+	$(PODMAN) build . -f $(if $(DEBUG_MODE),Containerfile.api-debug,Containerfile.api) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
@@ -145,16 +145,16 @@ quay-login:
 
 push-api-container: migration-planner-api-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
 push-agent-container: migration-planner-agent-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
 push-containers: push-api-container push-agent-container
@@ -165,6 +165,7 @@ deploy-on-openshift: oc
 	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
+       -p DEBUG_MODE=$(DEBUG_MODE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
