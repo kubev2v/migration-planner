@@ -57,7 +57,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 	zap.S().Named("image_server").Info("Initializing Image-side API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
-		return fmt.Errorf("failed loading swagger spec: %w", err)
+		return fmt.Errorf("failed to load swagger spec: %w", err)
 	}
 	// Skip server name validation
 	swagger.Servers = nil

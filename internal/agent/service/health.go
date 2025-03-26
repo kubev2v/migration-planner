@@ -115,7 +115,7 @@ func (h *HealthChecker) do(ctx context.Context) {
 
 	err := h.client.Health(ctx)
 	if err != nil {
-		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is unreachable.\n", time.Now().Format(time.RFC3339)))); err != nil {
+		if _, err := h.logFile.Write([]byte(fmt.Sprintf("[%s] console.redhat.com is unreachable\n", time.Now().Format(time.RFC3339)))); err != nil {
 			zap.S().Named("health").Errorf("failed to write to log file %s %w", h.logFilepath, err)
 		}
 		h.lock.Lock()

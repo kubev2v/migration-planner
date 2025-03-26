@@ -116,7 +116,7 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) (int, error) {
 	// Generate ISO data reader with ignition content
 	reader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return -1, fmt.Errorf("error reading rhcos iso: %w", err)
+		return -1, fmt.Errorf("failed to read rhcos iso: %w", err)
 	}
 
 	size, err := b.computeSize(reader)
@@ -161,7 +161,7 @@ func (b *ImageBuilder) Validate() error {
 
 	// Generate ISO data reader with ignition content
 	if _, err = isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil); err != nil {
-		return fmt.Errorf("error reading rhcos iso: %w", err)
+		return fmt.Errorf("failed to read rhcos iso: %w", err)
 	}
 
 	return nil
@@ -185,15 +185,15 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 	var buf bytes.Buffer
 	t, err := template.New("ignition.template").ParseFiles(b.Template)
 	if err != nil {
-		return "", fmt.Errorf("error reading the ignition template: %w", err)
+		return "", fmt.Errorf("failed to read the ignition template: %w", err)
 	}
 	if err := t.Execute(&buf, ignData); err != nil {
-		return "", fmt.Errorf("error parsing the ignition template: %w", err)
+		return "", fmt.Errorf("failed to parse the ignition template: %w", err)
 	}
 
 	dataOut, _, err := config.TranslateBytes(buf.Bytes(), common.TranslateBytesOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error translating config: %w", err)
+		return "", fmt.Errorf("failed to translate config: %w", err)
 	}
 
 	return string(dataOut), nil

@@ -90,7 +90,7 @@ func ValidateTar(file *os.File) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading tar header: %w", err)
+			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
 		switch header.Typeflag {
@@ -102,7 +102,7 @@ func ValidateTar(file *os.File) error {
 				// Validate OVF file
 				ovfContent, err := io.ReadAll(tarReader)
 				if err != nil {
-					return fmt.Errorf("error reading OVF file: %w", err)
+					return fmt.Errorf("failed to read OVF file: %w", err)
 				}
 
 				// Basic validation: check if the content contains essential OVF elements
@@ -139,7 +139,7 @@ func Untar(file *os.File, destFile string, fileName string) error {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("error reading tar header: %w", err)
+			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
 		switch header.Typeflag {
@@ -147,12 +147,12 @@ func Untar(file *os.File, destFile string, fileName string) error {
 			if header.Name == fileName {
 				outFile, err := os.Create(destFile)
 				if err != nil {
-					return fmt.Errorf("error creating file: %w", err)
+					return fmt.Errorf("failed to create file: %w", err)
 				}
 				defer outFile.Close()
 
 				if _, err := io.Copy(outFile, tarReader); err != nil {
-					return fmt.Errorf("error writing file: %w", err)
+					return fmt.Errorf("failed to write file: %w", err)
 				}
 				return nil
 			}

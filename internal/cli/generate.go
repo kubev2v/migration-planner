@@ -52,7 +52,7 @@ func (o *GenerateOptions) Validate(args []string) error {
 	if o.ServiceIP == "" {
 		localIP, err := getLocalIP()
 		if err != nil {
-			return fmt.Errorf("failed to get local ip: %s. Please provide planner api ip", err)
+			return fmt.Errorf("failed to get local ip: %s, Please provide planner api ip", err)
 		}
 		o.ServiceIP = fmt.Sprintf("http://%s:7443", localIP.String())
 	}

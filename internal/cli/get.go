@@ -135,14 +135,14 @@ func processReponse(response interface{}, err error, kind string, id *uuid.UUID,
 	case jsonFormat:
 		marshalled, err := json.Marshal(v.FieldByName("JSON200").Interface())
 		if err != nil {
-			return fmt.Errorf("marshalling resource: %w", err)
+			return fmt.Errorf("failed to marshal resource: %w", err)
 		}
 		fmt.Printf("%s\n", string(marshalled))
 		return nil
 	case yamlFormat:
 		marshalled, err := yaml.Marshal(v.FieldByName("JSON200").Interface())
 		if err != nil {
-			return fmt.Errorf("marshalling resource: %w", err)
+			return fmt.Errorf("failed to marshal resource: %w", err)
 		}
 		fmt.Printf("%s\n", string(marshalled))
 		return nil

@@ -176,7 +176,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 					a.Stop()
 					break
 				}
-				zap.S().Errorf("unable to update agent status: %s", err)
+				zap.S().Errorf("failed to update agent status: %s", err)
 				continue // skip inventory update if we cannot update agent's state.
 			}
 
@@ -191,7 +191,7 @@ func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
 	// Parse the service URL
 	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
 	if err != nil {
-		zap.S().Errorf("error parsing service URL: %v", err)
+		zap.S().Errorf("falied to parse service URL: %v", err)
 		return nil
 	}
 
@@ -204,7 +204,7 @@ func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
 	// Connect to service
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
-		zap.S().Errorf("failed connecting to migration planner: %v", err)
+		zap.S().Errorf("failed to connect the migration planner: %v", err)
 		return nil
 	}
 	defer conn.Close()

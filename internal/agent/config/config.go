@@ -135,10 +135,10 @@ func (cfg *Config) Validate() error {
 func (cfg *Config) ParseConfigFile(cfgFile string) error {
 	contents, err := cfg.reader.ReadFile(cfgFile)
 	if err != nil {
-		return fmt.Errorf("reading config file: %w", err)
+		return fmt.Errorf("failed to read config file: %w", err)
 	}
 	if err := yaml.Unmarshal(contents, cfg); err != nil {
-		return fmt.Errorf("unmarshalling config file: %w", err)
+		return fmt.Errorf("failed to unmarshal config file: %w", err)
 	}
 	cfg.PlannerService.Config.SetBaseDir(filepath.Dir(cfgFile))
 	return nil

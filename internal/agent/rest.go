@@ -97,13 +97,13 @@ func getInventory(dataDir string) (*service.InventoryData, error) {
 	filename := filepath.Join(dataDir, config.InventoryFile)
 	contents, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("error reading inventory file: %v", err)
+		return nil, fmt.Errorf("failed to read inventory file: %v", err)
 	}
 
 	var inventory service.InventoryData
 	err = json.Unmarshal(contents, &inventory)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing inventory file: %v", err)
+		return nil, fmt.Errorf("failed to parse inventory file: %v", err)
 	}
 
 	return &inventory, nil

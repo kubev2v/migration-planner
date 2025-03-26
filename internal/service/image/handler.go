@@ -53,11 +53,11 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	sourceId, err := image.IdFromJWT(req.Token)
 	if err != nil {
-		return nil, fmt.Errorf("error creating the HTTP stream: %v", err)
+		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
 	}
 	source, err := h.getSource(ctx, sourceId)
 	if err != nil {
-		return imageServer.GetImageByToken401JSONResponse{Message: "error creating the HTTP stream"}, nil
+		return imageServer.GetImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
 	}
 
 	imageBuilder := image.NewImageBuilder(source.ID)
@@ -72,8 +72,8 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	size, err := imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorf("error generating ova at GetImage: %s", err)
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
+		zap.S().Named("image_service").Errorf("failed to generate ova at GetImage: %s", err)
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
 
 	// Set proper headers of the OVA file:

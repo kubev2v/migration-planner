@@ -44,7 +44,7 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 		defer resp.HTTPResponse.Body.Close()
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("update source status failed: %s", resp.Status())
+		return fmt.Errorf("failed to update source status: %s", resp.Status())
 	}
 
 	return nil
@@ -87,7 +87,7 @@ func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params ap
 		return ErrSourceGone
 	}
 	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusCreated {
-		return fmt.Errorf("update agent status failed with status: %s", resp.Status())
+		return fmt.Errorf("failed to update agent status: %s", resp.Status())
 	}
 	return nil
 }
