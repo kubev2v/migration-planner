@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubev2v/migration-planner/pkg/log"
 	"net"
 	"net/http"
 	"time"
@@ -17,7 +18,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/image"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	chiprometheus "github.com/toshi0607/chi-prometheus"
 	"go.uber.org/zap"
@@ -74,7 +74,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 	router.Use(
 		metricMiddleware.Handler,
 		middleware.RequestID,
-		zapchi.Logger(zap.S(), "router_image"),
+		log.Logger(zap.S(), "router_image"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,

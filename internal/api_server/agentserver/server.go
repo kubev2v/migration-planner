@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/kubev2v/migration-planner/pkg/log"
 	"net"
 	"net/http"
 	"time"
@@ -18,7 +19,6 @@ import (
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/leosunmo/zapchi"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	chiprometheus "github.com/toshi0607/chi-prometheus"
 	"go.uber.org/zap"
@@ -75,7 +75,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	router.Use(
 		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
-		zapchi.Logger(zap.S(), "router_agent"),
+		log.Logger(zap.S(), "router_agent"),
 		auth.NewAgentAuthenticator(s.store).Authenticator,
 		middleware.RequestID,
 		middleware.Recoverer,
