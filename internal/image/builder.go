@@ -45,6 +45,7 @@ const (
 
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
+	DebugMode                  string
 	SshKey                     string
 	PlannerServiceUI           string
 	PlannerService             string
@@ -69,6 +70,7 @@ type ImageBuilder struct {
 	SshKey                     string
 	Proxy                      Proxy
 	CertificateChain           string
+	DebugMode                  string
 	PlannerServiceUI           string
 	PlannerService             string
 	MigrationPlannerAgentImage string
@@ -87,6 +89,7 @@ type ImageBuilder struct {
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	imageBuilder := &ImageBuilder{
 		SourceID:                   sourceID.String(),
+		DebugMode:                  util.GetEnv("DEBUG_MODE", ""),
 		PlannerService:             util.GetEnv("CONFIG_SERVER", defaultPlannerService),
 		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", defaultAgentImage),
@@ -169,6 +172,7 @@ func (b *ImageBuilder) Validate() error {
 
 func (b *ImageBuilder) generateIgnition() (string, error) {
 	ignData := IgnitionData{
+		DebugMode:                  b.DebugMode,
 		SourceID:                   b.SourceID,
 		SshKey:                     b.SshKey,
 		PlannerServiceUI:           b.PlannerServiceUI,
