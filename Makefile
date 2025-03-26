@@ -124,7 +124,7 @@ build-cli: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f $(if $(DEBUG_MODE),Containerfile.agent-debug,Containerfile.agent) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . -f $(if $(DEBUG_MODE),Containerfile.api-debug,Containerfile.api) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
@@ -147,7 +147,7 @@ push-api-container: bin/.migration-planner-api-container quay-login
 		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
-push-agent-container: migration-planner-agent-container quay-login
+push-agent-container: bin/.migration-planner-agent-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
 		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
