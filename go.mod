@@ -19,7 +19,6 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/konveyor/forklift-controller v0.0.0-20221102112227-e73b65a01cda
 	github.com/kubev2v/migration-event-streamer v0.0.0-20241125102656-9cdf9e64a16b
-	github.com/leosunmo/zapchi v0.2.0
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
