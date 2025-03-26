@@ -58,7 +58,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	zap.S().Named("agent_server").Info("Initializing Agent-side API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
-		return fmt.Errorf("failed loading swagger spec: %w", err)
+		return fmt.Errorf("failed to load swagger spec: %w", err)
 	}
 	// Skip server name validation
 	swagger.Servers = nil

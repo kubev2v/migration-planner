@@ -129,14 +129,14 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	} else {
 		res, err = p.c.GetImage(ctx, p.sourceID) // Stream the OVA directly to res
 		if err != nil {
-			return fmt.Errorf("error getting source image: %w", err)
+			return fmt.Errorf("failed to get source image: %w", err)
 		}
 	}
 
 	defer res.Body.Close()
 
 	if _, err = io.Copy(ovaFile, res.Body); err != nil {
-		return fmt.Errorf("error writing to file: %w", err)
+		return fmt.Errorf("failed to write to the file: %w", err)
 	}
 
 	if err := p.ovaValidateAndExtract(ovaFile); err != nil {
@@ -149,7 +149,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error) {
 	res, err := p.c.GetSourceDownloadURL(ctx, p.sourceID)
 	if err != nil {
-		return "", fmt.Errorf("error getting source url: %w", err)
+		return "", fmt.Errorf("failed to get source url: %w", err)
 	}
 	defer res.Body.Close()
 
@@ -160,11 +160,11 @@ func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return "", fmt.Errorf("error reading response body: %w", err)
+		return "", fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("error decoding JSON: %w", err)
+		return "", fmt.Errorf("failed to decod JSON: %w", err)
 	}
 
 	return result.URL, nil
@@ -172,17 +172,17 @@ func (p *plannerAgentLibvirt) getDownloadURL(ctx context.Context) (string, error
 
 func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 	if err := ValidateTar(ovaFile); err != nil {
-		return fmt.Errorf("error validating tar: %w", err)
+		return fmt.Errorf("failed to validate tar: %w", err)
 	}
 
 	// Untar ISO from OVA
 	if err := Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
-		return fmt.Errorf("error uncompressing the file: %w", err)
+		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
 	// Untar VMDK from OVA
 	if err := Untar(ovaFile, defaultVmdkName, "persistence-disk.vmdk"); err != nil {
-		return fmt.Errorf("error uncompressing the file: %w", err)
+		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
 	return nil
@@ -196,7 +196,7 @@ func (p *plannerAgentLibvirt) Version() (string, error) {
 	// Create a new HTTP GET request
 	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:3333/api/v1/version", agentIP), nil)
 	if err != nil {
-		return "", fmt.Errorf("Failed to create request: %v", err)
+		return "", fmt.Errorf("failed to create request: %v", err)
 	}
 
 	// Set the Content-Type header to application/json
@@ -210,7 +210,7 @@ func (p *plannerAgentLibvirt) Version() (string, error) {
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("Failed to send request: %v", err)
+		return "", fmt.Errorf("failed to send request: %v", err)
 	}
 	defer resp.Body.Close()
 
@@ -328,7 +328,7 @@ func (p *plannerAgentLibvirt) Remove() error {
 	defer p.con.Close()
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
-		return fmt.Errorf("unable to find domain: %v", err)
+		return fmt.Errorf("failed to find domain: %v", err)
 	}
 	defer func() {
 		_ = domain.Free()
@@ -336,12 +336,12 @@ func (p *plannerAgentLibvirt) Remove() error {
 
 	if state, _, err := domain.GetState(); err == nil && state == libvirt.DOMAIN_RUNNING {
 		if err := domain.Destroy(); err != nil {
-			return fmt.Errorf("unable to destroy domain: %v", err)
+			return fmt.Errorf("failed to destroy domain: %v", err)
 		}
 	}
 
 	if err := domain.Undefine(); err != nil {
-		return fmt.Errorf("unable to undefine domain: %v", err)
+		return fmt.Errorf("failed to undefine domain: %v", err)
 	}
 
 	// Remove the ISO file if it exists
@@ -394,7 +394,7 @@ func NewPlannerService(configPath string) (*plannerService, error) {
 	_ = createConfigFile(configPath)
 	c, err := client.NewFromConfigFile(configPath)
 	if err != nil {
-		return nil, fmt.Errorf("creating client: %w", err)
+		return nil, fmt.Errorf("failed to create client: %w", err)
 	}
 
 	return &plannerService{c: c}, nil
@@ -410,11 +410,11 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
 	res, err := s.c.CreateSourceWithResponse(ctx, params)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
-		return nil, fmt.Errorf("error creating the source: %v", err)
+		return nil, fmt.Errorf("failed to create the source: %v", err)
 	}
 
 	if res.JSON201 == nil {
-		return nil, fmt.Errorf("error creating the source")
+		return nil, fmt.Errorf("failed to create the source")
 	}
 
 	return res.JSON201, nil
@@ -429,7 +429,7 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 
 	res, err := s.c.GetSourceWithResponse(ctx, id)
 	if err != nil || res.HTTPResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("error listing sources. response status code: %d", res.HTTPResponse.StatusCode)
+		return nil, fmt.Errorf("failed to list sources. response status code: %d", res.HTTPResponse.StatusCode)
 	}
 
 	return res.JSON200, nil
@@ -461,7 +461,7 @@ func createConfigFile(configPath string) error {
 	// Ensure the directory exists
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("creating directory structure: %w", err)
+		return fmt.Errorf("failed to create directory structure: %w", err)
 	}
 
 	// Create configuration

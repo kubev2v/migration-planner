@@ -67,13 +67,13 @@ func (c *Collector) run() {
 
 	credsData, err := os.ReadFile(credentialsFilePath)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error reading credentials file: %v\n", err)
+		zap.S().Named("collector").Errorf("failed to read credentials file: %v", err)
 		return
 	}
 
 	var creds config.Credentials
 	if err := json.Unmarshal(credsData, &creds); err != nil {
-		zap.S().Named("collector").Errorf("Error parsing credentials JSON: %v\n", err)
+		zap.S().Named("collector").Errorf("failed to parse credentials JSON: %v", err)
 		return
 	}
 	zap.S().Named("collector").Infof("Create Provider")
@@ -84,14 +84,14 @@ func (c *Collector) run() {
 	zap.S().Named("collector").Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error creating DB: %s", err)
+		zap.S().Named("collector").Errorf("failed to create DB: %v", err)
 		return
 	}
 
 	zap.S().Named("collector").Infof("vSphere collector")
 	collector, err := createCollector(db, provider, secret)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error running collector: %s", err)
+		zap.S().Named("collector").Errorf("failed to run the collector: %v", err)
 		return
 	}
 	defer collector.DB().Close(true)
@@ -101,7 +101,7 @@ func (c *Collector) run() {
 	vms := &[]vspheremodel.VM{}
 	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1, Predicate: libmodel.Eq("IsTemplate", false)})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
 		return
 	}
 
@@ -109,7 +109,7 @@ func (c *Collector) run() {
 	hosts := &[]vspheremodel.Host{}
 	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
 		return
 	}
 
@@ -117,7 +117,7 @@ func (c *Collector) run() {
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
 		return
 	}
 
@@ -125,7 +125,7 @@ func (c *Collector) run() {
 	about := &vspheremodel.About{}
 	err = collector.DB().Get(about)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database about table: %s", err)
+		zap.S().Named("collector").Errorf("failed to list database about table: %v", err)
 		return
 	}
 
@@ -139,7 +139,7 @@ func (c *Collector) run() {
 		zap.S().Named("collector").Infof("Run the validation of VMs")
 		vms, err = validation(vms, opaServer)
 		if err != nil {
-			zap.S().Named("collector").Errorf("Error running validation: %s", err)
+			zap.S().Named("collector").Errorf("failed to run validation: %v", err)
 			return
 		}
 	}
@@ -149,7 +149,7 @@ func (c *Collector) run() {
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
-		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %s", err)
+		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
 		return
 	}
 }

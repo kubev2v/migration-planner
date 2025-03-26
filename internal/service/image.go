@@ -70,8 +70,8 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	size, err := imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorf("error generating ova at GetImage: %s", err)
-		return server.GetImage500JSONResponse{Message: fmt.Sprintf("error generating image %s", err)}, nil
+		zap.S().Named("image_service").Errorf("failed to generate ova at GetImage: %s", err)
+		return server.GetImage500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
 
 	// Set proper headers of the OVA file:

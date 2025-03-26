@@ -42,7 +42,7 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, inven
 
 	newContents, err := json.Marshal(update)
 	if err != nil {
-		zap.S().Named("inventory").Errorf("failed marshalling new status: %v", err)
+		zap.S().Named("inventory").Errorf("failed to marshal new status: %v", err)
 	}
 	if bytes.Equal(u.prevStatus, newContents) {
 		zap.S().Named("inventory").Debug("Local status did not change, skipping service update")
@@ -51,7 +51,7 @@ func (u *InventoryUpdater) UpdateServiceWithInventory(ctx context.Context, inven
 
 	err = u.client.UpdateSourceStatus(ctx, u.sourceID, update)
 	if err != nil {
-		zap.S().Named("inventory").Errorf("failed updating status: %v", err)
+		zap.S().Named("inventory").Errorf("failed to update status: %v", err)
 		return
 	}
 

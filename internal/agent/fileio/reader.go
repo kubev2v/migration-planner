@@ -45,7 +45,7 @@ func checkPathExists(filePath string) error {
 		return fmt.Errorf("path does not exist: %s", filePath)
 	}
 	if err != nil {
-		return fmt.Errorf("error checking path: %w", err)
+		return fmt.Errorf("failed to check path: %w", err)
 	}
 
 	return nil

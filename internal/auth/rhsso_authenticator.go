@@ -136,5 +136,5 @@ func (rh *RHSSOAuthenticator) getOrgID(claims jwt.MapClaims) (string, error) {
 		return orgID, nil
 	}
 
-	return "", fmt.Errorf("organization id not found in the claims")
+	return "", fmt.Errorf("organization ID not found in claims")
 }
