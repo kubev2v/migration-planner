@@ -7,8 +7,9 @@ GO_CACHE := -v $${HOME}/go/migration-planner-go-cache:/opt/app-root/src/go:Z -v 
 TIMEOUT ?= 30m
 VERBOSE ?= false
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
-MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
+MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
+MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
 MIGRATION_PLANNER_UI_IMAGE_TAG ?= latest
@@ -16,7 +17,6 @@ MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
-REGISTRY_TAG ?= latest
 DOWNLOAD_RHCOS ?= true
 KUBECTL ?= kubectl
 IFACE ?= eth0
@@ -25,6 +25,7 @@ PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
+DEBUG_MODE ?= false
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -123,15 +124,12 @@ build-cli: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG)
+	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG)
+	$(PODMAN) build . -f $(if $(DEBUG_MODE),Containerfile.api-debug,Containerfile.api) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
-migration-planner-api-container: bin/.migration-planner-api-container
-migration-planner-agent-container: bin/.migration-planner-agent-container
-
-build-containers: migration-planner-api-container migration-planner-agent-container
+build-containers: bin/.migration-planner-api-container bin/.migration-planner-agent-container
 
 .PHONY: build-containers
 
@@ -144,16 +142,16 @@ quay-login:
 
 push-api-container: migration-planner-api-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
 push-agent-container: migration-planner-agent-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(REGISTRY_TAG); \
+		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
 push-containers: push-api-container push-agent-container
