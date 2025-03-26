@@ -156,6 +156,9 @@ storage:
           AutoUpdate=registry
           Exec= -config /agent/config/config.yaml
           PublishPort=3333:3333
+          {{ if .DebugMode }}
+          PublishPort=40001:40001
+          {{ end }}
           Volume=/home/core/.migration-planner:/agent:Z
           Volume=/var/lib/data:/agent/persistent-data:Z
           Environment=OPA_SERVER=127.0.0.1:8181
