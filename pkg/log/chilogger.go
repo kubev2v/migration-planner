@@ -23,18 +23,32 @@ func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
 			fn := func(w http.ResponseWriter, r *http.Request) {
 				ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
 				t1 := time.Now()
+				requestID := middleware.GetReqID(r.Context())
 				defer func() {
-					if r.Method != http.MethodGet {
-						logger.Infof(sugaredLogFormat,
-							middleware.GetReqID(r.Context()),
-							r.Method,
-							r.URL.Path,
-							r.Proto,
-							r.RemoteAddr,
-							statusLabel(ww.Status()),
-							ww.BytesWritten(),
-							time.Since(t1),
-						)
+					statusCode := ww.Status()
+					status := statusLabel(statusCode)
+					bytes := ww.BytesWritten()
+					latency := time.Since(t1)
+					args := []interface{}{
+						requestID,
+						r.Method,
+						r.URL.Path,
+						r.Proto,
+						r.RemoteAddr,
+						status,
+						bytes,
+						latency,
+					}
+					switch {
+					case statusCode >= 500:
+						logger.Errorf(sugaredLogFormat, args...)
+					case statusCode >= 400:
+						logger.Warnf(sugaredLogFormat, args...)
+					default:
+						if isDebugLog(r.Method, r.URL.Path) {
+							logger.Debugf(sugaredLogFormat, args...)
+						}
+						logger.Infof(sugaredLogFormat, args...)
 					}
 
 				}()
@@ -46,6 +60,10 @@ func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
 		log.Fatalf("Unknown logger passed in. Please provide *Zap.Logger or *Zap.SugaredLogger")
 	}
 	return nil
+}
+
+func isDebugLog(method string, path string) bool {
+	return method == http.MethodGet && path == "/health"
 }
 
 func statusLabel(status int) string {
