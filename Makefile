@@ -140,7 +140,7 @@ quay-login:
 		$(PODMAN) login --authfile $(DOCKER_AUTH_FILE) -u=$(QUAY_USER) -p=$(QUAY_TOKEN) quay.io; \
 	fi;
 
-push-api-container: migration-planner-api-container quay-login
+push-api-container: bin/.migration-planner-api-container quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
 		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
