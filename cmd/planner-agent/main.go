@@ -70,15 +70,18 @@ func (a *agentCmd) Execute() error {
 		logLvl = zap.NewAtomicLevelAt(zapcore.InfoLevel)
 	}
 
-	logger := log.InitLog(logLvl)
+	// logger := log.InitLog(logLvl)
+	logger := log.InitLog(logLvl).Named("agent")
 	defer func() { _ = logger.Sync() }()
 
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
+	sugar := logger.Sugar()
+
 	agentID, err := a.readFileFromPersistent(agentFilename)
 	if err != nil {
-		zap.S().Fatalf("failed to retreive agent_id: %v", err)
+		sugar.Fatalf("failed to retreive agent_id: %v", err)
 	}
 
 	// Try to read jwt from file.
@@ -86,12 +89,12 @@ func (a *agentCmd) Execute() error {
 	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
 	jwt, err := a.readFileFromVolatile(jwtFilename)
 	if err != nil {
-		zap.S().Errorf("failed to read jwt: %v", err)
+		sugar.Errorf("failed to read jwt: %v", err)
 	}
 
-	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
+	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config, sugar)
 	if err := agentInstance.Run(context.Background()); err != nil {
-		zap.S().Fatalf("running device agent: %v", err)
+		sugar.Fatalf("running device agent: %v", err)
 	}
 	return nil
 }

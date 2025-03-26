@@ -32,12 +32,13 @@ const (
 var version string
 
 // New creates a new agent.
-func New(id uuid.UUID, jwt string, config *config.Config) *Agent {
+func New(id uuid.UUID, jwt string, config *config.Config, logger *zap.SugaredLogger) *Agent {
 	return &Agent{
 		config:           config,
 		healtCheckStopCh: make(chan chan any),
 		id:               id,
 		jwt:              jwt,
+		logger:           logger.Named("agent"),
 	}
 }
 
@@ -48,13 +49,14 @@ type Agent struct {
 	credUrl          string
 	id               uuid.UUID
 	jwt              string
+	logger           *zap.SugaredLogger
 }
 
 func (a *Agent) Run(ctx context.Context) error {
 	var err error
-	zap.S().Infof("Starting agent: %s", version)
-	defer zap.S().Infof("Agent stopped")
-	zap.S().Infof("Configuration: %s", a.config.String())
+	a.logger.Infof("Starting agent: %s", version)
+	defer a.logger.Infof("Agent stopped")
+	a.logger.Infof("Configuration: %s", a.config.String())
 
 	defer utilruntime.HandleCrash()
 
@@ -74,7 +76,7 @@ func (a *Agent) Run(ctx context.Context) error {
 	case <-ctx.Done():
 	}
 
-	zap.S().Info("stopping agent...")
+	a.logger.Infof("stopping agent...")
 
 	a.Stop()
 	cancel()
@@ -87,12 +89,12 @@ func (a *Agent) Stop() {
 	a.server.Stop(serverCh)
 
 	<-serverCh
-	zap.S().Info("server stopped")
+	a.logger.Infof("server stopped")
 
 	c := make(chan any)
 	a.healtCheckStopCh <- c
 	<-c
-	zap.S().Info("health check stopped")
+	a.logger.Infof("health check stopped")
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
@@ -109,7 +111,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 	cert, key, err := NewSelfSignedCertificateProvider(credUrl).GetCertificate(time.Now().AddDate(1, 0, 0))
 	if err != nil {
-		zap.S().Named("agent").Errorf("failed to generate certificate: %s", err)
+		a.logger.Errorf("failed to generate certificate: %s", err)
 	}
 
 	// start server
@@ -125,7 +127,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	if credUrl != nil {
 		a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrl.IP.String(), defaultAgentPort)
 	}
-	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
+	a.logger.Infof("Discovered Agent IP address: %s", a.credUrl)
 
 	// start the health check
 	healthChecker, err := service.NewHealthChecker(
@@ -134,7 +136,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 		time.Duration(a.config.HealthCheckInterval*int64(time.Second)),
 	)
 	if err != nil {
-		zap.S().Fatalf("failed to start health check: %w", err)
+		a.logger.Fatalf("failed to start health check: %w", err)
 	}
 
 	// TODO refactor health checker to call it from the main goroutine
@@ -171,12 +173,12 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, a.credUrl); err != nil {
 				if errors.Is(err, client.ErrSourceGone) {
-					zap.S().Info("Source is gone..Stop sending requests")
+					a.logger.Infof("Source is gone..Stop sending requests")
 					// stop the server and the healthchecker
 					a.Stop()
 					break
 				}
-				zap.S().Errorf("unable to update agent status: %s", err)
+				a.logger.Errorf("unable to update agent status: %s", err)
 				continue // skip inventory update if we cannot update agent's state.
 			}
 
@@ -191,7 +193,7 @@ func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
 	// Parse the service URL
 	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
 	if err != nil {
-		zap.S().Errorf("error parsing service URL: %v", err)
+		a.logger.Errorf("error parsing service URL: %v", err)
 		return nil
 	}
 
@@ -204,7 +206,7 @@ func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
 	// Connect to service
 	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%s", parsedURL.Hostname(), port))
 	if err != nil {
-		zap.S().Errorf("failed connecting to migration planner: %v", err)
+		a.logger.Errorf("failed connecting to migration planner: %v", err)
 		return nil
 	}
 	defer conn.Close()

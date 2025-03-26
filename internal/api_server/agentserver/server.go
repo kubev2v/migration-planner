@@ -12,7 +12,6 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
-	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
@@ -76,7 +75,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
 		zapchi.Logger(zap.S(), "router_agent"),
-		auth.NewAgentAuthenticator(s.store).Authenticator,
+		// auth.NewAgentAuthenticator(s.store).Authenticator,
 		middleware.RequestID,
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),

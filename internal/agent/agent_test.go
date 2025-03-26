@@ -19,6 +19,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
 )
 
 var _ = Describe("Agent", func() {
@@ -77,7 +78,8 @@ var _ = Describe("Agent", func() {
 			config.PlannerService.Service.Server = testHttpServer.URL
 
 			jwt := ""
-			a := agent.New(agentID, jwt, &config)
+			logger := zap.S().Named("agent")
+			a := agent.New(agentID, jwt, &config, logger)
 			ctx, cancel := context.WithTimeout(context.TODO(), 30*time.Second)
 			go func() {
 				err := a.Run(ctx)
