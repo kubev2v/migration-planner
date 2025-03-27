@@ -71,7 +71,7 @@ func (a *agentCmd) Execute() error {
 	}
 
 	// logger := log.InitLog(logLvl)
-	logger := log.InitLog(logLvl).Named("agent")
+	logger := log.InitLog(logLvl).Named("")
 	defer func() { _ = logger.Sync() }()
 
 	undo := zap.ReplaceGlobals(logger)
