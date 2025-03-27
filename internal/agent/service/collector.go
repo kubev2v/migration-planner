@@ -32,12 +32,14 @@ type Collector struct {
 	dataDir        string
 	credentialsDir string
 	once           sync.Once
+	logger         *zap.SugaredLogger
 }
 
 func NewCollector(dataDir string, credentialsDir string) *Collector {
 	return &Collector{
 		dataDir:        dataDir,
 		credentialsDir: credentialsDir,
+		logger:         zap.S().Named("collector"),
 	}
 }
 
@@ -62,94 +64,94 @@ func (c *Collector) Collect(ctx context.Context) {
 
 func (c *Collector) run() {
 	credentialsFilePath := filepath.Join(c.credentialsDir, config.CredentialsFile)
-	zap.S().Named("collector").Infof("Waiting for credentials")
+	c.logger.Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 
 	credsData, err := os.ReadFile(credentialsFilePath)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error reading credentials file: %v\n", err)
+		c.logger.Errorf("Error reading credentials file: %v\n", err)
 		return
 	}
 
 	var creds config.Credentials
 	if err := json.Unmarshal(credsData, &creds); err != nil {
-		zap.S().Named("collector").Errorf("Error parsing credentials JSON: %v\n", err)
+		c.logger.Errorf("Error parsing credentials JSON: %v\n", err)
 		return
 	}
-	zap.S().Named("collector").Infof("Create Provider")
+	c.logger.Infof("Create Provider")
 	provider := getProvider(creds)
 
-	zap.S().Named("collector").Infof("Create Secret")
+	c.logger.Infof("Create Secret")
 	secret := getSecret(creds)
-	zap.S().Named("collector").Infof("Create DB")
+	c.logger.Infof("Create DB")
 	db, err := createDB(provider)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error creating DB: %s", err)
+		c.logger.Errorf("Error creating DB: %s", err)
 		return
 	}
 
-	zap.S().Named("collector").Infof("vSphere collector")
+	c.logger.Infof("vSphere collector")
 	collector, err := createCollector(db, provider, secret)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error running collector: %s", err)
+		c.logger.Errorf("Error running collector: %s", err)
 		return
 	}
 	defer collector.DB().Close(true)
 	defer collector.Shutdown()
 
-	zap.S().Named("collector").Infof("List VMs")
+	c.logger.Infof("List VMs")
 	vms := &[]vspheremodel.VM{}
-	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1, Predicate: libmodel.Eq("IsTemplate", false)})
+	err = collector.DB().List(vms, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		c.logger.Errorf("Error list database: %s", err)
 		return
 	}
 
-	zap.S().Named("collector").Infof("List Hosts")
+	c.logger.Infof("List Hosts")
 	hosts := &[]vspheremodel.Host{}
 	err = collector.DB().List(hosts, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		c.logger.Errorf("Error list database: %s", err)
 		return
 	}
 
-	zap.S().Named("collector").Infof("List Clusters")
+	c.logger.Infof("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database: %s", err)
+		c.logger.Errorf("Error list database: %s", err)
 		return
 	}
 
-	zap.S().Named("collector").Infof("Get About")
+	c.logger.Infof("Get About")
 	about := &vspheremodel.About{}
 	err = collector.DB().Get(about)
 	if err != nil {
-		zap.S().Named("collector").Errorf("Error list database about table: %s", err)
+		c.logger.Errorf("Error list database about table: %s", err)
 		return
 	}
 
-	zap.S().Named("collector").Infof("Create inventory")
+	c.logger.Infof("Create inventory")
 
 	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
 
 	opaServerAlive := c.getOpaServerStatus()
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
 	if opaServerAlive {
-		zap.S().Named("collector").Infof("Run the validation of VMs")
+		c.logger.Infof("Run the validation of VMs")
 		vms, err = validation(vms, opaServer)
 		if err != nil {
-			zap.S().Named("collector").Errorf("Error running validation: %s", err)
+			c.logger.Errorf("Error running validation: %s", err)
 			return
 		}
 	}
 
-	zap.S().Named("collector").Infof("Fill the inventory object with more data")
+	c.logger.Infof("Fill the inventory object with more data")
 	fillInventoryObjectWithMoreData(vms, inv)
 
-	zap.S().Named("collector").Infof("Write the inventory to output file")
+	c.logger.Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
-		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %s", err)
+		c.logger.Errorf("Fill the inventory object with more data: %s", err)
 		return
 	}
 }
@@ -589,14 +591,14 @@ func waitForFile(filename string) {
 
 func (c *Collector) getOpaServerStatus() bool {
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	zap.S().Named("collector").Infof("Check if opaServer is responding")
+	c.logger.Infof("Check if opaServer is responding")
 	resp, err := http.Get("http://" + opaServer + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
+		c.logger.Errorf("OPA server %s is not responding", opaServer)
 		return false
 	}
 	defer resp.Body.Close()
-	zap.S().Named("collector").Infof("OPA server %s is alive", opaServer)
+	c.logger.Infof("OPA server %s is alive", opaServer)
 	return true
 }
 

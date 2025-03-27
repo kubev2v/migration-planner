@@ -31,20 +31,24 @@ type Server struct {
 	configuration *config.Config
 	restServer    *http.Server
 	tlsConfig     *tls.Config
+	logger        *zap.SugaredLogger
 }
 
 func NewServer(port int, configuration *config.Config, cert *x509.Certificate, certPrivateKey *rsa.PrivateKey) *Server {
+	logger := zap.S().Named("server")
+
 	s := &Server{
 		port:          port,
 		dataFolder:    configuration.DataDir,
 		wwwFolder:     configuration.WwwDir,
 		configuration: configuration,
+		logger:        logger,
 	}
 
 	if cert != nil && certPrivateKey != nil {
 		tlsConfig, err := getTlsConfig(cert, certPrivateKey)
 		if err != nil {
-			zap.S().Named("server").Errorf("failed to create tls configuration: %s", err)
+			s.logger.Errorf("failed to create tls configuration: %s", err)
 			return s
 		}
 
@@ -65,17 +69,17 @@ func (s *Server) Start(statusUpdater *service.StatusUpdater) {
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 
 	if s.tlsConfig != nil {
-		zap.S().Named("server").Info("tls configured")
+		s.logger.Infof("tls configured")
 		s.restServer.TLSConfig = s.tlsConfig
 		if err := s.restServer.ListenAndServeTLS("", ""); err != nil && err != http.ErrServerClosed {
-			zap.S().Named("server").Fatalf("failed to start server with tls: %w", err)
+			s.logger.Fatalf("failed to start server with tls: %w", err)
 		}
 	}
 
 	// Run the server without tls
 	err := s.restServer.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
-		zap.S().Named("server").Fatalf("failed to start server: %w", err)
+		s.logger.Fatalf("failed to start server: %w", err)
 	}
 }
 
@@ -86,7 +90,7 @@ func (s *Server) Stop(stopCh chan any) {
 	go func() {
 		err := s.restServer.Shutdown(shutdownCtx)
 		if err != nil {
-			zap.S().Named("server").Errorf("failed to graceful shutdown the server: %s", err)
+			s.logger.Errorf("failed to graceful shutdown the server: %s", err)
 		}
 		close(doneCh)
 	}()
