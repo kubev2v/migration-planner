@@ -4,6 +4,9 @@ apiVersion: template.openshift.io/v1
 metadata:
   name: assisted-migration-service
 parameters:
+  - name: DEBUG_MODE
+    description: If set the debug port 400001 will be opened on Agent VM
+    value: ""
   - name: MIGRATION_PLANNER_IMAGE
     required: true
   - name: MIGRATION_PLANNER_API_IMAGE_PULL_POLICY
@@ -180,6 +183,8 @@ objects:
                   value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
+                - name: DEBUG_MODE
+                  value: ${DEBUG_MODE}
                 - name: PERSISTENT_DISK_DEVICE
                   value: ${PERSISTENT_DISK_DEVICE}
                 - name:  INSECURE_REGISTRY
