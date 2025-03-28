@@ -211,6 +211,12 @@ objects:
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}
+                - name: MIGRATION_PLANNER_PRIVATE_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: migration-planner-private-key-secret
+                      key: private-key
+                      optional: true
                 - name: MIGRATION_PLANNER_JWK_URL
                   value: ${MIGRATION_PLANNER_JWK_URL}
                 # DB Config values

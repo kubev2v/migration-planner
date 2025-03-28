@@ -43,12 +43,12 @@ func newTokenCmd() *cobra.Command {
 		Use:   "token",
 		Short: "Generate a jwt",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			privateKey, err := parsePrivateKey(o.PrivateKey)
+			privateKey, err := ParsePrivateKey(o.PrivateKey)
 			if err != nil {
 				return err
 			}
 
-			token, err := generateToken(o.Username, o.Organization, privateKey)
+			token, err := GenerateToken(o.Username, o.Organization, privateKey)
 			if err != nil {
 				return err
 			}
@@ -87,7 +87,7 @@ func newPrivateKeyCmd() *cobra.Command {
 	}
 }
 
-func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
+func ParsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode([]byte(content))
 	key, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 	if err != nil {
@@ -96,7 +96,7 @@ func parsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-func generateToken(username, organization string, privateKey *rsa.PrivateKey) (string, error) {
+func GenerateToken(username, organization string, privateKey *rsa.PrivateKey) (string, error) {
 	type TokenClaims struct {
 		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id"`
