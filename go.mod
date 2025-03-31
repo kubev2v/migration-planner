@@ -162,7 +162,7 @@ require (
 )
 
 replace (
-	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20241129095927-4890e072e015
+	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250424071254-ca49c38ba1ca
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.34.1
 )

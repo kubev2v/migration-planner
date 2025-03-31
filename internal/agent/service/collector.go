@@ -34,6 +34,14 @@ type Collector struct {
 	once           sync.Once
 }
 
+type DatastoreInfo struct {
+	DiskName        string `json:"diskName"`
+	FreeCapacityGB  int    `json:"freeCapacityGB"`
+	TotalCapacityGB int    `json:"totalCapacityGB"`
+	Type            string `json:"type"`
+	Vendor          string `json:"vendor"`
+}
+
 func NewCollector(dataDir string, credentialsDir string) *Collector {
 	return &Collector{
 		dataDir:        dataDir,
@@ -229,7 +237,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			}{},
 		},
 		Infra: apiplanner.Infra{
-			Datastores:      getDatastores(collector),
+			Datastores:      getDatastores(hosts, collector),
 			HostPowerStates: getHostPowerStates(*hosts),
 			TotalHosts:      len(*hosts),
 			TotalClusters:   len(*clusters),
@@ -369,27 +377,46 @@ func getHostPowerStates(hosts []vspheremodel.Host) map[string]int {
 	return states
 }
 
-func getDatastores(collector *vsphere.Collector) []struct {
-	FreeCapacityGB  int    `json:"freeCapacityGB"`
-	TotalCapacityGB int    `json:"totalCapacityGB"`
-	Type            string `json:"type"`
-} {
+// findVendorBasedOnNaa iterate through host luns and find the vendor of the lun of stoarge
+func findVendorBasedOnNaa(hosts []vspheremodel.Host, names []string) string {
+	if len(names) == 0 {
+		return "N/A"
+	}
+
+	for _, host := range hosts {
+		for _, disk := range host.HostScsiDisks {
+			if disk.CanonicalName == names[0] {
+				return disk.Vendor
+			}
+		}
+	}
+
+	return "N/A"
+}
+
+func getNaa(ds *vspheremodel.Datastore) string {
+	if len(ds.BackingDevicesNames) > 0 {
+		return ds.BackingDevicesNames[0]
+	}
+
+	return "N/A"
+}
+
+func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
 	datastores := &[]vspheremodel.Datastore{}
 	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
 		return nil
 	}
-	res := []struct {
-		FreeCapacityGB  int    `json:"freeCapacityGB"`
-		TotalCapacityGB int    `json:"totalCapacityGB"`
-		Type            string `json:"type"`
-	}{}
+	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
-		res = append(res, struct {
-			FreeCapacityGB  int    `json:"freeCapacityGB"`
-			TotalCapacityGB int    `json:"totalCapacityGB"`
-			Type            string `json:"type"`
-		}{TotalCapacityGB: int(ds.Capacity / 1024 / 1024 / 1024), FreeCapacityGB: int(ds.Free / 1024 / 1024 / 1024), Type: ds.Type})
+		res = append(res, apiplanner.Datastore{
+			TotalCapacityGB: int(ds.Capacity / 1024 / 1024 / 1024),
+			FreeCapacityGB:  int(ds.Free / 1024 / 1024 / 1024),
+			Type:            ds.Type,
+			Vendor:          findVendorBasedOnNaa(*hosts, ds.BackingDevicesNames),
+			DiskId:          getNaa(&ds),
+		})
 	}
 
 	return res

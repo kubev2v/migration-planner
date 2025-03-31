@@ -48,6 +48,15 @@ type AgentProxy struct {
 	NoProxy  *string `json:"noProxy,omitempty"`
 }
 
+// Datastore defines model for Datastore.
+type Datastore struct {
+	DiskId          string `json:"diskId"`
+	FreeCapacityGB  int    `json:"freeCapacityGB"`
+	TotalCapacityGB int    `json:"totalCapacityGB"`
+	Type            string `json:"type"`
+	Vendor          string `json:"vendor"`
+}
+
 // Error defines model for Error.
 type Error struct {
 	// Message Error message
@@ -56,11 +65,7 @@ type Error struct {
 
 // Infra defines model for Infra.
 type Infra struct {
-	Datastores []struct {
-		FreeCapacityGB  int    `json:"freeCapacityGB"`
-		TotalCapacityGB int    `json:"totalCapacityGB"`
-		Type            string `json:"type"`
-	} `json:"datastores"`
+	Datastores      []Datastore    `json:"datastores"`
 	HostPowerStates map[string]int `json:"hostPowerStates"`
 	HostsPerCluster []int          `json:"hostsPerCluster"`
 	Networks        []struct {
