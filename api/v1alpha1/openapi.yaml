@@ -589,18 +589,27 @@ components:
         datastores:
           type: array
           items:
-            type: object
-            required:
-              - type
-              - totalCapacityGB
-              - freeCapacityGB
-            properties:
-              type:
-                type: string
-              totalCapacityGB:
-                type: integer
-              freeCapacityGB:
-                type: integer
+            $ref: '#/components/schemas/Datastore'
+
+    Datastore:
+      type: object
+      required:
+        - type
+        - totalCapacityGB
+        - freeCapacityGB
+        - vendor
+        - diskId
+      properties:
+        type:
+          type: string
+        totalCapacityGB:
+          type: integer
+        freeCapacityGB:
+          type: integer
+        vendor:
+          type: string
+        diskId:
+          type: string
 
     VMResourceBreakdown:
       type: object
