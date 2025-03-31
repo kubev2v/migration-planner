@@ -1,4 +1,4 @@
-package chilogger
+package log
 
 import (
 	"fmt"
