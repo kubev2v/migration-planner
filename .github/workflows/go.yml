@@ -63,11 +63,11 @@ jobs:
 
     - name: Migrate the db
       run: |
-        make migrate
+        MIGRATION_PLANNER_MIGRATIONS_FOLDER=${{ github.workspace }}/pkg/migrations/sql make migrate
 
     - name: Test
       run: |
-        make test
+        MIGRATION_PLANNER_MIGRATIONS_FOLDER=${{ github.workspace }}/pkg/migrations/sql make test
 
     - name: Checking generated files are up to date
       run: |
