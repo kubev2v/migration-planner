@@ -20,10 +20,6 @@ func NewCachePrivateKeyStore(delegate PrivateKey) PrivateKey {
 	}
 }
 
-func (p *CachePrivateKeyStore) InitialMigration(ctx context.Context) error {
-	return p.delegate.InitialMigration(ctx)
-}
-
 func (p *CachePrivateKeyStore) Create(ctx context.Context, privateKey model.Key) (*model.Key, error) {
 	r, err := p.delegate.Create(ctx, privateKey)
 	if err != nil {

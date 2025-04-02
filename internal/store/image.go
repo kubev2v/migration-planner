@@ -9,7 +9,6 @@ import (
 
 type ImageInfra interface {
 	Create(ctx context.Context, imageInfra model.ImageInfra) (*model.ImageInfra, error)
-	InitialMigration(context.Context) error
 }
 
 type ImageInfraStore struct {
@@ -18,10 +17,6 @@ type ImageInfraStore struct {
 
 func NewImageInfraStore(db *gorm.DB) ImageInfra {
 	return &ImageInfraStore{db: db}
-}
-
-func (i *ImageInfraStore) InitialMigration(ctx context.Context) error {
-	return i.getDB(ctx).AutoMigrate(&model.ImageInfra{})
 }
 
 func (i *ImageInfraStore) Create(ctx context.Context, image model.ImageInfra) (*model.ImageInfra, error) {

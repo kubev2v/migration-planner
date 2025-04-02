@@ -73,6 +73,9 @@ parameters:
     description: Define the backend authentication mechanism
   - name: MIGRATION_PLANNER_JWK_URL
     description: URL of the x.509 certificate chain that was used to verify the digital signature of the JWT
+  - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
+    description: Path to the migration folder containing the sql files used to migrate the db
+    value: "/app/migrations"
 
 objects:
   - kind: ServiceAccount
@@ -213,6 +216,8 @@ objects:
                   value: ${MIGRATION_PLANNER_KAFKA_VERSION}
                 - name: MIGRATION_PLANNER_KAFKA_CLIENT_ID
                   value: ${MIGRATION_PLANNER_KAFKA_CLIENT_ID}
+                - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
+                  value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}

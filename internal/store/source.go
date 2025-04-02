@@ -22,7 +22,6 @@ type Source interface {
 	Get(ctx context.Context, id uuid.UUID) (*model.Source, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, source model.Source) (*model.Source, error)
-	InitialMigration(context.Context) error
 }
 
 type SourceStore struct {
@@ -34,10 +33,6 @@ var _ Source = (*SourceStore)(nil)
 
 func NewSource(db *gorm.DB) Source {
 	return &SourceStore{db: db}
-}
-
-func (s *SourceStore) InitialMigration(ctx context.Context) error {
-	return s.getDB(ctx).AutoMigrate(&model.Source{})
 }
 
 func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error) {

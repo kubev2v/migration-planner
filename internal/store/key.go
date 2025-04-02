@@ -16,7 +16,6 @@ type PrivateKey interface {
 	Get(ctx context.Context, orgID string) (*model.Key, error)
 	Delete(ctx context.Context, orgID string) error
 	GetPublicKeys(ctx context.Context) (map[string]crypto.PublicKey, error)
-	InitialMigration(context.Context) error
 }
 
 type PrivateKeyStore struct {
@@ -25,10 +24,6 @@ type PrivateKeyStore struct {
 
 func NewPrivateKey(db *gorm.DB) PrivateKey {
 	return &PrivateKeyStore{db: db}
-}
-
-func (p *PrivateKeyStore) InitialMigration(ctx context.Context) error {
-	return p.getDB(ctx).AutoMigrate(&model.Key{})
 }
 
 func (p *PrivateKeyStore) Create(ctx context.Context, privateKey model.Key) (*model.Key, error) {
