@@ -24,7 +24,6 @@ type Agent interface {
 	Get(ctx context.Context, id uuid.UUID) (*model.Agent, error)
 	Update(ctx context.Context, agent model.Agent) (*model.Agent, error)
 	Create(ctx context.Context, agent model.Agent) (*model.Agent, error)
-	InitialMigration(context.Context) error
 }
 
 type AgentStore struct {
@@ -33,10 +32,6 @@ type AgentStore struct {
 
 func NewAgentSource(db *gorm.DB) Agent {
 	return &AgentStore{db: db}
-}
-
-func (a *AgentStore) InitialMigration(ctx context.Context) error {
-	return a.getDB(ctx).AutoMigrate(&model.Agent{})
 }
 
 // List lists all the agents.
