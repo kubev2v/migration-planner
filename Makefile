@@ -100,7 +100,10 @@ lint: tools
 	$(GOBIN)/golangci-lint run -v --timeout 2m
 
 migrate:
-	./bin/planner-api migrate --config $(PWD)/test/config.yaml
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
+
+run:
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
