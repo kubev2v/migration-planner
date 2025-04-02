@@ -4,6 +4,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
@@ -33,7 +34,7 @@ var migrateCmd = &cobra.Command{
 		store := store.NewStore(db)
 		defer store.Close()
 
-		if err := store.InitialMigration(); err != nil {
+		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
 			zap.S().Fatalf("running initial migration: %v", err)
 		}
 
