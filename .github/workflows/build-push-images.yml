@@ -12,7 +12,7 @@ jobs:
     env:
       REGISTRY: quay.io
       # Set tag to the last commit sha on main branch, otherwise tag will be the branch name
-      REGISTRY_TAG: ${{ (github.head_ref||github.ref_name)=='main' && github.sha || (github.head_ref||github.ref_name) }}
+      MIGRATION_PLANNER_IMAGE_TAG: ${{ (github.head_ref||github.ref_name)=='main' && github.sha || (github.head_ref||github.ref_name) }}
       REGISTRY_ORG: kubev2v
     steps:
       - name: Checkout forklift
@@ -28,7 +28,7 @@ jobs:
       - name: Build and push images to quay.io
         run: |
           cd ${GITHUB_WORKSPACE}
-          make build-containers REGISTRY_TAG=latest
-          make build-containers REGISTRY_TAG=$REGISTRY_TAG LABEL="quay.expires-after=10d"
-          make push-containers REGISTRY_TAG=latest
-          make push-containers REGISTRY_TAG=$REGISTRY_TAG LABEL="quay.expires-after=10d"
+          make build-containers MIGRATION_PLANNER_IMAGE_TAG=latest
+          make build-containers MIGRATION_PLANNER_IMAGE_TAG=$MIGRATION_PLANNER_IMAGE_TAG LABEL="quay.expires-after=10d"
+          make push-containers MIGRATION_PLANNER_IMAGE_TAG=latest
+          make push-containers MIGRATION_PLANNER_IMAGE_TAG=$MIGRATION_PLANNER_IMAGE_TAG LABEL="quay.expires-after=10d"
