@@ -8,6 +8,6 @@ cd "$PARENT_DIR"
 
 export MIGRATION_PLANNER_API_IMAGE="${MIGRATION_PLANNER_API_IMAGE:-quay.io/app-sre/migration-planner-api}"
 export MIGRATION_PLANNER_AGENT_IMAGE="${MIGRATION_PLANNER_AGENT_IMAGE:-quay.io/app-sre/migration-planner-agent}"
-export REGISTRY_TAG="${REGISTRY_TAG:-pr-test}"
+export MIGRATION_PLANNER_IMAGE_TAG="${MIGRATION_PLANNER_IMAGE_TAG:-pr-test}"
 
 make build-containers
