@@ -61,9 +61,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	}
 
 	imageBuilder := image.NewImageBuilder(source.ID)
-	if source.ImageInfra.SshPublicKey != "" {
-		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
-	}
+	imageBuilder.WithImageInfra(source.ImageInfra)
 
 	if err := internalService.GenerateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
 		return imageServer.GetImageByToken500JSONResponse{}, nil
