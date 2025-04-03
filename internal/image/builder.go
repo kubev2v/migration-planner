@@ -13,6 +13,7 @@ import (
 	"github.com/coreos/butane/config"
 	"github.com/coreos/butane/config/common"
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
@@ -311,6 +312,28 @@ func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (int, error) {
 	}
 
 	return isoSize + ovfSize + persistentDiskSize, nil
+}
+
+func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder {
+	if imageInfra.SshPublicKey != "" {
+		b.WithSshKey(imageInfra.SshPublicKey)
+	}
+
+	if imageInfra.HttpProxyUrl != "" || imageInfra.HttpsProxyUrl != "" || imageInfra.NoProxyDomains != "" {
+		b.WithProxy(
+			Proxy{
+				HttpUrl:       imageInfra.HttpProxyUrl,
+				HttpsUrl:      imageInfra.HttpsProxyUrl,
+				NoProxyDomain: imageInfra.NoProxyDomains,
+			},
+		)
+	}
+
+	if imageInfra.CertificateChain != "" {
+		b.WithCertificateChain(imageInfra.CertificateChain)
+	}
+
+	return b
 }
 
 func (b *ImageBuilder) WithSshKey(sshKey string) *ImageBuilder {
