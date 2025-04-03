@@ -46,8 +46,8 @@ make push-containers
 
 Optional:
 
-By default, the registry tag is "latest." You can customize the registry tag by setting REGISTRY_TAG=<REPLACE_WITH_CUSTOM_TAG_VALUE>
-For example: `make build-containers REGISTRY_TAG=v1` and then push with `make push-containers REGISTRY_TAG=v1`
+By default, the registry tag is "latest." You can customize the registry tag by setting MIGRATION_PLANNER_IMAGE_TAG=<REPLACE_WITH_CUSTOM_TAG_VALUE>
+For example: `make build-containers MIGRATION_PLANNER_IMAGE_TAG=v1` and then push with `make push-containers MIGRATION_PLANNER_IMAGE_TAG=v1`
 
 ### migration-planner-ui:
 
