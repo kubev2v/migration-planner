@@ -5,9 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"net/http"
 	"strconv"
+
+	"github.com/kubev2v/migration-planner/internal/store/model"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -58,10 +59,7 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	}
 
 	imageBuilder := image.NewImageBuilder(source.ID)
-
-	if source.ImageInfra.SshPublicKey != "" {
-		imageBuilder = imageBuilder.WithSshKey(source.ImageInfra.SshPublicKey)
-	}
+	imageBuilder.WithImageInfra(source.ImageInfra)
 
 	if err := GenerateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
 		return server.GetImage500JSONResponse{}, nil
