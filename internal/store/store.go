@@ -16,7 +16,6 @@ type Store interface {
 	ImageInfra() ImageInfra
 	PrivateKey() PrivateKey
 	Seed() error
-	InitialMigration() error
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
 }
@@ -57,33 +56,6 @@ func (s *DataStore) PrivateKey() PrivateKey {
 
 func (s *DataStore) ImageInfra() ImageInfra {
 	return s.imageInfra
-}
-
-func (s *DataStore) InitialMigration() error {
-	ctx, err := s.NewTransactionContext(context.Background())
-	if err != nil {
-		return err
-	}
-
-	if err := s.Source().InitialMigration(ctx); err != nil {
-		_, _ = Rollback(ctx)
-		return err
-	}
-
-	if err := s.Agent().InitialMigration(ctx); err != nil {
-		return err
-	}
-
-	if err := s.ImageInfra().InitialMigration(ctx); err != nil {
-		return err
-	}
-
-	if err := s.PrivateKey().InitialMigration(ctx); err != nil {
-		return err
-	}
-
-	_, err = Commit(ctx)
-	return err
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {

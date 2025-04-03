@@ -31,6 +31,7 @@ type svcConfig struct {
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
 	Kafka                kafkaConfig
 	Auth                 Auth
+	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 }
 
 type kafkaConfig struct {
