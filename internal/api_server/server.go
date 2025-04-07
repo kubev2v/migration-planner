@@ -90,12 +90,6 @@ func (s *Server) Run(ctx context.Context) error {
 
 	router.Use(
 		metricMiddleware.Handler,
-		authenticator.Authenticator,
-		middleware.RequestID,
-		log.Logger(zap.S(), "router_api"),
-		middleware.Recoverer,
-		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		WithResponseWriter,
 		cors.Handler(cors.Options{
 			AllowedOrigins:   []string{"https://console.stage.redhat.com"},
 			AllowedMethods:   []string{"GET", "PUT", "POST", "OPTIONS"},
@@ -103,6 +97,12 @@ func (s *Server) Run(ctx context.Context) error {
 			AllowCredentials: true,
 			MaxAge:           300,
 		}),
+		authenticator.Authenticator,
+		middleware.RequestID,
+		log.Logger(zap.S(), "router_api"),
+		middleware.Recoverer,
+		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
+		WithResponseWriter,
 	)
 
 	h := service.NewServiceHandler(s.store, s.evWriter)
