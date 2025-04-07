@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -95,6 +96,13 @@ func (s *Server) Run(ctx context.Context) error {
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,
+		cors.Handler(cors.Options{
+			AllowedOrigins:   []string{"https://console.stage.redhat.com"},
+			AllowedMethods:   []string{"GET", "PUT", "POST", "OPTIONS"},
+			AllowedHeaders:   []string{"*"},
+			AllowCredentials: true,
+			MaxAge:           300,
+		}),
 	)
 
 	h := service.NewServiceHandler(s.store, s.evWriter)
