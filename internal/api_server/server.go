@@ -91,7 +91,7 @@ func (s *Server) Run(ctx context.Context) error {
 	router.Use(
 		metricMiddleware.Handler,
 		cors.Handler(cors.Options{
-			AllowedOrigins:   []string{"https://console.stage.redhat.com"},
+			AllowedOrigins:   []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
 			AllowedMethods:   []string{"GET", "PUT", "POST", "DELETE", "OPTIONS"},
 			AllowedHeaders:   []string{"*"},
 			AllowCredentials: true,
