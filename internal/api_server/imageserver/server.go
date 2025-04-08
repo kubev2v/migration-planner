@@ -81,7 +81,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,
 		cors.Handler(cors.Options{
-			AllowedOrigins: []string{"https://console.stage.redhat.com"},
+			AllowedOrigins: []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
 			AllowedMethods: []string{"GET", "OPTIONS"},
 			AllowedHeaders: []string{"*"},
 			MaxAge:         300,
