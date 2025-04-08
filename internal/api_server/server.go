@@ -92,7 +92,7 @@ func (s *Server) Run(ctx context.Context) error {
 		metricMiddleware.Handler,
 		cors.Handler(cors.Options{
 			AllowedOrigins:   []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
-			AllowedMethods:   []string{"GET", "PUT", "POST", "DELETE", "OPTIONS"},
+			AllowedMethods:   []string{"GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"},
 			AllowedHeaders:   []string{"*"},
 			AllowCredentials: true,
 			MaxAge:           300,
