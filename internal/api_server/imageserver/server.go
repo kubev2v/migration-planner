@@ -4,13 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/kubev2v/migration-planner/pkg/log"
 	"net"
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/log"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/image"
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
@@ -78,6 +80,12 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,
+		cors.Handler(cors.Options{
+			AllowedOrigins: []string{"https://console.stage.redhat.com"},
+			AllowedMethods: []string{"GET", "OPTIONS"},
+			AllowedHeaders: []string{"*"},
+			MaxAge:         300,
+		}),
 	)
 
 	h := service.NewImageHandler(s.store, s.evWriter, s.cfg)
