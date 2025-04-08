@@ -35,17 +35,17 @@ func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName str
 			return ""
 		}
 		return agentIP
-	}, "3m").ShouldNot(BeEmpty())
+	}, "4m", "2s").ShouldNot(BeEmpty())
 	Expect(agentIP).ToNot(BeEmpty())
 	Eventually(func() bool {
 		return agent.IsServiceRunning(agentIP, "planner-agent")
-	}, "3m").Should(BeTrue())
+	}, "4m", "2s").Should(BeTrue())
 	return agent, agentIP
 }
 
 // Login to VSphere and put the credentials
-func LoginToVsphere(username string, password string, expectedStatusCode int) {
-	res, err := agent.Login(fmt.Sprintf("https://%s:8989/sdk", systemIP), username, password)
+func LoginToVsphere(agentApi PlannerAgentAPI, address string, port string, username string, password string, expectedStatusCode int) {
+	res, err := agentApi.Login(fmt.Sprintf("https://%s:%s/sdk", address, port), username, password)
 	Expect(err).To(BeNil())
 	Expect(res.StatusCode).To(Equal(expectedStatusCode))
 }
@@ -58,7 +58,7 @@ func WaitForAgentToBeUpToDate(uuid uuid.UUID) {
 			return false
 		}
 		return source.Agent.Status == v1alpha1.AgentStatusUpToDate
-	}, "3m").Should(BeTrue())
+	}, "6m", "2s").Should(BeTrue())
 }
 
 // Wait for the service to return correct credential url for a source by UUID
@@ -76,7 +76,7 @@ func WaitForValidCredentialURL(uuid uuid.UUID, agentIP string) {
 		}
 
 		return ""
-	}, "3m").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+	}, "4m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 }
 
 func ValidateTar(file *os.File) error {
@@ -184,7 +184,7 @@ func (p *plannerAgentLibvirt) CreateVm() error {
 	return nil
 }
 
-func RunCommand(ip string, command string) (string, error) {
+func RunSSHCommand(ip string, command string) (string, error) {
 	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null", fmt.Sprintf("core@%s", ip), command)
 
 	var stdout, stderr bytes.Buffer

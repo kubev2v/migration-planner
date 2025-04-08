@@ -22,6 +22,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
+
+	coreAgent "github.com/kubev2v/migration-planner/internal/agent"
 )
 
 const (
@@ -42,9 +44,8 @@ var (
 )
 
 type PlannerAgent interface {
+	AgentApi() (*AgentApi, error)
 	Run() error
-	Login(url string, user string, pass string) (*http.Response, error)
-	Version() (string, error)
 	Restart() error
 	Remove() error
 	GetIp() (string, error)
@@ -52,11 +53,19 @@ type PlannerAgent interface {
 	DumpLogs(string)
 }
 
+type PlannerAgentAPI interface {
+	Login(url string, user string, pass string) (*http.Response, error)
+	Version() (string, error)
+	Status() (*coreAgent.StatusReply, error)
+	Inventory() (*v1alpha1.Inventory, error)
+}
+
 type PlannerService interface {
 	RemoveSources() error
 	RemoveSource(id uuid.UUID) error
 	GetSource(id uuid.UUID) (*api.Source, error)
 	CreateSource(name string) (*api.Source, error)
+	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
 }
 
 type plannerService struct {
@@ -69,6 +78,12 @@ type plannerAgentLibvirt struct {
 	con                 *libvirt.Connect
 	sourceID            uuid.UUID
 	agentEndToEndTestID string
+	localApi            *AgentApi
+}
+
+type AgentApi struct {
+	baseURL    string
+	httpClient *http.Client
 }
 
 func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTest string) (*plannerAgentLibvirt, error) {
@@ -85,6 +100,18 @@ func NewPlannerAgent(configPath string, sourceID uuid.UUID, name string, idForTe
 	}
 
 	return &plannerAgentLibvirt{c: c, name: name, con: conn, sourceID: sourceID, agentEndToEndTestID: idForTest}, nil
+}
+
+func (p *plannerAgentLibvirt) AgentApi() (*AgentApi, error) {
+	if p.localApi != nil {
+		return p.localApi, nil
+	}
+	agentIP, err = p.GetIp()
+	if err != nil {
+		return nil, err
+	}
+	p.localApi = NewAgentApi(fmt.Sprintf("https://%s:3333/api/v1/", agentIP))
+	return p.localApi, nil
 }
 
 func (p *plannerAgentLibvirt) Run() error {
@@ -181,7 +208,7 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 	}
 
 	// Untar ISO from OVA
-	if err := Untar(ovaFile, p.getIsoPath(), "MigrationAssessment.iso"); err != nil {
+	if err := Untar(ovaFile, p.IsoFilePath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
@@ -190,87 +217,6 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
-	return nil
-}
-
-func (p *plannerAgentLibvirt) Version() (string, error) {
-	agentIP, err := p.GetIp()
-	if err != nil {
-		return "", fmt.Errorf("failed to get agent IP: %w", err)
-	}
-	// Create a new HTTP GET request
-	req, err := http.NewRequest("GET", fmt.Sprintf("https://%s:3333/api/v1/version", agentIP), nil)
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %v", err)
-	}
-
-	// Set the Content-Type header to application/json
-	req.Header.Set("Content-Type", "application/json")
-
-	// Send the request using http.DefaultClient
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", fmt.Errorf("failed to send request: %v", err)
-	}
-	defer resp.Body.Close()
-
-	// Read the response body
-	var result struct {
-		Version string `json:"version"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %v", err)
-	}
-	return result.Version, nil
-}
-
-func (p *plannerAgentLibvirt) Login(url string, user string, pass string) (*http.Response, error) {
-	agentIP, err := p.GetIp()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get agent IP: %w", err)
-	}
-
-	credentials := map[string]string{
-		"url":      url,
-		"username": user,
-		"password": pass,
-	}
-
-	jsonData, err := json.Marshal(credentials)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal credentials: %w", err)
-	}
-
-	resp, err := http.NewRequest(
-		"PUT",
-		fmt.Sprintf("https://%s:3333/api/v1/credentials", agentIP),
-		bytes.NewBuffer(jsonData),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-	resp.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{
-		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		},
-	}
-	response, err := client.Do(resp)
-	if err != nil {
-		return response, fmt.Errorf("failed to send request: %w", err)
-	}
-	defer response.Body.Close()
-
-	return response, nil
-}
-
-func (p *plannerAgentLibvirt) RestartService() error {
 	return nil
 }
 
@@ -350,7 +296,7 @@ func (p *plannerAgentLibvirt) Remove() error {
 	}
 
 	// Remove the ISO file if it exists
-	isoPath := p.getIsoPath()
+	isoPath := p.IsoFilePath()
 	if _, err := os.Stat(isoPath); err == nil {
 		if err := os.Remove(isoPath); err != nil {
 			return fmt.Errorf("failed to remove ISO file: %w", err)
@@ -386,13 +332,112 @@ func (p *plannerAgentLibvirt) GetIp() (string, error) {
 }
 
 func (p *plannerAgentLibvirt) IsServiceRunning(agentIp string, service string) bool {
-	_, err := RunCommand(agentIp, fmt.Sprintf("systemctl --user is-active --quiet %s", service))
+	_, err := RunSSHCommand(agentIp, fmt.Sprintf("systemctl --user is-active --quiet %s", service))
 	return err == nil
 }
 
 func (p *plannerAgentLibvirt) DumpLogs(agentIp string) {
-	stdout, _ := RunCommand(agentIp, "journalctl --no-pager")
+	stdout, _ := RunSSHCommand(agentIp, "journalctl --no-pager")
 	fmt.Fprintf(GinkgoWriter, "Journal: %v\n", stdout)
+}
+
+func (p *plannerAgentLibvirt) RestartService() error {
+	return nil
+}
+
+func NewAgentApi(baseURL string) *AgentApi {
+	return &AgentApi{
+		baseURL: baseURL,
+		httpClient: &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{
+					InsecureSkipVerify: true,
+				},
+			},
+		},
+	}
+}
+
+func (api *AgentApi) request(path string, result any) error {
+	res, err := api.httpClient.Get(api.baseURL + path)
+	if err != nil {
+		return fmt.Errorf("error getting response from local server: %v", err)
+	}
+	defer res.Body.Close()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return fmt.Errorf("error reading response body: %v", err)
+	}
+
+	if err := json.Unmarshal(body, &result); err != nil {
+		return fmt.Errorf("error decoding JSON: %v", err)
+	}
+
+	return nil
+}
+
+func (api *AgentApi) Version() (string, error) {
+	var result struct {
+		Version string `json:"version"`
+	}
+	if err := api.request("version", &result); err != nil {
+		return "", err
+	}
+	return result.Version, nil
+}
+
+func (api *AgentApi) Login(url string, user string, pass string) (*http.Response, error) {
+
+	credentials := map[string]string{
+		"url":      url,
+		"username": user,
+		"password": pass,
+	}
+
+	jsonData, err := json.Marshal(credentials)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal credentials: %w", err)
+	}
+
+	resp, err := http.NewRequest(
+		"PUT",
+		api.baseURL+"credentials",
+		bytes.NewBuffer(jsonData),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	resp.Header.Set("Content-Type", "application/json")
+
+	response, err := api.httpClient.Do(resp)
+	if err != nil {
+		return response, fmt.Errorf("failed to send request: %w", err)
+	}
+	defer response.Body.Close()
+
+	return response, nil
+}
+
+func (api *AgentApi) Status() (*coreAgent.StatusReply, error) {
+	result := &coreAgent.StatusReply{}
+	if err := api.request("status", result); err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+func (api *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
+	var result struct {
+		Inventory v1alpha1.Inventory `json:"inventory"`
+	}
+
+	if err := api.request("inventory", &result); err != nil {
+		return nil, err
+	}
+
+	return &result.Inventory, nil
 }
 
 func NewPlannerService(configPath string) (*plannerService, error) {
@@ -413,6 +458,20 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
 
 	params := v1alpha1.CreateSourceJSONRequestBody{Name: name}
+
+	if testOptions.disconnectedEnvironment { // make the service unreachable
+
+		toStrPtr := func(s string) *string {
+			return &s
+		}
+
+		params.Proxy = &api.AgentProxy{
+			HttpUrl:  toStrPtr("127.0.0.1"),
+			HttpsUrl: toStrPtr("127.0.0.1"),
+			NoProxy:  toStrPtr("vcenter.com"),
+		}
+	}
+
 	res, err := s.c.CreateSourceWithResponse(ctx, params, attachJWT)
 	if err != nil || res.HTTPResponse.StatusCode != 201 {
 		return nil, fmt.Errorf("failed to create the source: %v", err)
@@ -462,6 +521,22 @@ func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
 	return err
 }
 
+func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
+	update := v1alpha1.UpdateSourceJSONRequestBody{
+		AgentId:   uuid,
+		Inventory: *inventory,
+	}
+
+	user, err := defaultUserAuth()
+	if err != nil {
+		return err
+	}
+	ctx := contextWithJWT(auth.NewTokenContext(context.TODO(), user), user.Token.Raw)
+
+	_, err = s.c.UpdateSourceWithResponse(ctx, uuid, update, attachJWT)
+	return err
+}
+
 func createConfigFile(configPath string) error {
 	// Ensure the directory exists
 	dir := filepath.Dir(configPath)
@@ -484,7 +559,7 @@ func (p *plannerAgentLibvirt) getConfigXmlVMPath() string {
 	return fmt.Sprintf("data/vm-%s.xml", p.agentEndToEndTestID)
 }
 
-func (p *plannerAgentLibvirt) getIsoPath() string {
+func (p *plannerAgentLibvirt) IsoFilePath() string {
 	if p.agentEndToEndTestID == defaultAgentTestID {
 		return filepath.Join(defaultBasePath, "agent.iso")
 	}
