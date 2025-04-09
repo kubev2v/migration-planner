@@ -20,8 +20,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
-	chiprometheus "github.com/toshi0607/chi-prometheus"
 	"go.uber.org/zap"
 )
 
@@ -85,7 +85,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 	router := chi.NewRouter()
 
-	metricMiddleware := chiprometheus.New("api_server")
+	metricMiddleware := metrics.NewMiddleware("api_server")
 	metricMiddleware.MustRegisterDefault()
 
 	router.Use(
