@@ -13,6 +13,8 @@ parameters:
     value: Always
   - name: IMAGE_TAG
     value: latest
+  - name: MIGRATION_PLANNER_ISO_PATH
+    value: /iso/rhcos-live.x86_64.iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -155,6 +157,13 @@ objects:
           labels:
             app: migration-planner
         spec:
+          initContainers:
+            - name: download-iso
+              image: quay.io/curl/curl
+              command: [ "curl", "-L", "-o", "${MIGRATION_PLANNER_ISO_PATH}", "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso" ]
+              volumeMounts:
+                - name: iso-storage
+                  mountPath: /iso
           containers:
             - name: migration-planner
               resources:
@@ -192,6 +201,8 @@ objects:
                   value: ${PERSISTENT_DISK_DEVICE}
                 - name:  INSECURE_REGISTRY
                   value: ${INSECURE_REGISTRY}
+                - name: MIGRATION_PLANNER_ISO_PATH
+                  value: ${MIGRATION_PLANNER_ISO_PATH}
                 # Svc Config values
                 - name: MIGRATION_PLANNER_ADDRESS
                   value: ${MIGRATION_PLANNER_ADDRESS}
@@ -258,8 +269,12 @@ objects:
               volumeMounts:
                 - name: migration-planner-dir
                   mountPath: "/.migration-planner"
+                - name: iso-storage
+                  mountPath: /iso
           serviceAccountName: migration-planner
           volumes:
+            - name: iso-storage
+              emptyDir: {}
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi

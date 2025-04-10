@@ -100,7 +100,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 		OvfFile:                    defaultOvfFile,
 		OvfName:                    defaultOvfName,
 		Template:                   defaultTemplate,
-		RHCOSImage:                 defaultRHCOSImage,
+		RHCOSImage:                 util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
 		imageType:                  OVAImageType,
 	}
 
