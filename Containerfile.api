@@ -15,7 +15,6 @@ FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
 WORKDIR /app
 
-RUN curl -Lo /app/rhcos-live.x86_64.iso https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
 COPY /data /app/data/
 COPY /pkg/migrations/sql /app/migrations/
 COPY --from=builder /planner-api /app/
