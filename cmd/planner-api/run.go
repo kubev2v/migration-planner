@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
@@ -67,6 +68,13 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalf("seeding database with default report: %v", err)
 			}
 		}
+
+		// Initialize ISOs
+		zap.S().Info("Initializing RHCOS ISO")
+		if err := util.InitiliazeIso(); err != nil {
+			zap.S().Fatalf("failed to initilized iso: %v", err)
+		}
+		zap.S().Info("RHCOS ISO initialized")
 
 		// initilize event writer
 		ep, _ := getEventProducer(cfg)

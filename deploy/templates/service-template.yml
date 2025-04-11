@@ -15,6 +15,8 @@ parameters:
     value: latest
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live.x86_64.iso
+  - name: MIGRATION_PLANNER_ISO_URL
+    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -157,13 +159,6 @@ objects:
           labels:
             app: migration-planner
         spec:
-          initContainers:
-            - name: download-iso
-              image: quay.io/curl/curl
-              command: [ "curl", "-L", "-o", "${MIGRATION_PLANNER_ISO_PATH}", "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso" ]
-              volumeMounts:
-                - name: iso-storage
-                  mountPath: /iso
           containers:
             - name: migration-planner
               resources:
@@ -203,6 +198,8 @@ objects:
                   value: ${INSECURE_REGISTRY}
                 - name: MIGRATION_PLANNER_ISO_PATH
                   value: ${MIGRATION_PLANNER_ISO_PATH}
+                - name: MIGRATION_PLANNER_ISO_URL
+                  value: ${MIGRATION_PLANNER_ISO_URL}
                 # Svc Config values
                 - name: MIGRATION_PLANNER_ADDRESS
                   value: ${MIGRATION_PLANNER_ADDRESS}
