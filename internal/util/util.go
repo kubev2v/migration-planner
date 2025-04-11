@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
-  "strconv"
 )
 
 type StringerWithError func() (string, error)
@@ -58,14 +58,13 @@ func GetEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
-
 func GetIntEnv(key string, defaultValue uint) (uint, error) {
-  if value, exists := os.LookupEnv(key); exists && len(value) > 0 {
-    u64, err := strconv.ParseUint(value, 10, 32)
-    if err != nil {
-        return 0, err
-    }
-    return uint(u64), nil
-  }
-  return defaultValue, nil
+	if value, exists := os.LookupEnv(key); exists && len(value) > 0 {
+		u64, err := strconv.ParseUint(value, 10, 32)
+		if err != nil {
+			return 0, err
+		}
+		return uint(u64), nil
+	}
+	return defaultValue, nil
 }
