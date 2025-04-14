@@ -65,7 +65,9 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")
 		err = agent.Remove()
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
-		zap.S().Infof("Test completed in: %s\n", time.Since(startTime))
+		testDuration := time.Since(startTime)
+		zap.S().Infof("Test completed in: %s\n", testDuration.String())
+		testsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {

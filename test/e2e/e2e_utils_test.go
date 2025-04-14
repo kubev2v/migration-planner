@@ -11,7 +11,9 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"sort"
 	"strings"
+	"time"
 )
 
 // Create VM with the UUID of the source created
@@ -235,4 +237,28 @@ func RemoveFile(fullPath string) error {
 		}
 	}
 	return nil
+}
+
+func logExecutionSummary() {
+	zap.S().Infof("============Summarizing execution time============")
+
+	type testResult struct {
+		name     string
+		duration time.Duration
+	}
+
+	var results []testResult
+
+	for test, duration := range testsExecutionTime {
+		results = append(results, testResult{name: test, duration: duration})
+	}
+
+	// Sort tests by duration descending
+	sort.Slice(results, func(i, j int) bool {
+		return results[i].duration > results[j].duration
+	})
+
+	for _, result := range results {
+		zap.S().Infof("[%s] finished after: %s", result.name, result.duration.Round(time.Second))
+	}
 }
