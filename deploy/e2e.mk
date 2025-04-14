@@ -1,7 +1,7 @@
 E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
 
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration persistent_disk
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -81,10 +81,6 @@ deploy_assisted_migration:
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner 3443:3443 > /dev/null 2>&1 &
 	$(KUBECTL) port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 > /dev/null 2>&1 &
-
-.PHONY: persistent_disk
-persistent_disk:
-	mkdir -p /tmp/untarova
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:
