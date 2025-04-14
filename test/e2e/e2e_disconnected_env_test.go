@@ -69,7 +69,9 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")
 		err = agent.Remove()
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
-		zap.S().Infof("Test completed in: %s\n", time.Since(startTime))
+		testDuration := time.Since(startTime)
+		zap.S().Infof("Test completed in: %s\n", testDuration.String())
+		testsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {
@@ -77,7 +79,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 	})
 
 	Context("Flow", func() {
-		It("disconnected-environment", func() {
+		It("Disconnected-environment", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Adding vcenter.com to /etc/hosts to enable connectivity to the vSphere server.
