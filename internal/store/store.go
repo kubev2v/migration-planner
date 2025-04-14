@@ -33,7 +33,7 @@ func NewStore(db *gorm.DB) Store {
 		agent:      NewAgentSource(db),
 		source:     NewSource(db),
 		imageInfra: NewImageInfraStore(db),
-		privateKey: NewCachePrivateKeyStore(NewPrivateKey(db)),
+		privateKey: NewCacheKeyStore(NewPrivateKey(db)),
 		db:         db,
 	}
 }
