@@ -41,16 +41,14 @@ func (p *CachePrivateKeyStore) Delete(ctx context.Context, orgID string) error {
 }
 
 func (p *CachePrivateKeyStore) GetPublicKeys(ctx context.Context) (map[string]crypto.PublicKey, error) {
-	if len(p.publicKeys) != 0 {
-		return p.publicKeys, nil
-	}
+	// if len(p.publicKeys) != 0 {
+	// 	return p.publicKeys, nil
+	// }
 
 	pb, err := p.delegate.GetPublicKeys(ctx)
 	if err != nil {
 		return make(map[string]crypto.PublicKey), err
 	}
-
-	p.publicKeys = pb
 
 	return pb, nil
 }
