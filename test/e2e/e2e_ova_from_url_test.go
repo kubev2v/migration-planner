@@ -15,7 +15,6 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 	var (
 		svc       PlannerService
 		agent     PlannerAgent
-		agentApi  PlannerAgentAPI
 		agentIP   string
 		err       error
 		source    *v1alpha1.Source
@@ -27,14 +26,14 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		testOptions.downloadImageByUrl = true
 		testOptions.disconnectedEnvironment = false
 
-		svc, err = NewPlannerService(defaultConfigPath)
+		svc, err = NewPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
+		agent, err = CreateAgent(defaultAgentTestID, source.Id, vmName)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -43,14 +42,15 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		}, "3m", "2s").Should(BeNil())
 		zap.S().Infof("Agent ip is: %s", agentIP)
 
+		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+		agent.AgentApi().baseURL = agentApiBaseUrl
+		zap.S().Infof("Agent Api base url: %s", agentApiBaseUrl)
+
 		zap.S().Info("Wait for planner-agent to be running...")
 		Eventually(func() bool {
 			return IsPlannerAgentRunning(agent, agentIP)
 		}, "3m", "2s").Should(BeTrue())
 		zap.S().Info("Planner-agent is now running")
-
-		agentApi, err = agent.AgentApi()
-		Expect(err).To(BeNil(), "Failed to create agent localApi")
 
 		Eventually(func() string {
 			return CredentialURL(svc, source.Id)
@@ -78,7 +78,7 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		It("Downloads OVA file from URL", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agentApi.Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))

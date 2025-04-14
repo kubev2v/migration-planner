@@ -15,7 +15,6 @@ var _ = Describe("e2e-disconnected-environment", func() {
 	var (
 		svc       PlannerService
 		agent     PlannerAgent
-		agentApi  PlannerAgentAPI
 		agentIP   string
 		err       error
 		source    *v1alpha1.Source
@@ -27,14 +26,14 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		testOptions.downloadImageByUrl = false
 		testOptions.disconnectedEnvironment = true
 
-		svc, err = NewPlannerService(defaultConfigPath)
+		svc, err = NewPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(defaultConfigPath, defaultAgentTestID, source.Id, vmName)
+		agent, err = CreateAgent(defaultAgentTestID, source.Id, vmName)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -43,18 +42,19 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		}, "3m", "2s").Should(BeNil())
 		zap.S().Infof("Agent ip is: %s", agentIP)
 
+		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+		agent.AgentApi().baseURL = agentApiBaseUrl
+		zap.S().Infof("Agent Api base url: %s", agentApiBaseUrl)
+
 		zap.S().Info("Wait for planner-agent to be running...")
 		Eventually(func() bool {
 			return IsPlannerAgentRunning(agent, agentIP)
 		}, "3m", "2s").Should(BeTrue())
 		zap.S().Info("Planner-agent is now running")
 
-		agentApi, err = agent.AgentApi()
-		Expect(err).To(BeNil(), "Failed to create agent localApi")
-
 		zap.S().Info("Wait for agent server to start...")
 		Eventually(func() bool {
-			if _, err := agentApi.Status(); err != nil {
+			if _, err := agent.AgentApi().Status(); err != nil {
 				return false
 			}
 			return true
@@ -91,7 +91,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			// Login to Vcenter
 			Eventually(func() bool {
-				res, err := agentApi.Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
+				res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
 					"core", "123456")
 				return err == nil && res.StatusCode == http.StatusNoContent
 			}, "3m", "2s").Should(BeTrue())
@@ -99,7 +99,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				statusReply, err := agentApi.Status()
+				statusReply, err := agent.AgentApi().Status()
 				if err != nil {
 					return false
 				}
@@ -108,7 +108,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			}, "3m", "2s").Should(BeTrue())
 
 			// Get inventory
-			inventory, err := agentApi.Inventory()
+			inventory, err := agent.AgentApi().Inventory()
 			Expect(err).To(BeNil())
 
 			// Manually upload the collected inventory data

@@ -85,5 +85,4 @@ deploy_assisted_migration:
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:
 	kind delete cluster --name kind-e2e
-	rm ~/.config/planner/client.yaml
 	$(PODMAN) rmi $(MIGRATION_PLANNER_AGENT_IMAGE)
