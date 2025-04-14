@@ -4,9 +4,12 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
+	"github.com/libvirt/libvirt-go"
 	"go.uber.org/zap"
 	"io"
 	"os"
@@ -17,9 +20,9 @@ import (
 )
 
 // Create VM with the UUID of the source created
-func CreateAgent(configPath string, idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
+func CreateAgent(idForTest string, uuid uuid.UUID, vmName string) (PlannerAgent, error) {
 	zap.S().Info("Creating agent...")
-	agent, err := NewPlannerAgent(configPath, uuid, vmName, idForTest)
+	agent, err := NewPlannerAgent(uuid, vmName, idForTest)
 	if err != nil {
 		return nil, err
 	}
@@ -179,6 +182,27 @@ func (p *plannerAgentLibvirt) CreateVm() error {
 	return nil
 }
 
+func waitForDomainState(duration time.Duration, domain *libvirt.Domain, desiredState libvirt.DomainState) error {
+	timeout := time.After(duration)
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-timeout:
+			return fmt.Errorf("timed out waiting for desired state")
+		case <-ticker.C:
+			state, _, err := domain.GetState()
+			if err != nil {
+				return fmt.Errorf("failed to get VM state: %w", err)
+			}
+			if state == desiredState {
+				return nil
+			}
+		}
+	}
+}
+
 // ConvertVMDKtoQCOW2 converts a VMDK file to QCOW2 using qemu-img
 func ConvertVMDKtoQCOW2(src string, dst string) error {
 	command := fmt.Sprintf("qemu-img convert -f vmdk -O qcow2 %s %s", src, dst)
@@ -237,6 +261,20 @@ func RemoveFile(fullPath string) error {
 		}
 	}
 	return nil
+}
+
+func defaultUserAuth() (*auth.User, error) {
+	tokenVal, err := getToken(defaultUsername, defaultOrganization)
+	if err != nil {
+		return nil, fmt.Errorf("unable to create user: %v", err)
+	}
+	token := jwt.New(jwt.SigningMethodRS256)
+	token.Raw = tokenVal
+	return &auth.User{
+		Username:     defaultUsername,
+		Organization: defaultOrganization,
+		Token:        token,
+	}, nil
 }
 
 func logExecutionSummary() {
