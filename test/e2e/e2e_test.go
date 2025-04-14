@@ -17,7 +17,8 @@ const (
 )
 
 var (
-	systemIP = os.Getenv("PLANNER_IP")
+	systemIP           = os.Getenv("PLANNER_IP")
+	testsExecutionTime = make(map[string]time.Duration)
 )
 
 var _ = BeforeSuite(func() {
@@ -29,6 +30,10 @@ var _ = BeforeSuite(func() {
 	if logger != nil {
 		zap.ReplaceGlobals(logger)
 	}
+})
+
+var _ = AfterSuite(func() {
+	logExecutionSummary()
 })
 
 var _ = Describe("e2e", func() {
@@ -85,7 +90,9 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")
 		err = agent.Remove()
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
-		zap.S().Infof("Test completed in: %s\n", time.Since(startTime))
+		testDuration := time.Since(startTime)
+		zap.S().Infof("Test completed in: %s\n", testDuration.String())
+		testsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {
@@ -93,8 +100,7 @@ var _ = Describe("e2e", func() {
 	})
 
 	Context("Check Vcenter login behavior", func() {
-		It("should successfully login with valid credentials and should "+
-			"fail to authenticate with invalid vSphere credentials. ", func() {
+		It("Succeeds login only for valid credentials", func() {
 
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
