@@ -14,8 +14,3 @@ cover.out
 /docker-config/
 deploy/k8s/vcsim.yaml
 .idea/
-.pnp.cjs
-.yarn/
-package.json
-yarn.lock
-.gitignore
