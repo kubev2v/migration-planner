@@ -50,10 +50,10 @@ func NewAgentCommand() *agentCmd {
 	flag.Parse()
 
 	if err := a.config.ParseConfigFile(a.configFile); err != nil {
-		zap.S().Fatalf("Error parsing config: %v", err)
+		panic(fmt.Sprintf("Error parsing config: %v", err))
 	}
 	if err := a.config.Validate(); err != nil {
-		zap.S().Fatalf("Error validating config: %v", err)
+		panic(fmt.Sprintf("Error validating config: %v", err))
 	}
 
 	return a
