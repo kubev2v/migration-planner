@@ -54,11 +54,11 @@ parameters:
     value: "false"
   # Svc Config values
   - name: MIGRATION_PLANNER_ADDRESS
-    value: ":3443"
+    value: ":13443"
   - name: MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS
-    value: ":7443"
+    value: ":17443"
   - name: MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS
-    value: ":11443"
+    value: ":21443"
   - name: MIGRATION_PLANNER_BASE_URL
     value: "https://localhost:3443"
   - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
@@ -80,6 +80,10 @@ parameters:
   - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
     description: Path to the migration folder containing the sql files used to migrate the db
     value: "/app/migrations"
+  # Envoy Config values
+  - name: ENVOY_IMAGE
+    description: Envoy container image
+    value: docker.io/envoyproxy/envoy:v1.33.2
 
 objects:
   - kind: ServiceAccount
@@ -145,6 +149,23 @@ objects:
           port: 8080
           protocol: TCP
           targetPort: 8080
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
+        port: envoy-metrics
+      annotations:
+        description: Expose the envoy metrics endpoint
+      name: migration-planner-envoy-metrics
+    spec:
+      selector:
+        app: migration-planner
+      ports:
+        - name: metrics
+          port: 9000
+          protocol: TCP
+          targetPort: 9000
   - kind: Deployment
     apiVersion: apps/v1 # for versions before 1.9.0 use apps/v1beta2
     metadata:
@@ -160,6 +181,54 @@ objects:
             app: migration-planner
         spec:
           containers:
+            - name: envoy
+              image: ${ENVOY_IMAGE}
+              imagePullPolicy: IfNotPresent
+              command:
+                - envoy
+                - --log-level
+                - debug
+                - --config-path
+                - /etc/envoy/envoy.yaml
+              volumeMounts:
+                - name: envoy-config
+                  mountPath: /etc/envoy/
+                - name: envoy-unix-sockets
+                  mountPath: /sockets
+              ports:
+                - containerPort: 3443
+                  name: api-port
+                - containerPort: 7443
+                  name: agent-api-port
+                - containerPort: 11443
+                  name: image-port
+                - containerPort: 9000
+                  name: metrics-envoy
+              livenessProbe:
+                httpGet:
+                  path: /ready
+                  port: 9000
+                initialDelaySeconds: 10
+                timeoutSeconds: 1
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 10
+              readinessProbe:
+                httpGet:
+                  path: /ready
+                  port: 9000
+                initialDelaySeconds: 10
+                timeoutSeconds: 1
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 10
+              resources:
+                requests:
+                  memory: 128Mi
+                  cpu: 250m
+                limits:
+                  memory: 256Mi
+                  cpu: 500m
             - name: migration-planner
               resources:
                 requests:
@@ -171,13 +240,13 @@ objects:
               image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
               imagePullPolicy: ${MIGRATION_PLANNER_API_IMAGE_PULL_POLICY}
               ports:
-                - containerPort: 3443
-                  name: api-port
-                - containerPort: 7443
-                  name: agent-api-port
+                - containerPort: 8080
+                  name: backend-metrics
+                - containerPort: 13443
+                  name: probe-port
               livenessProbe:
                 tcpSocket:
-                  port: 3443
+                  port: 13443
                 initialDelaySeconds: 30
               readinessProbe:
                 tcpSocket:
@@ -279,3 +348,9 @@ objects:
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi
+            - name: envoy-config
+              configMap:
+                name: migration-planner-envoy
+            - name: envoy-unix-sockets
+              emptyDir:
+                medium: Memory
