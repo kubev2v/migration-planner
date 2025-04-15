@@ -167,6 +167,7 @@ deploy-on-openshift: oc
 	openshift_project=$$(oc project -q); \
 	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
+	oc process -f deploy/templates/envoy-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
@@ -209,6 +210,7 @@ delete-from-openshift: oc
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
+	oc process -f deploy/templates/envoy-template.yml | oc delete -f -; \
 	oc delete route planner-agent planner-ui planner-image; \
 	echo "*** Migration Planner has been deleted successfully from Openshift ***"
 
@@ -219,6 +221,7 @@ deploy-on-kind: oc
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f  deploy/templates/envoy-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
@@ -247,6 +250,7 @@ delete-from-kind: oc
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f  deploy/templates/envoy-template.yml | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
