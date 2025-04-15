@@ -4,19 +4,20 @@ import (
 	"archive/tar"
 	"bytes"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/auth"
-	"github.com/kubev2v/migration-planner/internal/cli"
-	"github.com/libvirt/libvirt-go"
-	"go.uber.org/zap"
 	"io"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/cli"
+	libvirt "github.com/libvirt/libvirt-go"
+	"go.uber.org/zap"
 )
 
 // Create VM with the UUID of the source created
@@ -65,12 +66,14 @@ func CredentialURL(svc PlannerService, uuid uuid.UUID) string {
 	zap.S().Info("try to retrieve valid credentials url")
 	s, err := svc.GetSource(uuid)
 	if err != nil {
+		zap.S().Errorw("failed to get source", "error", err, "uuid", uuid)
 		return ""
 	}
 	if s.Agent == nil {
 		return ""
 	}
 	if s.Agent.CredentialUrl != "N/A" && s.Agent.CredentialUrl != "" {
+		zap.S().Infof("agent credentials found: %s", s.Agent.CredentialUrl)
 		return s.Agent.CredentialUrl
 	}
 
