@@ -76,7 +76,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 	router.Use(
 		metricMiddleware.Handler,
 		middleware.RequestID,
-		log.Logger(zap.S(), "router_image"),
+		log.Logger(zap.L(), "router_api"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,
