@@ -20,7 +20,6 @@ func InitLog(lvl zap.AtomicLevel) *zap.Logger {
 	cfg.Sampling = &zap.SamplingConfig{
 		Initial:    sampleInitial,
 		Thereafter: sampleThereafter,
-		// Hook:       samplingHook,
 	}
 
 	logger, err := cfg.Build(
