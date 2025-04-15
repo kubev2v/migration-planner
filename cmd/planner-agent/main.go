@@ -34,14 +34,9 @@ type agentCmd struct {
 }
 
 func NewAgentCommand() *agentCmd {
-	logger := log.InitLog(zap.NewAtomicLevelAt(zapcore.InfoLevel))
-	defer func() { _ = logger.Sync() }()
-
-	undo := zap.ReplaceGlobals(logger)
-	defer undo()
 
 	a := &agentCmd{
-		config: config.NewDefault(),
+		config:   config.NewDefault(),
 	}
 
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
@@ -55,10 +50,10 @@ func NewAgentCommand() *agentCmd {
 	flag.Parse()
 
 	if err := a.config.ParseConfigFile(a.configFile); err != nil {
-		zap.S().Fatalf("Error parsing config: %v", err)
+		panic(fmt.Sprintf("Error parsing config: %v", err))
 	}
 	if err := a.config.Validate(); err != nil {
-		zap.S().Fatalf("Error validating config: %v", err)
+		panic(fmt.Sprintf("Error validating config: %v", err))
 	}
 
 	return a
