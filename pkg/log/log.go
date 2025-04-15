@@ -25,7 +25,7 @@ func InitLog(lvl zap.AtomicLevel) *zap.Logger {
 
 	logger, err := cfg.Build(
 		zap.AddCaller(),
-		zap.AddStacktrace(zap.ErrorLevel),
+		zap.AddStacktrace(zap.DPanicLevel),
 	)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to initialize zap logger: %v\n", err)

@@ -36,13 +36,9 @@ type agentCmd struct {
 }
 
 func NewAgentCommand() *agentCmd {
-	defaultLogLevel := zapcore.InfoLevel
-	atomicLogLevel := zap.NewAtomicLevelAt(defaultLogLevel)
+	atomicLogLevel := zap.NewAtomicLevelAt(zapcore.InfoLevel)
 
 	logger := log.InitLog(atomicLogLevel)
-	defer func() {
-		_ = logger.Sync()
-	}()
 
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
