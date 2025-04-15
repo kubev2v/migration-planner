@@ -179,6 +179,10 @@ objects:
                 tcpSocket:
                   port: 3443
                 initialDelaySeconds: 30
+              readinessProbe:
+                tcpSocket:
+                  port: 7443
+                initialDelaySeconds: 30
               env:
                 - name: CONFIG_SERVER
                   value: ${MIGRATION_PLANNER_URL}
