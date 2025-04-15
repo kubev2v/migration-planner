@@ -2,7 +2,6 @@ package log
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -10,59 +9,62 @@ import (
 	"go.uber.org/zap"
 )
 
-var (
-	sugaredLogFormat = `[%s] "%s %s %s" from %s - %s %dB in %s`
-)
-
-func Logger(l interface{}, name string) func(next http.Handler) http.Handler {
-	switch logger := l.(type) {
-
-	case *zap.SugaredLogger:
-		logger = zap.New(logger.Desugar().Core(), zap.AddCallerSkip(1)).Sugar().Named(name)
-		return func(next http.Handler) http.Handler {
-			fn := func(w http.ResponseWriter, r *http.Request) {
-				ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
-				t1 := time.Now()
-				requestID := middleware.GetReqID(r.Context())
-				defer func() {
-					statusCode := ww.Status()
-					status := statusLabel(statusCode)
-					bytes := ww.BytesWritten()
-					latency := time.Since(t1)
-					args := []interface{}{
-						requestID,
-						r.Method,
-						r.URL.Path,
-						r.Proto,
-						r.RemoteAddr,
-						status,
-						bytes,
-						latency,
-					}
-					switch {
-					case statusCode >= 500:
-						logger.Errorf(sugaredLogFormat, args...)
-					case statusCode >= 400:
-						logger.Warnf(sugaredLogFormat, args...)
-					default:
-						if isDebugLog(r.Method, r.URL.Path) {
-							logger.Debugf(sugaredLogFormat, args...)
-						}
-						logger.Infof(sugaredLogFormat, args...)
-					}
-
-				}()
-				next.ServeHTTP(ww, r)
-			}
-			return http.HandlerFunc(fn)
-		}
-	default:
-		log.Fatalf("Unknown logger passed in. Please provide *Zap.Logger or *Zap.SugaredLogger")
+func Logger(l *zap.Logger, name string) func(next http.Handler) http.Handler {
+	if l == nil {
+		panic("log.Logger received a nil *zap.Logger")
 	}
-	return nil
+
+	logger := l.WithOptions(zap.AddCallerSkip(1)).Named(name)
+
+	return func(next http.Handler) http.Handler {
+		fn := func(w http.ResponseWriter, r *http.Request) {
+			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			t1 := time.Now()
+			requestID := middleware.GetReqID(r.Context())
+
+			defer func() {
+				latency := time.Since(t1)
+				statusCode := ww.Status()
+				bytesWritten := ww.BytesWritten()
+				statusText := statusLabel(statusCode)
+
+				fields := []zap.Field{
+					zap.String("type", "http_request"),
+					zap.String("request_id", requestID),
+					zap.String("http_method", r.Method),
+					zap.String("http_path", r.URL.Path),
+					zap.String("http_proto", r.Proto),
+					zap.String("remote_addr", r.RemoteAddr),
+					zap.Int("http_status_code", statusCode),
+					zap.String("http_status_text", statusText),
+					zap.Int64("response_bytes", int64(bytesWritten)),
+					zap.Duration("latency", latency),
+					zap.String("user_agent", r.UserAgent()),
+				}
+
+				msg := fmt.Sprintf("HTTP request completed: %s", r.URL.Path)
+
+				switch {
+				case statusCode >= 500:
+					logger.Error(msg, fields...)
+				case statusCode >= 400:
+					logger.Warn(msg, fields...)
+				default:
+					if isHealthCheck(r.Method, r.URL.Path) {
+						logger.Debug(msg, fields...)
+					} else {
+						logger.Info(msg, fields...)
+					}
+				}
+			}()
+
+			next.ServeHTTP(ww, r)
+		}
+		return http.HandlerFunc(fn)
+	}
 }
 
-func isDebugLog(method string, path string) bool {
+func isHealthCheck(method string, path string) bool {
 	return method == http.MethodGet && path == "/health"
 }
 

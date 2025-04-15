@@ -99,7 +99,7 @@ func (s *Server) Run(ctx context.Context) error {
 		}),
 		authenticator.Authenticator,
 		middleware.RequestID,
-		log.Logger(zap.S(), "router_api"),
+		log.Logger(zap.L(), "router_api"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,

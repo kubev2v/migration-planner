@@ -31,17 +31,26 @@ func main() {
 type agentCmd struct {
 	config     *config.Config
 	configFile string
+	logger     *zap.Logger
+	logLevel   zap.AtomicLevel
 }
 
 func NewAgentCommand() *agentCmd {
-	logger := log.InitLog(zap.NewAtomicLevelAt(zapcore.InfoLevel))
-	defer func() { _ = logger.Sync() }()
+	defaultLogLevel := zapcore.InfoLevel
+	atomicLogLevel := zap.NewAtomicLevelAt(defaultLogLevel)
+
+	logger := log.InitLog(atomicLogLevel)
+	defer func() {
+		_ = logger.Sync()
+	}()
 
 	undo := zap.ReplaceGlobals(logger)
 	defer undo()
 
 	a := &agentCmd{
-		config: config.NewDefault(),
+		config:   config.NewDefault(),
+		logger:   logger,
+		logLevel: atomicLogLevel,
 	}
 
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
