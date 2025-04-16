@@ -2,12 +2,13 @@ package e2e_test
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 var _ = Describe("e2e-disconnected-environment", func() {
