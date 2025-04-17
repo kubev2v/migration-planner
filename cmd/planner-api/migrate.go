@@ -21,21 +21,21 @@ var migrateCmd = &cobra.Command{
 
 		cfg, err := config.New()
 		if err != nil {
-			zap.S().Fatalf("reading configuration: %v", err)
+			zap.S().Fatalw("reading configuration", "error", err)
 		}
-		zap.S().Infof("Using config: %s", cfg)
+		zap.S().Infow("Using config", "configuration", cfg)
 
 		zap.S().Info("Initializing data store")
 		db, err := store.InitDB(cfg)
 		if err != nil {
-			zap.S().Fatalf("initializing data store: %v", err)
+			zap.S().Fatalw("initializing data store", "error", err)
 		}
 
 		store := store.NewStore(db)
 		defer store.Close()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
-			zap.S().Fatalf("running initial migration: %v", err)
+			zap.S().Fatalw("running initial migration", "error", err)
 		}
 
 		return nil

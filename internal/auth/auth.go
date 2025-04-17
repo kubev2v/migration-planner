@@ -23,7 +23,7 @@ const (
 )
 
 func NewAuthenticator(authConfig config.Auth) (Authenticator, error) {
-	zap.S().Named("auth").Infof("authentication: '%s'", authConfig.AuthenticationType)
+	zap.S().Named("auth").Infow("creating authenticator", "type", authConfig.AuthenticationType)
 
 	switch authConfig.AuthenticationType {
 	case RHSSOAuthentication:
