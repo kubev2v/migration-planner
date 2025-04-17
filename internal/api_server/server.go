@@ -15,7 +15,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -33,21 +32,18 @@ type Server struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
-	evWriter *events.EventProducer
 }
 
 // New returns a new instance of a migration-planner server.
 func New(
 	cfg *config.Config,
 	store store.Store,
-	ew *events.EventProducer,
 	listener net.Listener,
 ) *Server {
 	return &Server{
 		cfg:      cfg,
 		store:    store,
 		listener: listener,
-		evWriter: ew,
 	}
 }
 
@@ -105,7 +101,7 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
-	h := service.NewServiceHandler(s.store, s.evWriter)
+	h := service.NewServiceHandler(s.store)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

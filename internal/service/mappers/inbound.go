@@ -6,7 +6,6 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
-	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -81,15 +80,4 @@ func UpdateSourceOnPrem(m *model.Source, inventory api.Inventory) *model.Source 
 	m.VCenterID = inventory.Vcenter.Id
 	m.OnPremises = true
 	return m
-}
-
-func UIEventFromApi(apiEvent api.Event) events.UIEvent {
-	uiEvent := events.UIEvent{
-		CreatedAt: apiEvent.CreatedAt,
-		Data:      make(map[string]string),
-	}
-	for _, v := range apiEvent.Data {
-		uiEvent.Data[v.Key] = v.Value
-	}
-	return uiEvent
 }
