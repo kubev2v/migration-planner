@@ -54,18 +54,6 @@ type Error struct {
 	Message string `json:"message"`
 }
 
-// Event defines model for Event.
-type Event struct {
-	CreatedAt time.Time   `json:"createdAt"`
-	Data      []EventData `json:"data"`
-}
-
-// EventData defines model for EventData.
-type EventData struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // Infra defines model for Infra.
 type Infra struct {
 	Datastores []struct {
@@ -189,9 +177,6 @@ type ListSourcesParams struct {
 	// IncludeDefault control whatever the default report should be added to the result
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
-
-// PushEventsJSONRequestBody defines body for PushEvents for application/json ContentType.
-type PushEventsJSONRequestBody = Event
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
