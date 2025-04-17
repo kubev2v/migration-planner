@@ -111,7 +111,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	return imageBuilder
 }
 
-func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) (int, error) {
+func (b *ImageBuilder) Size() (int, error) {
 	ignitionContent, err := b.generateIgnition()
 	if err != nil {
 		return -1, err
@@ -128,33 +128,40 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) (int, error) {
 		return -1, err
 	}
 
-	// write only the iso in case of qemu
-	if b.imageType == QemuImageType {
-		if _, err := io.Copy(w, reader); err != nil {
-			return 0, err
-		}
-		return size, nil
+	return size, nil
+}
+
+func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
+	ignitionContent, err := b.generateIgnition()
+	if err != nil {
+		return err
+	}
+
+	// Generate ISO data reader with ignition content
+	reader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
+	if err != nil {
+		return fmt.Errorf("failed to read rhcos iso: %w", err)
 	}
 
 	tw := tar.NewWriter(w)
 
 	// OVF Must be first file in OVA, to support URL download
 	if err := b.writeOvf(tw); err != nil {
-		return -1, err
+		return err
 	}
 
 	// Write ISO to TAR
 	if err := b.writeIso(reader, tw); err != nil {
-		return -1, err
+		return err
 	}
 
 	if err := b.writePersistenceDisk(tw); err != nil {
-		return -1, err
+		return err
 	}
 
 	tw.Flush()
 
-	return size, nil
+	return nil
 }
 
 func (b *ImageBuilder) Validate() error {
