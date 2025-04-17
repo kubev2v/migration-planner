@@ -91,11 +91,6 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// PushEventsWithBody request with any body
-	PushEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	PushEvents(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// DeleteSources request
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -129,30 +124,6 @@ type ClientInterface interface {
 
 	// Health request
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-}
-
-func (c *Client) PushEventsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPushEventsRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) PushEvents(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewPushEventsRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
 }
 
 func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -297,46 +268,6 @@ func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 		return nil, err
 	}
 	return c.Client.Do(req)
-}
-
-// NewPushEventsRequest calls the generic PushEvents builder with application/json body
-func NewPushEventsRequest(server string, body PushEventsJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewPushEventsRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewPushEventsRequestWithBody generates requests for PushEvents with any type of body
-func NewPushEventsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/events")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
 }
 
 // NewDeleteSourcesRequest generates requests for DeleteSources
@@ -742,11 +673,6 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// PushEventsWithBodyWithResponse request with any body
-	PushEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PushEventsResponse, error)
-
-	PushEventsWithResponse(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PushEventsResponse, error)
-
 	// DeleteSourcesWithResponse request
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
 
@@ -780,32 +706,6 @@ type ClientWithResponsesInterface interface {
 
 	// HealthWithResponse request
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
-}
-
-type PushEventsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *Source
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r PushEventsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r PushEventsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
 }
 
 type DeleteSourcesResponse struct {
@@ -1053,23 +953,6 @@ func (r HealthResponse) StatusCode() int {
 	return 0
 }
 
-// PushEventsWithBodyWithResponse request with arbitrary body returning *PushEventsResponse
-func (c *ClientWithResponses) PushEventsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PushEventsResponse, error) {
-	rsp, err := c.PushEventsWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePushEventsResponse(rsp)
-}
-
-func (c *ClientWithResponses) PushEventsWithResponse(ctx context.Context, body PushEventsJSONRequestBody, reqEditors ...RequestEditorFn) (*PushEventsResponse, error) {
-	rsp, err := c.PushEvents(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParsePushEventsResponse(rsp)
-}
-
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
 func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error) {
 	rsp, err := c.DeleteSources(ctx, reqEditors...)
@@ -1174,60 +1057,6 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseHealthResponse(rsp)
-}
-
-// ParsePushEventsResponse parses an HTTP response from a PushEventsWithResponse call
-func ParsePushEventsResponse(rsp *http.Response) (*PushEventsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &PushEventsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest Source
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
 }
 
 // ParseDeleteSourcesResponse parses an HTTP response from a DeleteSourcesWithResponse call
