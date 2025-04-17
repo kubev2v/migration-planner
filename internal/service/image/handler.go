@@ -78,7 +78,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorf("failed to generate ova at GetImage: %s", err)
+		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
 		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
 

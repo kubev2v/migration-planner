@@ -30,7 +30,7 @@ var runCmd = &cobra.Command{
 
 		cfg, err := config.New()
 		if err != nil {
-			zap.S().Fatalf("reading configuration: %v", err)
+			zap.S().Fatalw("reading configuration", "error", err)
 		}
 
 		logLvl, err := zap.ParseAtomicLevel(cfg.Service.LogLevel)
@@ -45,31 +45,31 @@ var runCmd = &cobra.Command{
 		defer undo()
 
 		zap.S().Info("Starting API service...")
-		zap.S().Infof("Build from git commit: %s", version.Get().GitCommit)
+		zap.S().Infow("Build from git", "commit", version.Get().GitCommit)
 		zap.S().Info("Initializing data store")
 		db, err := store.InitDB(cfg)
 		if err != nil {
-			zap.S().Fatalf("initializing data store: %v", err)
+			zap.S().Fatalw("initializing data store", "error", err)
 		}
 
 		store := store.NewStore(db)
 		defer store.Close()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
-			zap.S().Fatalf("running initial migration: %v", err)
+			zap.S().Fatalw("running initial migration", "error", err)
 		}
 
 		// Initialize database with basic example report
 		if v, b := os.LookupEnv("NO_SEED"); !b || v == "false" {
 			if err := store.Seed(); err != nil {
-				zap.S().Fatalf("seeding database with default report: %v", err)
+				zap.S().Fatalw("seeding database with default report", "error", err)
 			}
 		}
 
 		// Initialize ISOs
 		zap.S().Info("Initializing RHCOS ISO")
 		if err := util.InitiliazeIso(); err != nil {
-			zap.S().Fatalf("failed to initilized iso: %v", err)
+			zap.S().Fatalw("failed to initilized iso", "error", err)
 		}
 		zap.S().Info("RHCOS ISO initialized")
 
@@ -78,12 +78,12 @@ var runCmd = &cobra.Command{
 			defer cancel()
 			listener, err := newListener(cfg.Service.Address)
 			if err != nil {
-				zap.S().Fatalf("creating listener: %s", err)
+				zap.S().Fatalw("creating listener", "error", err)
 			}
 
 			server := apiserver.New(cfg, store, listener)
 			if err := server.Run(ctx); err != nil {
-				zap.S().Fatalf("Error running server: %s", err)
+				zap.S().Fatalw("Error running server", "error", err)
 			}
 		}()
 
@@ -94,12 +94,12 @@ var runCmd = &cobra.Command{
 			defer cancel()
 			listener, err := newListener(cfg.Service.AgentEndpointAddress)
 			if err != nil {
-				zap.S().Fatalf("creating listener: %s", err)
+				zap.S().Fatalw("creating listener", "error", err)
 			}
 
 			agentserver := agentserver.New(cfg, store, listener)
 			if err := agentserver.Run(ctx); err != nil {
-				zap.S().Fatalf("Error running server: %s", err)
+				zap.S().Fatalw("Error running server", "error", err)
 			}
 		}()
 
@@ -107,12 +107,12 @@ var runCmd = &cobra.Command{
 			defer cancel()
 			listener, err := newListener(cfg.Service.ImageEndpointAddress)
 			if err != nil {
-				zap.S().Fatalf("creating listener: %s", err)
+				zap.S().Fatalw("creating listener", "error", err)
 			}
 
 			imageserver := imageserver.New(cfg, store, listener)
 			if err := imageserver.Run(ctx); err != nil {
-				zap.S().Fatalf("Error running server: %s", err)
+				zap.S().Fatalw("Error running server", "error", err)
 			}
 		}()
 
@@ -120,11 +120,11 @@ var runCmd = &cobra.Command{
 			defer cancel()
 			listener, err := newListener("0.0.0.0:8080")
 			if err != nil {
-				zap.S().Named("metrics_server").Fatalf("creating listener: %s", err)
+				zap.S().Named("metrics_server").Fatalw("creating listener", "error", err)
 			}
 			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener)
 			if err := metricsServer.Run(ctx); err != nil {
-				zap.S().Named("metrics_server").Fatalf("failed to run metrics server: %s", err)
+				zap.S().Named("metrics_server").Fatalw("failed to run metrics server", "error", err)
 			}
 		}()
 
