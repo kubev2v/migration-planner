@@ -33,7 +33,7 @@ func AgentFromContext(ctx context.Context) (AgentJWT, bool) {
 func MustHaveUser(ctx context.Context) User {
 	user, found := UserFromContext(ctx)
 	if !found {
-		zap.S().Named("auth").Panicf("failed to find user in context")
+		zap.S().Named("auth").Panic("failed to find user in context")
 	}
 	return user
 }
@@ -41,7 +41,7 @@ func MustHaveUser(ctx context.Context) User {
 func MustHaveAgent(ctx context.Context) AgentJWT {
 	agentJwt, found := AgentFromContext(ctx)
 	if !found {
-		zap.S().Named("auth").Panicf("failed to find agent jwt in context")
+		zap.S().Named("auth").Panic("failed to find agent jwt in context")
 	}
 	return agentJwt
 }

@@ -79,7 +79,7 @@ func (h *ServiceHandler) GetImage(ctx context.Context, request server.GetImageRe
 	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorf("failed to generate ova at GetImage: %s", err)
+		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
 		return server.GetImage500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
 
@@ -111,7 +111,7 @@ func (h *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImage
 	}
 
 	if err := imageBuilder.Validate(); err != nil {
-		zap.S().Named("image_service").Errorf("error validating at HeadImage: %s", err)
+		zap.S().Named("image_service").Errorw("error validating at HeadImage", "error", err)
 		return server.HeadImage500Response{}, nil
 	}
 

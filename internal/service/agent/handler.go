@@ -119,7 +119,7 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 func (h *AgentServiceHandler) updateMetrics() {
 	agents, err := h.store.Agent().List(context.TODO(), store.NewAgentQueryFilter(), store.NewAgentQueryOptions())
 	if err != nil {
-		zap.S().Named("agent_handler").Warnf("failed to update agent metrics: %s", err)
+		zap.S().Named("agent_handler").Warnw("failed to update agent metrics", "error", err)
 		return
 	}
 	// holds the total number of agents by state

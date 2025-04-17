@@ -24,7 +24,7 @@ func (h *AgentServiceHandlerLogger) UpdateSourceInventory(ctx context.Context, r
 
 	resp, err := h.delegate.UpdateSourceInventory(ctx, request)
 	if err != nil {
-		zap.S().Named("agent_handler").Errorf("failed to update source inventory: %s", err)
+		zap.S().Named("agent_handler").Errorw("failed to update source inventory", "error", err)
 	}
 
 	return resp, nil
@@ -41,7 +41,7 @@ func (h *AgentServiceHandlerLogger) UpdateAgentStatus(ctx context.Context, reque
 
 	resp, err := h.delegate.UpdateAgentStatus(ctx, request)
 	if err != nil {
-		zap.S().Named("agent_handler").Errorf("failed to update agent status: %s", err)
+		zap.S().Named("agent_handler").Errorw("failed to update agent status", "error", err)
 	}
 
 	return resp, nil
