@@ -20,9 +20,6 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
-	// (POST /api/v1/events)
-	PushEvents(w http.ResponseWriter, r *http.Request)
-
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
 
@@ -57,11 +54,6 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
-
-// (POST /api/v1/events)
-func (_ Unimplemented) PushEvents(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
 
 // (DELETE /api/v1/sources)
 func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -121,21 +113,6 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
-
-// PushEvents operation middleware
-func (siw *ServerInterfaceWrapper) PushEvents(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.PushEvents(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
 
 // DeleteSources operation middleware
 func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -480,9 +457,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/api/v1/events", wrapper.PushEvents)
-	})
-	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
 	})
 	r.Group(func(r chi.Router) {
@@ -514,59 +488,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 
 	return r
-}
-
-type PushEventsRequestObject struct {
-	Body *PushEventsJSONRequestBody
-}
-
-type PushEventsResponseObject interface {
-	VisitPushEventsResponse(w http.ResponseWriter) error
-}
-
-type PushEvents201JSONResponse Source
-
-func (response PushEvents201JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PushEvents400JSONResponse Error
-
-func (response PushEvents400JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(400)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PushEvents401JSONResponse Error
-
-func (response PushEvents401JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PushEvents403JSONResponse Error
-
-func (response PushEvents403JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(403)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type PushEvents500JSONResponse Error
-
-func (response PushEvents500JSONResponse) VisitPushEventsResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
 }
 
 type DeleteSourcesRequestObject struct {
@@ -1041,9 +962,6 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
-	// (POST /api/v1/events)
-	PushEvents(ctx context.Context, request PushEventsRequestObject) (PushEventsResponseObject, error)
-
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
 
@@ -1102,37 +1020,6 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
-}
-
-// PushEvents operation middleware
-func (sh *strictHandler) PushEvents(w http.ResponseWriter, r *http.Request) {
-	var request PushEventsRequestObject
-
-	var body PushEventsJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
-	}
-	request.Body = &body
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.PushEvents(ctx, request.(PushEventsRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "PushEvents")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(PushEventsResponseObject); ok {
-		if err := validResponse.VisitPushEventsResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
 }
 
 // DeleteSources operation middleware

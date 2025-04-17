@@ -4,16 +4,13 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"time"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -60,8 +57,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -94,11 +90,8 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
 			Expect(tx.Error).To(BeNil())
 			Expect(credsUrl).To(Equal("creds-url"))
-
-			// should find one event
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
+
 		It("successfully updates the agent", func() {
 			sourceID := uuid.NewString()
 			agentID := uuid.New()
@@ -113,8 +106,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -146,10 +138,6 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
 			Expect(tx.Error).To(BeNil())
 			Expect(credsUrl).To(Equal("creds-url"))
-
-			// should find one event
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		It("failed to update agent -- source id is missing", func() {
@@ -163,8 +151,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -200,8 +187,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -220,10 +206,6 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 			Expect(source.Inventory.Data.Vcenter.Id).To(Equal("vcenter"))
-
-			// should have one 1 event only
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(1))
 		})
 
 		It("successfully updates the source - two agents", func() {
@@ -246,8 +228,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			// first agent request
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -281,10 +262,6 @@ var _ = Describe("agent service", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory200JSONResponse{}).String()))
-
-			// should have one 1 event only
-			<-time.After(500 * time.Millisecond)
-			Expect(eventWriter.Messages).To(HaveLen(2))
 		})
 
 		It("agents not associated with the source are not allowed to update inventory", func() {
@@ -307,8 +284,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -334,8 +310,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s, events.NewEventProducer(eventWriter)))
+			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -372,20 +347,3 @@ var _ = Describe("agent service", Ordered, func() {
 		})
 	})
 })
-
-type testwriter struct {
-	Messages []cloudevents.Event
-}
-
-func newTestWriter() *testwriter {
-	return &testwriter{Messages: []cloudevents.Event{}}
-}
-
-func (t *testwriter) Write(ctx context.Context, topic string, e cloudevents.Event) error {
-	t.Messages = append(t.Messages, e)
-	return nil
-}
-
-func (t *testwriter) Close(_ context.Context) error {
-	return nil
-}

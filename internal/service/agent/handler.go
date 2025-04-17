@@ -1,16 +1,12 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
-	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -18,17 +14,15 @@ import (
 )
 
 type AgentServiceHandler struct {
-	store       store.Store
-	eventWriter *events.EventProducer
+	store store.Store
 }
 
 // Make sure we conform to servers Service interface
 var _ agentServer.Service = (*AgentServiceHandler)(nil)
 
-func NewAgentServiceHandler(store store.Store, ew *events.EventProducer) *AgentServiceHandler {
+func NewAgentServiceHandler(store store.Store) *AgentServiceHandler {
 	return &AgentServiceHandler{
-		store:       store,
-		eventWriter: ew,
+		store: store,
 	}
 }
 
@@ -76,11 +70,6 @@ func (h *AgentServiceHandler) UpdateSourceInventory(ctx context.Context, request
 		return agentServer.UpdateSourceInventory500JSONResponse{}, fmt.Errorf("failed to update source: %s", err)
 	}
 
-	kind, inventoryEvent := h.newInventoryEvent(request.Id.String(), request.Body.Inventory)
-	if err := h.eventWriter.Write(ctx, kind, inventoryEvent); err != nil {
-		zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
-	}
-
 	return agentServer.UpdateSourceInventory200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
 }
 
@@ -107,14 +96,8 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 
 	if agent == nil {
 		newAgent := mappers.AgentFromApi(request.Id, request.Body)
-		a, err := h.store.Agent().Create(ctx, newAgent)
-		if err != nil {
+		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
 			return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to create the agent: %s", err)
-		}
-
-		kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*a))
-		if err := h.eventWriter.Write(ctx, kind, agentEvent); err != nil {
-			zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
 		}
 
 		return agentServer.UpdateAgentStatus201Response{}, nil
@@ -122,11 +105,6 @@ func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request age
 
 	if _, err := h.store.Agent().Update(ctx, mappers.AgentFromApi(request.Id, request.Body)); err != nil {
 		return agentServer.UpdateAgentStatus400JSONResponse{}, fmt.Errorf("failed to update agent: %s", err)
-	}
-
-	kind, agentEvent := h.newAgentEvent(mappers.AgentToApi(*agent))
-	if err := h.eventWriter.Write(ctx, kind, agentEvent); err != nil {
-		zap.S().Named("agent_handler").Errorw("failed to write event", "error", err, "event_kind", kind)
 	}
 
 	// must not block here.
@@ -163,27 +141,4 @@ func (h *AgentServiceHandler) updateMetrics() {
 	for k, v := range states {
 		metrics.UpdateAgentStateCounterMetric(k, v)
 	}
-}
-
-func (h *AgentServiceHandler) newAgentEvent(agent api.Agent) (string, io.Reader) {
-	event := events.AgentEvent{
-		AgentID:   agent.Id.String(),
-		State:     string(agent.Status),
-		StateInfo: agent.StatusInfo,
-	}
-
-	data, _ := json.Marshal(event)
-
-	return events.AgentMessageKind, bytes.NewReader(data)
-}
-
-func (h *AgentServiceHandler) newInventoryEvent(sourceID string, inventory api.Inventory) (string, io.Reader) {
-	event := events.InventoryEvent{
-		SourceID:  sourceID,
-		Inventory: inventory,
-	}
-
-	data, _ := json.Marshal(event)
-
-	return events.InventoryMessageKind, bytes.NewReader(data)
 }
