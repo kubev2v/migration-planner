@@ -5,13 +5,11 @@ import (
 	"fmt"
 	"reflect"
 
-	cloudevents "github.com/cloudevents/sdk-go/v2"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -59,15 +57,13 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -87,15 +83,13 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -115,15 +109,13 @@ var _ = Describe("source handler", Ordered, func() {
 
 	Context("create", func() {
 		It("successfully creates a source", func() {
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -141,8 +133,6 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
@@ -153,7 +143,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -176,8 +166,6 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with certificate chain defined", func() {
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
@@ -188,7 +176,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -233,8 +221,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -265,8 +252,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
@@ -292,8 +278,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
@@ -320,8 +305,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -346,8 +330,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 
@@ -370,15 +353,13 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			eventWriter := newTestWriter()
-
 			user := auth.User{
 				Username:     "user",
 				Organization: "user",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
@@ -402,8 +383,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -446,8 +426,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -497,8 +476,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			eventWriter := newTestWriter()
-			srv := service.NewServiceHandler(s, events.NewEventProducer(eventWriter))
+			srv := service.NewServiceHandler(s)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -544,20 +522,3 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 	})
 })
-
-type testwriter struct {
-	Messages []cloudevents.Event
-}
-
-func newTestWriter() *testwriter {
-	return &testwriter{Messages: []cloudevents.Event{}}
-}
-
-func (t *testwriter) Write(ctx context.Context, topic string, e cloudevents.Event) error {
-	t.Messages = append(t.Messages, e)
-	return nil
-}
-
-func (t *testwriter) Close(_ context.Context) error {
-	return nil
-}

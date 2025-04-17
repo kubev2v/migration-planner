@@ -18,7 +18,6 @@ import (
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/events"
 	service "github.com/kubev2v/migration-planner/internal/service/image"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -33,20 +32,17 @@ type ImageServer struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
-	evWriter *events.EventProducer
 }
 
 // New returns a new instance of a migration-planner server.
 func New(
 	cfg *config.Config,
 	store store.Store,
-	ew *events.EventProducer,
 	listener net.Listener,
 ) *ImageServer {
 	return &ImageServer{
 		cfg:      cfg,
 		store:    store,
-		evWriter: ew,
 		listener: listener,
 	}
 }
@@ -88,7 +84,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		}),
 	)
 
-	h := service.NewImageHandler(s.store, s.evWriter, s.cfg)
+	h := service.NewImageHandler(s.store, s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

@@ -11,7 +11,6 @@ import (
 	"github.com/google/uuid"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/events"
 	"github.com/kubev2v/migration-planner/internal/image"
 	internalService "github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -21,19 +20,17 @@ import (
 )
 
 type ImageHandler struct {
-	store       store.Store
-	eventWriter *events.EventProducer
-	cfg         *config.Config
+	store store.Store
+	cfg   *config.Config
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, ew *events.EventProducer, cfg *config.Config) *ImageHandler {
+func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
 	return &ImageHandler{
-		store:       store,
-		eventWriter: ew,
-		cfg:         cfg,
+		store: store,
+		cfg:   cfg,
 	}
 }
 
