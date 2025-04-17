@@ -64,17 +64,23 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		return imageServer.GetImageByToken500JSONResponse{}, nil
 	}
 
-	size, err := imageBuilder.Generate(ctx, writer)
+	// Get image size
+	size, err := imageBuilder.Size()
+	if err != nil {
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to read image size %s", err)}, nil
+	}
+
+	// Set proper headers of the OVA file:
+	writer.Header().Set("Content-Type", "application/ovf")
+	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
+	writer.Header().Set("Content-Length", strconv.Itoa(size))
+
+	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
 		zap.S().Named("image_service").Errorf("failed to generate ova at GetImage: %s", err)
 		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
-
-	// Set proper headers of the OVA file:
-	writer.Header().Set("Content-Type", "application/ovf")
-	writer.Header().Set("Content-Length", strconv.Itoa(size))
-	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 

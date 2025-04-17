@@ -151,7 +151,7 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if _, err := imageBuilder.Generate(ctx, output); err != nil {
+	if err := imageBuilder.Generate(ctx, output); err != nil {
 		return fmt.Errorf("failed to write image: %s", err)
 	}
 
