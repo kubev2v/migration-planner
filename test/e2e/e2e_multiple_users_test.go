@@ -2,14 +2,15 @@ package e2e_test
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
-	"strings"
-	"time"
 )
 
 var _ = Describe("e2e-multiple-users", func() {
@@ -23,7 +24,6 @@ var _ = Describe("e2e-multiple-users", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = DefaultPlannerService()

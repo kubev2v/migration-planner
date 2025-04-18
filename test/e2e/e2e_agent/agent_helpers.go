@@ -2,15 +2,16 @@ package e2e_agent
 
 import (
 	"fmt"
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
-	"github.com/libvirt/libvirt-go"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	"github.com/libvirt/libvirt-go"
+	"go.uber.org/zap"
 )
 
 // cleanupAgentFiles removes all temporary and generated files used during VM setup,
@@ -52,17 +53,9 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 		}
 	}
 
-	if TestOptions.DownloadImageByUrl {
-		if err := p.downloadOvaFromUrl(ovaFile); err != nil {
-			return fmt.Errorf("failed to download OVA image from url: %w", err)
-		}
-
-	} else {
-		if err := p.service.GetImage(ovaFile, p.sourceID); err != nil {
-			return fmt.Errorf("error download image: %v", err)
-		}
+	if err := p.downloadOvaFromUrl(ovaFile); err != nil {
+		return fmt.Errorf("failed to download OVA image from url: %w", err)
 	}
-
 	zap.S().Infof("Successfully downloaded ova file: %s", DefaultOvaPath)
 
 	if err := p.ovaValidateAndExtract(ovaFile); err != nil {

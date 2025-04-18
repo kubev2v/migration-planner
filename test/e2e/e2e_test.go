@@ -27,7 +27,6 @@ var _ = Describe("e2e", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = DefaultPlannerService()
