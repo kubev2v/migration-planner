@@ -1,7 +1,6 @@
 package config
 
 import (
-	"github.com/IBM/sarama"
 	"github.com/kelseyhightower/envconfig"
 )
 
@@ -29,18 +28,8 @@ type svcConfig struct {
 	BaseAgentEndpointUrl string `envconfig:"MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL" default:"https://localhost:7443"`
 	BaseImageEndpointUrl string `envconfig:"MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL" default:"https://localhost:11443"`
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
-	Kafka                kafkaConfig
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
-}
-
-type kafkaConfig struct {
-	Brokers  []string            `envconfig:"MIGRATION_PLANNER_KAFKA_BROKERS" default:""`
-	Topic    string              `envconfig:"MIGRATION_PLANNER_KAFKA_TOPIC" default:""`
-	Version  sarama.KafkaVersion `envconfig:"MIGRATION_PLANNER_KAFKA_VERSION" default:""`
-	ClientID string              `envconfig:"MIGRATION_PLANNER_KAFKA_CLIENT_ID" default:""`
-
-	SaramaConfig *sarama.Config
 }
 
 type Auth struct {
