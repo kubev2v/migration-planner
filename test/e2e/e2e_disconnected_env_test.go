@@ -29,7 +29,6 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = true
 
 		svc, err = DefaultPlannerService()
