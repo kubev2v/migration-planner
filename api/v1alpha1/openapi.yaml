@@ -317,51 +317,6 @@ paths:
           description: NotFound
         "500":
           description: Internal Server Error
-    get:
-      tags:
-        - image
-      description: Get the OVA image
-      operationId: getImage
-      parameters:
-        - name: id
-          in: path
-          description: id of the source
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        "200":
-          description: An OVA image
-          content:
-            application/octet-stream:
-              schema:
-                type: string
-                format: binary
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "404":
-          description: NotFound
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
   /health:
     get:
       tags:

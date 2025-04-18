@@ -3,12 +3,13 @@ package e2e_service
 import (
 	"bytes"
 	"fmt"
+	"net/http"
+	"strings"
+
 	"github.com/kubev2v/migration-planner/internal/auth"
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
-	"net/http"
-	"strings"
 )
 
 type ServiceApi struct {
@@ -81,7 +82,7 @@ func (api *ServiceApi) request(method string, path string, body []byte) (*http.R
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", api.jwtToken))
+	req.Header.Add("X-Authorization", fmt.Sprintf("Bearer %s", api.jwtToken))
 
 	zap.S().Infof("[Service-API] %s [Method: %s]", req.URL.String(), req.Method)
 
