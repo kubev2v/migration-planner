@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -10,9 +11,9 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/image"
-	internalService "github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -60,7 +61,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	imageBuilder := image.NewImageBuilder(source.ID)
 	imageBuilder.WithImageInfra(source.ImageInfra)
 
-	if err := internalService.GenerateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
+	if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
 		return imageServer.GetImageByToken500JSONResponse{}, nil
 	}
 
@@ -85,6 +86,31 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
 	return imageServer.GetImageByToken200ApplicationoctetStreamResponse{Body: bytes.NewReader([]byte{})}, nil
+}
+
+func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {
+	// get the key associated with source orgID to generate agent token
+	key, err := storeInstance.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return err
+		}
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		if err != nil {
+			return err
+		}
+		if _, err := storeInstance.PrivateKey().Create(ctx, *newKey); err != nil {
+			return err
+		}
+		imageBuilder.WithAgentToken(token)
+	} else {
+		token, err := auth.GenerateAgentJWT(key, source)
+		if err != nil {
+			return err
+		}
+		imageBuilder.WithAgentToken(token)
+	}
+	return nil
 }
 
 func (h *ImageHandler) getSourceKey(token *jwt.Token) (interface{}, error) {

@@ -9,7 +9,6 @@ import (
 
 var TestOptions = struct {
 	DisconnectedEnvironment bool
-	DownloadImageByUrl      bool
 }{}
 
 const (

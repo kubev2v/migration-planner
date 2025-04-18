@@ -3,15 +3,16 @@ package e2e_agent
 import (
 	"encoding/json"
 	"fmt"
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
-	"github.com/libvirt/libvirt-go"
-	"go.uber.org/zap"
 	"io"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	"github.com/libvirt/libvirt-go"
+	"go.uber.org/zap"
 )
 
 func (p *plannerAgentLibvirt) cleanupAgentFiles() error {
@@ -55,23 +56,14 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 	var res *http.Response
 
-	if TestOptions.DownloadImageByUrl {
-		url, err := p.getDownloadURL(user.Token.Raw)
-		if err != nil {
-			return err
-		}
+	url, err := p.getDownloadURL(user.Token.Raw)
+	if err != nil {
+		return err
+	}
 
-		res, err = http.Get(url) // Download OVA from the extracted URL
-		if err != nil {
-			return err
-		}
-	} else {
-		getImagePath := p.sourceID.String() + "/" + "image"
-		res, err = p.serviceApi.GetRequest(getImagePath, user.Token.Raw)
-
-		if err != nil {
-			return fmt.Errorf("failed to get source image: %w", err)
-		}
+	res, err = http.Get(url) // Download OVA from the extracted URL
+	if err != nil {
+		return err
 	}
 
 	defer res.Body.Close()
