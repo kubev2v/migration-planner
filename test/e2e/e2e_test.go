@@ -3,38 +3,16 @@ package e2e_test
 import (
 	"fmt"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e-service"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_helpers"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
 	"net/http"
-	"os"
 	"time"
 )
-
-const (
-	Vsphere1Port string = "8989"
-	Vsphere2Port string = "8990"
-)
-
-var (
-	systemIP           = os.Getenv("PLANNER_IP")
-	testsExecutionTime = make(map[string]time.Duration)
-)
-
-var _ = BeforeSuite(func() {
-	config := zap.NewDevelopmentConfig()
-	config.EncoderConfig.CallerKey = ""
-	config.EncoderConfig.MessageKey = "msg"
-
-	logger, _ := config.Build()
-	if logger != nil {
-		zap.ReplaceGlobals(logger)
-	}
-})
-
-var _ = AfterSuite(func() {
-	logExecutionSummary()
-})
 
 var _ = Describe("e2e", func() {
 	var (
@@ -48,8 +26,8 @@ var _ = Describe("e2e", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		testOptions.downloadImageByUrl = false
-		testOptions.disconnectedEnvironment = false
+		TestOptions.DownloadImageByUrl = false
+		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = NewPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -58,7 +36,7 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(defaultAgentTestID, source.Id, vmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -68,7 +46,7 @@ var _ = Describe("e2e", func() {
 		zap.S().Infof("Agent ip is: %s", agentIP)
 
 		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
-		agent.AgentApi().baseURL = agentApiBaseUrl
+		agent.SetAgentApi(DefaultAgentApi(agentApiBaseUrl))
 		zap.S().Infof("Agent Api base url: %s", agentApiBaseUrl)
 
 		zap.S().Info("Wait for planner-agent to be running...")
@@ -92,7 +70,7 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		testsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {
@@ -104,31 +82,31 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"", "pass")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
 			zap.S().Info("Empty User. Successfully returned http status: BadRequest.")
 
-			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"user", "")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
 			zap.S().Info("Empty Password. Successfully returned http status: BadRequest.")
 
-			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"invalid", "cred")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
 			zap.S().Info("Invalid credentials. HTTP status: Unauthorized returned.")
 
-			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/badUrl", systemIP, Vsphere1Port),
+			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
 				"user", "pass")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
 			zap.S().Info("Invalid URL. Successfully returned http status: BadRequest.")
 
-			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err = agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -142,7 +120,7 @@ var _ = Describe("e2e", func() {
 		It("Up to date", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -159,7 +137,7 @@ var _ = Describe("e2e", func() {
 		It("Source removal", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -182,7 +160,7 @@ var _ = Describe("e2e", func() {
 		It("Two agents, Two VSphere's", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -197,7 +175,7 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(source2).NotTo(BeNil())
 
-			agent2, err := CreateAgent("2", source2.Id, vmName+"-2")
+			agent2, err := CreateAgent("2", source2.Id, VmName+"-2")
 			Expect(err).To(BeNil())
 
 			var agentIP2 string
@@ -206,7 +184,7 @@ var _ = Describe("e2e", func() {
 			}, "3m", "2s").Should(BeNil())
 
 			agent2ApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP2)
-			agent2.AgentApi().baseURL = agent2ApiBaseUrl
+			agent2.SetAgentApi(DefaultAgentApi(agent2ApiBaseUrl))
 			zap.S().Infof("Agent2 Api base url: %s", agent2ApiBaseUrl)
 
 			Eventually(func() bool {
@@ -218,7 +196,7 @@ var _ = Describe("e2e", func() {
 			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
 
 			// Login to Vcsim2
-			res, err = agent2.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere2Port),
+			res, err = agent2.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere2Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -240,7 +218,7 @@ var _ = Describe("e2e", func() {
 		It("VM reboot", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", systemIP, Vsphere1Port),
+			res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
 			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
@@ -252,7 +230,7 @@ var _ = Describe("e2e", func() {
 
 			// Check that planner-agent service is running
 			Eventually(func() bool {
-				return agent.IsServiceRunning(agentIP, "planner-agent")
+				return IsPlannerAgentRunning(agent, agentIP)
 			}, "5m", "2s").Should(BeTrue())
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))

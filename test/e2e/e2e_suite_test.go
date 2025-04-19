@@ -1,10 +1,13 @@
 package e2e_test
 
 import (
-	"testing"
-
+	"fmt"
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"go.uber.org/zap"
+	"testing"
 )
 
 func TestE2e(t *testing.T) {
@@ -22,3 +25,19 @@ func AfterFailed(body func()) {
 		}
 	})
 }
+
+var _ = BeforeSuite(func() {
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.CallerKey = ""
+	config.EncoderConfig.MessageKey = "msg"
+
+	logger, _ := config.Build()
+	if logger != nil {
+		zap.ReplaceGlobals(logger)
+	}
+})
+
+var _ = AfterSuite(func() {
+	LogExecutionSummary()
+	_, _ = RunLocalCommand(fmt.Sprintf("rm -rf %s", DefaultBasePath))
+})
