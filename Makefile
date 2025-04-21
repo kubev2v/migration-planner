@@ -19,7 +19,6 @@ MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
 DOWNLOAD_RHCOS ?= true
-KUBECTL ?= kubectl
 IFACE ?= eth0
 GREP ?= grep
 PODMAN ?= podman
@@ -217,8 +216,8 @@ deploy-on-kind: oc
 		echo "*** Deploy Migration Planner on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
 	oc process --local -f  deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
-		| $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
@@ -230,7 +229,7 @@ deploy-on-kind: oc
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
-	   | $(KUBECTL) apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** Migration Planner has been deployed successfully on Kind ***"
 
 delete-from-kind: oc
@@ -245,11 +244,11 @@ delete-from-kind: oc
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
-	   | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f  deploy/templates/postgres-template.yml | $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	   | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f  deploy/templates/postgres-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
-		| $(KUBECTL) delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+		| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml

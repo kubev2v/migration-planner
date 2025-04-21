@@ -3,12 +3,15 @@ package cli
 import (
 	"context"
 	"fmt"
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/libvirt/libvirt-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -23,7 +26,7 @@ type E2ETestOptions struct {
 	insecureRegistryAddr      string
 	agentImage                string
 	registryIP                net.IP
-	destroyEnvironment        bool
+	keepEnvironment           bool
 	iface                     string
 }
 
@@ -34,14 +37,13 @@ const (
 	defaultContainerRuntime   = "docker"
 	defaultRegistryPort       = "5000"
 	defaultPlannerServicePort = "3443"
-	defaultDestroyEnv         = true
+	defaultImagePort          = "11443"
+	defaultAgentPort          = "7443"
 )
 
 func DefaultE2EOptions() *E2ETestOptions {
 	defaultRegistryIP, _ := getLocalIP()
 	defaultInsecureRegistry := fmt.Sprintf("%s:%s", defaultRegistryIP, defaultRegistryPort)
-	defaultPlannerAgentImage := fmt.Sprintf("%s/agent", defaultInsecureRegistry)
-	defaultNetworkInterface := getInterfaceName(defaultRegistryIP)
 
 	return &E2ETestOptions{
 		clusterName:               defaultClusterName,
@@ -50,11 +52,10 @@ func DefaultE2EOptions() *E2ETestOptions {
 		containerRuntime:          defaultContainerRuntime,
 		localRegistryPort:         defaultRegistryPort,
 		insecureRegistryAddr:      defaultInsecureRegistry,
-		agentImage:                defaultPlannerAgentImage,
+		agentImage:                fmt.Sprintf("%s/agent", defaultInsecureRegistry),
 		pkgManager:                getPackageManager(),
 		registryIP:                defaultRegistryIP,
-		destroyEnvironment:        defaultDestroyEnv,
-		iface:                     defaultNetworkInterface,
+		iface:                     getInterfaceName(defaultRegistryIP),
 	}
 }
 
@@ -63,53 +64,77 @@ func NewCmdE2E() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "e2e",
 		Short: "Running the e2e test locally",
-		Example: "e2e -d=false\n" +
+		Example: "e2e -k\n" +
 			"This command creates the environment, runs the e2e test and prevents the deletion of the Kind cluster.",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return o.Run(cmd.Context(), args)
+			return o.Run(cmd.Context())
 		},
 		SilenceUsage: true,
 	}
 	o.Bind(cmd.Flags())
+	cmd.AddCommand(NewCmdE2EDestroy())
 	return cmd
 }
 
-func (o *E2ETestOptions) Bind(fs *pflag.FlagSet) {
-	fs.BoolVarP(&o.destroyEnvironment, "destroy-env", "d", defaultDestroyEnv, fmt.Sprintf("Destroy the created %s cluster", o.clusterName))
+func NewCmdE2EDestroy() *cobra.Command {
+	return &cobra.Command{
+		Use:          "destroy",
+		Short:        "Destroy the e2e test environment",
+		SilenceUsage: true,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if _, err := DefaultE2EOptions().configureEnvironment(); err != nil {
+				return err
+			}
+			return destroyEnvironment()
+		},
+	}
 }
 
-func (o *E2ETestOptions) Run(ctx context.Context, args []string) error {
-	if err := o.configureEnvironment(); err != nil {
+func (o *E2ETestOptions) Bind(fs *pflag.FlagSet) {
+	fs.BoolVarP(&o.keepEnvironment, "keep-env", "k", false, fmt.Sprintf("Keep the created %s cluster", o.clusterName))
+}
+
+func (o *E2ETestOptions) Run(ctx context.Context) error {
+	envVars, err := o.configureEnvironment()
+	if err != nil {
 		return err
 	}
+	o.printConfig(envVars)
 
-	isDeployEnvironmentRequired := true
-	if kindClusterExists(ctx, o.clusterName) {
-		log.Printf("Cluster %s already exists, proceeding...", o.clusterName)
-		isDeployEnvironmentRequired = false
-	}
-	if isDeployEnvironmentRequired {
-		if err := o.deployEnvironment(ctx); err != nil {
-			log.Fatalf("Failed to deploy environment. Error: %v", err)
+	if shouldCreateCluster(ctx, o.clusterName) {
+		if err := o.deployEnvironment(); err != nil {
+			log.Fatalf("[CLI] Failed to deploy environment. Error: %v", err)
 		}
 	}
 
-	if err := o.waitForMigrationPlannerService(ctx); err != nil {
-		_ = destroyEnvironment(ctx)
+	log.Printf("[CLI] Cluster %s exists, proceeding...", o.clusterName)
+
+	if err := o.ensureFullConnectivity(); err != nil {
+		if err := destroyEnvironment(); err != nil {
+			log.Fatalf("[CLI] Failed to destroy environment. Error: %v", err)
+		}
+		return nil
+	}
+
+	if err := validateVmsDeletion(); err != nil {
+		log.Printf("[CLI] failed to delete old test VM's: %v", err)
 		return err
 	}
 
-	o.executeTest(ctx)
+	o.executeTest()
 
-	if o.destroyEnvironment {
-		if err := destroyEnvironment(ctx); err != nil {
-			log.Fatalf("Failed to destroy environment. Error: %v", err)
-		}
+	if o.keepEnvironment {
+		return nil
+	}
+
+	if err := destroyEnvironment(); err != nil {
+		log.Fatalf("[CLI] Failed to destroy environment. Error: %v", err)
 	}
 
 	return nil
 }
 
+// getPackageManager returns the name of the available system package manager (currently: dnf or apt)
 func getPackageManager() string {
 	if _, err := exec.LookPath("dnf"); err == nil {
 		return "dnf"
@@ -119,14 +144,21 @@ func getPackageManager() string {
 	return ""
 }
 
-func runCommand(ctx context.Context, cmdStr string) error {
-	cmd := exec.CommandContext(ctx, "bash", "-c", cmdStr)
+// runCommand executes a shell command in the context of the project root directory
+func runCommand(cmdStr string) error {
+	rootDir, err := findProjectRoot()
+	if err != nil {
+		return fmt.Errorf("[CLI] failed to find project root: %v", err)
+	}
+	cmd := exec.Command("bash", "-c", cmdStr)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
+	cmd.Dir = rootDir
 	return cmd.Run()
 }
 
-func (o *E2ETestOptions) configureEnvironment() error {
+// configureEnvironment sets up and exports environment variables needed for running the tests
+func (o *E2ETestOptions) configureEnvironment() (map[string]string, error) {
 	envVars := map[string]string{
 		"REGISTRY_IP":                             o.registryIP.String(),
 		"INSECURE_REGISTRY":                       o.insecureRegistryAddr,
@@ -140,15 +172,14 @@ func (o *E2ETestOptions) configureEnvironment() error {
 
 	for key, value := range envVars {
 		if err := os.Setenv(key, value); err != nil {
-			return fmt.Errorf("failed to set env variable %s: %w", key, err)
+			return nil, fmt.Errorf("failed to set env variable %s: %w", key, err)
 		}
 	}
 
-	o.printConfig(envVars)
-
-	return nil
+	return envVars, nil
 }
 
+// printConfig displays the configured environment variables and test settings
 func (o *E2ETestOptions) printConfig(envVars map[string]string) {
 	// Print the Environment Variables Configuration
 	fmt.Printf("====================================\n")
@@ -163,38 +194,49 @@ func (o *E2ETestOptions) printConfig(envVars map[string]string) {
 	fmt.Printf("====================================\n")
 	fmt.Printf("🛠 Test Execution Configuration:\n")
 	fmt.Printf("====================================\n")
-	fmt.Printf("Destroy environment at the end? %v\n", o.destroyEnvironment)
+	fmt.Printf("Keep environment at the end? %v\n", o.keepEnvironment)
 	fmt.Printf("====================================\n")
 }
 
-func kindClusterExists(ctx context.Context, clusterName string) bool {
+// shouldCreateCluster determines if a new Kind cluster should be created.
+// It returns true if no running cluster with the given name exists
+func shouldCreateCluster(ctx context.Context, clusterName string) bool {
 	cmd := exec.CommandContext(ctx, "kind", "get", "clusters")
 	output, err := cmd.Output()
 	if err != nil {
-		log.Printf("Error checking Kind clusters: %v\n", err)
+		log.Printf("[CLI] Error checking Kind clusters: %v\n", err)
+		return true
+	}
+
+	if strings.Contains(string(output), clusterName) {
 		return false
 	}
 
-	return strings.Contains(string(output), clusterName)
+	return true
 }
 
-func (o *E2ETestOptions) deployEnvironment(ctx context.Context) error {
+// deployEnvironment triggers the Makefile target to deploy the full e2e test environment
+func (o *E2ETestOptions) deployEnvironment() error {
 	command := "make deploy-e2e-environment"
-	return runCommand(ctx, command)
+	return runCommand(command)
 }
 
-func destroyEnvironment(ctx context.Context) error {
+// destroyEnvironment tears down the e2e test environment using the Makefile target
+func destroyEnvironment() error {
+	log.Printf("[CLI] Destroying environment...")
 	command := "make undeploy-e2e-environment"
-	return runCommand(ctx, command)
+	return runCommand(command)
 }
 
-func (o *E2ETestOptions) executeTest(ctx context.Context) {
+// executeTest runs the integration tests using a Makefile target and the planner IP
+func (o *E2ETestOptions) executeTest() {
 	command := fmt.Sprintf("make integration-test PLANNER_IP=%s", o.registryIP)
-	if err := runCommand(ctx, command); err != nil {
+	if err := runCommand(command); err != nil {
 		fmt.Printf("Failed to execute: %s, Error: %v\n", command, err)
 	}
 }
 
+// getInterfaceName attempts to find the network interface associated with the given IP
 func getInterfaceName(ip net.IP) string {
 
 	interfaces, err := net.Interfaces()
@@ -217,41 +259,125 @@ func getInterfaceName(ip net.IP) string {
 	return ""
 }
 
-func waitForService(ctx context.Context, host string, port string, fixCommand string) error {
-	address := fmt.Sprintf("%s:%s", host, port)
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
+// portForwardCommand establishes a `oc port-forward` command to expose a given service or deployment
+// to the local machine on a specified port, if it is not already reachable
+func (o *E2ETestOptions) portForwardCommand(dest string, port string) error {
 
-	channel := make(chan error)
+	address := fmt.Sprintf("%s:%s", o.registryIP.String(), port)
+	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
+	if err == nil {
+		log.Printf("[CLI] Destination: %s is already available. skipping port forward...\n", address)
+		_ = conn.Close()
+		return nil
+	}
 
-	go func() {
-		defer close(channel)
-		for {
-			select {
-			case <-ctxWithTimeout.Done():
-				channel <- fmt.Errorf("timeout waiting for %s", address)
-				return
-			case <-time.After(2 * time.Second):
-				fmt.Printf("Waiting for address: %s to become available\n", address)
+	log.Printf("[CLI] Destination: %s isn't available. need to run port forward...\n", address)
 
-				conn, err := net.DialTimeout("tcp", address, 2*time.Second)
-				if err == nil {
-					fmt.Printf("Address: %s is available\n", address)
-					_ = conn.Close()
-					channel <- nil
-					return
-				}
+	fixCommand := fmt.Sprintf("oc port-forward --address 0.0.0.0 %s %s:%s > /dev/null 2>&1 &", dest, port, port)
+	if err := runCommand(fixCommand); err != nil {
+		log.Printf("[CLI] error fix connection to %s: %v", address, err)
+		return fmt.Errorf("error fix connection to %s: %v", address, err)
+	}
 
-				_ = runCommand(ctxWithTimeout, fixCommand)
-			}
-		}
-	}()
+	time.Sleep(1 * time.Second)
 
-	return <-channel
+	conn, err = net.DialTimeout("tcp", address, 2*time.Second)
+	if err != nil {
+		log.Printf("[CLI] error after port-forward %v", err)
+		return err
+	}
+	_ = conn.Close()
+
+	log.Printf("[CLI] Destination: %s is now available during the execution.\n", address)
+
+	return nil
 }
 
-func (o *E2ETestOptions) waitForMigrationPlannerService(ctx context.Context) error {
-	portForwardCommand := fmt.Sprintf("kubectl port-forward --address 0.0.0.0 service/migration-planner %s:%s &",
-		defaultPlannerServicePort, defaultPlannerServicePort)
-	return waitForService(ctx, o.registryIP.String(), defaultPlannerServicePort, portForwardCommand)
+// ensureFullConnectivity establishes port-forwarding for all required services used in the E2E tests.
+// It skips destinations that are already connected and ensures each service is reachable before proceeding.
+func (o *E2ETestOptions) ensureFullConnectivity() error {
+
+	log.Printf("[CLI] Validating full connection to %s\n", o.registryIP)
+	time.Sleep(1 * time.Second) // Wait for port-forwarding from the deployment step to complete
+
+	services := []struct {
+		dest string
+		port string
+	}{
+		{"service/migration-planner", defaultPlannerServicePort},
+		{"service/migration-planner-image", defaultImagePort},
+		{"service/migration-planner-agent", defaultAgentPort},
+		{"deploy/registry", defaultRegistryPort},
+		{"deploy/vcsim1", Vsphere1Port},
+		{"deploy/vcsim2", Vsphere2Port},
+	}
+	for _, s := range services {
+		if err := o.portForwardCommand(s.dest, s.port); err != nil {
+			return fmt.Errorf("error establishing connection to port %s: %v", s.port, err)
+		}
+	}
+
+	return nil
+}
+
+// validateVmsDeletion connects to libvirt and destroys and undefines any VMs created for the test
+func validateVmsDeletion() error {
+	conn, err := libvirt.NewConnect("qemu:///system")
+	if err != nil {
+		return fmt.Errorf("failed to connect to hypervisor: %v", err)
+	}
+
+	defer func() {
+		_, _ = conn.Close()
+	}()
+
+	domains, err := conn.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE | libvirt.CONNECT_LIST_DOMAINS_INACTIVE)
+	if err != nil {
+		return fmt.Errorf("[CLI] Failed to list domains: %v", err)
+	}
+
+	for _, domain := range domains {
+		name, err := domain.GetName()
+		if err != nil {
+			log.Printf("[CLI] Failed to get domain name: %v", err)
+			_ = domain.Free()
+			continue
+		}
+
+		if strings.HasPrefix(name, VmName) {
+			if state, _, err := domain.GetState(); err == nil && state == libvirt.DOMAIN_RUNNING {
+				if err := domain.Destroy(); err != nil {
+					_ = domain.Free()
+					return fmt.Errorf("failed to destroy domain: %v", err)
+				}
+			}
+
+			if err := domain.Undefine(); err != nil {
+				_ = domain.Free()
+				return fmt.Errorf("failed to undefine domain: %v", err)
+			}
+		}
+
+		_ = domain.Free()
+	}
+
+	return nil
+}
+
+// findProjectRoot searches for the project root by looking for a Makefile in the current or parent directory
+func findProjectRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	if _, err := os.Stat(filepath.Join(dir, "Makefile")); err == nil {
+		return dir, nil
+	}
+
+	parent := filepath.Dir(dir)
+	if _, err := os.Stat(filepath.Join(parent, "Makefile")); err == nil {
+		return parent, nil
+	}
+
+	return "", fmt.Errorf("error, Makefile not found in current or parent directory")
 }
