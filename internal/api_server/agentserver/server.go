@@ -72,9 +72,9 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	router.Use(
 		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
+		middleware.RequestID,
 		log.Logger(zap.L(), "router_agent"),
 		auth.NewAgentAuthenticator(s.store).Authenticator,
-		middleware.RequestID,
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
