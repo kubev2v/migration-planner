@@ -68,13 +68,21 @@ func (s *AgentServer) Run(ctx context.Context) error {
 
 	metricMiddleware := metrics.NewMiddleware("agent_server")
 	metricMiddleware.MustRegisterDefault()
-
 	router.Use(
 		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
 		middleware.RequestID,
 		log.Logger(zap.L(), "router_agent"),
-		auth.NewAgentAuthenticator(s.store).Authenticator,
+	)
+
+	zap.S().Infow("agent authentication", "enabled", s.cfg.Service.Auth.AgentAuthenticationEnabled)
+	if s.cfg.Service.Auth.AgentAuthenticationEnabled {
+		router.Use(
+			auth.NewAgentAuthenticator(s.store).Authenticator,
+		)
+	}
+
+	router.Use(
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
