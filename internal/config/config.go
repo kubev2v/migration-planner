@@ -44,9 +44,10 @@ type kafkaConfig struct {
 }
 
 type Auth struct {
-	AuthenticationType string `envconfig:"MIGRATION_PLANNER_AUTH" default:""`
-	JwkCertURL         string `envconfig:"MIGRATION_PLANNER_JWK_URL" default:""`
-	LocalPrivateKey    string `envconfig:"MIGRATION_PLANNER_PRIVATE_KEY" default:""`
+	AuthenticationType         string `envconfig:"MIGRATION_PLANNER_AUTH" default:""`
+	JwkCertURL                 string `envconfig:"MIGRATION_PLANNER_JWK_URL" default:""`
+	LocalPrivateKey            string `envconfig:"MIGRATION_PLANNER_PRIVATE_KEY" default:""`
+	AgentAuthenticationEnabled bool   `envconfig:"MIGRATION_PLANNER_AGENT_AUTH_ENABLED" default:"true"`
 }
 
 func New() (*Config, error) {
