@@ -2,6 +2,9 @@ package e2e_test
 
 import (
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
@@ -10,8 +13,6 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
-	"net/http"
-	"time"
 )
 
 var _ = Describe("e2e", func() {
@@ -26,7 +27,6 @@ var _ = Describe("e2e", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = NewPlannerService()
