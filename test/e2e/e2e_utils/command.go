@@ -23,6 +23,9 @@ func RunLocalCommand(command string) (string, error) {
 	return string(output), err
 }
 
+// RunSSHCommand executes a command on a remote machine over SSH using sshpass for authentication.
+// It takes an IP address and a command string as parameters, runs the command on the remote machine,
+// and returns the command's output (stdout) as a string, or an error if the command fails.
 func RunSSHCommand(ip string, command string) (string, error) {
 	sshCmd := exec.Command("sshpass", "-p", "123456", "ssh", "-o", "StrictHostKeyChecking=no", "-o",
 		"UserKnownHostsFile=/dev/null", fmt.Sprintf("core@%s", ip), command)

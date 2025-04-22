@@ -8,6 +8,9 @@ import (
 	"strings"
 )
 
+// ValidateTar validates a tar file by checking if it contains at least one file with the following suffixes:
+// .ovf, .vmdk, and .iso. It also performs basic validation on the .ovf file to ensure it contains essential elements
+// like <Envelope> and <VirtualSystem>. Returns an error if any of these conditions are not met
 func ValidateTar(file *os.File) error {
 	_, _ = file.Seek(0, 0)
 	tarReader := tar.NewReader(file)
@@ -60,6 +63,9 @@ func ValidateTar(file *os.File) error {
 	return nil
 }
 
+// Untar extracts a specific file (identified by 'fileName') from a tar file and writes it to the 'destFile' path.
+// If the specified file is found, it is extracted and written; otherwise, an error is returned indicating that
+// the file was not found in the tar archive.
 func Untar(file *os.File, destFile string, fileName string) error {
 	_, _ = file.Seek(0, 0)
 	tarReader := tar.NewReader(file)
