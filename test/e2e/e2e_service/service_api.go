@@ -3,7 +3,9 @@ package e2e_service
 import (
 	"bytes"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
 	"net/http"
 	"strings"
@@ -12,32 +14,50 @@ import (
 type ServiceApi struct {
 	baseURL    string
 	httpClient *http.Client
+	jwtToken   string
 }
 
-func NewServiceApi() *ServiceApi {
+// NewServiceApi creates and returns a new ServiceApi instance, initializing the base URL
+// and HTTP client for making requests to the service API
+func NewServiceApi(cred *auth.User) (*ServiceApi, error) {
+	token, err := GetToken(cred)
+	if err != nil {
+		return nil, fmt.Errorf("error getting token: %v", err)
+	}
 	return &ServiceApi{
 		baseURL:    fmt.Sprintf("%s/api/v1/sources/", DefaultServiceUrl),
 		httpClient: &http.Client{},
-	}
+		jwtToken:   token,
+	}, nil
 }
 
-func (api *ServiceApi) GetRequest(path string, token string) (*http.Response, error) {
-	return api.request(http.MethodGet, path, nil, token)
+// GetRequest makes an HTTP GET request to the specified path, passing the provided token
+// for authorization, and returns the HTTP response
+func (api *ServiceApi) GetRequest(path string) (*http.Response, error) {
+	return api.request(http.MethodGet, path, nil)
 }
 
-func (api *ServiceApi) PostRequest(path string, body []byte, token string) (*http.Response, error) {
-	return api.request(http.MethodPost, path, body, token)
+// PostRequest makes an HTTP POST request to the specified path with the provided body
+// and authorization token, returning the HTTP response
+func (api *ServiceApi) PostRequest(path string, body []byte) (*http.Response, error) {
+	return api.request(http.MethodPost, path, body)
 }
 
-func (api *ServiceApi) PutRequest(path string, body []byte, token string) (*http.Response, error) {
-	return api.request(http.MethodPut, path, body, token)
+// PutRequest makes an HTTP PUT request to the specified path with the provided body
+// and authorization token, returning the HTTP response.
+func (api *ServiceApi) PutRequest(path string, body []byte) (*http.Response, error) {
+	return api.request(http.MethodPut, path, body)
 }
 
-func (api *ServiceApi) DeleteRequest(path string, token string) (*http.Response, error) {
-	return api.request(http.MethodDelete, path, nil, token)
+// DeleteRequest makes an HTTP DELETE request to the specified path with the provided token
+// for authorization, returning the HTTP response.
+func (api *ServiceApi) DeleteRequest(path string) (*http.Response, error) {
+	return api.request(http.MethodDelete, path, nil)
 }
 
-func (api *ServiceApi) request(method string, path string, body []byte, jwtToken string) (*http.Response, error) {
+// request is a helper function that performs an HTTP request based on the method (GET, POST, PUT, DELETE),
+// path, body, and JWT token, returning the HTTP response.
+func (api *ServiceApi) request(method string, path string, body []byte) (*http.Response, error) {
 	var req *http.Request
 	var err error
 
@@ -61,7 +81,7 @@ func (api *ServiceApi) request(method string, path string, body []byte, jwtToken
 	}
 
 	req.Header.Add("Content-Type", "application/json")
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", jwtToken))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", api.jwtToken))
 
 	zap.S().Infof("[Service-API] %s [Method: %s]", req.URL.String(), req.Method)
 

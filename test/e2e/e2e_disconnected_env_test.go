@@ -32,14 +32,14 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = true
 
-		svc, err = NewPlannerService()
+		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
