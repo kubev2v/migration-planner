@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// PlannerAgent defines the interface for interacting with a planner agent instance
 type PlannerAgent interface {
 	AgentApi() *AgentApi
 	DumpLogs(string)
@@ -22,34 +23,39 @@ type PlannerAgent interface {
 	SetAgentApi(*AgentApi)
 }
 
+// plannerAgentLibvirt is an implementation of the PlannerAgent interface
 type plannerAgentLibvirt struct {
 	agentEndToEndTestID string
 	con                 *libvirt.Connect
 	localApi            *AgentApi
 	name                string
-	serviceApi          *ServiceApi
+	service             PlannerService
 	sourceID            uuid.UUID
 }
 
-func NewPlannerAgent(sourceID uuid.UUID, name string, idForTest string) (*plannerAgentLibvirt, error) {
+// NewPlannerAgent creates a new libvirt-based planner agent instance
+func NewPlannerAgent(sourceID uuid.UUID, name string, idForTest string, svc PlannerService) (*plannerAgentLibvirt, error) {
 
 	conn, err := libvirt.NewConnect("qemu:///system")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to hypervisor: %v", err)
 	}
 	return &plannerAgentLibvirt{agentEndToEndTestID: idForTest, con: conn,
-		name: name, serviceApi: NewServiceApi(), sourceID: sourceID}, nil
+		name: name, service: svc, sourceID: sourceID}, nil
 }
 
+// AgentApi returns the associated Agent API instance
 func (p *plannerAgentLibvirt) AgentApi() *AgentApi {
 	return p.localApi
 }
 
+// DumpLogs prints journal logs from the agent VM to the GinkgoWriter
 func (p *plannerAgentLibvirt) DumpLogs(agentIp string) {
 	stdout, _ := RunSSHCommand(agentIp, "journalctl --no-pager")
 	fmt.Fprintf(GinkgoWriter, "Journal: %v\n", stdout)
 }
 
+// GetIp retrieves the IP address of the agent VM
 func (p *plannerAgentLibvirt) GetIp() (string, error) {
 	zap.S().Info("Attempting to retrieve agent IP")
 	domain, err := p.con.LookupDomainByName(p.name)
@@ -76,11 +82,13 @@ func (p *plannerAgentLibvirt) GetIp() (string, error) {
 	return "", fmt.Errorf("No IP found")
 }
 
+// IsServiceRunning checks whether the specified systemd service is running on the agent
 func (p *plannerAgentLibvirt) IsServiceRunning(agentIp string, service string) bool {
 	_, err := RunSSHCommand(agentIp, fmt.Sprintf("systemctl --user is-active --quiet %s", service))
 	return err == nil
 }
 
+// Run prepares and launches the planner agent VM
 func (p *plannerAgentLibvirt) Run() error {
 	if err := p.prepareImage(); err != nil {
 		return err
@@ -94,6 +102,7 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
+// Restart reboots the agent VM gracefully and waits for it to return to a running state
 func (p *plannerAgentLibvirt) Restart() error {
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
@@ -128,6 +137,7 @@ func (p *plannerAgentLibvirt) Restart() error {
 	return nil
 }
 
+// Remove gracefully deletes the virtual machine and associated resources
 func (p *plannerAgentLibvirt) Remove() error {
 	defer p.con.Close()
 	domain, err := p.con.LookupDomainByName(p.name)
@@ -155,6 +165,7 @@ func (p *plannerAgentLibvirt) Remove() error {
 	return nil
 }
 
+// SetAgentApi allows assigning a reference to the AgentApi instance used by the agent
 func (p *plannerAgentLibvirt) SetAgentApi(agentApi *AgentApi) {
 	p.localApi = agentApi
 }

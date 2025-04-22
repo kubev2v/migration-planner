@@ -1,7 +1,6 @@
 package e2e_agent
 
 import (
-	"encoding/json"
 	"fmt"
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
@@ -14,6 +13,8 @@ import (
 	"time"
 )
 
+// cleanupAgentFiles removes all temporary and generated files used during VM setup,
+// including the OVA, ISO, VMDK, and QCOW files.
 func (p *plannerAgentLibvirt) cleanupAgentFiles() error {
 	if err := RemoveFile(DefaultOvaPath); err != nil {
 		return fmt.Errorf("failed to remove OVA file: %w", err)
@@ -34,6 +35,9 @@ func (p *plannerAgentLibvirt) cleanupAgentFiles() error {
 	return nil
 }
 
+// prepareImage handles the full preparation of the agent VM image:
+// it downloads the OVA (from URL or image service), extracts the required ISO and VMDK files,
+// and converts the VMDK to QCOW format.
 func (p *plannerAgentLibvirt) prepareImage() error {
 	// Create OVA:
 	ovaFile, err := os.Create(DefaultOvaPath)
@@ -48,40 +52,15 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 		}
 	}
 
-	user, err := DefaultUserAuth()
-	if err != nil {
-		return err
-	}
-
-	var res *http.Response
-
 	if TestOptions.DownloadImageByUrl {
-		url, err := p.getDownloadURL(user.Token.Raw)
-		if err != nil {
-			return err
+		if err := p.downloadOvaFromUrl(ovaFile); err != nil {
+			return fmt.Errorf("failed to download OVA image from url: %w", err)
 		}
 
-		res, err = http.Get(url) // Download OVA from the extracted URL
-		if err != nil {
-			return err
-		}
 	} else {
-		getImagePath := p.sourceID.String() + "/" + "image"
-		res, err = p.serviceApi.GetRequest(getImagePath, user.Token.Raw)
-
-		if err != nil {
-			return fmt.Errorf("failed to get source image: %w", err)
+		if err := p.service.GetImage(ovaFile, p.sourceID); err != nil {
+			return fmt.Errorf("error download image: %v", err)
 		}
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download image: %s", res.Status)
-	}
-
-	if _, err = io.Copy(ovaFile, res.Body); err != nil {
-		return fmt.Errorf("failed to write to the file: %w", err)
 	}
 
 	zap.S().Infof("Successfully downloaded ova file: %s", DefaultOvaPath)
@@ -101,6 +80,30 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	return nil
 }
 
+// downloadOvaFromUrl fetches the OVA file from a remote URL and writes it to the provided file
+func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
+	url, err := p.service.GetImageUrl(p.sourceID)
+	if err != nil {
+		return err
+	}
+
+	res, err := http.Get(url) // Download OVA from the extracted URL
+
+	if err != nil {
+		return fmt.Errorf("failed to download image: %v", err)
+	}
+
+	defer res.Body.Close()
+
+	if _, err = io.Copy(ovaFile, res.Body); err != nil {
+		return fmt.Errorf("failed to write to the file: %w", err)
+	}
+
+	return nil
+}
+
+// createVm defines and starts a VM based on its XML configuration.
+// It reads the XML from a file and uses libvirt to create the domain
 func (p *plannerAgentLibvirt) createVm() error {
 	// Read VM XML definition from file
 	vmXMLBytes, err := os.ReadFile(p.getConfigXmlVMPath())
@@ -122,31 +125,8 @@ func (p *plannerAgentLibvirt) createVm() error {
 	return nil
 }
 
-func (p *plannerAgentLibvirt) getDownloadURL(jwtToken string) (string, error) {
-	getImageUrlPath := p.sourceID.String() + "/" + "image-url"
-	res, err := p.serviceApi.GetRequest(getImageUrlPath, jwtToken)
-	if err != nil {
-		return "", fmt.Errorf("failed to get source url: %w", err)
-	}
-	defer res.Body.Close()
-
-	var result struct {
-		ExpiresAt string `json:"expires_at"`
-		URL       string `json:"url"`
-	}
-
-	body, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if err := json.Unmarshal(body, &result); err != nil {
-		return "", fmt.Errorf("failed to decod JSON: %w", err)
-	}
-
-	return result.URL, nil
-}
-
+// ovaValidateAndExtract validates the OVA as a tar archive and extracts the ISO and VMDK files
+// from it using their known filenames inside the archive.
 func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 	if err := ValidateTar(ovaFile); err != nil {
 		return fmt.Errorf("failed to validate tar: %w", err)
@@ -165,6 +145,8 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 	return nil
 }
 
+// getConfigXmlVMPath returns the path to the VM XML configuration file,
+// which can differ based on the test ID.
 func (p *plannerAgentLibvirt) getConfigXmlVMPath() string {
 	if p.agentEndToEndTestID == DefaultAgentTestID {
 		return "data/vm.xml"
@@ -172,6 +154,8 @@ func (p *plannerAgentLibvirt) getConfigXmlVMPath() string {
 	return fmt.Sprintf("data/vm-%s.xml", p.agentEndToEndTestID)
 }
 
+// isoFilePath returns the expected file path of the agent ISO,
+// which may be test-specific or default.
 func (p *plannerAgentLibvirt) isoFilePath() string {
 	if p.agentEndToEndTestID == DefaultAgentTestID {
 		return filepath.Join(DefaultBasePath, "agent.iso")
@@ -180,6 +164,8 @@ func (p *plannerAgentLibvirt) isoFilePath() string {
 	return filepath.Join(DefaultBasePath, fileName)
 }
 
+// qcowDiskFilePath returns the expected path of the QCOW2 disk image,
+// varying based on the test ID.
 func (p *plannerAgentLibvirt) qcowDiskFilePath() string {
 	if p.agentEndToEndTestID == DefaultAgentTestID {
 		return filepath.Join(DefaultBasePath, "persistence-disk.qcow2")
@@ -188,6 +174,8 @@ func (p *plannerAgentLibvirt) qcowDiskFilePath() string {
 	return filepath.Join(DefaultBasePath, fileName)
 }
 
+// WaitForDomainState polls the libvirt domain state until the desired state is reached
+// or a timeout occurs. It checks the state once every second.
 func WaitForDomainState(duration time.Duration, domain *libvirt.Domain, desiredState libvirt.DomainState) error {
 	timeout := time.After(duration)
 	ticker := time.NewTicker(time.Second)
