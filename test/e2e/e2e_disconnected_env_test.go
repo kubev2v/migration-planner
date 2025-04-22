@@ -6,6 +6,11 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_helpers"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
+	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -24,8 +29,8 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		testOptions.downloadImageByUrl = false
-		testOptions.disconnectedEnvironment = true
+		TestOptions.DownloadImageByUrl = false
+		TestOptions.DisconnectedEnvironment = true
 
 		svc, err = NewPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -34,22 +39,26 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(defaultAgentTestID, source.Id, vmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
 		Eventually(func() error {
-			return FindAgentIp(agent, &agentIP)
+			agentIP, err = agent.GetIp()
+			if err != nil {
+				return err
+			}
+			return nil
 		}, "3m", "2s").Should(BeNil())
 		zap.S().Infof("Agent ip is: %s", agentIP)
 
 		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
-		agent.AgentApi().baseURL = agentApiBaseUrl
+		agent.SetAgentApi(DefaultAgentApi(agentApiBaseUrl))
 		zap.S().Infof("Agent Api base url: %s", agentApiBaseUrl)
 
 		zap.S().Info("Wait for planner-agent to be running...")
 		Eventually(func() bool {
-			return IsPlannerAgentRunning(agent, agentIP)
+			return agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())
 		zap.S().Info("Planner-agent is now running")
 
@@ -72,7 +81,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		testsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {
@@ -87,7 +96,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			_, err := RunSSHCommand(agentIP, fmt.Sprintf("podman exec "+
 				"--user root "+
 				"planner-agent "+
-				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", systemIP))
+				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", SystemIP))
 			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
 
 			// Login to Vcenter
