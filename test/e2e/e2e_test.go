@@ -29,14 +29,14 @@ var _ = Describe("e2e", func() {
 		TestOptions.DownloadImageByUrl = false
 		TestOptions.DisconnectedEnvironment = false
 
-		svc, err = NewPlannerService()
+		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -60,7 +60,11 @@ var _ = Describe("e2e", func() {
 		zap.S().Info("Planner-agent is now running")
 
 		Eventually(func() string {
-			return CredentialURL(svc, source.Id)
+			credUrl, err := CredentialURL(svc, source.Id)
+			if err != nil {
+				return err.Error()
+			}
+			return credUrl
 		}, "3m", "2s").
 			Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 		zap.S().Info("Setup complete for test.")
@@ -132,7 +136,9 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
@@ -149,7 +155,9 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			err = svc.RemoveSource(source.Id)
@@ -172,14 +180,16 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			source2, err := svc.CreateSource("source-2")
 			Expect(err).To(BeNil())
 			Expect(source2).NotTo(BeNil())
 
-			agent2, err := CreateAgent("2", source2.Id, VmName+"-2")
+			agent2, err := CreateAgent("2", source2.Id, VmName+"-2", svc)
 			Expect(err).To(BeNil())
 
 			var agentIP2 string
@@ -200,7 +210,11 @@ var _ = Describe("e2e", func() {
 			}, "3m", "2s").Should(BeTrue())
 
 			Eventually(func() string {
-				return CredentialURL(svc, source2.Id)
+				credUrl, err := CredentialURL(svc, source2.Id)
+				if err != nil {
+					return err.Error()
+				}
+				return credUrl
 			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
 
 			// Login to Vcsim2
@@ -212,7 +226,9 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source2.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source2.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			err = agent2.Remove()
@@ -243,7 +259,9 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)

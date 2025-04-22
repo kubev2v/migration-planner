@@ -7,6 +7,8 @@ import (
 	"time"
 )
 
+// LogExecutionSummary logs the execution time of all tests stored in the TestsExecutionTime map.
+// It sorts the tests by duration in descending order and logs the test name along with its execution duration.
 func LogExecutionSummary() {
 	zap.S().Infof("============Summarizing execution time============")
 

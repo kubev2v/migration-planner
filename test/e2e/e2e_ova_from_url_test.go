@@ -30,14 +30,14 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		TestOptions.DownloadImageByUrl = true
 		TestOptions.DisconnectedEnvironment = false
 
-		svc, err = NewPlannerService()
+		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
 
 		source, err = svc.CreateSource("source")
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName)
+		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -61,7 +61,11 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 		zap.S().Info("Planner-agent is now running")
 
 		Eventually(func() string {
-			return CredentialURL(svc, source.Id)
+			credUrl, err := CredentialURL(svc, source.Id)
+			if err != nil {
+				return err.Error()
+			}
+			return credUrl
 		}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
 
 		zap.S().Info("Setup complete for test.")
@@ -94,7 +98,9 @@ var _ = Describe("e2e-download-ova-from-url", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				return AgentIsUpToDate(svc, source.Id)
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
 			}, "3m", "2s").Should(BeTrue())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
