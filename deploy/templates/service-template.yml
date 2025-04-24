@@ -387,6 +387,7 @@ objects:
                             prefix: /api/v1/image
                           route:
                             cluster: backend-image
+                            timeout: 0s
                         - match: 
                             prefix: /health
                           route:
