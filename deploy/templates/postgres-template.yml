@@ -25,9 +25,9 @@ parameters:
     displayName: PostgreSQL Database Name
     value: planner
   - name: POSTGRES_IMAGE
-    description: Postgres image (14 or latest).
+    description: Postgres image (15).
     displayName: Postgres Image
-    value: quay.io/sclorg/postgresql-12-c8s
+    value: quay.io/sclorg/postgresql-15-c9s
   - name: DB_VOLUME_CAPACITY
     description: Volume space available for data, e.g. 512Mi, 2Gi.
     displayName: Volume Capacity
