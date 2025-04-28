@@ -99,7 +99,8 @@ export default class Store {
         // Merge the old and new together to create a new state and set it
         self.state = Object.assign(self.state, newState);
 
-        self.events.publish(event, self.state);
+        // Publish the change event for the components that are listening
+        self.events.publish('stateChange', self.state);
 
         return true;
     }
