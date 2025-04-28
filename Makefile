@@ -101,8 +101,6 @@ lint: tools
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
-run-agent:
-	./bin/planner-agent --config ${XDG_CONFIG_HOME}/planner/agent.yaml
 run:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
