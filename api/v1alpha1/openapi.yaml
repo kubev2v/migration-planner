@@ -599,6 +599,7 @@ components:
         - freeCapacityGB
         - vendor
         - diskId
+        - hardwareAcceleratedMove
       properties:
         type:
           type: string
@@ -610,6 +611,8 @@ components:
           type: string
         diskId:
           type: string
+        hardwareAcceleratedMove:
+          type: boolean
 
     VMResourceBreakdown:
       type: object

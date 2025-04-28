@@ -50,11 +50,12 @@ type AgentProxy struct {
 
 // Datastore defines model for Datastore.
 type Datastore struct {
-	DiskId          string `json:"diskId"`
-	FreeCapacityGB  int    `json:"freeCapacityGB"`
-	TotalCapacityGB int    `json:"totalCapacityGB"`
-	Type            string `json:"type"`
-	Vendor          string `json:"vendor"`
+	DiskId                  string `json:"diskId"`
+	FreeCapacityGB          int    `json:"freeCapacityGB"`
+	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
+	TotalCapacityGB         int    `json:"totalCapacityGB"`
+	Type                    string `json:"type"`
+	Vendor                  string `json:"vendor"`
 }
 
 // Error defines model for Error.

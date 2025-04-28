@@ -18,8 +18,12 @@ import (
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
 	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
 	vspheremodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
+	webprovider "github.com/konveyor/forklift-controller/pkg/controller/provider/web"
+	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
 	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
+	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
 	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
+	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/util"
@@ -32,14 +36,6 @@ type Collector struct {
 	dataDir        string
 	credentialsDir string
 	once           sync.Once
-}
-
-type DatastoreInfo struct {
-	DiskName        string `json:"diskName"`
-	FreeCapacityGB  int    `json:"freeCapacityGB"`
-	TotalCapacityGB int    `json:"totalCapacityGB"`
-	Type            string `json:"type"`
-	Vendor          string `json:"vendor"`
 }
 
 func NewCollector(dataDir string, credentialsDir string) *Collector {
@@ -97,13 +93,14 @@ func (c *Collector) run() {
 	}
 
 	zap.S().Named("collector").Infof("vSphere collector")
-	collector, err := createCollector(db, provider, secret)
+	collector := vsphere.New(db, provider, secret)
+	container, err := startWeb(collector)
 	if err != nil {
-		zap.S().Named("collector").Errorf("failed to run the collector: %v", err)
+		zap.S().Named("collector").Errorf("failed to create forklift API: %v", err)
 		return
 	}
+	defer container.Delete(collector.Owner())
 	defer collector.DB().Close(true)
-	defer collector.Shutdown()
 
 	zap.S().Named("collector").Infof("List VMs")
 	vms := &[]vspheremodel.VM{}
@@ -160,6 +157,43 @@ func (c *Collector) run() {
 		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
 		return
 	}
+}
+
+func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
+	container := libcontainer.New()
+	if err := container.Add(collector); err != nil {
+		return container, err
+	}
+
+	all := []libweb.RequestHandler{
+		&libweb.SchemaHandler{},
+		&webprovider.ProviderHandler{
+			Handler: base.Handler{
+				Container: container,
+			},
+		},
+	}
+	all = append(
+		all,
+		web.Handlers(container)...)
+
+	web := libweb.New(container, all...)
+
+	web.Start()
+
+	const maxRetries = 300
+	var i int
+	for i = 0; i < maxRetries; i++ {
+		time.Sleep(1 * time.Second)
+		if collector.HasParity() {
+			break
+		}
+	}
+	if i == maxRetries {
+		return container, fmt.Errorf("timed out waiting for collector parity")
+	}
+
+	return container, nil
 }
 
 func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
@@ -250,6 +284,9 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 func getProvider(creds config.Credentials) *api.Provider {
 	vsphereType := api.VSphere
 	return &api.Provider{
+		ObjectMeta: meta.ObjectMeta{
+			UID: "1",
+		},
 		Spec: api.ProviderSpec{
 			URL:  creds.URL,
 			Type: &vsphereType,
@@ -402,6 +439,47 @@ func getNaa(ds *vspheremodel.Datastore) string {
 	return "N/A"
 }
 
+func isHardwareAcceleratedMove(hosts []vspheremodel.Host, names []string) bool {
+	supported := false
+	if len(names) == 0 {
+		return supported
+	}
+
+	for _, host := range hosts {
+		for _, disk := range host.HostScsiDisks {
+			if disk.CanonicalName != names[0] {
+				continue
+			}
+		}
+
+		resp, err := http.Get("http://localhost:8080/providers/vsphere/1/hosts/" + host.ID + "?advancedOption=DataMover.HardwareAcceleratedMove")
+		if err != nil {
+			return supported
+		}
+		defer resp.Body.Close()
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return supported
+		}
+
+		var hostData web.Host
+		err = json.Unmarshal(bodyBytes, &hostData)
+		if err != nil {
+			return supported
+		}
+
+		for _, option := range hostData.AdvancedOptions {
+			if option.Key == "DataMover.HardwareAcceleratedMove" {
+				supported = option.Value == "1"
+				return supported
+			}
+		}
+	}
+
+	return supported
+}
+
 func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
 	datastores := &[]vspheremodel.Datastore{}
 	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
@@ -411,11 +489,12 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
 		res = append(res, apiplanner.Datastore{
-			TotalCapacityGB: int(ds.Capacity / 1024 / 1024 / 1024),
-			FreeCapacityGB:  int(ds.Free / 1024 / 1024 / 1024),
-			Type:            ds.Type,
-			Vendor:          findVendorBasedOnNaa(*hosts, ds.BackingDevicesNames),
-			DiskId:          getNaa(&ds),
+			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
+			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
+			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
+			Type:                    ds.Type,
+			Vendor:                  findVendorBasedOnNaa(*hosts, ds.BackingDevicesNames),
+			DiskId:                  getNaa(&ds),
 		})
 	}
 
@@ -444,25 +523,6 @@ func hasLabel(
 		}
 	}
 	return -1
-}
-
-func createCollector(db libmodel.DB, provider *api.Provider, secret *core.Secret) (*vsphere.Collector, error) {
-	collector := vsphere.New(db, provider, secret)
-
-	// Collect
-	err := collector.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	// Wait for collector.
-	for {
-		time.Sleep(1 * time.Second)
-		if collector.HasParity() {
-			break
-		}
-	}
-	return collector, nil
 }
 
 func createDB(provider *api.Provider) (libmodel.DB, error) {
