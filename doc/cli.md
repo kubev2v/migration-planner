@@ -123,6 +123,25 @@ If the hypervisor is not local one, use `--qemu-url` to specify the address of t
 $ planner deploy source-1 --name agent1 --qemu-url qemu+ssh://virtuser@remote-host
 ```
 
+#### e2e
+
+The e2e command is used to run the end-to-end (E2E) test suite for the Migration Planner. This is primarily intended for development and QA purposes,  
+allowing you to verify the full end-to-end workflow locally using libvirt, simulated vSphere (VCSIM), and a local registry.
+
+```bash
+$ planner e2e [flags]
+```
+| Flag                                                                                      | Description                                                       |
+|-------------------------------------------------------------------------------------------|-------------------------------------------------------------------|
+| `-k`, `--keep-env`                                                                        | Keep the environment after the test completes (default: false)    |                                           |
+
+```bash
+$ planner e2e [command]
+```
+| command                                                                          | Description                             |
+|----------------------------------------------------------------------------------|-----------------------------------------|
+| `destroy`                                                                        | Destroy the E2E environment manually    |                                         
+
 #### sso
 
 #### private-key
@@ -147,4 +166,3 @@ Generate a jwt to be used when local authentication is set.
 ```bash
 $ planner sso token --private-key $private_key --username admin --org admin
 ```
-
