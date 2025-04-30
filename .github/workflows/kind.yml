@@ -32,3 +32,12 @@ jobs:
       - name: Run test
         run: |
           sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+          
+      - name: Collect logs
+        if: always()
+        run: |
+          for pod in $(oc get pods -o name); do
+            echo "=== Logs for ${pod} ==="
+            oc logs ${pod} || echo "Failed to get logs for ${pod}"
+            echo "======================="
+          done

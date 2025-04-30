@@ -25,7 +25,7 @@ var (
 	DefaultBasePath    string = "/tmp/untarova/"
 	DefaultVmdkName    string = filepath.Join(DefaultBasePath, "persistence-disk.vmdk")
 	DefaultOvaPath     string = filepath.Join(Home, "myimage.ova")
-	DefaultServiceUrl  string = fmt.Sprintf("http://%s:3443", SystemIP)
+	DefaultServiceUrl  string = fmt.Sprintf("http://%s:7443/api/migration-assessment", SystemIP)
 	Home               string = os.Getenv("HOME")
 	PrivateKeyPath     string = filepath.Join(os.Getenv("E2E_PRIVATE_KEY_FOLDER_PATH"), "private-key")
 	SystemIP           string = os.Getenv("PLANNER_IP")
