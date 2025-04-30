@@ -219,9 +219,9 @@ deploy-on-kind: oc
 		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/service-template.yml \
-	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
+	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
+	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
