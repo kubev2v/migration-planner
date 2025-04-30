@@ -19,7 +19,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	service "github.com/kubev2v/migration-planner/internal/service/agent"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/util"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
 )
@@ -69,7 +68,6 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	metricMiddleware := metrics.NewMiddleware("agent_server")
 	metricMiddleware.MustRegisterDefault()
 	router.Use(
-		util.GatewayApiRewrite,
 		metricMiddleware.Handler,
 		middleware.RequestID,
 		log.Logger(zap.L(), "router_agent"),
