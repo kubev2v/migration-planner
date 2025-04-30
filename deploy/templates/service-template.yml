@@ -478,7 +478,7 @@ objects:
                 initialDelaySeconds: 30
               readinessProbe:
                 tcpSocket:
-                  port: 7443
+                  port: 17443
                 initialDelaySeconds: 30
               env:
                 - name: CONFIG_SERVER
