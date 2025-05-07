@@ -1,11 +1,15 @@
 package store
 
 import (
+	"database/sql"
 	"fmt"
+	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5/stdlib"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/ngrok/sqlmw"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -13,6 +17,10 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
+)
+
+var (
+	registerSync sync.Once
 )
 
 func InitDB(cfg *config.Config) (*gorm.DB, error) {
@@ -28,7 +36,14 @@ func InitDB(cfg *config.Config) (*gorm.DB, error) {
 		if cfg.Database.Name != "" {
 			dsn = fmt.Sprintf("%s dbname=%s", dsn, cfg.Database.Name)
 		}
-		dia = postgres.Open(dsn)
+
+		registerSync.Do(func() {
+			sql.Register("postgres", sqlmw.Driver(stdlib.GetDefaultDriver(), new(metricInterceptor)))
+		})
+		dia = postgres.New(postgres.Config{
+			DriverName: "postgres",
+			DSN:        dsn,
+		})
 	} else {
 		dia = sqlite.Open(cfg.Database.Name)
 	}
