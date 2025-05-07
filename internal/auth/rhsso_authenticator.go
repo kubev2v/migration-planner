@@ -88,7 +88,7 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
 
 func (rh *RHSSOAuthenticator) Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		accessToken := r.Header.Get("Authorization")
+		accessToken := r.Header.Get("X-Authorization")
 		if accessToken == "" || len(accessToken) < len("Bearer ") {
 			http.Error(w, "No token provided", http.StatusUnauthorized)
 			return
