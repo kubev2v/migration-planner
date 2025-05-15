@@ -600,6 +600,8 @@ components:
         - vendor
         - diskId
         - hardwareAcceleratedMove
+        - protocolType
+        - model
       properties:
         type:
           type: string
@@ -613,6 +615,10 @@ components:
           type: string
         hardwareAcceleratedMove:
           type: boolean
+        protocolType:
+          type: string
+        model:
+          type: string
 
     VMResourceBreakdown:
       type: object
