@@ -53,6 +53,8 @@ type Datastore struct {
 	DiskId                  string `json:"diskId"`
 	FreeCapacityGB          int    `json:"freeCapacityGB"`
 	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
+	Model                   string `json:"model"`
+	ProtocolType            string `json:"protocolType"`
 	TotalCapacityGB         int    `json:"totalCapacityGB"`
 	Type                    string `json:"type"`
 	Vendor                  string `json:"vendor"`

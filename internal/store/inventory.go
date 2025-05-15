@@ -14,17 +14,17 @@ func GenerateDefaultInventory() api.Inventory {
 	return api.Inventory{
 		Infra: api.Infra{
 			Datastores: []api.Datastore{
-				{FreeCapacityGB: 615, TotalCapacityGB: 766, Type: "VMFS", Vendor: "NETAPP", DiskId: "naa.600a098038314648593f517773636465"},
-				{FreeCapacityGB: 650, TotalCapacityGB: 766, Type: "VMFS", Vendor: "3PARdata", DiskId: "naa.600a098038314648593f517773636465"},
-				{FreeCapacityGB: 167, TotalCapacityGB: 221, Type: "VMFS", Vendor: "3PARdata", DiskId: "naa.600a098038314648593f517773636465"},
-				{FreeCapacityGB: 424, TotalCapacityGB: 766, Type: "VMFS", Vendor: "NETAPP", DiskId: "naa.600a098038314648593f517773636465"},
-				{FreeCapacityGB: 1369, TotalCapacityGB: 3321, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
-				{FreeCapacityGB: 1252, TotalCapacityGB: 3071, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
-				{FreeCapacityGB: 415, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
-				{FreeCapacityGB: 585, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
-				{FreeCapacityGB: 170, TotalCapacityGB: 196, Type: "NFS", Vendor: "N/A", DiskId: "N/A"},
-				{FreeCapacityGB: 606, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
-				{FreeCapacityGB: 740, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A"},
+				{FreeCapacityGB: 615, TotalCapacityGB: 766, Type: "VMFS", Vendor: "NETAPP", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 650, TotalCapacityGB: 766, Type: "VMFS", Vendor: "3PARdata", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 167, TotalCapacityGB: 221, Type: "VMFS", Vendor: "3PARdata", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 424, TotalCapacityGB: 766, Type: "VMFS", Vendor: "NETAPP", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 1369, TotalCapacityGB: 3321, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 1252, TotalCapacityGB: 3071, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 415, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 585, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 170, TotalCapacityGB: 196, Type: "NFS", Vendor: "N/A", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 606, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
+				{FreeCapacityGB: 740, TotalCapacityGB: 766, Type: "VMFS", Vendor: "ATA", DiskId: "N/A", Model: "N/A", ProtocolType: "N/A"},
 			},
 			HostPowerStates: map[string]int{
 				"Green": 8,
