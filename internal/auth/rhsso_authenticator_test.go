@@ -81,15 +81,14 @@ var _ = Describe("sso authentication", func() {
 
 			req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
 			Expect(err).To(BeNil())
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", sToken))
+			req.Header.Add("X-Authorization", fmt.Sprintf("Bearer %s", sToken))
 
 			resp, rerr := http.DefaultClient.Do(req)
 			Expect(rerr).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
 		})
 
-		// FIXME: enable when token validation enabled again
-		PIt("failed to authenticate", func() {
+		It("failed to authenticate", func() {
 			sToken, keyFn := generateInvalidTokenWrongSigningMethod()
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
@@ -100,7 +99,7 @@ var _ = Describe("sso authentication", func() {
 
 			req, err := http.NewRequest(http.MethodGet, ts.URL, nil)
 			Expect(err).To(BeNil())
-			req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", sToken))
+			req.Header.Add("X-Authorization", fmt.Sprintf("Bearer %s", sToken))
 
 			resp, rerr := http.DefaultClient.Do(req)
 			Expect(rerr).To(BeNil())
