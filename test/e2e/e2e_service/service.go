@@ -3,10 +3,6 @@ package e2e_service
 import (
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"os"
-
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -15,12 +11,13 @@ import (
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
+	"io"
+	"net/http"
 )
 
 // PlannerService defines the interface for interacting with the planner service
 type PlannerService interface {
 	CreateSource(string) (*api.Source, error)
-	GetImage(*os.File, uuid.UUID) error
 	GetImageUrl(uuid.UUID) (string, error)
 	GetSource(uuid.UUID) (*api.Source, error)
 	GetSources() (*api.SourceList, error)
@@ -94,29 +91,6 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	zap.S().Info("Source created successfully")
 
 	return createSourceRes.JSON201, nil
-}
-
-// GetImage downloads the image of the specified source and writes it to the given file
-func (s *plannerService) GetImage(destFile *os.File, id uuid.UUID) error {
-	zap.S().Infof("[PlannerService] Get image [user: %s, organization: %s]",
-		s.credentials.Username, s.credentials.Organization)
-	getImagePath := id.String() + "/" + "image"
-	res, err := s.api.GetRequest(getImagePath)
-	if err != nil {
-		return fmt.Errorf("failed to get source image: %w", err)
-	}
-
-	defer res.Body.Close()
-
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download image: %s", res.Status)
-	}
-
-	if _, err = io.Copy(destFile, res.Body); err != nil {
-		return fmt.Errorf("failed to write to the file: %w", err)
-	}
-
-	return nil
 }
 
 // GetImageUrl retrieves the image URL for a specific source by UUID
