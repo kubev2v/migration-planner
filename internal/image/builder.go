@@ -32,16 +32,17 @@ const (
 )
 
 const (
-	defaultAgentImage            = "quay.io/kubev2v/migration-planner-agent"
-	defaultPlannerService        = "http://127.0.0.1:7443"
-	defaultPersistenceDiskDevice = "/dev/sda"
-	defaultConfigServerUI        = "http://localhost:3000/migrate/wizard"
-	defaultTemplate              = "data/ignition.template"
-	defaultPersistentDiskImage   = "data/persistence-disk.vmdk"
-	defaultOvfFile               = "data/MigrationAssessment.ovf"
-	defaultOvfName               = "MigrationAssessment.ovf"
-	defaultIsoImageName          = "MigrationAssessment.iso"
-	defaultRHCOSImage            = "rhcos-live.x86_64.iso"
+	defaultAgentImage               = "quay.io/kubev2v/migration-planner-agent"
+	defaultValidationContainerImage = "quay.io/kubev2v/forklift-validation"
+	defaultPlannerService           = "http://127.0.0.1:7443"
+	defaultPersistenceDiskDevice    = "/dev/sda"
+	defaultConfigServerUI           = "http://localhost:3000/migrate/wizard"
+	defaultTemplate                 = "data/ignition.template"
+	defaultPersistentDiskImage      = "data/persistence-disk.vmdk"
+	defaultOvfFile                  = "data/MigrationAssessment.ovf"
+	defaultOvfName                  = "MigrationAssessment.ovf"
+	defaultIsoImageName             = "MigrationAssessment.iso"
+	defaultRHCOSImage               = "rhcos-live.x86_64.iso"
 )
 
 // IgnitionData defines modifiable fields in ignition config
@@ -58,6 +59,7 @@ type IgnitionData struct {
 	HttpProxyUrl               string
 	HttpsProxyUrl              string
 	NoProxyDomain              string
+	ValidationContainerImage   string
 }
 
 type Proxy struct {
@@ -78,6 +80,7 @@ type ImageBuilder struct {
 	InsecureRegistry           string
 	Token                      string
 	PersistentDiskDevice       string
+	ValidationContainerImage   string
 	PersistentDiskImage        string
 	IsoImageName               string
 	OvfFile                    string
@@ -95,6 +98,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
 		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", defaultAgentImage),
 		PersistentDiskDevice:       util.GetEnv("PERSISTENT_DISK_DEVICE", defaultPersistenceDiskDevice),
+		ValidationContainerImage:   util.GetEnv("VALIDATION_CONTAINER_IMAGE", defaultValidationContainerImage),
 		PersistentDiskImage:        defaultPersistentDiskImage,
 		IsoImageName:               defaultIsoImageName,
 		OvfFile:                    defaultOvfFile,
@@ -192,6 +196,7 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		HttpProxyUrl:               b.Proxy.HttpUrl,
 		HttpsProxyUrl:              b.Proxy.HttpsUrl,
 		NoProxyDomain:              b.Proxy.NoProxyDomain,
+		ValidationContainerImage:   b.ValidationContainerImage,
 	}
 
 	var buf bytes.Buffer

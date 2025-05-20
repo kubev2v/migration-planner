@@ -82,6 +82,8 @@ parameters:
   - name: ENVOY_IMAGE
     description: Envoy container image
     value: docker.io/envoyproxy/envoy:v1.33.2
+  - name: VALIDATION_CONTAINER_IMAGE
+    description: Full registry path to the validation (OPA) container
 
 objects:
   - kind: ServiceAccount
@@ -428,6 +430,8 @@ objects:
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE
                   value: ${DEBUG_MODE}
+                - name: VALIDATION_CONTAINER_IMAGE
+                  value: ${VALIDATION_CONTAINER_IMAGE}
                 - name: PERSISTENT_DISK_DEVICE
                   value: ${PERSISTENT_DISK_DEVICE}
                 - name:  INSECURE_REGISTRY
