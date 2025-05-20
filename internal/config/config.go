@@ -30,6 +30,7 @@ type svcConfig struct {
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
+	S3                   S3
 }
 
 type Auth struct {
@@ -37,6 +38,14 @@ type Auth struct {
 	JwkCertURL                 string `envconfig:"MIGRATION_PLANNER_JWK_URL" default:""`
 	LocalPrivateKey            string `envconfig:"MIGRATION_PLANNER_PRIVATE_KEY" default:""`
 	AgentAuthenticationEnabled bool   `envconfig:"MIGRATION_PLANNER_AGENT_AUTH_ENABLED" default:"true"`
+}
+
+type S3 struct {
+	Endpoint    string `envconfig:"MIGRATION_PLANNER_S3_ENDPOINT" default:""`
+	Bucket      string `envconfig:"MIGRATION_PLANNER_S3_BUCKET" default:""`
+	AccessKey   string `envconfig:"MIGRATION_PLANNER_S3_ACCESS_KEY" default:""`
+	SecretKey   string `envconfig:"MIGRATION_PLANNER_S3_SECRET_KEY" default:""`
+	IsoFileName string `envconfig:"MIGRATION_PLANNER_S3_ISO_FILENAME" default:""`
 }
 
 func New() (*Config, error) {

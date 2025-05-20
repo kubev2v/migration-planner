@@ -218,6 +218,7 @@ deploy-on-kind: oc
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/s3-secret-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
@@ -249,6 +250,7 @@ delete-from-kind: oc
 	oc process --local -f deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/s3-secret-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml
