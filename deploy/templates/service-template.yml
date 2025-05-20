@@ -78,6 +78,24 @@ parameters:
   - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
     description: Path to the migration folder containing the sql files used to migrate the db
     value: "/app/migrations"
+  - name: MIGRATION_PLANNER_S3_ENDPOINT
+    description: Url of s3 endpoint where custom iso is found
+    value: ""
+  - name: MIGRATION_PLANNER_S3_BUCKET
+    description: Name of the S3 bucket
+    value: ""
+  - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+    description: S3 access key
+    value: ""
+  - name: MIGRATION_PLANNER_S3_SECRET_KEY
+    description: S3 secret key
+    value: ""
+  - name: MIGRATION_PLANNER_S3_ISO_FILENAME
+    description: custom iso filename
+    value: "custom-rhcos-live-iso.x86_64.iso"
+  - name: S3_SECRET_NAME
+    description: secret name for s3 credentials
+    value: "migration-planner-s3-creds"
   # Envoy Config values
   - name: ENVOY_IMAGE
     description: Envoy container image
@@ -468,6 +486,22 @@ objects:
                   value: ${MIGRATION_PLANNER_JWK_URL}
                 - name: MIGRATION_PLANNER_AGENT_AUTH_ENABLED
                   value: ${MIGRATION_PLANNER_AGENT_AUTH_ENABLED}
+                - name: MIGRATION_PLANNER_S3_ENDPOINT
+                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
+                - name: MIGRATION_PLANNER_S3_BUCKET
+                  value: ${MIGRATION_PLANNER_S3_BUCKET}
+                - name: MIGRATION_PLANNER_S3_ISO_FILENAME
+                  value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
+                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: access_key
+                - name: MIGRATION_PLANNER_S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: secret_key
                 # DB Config values
                 - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
                   value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}
