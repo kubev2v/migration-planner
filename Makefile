@@ -6,6 +6,7 @@ GO_FILES := $(shell find ./ -name ".go" -not -path "./bin" -not -path "./packagi
 GO_CACHE := -v $${HOME}/go/migration-planner-go-cache:/opt/app-root/src/go:Z -v $${HOME}/go/migration-planner-go-cache/.cache:/opt/app-root/src/.cache:Z
 TIMEOUT ?= 30m
 VERBOSE ?= false
+VALIDATION_CONTAINER_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
 MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
@@ -168,6 +169,7 @@ deploy-on-openshift: oc
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
+       -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
@@ -223,6 +225,7 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
+	   -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
