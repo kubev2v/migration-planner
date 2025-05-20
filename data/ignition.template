@@ -191,7 +191,7 @@ storage:
 
           [Container]
           ContainerName=opa
-          Image=quay.io/kubev2v/forklift-validation:release-v2.6.4
+          Image={{ .ValidationContainerImage }}
           Entrypoint=/usr/bin/opa
           PublishPort=8181:8181
           Exec=run --server /usr/share/opa/policies
