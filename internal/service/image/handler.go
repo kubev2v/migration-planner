@@ -75,6 +75,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
 	writer.Header().Set("Content-Length", strconv.Itoa(size))
+	writer.Header().Set("Content-Encoding", "identity")
 
 	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
