@@ -1,6 +1,8 @@
 module github.com/kubev2v/migration-planner
 
-go 1.22.2
+go 1.23
+
+toolchain go1.24.0
 
 require (
 	github.com/MicahParks/jwkset v0.5.19
@@ -117,6 +119,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1 // indirect
+	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
@@ -163,7 +166,7 @@ require (
 )
 
 replace (
-	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250429123542-ac813a48991e
+	github.com/konveyor/forklift-controller => github.com/nirarg/forklift v0.0.0-20250521005141-c54d7bbed20b
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.34.1
 )

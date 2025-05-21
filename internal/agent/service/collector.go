@@ -414,21 +414,37 @@ func getHostPowerStates(hosts []vspheremodel.Host) map[string]int {
 	return states
 }
 
-// findVendorBasedOnNaa iterate through host luns and find the vendor of the lun of stoarge
-func findVendorBasedOnNaa(hosts []vspheremodel.Host, names []string) string {
+func findDataStoreInfo(hosts []vspheremodel.Host, names []string) (vendor, model, protocol string) {
+	vendor, model, protocol = "N/A", "N/A", "N/A"
 	if len(names) == 0 {
-		return "N/A"
+		return
 	}
 
 	for _, host := range hosts {
 		for _, disk := range host.HostScsiDisks {
-			if disk.CanonicalName == names[0] {
-				return disk.Vendor
+			if disk.CanonicalName != names[0] {
+				continue
+			}
+
+			vendor = disk.Vendor
+
+			for _, topology := range host.HostScsiTopology {
+				if !util.Contains(topology.ScsiDiskKeys, disk.Key) {
+					continue
+				}
+
+				hbaKey := topology.HbaKey
+				for _, hba := range host.HbaDiskInfo {
+					if hba.Key == hbaKey {
+						model = hba.Model
+						protocol = hba.Protocol
+						return
+					}
+				}
 			}
 		}
 	}
-
-	return "N/A"
+	return
 }
 
 func getNaa(ds *vspheremodel.Datastore) string {
@@ -488,12 +504,15 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	}
 	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
+		dsVendor, dsModel, dsProtocol := findDataStoreInfo(*hosts, ds.BackingDevicesNames)
 		res = append(res, apiplanner.Datastore{
 			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
 			Type:                    ds.Type,
-			Vendor:                  findVendorBasedOnNaa(*hosts, ds.BackingDevicesNames),
+			Vendor:                  dsVendor,
+			Model:                   dsModel,
+			ProtocolType:            dsProtocol,
 			DiskId:                  getNaa(&ds),
 		})
 	}
@@ -511,10 +530,10 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 
 func hasLabel(
 	reasons []struct {
-		Assessment string `json:"assessment"`
-		Count      int    `json:"count"`
-		Label      string `json:"label"`
-	},
+	Assessment string `json:"assessment"`
+	Count      int    `json:"count"`
+	Label      string `json:"label"`
+},
 	label string,
 ) int {
 	for i, reason := range reasons {
