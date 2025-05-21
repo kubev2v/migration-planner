@@ -68,3 +68,13 @@ func GetIntEnv(key string, defaultValue uint) (uint, error) {
 	}
 	return defaultValue, nil
 }
+
+// Contains checks if a slice contains a specific string
+func Contains(slice []string, val string) bool {
+	for _, item := range slice {
+		if item == val {
+			return true
+		}
+	}
+	return false
+}
