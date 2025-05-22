@@ -2,7 +2,11 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/rvtools"
 )
 
 func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
@@ -187,4 +192,131 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 	}
 
 	return server.UpdateSource200JSONResponse{}, nil
+}
+
+func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.UploadRvtoolsFileRequestObject) (server.UploadRvtoolsFileResponseObject, error) {
+    ctx, err := h.store.NewTransactionContext(ctx)
+    if err != nil {
+        return server.UploadRvtoolsFile500JSONResponse{}, nil
+    }
+
+    source, err := h.store.Source().Get(ctx, request.Id)
+    if err != nil {
+        _, _ = store.Rollback(ctx)
+        return server.UploadRvtoolsFile400JSONResponse{}, nil
+    }
+
+    if source == nil {
+        _, _ = store.Rollback(ctx)
+        return server.UploadRvtoolsFile404JSONResponse{}, nil
+    }
+
+    user := auth.MustHaveUser(ctx)
+    if source.OrgID != user.Organization {
+        _, _ = store.Rollback(ctx)
+        return server.UploadRvtoolsFile403JSONResponse{}, nil
+    }
+
+    var rvtoolsAgent *model.Agent
+    for _, a := range source.Agents {
+        rvtoolsAgent = &a
+        break
+    }
+
+    if rvtoolsAgent == nil {
+        newAgent := model.NewAgentForSource(uuid.New(), *source)
+        
+        if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile500JSONResponse{}, nil
+        }
+        rvtoolsAgent = &newAgent
+    }
+
+    multipartReader := request.Body
+    
+    var rvtoolsContent []byte
+    
+    for {
+        part, err := multipartReader.NextPart()
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile400JSONResponse{}, nil
+        }
+        
+        if part.FormName() == "file" {
+            
+            rvtoolsContent, err = io.ReadAll(part)
+            if err != nil {
+                _, _ = store.Rollback(ctx)
+                return server.UploadRvtoolsFile400JSONResponse{}, nil
+            }
+            break
+        }
+    }
+    
+    if rvtoolsContent == nil {
+        _, _ = store.Rollback(ctx)
+        return server.UploadRvtoolsFile400JSONResponse{
+            Message: "No file was found in the request",
+        }, nil
+    }
+    
+    if len(rvtoolsContent) > 0 {
+        fmt.Printf("Received RVTools data with size: %d bytes\n", len(rvtoolsContent))
+        
+        if !rvtools.IsExcelFile(rvtoolsContent) {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile400JSONResponse{
+                Message: "The uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.",
+            }, nil
+        }
+        
+        inventory, err := rvtools.ParseRVTools(rvtoolsContent)
+        if err != nil {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile400JSONResponse{
+                Message: fmt.Sprintf("Error creating inventory from Excel file: %v", err),
+            }, nil
+        }
+
+        source = mappers.UpdateSourceOnPrem(source, *inventory)
+
+        if _, err = h.store.Source().Update(ctx, *source); err != nil {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile500JSONResponse{}, nil
+        }
+
+        rvtoolsAgent.Status = "not-connected" //TODO fix the status to show 'Uploaded manually'
+        rvtoolsAgent.StatusInfo = "Last updated via RVTools upload on " + time.Now().Format(time.RFC3339)
+        
+        if _, err = h.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
+            _, _ = store.Rollback(ctx)
+            return server.UploadRvtoolsFile500JSONResponse{}, nil
+        }        
+        
+        // log the structured format with agentId
+        // This is just for debugging/testing
+        structuredData := map[string]interface{}{
+            "agentId":   rvtoolsAgent.ID.String(),
+            "inventory": inventory,
+        }
+        structuredJSON, _ := json.MarshalIndent(structuredData, "", "  ")
+        structuredLogPath := "/tmp/rvtools_structured_inventory.json"
+        err = os.WriteFile(structuredLogPath, structuredJSON, 0644)
+        if err != nil {
+            fmt.Printf("Warning: Unable to write structured inventory to log file: %v\n", err)
+        } else {
+            fmt.Printf("Structured inventory JSON written to %s for testing\n", structuredLogPath)
+        }
+    }
+
+    if _, err := store.Commit(ctx); err != nil {
+        return server.UploadRvtoolsFile500JSONResponse{}, nil
+    }
+
+    return server.UploadRvtoolsFile200JSONResponse{}, nil
 }

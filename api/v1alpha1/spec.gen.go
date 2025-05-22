@@ -18,6 +18,7 @@ import (
 // Base64 encoded, gzipped, json marshaled Swagger object
 var swaggerSpec = []string{
 
+<<<<<<< HEAD
 	"H4sIAAAAAAAC/+xZX28iORL/Kpb3pHtpIDM7J514yyTzB+1kBiWb7MNMtCraBe2N2+613bBcxHc/2e6G",
 	"hnYDySWze9q8AbarylW/qvqVuaepygslUVpDh/fUpBnm4D+ezlBa96HQqkBtOfqfU41gkZ36panSOVg6",
 	"pAws9izPkSbULgukQ2qs5nJGV4k7wlBaDuJaC3estYOzLWllyVlMkLFgS28FyjKnw69UKttLlZSYWnRH",
@@ -54,6 +55,50 @@ var swaggerSpec = []string{
 	"wfkw/A7C5aHhDRE5EN363XYvtVvHl8w5kOvLT93c7rx6Yg2b9oY8HCA+Uv9f/G771TtW0/wb9vq9+W9b",
 	"yd/8STNLE/oZgrBZJ8bDMkkzTO9i5Ut4TB5XNhoWVFpvvcXGp2jIgfD0P6Cr29V/AwAA///4oHzSpC0A",
 	"AA==",
+=======
+	"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",
+>>>>>>> f880fbb (New andpoint for upload rvtools ecxel file and update source)
 }
 
 // GetSwagger returns the content of the embedded swagger specification file
