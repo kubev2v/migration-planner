@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -45,6 +46,9 @@ type ServerInterface interface {
 
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
+
+	// (POST /sources/{id}/rvtools)
+	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -93,6 +97,11 @@ func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Reque
 
 // (GET /health)
 func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /sources/{id}/rvtools)
+func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -308,6 +317,32 @@ func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// UploadRvtoolsFile operation middleware
+func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadRvtoolsFile(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -447,6 +482,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
 	})
 
 	return r
@@ -858,6 +896,71 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 	return nil
 }
 
+type UploadRvtoolsFileRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *multipart.Reader
+}
+
+type UploadRvtoolsFileResponseObject interface {
+	VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error
+}
+
+type UploadRvtoolsFile200JSONResponse struct {
+	Message *string `json:"message,omitempty"`
+}
+
+func (response UploadRvtoolsFile200JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsFile400JSONResponse Error
+
+func (response UploadRvtoolsFile400JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsFile401JSONResponse Error
+
+func (response UploadRvtoolsFile401JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsFile403JSONResponse Error
+
+func (response UploadRvtoolsFile403JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsFile404JSONResponse Error
+
+func (response UploadRvtoolsFile404JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsFile500JSONResponse Error
+
+func (response UploadRvtoolsFile500JSONResponse) VisitUploadRvtoolsFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -887,6 +990,9 @@ type StrictServerInterface interface {
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
+
+	// (POST /sources/{id}/rvtools)
+	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1153,6 +1259,39 @@ func (sh *strictHandler) Health(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(HealthResponseObject); ok {
 		if err := validResponse.VisitHealthResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadRvtoolsFile operation middleware
+func (sh *strictHandler) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UploadRvtoolsFileRequestObject
+
+	request.Id = id
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadRvtoolsFile(ctx, request.(UploadRvtoolsFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadRvtoolsFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadRvtoolsFileResponseObject); ok {
+		if err := validResponse.VisitUploadRvtoolsFileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

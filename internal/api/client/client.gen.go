@@ -121,6 +121,9 @@ type ClientInterface interface {
 
 	// Health request
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadRvtoolsFileWithBody request with any body
+	UploadRvtoolsFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -245,6 +248,18 @@ func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID
 
 func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewHealthRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadRvtoolsFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadRvtoolsFileRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -581,6 +596,42 @@ func NewHealthRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewUploadRvtoolsFileRequestWithBody generates requests for UploadRvtoolsFile with any type of body
+func NewUploadRvtoolsFileRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/sources/%s/rvtools", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -654,6 +705,9 @@ type ClientWithResponsesInterface interface {
 
 	// HealthWithResponse request
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
+
+	// UploadRvtoolsFileWithBodyWithResponse request with any body
+	UploadRvtoolsFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsFileResponse, error)
 }
 
 type DeleteSourcesResponse struct {
@@ -876,6 +930,35 @@ func (r HealthResponse) StatusCode() int {
 	return 0
 }
 
+type UploadRvtoolsFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *struct {
+		Message *string `json:"message,omitempty"`
+	}
+	JSON400 *Error
+	JSON401 *Error
+	JSON403 *Error
+	JSON404 *Error
+	JSON500 *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadRvtoolsFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadRvtoolsFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
 func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error) {
 	rsp, err := c.DeleteSources(ctx, reqEditors...)
@@ -971,6 +1054,15 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 		return nil, err
 	}
 	return ParseHealthResponse(rsp)
+}
+
+// UploadRvtoolsFileWithBodyWithResponse request with arbitrary body returning *UploadRvtoolsFileResponse
+func (c *ClientWithResponses) UploadRvtoolsFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsFileResponse, error) {
+	rsp, err := c.UploadRvtoolsFileWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadRvtoolsFileResponse(rsp)
 }
 
 // ParseDeleteSourcesResponse parses an HTTP response from a DeleteSourcesWithResponse call
@@ -1350,6 +1442,69 @@ func ParseHealthResponse(rsp *http.Response) (*HealthResponse, error) {
 	response := &HealthResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
+	}
+
+	return response, nil
+}
+
+// ParseUploadRvtoolsFileResponse parses an HTTP response from a UploadRvtoolsFileWithResponse call
+func ParseUploadRvtoolsFileResponse(rsp *http.Response) (*UploadRvtoolsFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadRvtoolsFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Message *string `json:"message,omitempty"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
 	}
 
 	return response, nil

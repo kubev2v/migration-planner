@@ -244,10 +244,10 @@ func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	}
 
 	// Histogram
-	inv.Vms.CpuCores.Histogram = histogram(cpuSet)
-	inv.Vms.RamGB.Histogram = histogram(memorySet)
-	inv.Vms.DiskCount.Histogram = histogram(diskCountSet)
-	inv.Vms.DiskGB.Histogram = histogram(diskGBSet)
+	inv.Vms.CpuCores.Histogram = Histogram(cpuSet)
+	inv.Vms.RamGB.Histogram = Histogram(memorySet)
+	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
+	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
 }
 
 func vmGuestName(vm vspheremodel.VM) string {
@@ -315,7 +315,7 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
-func histogram(d []int) struct {
+func Histogram(d []int) struct {
 	Data     []int `json:"data"`
 	MinValue int   `json:"minValue"`
 	Step     int   `json:"step"`
