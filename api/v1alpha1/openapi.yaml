@@ -250,6 +250,73 @@ paths:
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/Error'           
+  /sources/{id}/rvtools:
+    post:
+      tags:
+        - source
+      description: Update a source by uploading an RVTools file directly
+      operationId: uploadRvtoolsFile
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The RVTools file (Excel)
+              required:
+                - file
+        required: true
+      responses:
+        "200":
+          description: File uploaded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
                 $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}/image-url:
     get:
@@ -434,6 +501,25 @@ components:
           type: string
           description: 'Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
       description: Status is a return value for calls that don't return other objects.
+
+    SourceUpdateFromRvtools:
+      type: object
+      description: Request body for updating a source using RVTools data
+      required:
+        - rvtoolsData
+      properties:
+        rvtoolsData:
+          oneOf:
+            - $ref: '#/components/schemas/RvtoolsFileContent'
+            - $ref: '#/components/schemas/RvtoolsFileReference'
+        options:
+          type: object
+          description: Optional configuration for RVTools processing
+          properties:
+            skipValidation:
+              type: boolean
+              description: Whether to skip validation checks on the RVTools data
+              default: false
 
     Inventory:
       type: object
@@ -668,3 +754,34 @@ components:
       required:
         - key
         - value
+
+    Label:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value
+
+    RvtoolsFileContent:
+      type: object
+      required:
+        - fileContent
+      properties:
+        fileContent:
+          type: string
+          format: byte
+          description: Base64-encoded content of the RVTools CSV file
+    
+    RvtoolsFileReference:
+      type: object
+      required:
+        - fileId
+      properties:
+        fileId:
+          type: string
+          format: uuid
+          description: Reference to a previously uploaded file

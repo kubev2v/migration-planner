@@ -1,0 +1,147 @@
+package rvtools
+
+import (
+	"bytes"
+	"fmt"
+	"slices"
+
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/xuri/excelize/v2"
+)
+
+func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
+	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
+	if err != nil {
+		return nil, fmt.Errorf("error opening Excel file: %v", err)
+	}
+	defer excelFile.Close()
+	
+	sheets := excelFile.GetSheetList()
+
+	inventory := api.Inventory{}
+
+	inventory.Infra.Datastores = []api.Datastore{}
+	inventory.Infra.HostsPerCluster = []int{}
+	inventory.Vms.MigrationWarnings = api.MigrationIssues{}
+	inventory.Vms.NotMigratableReasons = []struct {
+		Assessment string `json:"assessment"`
+		Count      int    `json:"count"`
+		Label      string `json:"label"`
+	}{}
+	
+	if slices.Contains(sheets, "vInfo") {
+		vcenterUUID, err := extractVCenterUUID(excelFile, "vInfo")
+		if err != nil {
+			inventory.Vcenter.Id = ""
+		} else {
+			inventory.Vcenter.Id = vcenterUUID
+		}
+	} else {
+		inventory.Vcenter.Id = ""
+	}
+	
+	if slices.Contains(sheets, "vInfo") {
+		rows, err := excelFile.GetRows("vInfo")
+		if err != nil {
+			fmt.Printf("Warning: Could not read vInfo sheet: %v\n", err)
+		} else {
+			vms, err := processVMInfo(rows)
+			if err != nil {
+				fmt.Printf("Warning: VM processing failed: %v\n", err)
+			} else if len(vms) > 0 {
+				fillInventoryWithVMData(vms, &inventory)
+			}
+		}
+	}
+	
+	if slices.Contains(sheets, "vHost") {
+		rows, err := excelFile.GetRows("vHost")
+		if err != nil {
+			fmt.Printf("Warning: Could not read vHost sheet: %v\n", err)
+			inventory.Infra.TotalHosts = 0
+			inventory.Infra.TotalClusters = 0
+			inventory.Infra.HostsPerCluster = []int{}
+			inventory.Infra.HostPowerStates = map[string]int{}
+		} else {
+			err = processHostInfo(rows, &inventory)
+			if err != nil {
+				fmt.Printf("Warning: Host processing failed: %v\n", err)
+				inventory.Infra.TotalHosts = 0
+				inventory.Infra.TotalClusters = 0
+				inventory.Infra.HostsPerCluster = []int{}
+				inventory.Infra.HostPowerStates = map[string]int{}
+			}
+		}
+	}
+	
+	if slices.Contains(sheets, "vDatastore") {
+		rows, err := excelFile.GetRows("vDatastore")
+		if err != nil {
+			inventory.Infra.Datastores = []api.Datastore{}
+		} else {
+			err = processDatastoreInfo(rows, &inventory)
+			if err != nil {
+				inventory.Infra.Datastores = []api.Datastore{}
+			}
+		}
+	}
+	
+	var dvswitchRows, dvportRows [][]string
+
+	if slices.Contains(sheets, "dvSwitch") {
+		dvswitchRows, err = excelFile.GetRows("dvSwitch")
+		if err != nil {
+			dvswitchRows = [][]string{}
+		}
+	}
+
+	if slices.Contains(sheets, "dvPort") {
+		dvportRows, err = excelFile.GetRows("dvPort")
+		if err != nil {
+			dvportRows = [][]string{}
+		}
+	}
+	
+	err = processNetworkInfo(dvswitchRows, dvportRows, &inventory)
+	if err != nil {
+		fmt.Printf("Warning: Network processing failed: %v\n", err)
+		inventory.Infra.Networks = []struct {
+			Dvswitch *string               `json:"dvswitch,omitempty"`
+			Name     string                `json:"name"`
+			Type     api.InfraNetworksType `json:"type"`
+			VlanId   *string               `json:"vlanId,omitempty"`
+		}{}
+	}
+		return &inventory, nil
+	}
+
+func extractVCenterUUID(excelFile *excelize.File, sheetName string) (string, error) {
+    rows, err := excelFile.GetRows(sheetName)
+    if err != nil || len(rows) < 2 {
+        return "", fmt.Errorf("insufficient data")
+    }
+
+    header := rows[0]
+    data := rows[1]
+
+    for i, colName := range header {
+        if colName == "VI SDK UUID" && i < len(data) {
+            return data[i], nil
+        }
+    }
+    
+    return "", fmt.Errorf("VI SDK UUID column not found")
+}
+
+func IsExcelFile(content []byte) bool {
+	if len(content) < 2 {
+		return false
+	}
+	
+	if content[0] == 0x50 && content[1] == 0x4B {
+		_, err := excelize.OpenReader(bytes.NewReader(content))
+		return err == nil
+	}
+	
+	return false
+}

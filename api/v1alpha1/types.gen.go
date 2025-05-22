@@ -4,8 +4,10 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"time"
 
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -104,6 +106,18 @@ type MigrationIssues = []struct {
 	Label      string `json:"label"`
 }
 
+// RvtoolsFileContent defines model for RvtoolsFileContent.
+type RvtoolsFileContent struct {
+	// FileContent Base64-encoded content of the RVTools CSV file
+	FileContent []byte `json:"fileContent"`
+}
+
+// RvtoolsFileReference defines model for RvtoolsFileReference.
+type RvtoolsFileReference struct {
+	// FileId Reference to a previously uploaded file
+	FileId openapi_types.UUID `json:"fileId"`
+}
+
 // Source defines model for Source.
 type Source struct {
 	Agent      *Agent             `json:"agent,omitempty"`
@@ -126,6 +140,21 @@ type SourceCreate struct {
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
+
+// SourceUpdateFromRvtools Request body for updating a source using RVTools data
+type SourceUpdateFromRvtools struct {
+	// Options Optional configuration for RVTools processing
+	Options *struct {
+		// SkipValidation Whether to skip validation checks on the RVTools data
+		SkipValidation *bool `json:"skipValidation,omitempty"`
+	} `json:"options,omitempty"`
+	RvtoolsData SourceUpdateFromRvtools_RvtoolsData `json:"rvtoolsData"`
+}
+
+// SourceUpdateFromRvtools_RvtoolsData defines model for SourceUpdateFromRvtools.RvtoolsData.
+type SourceUpdateFromRvtools_RvtoolsData struct {
+	union json.RawMessage
+}
 
 // SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
 type SourceUpdateOnPrem struct {
@@ -193,8 +222,79 @@ type ListSourcesParams struct {
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
 
+// UploadRvtoolsFileMultipartBody defines parameters for UploadRvtoolsFile.
+type UploadRvtoolsFileMultipartBody struct {
+	// File The RVTools file (Excel)
+	File openapi_types.File `json:"file"`
+}
+
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
 // UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
 type UpdateSourceJSONRequestBody = SourceUpdateOnPrem
+
+// UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
+type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody
+
+// AsRvtoolsFileContent returns the union data inside the SourceUpdateFromRvtools_RvtoolsData as a RvtoolsFileContent
+func (t SourceUpdateFromRvtools_RvtoolsData) AsRvtoolsFileContent() (RvtoolsFileContent, error) {
+	var body RvtoolsFileContent
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRvtoolsFileContent overwrites any union data inside the SourceUpdateFromRvtools_RvtoolsData as the provided RvtoolsFileContent
+func (t *SourceUpdateFromRvtools_RvtoolsData) FromRvtoolsFileContent(v RvtoolsFileContent) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRvtoolsFileContent performs a merge with any union data inside the SourceUpdateFromRvtools_RvtoolsData, using the provided RvtoolsFileContent
+func (t *SourceUpdateFromRvtools_RvtoolsData) MergeRvtoolsFileContent(v RvtoolsFileContent) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsRvtoolsFileReference returns the union data inside the SourceUpdateFromRvtools_RvtoolsData as a RvtoolsFileReference
+func (t SourceUpdateFromRvtools_RvtoolsData) AsRvtoolsFileReference() (RvtoolsFileReference, error) {
+	var body RvtoolsFileReference
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromRvtoolsFileReference overwrites any union data inside the SourceUpdateFromRvtools_RvtoolsData as the provided RvtoolsFileReference
+func (t *SourceUpdateFromRvtools_RvtoolsData) FromRvtoolsFileReference(v RvtoolsFileReference) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeRvtoolsFileReference performs a merge with any union data inside the SourceUpdateFromRvtools_RvtoolsData, using the provided RvtoolsFileReference
+func (t *SourceUpdateFromRvtools_RvtoolsData) MergeRvtoolsFileReference(v RvtoolsFileReference) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t SourceUpdateFromRvtools_RvtoolsData) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	return b, err
+}
+
+func (t *SourceUpdateFromRvtools_RvtoolsData) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	return err
+}
