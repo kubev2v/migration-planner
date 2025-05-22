@@ -215,7 +215,7 @@ type ListSourcesParams struct {
 
 // UploadRvtoolsFileMultipartBody defines parameters for UploadRvtoolsFile.
 type UploadRvtoolsFileMultipartBody struct {
-	// File The RVTools file (CSV or Excel)
+	// File The RVTools file (Excel)
 	File openapi_types.File `json:"file"`
 }
 
