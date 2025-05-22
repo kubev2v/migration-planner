@@ -235,6 +235,7 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
 
     fmt.Printf("Received RVTools data with size: %d bytes\n", len(rvtoolsContent))
     
+	//TODO: support csv files
     if !rvtools.IsExcelFile(rvtoolsContent) {
         return server.UploadRvtoolsFile400JSONResponse{
             Message: "The uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.",
