@@ -210,7 +210,7 @@ func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
-		inv.Vms.Os[vm.GuestName]++
+		inv.Vms.Os[vmGuestName(&vm)]++
 		inv.Vms.PowerStates[vm.PowerState]++
 
 		// Update total values
@@ -248,6 +248,16 @@ func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.RamGB.Histogram = histogram(memorySet)
 	inv.Vms.DiskCount.Histogram = histogram(diskCountSet)
 	inv.Vms.DiskGB.Histogram = histogram(diskGBSet)
+}
+
+func vmGuestName(vm *vspheremodel.VM) string {
+	if vm.GuestNameFromVmwareTools != "" {
+		return vm.GuestNameFromVmwareTools
+	}
+	if vm.GuestName != "" {
+		return vm.GuestName
+	}
+	return "Unknown"
 }
 
 func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster) *apiplanner.Inventory {
@@ -511,10 +521,10 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 
 func hasLabel(
 	reasons []struct {
-		Assessment string `json:"assessment"`
-		Count      int    `json:"count"`
-		Label      string `json:"label"`
-	},
+	Assessment string `json:"assessment"`
+	Count      int    `json:"count"`
+	Label      string `json:"label"`
+},
 	label string,
 ) int {
 	for i, reason := range reasons {
