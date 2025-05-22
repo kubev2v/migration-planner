@@ -1,6 +1,6 @@
 module github.com/kubev2v/migration-planner
 
-go 1.22.10
+go 1.23.6
 
 require (
 	github.com/MicahParks/jwkset v0.5.19
@@ -85,6 +85,7 @@ require (
 	github.com/go-task/slim-sprig v0.0.0-20230315185526-52ccab3ef572 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/google/gnostic-models v0.6.8 // indirect
@@ -119,6 +120,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1 // indirect
+	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.9 // indirect
@@ -166,7 +168,7 @@ require (
 )
 
 replace (
-	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250429123542-ac813a48991e
+	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250522124430-f56dfd509a3c
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.80
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.34.1
