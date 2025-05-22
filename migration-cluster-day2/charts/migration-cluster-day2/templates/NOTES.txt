@@ -8,10 +8,7 @@ To verify the status of each operator, use the following commands:
 
 - MTV Init
   A helper service to help configure MTV for vmware providers
-  
-  oc get deployment mtv-init -n {{ .Values.mtvOperator.subscription.namespace }}
-  oc get route mtv-init -n {{ .Values.mtvOperator.subscription.namespace }}
-  
+
 - NMState operator
   A Red Hat operator to declare and define L2 networks on the cluster
   TODO
