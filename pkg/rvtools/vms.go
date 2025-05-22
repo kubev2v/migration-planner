@@ -92,14 +92,7 @@ func processVMInfo(excelFile *excelize.File, sheetName string) ([]VM, error) {
 		}
 
 		if idx, exists := colMap["CPUs"]; exists && idx < len(row) {
-			cpuStr := strings.Map(func(r rune) rune {
-				if r >= '0' && r <= '9' {
-					return r
-				}
-				return -1
-			}, row[idx])
-
-			if cpuCount, err := strconv.Atoi(cpuStr); err == nil && cpuCount > 0 {
+			if cpuCount, err := strconv.Atoi(strings.TrimSpace(row[idx])); err == nil && cpuCount > 0 {
 				vm.CPUCount = cpuCount
 			}
 		}
@@ -154,14 +147,9 @@ func processVMInfo(excelFile *excelize.File, sheetName string) ([]VM, error) {
 		}
 
 		if diskCount > 0 {
-			capacityPerDisk := 0
+			capacityPerDisk := 10
 			if totalDiskCapacityGB > 0 {
-				capacityPerDisk = totalDiskCapacityGB / diskCount
-				if capacityPerDisk < 1 {
-					capacityPerDisk = 1
-				}
-			} else {
-				capacityPerDisk = 10
+				capacityPerDisk = max(1, totalDiskCapacityGB/diskCount)
 			}
 
 			for j := 0; j < diskCount; j++ {
