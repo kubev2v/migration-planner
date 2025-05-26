@@ -35,6 +35,7 @@ require (
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 	github.com/thoas/go-funk v0.9.3
 	github.com/vmware/govmomi v0.39.0
+	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
@@ -142,7 +143,6 @@ require (
 	github.com/ulikunitz/xz v0.5.11 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/xuri/efp v0.0.1 // indirect
-	github.com/xuri/excelize/v2 v2.9.1 // indirect
 	github.com/xuri/nfp v0.0.1 // indirect
 	go.mongodb.org/mongo-driver v1.14.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
