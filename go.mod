@@ -168,7 +168,7 @@ require (
 )
 
 replace (
-	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250522124430-f56dfd509a3c
+	github.com/konveyor/forklift-controller => github.com/kubev2v/forklift v0.0.0-20250526103348-5b9a983b7a06
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.80
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.34.1
