@@ -28,10 +28,6 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 		return []VM{}, nil
 	}
 
-	if len(rows) <= 1 {
-		return []VM{}, nil
-	}
-
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
 		headerTrimmed := strings.TrimSpace(header)
