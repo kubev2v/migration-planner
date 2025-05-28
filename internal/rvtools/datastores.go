@@ -16,19 +16,16 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 
     colMap := make(map[string]int)
     for i, header := range headers {
-        headerTrimmed := strings.TrimSpace(header)
-        colMap[header] = i
-        colMap[headerTrimmed] = i
-        colMap[strings.ToLower(header)] = i
-        colMap[strings.ToLower(headerTrimmed)] = i
+        key := strings.ToLower(strings.TrimSpace(header))
+        colMap[key] = i
     }
 
-    nameIdx := colMap["Name"]
-    objectIdIdx := colMap["Object ID"]
+    nameIdx := colMap["name"]
+    objectIdIdx := colMap["object id"]
     typeIdx := colMap["Type"] 
-    capacityMiBIdx := colMap["Capacity MiB"]
-    freeMiBIdx := colMap["Free MiB"]
-    freePercentIdx := colMap["Free %"]
+    capacityMiBIdx := colMap["capacity mib"]
+    freeMiBIdx := colMap["free mib"]
+    freePercentIdx := colMap["free %"]
 
     for i := 1; i < len(rows); i++ {
         row := rows[i]
