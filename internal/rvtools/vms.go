@@ -58,10 +58,7 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 			}
 		}
 
-		vm := VM{
-			Disks:      []Disk{},
-			CBTEnabled: false,
-		}
+		vm := VM{}
 
 		if idx, exists := colMap["vm"]; exists && idx < len(row) {
 			vm.Name = row[idx]
