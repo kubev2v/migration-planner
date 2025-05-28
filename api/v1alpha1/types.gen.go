@@ -91,6 +91,12 @@ type Inventory struct {
 	Vms     VMs     `json:"vms"`
 }
 
+// Label defines model for Label.
+type Label struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // MigrationIssues defines model for MigrationIssues.
 type MigrationIssues = []struct {
 	Assessment string `json:"assessment"`
@@ -104,6 +110,7 @@ type Source struct {
 	CreatedAt  time.Time          `json:"createdAt"`
 	Id         openapi_types.UUID `json:"id"`
 	Inventory  *Inventory         `json:"inventory,omitempty"`
+	Labels     *[]Label           `json:"labels,omitempty"`
 	Name       string             `json:"name"`
 	OnPremises bool               `json:"onPremises"`
 	UpdatedAt  time.Time          `json:"updatedAt"`

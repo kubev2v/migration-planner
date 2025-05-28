@@ -361,6 +361,10 @@ components:
           type: boolean
         agent:
           $ref: '#/components/schemas/Agent'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
       required:
         - id
         - name
@@ -653,3 +657,14 @@ components:
         - createdAt
         - updatedAt
         - version
+
+    Label:
+      type: object
+      properties:
+        key:
+          type: string
+        value:
+          type: string
+      required:
+        - key
+        - value

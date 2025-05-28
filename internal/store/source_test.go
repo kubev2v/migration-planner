@@ -16,6 +16,7 @@ import (
 const (
 	insertSourceStm           = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', '%s', '%s', '%s');"
 	insertSourceOnPremisesStm = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s','%s', '%s', '%s', TRUE);"
+	insertLabelStm            = "INSERT INTO labels (key, value, source_id) VALUES ('%s', '%s', '%s');"
 )
 
 var _ = Describe("source store", Ordered, func() {
@@ -261,6 +262,160 @@ var _ = Describe("source store", Ordered, func() {
 				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")
 			})
+		})
+	})
+
+	Context("labels", func() {
+		It("get successfully a source with labels", func() {
+			sourceID := uuid.New()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// insert two labels
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key1", "value1", sourceID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key2", "value2", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			source, err := s.Source().Get(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+			Expect(source.Labels).To(HaveLen(2))
+			Expect([]string{"key1", "key2"}).To(ContainElement(source.Labels[0].Key))
+			Expect([]string{"key1", "key2"}).To(ContainElement(source.Labels[1].Key))
+			Expect([]string{"value1", "value2"}).To(ContainElement(source.Labels[0].Value))
+			Expect([]string{"value1", "value2"}).To(ContainElement(source.Labels[1].Value))
+		})
+
+		It("get successfully a source with labels -- two sources", func() {
+			sourceID := uuid.New()
+			sourceID2 := uuid.New()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID2, "source2", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// insert labels for both sources
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key1", "value1", sourceID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key2", "value2", sourceID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key2", "value2", sourceID2))
+			Expect(tx.Error).To(BeNil())
+
+			source, err := s.Source().Get(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+			Expect(source.Labels).To(HaveLen(2))
+			Expect([]string{"key1", "key2"}).To(ContainElement(source.Labels[0].Key))
+			Expect([]string{"key1", "key2"}).To(ContainElement(source.Labels[1].Key))
+			Expect([]string{"value1", "value2"}).To(ContainElement(source.Labels[0].Value))
+			Expect([]string{"value1", "value2"}).To(ContainElement(source.Labels[1].Value))
+		})
+
+		It("delete labels when source is deleted", func() {
+			sourceID := uuid.New()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// insert two labels
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key1", "value1", sourceID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key2", "value2", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			err := s.Source().Delete(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+
+			count := 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM labels;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("creates successfully a source with labels", func() {
+			sourceID := uuid.New()
+			m := model.Source{
+				ID:       sourceID,
+				Username: "admin",
+				OrgID:    "org",
+				Labels: []model.Label{
+					{
+						Key:   "key1",
+						Value: "value1",
+					},
+					{
+						Key:   "key2",
+						Value: "value1",
+					},
+				},
+			}
+			source, err := s.Source().Create(context.TODO(), m)
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+
+			var count int
+			tx := gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM labels;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+		})
+
+		It("updates successfully a source with labels", func() {
+			sourceID := uuid.New()
+			m := model.Source{
+				ID:       sourceID,
+				Username: "admin",
+				OrgID:    "org",
+			}
+			source, err := s.Source().Create(context.TODO(), m)
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+
+			var count int
+			tx := gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM labels;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			m = model.Source{
+				ID:       sourceID,
+				Username: "admin",
+				OrgID:    "org",
+				Labels: []model.Label{
+					{
+						Key:   "key1",
+						Value: "value1",
+					},
+					{
+						Key:   "key2",
+						Value: "value1",
+					},
+				},
+			}
+			source, err = s.Source().Update(context.TODO(), m)
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM labels;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE from labels;")
+			gormdb.Exec("DELETE from sources;")
 		})
 	})
 })
