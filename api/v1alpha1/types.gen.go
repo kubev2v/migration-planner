@@ -104,18 +104,6 @@ type MigrationIssues = []struct {
 	Label      string `json:"label"`
 }
 
-// RvtoolsFileContent defines model for RvtoolsFileContent.
-type RvtoolsFileContent struct {
-	// FileContent Base64-encoded content of the RVTools CSV file
-	FileContent []byte `json:"fileContent"`
-}
-
-// RvtoolsFileReference defines model for RvtoolsFileReference.
-type RvtoolsFileReference struct {
-	// FileId Reference to a previously uploaded file
-	FileId openapi_types.UUID `json:"fileId"`
-}
-
 // Source defines model for Source.
 type Source struct {
 	Agent      *Agent             `json:"agent,omitempty"`
