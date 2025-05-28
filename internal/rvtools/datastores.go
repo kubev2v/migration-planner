@@ -9,7 +9,7 @@ import (
 
 func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
     if len(rows) <= 1 {
-        return nil // or return fmt.Errorf("no valid datastore data available")
+        return nil
     }
 
     headers := rows[0]
@@ -38,11 +38,6 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
         }
         
         datastore := api.Datastore{
-            DiskId:                  "",
-            HardwareAcceleratedMove: true,
-            TotalCapacityGB:         0,
-            Type:                    "VMFS",
-            Vendor:                  "ATA",
         }
         
         if nameIdx >= 0 && nameIdx < len(row) {
