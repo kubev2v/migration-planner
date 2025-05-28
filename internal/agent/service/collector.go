@@ -118,6 +118,13 @@ func (c *Collector) run() {
 		return
 	}
 
+	zap.S().Named("collector").Infof("List Datacenters")
+	datacenters := &[]vspheremodel.Datacenter{}
+	if err := collector.DB().List(datacenters, libmodel.FilterOptions{Detail: 1}); err != nil {
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
+		return
+	}
+
 	zap.S().Named("collector").Infof("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
@@ -136,7 +143,7 @@ func (c *Collector) run() {
 
 	zap.S().Named("collector").Infof("Create inventory")
 
-	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters)
+	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters, datacenters)
 
 	opaServerAlive := c.getOpaServerStatus()
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
@@ -257,7 +264,7 @@ func vmGuestName(vm vspheremodel.VM) string {
 	return vm.GuestName
 }
 
-func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster) *apiplanner.Inventory {
+func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster, datacenters *[]vspheremodel.Datacenter) *apiplanner.Inventory {
 	return &apiplanner.Inventory{
 		Vcenter: apiplanner.VCenter{
 			Id: vCenterID,
@@ -278,12 +285,13 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			}{},
 		},
 		Infra: apiplanner.Infra{
-			Datastores:      getDatastores(hosts, collector),
-			HostPowerStates: getHostPowerStates(*hosts),
-			TotalHosts:      len(*hosts),
-			TotalClusters:   len(*clusters),
-			HostsPerCluster: getHostsPerCluster(*clusters),
-			Networks:        getNetworks(collector),
+			Datastores:       getDatastores(hosts, collector),
+			HostPowerStates:  getHostPowerStates(*hosts),
+			TotalHosts:       len(*hosts),
+			TotalClusters:    len(*clusters),
+			TotalDatacenters: len(*datacenters),
+			HostsPerCluster:  getHostsPerCluster(*clusters),
+			Networks:         getNetworks(collector),
 		},
 	}
 }

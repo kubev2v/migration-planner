@@ -77,8 +77,9 @@ type Infra struct {
 		Type     InfraNetworksType `json:"type"`
 		VlanId   *string           `json:"vlanId,omitempty"`
 	} `json:"networks"`
-	TotalClusters int `json:"totalClusters"`
-	TotalHosts    int `json:"totalHosts"`
+	TotalClusters    int `json:"totalClusters"`
+	TotalDatacenters int `json:"totalDatacenters"`
+	TotalHosts       int `json:"totalHosts"`
 }
 
 // InfraNetworksType defines model for Infra.Networks.Type.
