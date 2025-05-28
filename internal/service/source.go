@@ -198,6 +198,11 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
     var rvtoolsContent []byte
     
 	source, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+        return server.UploadRvtoolsFile400JSONResponse{
+            Message: "Failed to retrieve source",
+        }, nil
+    }
 
     for {
         part, err := multipartReader.NextPart()
