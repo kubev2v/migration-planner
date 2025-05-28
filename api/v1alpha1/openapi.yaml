@@ -577,6 +577,7 @@ components:
       type: object
       required:
       - totalHosts
+      - totalDatacenters
       - totalClusters
       - hostsPerCluster
       - hostPowerStates
@@ -584,6 +585,8 @@ components:
       - datastores
       properties:
         totalHosts:
+          type: integer
+        totalDatacenters:
           type: integer
         totalClusters:
           type: integer
