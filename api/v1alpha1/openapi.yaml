@@ -736,17 +736,6 @@ components:
         - key
         - value
 
-    Label:
-      type: object
-      properties:
-        key:
-          type: string
-        value:
-          type: string
-      required:
-        - key
-        - value
-
     RvtoolsFileContent:
       type: object
       required:
