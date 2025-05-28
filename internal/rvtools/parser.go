@@ -33,7 +33,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	if slices.Contains(sheets, "vInfo") {
 		rows, err := excelFile.GetRows("vInfo")
 		if err != nil {
-			zap.S().Infof("Warning: Could not read vInfo sheet: %v", err)
+			zap.S().Infof("	Could not read vInfo sheet: %v", err)
 		} else {
 			vcenterUUID, _ := extractVCenterUUID(excelFile, "vInfo")
 			inventory.Vcenter.Id = vcenterUUID
