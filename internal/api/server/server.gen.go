@@ -47,7 +47,7 @@ type ServerInterface interface {
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
 
-	// (POST /sources/{id}/rvtools)
+	// (PUT /sources/{id}/rvtools)
 	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
@@ -100,7 +100,7 @@ func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (POST /sources/{id}/rvtools)
+// (PUT /sources/{id}/rvtools)
 func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
@@ -484,7 +484,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/health", wrapper.Health)
 	})
 	r.Group(func(r chi.Router) {
-		r.Post(options.BaseURL+"/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
+		r.Put(options.BaseURL+"/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
 	})
 
 	return r
@@ -991,7 +991,7 @@ type StrictServerInterface interface {
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
 
-	// (POST /sources/{id}/rvtools)
+	// (PUT /sources/{id}/rvtools)
 	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
 }
 

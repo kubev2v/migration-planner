@@ -252,7 +252,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'           
   /sources/{id}/rvtools:
-    post:
+    put:
       tags:
         - source
       description: Update a source by uploading an RVTools file directly
