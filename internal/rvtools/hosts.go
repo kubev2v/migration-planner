@@ -14,11 +14,8 @@ func processHostInfo(rows [][]string, inventory *api.Inventory) error {
 	
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
-		headerTrimmed := strings.TrimSpace(header)
-		colMap[header] = i
-		colMap[headerTrimmed] = i
-		colMap[strings.ToLower(header)] = i
-		colMap[strings.ToLower(headerTrimmed)] = i
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
 	}
 
 	if inventory.Infra.HostPowerStates == nil {
@@ -26,11 +23,11 @@ func processHostInfo(rows [][]string, inventory *api.Inventory) error {
 	}
 
 	clusterCol := -1
-	if idx, exists := colMap["Cluster"]; exists {
+	if idx, exists := colMap["cluster"]; exists {
 		clusterCol = idx
 	} else {
 		for header, idx := range colMap {
-			if strings.Contains(strings.ToLower(header), "cluster") {
+			if strings.Contains(header, "cluster") {
 				clusterCol = idx
 				break
 			}
@@ -49,8 +46,8 @@ func processHostInfo(rows [][]string, inventory *api.Inventory) error {
 
 		hostCount++
 
-		if idx, exists := colMap["Config Status"]; exists && idx < len(row) {
-			stateColor := strings.ToLower(strings.TrimSpace(row[idx]))
+		if idx, exists := colMap["config status"]; exists && idx < len(row) {
+			stateColor := row[idx]
 			switch stateColor {
 			case "red", "yellow", "green", "gray":
 				inventory.Infra.HostPowerStates[stateColor]++
