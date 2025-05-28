@@ -577,13 +577,17 @@ components:
       type: object
       required:
       - totalHosts
+      - totalDatacenters
       - totalClusters
       - hostsPerCluster
       - hostPowerStates
       - networks
       - datastores
+      - datacenters
       properties:
         totalHosts:
+          type: integer
+        totalDatacenters:
           type: integer
         totalClusters:
           type: integer
@@ -616,6 +620,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Datastore'
+        datacenters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Datacenter'
 
     Datastore:
       type: object
@@ -645,6 +653,17 @@ components:
           type: string
         model:
           type: string
+
+    Datacenter:
+      type: object
+      required:
+        - name
+        - totalClusters
+      properties:
+        name:
+          type: string
+        totalClusters:
+          type: integer
 
     VMResourceBreakdown:
       type: object

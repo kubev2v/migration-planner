@@ -258,6 +258,7 @@ func vmGuestName(vm vspheremodel.VM) string {
 }
 
 func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster) *apiplanner.Inventory {
+	datacenters := getDatacenters(collector)
 	return &apiplanner.Inventory{
 		Vcenter: apiplanner.VCenter{
 			Id: vCenterID,
@@ -278,14 +279,46 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			}{},
 		},
 		Infra: apiplanner.Infra{
-			Datastores:      getDatastores(hosts, collector),
-			HostPowerStates: getHostPowerStates(*hosts),
-			TotalHosts:      len(*hosts),
-			TotalClusters:   len(*clusters),
-			HostsPerCluster: getHostsPerCluster(*clusters),
-			Networks:        getNetworks(collector),
+			Datacenters:      datacenters,
+			Datastores:       getDatastores(hosts, collector),
+			HostPowerStates:  getHostPowerStates(*hosts),
+			TotalHosts:       len(*hosts),
+			TotalClusters:    len(*clusters),
+			TotalDatacenters: len(datacenters),
+			HostsPerCluster:  getHostsPerCluster(*clusters),
+			Networks:         getNetworks(collector),
 		},
 	}
+}
+
+func getDatacenters(collector *vsphere.Collector) []apiplanner.Datacenter {
+	var l []apiplanner.Datacenter
+
+	datacenters := &[]vspheremodel.Datacenter{}
+	if err := collector.DB().List(datacenters, libmodel.FilterOptions{Detail: 1}); err != nil {
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
+		return l
+	}
+
+	for i, dc := range *datacenters {
+		clusters := &[]vspheremodel.Cluster{}
+		filterOptions := libmodel.FilterOptions{
+			Detail:    1,
+			Predicate: libmodel.Eq("Folder", dc.Clusters.ID),
+		}
+
+		if err := collector.DB().List(clusters, filterOptions); err != nil {
+			zap.S().Named("collector").Errorf("failed to list database: %v", err)
+			return l
+		}
+
+		l = append(l, apiplanner.Datacenter{
+			Name:          fmt.Sprintf("Datacenter-%d", i+1),
+			TotalClusters: len(*clusters),
+		})
+	}
+
+	return l
 }
 
 func getProvider(creds config.Credentials) *api.Provider {

@@ -48,6 +48,12 @@ type AgentProxy struct {
 	NoProxy  *string `json:"noProxy,omitempty"`
 }
 
+// Datacenter defines model for Datacenter.
+type Datacenter struct {
+	Name          string `json:"name"`
+	TotalClusters int    `json:"totalClusters"`
+}
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`
@@ -68,6 +74,7 @@ type Error struct {
 
 // Infra defines model for Infra.
 type Infra struct {
+	Datacenters     []Datacenter   `json:"datacenters"`
 	Datastores      []Datastore    `json:"datastores"`
 	HostPowerStates map[string]int `json:"hostPowerStates"`
 	HostsPerCluster []int          `json:"hostsPerCluster"`
@@ -77,8 +84,9 @@ type Infra struct {
 		Type     InfraNetworksType `json:"type"`
 		VlanId   *string           `json:"vlanId,omitempty"`
 	} `json:"networks"`
-	TotalClusters int `json:"totalClusters"`
-	TotalHosts    int `json:"totalHosts"`
+	TotalClusters    int `json:"totalClusters"`
+	TotalDatacenters int `json:"totalDatacenters"`
+	TotalHosts       int `json:"totalHosts"`
 }
 
 // InfraNetworksType defines model for Infra.Networks.Type.
