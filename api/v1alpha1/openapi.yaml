@@ -502,25 +502,6 @@ components:
           description: 'Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
       description: Status is a return value for calls that don't return other objects.
 
-    SourceUpdateFromRvtools:
-      type: object
-      description: Request body for updating a source using RVTools data
-      required:
-        - rvtoolsData
-      properties:
-        rvtoolsData:
-          oneOf:
-            - $ref: '#/components/schemas/RvtoolsFileContent'
-            - $ref: '#/components/schemas/RvtoolsFileReference'
-        options:
-          type: object
-          description: Optional configuration for RVTools processing
-          properties:
-            skipValidation:
-              type: boolean
-              description: Whether to skip validation checks on the RVTools data
-              default: false
-
     Inventory:
       type: object
       required:
