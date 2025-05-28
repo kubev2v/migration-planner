@@ -622,7 +622,7 @@ func NewUploadRvtoolsFileRequestWithBody(server string, id openapi_types.UUID, c
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", queryURL.String(), body)
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
