@@ -23,7 +23,7 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
     nameIdx := colMap["name"]
     objectIdIdx := colMap["object id"]
     typeIdx := colMap["Type"] 
-    capacityMiBIdx := colMap["capacity mib"]
+    capacityMiBIdx, capacityMiBIdxOk := colMap["capacity mib"]
     freeMiBIdx := colMap["free mib"]
     freePercentIdx := colMap["free %"]
 
@@ -56,14 +56,8 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
             datastore.Type = row[typeIdx]
         }
         
-        if capacityMiBIdx >= 0 && capacityMiBIdx < len(row) {
-            capacityStr := row[capacityMiBIdx]
-            capacityStr = strings.Map(func(r rune) rune {
-                if (r >= '0' && r <= '9') || r == '.' {
-                    return r
-                }
-                return -1
-            }, capacityStr)
+        if capacityMiBIdxOk {
+            capacityStr := cleanNumericString(row[capacityMiBIdx])
             
             capacityMiB, err := strconv.ParseFloat(capacityStr, 64)
             if err == nil && capacityMiB > 0 {
@@ -75,26 +69,14 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
         }
         
         if freeMiBIdx >= 0 && freeMiBIdx < len(row) {
-            freeStr := row[freeMiBIdx]
-            freeStr = strings.Map(func(r rune) rune {
-                if (r >= '0' && r <= '9') || r == '.' {
-                    return r
-                }
-                return -1
-            }, freeStr)
+            freeStr := cleanNumericString(row[freeMiBIdx])
             
             freeMiB, err := strconv.ParseFloat(freeStr, 64)
             if err == nil && freeMiB >= 0 {
                 datastore.FreeCapacityGB = int(freeMiB / 1024)
             }
         } else if freePercentIdx >= 0 && freePercentIdx < len(row) && datastore.TotalCapacityGB > 0 {
-            freePercentStr := row[freePercentIdx]
-            freePercentStr = strings.Map(func(r rune) rune {
-                if (r >= '0' && r <= '9') || r == '.' {
-                    return r
-                }
-                return -1
-            }, freePercentStr)
+            freePercentStr := cleanNumericString(row[freePercentIdx])
             
             freePercent, err := strconv.ParseFloat(freePercentStr, 64)
             if err == nil && freePercent >= 0 {
@@ -122,4 +104,13 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
     }
     
     return nil
+}
+
+func cleanNumericString(s string) string {
+    return strings.Map(func(r rune) rune {
+        if (r >= '0' && r <= '9') || r == '.' {
+            return r
+        }
+        return -1
+    }, s)
 }
