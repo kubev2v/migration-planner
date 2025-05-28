@@ -21,6 +21,7 @@ const (
 	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url,source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
 	insertSourceOnPremisesStm   = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s', '%s', '%s', '%s', TRUE);"
+	insertLabelStm              = "INSERT INTO labels (key, value, source_id) VALUES ('%s', '%s', '%s');"
 )
 
 var _ = Describe("source handler", Ordered, func() {
@@ -232,6 +233,45 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
 		})
 
+		It("successfully retrieve the source -- with labels", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			secondSourceID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key", "value", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+			Expect(source.Agent).NotTo(BeNil())
+			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
+			Expect(source.Labels).ToNot(BeNil())
+			Expect(*source.Labels).To(HaveLen(1))
+			labels := *source.Labels
+			Expect(labels[0].Key).To(Equal("key"))
+			Expect(labels[0].Value).To(Equal("value"))
+		})
+
 		It("failed to get source - 404", func() {
 			firstSourceID := uuid.New()
 			firstAgentID := uuid.New()
@@ -285,6 +325,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})

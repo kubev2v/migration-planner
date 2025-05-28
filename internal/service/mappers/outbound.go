@@ -21,6 +21,14 @@ func SourceToApi(s model.Source) api.Source {
 		source.Inventory = &s.Inventory.Data
 	}
 
+	if len(s.Labels) > 0 {
+		labels := make([]api.Label, 0, len(s.Labels))
+		for _, label := range s.Labels {
+			labels = append(labels, api.Label{Key: label.Key, Value: label.Value})
+		}
+		source.Labels = &labels
+	}
+
 	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
 	// TODO:
 	// Remark: If multiple agents are deployed, we pass only the first one based on created_at timestamp
