@@ -84,15 +84,12 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
-		headerTrimmed := strings.TrimSpace(header)
-		colMap[header] = i
-		colMap[headerTrimmed] = i
-		colMap[strings.ToLower(header)] = i
-		colMap[strings.ToLower(headerTrimmed)] = i
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
 	}
 
 	switchIdx := -1
-	for _, colName := range []string{"Switch", "Name"} {
+	for _, colName := range []string{"switch", "name"} {
 		if idx, exists := colMap[colName]; exists {
 			switchIdx = idx
 			break
@@ -124,25 +121,22 @@ func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMa
 	}) {
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
-		headerTrimmed := strings.TrimSpace(header)
-		colMap[header] = i
-		colMap[headerTrimmed] = i
-		colMap[strings.ToLower(header)] = i
-		colMap[strings.ToLower(headerTrimmed)] = i
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
 	}
 
 	portIdx := -1
-	if idx, exists := colMap["Port"]; exists {
+	if idx, exists := colMap["port"]; exists {
 		portIdx = idx
 	}
 	
 	switchIdx := -1
-	if idx, exists := colMap["Switch"]; exists {
+	if idx, exists := colMap["switch"]; exists {
 		switchIdx = idx
 	}
 	
 	vlanIdx := -1
-	if idx, exists := colMap["VLAN"]; exists {
+	if idx, exists := colMap["vlan"]; exists {
 		vlanIdx = idx
 	}
 	

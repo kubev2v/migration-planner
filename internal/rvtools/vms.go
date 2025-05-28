@@ -30,20 +30,17 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
-		headerTrimmed := strings.TrimSpace(header)
-		colMap[header] = i
-		colMap[headerTrimmed] = i
-		colMap[strings.ToLower(header)] = i
-		colMap[strings.ToLower(headerTrimmed)] = i
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
 	}
 
 	templateIdx := -1
-	if idx, exists := colMap["Template"]; exists {
+	if idx, exists := colMap["template"]; exists {
 		templateIdx = idx
 	}
 
 	cbtIdx := -1
-	if idx, exists := colMap["CBT"]; exists {
+	if idx, exists := colMap["cbt"]; exists {
 		cbtIdx = idx
 	}
 
@@ -66,7 +63,7 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 			CBTEnabled: false,
 		}
 
-		if idx, exists := colMap["VM"]; exists && idx < len(row) {
+		if idx, exists := colMap["vm"]; exists && idx < len(row) {
 			vm.Name = row[idx]
 		}
 
@@ -74,23 +71,23 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 			continue
 		}
 
-		if idx, exists := colMap["Powerstate"]; exists && idx < len(row) {
+		if idx, exists := colMap["powerstate"]; exists && idx < len(row) {
 			vm.PowerState = row[idx]
 		}
 
-		if idx, exists := colMap["OS according to the VMware Tools"]; exists && idx < len(row) && row[idx] != "" {
+		if idx, exists := colMap["os according to the VMware Tools"]; exists && idx < len(row) && row[idx] != "" {
 			vm.OS = row[idx]
-		} else if idx, exists := colMap["OS according to the configuration file"]; exists && idx < len(row) && row[idx] != "" {
+		} else if idx, exists := colMap["os according to the configuration file"]; exists && idx < len(row) && row[idx] != "" {
 			vm.OS = row[idx]
 		}
 
-		if idx, exists := colMap["CPUs"]; exists && idx < len(row) {
+		if idx, exists := colMap["cpus"]; exists && idx < len(row) {
 			if cpuCount, err := strconv.Atoi(strings.TrimSpace(row[idx])); err == nil && cpuCount > 0 {
 				vm.CPUCount = cpuCount
 			}
 		}
 
-		if idx, exists := colMap["Memory"]; exists && idx < len(row) {
+		if idx, exists := colMap["memory"]; exists && idx < len(row) {
 			memStr := strings.Map(func(r rune) rune {
 				if (r >= '0' && r <= '9') || r == '.' {
 					return r
@@ -112,7 +109,7 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 		}
 
 		diskCount := 0
-		if idx, exists := colMap["Disks"]; exists && idx < len(row) {
+		if idx, exists := colMap["disks"]; exists && idx < len(row) {
 			diskCountStr := strings.Map(func(r rune) rune {
 				if r >= '0' && r <= '9' {
 					return r
@@ -126,7 +123,7 @@ func processVMInfo(rows [][]string) ([]VM, error) {
 		}
 
 		totalDiskCapacityGB := 0
-		if idx, exists := colMap["Total disk capacity MiB"]; exists && idx < len(row) {
+		if idx, exists := colMap["total disk capacity MiB"]; exists && idx < len(row) {
 			capacityStr := strings.Map(func(r rune) rune {
 				if (r >= '0' && r <= '9') || r == '.' {
 					return r
