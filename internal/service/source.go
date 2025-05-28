@@ -15,7 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/rvtools"
+	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"go.uber.org/zap"
 )
 
@@ -197,6 +197,8 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
     multipartReader := request.Body
     var rvtoolsContent []byte
     
+	source, err := h.store.Source().Get(ctx, request.Id)
+
     for {
         part, err := multipartReader.NextPart()
         if err == io.EOF {
@@ -230,6 +232,7 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
             Message: "Empty file uploaded",
         }, nil
     }
+
 	zap.S().Infof("Received RVTools data with size: %d bytes", len(rvtoolsContent))
     
 	//TODO: support csv files
@@ -243,13 +246,6 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
     if err != nil {
         return server.UploadRvtoolsFile400JSONResponse{
             Message: fmt.Sprintf("Error parsing RVTools file: %v", err),
-        }, nil
-    }
-
-    source, err := h.store.Source().Get(ctx, request.Id)
-    if err != nil {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "Failed to retrieve source",
         }, nil
     }
 

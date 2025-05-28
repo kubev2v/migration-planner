@@ -7,6 +7,7 @@ import (
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/xuri/excelize/v2"
+	"go.uber.org/zap"
 )
 
 func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
@@ -30,24 +31,15 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	}{}
 	
 	if slices.Contains(sheets, "vInfo") {
-		vcenterUUID, err := extractVCenterUUID(excelFile, "vInfo")
-		if err != nil {
-			inventory.Vcenter.Id = ""
-		} else {
-			inventory.Vcenter.Id = vcenterUUID
-		}
-	} else {
-		inventory.Vcenter.Id = ""
-	}
-	
-	if slices.Contains(sheets, "vInfo") {
 		rows, err := excelFile.GetRows("vInfo")
 		if err != nil {
-			fmt.Printf("Warning: Could not read vInfo sheet: %v\n", err)
+			zap.S().Infof("Warning: Could not read vInfo sheet: %v", err)
 		} else {
+			vcenterUUID, _ := extractVCenterUUID(excelFile, "vInfo")
+			inventory.Vcenter.Id = vcenterUUID
 			vms, err := processVMInfo(rows)
 			if err != nil {
-				fmt.Printf("Warning: VM processing failed: %v\n", err)
+				zap.S().Infof("Warning: VM processing failed: %v", err)
 			} else if len(vms) > 0 {
 				fillInventoryWithVMData(vms, &inventory)
 			}
@@ -57,7 +49,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	if slices.Contains(sheets, "vHost") {
 		rows, err := excelFile.GetRows("vHost")
 		if err != nil {
-			fmt.Printf("Warning: Could not read vHost sheet: %v\n", err)
+			zap.S().Infof("Warning: Could not read vHost sheet: %v", err)
 			inventory.Infra.TotalHosts = 0
 			inventory.Infra.TotalClusters = 0
 			inventory.Infra.HostsPerCluster = []int{}
@@ -65,7 +57,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		} else {
 			err = processHostInfo(rows, &inventory)
 			if err != nil {
-				fmt.Printf("Warning: Host processing failed: %v\n", err)
+				zap.S().Infof("Warning: Host processing failed: %v", err)
 				inventory.Infra.TotalHosts = 0
 				inventory.Infra.TotalClusters = 0
 				inventory.Infra.HostsPerCluster = []int{}
@@ -104,7 +96,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	
 	err = processNetworkInfo(dvswitchRows, dvportRows, &inventory)
 	if err != nil {
-		fmt.Printf("Warning: Network processing failed: %v\n", err)
+		zap.S().Infof("Warning: Network processing failed: %v", err)
 		inventory.Infra.Networks = []struct {
 			Dvswitch *string               `json:"dvswitch,omitempty"`
 			Name     string                `json:"name"`
