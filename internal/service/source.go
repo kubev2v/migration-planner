@@ -11,11 +11,11 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"go.uber.org/zap"
 )
 
@@ -194,116 +194,116 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 }
 
 func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.UploadRvtoolsFileRequestObject) (server.UploadRvtoolsFileResponseObject, error) {
-    multipartReader := request.Body
-    var rvtoolsContent []byte
-    
+	multipartReader := request.Body
+	var rvtoolsContent []byte
+
 	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "Failed to retrieve source",
-        }, nil
-    }
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: "Failed to retrieve source",
+		}, nil
+	}
 
-    for {
-        part, err := multipartReader.NextPart()
-        if err == io.EOF {
-            break
-        }
-        if err != nil {
-            return server.UploadRvtoolsFile400JSONResponse{
-                Message: "Failed to read multipart data",
-            }, nil
-        }
-        
-        if part.FormName() == "file" {
-            rvtoolsContent, err = io.ReadAll(part)
-            if err != nil {
-                return server.UploadRvtoolsFile400JSONResponse{
-                    Message: "Failed to read uploaded file content",
-                }, nil
-            }
-            break
-        }
-    }
-    
-    if rvtoolsContent == nil {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "No file was found in the request",
-        }, nil
-    }
-    
-    if len(rvtoolsContent) == 0 {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "Empty file uploaded",
-        }, nil
-    }
+	for {
+		part, err := multipartReader.NextPart()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return server.UploadRvtoolsFile400JSONResponse{
+				Message: "Failed to read multipart data",
+			}, nil
+		}
+
+		if part.FormName() == "file" {
+			rvtoolsContent, err = io.ReadAll(part)
+			if err != nil {
+				return server.UploadRvtoolsFile400JSONResponse{
+					Message: "Failed to read uploaded file content",
+				}, nil
+			}
+			break
+		}
+	}
+
+	if rvtoolsContent == nil {
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: "No file was found in the request",
+		}, nil
+	}
+
+	if len(rvtoolsContent) == 0 {
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: "Empty file uploaded",
+		}, nil
+	}
 
 	zap.S().Infof("Received RVTools data with size: %d bytes", len(rvtoolsContent))
-    
+
 	//TODO: support csv files
-    if !rvtools.IsExcelFile(rvtoolsContent) {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "The uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.",
-        }, nil
-    }
-    
-    inventory, err := rvtools.ParseRVTools(rvtoolsContent)
-    if err != nil {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: fmt.Sprintf("Error parsing RVTools file: %v", err),
-        }, nil
-    }
+	if !rvtools.IsExcelFile(rvtoolsContent) {
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: "The uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.",
+		}, nil
+	}
 
-    if source == nil {
-        return server.UploadRvtoolsFile404JSONResponse{}, nil
-    }
+	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
+	if err != nil {
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: fmt.Sprintf("Error parsing RVTools file: %v", err),
+		}, nil
+	}
 
-    user := auth.MustHaveUser(ctx)
-    if source.OrgID != user.Organization {
-        return server.UploadRvtoolsFile403JSONResponse{}, nil
-    }
+	if source == nil {
+		return server.UploadRvtoolsFile404JSONResponse{}, nil
+	}
 
-    if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
-        return server.UploadRvtoolsFile400JSONResponse{
-            Message: "vCenter ID mismatch: existing source has different vCenter ID than the uploaded RVTools file",
-        }, nil
-    }
+	user := auth.MustHaveUser(ctx)
+	if source.OrgID != user.Organization {
+		return server.UploadRvtoolsFile403JSONResponse{}, nil
+	}
 
-    ctx, err = h.store.NewTransactionContext(ctx)
-    if err != nil {
-        return server.UploadRvtoolsFile500JSONResponse{}, nil
-    }
+	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
+		return server.UploadRvtoolsFile400JSONResponse{
+			Message: "vCenter ID mismatch: existing source has different vCenter ID than the uploaded RVTools file",
+		}, nil
+	}
 
-    var rvtoolsAgent *model.Agent
-    if len(source.Agents) > 0 {
-        rvtoolsAgent = &source.Agents[0]
-    } else {
-        newAgent := model.NewAgentForSource(uuid.New(), *source)
-        
-        if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
-            _, _ = store.Rollback(ctx)
-            return server.UploadRvtoolsFile500JSONResponse{}, nil
-        }
-        rvtoolsAgent = &newAgent
-    }
+	ctx, err = h.store.NewTransactionContext(ctx)
+	if err != nil {
+		return server.UploadRvtoolsFile500JSONResponse{}, nil
+	}
 
-    source = mappers.UpdateSourceOnPrem(source, *inventory)
+	var rvtoolsAgent *model.Agent
+	if len(source.Agents) > 0 {
+		rvtoolsAgent = &source.Agents[0]
+	} else {
+		newAgent := model.NewAgentForSource(uuid.New(), *source)
 
-    if _, err = h.store.Source().Update(ctx, *source); err != nil {
-        _, _ = store.Rollback(ctx)
-        return server.UploadRvtoolsFile500JSONResponse{}, nil
-    }
+		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
+			_, _ = store.Rollback(ctx)
+			return server.UploadRvtoolsFile500JSONResponse{}, nil
+		}
+		rvtoolsAgent = &newAgent
+	}
 
-    rvtoolsAgent.StatusInfo = "Last updated via RVTools upload on " + time.Now().Format(time.RFC3339)
-    
-    if _, err = h.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
-        _, _ = store.Rollback(ctx)
-        return server.UploadRvtoolsFile500JSONResponse{}, nil
-    }
+	source = mappers.UpdateSourceOnPrem(source, *inventory)
 
-    if _, err := store.Commit(ctx); err != nil {
-        return server.UploadRvtoolsFile500JSONResponse{}, nil
-    }
+	if _, err = h.store.Source().Update(ctx, *source); err != nil {
+		_, _ = store.Rollback(ctx)
+		return server.UploadRvtoolsFile500JSONResponse{}, nil
+	}
 
-    return server.UploadRvtoolsFile200JSONResponse{}, nil
+	rvtoolsAgent.StatusInfo = "Last updated via RVTools upload on " + time.Now().Format(time.RFC3339)
+
+	if _, err = h.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
+		_, _ = store.Rollback(ctx)
+		return server.UploadRvtoolsFile500JSONResponse{}, nil
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return server.UploadRvtoolsFile500JSONResponse{}, nil
+	}
+
+	return server.UploadRvtoolsFile200JSONResponse{}, nil
 }
