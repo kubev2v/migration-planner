@@ -33,13 +33,13 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	if slices.Contains(sheets, "vInfo") {
 		rows, err := excelFile.GetRows("vInfo")
 		if err != nil {
-			zap.S().Infof("	Could not read vInfo sheet: %v", err)
+			zap.S().Warnf("Could not read vInfo sheet: %v", err)
 		} else {
-			vcenterUUID, _ := extractVCenterUUID(excelFile, "vInfo")
+			vcenterUUID, _ := extractVCenterUUID(rows)
 			inventory.Vcenter.Id = vcenterUUID
 			vms, err := processVMInfo(rows)
 			if err != nil {
-				zap.S().Infof("Warning: VM processing failed: %v", err)
+				zap.S().Warnf("VM processing failed: %v", err)
 			} else if len(vms) > 0 {
 				fillInventoryWithVMData(vms, &inventory)
 			}
@@ -49,19 +49,13 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	if slices.Contains(sheets, "vHost") {
 		rows, err := excelFile.GetRows("vHost")
 		if err != nil {
-			zap.S().Infof("Warning: Could not read vHost sheet: %v", err)
-			inventory.Infra.TotalHosts = 0
-			inventory.Infra.TotalClusters = 0
-			inventory.Infra.HostsPerCluster = []int{}
-			inventory.Infra.HostPowerStates = map[string]int{}
+			zap.S().Warnf("Could not read vHost sheet: %v", err)
+			resetHostInfo(&inventory)
 		} else {
 			err = processHostInfo(rows, &inventory)
 			if err != nil {
-				zap.S().Infof("Warning: Host processing failed: %v", err)
-				inventory.Infra.TotalHosts = 0
-				inventory.Infra.TotalClusters = 0
-				inventory.Infra.HostsPerCluster = []int{}
-				inventory.Infra.HostPowerStates = map[string]int{}
+				zap.S().Warnf("Host processing failed: %v", err)
+				resetHostInfo(&inventory)
 			}
 		}
 	}
@@ -96,7 +90,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	
 	err = processNetworkInfo(dvswitchRows, dvportRows, &inventory)
 	if err != nil {
-		zap.S().Infof("Warning: Network processing failed: %v", err)
+		zap.S().Warnf("Network processing failed: %v", err)
 		inventory.Infra.Networks = []struct {
 			Dvswitch *string               `json:"dvswitch,omitempty"`
 			Name     string                `json:"name"`
@@ -105,11 +99,10 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		}{}
 	}
 		return &inventory, nil
-	}
+}
 
-func extractVCenterUUID(excelFile *excelize.File, sheetName string) (string, error) {
-    rows, err := excelFile.GetRows(sheetName)
-    if err != nil || len(rows) < 2 {
+func extractVCenterUUID(rows [][]string) (string, error) {
+    if len(rows) < 2 {
         return "", fmt.Errorf("insufficient data")
     }
 
@@ -131,9 +124,20 @@ func IsExcelFile(content []byte) bool {
 	}
 	
 	if content[0] == 0x50 && content[1] == 0x4B {
-		_, err := excelize.OpenReader(bytes.NewReader(content))
-		return err == nil
+		f, err := excelize.OpenReader(bytes.NewReader(content))
+		if err != nil {
+			return false
+		}
+		defer f.Close()
+		return true
 	}
 	
 	return false
+}
+
+func resetHostInfo(inventory *api.Inventory) {
+    inventory.Infra.TotalHosts = 0
+    inventory.Infra.TotalClusters = 0
+    inventory.Infra.HostsPerCluster = []int{}
+    inventory.Infra.HostPowerStates = map[string]int{}
 }
