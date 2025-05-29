@@ -87,17 +87,11 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
                 datastore.FreeCapacityGB = int(float64(datastore.TotalCapacityGB) * freePercent)
             }
         }
-
+        
+        // Ensure that the free capacity of the datastore does not exceed its total capacity.
+        // If FreeCapacityGB is greater than TotalCapacityGB, set FreeCapacityGB to TotalCapacityGB.
         if datastore.FreeCapacityGB > datastore.TotalCapacityGB {
             datastore.FreeCapacityGB = datastore.TotalCapacityGB
-        }
-
-        if datastore.TotalCapacityGB == 0 {
-            datastore.TotalCapacityGB = 500
-        }
-        
-        if datastore.FreeCapacityGB == 0 {
-            datastore.FreeCapacityGB = datastore.TotalCapacityGB / 5
         }
 
         inventory.Infra.Datastores = append(inventory.Infra.Datastores, datastore)
