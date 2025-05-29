@@ -14,20 +14,20 @@ const (
 )
 
 func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.Inventory) error {
-	
+
 	dvswitchMap := make(map[string]bool)
-	
+
 	networksMap := make(map[string]*struct {
 		Name     string
 		Type     string
 		VlanId   string
 		DVSwitch string
 	})
-	
+
 	if len(dvswitchRows) > 1 {
 		processDvSwitchSheet(dvswitchRows, dvswitchMap)
 	}
-	
+
 	if len(dvportRows) > 1 {
 		processDvPortSheet(dvportRows, dvswitchMap, networksMap)
 	}
@@ -35,14 +35,14 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 	if len(dvswitchMap) == 0 && len(networksMap) == 0 {
 		return nil
 	}
-	
+
 	inventory.Infra.Networks = []struct {
 		Dvswitch *string               `json:"dvswitch,omitempty"`
 		Name     string                `json:"name"`
 		Type     api.InfraNetworksType `json:"type"`
 		VlanId   *string               `json:"vlanId,omitempty"`
 	}{}
-	
+
 	for switchName := range dvswitchMap {
 		inventory.Infra.Networks = append(inventory.Infra.Networks, struct {
 			Dvswitch *string               `json:"dvswitch,omitempty"`
@@ -54,7 +54,7 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 			Type: api.InfraNetworksType(NetDvSwitch),
 		})
 	}
-	
+
 	for _, network := range networksMap {
 		netEntry := struct {
 			Dvswitch *string               `json:"dvswitch,omitempty"`
@@ -65,18 +65,18 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 			Name: network.Name,
 			Type: api.InfraNetworksType(network.Type),
 		}
-		
+
 		if network.DVSwitch != "" {
 			dvSwitch := network.DVSwitch
 			netEntry.Dvswitch = &dvSwitch
 		}
-		
+
 		vlanId := network.VlanId
 		netEntry.VlanId = &vlanId
-		
+
 		inventory.Infra.Networks = append(inventory.Infra.Networks, netEntry)
 	}
-	
+
 	return nil
 }
 
@@ -95,7 +95,7 @@ func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 			break
 		}
 	}
-	
+
 	if switchIdx == -1 {
 		return
 	}
@@ -105,7 +105,7 @@ func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 		if len(row) <= switchIdx {
 			continue
 		}
-		
+
 		switchName := strings.TrimSpace(row[switchIdx])
 		if switchName != "" {
 			dvswitchMap[switchName] = true
@@ -114,11 +114,11 @@ func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 }
 
 func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMap map[string]*struct {
-    Name     string
-    Type     string
-    VlanId   string
-    DVSwitch string
-	}) {
+	Name     string
+	Type     string
+	VlanId   string
+	DVSwitch string
+}) {
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
 		key := strings.ToLower(strings.TrimSpace(header))
@@ -129,17 +129,17 @@ func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMa
 	if idx, exists := colMap["port"]; exists {
 		portIdx = idx
 	}
-	
+
 	switchIdx := -1
 	if idx, exists := colMap["switch"]; exists {
 		switchIdx = idx
 	}
-	
+
 	vlanIdx := -1
 	if idx, exists := colMap["vlan"]; exists {
 		vlanIdx = idx
 	}
-	
+
 	if portIdx == -1 || switchIdx == -1 {
 		return
 	}
@@ -149,10 +149,10 @@ func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMa
 		if len(row) <= portIdx || len(row) <= switchIdx {
 			continue
 		}
-		
+
 		portName := strings.TrimSpace(row[portIdx])
 		switchName := strings.TrimSpace(row[switchIdx])
-		
+
 		if portName == "" || switchName == "" {
 			continue
 		}

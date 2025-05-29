@@ -11,7 +11,7 @@ func processHostInfo(rows [][]string, inventory *api.Inventory) error {
 	if len(rows) <= 1 {
 		return fmt.Errorf("no valid host data available")
 	}
-	
+
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
 		key := strings.ToLower(strings.TrimSpace(header))
@@ -83,6 +83,6 @@ func processHostInfo(rows [][]string, inventory *api.Inventory) error {
 		hostsPerCluster = append(hostsPerCluster, count)
 	}
 	inventory.Infra.HostsPerCluster = hostsPerCluster
-	
+
 	return nil
 }

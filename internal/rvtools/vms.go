@@ -180,12 +180,12 @@ func fillInventoryWithVMData(vms []VM, inventory *api.Inventory) {
 	for _, vm := range vms {
 		cpuSet = append(cpuSet, vm.CPUCount)
 		memorySet = append(memorySet, vm.MemoryMB/1024)
-		
+
 		totalDiskGB := 0
 		for _, disk := range vm.Disks {
 			totalDiskGB += disk.Capacity
 		}
-		
+
 		diskGBSet = append(diskGBSet, totalDiskGB)
 		diskCountSet = append(diskCountSet, len(vm.Disks))
 

@@ -16,7 +16,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
 	}
 	defer excelFile.Close()
-	
+
 	sheets := excelFile.GetSheetList()
 
 	inventory := api.Inventory{}
@@ -29,7 +29,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		Count      int    `json:"count"`
 		Label      string `json:"label"`
 	}{}
-	
+
 	if slices.Contains(sheets, "vInfo") {
 		rows, err := excelFile.GetRows("vInfo")
 		if err != nil {
@@ -45,7 +45,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 			}
 		}
 	}
-	
+
 	if slices.Contains(sheets, "vHost") {
 		rows, err := excelFile.GetRows("vHost")
 		if err != nil {
@@ -59,7 +59,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 			}
 		}
 	}
-	
+
 	if slices.Contains(sheets, "vDatastore") {
 		rows, err := excelFile.GetRows("vDatastore")
 		if err != nil {
@@ -71,7 +71,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 			}
 		}
 	}
-	
+
 	var dvswitchRows, dvportRows [][]string
 
 	if slices.Contains(sheets, "dvSwitch") {
@@ -87,7 +87,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 			dvportRows = [][]string{}
 		}
 	}
-	
+
 	err = processNetworkInfo(dvswitchRows, dvportRows, &inventory)
 	if err != nil {
 		zap.S().Warnf("Network processing failed: %v", err)
@@ -98,31 +98,31 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 			VlanId   *string               `json:"vlanId,omitempty"`
 		}{}
 	}
-		return &inventory, nil
+	return &inventory, nil
 }
 
 func extractVCenterUUID(rows [][]string) (string, error) {
-    if len(rows) < 2 {
-        return "", fmt.Errorf("insufficient data")
-    }
+	if len(rows) < 2 {
+		return "", fmt.Errorf("insufficient data")
+	}
 
-    header := rows[0]
-    data := rows[1]
+	header := rows[0]
+	data := rows[1]
 
-    for i, colName := range header {
-        if colName == "VI SDK UUID" && i < len(data) {
-            return data[i], nil
-        }
-    }
-    
-    return "", fmt.Errorf("VI SDK UUID column not found")
+	for i, colName := range header {
+		if colName == "VI SDK UUID" && i < len(data) {
+			return data[i], nil
+		}
+	}
+
+	return "", fmt.Errorf("VI SDK UUID column not found")
 }
 
 func IsExcelFile(content []byte) bool {
 	if len(content) < 2 {
 		return false
 	}
-	
+
 	if content[0] == 0x50 && content[1] == 0x4B {
 		f, err := excelize.OpenReader(bytes.NewReader(content))
 		if err != nil {
@@ -131,13 +131,13 @@ func IsExcelFile(content []byte) bool {
 		defer f.Close()
 		return true
 	}
-	
+
 	return false
 }
 
 func resetHostInfo(inventory *api.Inventory) {
-    inventory.Infra.TotalHosts = 0
-    inventory.Infra.TotalClusters = 0
-    inventory.Infra.HostsPerCluster = []int{}
-    inventory.Infra.HostPowerStates = map[string]int{}
+	inventory.Infra.TotalHosts = 0
+	inventory.Infra.TotalClusters = 0
+	inventory.Infra.HostsPerCluster = []int{}
+	inventory.Infra.HostPowerStates = map[string]int{}
 }
