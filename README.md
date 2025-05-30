@@ -10,6 +10,34 @@ The agent is responsible to collect the anonymous data from VMware environment.
 
 ## The data that are collected
 
+```
+Datastores:
+ - free capacity
+ - total capacity
+ - type
+Hosts:
+ - number
+ - status
+Networks:
+ - type
+ - vlan ID
+Clusters:
+ - number
+Datacenters:
+ - number
+General:
+ - vCenter ID
+VMs:
+  - number
+  - cpu cores
+  - memory
+  - disk count
+  - disk size
+  - operating system
+  - status
+  - properties to test if VM is migratable
+```
+
 ## Architecture
 
 ### Flow chart
