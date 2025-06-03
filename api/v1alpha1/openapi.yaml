@@ -250,7 +250,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'           
+                $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}/rvtools:
     put:
       tags:
@@ -536,6 +536,7 @@ components:
       - diskGB
       - diskCount
       - os
+      - osInfo
       - powerStates
       - notMigratableReasons
       - migrationWarnings
@@ -566,6 +567,11 @@ components:
           type: object
           additionalProperties:
             type: integer
+        osInfo:
+          type: object
+          additionalProperties:
+            type: object
+            $ref: '#/components/schemas/osInfo'
         notMigratableReasons:
           type: array
           items:
@@ -574,6 +580,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MigrationIssue'
+
+    osInfo:
+      type: object
+      required:
+        - supported
+      properties:
+        supported:
+          type: boolean
 
     Infra:
       type: object
