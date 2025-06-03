@@ -256,7 +256,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'           
+                $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}/rvtools:
     put:
       tags:
@@ -535,18 +535,15 @@ components:
     Inventory:
       type: object
       required:
-      - vcenter
-      - vms
-      - infra
+        - vcenter
+        - vms
+        - infra
       properties:
         vcenter:
-          type: object
           $ref: '#/components/schemas/VCenter'
         vms:
-          type: object
           $ref: '#/components/schemas/VMs'
         infra:
-          type: object
           $ref: '#/components/schemas/Infra'
 
     VCenter:
@@ -559,16 +556,16 @@ components:
     VMs:
       type: object
       required:
-      - total
-      - totalMigratable
-      - cpuCores
-      - ramGB
-      - diskGB
-      - diskCount
-      - os
-      - powerStates
-      - notMigratableReasons
-      - migrationWarnings
+        - total
+        - totalMigratable
+        - cpuCores
+        - ramGB
+        - diskGB
+        - diskCount
+        - os
+        - powerStates
+        - notMigratableReasons
+        - migrationWarnings
       properties:
         total:
           type: integer
@@ -577,25 +574,26 @@ components:
         totalMigratableWithWarnings:
           type: integer
         cpuCores:
-          type: object
           $ref: '#/components/schemas/VMResourceBreakdown'
         ramGB:
-          type: object
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
-          type: object
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskCount:
-          type: object
           $ref: '#/components/schemas/VMResourceBreakdown'
         powerStates:
           type: object
           additionalProperties:
             type: integer
         os:
+          deprecated: true
           type: object
           additionalProperties:
             type: integer
+        osInfo:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/osInfo'
         notMigratableReasons:
           type: array
           items:
@@ -605,18 +603,29 @@ components:
           items:
             $ref: '#/components/schemas/MigrationIssue'
 
+    osInfo:
+      type: object
+      required:
+        - count
+        - supported
+      properties:
+        count:
+          type: integer
+        supported:
+          type: boolean
+
     Infra:
       type: object
       required:
-      - totalHosts
-      - totalDatacenters
-      - totalClusters
-      - clustersPerDatacenter
-      - hosts
-      - hostsPerCluster
-      - hostPowerStates
-      - networks
-      - datastores
+        - totalHosts
+        - totalDatacenters
+        - totalClusters
+        - clustersPerDatacenter
+        - hosts
+        - hostsPerCluster
+        - hostPowerStates
+        - networks
+        - datastores
       properties:
         totalHosts:
           type: integer
@@ -668,7 +677,7 @@ components:
       properties:
         type:
           type: string
-          enum: [standard, distributed, dvswitch, unsupported]
+          enum: [ standard, distributed, dvswitch, unsupported ]
         name:
           type: string
         vlanId:
@@ -708,11 +717,11 @@ components:
     VMResourceBreakdown:
       type: object
       required:
-      - histogram
-      - total
-      - totalForMigratable
-      - totalForMigratableWithWarnings
-      - totalForNotMigratable
+        - histogram
+        - total
+        - totalForMigratable
+        - totalForMigratableWithWarnings
+        - totalForNotMigratable
       properties:
         total:
           type: integer
@@ -723,15 +732,14 @@ components:
         totalForNotMigratable:
           type: integer
         histogram:
-          type: object
           $ref: '#/components/schemas/Histogram'
 
     Histogram:
       type: object
       required:
-      - minValue
-      - step
-      - data
+        - minValue
+        - step
+        - data
       properties:
         minValue:
           type: integer
@@ -750,9 +758,9 @@ components:
     MigrationIssue:
       type: object
       required:
-      - label
-      - assessment
-      - count
+        - label
+        - assessment
+        - count
       properties:
         label:
           type: string
@@ -769,7 +777,7 @@ components:
           format: uuid
         status:
           type: string
-          enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
+          enum: [ not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone ]
         statusInfo:
           type: string
         credentialUrl:
