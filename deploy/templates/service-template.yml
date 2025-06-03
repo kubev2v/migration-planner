@@ -29,6 +29,9 @@ parameters:
   - name: MIGRATION_PLANNER_AGENT_IMAGE
     description: Migration Discovery Service image
     required: true
+  - name: MIGRATION_PLANNER_AGENT_IMAGE_TAG
+    description: Migration Discovery Service image tag
+    value: latest
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
     value: "3"
@@ -443,7 +446,7 @@ objects:
                 - name: MIGRATION_PLANNER_IMAGE_URL
                   value: ${MIGRATION_PLANNER_IMAGE_URL}
                 - name: MIGRATION_PLANNER_AGENT_IMAGE
-                  value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
+                  value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${MIGRATION_PLANNER_AGENT_IMAGE_TAG}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE
