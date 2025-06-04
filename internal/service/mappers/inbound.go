@@ -69,6 +69,27 @@ func ImageInfraFromApi(sourceID uuid.UUID, imageTokenKey string, resource *v1alp
 	return imageInfra
 }
 
+func LabelsFromApi(apiLabels *[]api.Label) []model.Label {
+	if apiLabels == nil {
+		return nil
+	}
+	modelLabels := make([]model.Label, len(*apiLabels))
+	for i, apiLabel := range *apiLabels {
+		modelLabels[i] = model.Label{
+			Key:   apiLabel.Key,
+			Value: apiLabel.Value,
+		}
+	}
+	return modelLabels
+}
+
+func AgentProxyFromApi(apiProxy *api.AgentProxy) *model.JSONField[api.AgentProxy] {
+	if apiProxy == nil {
+		return nil
+	}
+	return model.MakeJSONField(*apiProxy)
+}
+
 func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {
 	m.Inventory = model.MakeJSONField(inventory)
 	m.VCenterID = inventory.Vcenter.Id

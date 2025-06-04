@@ -134,19 +134,19 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	return server.DeleteSource200JSONResponse{}, nil
 }
 
-func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
+func (h *ServiceHandler) UpdateSourceInventory(ctx context.Context, request server.UpdateSourceInventoryRequestObject) (server.UpdateSourceInventoryResponseObject, error) {
 	ctx, err := h.store.NewTransactionContext(ctx)
 	if err != nil {
-		return server.UpdateSource404JSONResponse{}, nil
+		return server.UpdateSourceInventory404JSONResponse{}, nil
 	}
 
 	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
-		return server.UpdateSource400JSONResponse{}, nil
+		return server.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
 	if source == nil {
-		return server.UpdateSource404JSONResponse{}, nil
+		return server.UpdateSourceInventory404JSONResponse{}, nil
 	}
 
 	// create the agent if missing
@@ -161,30 +161,109 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 	if agent == nil {
 		newAgent := model.NewAgentForSource(uuid.New(), *source)
 		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
-			return server.UpdateSource500JSONResponse{}, nil
+			return server.UpdateSourceInventory500JSONResponse{}, nil
 		}
 	}
 
 	user := auth.MustHaveUser(ctx)
 	if source.OrgID != user.Organization {
-		return server.UpdateSource403JSONResponse{}, nil
+		return server.UpdateSourceInventory403JSONResponse{}, nil
 	}
 
 	if source.VCenterID != "" && source.VCenterID != request.Body.Inventory.Vcenter.Id {
 		_, _ = store.Rollback(ctx)
-		return server.UpdateSource400JSONResponse{}, nil
+		return server.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
-	source = mappers.UpdateSourceOnPrem(source, request.Body.Inventory)
+	source = mappers.UpdateSourceFromApi(source, request.Body.Inventory)
 
 	if _, err = h.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.UpdateSource500JSONResponse{}, nil
+		return server.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return server.UpdateSource500JSONResponse{}, nil
+		return server.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
-	return server.UpdateSource200JSONResponse{}, nil
+	return server.UpdateSourceInventory200JSONResponse(mappers.SourceToApi(*source)), nil
+}
+
+func (h *ServiceHandler) UpdateSourceMetadata(ctx context.Context, request server.UpdateSourceMetadataRequestObject) (server.UpdateSourceMetadataResponseObject, error) {
+	ctx, err := h.store.NewTransactionContext(ctx)
+	if err != nil {
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to start transaction: " + err.Error()}, nil
+	}
+
+	source, err := h.store.Source().Get(ctx, request.Id) // Get preloads ImageInfra
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.UpdateSourceMetadata404JSONResponse{Message: "Source not found"}, nil
+		}
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to get source: " + err.Error()}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if source.OrgID != user.Organization {
+		_, _ = store.Rollback(ctx)
+		return server.UpdateSourceMetadata403JSONResponse{Message: "Forbidden"}, nil
+	}
+
+	updated := false
+
+	if request.Body.Name != nil && *request.Body.Name != source.Name {
+		source.Name = *request.Body.Name
+		updated = true
+	}
+
+	if request.Body.Labels != nil {
+		source.Labels = mappers.LabelsFromApi(request.Body.Labels)
+		updated = true
+	}
+
+	// ImageInfra is part of the Source model and should be preloaded by Get.
+	// GORM's association handling should persist changes to source.ImageInfra when source is updated.
+	if request.Body.SshPublicKey != nil && *request.Body.SshPublicKey != source.ImageInfra.SshPublicKey {
+		source.ImageInfra.SshPublicKey = *request.Body.SshPublicKey
+		updated = true
+	}
+	if request.Body.CertificateChain != nil && *request.Body.CertificateChain != source.ImageInfra.CertificateChain {
+		source.ImageInfra.CertificateChain = *request.Body.CertificateChain
+		updated = true
+	}
+
+	if request.Body.Proxy != nil {
+		if request.Body.Proxy.HttpUrl != nil && *request.Body.Proxy.HttpUrl != source.ImageInfra.HttpProxyUrl {
+			source.ImageInfra.HttpProxyUrl = *request.Body.Proxy.HttpUrl
+			updated = true
+		}
+		if request.Body.Proxy.HttpsUrl != nil && *request.Body.Proxy.HttpsUrl != source.ImageInfra.HttpsProxyUrl {
+			source.ImageInfra.HttpsProxyUrl = *request.Body.Proxy.HttpsUrl
+			updated = true
+		}
+		if request.Body.Proxy.NoProxy != nil && *request.Body.Proxy.NoProxy != source.ImageInfra.NoProxyDomains {
+			source.ImageInfra.NoProxyDomains = *request.Body.Proxy.NoProxy
+			updated = true
+		}
+	}
+
+	if updated {
+		// The ImageInfra model is associated with Source. GORM should handle updates to
+		// source.ImageInfra when source is updated if ImageInfra's primary key (SourceID)
+		// is correctly set up and ImageInfra was loaded with the Source.
+		// store.ImageInfra() only has Create, implying updates go via the Source model.
+		updatedSource, updateErr := h.store.Source().Update(ctx, *source)
+		if updateErr != nil {
+			_, _ = store.Rollback(ctx)
+			return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to update source metadata: " + updateErr.Error()}, nil
+		}
+		source = updatedSource // Use the returned updated source
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to commit transaction: " + err.Error()}, nil
+	}
+
+	return server.UpdateSourceMetadata200JSONResponse(mappers.SourceToApi(*source)), nil
 }

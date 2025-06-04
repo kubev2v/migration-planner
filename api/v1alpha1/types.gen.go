@@ -89,6 +89,12 @@ type Inventory struct {
 	Vms     VMs     `json:"vms"`
 }
 
+// Label defines model for Label.
+type Label struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // MigrationIssues defines model for MigrationIssues.
 type MigrationIssues = []struct {
 	Assessment string `json:"assessment"`
@@ -117,6 +123,21 @@ type SourceCreate struct {
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
+
+// SourceUpdateInventory defines model for SourceUpdateInventory.
+type SourceUpdateInventory struct {
+	AgentId   openapi_types.UUID `json:"agentId"`
+	Inventory Inventory          `json:"inventory"`
+}
+
+// SourceUpdateMetadata defines model for SourceUpdateMetadata.
+type SourceUpdateMetadata struct {
+	CertificateChain *string     `json:"certificateChain,omitempty"`
+	Labels           *[]Label    `json:"labels,omitempty"`
+	Name             *string     `json:"name,omitempty"`
+	Proxy            *AgentProxy `json:"proxy,omitempty"`
+	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
+}
 
 // SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
 type SourceUpdateOnPrem struct {
@@ -187,5 +208,8 @@ type ListSourcesParams struct {
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
-// UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
-type UpdateSourceJSONRequestBody = SourceUpdateOnPrem
+// UpdateSourceMetadataJSONRequestBody defines body for UpdateSourceMetadata for application/json ContentType.
+type UpdateSourceMetadataJSONRequestBody = SourceUpdateMetadata
+
+// UpdateSourceInventoryJSONRequestBody defines body for UpdateSourceInventory for application/json ContentType.
+type UpdateSourceInventoryJSONRequestBody = SourceUpdateInventory

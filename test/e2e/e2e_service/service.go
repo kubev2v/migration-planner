@@ -3,6 +3,9 @@ package e2e_service
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -11,8 +14,6 @@ import (
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
 )
 
 // PlannerService defines the interface for interacting with the planner service
@@ -196,7 +197,7 @@ func (s *plannerService) RemoveSources() error {
 func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
 	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	update := v1alpha1.UpdateSourceJSONRequestBody{
+	update := v1alpha1.UpdateSourceInventoryJSONRequestBody{
 		AgentId:   uuid,
 		Inventory: *inventory,
 	}

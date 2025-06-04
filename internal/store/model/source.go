@@ -8,6 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
+type Label struct {
+	Key      string `gorm:"primaryKey;column:key;type:VARCHAR;size:100;not null"`
+	Value    string `gorm:"column:value;type:VARCHAR;size:100;not null"`
+	SourceID string `gorm:"primaryKey;column:source_id;type:TEXT;not null"`
+}
+
 type Source struct {
 	gorm.Model
 	ID         uuid.UUID `gorm:"primaryKey; not null"`
@@ -19,6 +25,7 @@ type Source struct {
 	OnPremises bool
 	Agents     []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
 	ImageInfra ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
+	Labels     []Label
 }
 
 type SourceList []Source
