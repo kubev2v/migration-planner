@@ -130,6 +130,55 @@ func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form mappers.SourceUpdateForm) (*model.Source, error) {
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	source, err := s.store.Source().Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(id)
+		}
+		return nil, err
+	}
+
+	// Update source fields
+	form.ToSource(source)
+	if _, err := s.store.Source().Update(ctx, *source); err != nil {
+		return nil, err
+	}
+
+	// Update ImageInfra
+	form.ToImageInfra(&source.ImageInfra)
+	if _, err := s.store.ImageInfra().Update(ctx, source.ImageInfra); err != nil {
+		return nil, err
+	}
+
+	// Update labels
+	if labels := form.ToLabels(); labels != nil {
+		if err := s.store.Label().UpdateLabels(ctx, source.ID, labels); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	// Re-fetch source to get all updated associations
+	updatedSource, err := s.store.Source().Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return updatedSource, nil
+}
+
 func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.InventoryUpdateForm) (model.Source, error) {
 	ctx, err := s.store.NewTransactionContext(ctx)
 	if err != nil {
@@ -212,7 +261,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	inventory, err := rvtools.ParseRVTools(ctx, rvtoolsContent, s.opaValidator)
 	if err != nil {
-		return fmt.Errorf("error parsing RVTools file: %v", err)
+		return fmt.Errorf("Error parsing RVTools file: %v", err)
 	}
 
 	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {

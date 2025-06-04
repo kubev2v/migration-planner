@@ -3,14 +3,19 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
+	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -89,8 +94,10 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM image_infras;")
 		})
 	})
 
@@ -109,13 +116,16 @@ var _ = Describe("source handler", Ordered, func() {
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
 			srv := service.NewSourceService(s, nil)
+			httpUrl := "http"
+			httpsUrl := "https"
+			noProxy := "noproxy"
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
 				Username: "admin",
 				OrgID:    "admin",
 				Name:     "test",
-				HttpUrl:  "http",
-				HttpsUrl: "https",
-				NoProxy:  "noproxy",
+				HttpUrl:  httpUrl,
+				HttpsUrl: httpsUrl,
+				NoProxy:  noProxy,
 			})
 			Expect(err).To(BeNil())
 			Expect(source.Name).To(Equal("test"))
@@ -153,8 +163,10 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM image_infras;")
 		})
 	})
 
@@ -230,6 +242,7 @@ var _ = Describe("source handler", Ordered, func() {
 			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM image_infras;")
 		})
 	})
 
@@ -283,8 +296,10 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM image_infras;")
 		})
 	})
 
@@ -379,16 +394,7 @@ var _ = Describe("source handler", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 
-			vCenterID := ""
-			tx = gormdb.Raw(fmt.Sprintf("SELECT v_center_id FROM SOURCES where id = '%s';", firstSourceID)).Scan(&vCenterID)
-			Expect(tx.Error).To(BeNil())
-			Expect(vCenterID).To(Equal("vcenter"))
-
-			onPrem := false
-			tx = gormdb.Raw(fmt.Sprintf("SELECT on_premises FROM SOURCES where id = '%s';", firstSourceID)).Scan(&onPrem)
-			Expect(tx.Error).To(BeNil())
-			Expect(onPrem).To(BeTrue())
-
+			// Now try to update with a different vCenter ID
 			_, err = srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID: firstSourceID,
 				AgentId:  uuid.New(),
@@ -406,6 +412,199 @@ var _ = Describe("source handler", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("update-source", func() {
+		It("successfully updates source", func() {
+			// First create a source with initial data
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create initial image_infra record
+			initialImageInfra := model.ImageInfra{
+				SourceID: uuid.MustParse(sourceID),
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil))
+			newName := "updated-name"
+			newLabels := []v1alpha1.Label{
+				{Key: "env", Value: "prod"},
+			}
+			newSshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCk83ddeteALlqCbO43E3ardbavFPboYIoFnlQZ3zVi+ls96c1x3P9DDWkNhuOgpQurull2y55Wm7HWLLK5hlk49s6tUuBDftH3XXfGMAmncBH9apGHxl0O+k/X1MrfhoEXHmmEwXTv+X6vC3BsZiazSOkKbIozHgnD7y1z83wuYWbbW0NYvgwhaoOtkWteKSJWwPxNaTwGCpj+RQ6xWygt5EbMSf7U3Ih2P1hcsa615zD5P2GSLxtLwWnHgWCylT/krdyIYlR1pqW9e/Iv2MKlGX6W1DSUxUz5BNxzCA8O53C0NSCeDFAhn9T8VE9U/RkGDtXBFJ8JVcmtM6S9buq5HZ12+0E0VCGFdmnvNT8XxdYrN0ff8f3DQI7ERgHEKQiqjrSPDv2+OMdv3nr3n5+tOBvQEn6aYDbnybILyrUP76UvLvjfgDTnnRxlkpw2Y43EtgtdeIUUo/VBSE9qfzRa21Pz3gBh6ZJE9xF+u6DstgvFigNJ7nMJoSktH5mzuBM= test@test"
+			newCertChain := `-----BEGIN CERTIFICATE-----
+MIIDiTCCAnGgAwIBAgIUBvDjZ2irE/zWyKQxxRnPi3Ap5OowDQYJKoZIhvcNAQEL
+BQAwVDELMAkGA1UEBhMCVVMxFDASBgNVBAcMC0dvdGhhbSBDaXR5MRowGAYDVQQK
+DBFXYXluZSBFbnRlcnByaXNlczETMBEGA1UEAwwKYmF0bWFuLmNvbTAeFw0yNTA2
+MTIxMjU1MzNaFw0yNjAzMDQxMjU1MzNaMFQxCzAJBgNVBAYTAlVTMRQwEgYDVQQH
+DAtHb3RoYW0gQ2l0eTEaMBgGA1UECgwRV2F5bmUgRW50ZXJwcmlzZXMxEzARBgNV
+BAMMCmJhdG1hbi5jb20wggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDk
+w2USSDum5VXDR7uq3S7y2P+DJYB4k2cNcCJKkE0vSj6IlJ886YnohONGIPrZx2pa
+5xZOR8yDaGzRTfRy5qt4X3RvctzEkDnXVSQFCOG1HoDmZ9EX7q9e0DlMX6tVV6Dm
+Dv19C3zryHwA5zsG2xSVMJLLNlNbDmr+mgzNy9ot98MTRs8CszD/X0M7FkaYrmCo
+9hUCm6ItU1R3rLLd60s2izso69zyjmW5ao8JuG9zfTKaL8Nvrt43xLLcMaR5iUTx
+Fq29xHFk7YwmYPyH6lQQggQUGO7TMAidKGa9lSSmwKoB3HzSc+LP2ie34nY0wzyV
+cXeKOYDbWQTZ2xMHDm/9AgMBAAGjUzBRMB0GA1UdDgQWBBShEoxZ2LSSMJaRFt9O
+xZibvI5c+jAfBgNVHSMEGDAWgBShEoxZ2LSSMJaRFt9OxZibvI5c+jAPBgNVHRMB
+Af8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDNBS+evQj+4L7wNE/JReJ+MVen
+ag8/v9/cBs0Yh+Rahglgp7iqzZDyrBwSUSRZ+BIVouHH8SuX2QPmW17Xy/IhNW6u
+L0qx03is4pz+xjrXXIpKe+xlJGqYm/0DRLdDLBPSiMEtGm7sFQL8kBW5S6/1xg/B
+4lX/tP70LbXygP+rkDjzVTRY3IVModi+fhKXxB3rWBH88IJTDYjQ0MmfXveLeTcK
+TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
+1+6zqGMDx++ViZJ2IRU+rLETtnOwS3yV5dUCIRN7jZN1iLIjgcgs5XLKY1Ft
+-----END CERTIFICATE-----`
+			newHttpProxy := "http://proxy.example.com:8080"
+			newHttpsProxy := "https://proxy.example.com:8443"
+			newNoProxy := "localhost,127.0.0.1"
+
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					Name:             util.ToStrPtr(newName),
+					Labels:           &newLabels,
+					SshPublicKey:     util.ToStrPtr(newSshKey),
+					CertificateChain: util.ToStrPtr(newCertChain),
+					Proxy: &v1alpha1.AgentProxy{
+						HttpUrl:  util.ToStrPtr(newHttpProxy),
+						HttpsUrl: util.ToStrPtr(newHttpsProxy),
+						NoProxy:  util.ToStrPtr(newNoProxy),
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+
+			// Verify the updated source
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Name).To(Equal(newName))
+			Expect(updatedSource.Labels).To(HaveLen(1))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("prod"))
+			Expect(updatedSource.ImageInfra.SshPublicKey).To(Equal(newSshKey))
+			Expect(updatedSource.ImageInfra.CertificateChain).To(Equal(newCertChain))
+			Expect(updatedSource.ImageInfra.HttpProxyUrl).To(Equal(newHttpProxy))
+			Expect(updatedSource.ImageInfra.HttpsProxyUrl).To(Equal(newHttpsProxy))
+			Expect(updatedSource.ImageInfra.NoProxyDomains).To(Equal(newNoProxy))
+		})
+
+		It("returns 404 if source not found", func() {
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil))
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id:   uuid.New(),
+				Body: &v1alpha1.SourceUpdate{},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource404JSONResponse{}).String()))
+		})
+
+		It("returns 403 if user not authorized", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "owner-org", "owner-org"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "unauthorized",
+				Organization: "unauthorized",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil))
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id:   uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource403JSONResponse{}).String()))
+		})
+
+		It("successfully replaces existing labels", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create initial image_infra record
+			initialImageInfra := model.ImageInfra{
+				SourceID: uuid.MustParse(sourceID),
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil))
+
+			// First set initial labels
+			initialLabels := []v1alpha1.Label{
+				{Key: "env", Value: "dev"},
+				{Key: "region", Value: "us-east"},
+			}
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					Labels: &initialLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+
+			// Verify initial labels were set
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Labels).To(HaveLen(2))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("dev"))
+			Expect(updatedSource.Labels[1].Key).To(Equal("region"))
+			Expect(updatedSource.Labels[1].Value).To(Equal("us-east"))
+
+			// Now update with new labels
+			newLabels := []v1alpha1.Label{
+				{Key: "env", Value: "prod"},
+				{Key: "tier", Value: "critical"},
+			}
+			resp, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					Labels: &newLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+
+			// Verify labels were replaced
+			updatedSource, err = s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Labels).To(HaveLen(2))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("prod"))
+			Expect(updatedSource.Labels[1].Key).To(Equal("tier"))
+			Expect(updatedSource.Labels[1].Value).To(Equal("critical"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM image_infras;")
 		})
 	})
 

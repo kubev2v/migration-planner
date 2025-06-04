@@ -154,7 +154,7 @@ paths:
     put:
       tags:
         - source
-      description: Update a source from inventory file
+      description: Update source
       operationId: updateSource
       parameters:
         - name: id
@@ -168,11 +168,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourceUpdateOnPrem'
+              $ref: '#/components/schemas/SourceUpdate'
         required: true
       responses:
         "200":
-          description: An OVA image
+          description: Updated source
           content:
             application/json:
               schema:
@@ -253,6 +253,63 @@ paths:
                 $ref: '#/components/schemas/Error'
         "500":
           description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'     
+  /api/v1/sources/{id}/inventory:
+    put:
+      tags:
+        - source
+      description: Update inventory
+      operationId: updateInventory
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventory'
+      responses:
+        "200":
+          description: Updated source inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -564,6 +621,32 @@ paths:
 
 components:
   schemas:
+
+    # Reusable validation components
+    ValidatedSourceName:
+      type: string
+      x-oapi-codegen-extra-tags:
+        validate: "required,source_name,min=1,max=100"
+
+    ValidatedOptionalSourceName:
+      type: string
+      x-oapi-codegen-extra-tags:
+        validate: "omitempty,source_name,min=1,max=100"
+
+    ValidatedSSHPublicKey:
+      type: string
+      nullable: true
+      minLength: 1
+      x-oapi-codegen-extra-tags:
+        validate: "omitnil,ssh_key"
+
+    ValidatedCertificateChain:
+      type: string
+      nullable: true
+      minLength: 1
+      x-oapi-codegen-extra-tags:
+        validate: "omitnil,certs"
+
     presigned-url:
       type: object
       required:
@@ -576,6 +659,7 @@ components:
           type: string
           format: date-time
           description: Expiration time for the URL token.
+
     Source:
       type: object
       properties:
@@ -633,39 +717,25 @@ components:
       type: object
       properties:
         name:
-          type: string
-          x-oapi-codegen-extra-tags:
-            validate: "required,source_name,min=1,max=100"
+          $ref: '#/components/schemas/ValidatedSourceName'
         sshPublicKey:
-          type: string
-          nullable: true
-          minLength: 1
-          x-oapi-codegen-extra-tags:
-            validate: "omitnil,ssh_key"
+          $ref: '#/components/schemas/ValidatedSSHPublicKey'
         proxy:
           $ref: '#/components/schemas/AgentProxy'
           x-oapi-codegen-extra-tags:
             validate: "omitnil"
         certificateChain:
-          type: string
-          nullable: true
-          minLength: 1
+          $ref: '#/components/schemas/ValidatedCertificateChain'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+            x-oapi-codegen-extra-tags:
+              validate: "required,label"
           x-oapi-codegen-extra-tags:
-            validate: "omitnil,certs"
+            validate: "omitempty,dive,required"
       required:
         - name
-
-    SourceUpdateOnPrem:
-      type: object
-      properties:
-        agentId:
-          type: string
-          format: uuid
-        inventory:
-          $ref: '#/components/schemas/Inventory'
-      required:
-        - inventory
-        - agentId
 
     SourceList:
       type: array
@@ -965,13 +1035,49 @@ components:
         - updatedAt
         - version
 
+    SourceUpdate:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/ValidatedOptionalSourceName'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+            x-oapi-codegen-extra-tags:
+              validate: "required,label"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive,required"
+        sshPublicKey:
+          $ref: '#/components/schemas/ValidatedSSHPublicKey'
+        certificateChain:
+          $ref: '#/components/schemas/ValidatedCertificateChain'
+        proxy:
+          $ref: '#/components/schemas/AgentProxy'
+
+    UpdateInventory:
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+      required:
+        - inventory
+        - agentId
+
     Label:
       type: object
       properties:
         key:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
         value:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
       required:
         - key
         - value
