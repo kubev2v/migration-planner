@@ -33,26 +33,6 @@ Add admin role to mtv service account once the openshift-mtv namespace is automa
 oc adm policy add-role-to-user admin system:serviceaccount:openshift-gitops:openshift-gitops-argocd-application-controller -n openshift-mtv
 ```
 
-Initialize the MTV provider
-
-Navigate to the mtv-init application route
-```console
-oc get route -n openshift-mtv mtv-init -o jsonpath={.status.ingress[0].host}
-```
-
-Fill in the details of form:
-- vddk image: go and download the vddk.tar.gz from broadcom site. The link is part of the form
-- vcenter username: use the admin username, or a user which is the most credentials you can get
-- vcenter password
-- vcenter url: the url of vcenter, no need to add /sdk in the end
-
-When the form is submitted, follow the job in the default namespace that creates the vddk image and updates the existing
-vmware-credentials
-
-Check the vmware provider status, if it is ready we can start migrating VMs
-
-
-
 
 
 
