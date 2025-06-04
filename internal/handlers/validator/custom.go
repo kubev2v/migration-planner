@@ -19,6 +19,7 @@ var (
 	}
 
 	sourceNameValidRegex = regexp.MustCompile("^[a-zA-Z0-9+-_.]+$")
+	labelRegex           = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
 )
 
 func nameValidator(fl validator.FieldLevel) bool {
@@ -97,6 +98,18 @@ func uuidValidator(fl validator.FieldLevel) bool {
 		return false
 	}
 	return val != uuid.UUID{}
+}
+
+func labelValidator(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
+		return false
+	}
+
+	// Label key/value should not be empty
+	// Allow alphanumeric characters, hyphens, underscores, and dots
+	// Must start and end with alphanumeric character
+	return labelRegex.MatchString(val)
 }
 
 func startsWithValidator(fl validator.FieldLevel) bool {

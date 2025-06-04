@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"path"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -197,7 +198,7 @@ func (s *plannerService) RemoveSources() error {
 func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
 	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	update := v1alpha1.UpdateSourceJSONRequestBody{
+	update := v1alpha1.UpdateInventoryJSONRequestBody{
 		AgentId:   uuid,
 		Inventory: *inventory,
 	}
@@ -207,7 +208,7 @@ func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Invent
 		return err
 	}
 
-	res, err := s.api.PutRequest(uuid.String(), reqBody)
+	res, err := s.api.PutRequest(path.Join(uuid.String(), "inventory"), reqBody)
 	if err != nil {
 		return err
 	}
