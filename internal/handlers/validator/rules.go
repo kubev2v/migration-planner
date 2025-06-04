@@ -30,5 +30,8 @@ func NewSourceValidationRules() []ValidationRule {
 		{
 			Rule: registerFn("certs", certificateValidator),
 		},
+		{
+			Rule: registerFn("label", labelValidator),
+		},
 	}
 }

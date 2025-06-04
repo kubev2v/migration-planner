@@ -61,6 +61,14 @@ type AgentUpdateForm struct {
 	SourceID   uuid.UUID
 }
 
+type SourceUpdateForm struct {
+	Name             *string
+	Labels           *[]api.Label
+	SshPublicKey     *string
+	CertificateChain *string
+	Proxy            *api.AgentProxy
+}
+
 func (f *AgentUpdateForm) ToModel() model.Agent {
 	return model.Agent{
 		ID:         f.ID,
@@ -70,6 +78,28 @@ func (f *AgentUpdateForm) ToModel() model.Agent {
 		Version:    f.Version,
 		SourceID:   f.SourceID,
 	}
+}
+
+func LabelsFromApi(sourceID uuid.UUID, apiLabels *[]api.Label) []model.Label {
+	if apiLabels == nil {
+		return nil
+	}
+	modelLabels := make([]model.Label, len(*apiLabels))
+	for i, apiLabel := range *apiLabels {
+		modelLabels[i] = model.Label{
+			Key:      apiLabel.Key,
+			Value:    apiLabel.Value,
+			SourceID: sourceID.String(),
+		}
+	}
+	return modelLabels
+}
+
+func AgentProxyFromApi(apiProxy *api.AgentProxy) *model.JSONField[api.AgentProxy] {
+	if apiProxy == nil {
+		return nil
+	}
+	return model.MakeJSONField(*apiProxy)
 }
 
 func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {

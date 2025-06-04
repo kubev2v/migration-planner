@@ -509,9 +509,9 @@ var _ = Describe("source handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s))
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
+				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
@@ -521,7 +521,7 @@ var _ = Describe("source handler", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
 
 			// agent must be created
 			count := 0
@@ -552,9 +552,10 @@ var _ = Describe("source handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s))
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
+				Body: &v1alpha1.UpdateInventory{
+					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
 							Id: "vcenter",
@@ -563,7 +564,7 @@ var _ = Describe("source handler", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
 
 			vCenterID := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT v_center_id FROM SOURCES where id = '%s';", firstSourceID)).Scan(&vCenterID)
@@ -575,9 +576,9 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			Expect(onPrem).To(BeTrue())
 
-			resp, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+			updateResp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
+				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
@@ -587,7 +588,7 @@ var _ = Describe("source handler", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(updateResp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
 		})
 
 		It("fails to update source on prem -- different vcenter", func() {
@@ -602,9 +603,9 @@ var _ = Describe("source handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s))
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
+				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
@@ -614,7 +615,7 @@ var _ = Describe("source handler", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
 
 			vCenterID := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT v_center_id FROM SOURCES where id = '%s';", firstSourceID)).Scan(&vCenterID)
@@ -626,9 +627,9 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			Expect(onPrem).To(BeTrue())
 
-			resp, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+			resp, err = srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
+				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
@@ -638,7 +639,7 @@ var _ = Describe("source handler", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory400JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {

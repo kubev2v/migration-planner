@@ -121,9 +121,25 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request apiServer.GetSou
 
 // (PUT /api/v1/sources/{id})
 func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.UpdateSourceRequestObject) (apiServer.UpdateSourceResponseObject, error) {
+	if request.Body == nil {
+		return server.UpdateSource400JSONResponse{Message: "There is nothing to update"}, nil
+	}
+
+	// Add validation for update
+	v := validator.NewValidator()
+	v.Register(validator.NewSourceValidationRules()...)
+	if err := v.Struct(*request.Body); err != nil {
+		return server.UpdateSource400JSONResponse{Message: err.Error()}, nil
+	}
+
 	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
-		return server.UpdateSource404JSONResponse{Message: err.Error()}, nil
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UpdateSource404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.UpdateSource500JSONResponse{Message: err.Error()}, nil
+		}
 	}
 
 	user := auth.MustHaveUser(ctx)
@@ -131,7 +147,50 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.Upd
 		return server.UpdateSource403JSONResponse{Message: fmt.Sprintf("forbidden to update source %s by user with org_id %s", request.Id, user.Organization)}, nil
 	}
 
-	updateSource, err := s.sourceSrv.UpdateInventory(ctx, srvMappers.InventoryUpdateForm{
+	// Convert API request to service form
+	form := srvMappers.SourceUpdateForm{
+		Name:             request.Body.Name,
+		Labels:           request.Body.Labels,
+		SshPublicKey:     request.Body.SshPublicKey,
+		CertificateChain: request.Body.CertificateChain,
+		Proxy:            request.Body.Proxy,
+	}
+
+	updatedSource, err := s.sourceSrv.UpdateSource(ctx, request.Id, form)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UpdateSource404JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to update source %s", request.Id)}, nil
+		}
+	}
+
+	return apiServer.UpdateSource200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
+}
+
+// (PUT /api/v1/sources/{id}/inventory)
+func (s *ServiceHandler) UpdateInventory(ctx context.Context, request apiServer.UpdateInventoryRequestObject) (apiServer.UpdateInventoryResponseObject, error) {
+	if request.Body == nil {
+		return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
+	}
+
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UpdateInventory404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.UpdateInventory500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return server.UpdateInventory403JSONResponse{Message: fmt.Sprintf("forbidden to update source inventory %s by user with org_id %s", request.Id, user.Organization)}, nil
+	}
+
+	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, srvMappers.InventoryUpdateForm{
 		AgentId:   request.Body.AgentId,
 		SourceID:  request.Id,
 		Inventory: request.Body.Inventory,
@@ -139,13 +198,13 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.Upd
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrInvalidVCenterID:
-			return server.UpdateSource400JSONResponse{Message: err.Error()}, nil
+			return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
 		default:
-			return apiServer.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to update source %s", request.Id)}, nil
+			return apiServer.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s", request.Id)}, nil
 		}
 	}
 
-	return apiServer.UpdateSource200JSONResponse(mappers.SourceToApi(updateSource)), nil
+	return apiServer.UpdateInventory200JSONResponse(mappers.SourceToApi(updatedSource)), nil
 }
 
 // (HEAD /api/v1/sources/{id}/image)

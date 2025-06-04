@@ -125,6 +125,88 @@ func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form mappers.SourceUpdateForm) (*model.Source, error) {
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := s.store.Source().Get(ctx, id)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(id)
+		}
+		return nil, err
+	}
+
+	// Update source basic fields
+	if form.Name != nil {
+		source.Name = *form.Name
+	}
+
+	// Update labels if provided
+	if form.Labels != nil {
+		// Convert API labels to model labels using the mapper
+		labels := mappers.LabelsFromApi(source.ID, form.Labels)
+
+		// Update labels using the new UpdateLabels function
+		if err := s.store.Label().UpdateLabels(ctx, source.ID, labels); err != nil {
+			_, _ = store.Rollback(ctx)
+			return nil, err
+		}
+		source.Labels = labels
+	}
+
+	// Update image infrastructure if any related fields are provided
+	if form.SshPublicKey != nil || form.CertificateChain != nil || form.Proxy != nil {
+		imageInfra := source.ImageInfra
+
+		if form.SshPublicKey != nil {
+			imageInfra.SshPublicKey = *form.SshPublicKey
+		}
+		if form.CertificateChain != nil {
+			imageInfra.CertificateChain = *form.CertificateChain
+		}
+		if form.Proxy != nil {
+			if form.Proxy.HttpUrl != nil {
+				imageInfra.HttpProxyUrl = *form.Proxy.HttpUrl
+			}
+			if form.Proxy.HttpsUrl != nil {
+				imageInfra.HttpsProxyUrl = *form.Proxy.HttpsUrl
+			}
+			if form.Proxy.NoProxy != nil {
+				imageInfra.NoProxyDomains = *form.Proxy.NoProxy
+			}
+		}
+
+		updatedImageInfra, err := s.store.ImageInfra().Update(ctx, imageInfra)
+		if err != nil {
+			_, _ = store.Rollback(ctx)
+			return nil, err
+		}
+		source.ImageInfra = *updatedImageInfra
+	}
+
+	// Update source
+	if _, updateErr := s.store.Source().Update(ctx, *source); updateErr != nil {
+		_, _ = store.Rollback(ctx)
+		return nil, updateErr
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	// Fetch the source again with updated labels after commit
+	finalSource, err := s.store.Source().Get(context.Background(), id)
+	if err != nil {
+		return nil, err
+	}
+
+	return finalSource, nil
+}
+
 func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.InventoryUpdateForm) (model.Source, error) {
 	ctx, err := s.store.NewTransactionContext(ctx)
 	if err != nil {
@@ -207,7 +289,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
 	if err != nil {
-		return fmt.Errorf("Error parsing RVTools file: %v", err)
+		return fmt.Errorf("error parsing RVTools file: %v", err)
 	}
 
 	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
