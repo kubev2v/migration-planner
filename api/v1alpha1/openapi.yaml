@@ -148,8 +148,8 @@ paths:
     put:
       tags:
         - source
-      description: Update a source from inventory file
-      operationId: updateSource
+      description: Update source metadata
+      operationId: updateSourceMetadata
       parameters:
         - name: id
           in: path
@@ -162,11 +162,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourceUpdateOnPrem'
+              $ref: '#/components/schemas/SourceUpdateMetadata'
         required: true
       responses:
         "200":
-          description: An OVA image
+          description: Updated source metadata
           content:
             application/json:
               schema:
@@ -288,6 +288,63 @@ paths:
                 properties:
                   message:
                     type: string
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/sources/{id}/inventory:
+    put:
+      tags:
+        - source
+      description: Update inventory of the source
+      operationId: updateSourceInventory
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceUpdateInventory'
+      responses:
+        "200":
+          description: Updated source inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
         "400":
           description: Bad Request
           content:
@@ -760,6 +817,34 @@ components:
         - createdAt
         - updatedAt
         - version
+
+    SourceUpdateMetadata:
+      type: object
+      properties:
+        name:
+          type: string
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+        sshPublicKey:
+          type: string
+        certificateChain:
+          type: string
+        proxy:
+          $ref: '#/components/schemas/AgentProxy'
+
+    SourceUpdateInventory:
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+      required:
+        - inventory
+        - agentId
 
     Label:
       type: object

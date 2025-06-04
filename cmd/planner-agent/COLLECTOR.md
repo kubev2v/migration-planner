@@ -46,7 +46,7 @@ podman run -p 8181:8181 -d --name opa --entrypoint '/usr/bin/opa' quay.io/kubev2
 Build & run the collector code specifying credentials file as first argument and as second path to invetory file, where data should be written.
 
 ```
-go run cmd/planner-agent/main.go -config -config ~/.planner-agent/config.yaml
+go run cmd/planner-agent/main.go -config ~/.planner-agent/config.yaml
 ```
 
 Explore `/tmp/data/inventory.json`

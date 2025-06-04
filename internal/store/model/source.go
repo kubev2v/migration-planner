@@ -9,9 +9,9 @@ import (
 )
 
 type Label struct {
-	Key      string `gorm:"primaryKey;column:key;type:VARCHAR;size:100"`
-	Value    string `gorm:"column:value;type:VARCHAR;size:100"`
-	SourceID string `gorm:"primaryKey;column:source_id;type:TEXT"`
+	Key      string `gorm:"primaryKey;column:key;type:VARCHAR;size:100;not null"`
+	Value    string `gorm:"column:value;type:VARCHAR;size:100;not null"`
+	SourceID string `gorm:"primaryKey;column:source_id;type:TEXT;not null"`
 }
 
 type Source struct {

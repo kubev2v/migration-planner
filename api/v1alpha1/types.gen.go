@@ -105,6 +105,16 @@ type Label struct {
 	Value string `json:"value"`
 }
 
+<<<<<<< HEAD
+// MigrationIssue defines model for MigrationIssue.
+type MigrationIssue struct {
+=======
+// Label defines model for Label.
+type Label struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // MigrationIssue defines model for MigrationIssue.
 type MigrationIssue struct {
 	Assessment string `json:"assessment"`
@@ -148,6 +158,21 @@ type SourceCreate struct {
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
+
+// SourceUpdateInventory defines model for SourceUpdateInventory.
+type SourceUpdateInventory struct {
+	AgentId   openapi_types.UUID `json:"agentId"`
+	Inventory Inventory          `json:"inventory"`
+}
+
+// SourceUpdateMetadata defines model for SourceUpdateMetadata.
+type SourceUpdateMetadata struct {
+	CertificateChain *string     `json:"certificateChain,omitempty"`
+	Labels           *[]Label    `json:"labels,omitempty"`
+	Name             *string     `json:"name,omitempty"`
+	Proxy            *AgentProxy `json:"proxy,omitempty"`
+	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
+}
 
 // SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
 type SourceUpdateOnPrem struct {
@@ -220,8 +245,8 @@ type UploadRvtoolsFileMultipartBody struct {
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
-// UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
-type UpdateSourceJSONRequestBody = SourceUpdateOnPrem
+// UpdateSourceMetadataJSONRequestBody defines body for UpdateSourceMetadata for application/json ContentType.
+type UpdateSourceMetadataJSONRequestBody = SourceUpdateMetadata
 
-// UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
-type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody
+// UpdateSourceInventoryJSONRequestBody defines body for UpdateSourceInventory for application/json ContentType.
+type UpdateSourceInventoryJSONRequestBody = SourceUpdateInventory
