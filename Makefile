@@ -105,6 +105,14 @@ migrate:
 run:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
+run-collector: build-collector
+	$(PODMAN) run --rm \
+		-p 3333:3333 \
+		-e VSPHERE_USER=$(VSPHERE_USER) \
+		-e VSPHERE_PASSWORD=$(VSPHERE_PASSWORD) \
+		-e VSPHERE_URL=$(VSPHERE_URL) \
+		planner-standalone-collector
+
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
 	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
@@ -136,6 +144,10 @@ migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
 
 build-containers: migration-planner-api-container migration-planner-agent-container
+
+build-collector:
+	$(PODMAN) build . \
+	-f Containerfile.standalone-collector -t planner-standalone-collector
 
 .PHONY: build-containers
 
