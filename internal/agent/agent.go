@@ -26,7 +26,7 @@ import (
 type closeChKeyType struct{}
 
 const (
-	defaultAgentPort = 3333
+	DefaultAgentPort = 3333
 )
 
 // This varible is set during build time.
@@ -114,7 +114,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 
 	// start server
-	a.server = NewServer(defaultAgentPort, a.config, cert, key)
+	a.server = NewServer(DefaultAgentPort, a.config, cert, key)
 	go a.server.Start(statusUpdater)
 
 	protocol := "http"
@@ -124,7 +124,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 	a.credUrl = "N/A"
 	if credUrl != nil {
-		a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrl.IP.String(), defaultAgentPort)
+		a.credUrl = fmt.Sprintf("%s://%s:%d", protocol, credUrl.IP.String(), DefaultAgentPort)
 	}
 	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
