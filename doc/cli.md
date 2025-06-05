@@ -36,6 +36,7 @@ Usage:
   planner [command]
 
 Available Commands:
+  collect     Gather vCenter inventory
   completion  Generate the autocompletion script for the specified shell
   create      Create a source
   delete      Delete resources by resources or owner.
@@ -46,6 +47,33 @@ Available Commands:
   help        Help about any command
   sso         Generate either the token or the signing private key
   version     Print Planner version information
+```
+
+#### collect
+## Prerequisites
+
+- OPA installed in order to get validations
+- Policy folder which contains the policy `.rego` files
+- 
+You can customize the OPA policy folder path using `OPA_POLICY_FOLDER_PATH`. (default /usr/share/opa/policies)
+
+```bash
+Gather vCenter inventory
+
+Usage:
+planner collect [flags]
+
+Examples:
+planner collect --data-dir ~/Downloads --credentials-dir /tmp
+
+Flags:
+--credentials-dir string   directory where credentials.json is stored (default current-directory)
+--data-dir string          directory where the agent will write its data (e.g., inventory.json) (default "/home/USER/Downloads")
+-h, --help                 help for collect
+-p, --password string      vsphere password
+--timeout duration         collection timeout (default 5m0s)
+--url string               vsphere url
+-u, --username string      vsphere username
 ```
 
 #### get

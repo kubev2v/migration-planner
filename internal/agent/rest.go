@@ -124,7 +124,7 @@ func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 	}
 
 	zap.S().Named("rest").Info("received credentials")
-	status, err := testVmwareConnection(r.Context(), credentials)
+	status, err := TestVmwareConnection(r.Context(), credentials)
 	if err != nil {
 		http.Error(w, err.Error(), status)
 		return
@@ -157,7 +157,7 @@ func parseUrl(credentials *config.Credentials) (*url.URL, error) {
 	return u, nil
 }
 
-func testVmwareConnection(requestCtx context.Context, credentials *config.Credentials) (status int, err error) {
+func TestVmwareConnection(requestCtx context.Context, credentials *config.Credentials) (status int, err error) {
 	u, err := parseUrl(credentials)
 	if err != nil {
 		return http.StatusUnprocessableEntity, liberr.Wrap(err)

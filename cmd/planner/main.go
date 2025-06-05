@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/kubev2v/migration-planner/internal/cli/standalone"
 	"os"
 
 	"github.com/kubev2v/migration-planner/internal/cli"
@@ -31,6 +32,7 @@ func NewPlannerCtlCommand() *cobra.Command {
 	cmd.AddCommand(cli.NewCmdDeploy())
 	cmd.AddCommand(cli.NewCmdSSO())
 	cmd.AddCommand(cli.NewCmdE2E())
+	cmd.AddCommand(standalone.NewCmdCollect())
 
 	return cmd
 }
