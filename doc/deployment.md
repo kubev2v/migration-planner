@@ -32,6 +32,17 @@ export MIGRATION_PLANNER_UI_IMAGE_TAG=<ui_image_tag>            # Default: lates
 export MIGRATION_PLANNER_REPLICAS=<replica_count>               # Default: 1  
 ```
 
+
+To use custom rhcos image stored in S3 bucket, you must supply s3 credentials in the secret created by the `s3-secret-template.yml` template.
+The s3 endpoint and bucket are set via env variables:
+```sh
+export MIGRATION_PLANNER_S3_ENDPOINT=<s3_endpoint>
+export MIGRATION_PLANNER_S3_BUCKET=<s3_bucket>
+export MIGRATION_PLANNER_S3_ISO_FILENAME=<iso_filename>
+```
+
+> MIGRATION_PLANNER_S3_ISO_FILENAME defaults to `custom-rhcos-live-iso.x86_64.iso`
+
 ### 3. Deploy to OpenShift
 Run the following command to deploy the Assisted Migration Service and its dependencies (including the UI and database):
 ```sh

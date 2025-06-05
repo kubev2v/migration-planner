@@ -167,6 +167,7 @@ deploy-on-openshift: oc
 	openshift_project=$$(oc project -q); \
 	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
+	oc process -f deploy/templates/s3-secret-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
        -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
@@ -210,6 +211,7 @@ delete-from-openshift: oc
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
+	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
 	oc delete route planner-agent planner-ui planner-image; \
 	echo "*** Migration Planner has been deleted successfully from Openshift ***"
 
