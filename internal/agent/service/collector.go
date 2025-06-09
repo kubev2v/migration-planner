@@ -218,7 +218,15 @@ func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
-		inv.Vms.Os[vmGuestName(vm)]++
+
+		guestName := vmGuestName(vm)
+		vmOsInfo, found := inv.Vms.Os[guestName]
+		if !found {
+			vmOsInfo.Supported = isVMSupported(vm.Concerns)
+		}
+		vmOsInfo.Count++
+		inv.Vms.Os[guestName] = vmOsInfo
+
 		inv.Vms.PowerStates[vm.PowerState]++
 
 		// Update total values
@@ -265,6 +273,15 @@ func vmGuestName(vm vspheremodel.VM) string {
 	return vm.GuestName
 }
 
+func isVMSupported(concerns []vspheremodel.Concern) bool {
+	for _, concern := range concerns {
+		if strings.Contains(concern.Label, "Unsupported operating system") {
+			return false
+		}
+	}
+	return true
+}
+
 func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster, datacenters *[]vspheremodel.Datacenter) *apiplanner.Inventory {
 	return &apiplanner.Inventory{
 		Vcenter: apiplanner.VCenter{
@@ -273,7 +290,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 		Vms: apiplanner.VMs{
 			Total:       len(*vms),
 			PowerStates: map[string]int{},
-			Os:          map[string]int{},
+			Os:          map[string]apiplanner.OsInfo{},
 			MigrationWarnings: []struct {
 				Assessment string `json:"assessment"`
 				Count      int    `json:"count"`

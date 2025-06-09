@@ -172,12 +172,18 @@ type VMs struct {
 	DiskGB                      VMResourceBreakdown `json:"diskGB"`
 	MigrationWarnings           MigrationIssues     `json:"migrationWarnings"`
 	NotMigratableReasons        MigrationIssues     `json:"notMigratableReasons"`
-	Os                          map[string]int      `json:"os"`
+	Os                          map[string]OsInfo   `json:"os"`
 	PowerStates                 map[string]int      `json:"powerStates"`
 	RamGB                       VMResourceBreakdown `json:"ramGB"`
 	Total                       int                 `json:"total"`
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
+}
+
+// OsInfo defines model for osInfo.
+type OsInfo struct {
+	Count     int  `json:"count"`
+	Supported bool `json:"supported"`
 }
 
 // PresignedUrl defines model for presigned-url.
