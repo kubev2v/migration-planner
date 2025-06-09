@@ -68,10 +68,11 @@ type Error struct {
 
 // Infra defines model for Infra.
 type Infra struct {
-	Datastores      []Datastore    `json:"datastores"`
-	HostPowerStates map[string]int `json:"hostPowerStates"`
-	HostsPerCluster []int          `json:"hostsPerCluster"`
-	Networks        []struct {
+	ClustersPerDatacenter []int          `json:"clustersPerDatacenter"`
+	Datastores            []Datastore    `json:"datastores"`
+	HostPowerStates       map[string]int `json:"hostPowerStates"`
+	HostsPerCluster       []int          `json:"hostsPerCluster"`
+	Networks              []struct {
 		Dvswitch *string           `json:"dvswitch,omitempty"`
 		Name     string            `json:"name"`
 		Type     InfraNetworksType `json:"type"`
