@@ -565,24 +565,13 @@ components:
         os:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/osInfo'
+            type: integer
         notMigratableReasons:
           type: object
           $ref: '#/components/schemas/MigrationIssues'
         migrationWarnings:
           type: object
           $ref: '#/components/schemas/MigrationIssues'
-
-    osInfo:
-      type: object
-      required:
-        - count
-        - supported
-      properties:
-        count:
-          type: integer
-        supported:
-          type: boolean
 
     Infra:
       type: object

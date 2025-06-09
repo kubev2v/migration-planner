@@ -50,10 +50,10 @@ func computeVmStats(sources []Source) VmStats {
 		total += s.Inventory.Data.Vms.Total
 		for k, v := range s.Inventory.Data.Vms.Os {
 			if oldValue, found := os[k]; found {
-				oldValue += v.Count
+				oldValue += v
 				os[k] = oldValue
 			} else {
-				os[k] = v.Count
+				os[k] = v
 			}
 		}
 		orgTotal[s.OrgID] = s.Inventory.Data.Vms.Total
