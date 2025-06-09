@@ -70,7 +70,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	router.Use(
 		metricMiddleware.Handler,
 		middleware.RequestID,
-		log.Logger(zap.L(), "router_agent"),
+		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "router_agent"),
 	)
 
 	zap.S().Infow("agent authentication", "enabled", s.cfg.Service.Auth.AgentAuthenticationEnabled)
