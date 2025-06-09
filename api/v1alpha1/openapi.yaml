@@ -251,7 +251,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'           
-  /sources/{id}/rvtools:
+  /api/v1/sources/{id}/rvtools:
     put:
       tags:
         - source
