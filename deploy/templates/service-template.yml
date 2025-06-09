@@ -294,6 +294,20 @@ objects:
                       typed_config:
                         "@type": type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog
                         path: /dev/stdout
+                        log_format:
+                          json_format:
+                            type: "http_request"
+                            request_id: "%REQ(X-REQUEST-ID)%"
+                            http_method: "%REQ(:METHOD)%"
+                            http_path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+                            http_proto: "%PROTOCOL%"
+                            remote_addr: "%DOWNSTREAM_REMOTE_ADDRESS%"
+                            http_status_code: "%RESPONSE_CODE%"
+                            http_status_text: "%RESPONSE_CODE_DETAILS%"
+                            response_bytes: "%BYTES_SENT%"
+                            latency: "%DURATION%ms"
+                            user_agent: "%REQ(USER-AGENT)%"
+                            timestamp: "%START_TIME%"
                     route_config:
                       name: http_route
                       virtual_hosts:
