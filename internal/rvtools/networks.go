@@ -57,7 +57,6 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 	return nil
 }
 
-// processDvSwitchSheet extracts switch information from dvSwitch sheet
 func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
