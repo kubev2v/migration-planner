@@ -105,16 +105,6 @@ type Label struct {
 	Value string `json:"value"`
 }
 
-<<<<<<< HEAD
-// MigrationIssue defines model for MigrationIssue.
-type MigrationIssue struct {
-=======
-// Label defines model for Label.
-type Label struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // MigrationIssue defines model for MigrationIssue.
 type MigrationIssue struct {
 	Assessment string `json:"assessment"`
@@ -172,12 +162,6 @@ type SourceUpdateMetadata struct {
 	Name             *string     `json:"name,omitempty"`
 	Proxy            *AgentProxy `json:"proxy,omitempty"`
 	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
-}
-
-// SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
-type SourceUpdateOnPrem struct {
-	AgentId   openapi_types.UUID `json:"agentId"`
-	Inventory Inventory          `json:"inventory"`
 }
 
 // Status Status is a return value for calls that don't return other objects.
@@ -250,3 +234,6 @@ type UpdateSourceMetadataJSONRequestBody = SourceUpdateMetadata
 
 // UpdateSourceInventoryJSONRequestBody defines body for UpdateSourceInventory for application/json ContentType.
 type UpdateSourceInventoryJSONRequestBody = SourceUpdateInventory
+
+// UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
+type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody

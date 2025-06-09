@@ -69,15 +69,16 @@ func ImageInfraFromApi(sourceID uuid.UUID, imageTokenKey string, resource *v1alp
 	return imageInfra
 }
 
-func LabelsFromApi(apiLabels *[]api.Label) []model.Label {
+func LabelsFromApi(sourceID uuid.UUID, apiLabels *[]api.Label) []model.Label {
 	if apiLabels == nil {
 		return nil
 	}
 	modelLabels := make([]model.Label, len(*apiLabels))
 	for i, apiLabel := range *apiLabels {
 		modelLabels[i] = model.Label{
-			Key:   apiLabel.Key,
-			Value: apiLabel.Value,
+			Key:      apiLabel.Key,
+			Value:    apiLabel.Value,
+			SourceID: sourceID.String(),
 		}
 	}
 	return modelLabels

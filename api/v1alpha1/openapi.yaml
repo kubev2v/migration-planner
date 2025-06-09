@@ -250,6 +250,63 @@ paths:
           content:
             application/json:
               schema:
+                $ref: '#/components/schemas/Error'     
+  /api/v1/sources/{id}/inventory:
+    put:
+      tags:
+        - source
+      description: Update inventory of the source
+      operationId: updateSourceInventory
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceUpdateInventory'
+      responses:
+        "200":
+          description: Updated source inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
                 $ref: '#/components/schemas/Error'           
   /api/v1/sources/{id}/rvtools:
     put:
@@ -288,63 +345,6 @@ paths:
                 properties:
                   message:
                     type: string
-        "400":
-          description: Bad Request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "401":
-          description: Unauthorized
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "403":
-          description: Forbidden
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "404":
-          description: NotFound
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-        "500":
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
-  /api/v1/sources/{id}/inventory:
-    put:
-      tags:
-        - source
-      description: Update inventory of the source
-      operationId: updateSourceInventory
-      parameters:
-        - name: id
-          in: path
-          description: ID of the source
-          required: true
-          schema:
-            type: string
-            format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/SourceUpdateInventory'
-      responses:
-        "200":
-          description: Updated source inventory
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Source'
         "400":
           description: Bad Request
           content:
@@ -453,6 +453,7 @@ paths:
 
 components:
   schemas:
+
     presigned-url:
       type: object
       required:
@@ -465,6 +466,7 @@ components:
           type: string
           format: date-time
           description: Expiration time for the URL token.
+
     Source:
       type: object
       properties:
@@ -519,18 +521,6 @@ components:
           type: string
       required:
         - name
-
-    SourceUpdateOnPrem:
-      type: object
-      properties:
-        agentId:
-          type: string
-          format: uuid
-        inventory:
-          $ref: '#/components/schemas/Inventory'
-      required:
-        - inventory
-        - agentId
 
     SourceList:
       type: array

@@ -12,6 +12,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -103,6 +104,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 			gormdb.Exec("DELETE FROM image_infras;")
@@ -197,6 +199,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 			gormdb.Exec("DELETE FROM image_infras;")
@@ -410,6 +413,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 			gormdb.Exec("DELETE FROM image_infras;")
@@ -562,6 +566,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 			gormdb.Exec("DELETE FROM image_infras;")
@@ -570,9 +575,17 @@ var _ = Describe("source handler", Ordered, func() {
 
 	Context("update-metadata", func() {
 		It("successfully updates source metadata", func() {
+			// First create a source with initial metadata
 			sourceID := uuid.NewString()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
+
+			// Create initial image_infra record
+			initialImageInfra := model.ImageInfra{
+				SourceID: uuid.MustParse(sourceID),
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -582,7 +595,9 @@ var _ = Describe("source handler", Ordered, func() {
 
 			srv := service.NewServiceHandler(s)
 			newName := "updated-name"
-			newLabels := map[string]string{"env": "prod"}
+			newLabels := []v1alpha1.Label{
+				{Key: "env", Value: "prod"},
+			}
 			newSshKey := "ssh-public-key-updated"
 			newCertChain := "certificate-chain-updated"
 			newHttpProxy := "http-proxy-updated"
@@ -593,7 +608,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: uuid.MustParse(sourceID),
 				Body: &v1alpha1.SourceUpdateMetadata{
 					Name:             toStrPtr(newName),
-					Labels:           toLabelsPtr(newLabels),
+					Labels:           &newLabels,
 					SshPublicKey:     toStrPtr(newSshKey),
 					CertificateChain: toStrPtr(newCertChain),
 					Proxy: &v1alpha1.AgentProxy{
@@ -610,7 +625,9 @@ var _ = Describe("source handler", Ordered, func() {
 			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
 			Expect(err).To(BeNil())
 			Expect(updatedSource.Name).To(Equal(newName))
-			Expect(updatedSource.Labels).To(Equal(newLabels))
+			Expect(updatedSource.Labels).To(HaveLen(1))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("prod"))
 			Expect(updatedSource.ImageInfra.SshPublicKey).To(Equal(newSshKey))
 			Expect(updatedSource.ImageInfra.CertificateChain).To(Equal(newCertChain))
 			Expect(updatedSource.ImageInfra.HttpProxyUrl).To(Equal(newHttpProxy))
@@ -654,7 +671,68 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceMetadata403JSONResponse{}).String()))
 		})
 
+		It("successfully replaces existing labels", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := service.NewServiceHandler(s)
+
+			// First set initial labels
+			initialLabels := []v1alpha1.Label{
+				{Key: "env", Value: "dev"},
+				{Key: "region", Value: "us-east"},
+			}
+			resp, err := srv.UpdateSourceMetadata(ctx, server.UpdateSourceMetadataRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdateMetadata{
+					Labels: &initialLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceMetadata200JSONResponse{}).String()))
+
+			// Verify initial labels were set
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Labels).To(HaveLen(2))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("dev"))
+			Expect(updatedSource.Labels[1].Key).To(Equal("region"))
+			Expect(updatedSource.Labels[1].Value).To(Equal("us-east"))
+
+			// Now update with new labels
+			newLabels := []v1alpha1.Label{
+				{Key: "env", Value: "prod"},
+				{Key: "tier", Value: "critical"},
+			}
+			resp, err = srv.UpdateSourceMetadata(ctx, server.UpdateSourceMetadataRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdateMetadata{
+					Labels: &newLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceMetadata200JSONResponse{}).String()))
+
+			// Verify labels were replaced
+			updatedSource, err = s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Labels).To(HaveLen(2))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("prod"))
+			Expect(updatedSource.Labels[1].Key).To(Equal("tier"))
+			Expect(updatedSource.Labels[1].Value).To(Equal("critical"))
+		})
+
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 			gormdb.Exec("DELETE FROM image_infras;")
@@ -664,18 +742,4 @@ var _ = Describe("source handler", Ordered, func() {
 
 func toStrPtr(s string) *string {
 	return &s
-}
-
-func toLabelsPtr(m map[string]string) *[]v1alpha1.Label {
-	if len(m) == 0 {
-		return nil
-	}
-	labels := make([]v1alpha1.Label, 0, len(m))
-	for k, v := range m {
-		labels = append(labels, v1alpha1.Label{
-			Key:   k,
-			Value: v,
-		})
-	}
-	return &labels
 }
