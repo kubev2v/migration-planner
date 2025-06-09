@@ -23,8 +23,6 @@ type Disk struct {
 	Capacity int
 }
 
-var unsupported = []string{"VMware Photon OS", "Red Hat Enterprise Linux 6"} //Todo: Use forklift validation instead
-
 func processVMInfo(rows [][]string) ([]VM, error) {
 	if len(rows) <= 1 {
 		return []VM{}, nil
@@ -167,7 +165,7 @@ func fillInventoryWithVMData(vms []VM, inventory *api.Inventory) {
 	diskCountSet := []int{}
 
 	if inventory.Vms.Os == nil {
-		inventory.Vms.Os = make(map[string]api.OsInfo)
+		inventory.Vms.Os = make(map[string]int)
 	}
 	if inventory.Vms.PowerStates == nil {
 		inventory.Vms.PowerStates = make(map[string]int)
@@ -191,11 +189,7 @@ func fillInventoryWithVMData(vms []VM, inventory *api.Inventory) {
 		diskGBSet = append(diskGBSet, totalDiskGB)
 		diskCountSet = append(diskCountSet, len(vm.Disks))
 
-		vmOsInfo := inventory.Vms.Os[vm.OS]
-		vmOsInfo.Count++
-		vmOsInfo.Supported = isVMSupported(vm.OS)
-		inventory.Vms.Os[vm.OS] = vmOsInfo
-
+		inventory.Vms.Os[vm.OS]++
 		inventory.Vms.PowerStates[vm.PowerState]++
 
 		inventory.Vms.CpuCores.Total += vm.CPUCount
@@ -237,13 +231,4 @@ func fillInventoryWithVMData(vms []VM, inventory *api.Inventory) {
 			Label:      "Changed Block Tracking (CBT) not enabled",
 		})
 	}
-}
-
-func isVMSupported(os string) bool {
-	for _, unsupportedOs := range unsupported {
-		if strings.Contains(os, unsupportedOs) {
-			return false
-		}
-	}
-	return true
 }
