@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"sync"
 	"time"
 
@@ -285,15 +286,59 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			}{},
 		},
 		Infra: apiplanner.Infra{
-			Datastores:       getDatastores(hosts, collector),
-			HostPowerStates:  getHostPowerStates(*hosts),
-			TotalHosts:       len(*hosts),
-			TotalClusters:    len(*clusters),
-			TotalDatacenters: len(*datacenters),
-			HostsPerCluster:  getHostsPerCluster(*clusters),
-			Networks:         getNetworks(collector),
+			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
+			Datastores:            getDatastores(hosts, collector),
+			HostPowerStates:       getHostPowerStates(*hosts),
+			TotalHosts:            len(*hosts),
+			TotalClusters:         len(*clusters),
+			TotalDatacenters:      len(*datacenters),
+			HostsPerCluster:       getHostsPerCluster(*clusters),
+			Networks:              getNetworks(collector),
 		},
 	}
+}
+
+func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) []int {
+	var h []int
+
+	folders := &[]vspheremodel.Folder{}
+	if err := collector.DB().List(folders, libmodel.FilterOptions{Detail: 1}); err != nil {
+		return nil
+	}
+
+	folderByID := make(map[string]vspheremodel.Folder, len(*folders))
+	for _, f := range *folders {
+		folderByID[f.ID] = f
+	}
+
+	for _, dc := range *datacenters {
+		hostFolderId := dc.Clusters.ID
+		for _, folder := range *folders {
+			if folder.ID == hostFolderId {
+				h = append(h, countClustersRecursively(folder, folderByID))
+				break
+			}
+		}
+	}
+
+	return h
+}
+
+func countClustersRecursively(folder vspheremodel.Folder, folderByID map[string]vspheremodel.Folder) int {
+	count := 0
+
+	for _, child := range folder.Children {
+
+		if child.Kind == vspheremodel.ClusterKind && strings.HasPrefix(child.ID, "domain-c") {
+			count++
+		}
+
+		if child.Kind == vspheremodel.FolderKind {
+			count += countClustersRecursively(folderByID[child.ID], folderByID) // recursive count
+		}
+	}
+
+	return count
 }
 
 func getProvider(creds config.Credentials) *api.Provider {
