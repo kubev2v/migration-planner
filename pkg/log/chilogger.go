@@ -3,6 +3,7 @@ package log
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5/middleware"
@@ -61,6 +62,26 @@ func Logger(l *zap.Logger, name string) func(next http.Handler) http.Handler {
 			next.ServeHTTP(ww, r)
 		}
 		return http.HandlerFunc(fn)
+	}
+}
+
+// ConditionalLogger returns HTTP request logging middleware only if log level is debug/trace
+func ConditionalLogger(logLevel string, l *zap.Logger, name string) func(next http.Handler) http.Handler {
+	if l == nil {
+		panic("log.ConditionalLogger received a nil *zap.Logger")
+	}
+
+	logger := l.WithOptions(zap.AddCallerSkip(1)).Named(name)
+	level := strings.ToLower(logLevel)
+
+	if level == "debug" || level == "trace" {
+		logger.Info("HTTP request logging enabled (debug mode)")
+		return Logger(l, name)
+	}
+	
+	logger.Info("HTTP request logging disabled (info mode) - using Envoy for access logs")
+	return func(next http.Handler) http.Handler {
+		return next // Pass through without logging
 	}
 }
 
