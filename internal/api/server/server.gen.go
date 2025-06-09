@@ -44,11 +44,11 @@ type ServerInterface interface {
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (PUT /api/v1/sources/{id}/rvtools)
+	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
-
-	// (PUT /sources/{id}/rvtools)
-	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -95,13 +95,13 @@ func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (GET /health)
-func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
+// (PUT /api/v1/sources/{id}/rvtools)
+func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (PUT /sources/{id}/rvtools)
-func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+// (GET /health)
+func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -302,21 +302,6 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// Health operation middleware
-func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.Health(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
 // UploadRvtoolsFile operation middleware
 func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -334,6 +319,21 @@ func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UploadRvtoolsFile(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// Health operation middleware
+func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Health(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -481,10 +481,10 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/sources/{id}/image-url", wrapper.GetSourceDownloadURL)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/health", wrapper.Health)
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
+		r.Get(options.BaseURL+"/health", wrapper.Health)
 	})
 
 	return r
@@ -881,21 +881,6 @@ func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
-type HealthRequestObject struct {
-}
-
-type HealthResponseObject interface {
-	VisitHealthResponse(w http.ResponseWriter) error
-}
-
-type Health200Response struct {
-}
-
-func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
 type UploadRvtoolsFileRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *multipart.Reader
@@ -961,6 +946,21 @@ func (response UploadRvtoolsFile500JSONResponse) VisitUploadRvtoolsFileResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
+type HealthRequestObject struct {
+}
+
+type HealthResponseObject interface {
+	VisitHealthResponse(w http.ResponseWriter) error
+}
+
+type Health200Response struct {
+}
+
+func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -988,11 +988,11 @@ type StrictServerInterface interface {
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(ctx context.Context, request GetSourceDownloadURLRequestObject) (GetSourceDownloadURLResponseObject, error)
 
+	// (PUT /api/v1/sources/{id}/rvtools)
+	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
+
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
-
-	// (PUT /sources/{id}/rvtools)
-	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1242,30 +1242,6 @@ func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// Health operation middleware
-func (sh *strictHandler) Health(w http.ResponseWriter, r *http.Request) {
-	var request HealthRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.Health(ctx, request.(HealthRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "Health")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(HealthResponseObject); ok {
-		if err := validResponse.VisitHealthResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
 // UploadRvtoolsFile operation middleware
 func (sh *strictHandler) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request UploadRvtoolsFileRequestObject
@@ -1292,6 +1268,30 @@ func (sh *strictHandler) UploadRvtoolsFile(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadRvtoolsFileResponseObject); ok {
 		if err := validResponse.VisitUploadRvtoolsFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Health operation middleware
+func (sh *strictHandler) Health(w http.ResponseWriter, r *http.Request) {
+	var request HealthRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Health(ctx, request.(HealthRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Health")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HealthResponseObject); ok {
+		if err := validResponse.VisitHealthResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
