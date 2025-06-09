@@ -72,7 +72,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 	router.Use(
 		metricMiddleware.Handler,
 		middleware.RequestID,
-		log.Logger(zap.L(), "image_server"),
+		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "image_server"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,
