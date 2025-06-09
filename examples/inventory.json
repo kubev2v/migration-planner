@@ -70,8 +70,14 @@
                 }
             },
             "os": {
-                "windows": 4,
-                "linux": 6
+                "Microsoft Windows Server 2022 (64-bit)": {
+                    "count": 1,
+                    "supported": true
+                },
+                "VMware Photon OS (64-bit)": {
+                    "count": 4,
+                    "supported": false
+                }
             },
             "powerStates": {
                 "POWERED_OFF": 2,
@@ -92,8 +98,13 @@
             "notMigratableReasons": []
         },
         "infra": {
+            "clustersPerDatacenter": [
+                1,
+                1
+            ],
             "totalHosts": 5,
             "totalClusters": 2,
+            "totalDatacenters": 1,
             "hostsPerCluster": [
                 2,
                 3
