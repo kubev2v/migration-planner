@@ -231,13 +231,13 @@ type GetImageByTokenResponseObject interface {
 	VisitGetImageByTokenResponse(w http.ResponseWriter) error
 }
 
-type GetImageByToken200ApplicationoctetStreamResponse struct {
+type GetImageByToken200ApplicationovfResponse struct {
 	Body          io.Reader
 	ContentLength int64
 }
 
-func (response GetImageByToken200ApplicationoctetStreamResponse) VisitGetImageByTokenResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/octet-stream")
+func (response GetImageByToken200ApplicationovfResponse) VisitGetImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/ovf")
 	if response.ContentLength != 0 {
 		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
 	}

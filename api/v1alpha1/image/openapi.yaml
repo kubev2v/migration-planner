@@ -31,7 +31,7 @@ paths:
         "200":
           description: An OVA image
           content:
-            application/octet-stream:
+            application/ovf:
               schema:
                 type: string
                 format: binary
