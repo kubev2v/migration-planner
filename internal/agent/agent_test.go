@@ -66,13 +66,12 @@ var _ = Describe("Agent", func() {
 		It("agents starts successfully -- status waiting-for-credentials", func() {
 			updateInterval, _ := time.ParseDuration("5s")
 			config := config.Config{
-				PlannerService:      config.PlannerService{Config: *client.NewDefault()},
-				DataDir:             agentTmpFolder,
-				PersistentDataDir:   agentTmpFolder,
-				ConfigDir:           agentTmpFolder,
-				UpdateInterval:      util.Duration{Duration: updateInterval},
-				SourceID:            uuid.NewString(),
-				HealthCheckInterval: 10,
+				PlannerService:    config.PlannerService{Config: *client.NewDefault()},
+				DataDir:           agentTmpFolder,
+				PersistentDataDir: agentTmpFolder,
+				ConfigDir:         agentTmpFolder,
+				UpdateInterval:    util.Duration{Duration: updateInterval},
+				SourceID:          uuid.NewString(),
 			}
 			config.PlannerService.Service.Server = testHttpServer.URL
 
@@ -99,9 +98,6 @@ var _ = Describe("Agent", func() {
 			Expect(found).To(BeTrue())
 			Expect(status.(agentapi.AgentStatusUpdate).CredentialUrl).NotTo(BeEmpty())
 			Expect(status.(agentapi.AgentStatusUpdate).Status).To(Equal("waiting-for-credentials"))
-
-			_, found = endpointsCalled["/health"]
-			Expect(found).To(BeTrue())
 		})
 	})
 
