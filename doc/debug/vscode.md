@@ -29,7 +29,10 @@ Please create following file on `.vscode/launch.json`:
             "program": "${workspaceFolder}/cmd/planner-api/",
             "args": [
                 "run"
-            ]
+            ],
+            "env": {
+                "MIGRATION_PLANNER_MIGRATIONS_FOLDER": "${workspaceFolder}/pkg/migrations/sql"
+            }
         },
         {
             "name": "Remote planner-api",
