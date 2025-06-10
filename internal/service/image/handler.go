@@ -39,6 +39,23 @@ func (h *ImageHandler) Health(ctx context.Context, request imageServer.HealthReq
 	return nil, nil
 }
 
+func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.HeadImageByTokenRequestObject) (imageServer.HeadImageByTokenResponseObject, error) {
+	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
+		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
+	}
+
+	sourceId, err := image.IdFromJWT(req.Token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
+	}
+	_, err = h.getSource(ctx, sourceId)
+	if err != nil {
+		return imageServer.HeadImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
+	}
+
+	return imageServer.HeadImageByToken200Response{}, nil
+}
+
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {
 	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
 	if !ok {

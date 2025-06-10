@@ -22,6 +22,9 @@ type ServerInterface interface {
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string)
 
+	// (HEAD /api/v1/image/bytoken/{token}/{name})
+	HeadImageByToken(w http.ResponseWriter, r *http.Request, token string, name string)
+
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
 }
@@ -32,6 +35,11 @@ type Unimplemented struct{}
 
 // (GET /api/v1/image/bytoken/{token}/{name})
 func (_ Unimplemented) GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (HEAD /api/v1/image/bytoken/{token}/{name})
+func (_ Unimplemented) HeadImageByToken(w http.ResponseWriter, r *http.Request, token string, name string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -75,6 +83,41 @@ func (siw *ServerInterfaceWrapper) GetImageByToken(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetImageByToken(w, r, token, name)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// HeadImageByToken operation middleware
+func (siw *ServerInterfaceWrapper) HeadImageByToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "token" -------------
+	var token string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "name" -------------
+	var name string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "name", chi.URLParam(r, "name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "name", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadImageByToken(w, r, token, name)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -216,6 +259,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/image/bytoken/{token}/{name}", wrapper.GetImageByToken)
 	})
 	r.Group(func(r chi.Router) {
+		r.Head(options.BaseURL+"/api/v1/image/bytoken/{token}/{name}", wrapper.HeadImageByToken)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
 	})
 
@@ -286,6 +332,59 @@ func (response GetImageByToken500JSONResponse) VisitGetImageByTokenResponse(w ht
 	return json.NewEncoder(w).Encode(response)
 }
 
+type HeadImageByTokenRequestObject struct {
+	Token string `json:"token"`
+	Name  string `json:"name"`
+}
+
+type HeadImageByTokenResponseObject interface {
+	VisitHeadImageByTokenResponse(w http.ResponseWriter) error
+}
+
+type HeadImageByToken200Response struct {
+}
+
+func (response HeadImageByToken200Response) VisitHeadImageByTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type HeadImageByToken400JSONResponse externalRef0.Error
+
+func (response HeadImageByToken400JSONResponse) VisitHeadImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadImageByToken401JSONResponse externalRef0.Error
+
+func (response HeadImageByToken401JSONResponse) VisitHeadImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadImageByToken404JSONResponse externalRef0.Error
+
+func (response HeadImageByToken404JSONResponse) VisitHeadImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadImageByToken500JSONResponse externalRef0.Error
+
+func (response HeadImageByToken500JSONResponse) VisitHeadImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type HealthRequestObject struct {
 }
 
@@ -306,6 +405,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(ctx context.Context, request GetImageByTokenRequestObject) (GetImageByTokenResponseObject, error)
+
+	// (HEAD /api/v1/image/bytoken/{token}/{name})
+	HeadImageByToken(ctx context.Context, request HeadImageByTokenRequestObject) (HeadImageByTokenResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -360,6 +462,33 @@ func (sh *strictHandler) GetImageByToken(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetImageByTokenResponseObject); ok {
 		if err := validResponse.VisitGetImageByTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// HeadImageByToken operation middleware
+func (sh *strictHandler) HeadImageByToken(w http.ResponseWriter, r *http.Request, token string, name string) {
+	var request HeadImageByTokenRequestObject
+
+	request.Token = token
+	request.Name = name
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.HeadImageByToken(ctx, request.(HeadImageByTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "HeadImageByToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HeadImageByTokenResponseObject); ok {
+		if err := validResponse.VisitHeadImageByTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
