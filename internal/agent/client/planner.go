@@ -50,26 +50,6 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 	return nil
 }
 
-func (p *planner) Health(ctx context.Context) error {
-	resp, err := p.client.HealthWithResponse(ctx, func(ctx context.Context, req *http.Request) error {
-		if jwt, found := p.jwtFromContext(ctx); found {
-			req.Header.Add(auth.AgentTokenHeader, jwt)
-		}
-		return nil
-	})
-
-	if err != nil {
-		return err
-	}
-	if resp.HTTPResponse != nil {
-		defer resp.HTTPResponse.Body.Close()
-	}
-	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("health check failed with status: %s", resp.Status())
-	}
-	return nil
-}
-
 func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
 	resp, err := p.client.UpdateAgentStatusWithResponse(ctx, id, params, func(ctx context.Context, req *http.Request) error {
 		if jwt, found := p.jwtFromContext(ctx); found {

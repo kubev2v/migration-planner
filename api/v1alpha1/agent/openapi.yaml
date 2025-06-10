@@ -119,16 +119,6 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
-  /health:
-    get:
-      tags:
-        - health
-      description: Health check
-      operationId: health
-      responses:
-        "200":
-          description: OK
-
 components:
   schemas:
     SourceStatusUpdate:

@@ -22,6 +22,8 @@ import (
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
 
+type closeChKeyType struct{}
+
 const (
 	defaultAgentPort = 3333
 )
@@ -29,25 +31,26 @@ const (
 // This varible is set during build time.
 // It contains the version of the code.
 // For more info take a look into Makefile.
-var version string
+var (
+	version    string
+	closeChKey closeChKeyType
+)
 
 // New creates a new agent.
 func New(id uuid.UUID, jwt string, config *config.Config) *Agent {
 	return &Agent{
-		config:           config,
-		healtCheckStopCh: make(chan chan any),
-		id:               id,
-		jwt:              jwt,
+		config: config,
+		id:     id,
+		jwt:    jwt,
 	}
 }
 
 type Agent struct {
-	config           *config.Config
-	server           *Server
-	healtCheckStopCh chan chan any
-	credUrl          string
-	id               uuid.UUID
-	jwt              string
+	config  *config.Config
+	server  *Server
+	credUrl string
+	id      uuid.UUID
+	jwt     string
 }
 
 func (a *Agent) Run(ctx context.Context) error {
@@ -66,7 +69,8 @@ func (a *Agent) Run(ctx context.Context) error {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
-	ctx, cancel := context.WithCancel(ctx)
+	closeCh := make(chan any, 1)
+	ctx, cancel := context.WithCancel(context.WithValue(ctx, closeChKey, closeCh))
 	a.start(ctx, client)
 
 	select {
@@ -78,6 +82,7 @@ func (a *Agent) Run(ctx context.Context) error {
 
 	a.Stop()
 	cancel()
+	<-closeCh // Need to wait for main loop to exit before return to os.
 
 	return nil
 }
@@ -88,11 +93,6 @@ func (a *Agent) Stop() {
 
 	<-serverCh
 	zap.S().Info("server stopped")
-
-	c := make(chan any)
-	a.healtCheckStopCh <- c
-	<-c
-	zap.S().Info("health check stopped")
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
@@ -127,20 +127,6 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
-	// start the health check
-	healthChecker, err := service.NewHealthChecker(
-		plannerClient,
-		a.config.DataDir,
-		time.Duration(a.config.HealthCheckInterval*int64(time.Second)),
-	)
-	if err != nil {
-		zap.S().Fatalf("failed to start health check: %w", err)
-	}
-
-	// TODO refactor health checker to call it from the main goroutine
-	healthChecker.Start(ctx, a.healtCheckStopCh)
-	statusUpdater.HealthChecker = healthChecker
-
 	collector := service.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
 	collector.Collect(ctx)
 
@@ -157,17 +143,15 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 		for {
 			select {
 			case <-ctx.Done():
+				if ch, ok := ctx.Value(closeChKey).(chan any); ok {
+					ch <- struct{}{}
+				}
 				return
 			case <-updateTicker.C:
 			}
 
 			// calculate status regardless if we have connectivity with the backend.
 			status, statusInfo, inventory := statusUpdater.CalculateStatus()
-
-			//	check for health. Send requests only if we have connectivity
-			if healthChecker.State() == service.HealthCheckStateConsoleUnreachable {
-				continue
-			}
 
 			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, a.credUrl); err != nil {
 				if errors.Is(err, client.ErrSourceGone) {

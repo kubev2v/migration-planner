@@ -73,11 +73,6 @@ func (h *AgentServiceHandler) UpdateSourceInventory(ctx context.Context, request
 	return agentServer.UpdateSourceInventory200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
 }
 
-func (h *AgentServiceHandler) Health(ctx context.Context, request agentServer.HealthRequestObject) (agentServer.HealthResponseObject, error) {
-	// NO-OP
-	return nil, nil
-}
-
 // UpdateAgentStatus updates or creates a new agent resource
 // If the source has not agent than the agent is created.
 func (h *AgentServiceHandler) UpdateAgentStatus(ctx context.Context, request agentServer.UpdateAgentStatusRequestObject) (agentServer.UpdateAgentStatusResponseObject, error) {
