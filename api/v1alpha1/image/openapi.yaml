@@ -59,6 +59,51 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+    head:
+      tags:
+        - image
+      description: Head the OVA image via URL
+      operationId: headImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+        - name: name
+          in: path
+          description: Image name
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: An OVA image
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /health:
     get:
       tags:
