@@ -98,13 +98,13 @@ func (c *inventoryStatsCollector) Collect(ch chan<- prometheus.Metric) {
 		ch <- prometheus.MustNewConstMetric(c.totalVmByOs, prometheus.GaugeValue, float64(total), osType)
 	}
 
-	for orgID, total := range stats.Vms.TotalByCustomer {
-		ch <- prometheus.MustNewConstMetric(c.totalVmByCustomer, prometheus.GaugeValue, float64(total), orgID)
+	for domain, total := range stats.Vms.TotalByCustomer {
+		ch <- prometheus.MustNewConstMetric(c.totalVmByCustomer, prometheus.GaugeValue, float64(total), domain)
 	}
 
 	for _, storage := range stats.Storage {
 		for k, v := range storage.TotalByProvider {
-			ch <- prometheus.MustNewConstMetric(c.totalStorageByCustomer, prometheus.GaugeValue, float64(v), storage.OrgID, k)
+			ch <- prometheus.MustNewConstMetric(c.totalStorageByCustomer, prometheus.GaugeValue, float64(v), storage.Domain, k)
 		}
 	}
 }

@@ -1,5 +1,12 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+
+	"go.uber.org/zap"
+)
+
 type VmStats struct {
 	// Total is the total number of vms
 	Total int
@@ -16,7 +23,7 @@ type OsStats struct {
 
 type StorageCustomerStats struct {
 	TotalByProvider map[string]int
-	OrgID           string
+	Domain          string
 }
 
 type InventoryStats struct {
@@ -56,7 +63,13 @@ func computeVmStats(sources []Source) VmStats {
 				os[k] = v
 			}
 		}
-		orgTotal[s.OrgID] = s.Inventory.Data.Vms.Total
+
+		domain, err := getDomainName(s.Username)
+		if err != nil {
+			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
+			domain = s.OrgID
+		}
+		orgTotal[domain] = s.Inventory.Data.Vms.Total
 	}
 
 	return VmStats{
@@ -107,15 +120,21 @@ func computeStorateStats(sources []Source) []StorageCustomerStats {
 			continue
 		}
 
+		domain, err := getDomainName(s.Username)
+		if err != nil {
+			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
+			domain = s.OrgID
+		}
+
 		storageSourceStats := computeSourceStorageStats(s)
-		val, found := statsPerCustomer[s.OrgID]
+		val, found := statsPerCustomer[domain]
 		if found {
-			statsPerCustomer[s.OrgID] = StorageCustomerStats{
-				OrgID:           s.OrgID,
+			statsPerCustomer[domain] = StorageCustomerStats{
+				Domain:          domain,
 				TotalByProvider: sum(val.TotalByProvider, storageSourceStats),
 			}
 		} else {
-			statsPerCustomer[s.OrgID] = StorageCustomerStats{OrgID: s.OrgID, TotalByProvider: storageSourceStats}
+			statsPerCustomer[domain] = StorageCustomerStats{Domain: domain, TotalByProvider: storageSourceStats}
 		}
 	}
 
@@ -173,4 +192,29 @@ func sum(m1, m2 map[string]int) map[string]int {
 	}
 
 	return result
+}
+
+func getDomainName(username string) (string, error) {
+	const (
+		dotChar = "."
+		atChar  = "@"
+	)
+
+	if !strings.Contains(username, atChar) {
+		return "", fmt.Errorf("username is not an email")
+	}
+
+	domain := strings.Split(username, atChar)[1]
+	if strings.TrimSpace(domain) == "" {
+		return "", fmt.Errorf("preferred_username %q is malformatted", username)
+	}
+
+	// split the domain name by subdomain and return only the top domain
+	// a.b.c.redhat.com => redhat.com
+	parts := strings.Split(domain, dotChar)
+	if len(parts) < 2 {
+		return domain, nil
+	}
+
+	return strings.Join(parts[len(parts)-2:], dotChar), nil
 }
