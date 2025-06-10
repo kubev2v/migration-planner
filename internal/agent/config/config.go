@@ -68,8 +68,6 @@ type Config struct {
 	LogLevel string `json:"log-level,omitempty"`
 	// LogPrefix is the log prefix used for testing
 	LogPrefix string `json:"log-prefix,omitempty"`
-	// HealthCheckInterval is the interval between two health checks
-	HealthCheckInterval int64 `json:"health-check-interval,omitempty"`
 
 	reader *fileio.Reader
 }
@@ -87,15 +85,14 @@ func (s *PlannerService) Equal(s2 *PlannerService) bool {
 
 func NewDefault() *Config {
 	c := &Config{
-		ConfigDir:           DefaultConfigDir,
-		DataDir:             DefaultDataDir,
-		PersistentDataDir:   DefaultPersistentDataDir,
-		WwwDir:              DefaultWwwDir,
-		PlannerService:      PlannerService{Config: *client.NewDefault()},
-		UpdateInterval:      util.Duration{Duration: DefaultUpdateInterval},
-		reader:              fileio.NewReader(),
-		LogLevel:            logrus.InfoLevel.String(),
-		HealthCheckInterval: DefaultHealthCheck,
+		ConfigDir:         DefaultConfigDir,
+		DataDir:           DefaultDataDir,
+		PersistentDataDir: DefaultPersistentDataDir,
+		WwwDir:            DefaultWwwDir,
+		PlannerService:    PlannerService{Config: *client.NewDefault()},
+		UpdateInterval:    util.Duration{Duration: DefaultUpdateInterval},
+		reader:            fileio.NewReader(),
+		LogLevel:          logrus.InfoLevel.String(),
 	}
 	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
