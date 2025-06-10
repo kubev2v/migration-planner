@@ -20,9 +20,6 @@ var _ Planner = &PlannerMock{}
 //
 //		// make and configure a mocked Planner
 //		mockedPlanner := &PlannerMock{
-//			HealthFunc: func(ctx context.Context) error {
-//				panic("mock out the Health method")
-//			},
 //			UpdateAgentStatusFunc: func(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error {
 //				panic("mock out the UpdateAgentStatus method")
 //			},
@@ -36,9 +33,6 @@ var _ Planner = &PlannerMock{}
 //
 //	}
 type PlannerMock struct {
-	// HealthFunc mocks the Health method.
-	HealthFunc func(ctx context.Context) error
-
 	// UpdateAgentStatusFunc mocks the UpdateAgentStatus method.
 	UpdateAgentStatusFunc func(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error
 
@@ -47,11 +41,6 @@ type PlannerMock struct {
 
 	// calls tracks calls to the methods.
 	calls struct {
-		// Health holds details about calls to the Health method.
-		Health []struct {
-			// Ctx is the ctx argument value.
-			Ctx context.Context
-		}
 		// UpdateAgentStatus holds details about calls to the UpdateAgentStatus method.
 		UpdateAgentStatus []struct {
 			// Ctx is the ctx argument value.
@@ -71,41 +60,8 @@ type PlannerMock struct {
 			Params api.SourceStatusUpdate
 		}
 	}
-	lockHealth             sync.RWMutex
 	lockUpdateAgentStatus  sync.RWMutex
 	lockUpdateSourceStatus sync.RWMutex
-}
-
-// Health calls HealthFunc.
-func (mock *PlannerMock) Health(ctx context.Context) error {
-	if mock.HealthFunc == nil {
-		panic("PlannerMock.HealthFunc: method is nil but Planner.Health was just called")
-	}
-	callInfo := struct {
-		Ctx context.Context
-	}{
-		Ctx: ctx,
-	}
-	mock.lockHealth.Lock()
-	mock.calls.Health = append(mock.calls.Health, callInfo)
-	mock.lockHealth.Unlock()
-	return mock.HealthFunc(ctx)
-}
-
-// HealthCalls gets all the calls that were made to Health.
-// Check the length with:
-//
-//	len(mockedPlanner.HealthCalls())
-func (mock *PlannerMock) HealthCalls() []struct {
-	Ctx context.Context
-} {
-	var calls []struct {
-		Ctx context.Context
-	}
-	mock.lockHealth.RLock()
-	calls = mock.calls.Health
-	mock.lockHealth.RUnlock()
-	return calls
 }
 
 // UpdateAgentStatus calls UpdateAgentStatusFunc.

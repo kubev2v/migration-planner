@@ -46,7 +46,3 @@ func (h *AgentServiceHandlerLogger) UpdateAgentStatus(ctx context.Context, reque
 
 	return resp, nil
 }
-
-func (h *AgentServiceHandlerLogger) Health(ctx context.Context, request agentServer.HealthRequestObject) (agentServer.HealthResponseObject, error) {
-	return h.delegate.Health(ctx, request)
-}
