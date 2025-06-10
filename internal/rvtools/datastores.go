@@ -20,7 +20,6 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 		colMap[key] = i
 	}
 
-	nameIdx := colMap["name"]
 	objectIdIdx := colMap["object id"]
 	typeIdx := colMap["Type"]
 	capacityMiBIdx, capacityMiBIdxOk := colMap["capacity mib"]
@@ -33,19 +32,11 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 			continue
 		}
 
-		if len(row) <= nameIdx || len(row) <= capacityMiBIdx {
+		if len(row) <= objectIdIdx || len(row) <= capacityMiBIdx {
 			continue
 		}
 
 		datastore := api.Datastore{}
-
-		if nameIdx >= 0 && nameIdx < len(row) {
-			datastore.DiskId = row[nameIdx]
-		}
-
-		if datastore.DiskId == "" {
-			continue
-		}
 
 		if objectIdIdx >= 0 && objectIdIdx < len(row) && row[objectIdIdx] != "" {
 			datastore.DiskId = row[objectIdIdx]
