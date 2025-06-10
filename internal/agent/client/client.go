@@ -39,8 +39,6 @@ func NewDefault() *Config {
 //go:generate moq -out zz_generated_planner.go . Planner
 type Planner interface {
 	UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error
-	// Health is checking the connectivity with console.redhat.com by making requests to /health endpoint.
-	Health(ctx context.Context) error
 	// UpdateAgentStatus updates the agent status.
 	UpdateAgentStatus(ctx context.Context, id uuid.UUID, params api.AgentStatusUpdate) error
 }
