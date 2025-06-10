@@ -131,9 +131,9 @@ objects:
     spec:
       ports:
         - name: migration-planner-image
-          port: 11443
+          port: 21443
           protocol: TCP
-          targetPort: 11443
+          targetPort: 21443
       selector:
         app: migration-planner
   - kind: Service
