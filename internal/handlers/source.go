@@ -1,19 +1,22 @@
-package service
+package handlers
 
 import (
 	"context"
 
+	"github.com/go-playground/validator/v10"
 	apiServer "github.com/kubev2v/migration-planner/internal/api/server"
-	"github.com/kubev2v/migration-planner/internal/store"
 )
 
 type ServiceHandler struct {
-	store store.Store
+	validate *validator.Validate
 }
 
-func NewServiceHandler(store store.Store) *ServiceHandler {
+func NewServiceHandler() *ServiceHandler {
+	validator := validator.New()
+	registerSourceCreateFormValidation(validator)
+
 	return &ServiceHandler{
-		store: store,
+		validate: validator,
 	}
 }
 
@@ -47,6 +50,11 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.Upd
 	return nil, nil
 }
 
+// (HEAD /api/v1/sources/{id}/image)
+func (s *ServiceHandler) HeadImage(ctx context.Context, request apiServer.HeadImageRequestObject) (apiServer.HeadImageResponseObject, error) {
+	return nil, nil
+}
+
 // (GET /api/v1/sources/{id}/image-url)
 func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request apiServer.GetSourceDownloadURLRequestObject) (apiServer.GetSourceDownloadURLResponseObject, error) {
 	return nil, nil
@@ -54,5 +62,10 @@ func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request apiSe
 
 // (PUT /api/v1/sources/{id}/rvtools)
 func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServer.UploadRvtoolsFileRequestObject) (apiServer.UploadRvtoolsFileResponseObject, error) {
+	return nil, nil
+}
+
+// (GET /health)
+func (s *ServiceHandler) Health(ctx context.Context, request apiServer.HealthRequestObject) (apiServer.HealthResponseObject, error) {
 	return nil, nil
 }

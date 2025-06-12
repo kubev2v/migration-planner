@@ -9,6 +9,50 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
+type SourceCreateForm struct {
+	CertificateChain string
+	Name             string
+	HttpUrl          string
+	HttpsUrl         string
+	NoProxy          string
+	SshPublicKey     string
+	Username         string
+	OrgID            string
+	Labels           map[string]string
+}
+
+func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string) model.ImageInfra {
+	imageInfra := model.ImageInfra{
+		SourceID:         sourceID,
+		ImageTokenKey:    imageTokenKey,
+		SshPublicKey:     s.SshPublicKey,
+		CertificateChain: s.CertificateChain,
+		HttpProxyUrl:     s.HttpUrl,
+		HttpsProxyUrl:    s.HttpsUrl,
+		NoProxyDomains:   s.NoProxy,
+	}
+	return imageInfra
+}
+
+func (s SourceCreateForm) ToSource() model.Source {
+	source := model.Source{
+		ID:       uuid.New(),
+		Username: s.Username,
+		OrgID:    s.OrgID,
+		Name:     s.Name,
+	}
+	for k, v := range s.Labels {
+		source.Labels = append(source.Labels, model.Label{Key: k, Value: v, SourceID: source.ID.String()})
+	}
+	return source
+}
+
+type InventoryUpdateForm struct {
+	SourceID  uuid.UUID
+	AgentId   uuid.UUID
+	Inventory v1alpha1.Inventory
+}
+
 func AgentFromSource(id uuid.UUID, user auth.User, source model.Source) model.Agent {
 	return model.Agent{
 		ID:         id,
@@ -38,35 +82,6 @@ func SourceFromApi(id uuid.UUID, user auth.User, imageTokenKey string, resource 
 	}
 
 	return source
-}
-
-func ImageInfraFromApi(sourceID uuid.UUID, imageTokenKey string, resource *v1alpha1.CreateSourceJSONRequestBody) model.ImageInfra {
-	imageInfra := model.ImageInfra{
-		SourceID:      sourceID,
-		ImageTokenKey: imageTokenKey,
-	}
-
-	if resource.SshPublicKey != nil {
-		imageInfra.SshPublicKey = *resource.SshPublicKey
-	}
-
-	if resource.Proxy != nil {
-		if resource.Proxy.HttpUrl != nil {
-			imageInfra.HttpProxyUrl = *resource.Proxy.HttpUrl
-		}
-		if resource.Proxy.HttpsUrl != nil {
-			imageInfra.HttpsProxyUrl = *resource.Proxy.HttpsUrl
-		}
-		if resource.Proxy.NoProxy != nil {
-			imageInfra.NoProxyDomains = *resource.Proxy.NoProxy
-		}
-	}
-
-	if resource.CertificateChain != nil {
-		imageInfra.CertificateChain = *resource.CertificateChain
-	}
-
-	return imageInfra
 }
 
 func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {
