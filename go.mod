@@ -120,7 +120,7 @@ require (
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/openshift/api v0.0.0-20230613151523-ba04973d3ed1 // indirect
+	github.com/openshift/api 29b831646a5f // indirect
 	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pborman/uuid v1.2.1 // indirect
