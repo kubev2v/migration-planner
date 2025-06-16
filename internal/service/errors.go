@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -20,4 +21,12 @@ type ErrSourceNotFound struct {
 
 func NewErrSourceNotFound(sourceID uuid.UUID) *ErrSourceNotFound {
 	return &ErrSourceNotFound{fmt.Errorf("source %q not found", sourceID)}
+}
+
+type ErrExcelFileNotValid struct {
+	error
+}
+
+func NewErrExcelFileNotValid() *ErrExcelFileNotValid {
+	return &ErrExcelFileNotValid{errors.New("the uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.")}
 }

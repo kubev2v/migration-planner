@@ -159,7 +159,9 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 		return model.Source{}, NewErrInvalidVCenterID(form.SourceID, form.Inventory.Vcenter.Id)
 	}
 
-	source = mappers.UpdateSourceOnPrem(source, form.Inventory)
+	source.OnPremises = true
+	source.VCenterID = form.Inventory.Vcenter.Id
+	source.Inventory = model.MakeJSONField(form.Inventory)
 
 	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
@@ -199,7 +201,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	//TODO: support csv files
 	if !rvtools.IsExcelFile(rvtoolsContent) {
-		return errors.New("the uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.")
+		return NewErrExcelFileNotValid()
 	}
 
 	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
@@ -229,7 +231,9 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 		rvtoolsAgent = &newAgent
 	}
 
-	source = mappers.UpdateSourceOnPrem(source, *inventory)
+	source.OnPremises = true
+	source.VCenterID = inventory.Vcenter.Id
+	source.Inventory = model.MakeJSONField(*inventory)
 
 	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
@@ -266,6 +270,11 @@ func NewSourceFilter(filters ...SourceFilterFunc) *SourceFilter {
 	return s
 }
 
+func (s *SourceFilter) WithOption(o SourceFilterFunc) *SourceFilter {
+	o(s)
+	return s
+}
+
 func WithSourceID(id uuid.UUID) SourceFilterFunc {
 	return func(s *SourceFilter) {
 		s.ID = id
@@ -275,5 +284,11 @@ func WithSourceID(id uuid.UUID) SourceFilterFunc {
 func WithOrgID(orgID string) SourceFilterFunc {
 	return func(s *SourceFilter) {
 		s.OrgID = orgID
+	}
+}
+
+func WithDefaultInventory() SourceFilterFunc {
+	return func(s *SourceFilter) {
+		s.IncludeDefault = true
 	}
 }
