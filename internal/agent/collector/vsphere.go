@@ -1,4 +1,4 @@
-package service
+package collector
 
 import (
 	"bytes"
@@ -27,6 +27,7 @@ import (
 	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"go.uber.org/zap"
 	core "k8s.io/api/core/v1"
@@ -37,6 +38,10 @@ type Collector struct {
 	dataDir        string
 	credentialsDir string
 	once           sync.Once
+}
+
+type VMValidation struct {
+	Result []vspheremodel.Concern `json:"result"`
 }
 
 func NewCollector(dataDir string, credentialsDir string) *Collector {
@@ -271,19 +276,11 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			Id: vCenterID,
 		},
 		Vms: apiplanner.VMs{
-			Total:       len(*vms),
-			PowerStates: map[string]int{},
-			Os:          map[string]int{},
-			MigrationWarnings: []struct {
-				Assessment string `json:"assessment"`
-				Count      int    `json:"count"`
-				Label      string `json:"label"`
-			}{},
-			NotMigratableReasons: []struct {
-				Assessment string `json:"assessment"`
-				Count      int    `json:"count"`
-				Label      string `json:"label"`
-			}{},
+			Total:                len(*vms),
+			PowerStates:          map[string]int{},
+			Os:                   map[string]int{},
+			MigrationWarnings:    apiplanner.MigrationIssues{},
+			NotMigratableReasons: apiplanner.MigrationIssues{},
 		},
 		Infra: apiplanner.Infra{
 			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
@@ -368,11 +365,7 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
-func Histogram(d []int) struct {
-	Data     []int `json:"data"`
-	MinValue int   `json:"minValue"`
-	Step     int   `json:"step"`
-} {
+func Histogram(d []int) apiplanner.Histogram {
 	minVal := slices.Min(d)
 	maxVal := slices.Max(d)
 
@@ -396,29 +389,15 @@ func Histogram(d []int) struct {
 		bins[binIndex]++
 	}
 
-	return struct {
-		Data     []int `json:"data"`
-		MinValue int   `json:"minValue"`
-		Step     int   `json:"step"`
-	}{
+	return apiplanner.Histogram{
 		Data:     bins,
 		Step:     int(math.Round(binSize)),
 		MinValue: minVal,
 	}
 }
 
-func getNetworks(collector *vsphere.Collector) []struct {
-	Dvswitch *string                      `json:"dvswitch,omitempty"`
-	Name     string                       `json:"name"`
-	Type     apiplanner.InfraNetworksType `json:"type"`
-	VlanId   *string                      `json:"vlanId,omitempty"`
-} {
-	r := []struct {
-		Dvswitch *string                      `json:"dvswitch,omitempty"`
-		Name     string                       `json:"name"`
-		Type     apiplanner.InfraNetworksType `json:"type"`
-		VlanId   *string                      `json:"vlanId,omitempty"`
-	}{}
+func getNetworks(collector *vsphere.Collector) []apiplanner.Network {
+	r := []apiplanner.Network{}
 	networks := &[]vspheremodel.Network{}
 	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
@@ -426,19 +405,18 @@ func getNetworks(collector *vsphere.Collector) []struct {
 	}
 
 	for _, n := range *networks {
-
 		vlanId := n.VlanId
 		dvNet := &vspheremodel.Network{}
 		if n.Variant == vspheremodel.NetDvPortGroup {
 			dvNet.WithRef(n.DVSwitch)
 			_ = collector.DB().Get(dvNet)
 		}
-		r = append(r, struct {
-			Dvswitch *string                      `json:"dvswitch,omitempty"`
-			Name     string                       `json:"name"`
-			Type     apiplanner.InfraNetworksType `json:"type"`
-			VlanId   *string                      `json:"vlanId,omitempty"`
-		}{Name: n.Name, Type: apiplanner.InfraNetworksType(getNetworkType(&n)), VlanId: &vlanId, Dvswitch: &dvNet.Name})
+		r = append(r, apiplanner.Network{
+			Name:     n.Name,
+			Type:     apiplanner.NetworkType(getNetworkType(&n)),
+			VlanId:   &vlanId,
+			Dvswitch: &dvNet.Name,
+		})
 	}
 
 	return r
@@ -588,14 +566,7 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 	return total / 1024 / 1024 / 1024
 }
 
-func hasLabel(
-	reasons []struct {
-	Assessment string `json:"assessment"`
-	Count      int    `json:"count"`
-	Label      string `json:"label"`
-},
-	label string,
-) int {
+func hasLabel(reasons apiplanner.MigrationIssues, label string) int {
 	for i, reason := range reasons {
 		if label == reason.Label {
 			return i
@@ -625,7 +596,7 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	defer file.Close()
 
 	// Write the string to the file
-	jsonData, err := json.Marshal(&InventoryData{Inventory: *inv})
+	jsonData, err := json.Marshal(&service.InventoryData{Inventory: *inv})
 	if err != nil {
 		return err
 	}
@@ -705,7 +676,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 			if i := hasLabel(inv.Vms.NotMigratableReasons, result.Label); i >= 0 {
 				inv.Vms.NotMigratableReasons[i].Count++
 			} else {
-				inv.Vms.NotMigratableReasons = append(inv.Vms.NotMigratableReasons, NotMigratableReason{
+				inv.Vms.NotMigratableReasons = append(inv.Vms.NotMigratableReasons, apiplanner.MigrationIssue{
 					Label:      result.Label,
 					Count:      1,
 					Assessment: result.Assessment,
@@ -717,7 +688,7 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 			if i := hasLabel(inv.Vms.MigrationWarnings, result.Label); i >= 0 {
 				inv.Vms.MigrationWarnings[i].Count++
 			} else {
-				inv.Vms.MigrationWarnings = append(inv.Vms.MigrationWarnings, NotMigratableReason{
+				inv.Vms.MigrationWarnings = append(inv.Vms.MigrationWarnings, apiplanner.MigrationIssue{
 					Label:      result.Label,
 					Count:      1,
 					Assessment: result.Assessment,
@@ -773,22 +744,4 @@ func (c *Collector) waitUntilOpaIsRunning() {
 		}
 		time.Sleep(2 * time.Second)
 	}
-}
-
-type NotMigratableReasons []NotMigratableReason
-
-type NotMigratableReason struct {
-	Assessment string `json:"assessment"`
-	Count      int    `json:"count"`
-	Label      string `json:"label"`
-}
-
-type VMResult struct {
-	Assessment string `json:"assessment"`
-	Category   string `json:"category"`
-	Label      string `json:"label"`
-}
-
-type VMValidation struct {
-	Result []VMResult `json:"result"`
 }

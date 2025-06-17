@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/agent/service"
+	"github.com/kubev2v/migration-planner/internal/agent/collector"
 )
 
 type VM struct {
@@ -214,18 +214,14 @@ func fillInventoryWithVMData(vms []VM, inventory *api.Inventory) {
 
 	inventory.Vms.TotalMigratableWithWarnings = &totalMigratableWithWarnings
 
-	inventory.Vms.CpuCores.Histogram = service.Histogram(cpuSet)
-	inventory.Vms.RamGB.Histogram = service.Histogram(memorySet)
-	inventory.Vms.DiskCount.Histogram = service.Histogram(diskCountSet)
-	inventory.Vms.DiskGB.Histogram = service.Histogram(diskGBSet)
+	inventory.Vms.CpuCores.Histogram = collector.Histogram(cpuSet)
+	inventory.Vms.RamGB.Histogram = collector.Histogram(memorySet)
+	inventory.Vms.DiskCount.Histogram = collector.Histogram(diskCountSet)
+	inventory.Vms.DiskGB.Histogram = collector.Histogram(diskGBSet)
 
 	if vmWithCBTDisabled > 0 {
 		inventory.Vms.MigrationWarnings = nil
-		inventory.Vms.MigrationWarnings = append(inventory.Vms.MigrationWarnings, struct {
-			Assessment string `json:"assessment"`
-			Count      int    `json:"count"`
-			Label      string `json:"label"`
-		}{
+		inventory.Vms.MigrationWarnings = append(inventory.Vms.MigrationWarnings, api.MigrationIssue{
 			Assessment: "Changed Block Tracking (CBT) has not been enabled on this VM. This feature is a prerequisite for VM warm migration.",
 			Count:      vmWithCBTDisabled,
 			Label:      "Changed Block Tracking (CBT) not enabled",
