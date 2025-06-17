@@ -30,12 +30,7 @@ func GenerateDefaultInventory() api.Inventory {
 				"Green": 8,
 			},
 			HostsPerCluster: []int{1, 7, 0},
-			Networks: []struct {
-				Dvswitch *string               `json:"dvswitch,omitempty"`
-				Name     string                `json:"name"`
-				Type     api.InfraNetworksType `json:"type"`
-				VlanId   *string               `json:"vlanId,omitempty"`
-			}{
+			Networks: []api.Network{
 				{Name: dvSwitch, Type: "dvswitch"},
 				{Dvswitch: &dvSwitch, Name: "mgmt", Type: "distributed", VlanId: &vlanid100},
 				{Name: dvSwitchVm, Type: "dvswitch"},
@@ -51,11 +46,7 @@ func GenerateDefaultInventory() api.Inventory {
 		},
 		Vms: api.VMs{
 			CpuCores: api.VMResourceBreakdown{
-				Histogram: struct {
-					Data     []int `json:"data"`
-					MinValue int   `json:"minValue"`
-					Step     int   `json:"step"`
-				}{
+				Histogram: api.Histogram{
 					Data:     []int{45, 0, 39, 2, 13, 0, 0, 0, 0, 8},
 					MinValue: 1,
 					Step:     2,
@@ -64,11 +55,7 @@ func GenerateDefaultInventory() api.Inventory {
 				TotalForMigratableWithWarnings: 472,
 			},
 			DiskCount: api.VMResourceBreakdown{
-				Histogram: struct {
-					Data     []int `json:"data"`
-					MinValue int   `json:"minValue"`
-					Step     int   `json:"step"`
-				}{
+				Histogram: api.Histogram{
 					Data:     []int{10, 91, 1, 2, 0, 2, 0, 0, 0, 1},
 					MinValue: 0,
 					Step:     1,
@@ -76,17 +63,9 @@ func GenerateDefaultInventory() api.Inventory {
 				Total:                          115,
 				TotalForMigratableWithWarnings: 115,
 			},
-			NotMigratableReasons: []struct {
-				Assessment string `json:"assessment"`
-				Count      int    `json:"count"`
-				Label      string `json:"label"`
-			}{},
+			NotMigratableReasons: []api.MigrationIssue{},
 			DiskGB: api.VMResourceBreakdown{
-				Histogram: struct {
-					Data     []int `json:"data"`
-					MinValue int   `json:"minValue"`
-					Step     int   `json:"step"`
-				}{
+				Histogram: api.Histogram{
 					Data:     []int{32, 23, 31, 14, 0, 2, 2, 1, 0, 2},
 					MinValue: 0,
 					Step:     38,
@@ -95,11 +74,7 @@ func GenerateDefaultInventory() api.Inventory {
 				TotalForMigratableWithWarnings: 7945,
 			},
 			RamGB: api.VMResourceBreakdown{
-				Histogram: struct {
-					Data     []int `json:"data"`
-					MinValue int   `json:"minValue"`
-					Step     int   `json:"step"`
-				}{
+				Histogram: api.Histogram{
 					Data:     []int{49, 32, 1, 14, 0, 0, 9, 0, 0, 2},
 					MinValue: 1,
 					Step:     5,

@@ -17,12 +17,7 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 
 	dvswitchMap := make(map[string]bool)
 
-	networksMap := make(map[string]*struct {
-		Name     string
-		Type     string
-		VlanId   string
-		DVSwitch string
-	})
+	networksMap := make(map[string]api.Network)
 
 	if len(dvswitchRows) > 1 {
 		processDvSwitchSheet(dvswitchRows, dvswitchMap)
@@ -36,44 +31,26 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 		return nil
 	}
 
-	inventory.Infra.Networks = []struct {
-		Dvswitch *string               `json:"dvswitch,omitempty"`
-		Name     string                `json:"name"`
-		Type     api.InfraNetworksType `json:"type"`
-		VlanId   *string               `json:"vlanId,omitempty"`
-	}{}
+	inventory.Infra.Networks = []api.Network{}
 
 	for switchName := range dvswitchMap {
-		inventory.Infra.Networks = append(inventory.Infra.Networks, struct {
-			Dvswitch *string               `json:"dvswitch,omitempty"`
-			Name     string                `json:"name"`
-			Type     api.InfraNetworksType `json:"type"`
-			VlanId   *string               `json:"vlanId,omitempty"`
-		}{
+		inventory.Infra.Networks = append(inventory.Infra.Networks, api.Network{
 			Name: switchName,
-			Type: api.InfraNetworksType(NetDvSwitch),
+			Type: api.NetworkType(NetDvSwitch),
 		})
 	}
 
 	for _, network := range networksMap {
-		netEntry := struct {
-			Dvswitch *string               `json:"dvswitch,omitempty"`
-			Name     string                `json:"name"`
-			Type     api.InfraNetworksType `json:"type"`
-			VlanId   *string               `json:"vlanId,omitempty"`
-		}{
+		netEntry := api.Network{
 			Name: network.Name,
-			Type: api.InfraNetworksType(network.Type),
+			Type: api.NetworkType(network.Type),
 		}
 
-		if network.DVSwitch != "" {
-			dvSwitch := network.DVSwitch
-			netEntry.Dvswitch = &dvSwitch
+		if network.Dvswitch != nil && *network.Dvswitch != "" {
+			netEntry.Dvswitch = network.Dvswitch
 		}
 
-		vlanId := network.VlanId
-		netEntry.VlanId = &vlanId
-
+		netEntry.VlanId = network.VlanId
 		inventory.Infra.Networks = append(inventory.Infra.Networks, netEntry)
 	}
 
@@ -113,12 +90,7 @@ func processDvSwitchSheet(rows [][]string, dvswitchMap map[string]bool) {
 	}
 }
 
-func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMap map[string]*struct {
-	Name     string
-	Type     string
-	VlanId   string
-	DVSwitch string
-}) {
+func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMap map[string]api.Network) {
 	colMap := make(map[string]int)
 	for i, header := range rows[0] {
 		key := strings.ToLower(strings.TrimSpace(header))
@@ -168,16 +140,11 @@ func processDvPortSheet(rows [][]string, dvswitchMap map[string]bool, networksMa
 			vlanId = strings.TrimSpace(row[vlanIdx])
 		}
 
-		networksMap[portName] = &struct {
-			Name     string
-			Type     string
-			VlanId   string
-			DVSwitch string
-		}{
+		networksMap[portName] = api.Network{
 			Name:     portName,
 			Type:     NetDvPortGroup,
-			VlanId:   vlanId,
-			DVSwitch: switchName,
+			VlanId:   &vlanId,
+			Dvswitch: &switchName,
 		}
 	}
 }
