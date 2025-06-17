@@ -24,11 +24,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	inventory.Infra.Datastores = []api.Datastore{}
 	inventory.Infra.HostsPerCluster = []int{}
 	inventory.Vms.MigrationWarnings = api.MigrationIssues{}
-	inventory.Vms.NotMigratableReasons = []struct {
-		Assessment string `json:"assessment"`
-		Count      int    `json:"count"`
-		Label      string `json:"label"`
-	}{}
+	inventory.Vms.NotMigratableReasons = []api.MigrationIssue{}
 
 	if slices.Contains(sheets, "vInfo") {
 		rows, err := excelFile.GetRows("vInfo")
@@ -91,12 +87,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	err = processNetworkInfo(dvswitchRows, dvportRows, &inventory)
 	if err != nil {
 		zap.S().Warnf("Network processing failed: %v", err)
-		inventory.Infra.Networks = []struct {
-			Dvswitch *string               `json:"dvswitch,omitempty"`
-			Name     string                `json:"name"`
-			Type     api.InfraNetworksType `json:"type"`
-			VlanId   *string               `json:"vlanId,omitempty"`
-		}{}
+		inventory.Infra.Networks = []api.Network{}
 	}
 	return &inventory, nil
 }

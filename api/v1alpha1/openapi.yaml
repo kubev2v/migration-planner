@@ -567,11 +567,13 @@ components:
           additionalProperties:
             type: integer
         notMigratableReasons:
-          type: object
-          $ref: '#/components/schemas/MigrationIssues'
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationIssue'
         migrationWarnings:
-          type: object
-          $ref: '#/components/schemas/MigrationIssues'
+          type: array
+          items:
+            $ref: '#/components/schemas/MigrationIssue'
 
     Infra:
       type: object
@@ -606,24 +608,27 @@ components:
         networks:
           type: array
           items:
-            type: object
-            required:
-              - type
-              - name
-            properties:
-              type:
-                type: string
-                enum: [standard, distributed, dvswitch, unsupported]
-              name:
-                type: string
-              vlanId:
-                type: string
-              dvswitch:
-                type: string
+            $ref: '#/components/schemas/Network'
         datastores:
           type: array
           items:
             $ref: '#/components/schemas/Datastore'
+
+    Network:
+      type: object
+      required:
+        - type
+        - name
+      properties:
+        type:
+          type: string
+          enum: [standard, distributed, dvswitch, unsupported]
+        name:
+          type: string
+        vlanId:
+          type: string
+        dvswitch:
+          type: string
 
     Datastore:
       type: object
@@ -673,35 +678,42 @@ components:
           type: integer
         histogram:
           type: object
-          required:
-          - minValue
-          - step
-          - data
-          properties:
-            minValue:
-              type: integer
-            step:
-              type: integer
-            data:
-              type: array
-              items:
-                type: integer
+          $ref: '#/components/schemas/Histogram'
+
+    Histogram:
+      type: object
+      required:
+      - minValue
+      - step
+      - data
+      properties:
+        minValue:
+          type: integer
+        step:
+          type: integer
+        data:
+          type: array
+          items:
+            type: integer
 
     MigrationIssues:
       type: array
       items:
-        type: object
-        required:
-        - label
-        - assessment
-        - count
-        properties:
-          label:
-            type: string
-          assessment:
-            type: string
-          count:
-            type: integer
+        $ref: '#/components/schemas/MigrationIssue'
+
+    MigrationIssue:
+      type: object
+      required:
+      - label
+      - assessment
+      - count
+      properties:
+        label:
+          type: string
+        assessment:
+          type: string
+        count:
+          type: integer
 
     Agent:
       type: object
