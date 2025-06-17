@@ -19,12 +19,12 @@ const (
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
 )
 
-// Defines values for InfraNetworksType.
+// Defines values for NetworkType.
 const (
-	Distributed InfraNetworksType = "distributed"
-	Dvswitch    InfraNetworksType = "dvswitch"
-	Standard    InfraNetworksType = "standard"
-	Unsupported InfraNetworksType = "unsupported"
+	Distributed NetworkType = "distributed"
+	Dvswitch    NetworkType = "dvswitch"
+	Standard    NetworkType = "standard"
+	Unsupported NetworkType = "unsupported"
 )
 
 // Agent defines model for Agent.
@@ -66,25 +66,24 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// Histogram defines model for Histogram.
+type Histogram struct {
+	Data     []int `json:"data"`
+	MinValue int   `json:"minValue"`
+	Step     int   `json:"step"`
+}
+
 // Infra defines model for Infra.
 type Infra struct {
 	ClustersPerDatacenter []int          `json:"clustersPerDatacenter"`
 	Datastores            []Datastore    `json:"datastores"`
 	HostPowerStates       map[string]int `json:"hostPowerStates"`
 	HostsPerCluster       []int          `json:"hostsPerCluster"`
-	Networks              []struct {
-		Dvswitch *string           `json:"dvswitch,omitempty"`
-		Name     string            `json:"name"`
-		Type     InfraNetworksType `json:"type"`
-		VlanId   *string           `json:"vlanId,omitempty"`
-	} `json:"networks"`
-	TotalClusters    int `json:"totalClusters"`
-	TotalDatacenters int `json:"totalDatacenters"`
-	TotalHosts       int `json:"totalHosts"`
+	Networks              []Network      `json:"networks"`
+	TotalClusters         int            `json:"totalClusters"`
+	TotalDatacenters      int            `json:"totalDatacenters"`
+	TotalHosts            int            `json:"totalHosts"`
 }
-
-// InfraNetworksType defines model for Infra.Networks.Type.
-type InfraNetworksType string
 
 // Inventory defines model for Inventory.
 type Inventory struct {
@@ -99,12 +98,26 @@ type Label struct {
 	Value string `json:"value"`
 }
 
-// MigrationIssues defines model for MigrationIssues.
-type MigrationIssues = []struct {
+// MigrationIssue defines model for MigrationIssue.
+type MigrationIssue struct {
 	Assessment string `json:"assessment"`
 	Count      int    `json:"count"`
 	Label      string `json:"label"`
 }
+
+// MigrationIssues defines model for MigrationIssues.
+type MigrationIssues = []MigrationIssue
+
+// Network defines model for Network.
+type Network struct {
+	Dvswitch *string     `json:"dvswitch,omitempty"`
+	Name     string      `json:"name"`
+	Type     NetworkType `json:"type"`
+	VlanId   *string     `json:"vlanId,omitempty"`
+}
+
+// NetworkType defines model for Network.Type.
+type NetworkType string
 
 // Source defines model for Source.
 type Source struct {
@@ -154,15 +167,11 @@ type VCenter struct {
 
 // VMResourceBreakdown defines model for VMResourceBreakdown.
 type VMResourceBreakdown struct {
-	Histogram struct {
-		Data     []int `json:"data"`
-		MinValue int   `json:"minValue"`
-		Step     int   `json:"step"`
-	} `json:"histogram"`
-	Total                          int `json:"total"`
-	TotalForMigratable             int `json:"totalForMigratable"`
-	TotalForMigratableWithWarnings int `json:"totalForMigratableWithWarnings"`
-	TotalForNotMigratable          int `json:"totalForNotMigratable"`
+	Histogram                      Histogram `json:"histogram"`
+	Total                          int       `json:"total"`
+	TotalForMigratable             int       `json:"totalForMigratable"`
+	TotalForMigratableWithWarnings int       `json:"totalForMigratableWithWarnings"`
+	TotalForNotMigratable          int       `json:"totalForNotMigratable"`
 }
 
 // VMs defines model for VMs.
@@ -170,8 +179,8 @@ type VMs struct {
 	CpuCores                    VMResourceBreakdown `json:"cpuCores"`
 	DiskCount                   VMResourceBreakdown `json:"diskCount"`
 	DiskGB                      VMResourceBreakdown `json:"diskGB"`
-	MigrationWarnings           MigrationIssues     `json:"migrationWarnings"`
-	NotMigratableReasons        MigrationIssues     `json:"notMigratableReasons"`
+	MigrationWarnings           []MigrationIssue    `json:"migrationWarnings"`
+	NotMigratableReasons        []MigrationIssue    `json:"notMigratableReasons"`
 	Os                          map[string]int      `json:"os"`
 	PowerStates                 map[string]int      `json:"powerStates"`
 	RamGB                       VMResourceBreakdown `json:"ramGB"`
