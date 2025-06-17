@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
+	"github.com/kubev2v/migration-planner/internal/agent/collector"
 	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
@@ -127,8 +128,8 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
-	collector := service.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
-	collector.Collect(ctx)
+	c := collector.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
+	c.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})
 
