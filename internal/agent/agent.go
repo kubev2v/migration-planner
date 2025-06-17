@@ -97,8 +97,9 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
-	inventoryUpdater := service.NewInventoryUpdater(uuid.MustParse(a.config.SourceID), a.id, plannerClient)
-	statusUpdater := service.NewStatusUpdater(uuid.MustParse(a.config.SourceID), a.id, version, a.credUrl, a.config, plannerClient)
+	interceptor := client.NewInterceptor(plannerClient)
+	inventoryUpdater := service.NewInventoryUpdater(uuid.MustParse(a.config.SourceID), a.id, interceptor)
+	statusUpdater := service.NewStatusUpdater(uuid.MustParse(a.config.SourceID), a.id, version, a.credUrl, a.config, interceptor)
 
 	// insert jwt into the context if any
 	if a.jwt != "" {
@@ -115,7 +116,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config, cert, key)
-	go a.server.Start(statusUpdater)
+	go a.server.Start(statusUpdater, interceptor)
 
 	protocol := "http"
 	if a.server.tlsConfig != nil {
