@@ -582,6 +582,7 @@ components:
       - totalDatacenters
       - totalClusters
       - clustersPerDatacenter
+      - hosts
       - hostsPerCluster
       - hostPowerStates
       - networks
@@ -597,6 +598,10 @@ components:
           type: array
           items:
             type: integer
+        hosts:
+          type: array
+          items:
+            $ref: '#/components/schemas/Host'
         hostsPerCluster:
           type: array
           items:
@@ -613,6 +618,17 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Datastore'
+
+    Host:
+      type: object
+      required:
+        - vendor
+        - model
+      properties:
+        vendor:
+          type: string
+        model:
+          type: string
 
     Network:
       type: object
