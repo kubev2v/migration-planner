@@ -73,11 +73,18 @@ type Histogram struct {
 	Step     int   `json:"step"`
 }
 
+// Host defines model for Host.
+type Host struct {
+	Model  string `json:"model"`
+	Vendor string `json:"vendor"`
+}
+
 // Infra defines model for Infra.
 type Infra struct {
 	ClustersPerDatacenter []int          `json:"clustersPerDatacenter"`
 	Datastores            []Datastore    `json:"datastores"`
 	HostPowerStates       map[string]int `json:"hostPowerStates"`
+	Hosts                 []Host         `json:"hosts"`
 	HostsPerCluster       []int          `json:"hostsPerCluster"`
 	Networks              []Network      `json:"networks"`
 	TotalClusters         int            `json:"totalClusters"`
