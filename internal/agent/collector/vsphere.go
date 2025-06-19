@@ -15,16 +15,16 @@ import (
 	"sync"
 	"time"
 
-	api "github.com/konveyor/forklift-controller/pkg/apis/forklift/v1beta1"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/container/vsphere"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/model"
-	vspheremodel "github.com/konveyor/forklift-controller/pkg/controller/provider/model/vsphere"
-	webprovider "github.com/konveyor/forklift-controller/pkg/controller/provider/web"
-	"github.com/konveyor/forklift-controller/pkg/controller/provider/web/base"
-	web "github.com/konveyor/forklift-controller/pkg/controller/provider/web/vsphere"
-	libcontainer "github.com/konveyor/forklift-controller/pkg/lib/inventory/container"
-	libmodel "github.com/konveyor/forklift-controller/pkg/lib/inventory/model"
-	libweb "github.com/konveyor/forklift-controller/pkg/lib/inventory/web"
+	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
+	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
+	"github.com/kubev2v/forklift/pkg/controller/provider/model"
+	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	webprovider "github.com/kubev2v/forklift/pkg/controller/provider/web"
+	"github.com/kubev2v/forklift/pkg/controller/provider/web/base"
+	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	libcontainer "github.com/kubev2v/forklift/pkg/lib/inventory/container"
+	libmodel "github.com/kubev2v/forklift/pkg/lib/inventory/model"
+	libweb "github.com/kubev2v/forklift/pkg/lib/inventory/web"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
@@ -286,6 +286,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
 			Datastores:            getDatastores(hosts, collector),
 			HostPowerStates:       getHostPowerStates(*hosts),
+			Hosts:                 getHosts(hosts),
 			TotalHosts:            len(*hosts),
 			TotalClusters:         len(*clusters),
 			TotalDatacenters:      len(*datacenters),
@@ -556,6 +557,19 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	}
 
 	return res
+}
+
+func getHosts(hosts *[]vspheremodel.Host) []apiplanner.Host {
+	var l []apiplanner.Host
+
+	for _, host := range *hosts {
+		l = append(l, apiplanner.Host{
+			Model:  host.Model,
+			Vendor: host.Vendor,
+		})
+	}
+
+	return l
 }
 
 func totalCapacity(disks []vspheremodel.Disk) int {
