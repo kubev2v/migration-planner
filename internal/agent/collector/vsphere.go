@@ -155,7 +155,7 @@ func (c *Collector) run() {
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
 	if opaServerAlive {
 		zap.S().Named("collector").Infof("Run the validation of VMs")
-		vms, err = validation(vms, opaServer)
+		vms, err = Validation(vms, opaServer)
 		if err != nil {
 			zap.S().Named("collector").Errorf("failed to run validation: %v", err)
 			return
@@ -163,7 +163,7 @@ func (c *Collector) run() {
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	fillInventoryObjectWithMoreData(vms, inv)
+	FillInventoryObjectWithMoreData(vms, inv)
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
@@ -209,7 +209,7 @@ func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
 	return container, nil
 }
 
-func fillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
+func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
 	cpuSet := []int{}
 	memorySet := []int{}
 	diskGBSet := []int{}
@@ -622,7 +622,7 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	return nil
 }
 
-func validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, error) {
+func Validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, error) {
 	res := []vspheremodel.VM{}
 	for _, vm := range *vms {
 		// Prepare the JSON data to MTV OPA server format.
