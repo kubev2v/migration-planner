@@ -4,7 +4,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -52,14 +51,23 @@ type InventoryUpdateForm struct {
 	Inventory v1alpha1.Inventory // TODO: think about versioning. This is bound to v1alpha1 currently.
 }
 
-func AgentFromApi(id uuid.UUID, resource *apiAgent.AgentStatusUpdate) model.Agent {
+type AgentUpdateForm struct {
+	ID         uuid.UUID
+	Status     string
+	StatusInfo string
+	CredUrl    string
+	Version    string
+	SourceID   uuid.UUID
+}
+
+func (f *AgentUpdateForm) ToModel() model.Agent {
 	return model.Agent{
-		ID:         id,
-		Status:     resource.Status,
-		StatusInfo: resource.StatusInfo,
-		CredUrl:    resource.CredentialUrl,
-		Version:    resource.Version,
-		SourceID:   resource.SourceId,
+		ID:         f.ID,
+		Status:     f.Status,
+		StatusInfo: f.StatusInfo,
+		CredUrl:    f.CredUrl,
+		Version:    f.Version,
+		SourceID:   f.SourceID,
 	}
 }
 

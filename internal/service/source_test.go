@@ -193,7 +193,7 @@ var _ = Describe("source handler", Ordered, func() {
 			srv := service.NewSourceService(s)
 			_, err := srv.GetSource(context.TODO(), uuid.New())
 			Expect(err).ToNot(BeNil())
-			_, ok := err.(*service.ErrSourceNotFound)
+			_, ok := err.(*service.ErrResourceNotFound)
 			Expect(ok).To(BeTrue())
 		})
 

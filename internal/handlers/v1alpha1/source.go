@@ -105,7 +105,7 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request apiServer.GetSou
 	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
-		case *service.ErrSourceNotFound:
+		case *service.ErrResourceNotFound:
 			return server.GetSource404JSONResponse{Message: fmt.Sprintf("source %q not found", request.Id)}, nil
 		default:
 			return server.GetSource500JSONResponse{}, nil
@@ -159,7 +159,7 @@ func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request apiSe
 	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
-		case *service.ErrSourceNotFound:
+		case *service.ErrResourceNotFound:
 			return apiServer.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
 		default:
 			return apiServer.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
@@ -187,7 +187,7 @@ func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServe
 			err := s.sourceSrv.UploadRvtoolsFile(ctx, request.Id, part)
 			if err != nil {
 				switch err.(type) {
-				case *service.ErrSourceNotFound:
+				case *service.ErrResourceNotFound:
 					return apiServer.UploadRvtoolsFile404JSONResponse{Message: err.Error()}, nil
 				case *service.ErrExcelFileNotValid:
 					return apiServer.UploadRvtoolsFile400JSONResponse{Message: err.Error()}, nil
