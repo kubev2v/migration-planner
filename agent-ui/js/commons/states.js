@@ -9,5 +9,12 @@ const FormStates = {
     Error: "error",
 }
 
+const AgentStates = {
+    Connected: "connected",
+    NotConnected: "notConnected",
+    UpdateSuccessfull: "updateSuccessfull",
+    UpdateFailed: "updateFailed",
+}
+
 export default FormStates;
 

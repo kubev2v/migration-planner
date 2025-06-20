@@ -13,10 +13,15 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"go.uber.org/zap"
 )
+
+type AgentStatusProvider interface {
+	GetStatus() common.AgentStatus
+}
 
 /*
 Server serves 3 endpoints:
@@ -54,13 +59,13 @@ func NewServer(port int, configuration *config.Config, cert *x509.Certificate, c
 	return s
 }
 
-func (s *Server) Start(statusUpdater *service.StatusUpdater) {
+func (s *Server) Start(statusUpdater *service.StatusUpdater, statusProvider AgentStatusProvider) {
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Logger)
 
 	RegisterFileServer(router, s.wwwFolder)
-	RegisterApi(router, statusUpdater, s.configuration)
+	RegisterApi(router, statusUpdater, statusProvider, s.configuration)
 
 	s.restServer = &http.Server{Addr: fmt.Sprintf("0.0.0.0:%d", s.port), Handler: router}
 

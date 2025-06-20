@@ -25,13 +25,34 @@ import (
 	"go.uber.org/zap"
 )
 
-func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configuration *config.Config) {
+func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, statusProvider AgentStatusProvider, configuration *config.Config) {
 	router.Get("/api/v1/version", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, VersionReply{Version: version})
 	})
 	router.Get("/api/v1/status", func(w http.ResponseWriter, r *http.Request) {
 		status, statusInfo, _ := statusUpdater.CalculateStatus()
-		_ = render.Render(w, r, StatusReply{Status: string(status), StatusInfo: statusInfo, Connected: fmt.Sprintf("%t", statusUpdater.IsConnected())})
+		sr := StatusReply{
+			Status:     string(status),
+			StatusInfo: statusInfo,
+			Connected:  fmt.Sprintf("%t", statusProvider.GetStatus().Connected),
+		}
+
+		agentStatus := statusProvider.GetStatus()
+		if agentStatus.StateUpdateSuccessfull != nil {
+			sr.AgentStateUpdateSuccessful = fmt.Sprintf("%t", *agentStatus.StateUpdateSuccessfull)
+			if agentStatus.StateUpdateError != nil {
+				sr.AgentStateUpdateErrMessage = statusProvider.GetStatus().StateUpdateError.Error()
+			}
+		}
+
+		if agentStatus.InventoryUpdateSuccessfull != nil {
+			sr.InventoryUpdateSuccessful = fmt.Sprintf("%t", *agentStatus.InventoryUpdateSuccessfull)
+			if agentStatus.InventoryUpdateError != nil {
+				sr.InventoryUpdateErrMessage = statusProvider.GetStatus().InventoryUpdateError.Error()
+			}
+		}
+
+		_ = render.Render(w, r, sr)
 	})
 	router.Get("/api/v1/url", func(w http.ResponseWriter, r *http.Request) {
 		_ = render.Render(w, r, ServiceUIReply{URL: configuration.PlannerService.Service.UI})
@@ -55,9 +76,13 @@ func RegisterApi(router *chi.Mux, statusUpdater *service.StatusUpdater, configur
 }
 
 type StatusReply struct {
-	Status     string `json:"status"`
-	Connected  string `json:"connected"`
-	StatusInfo string `json:"statusInfo"`
+	Status                     string `json:"status"`
+	Connected                  string `json:"connected"`
+	StatusInfo                 string `json:"statusInfo"`
+	AgentStateUpdateSuccessful string `json:"agentStateUpdateSuccessful,omitempty"`
+	AgentStateUpdateErrMessage string `json:"agentStateUpdateErrMessage,omitempty"`
+	InventoryUpdateSuccessful  string `json:"inventoryUpdateSuccessful,omitempty"`
+	InventoryUpdateErrMessage  string `json:"inventoryUpdateErrMessage,omitempty"`
 }
 
 type VersionReply struct {
