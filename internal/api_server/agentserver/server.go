@@ -17,7 +17,8 @@ import (
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
-	service "github.com/kubev2v/migration-planner/internal/service/agent"
+	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	service "github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
@@ -85,7 +86,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
 
-	h := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s.store))
+	h := handlers.NewAgentHandler(service.NewAgentService(s.store))
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

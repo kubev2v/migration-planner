@@ -739,6 +739,7 @@ type ListSourcesResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *SourceList
 	JSON401      *Error
+	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
@@ -1132,6 +1133,13 @@ func ParseListSourcesResponse(rsp *http.Response) (*ListSourcesResponse, error) 
 			return nil, err
 		}
 		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
