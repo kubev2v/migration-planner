@@ -18,7 +18,7 @@ import (
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
-	service "github.com/kubev2v/migration-planner/internal/service/image"
+	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
@@ -84,7 +84,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		}),
 	)
 
-	h := service.NewImageHandler(s.store, s.cfg)
+	h := handlers.NewImageHandler(s.store, s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

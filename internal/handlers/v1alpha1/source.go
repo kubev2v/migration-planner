@@ -187,10 +187,10 @@ func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServe
 			err := s.sourceSrv.UploadRvtoolsFile(ctx, request.Id, part)
 			if err != nil {
 				switch err.(type) {
-				case *service.ErrResourceNotFound:
-					return apiServer.UploadRvtoolsFile404JSONResponse{Message: err.Error()}, nil
 				case *service.ErrExcelFileNotValid:
 					return apiServer.UploadRvtoolsFile400JSONResponse{Message: err.Error()}, nil
+				case *service.ErrResourceNotFound:
+					return apiServer.UploadRvtoolsFile404JSONResponse{Message: err.Error()}, nil
 				default:
 					return server.UploadRvtoolsFile400JSONResponse{
 						Message: "Failed to read uploaded file content",

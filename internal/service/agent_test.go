@@ -16,10 +16,6 @@ import (
 	"gorm.io/gorm"
 )
 
-const (
-	insertAgentWithUpdateAtStm = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
-)
-
 var _ = Describe("agent service", Ordered, func() {
 	var (
 		s      store.Store
