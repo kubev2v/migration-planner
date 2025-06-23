@@ -12,8 +12,6 @@ MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
-MIGRATION_PLANNER_UI_IMAGE ?= quay.io/kubev2v/migration-planner-ui
-MIGRATION_PLANNER_UI_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
 MIGRATION_PLANNER_AUTH ?= local
@@ -179,26 +177,14 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc apply -f -; \
-	oc process -f https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml \
-     -p MIGRATION_PLANNER_UI_IMAGE=$(MIGRATION_PLANNER_UI_IMAGE) \
-     -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
-     -p IMAGE_TAG=$(MIGRATION_PLANNER_UI_IMAGE_TAG) \
-	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
-	oc expose service migration-planner-ui --name planner-ui; \
 	oc expose service migration-planner-image --name planner-image; \
 	echo "*** Migration Planner has been deployed successfully on Openshift ***"; \
-	echo "*** Open UI: http://planner-ui-$${openshift_project}.apps.$${openshift_base_url}"
 
 delete-from-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
 	echo "*** Delete Migration Planner from Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***"; \
-	oc process -f https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml \
-     -p MIGRATION_PLANNER_UI_IMAGE=$(MIGRATION_PLANNER_UI_IMAGE) \
-     -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
-     -p IMAGE_TAG=$(MIGRATION_PLANNER_UI_IMAGE_TAG) \
-	   | oc delete -f -; \
 	openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
 	oc process -f deploy/templates/service-template.yml \
@@ -212,7 +198,7 @@ delete-from-openshift: oc
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
 	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
-	oc delete route planner-agent planner-ui planner-image; \
+	oc delete route planner-agent planner-image; \
 	echo "*** Migration Planner has been deleted successfully from Openshift ***"
 
 deploy-on-kind: oc
