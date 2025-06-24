@@ -14,9 +14,9 @@ parameters:
   - name: IMAGE_TAG
     value: latest
   - name: MIGRATION_PLANNER_ISO_PATH
-    value: /iso/rhcos-live.x86_64.iso
+    value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_URL
-    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
+    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
