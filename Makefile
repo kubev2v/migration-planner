@@ -63,7 +63,7 @@ GOBIN = $(shell pwd)/bin
 GINKGO ?= $(GOBIN)/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 ifeq (, $(shell which ginkgo 2> /dev/null))
-	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.15.0
+	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 endif
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
@@ -107,7 +107,7 @@ run:
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
-	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
+	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
 endif
 
 integration-test: ginkgo
