@@ -42,7 +42,7 @@ const (
 	defaultOvfFile                  = "data/MigrationAssessment.ovf"
 	defaultOvfName                  = "MigrationAssessment.ovf"
 	defaultIsoImageName             = "MigrationAssessment.iso"
-	defaultRHCOSImage               = "rhcos-live.x86_64.iso"
+	defaultRHCOSImage               = "rhcos-live-iso.x86_64.iso"
 )
 
 // IgnitionData defines modifiable fields in ignition config
