@@ -144,7 +144,7 @@ func newListener(address string) (net.Listener, error) {
 
 func initializeIso(ctx context.Context, cfg *config.Config) error {
 	// Check if ISO already exists:
-	isoPath := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live.x86_64.iso")
+	isoPath := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live-iso.x86_64.iso")
 	if _, err := os.Stat(isoPath); err == nil {
 		return nil
 	}
