@@ -287,14 +287,48 @@ func validateVMsWithOPA(vms []vsphere.VM) ([]vsphere.VM, error) {
 		return vms, fmt.Errorf("OPA server %s is not responding", opaServer)
 	}
 
-	zap.S().Named("rvtools").Infof("OPA server %s is alive, validating VMs", opaServer)
+	zap.S().Named("rvtools").Infof("OPA server %s is alive, validating %d VMs in batches", opaServer, len(vms))
 
-	validatedVMs, err := collector.Validation(&vms, opaServer)
-	if err != nil {
-		return vms, err
+	// Configuration
+	const batchSize = 50 // Adjust this based on your needs
+	batchDelay := 100 * time.Millisecond // Small delay between batches
+
+	var validatedVMs []vsphere.VM
+	totalBatches := (len(vms) + batchSize - 1) / batchSize // Ceiling division
+
+	for i := 0; i < len(vms); i += batchSize {
+		// Calculate batch boundaries
+		end := i + batchSize
+		if end > len(vms) {
+			end = len(vms)
+		}
+
+		currentBatch := i/batchSize + 1
+		batch := vms[i:end]
+		
+		zap.S().Named("rvtools").Infof("Validating batch %d/%d: VMs %d-%d (%d VMs)", 
+			currentBatch, totalBatches, i+1, end, len(batch))
+
+		// Validate this batch
+		validatedBatch, err := collector.Validation(&batch, opaServer)
+		if err != nil {
+			zap.S().Named("rvtools").Errorf("Failed to validate batch %d/%d: %v", currentBatch, totalBatches, err)
+			return vms, fmt.Errorf("validation failed at batch %d/%d: %w", currentBatch, totalBatches, err)
+		}
+
+		// Append validated batch to results
+		validatedVMs = append(validatedVMs, *validatedBatch...)
+		
+		zap.S().Named("rvtools").Infof("Completed batch %d/%d successfully", currentBatch, totalBatches)
+
+		// Small delay between batches to avoid overwhelming OPA (skip for last batch)
+		if i+batchSize < len(vms) {
+			time.Sleep(batchDelay)
+		}
 	}
 
-	return *validatedVMs, nil
+	zap.S().Named("rvtools").Infof("Successfully validated all %d VMs in %d batches", len(validatedVMs), totalBatches)
+	return validatedVMs, nil
 }
 
 func isOPAServerAlive(opaServer string) bool {
