@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	rhcosUrl string = "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso"
+	rhcosUrl string = "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso"
 )
 
 type HttpDownloader struct {
