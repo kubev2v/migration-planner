@@ -272,9 +272,7 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 
-	if ctx.Err() != nil {
-		ctx = timeoutCtx
-	}
+	ctx = timeoutCtx
 
 	var rvtoolsAgent *model.Agent
 	if len(source.Agents) > 0 {
