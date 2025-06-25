@@ -269,9 +269,11 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
 		}, nil
 	}
 
-	ctx, err = h.store.NewTransactionContext(ctx)
-	if err != nil {
-		return server.UploadRvtoolsFile500JSONResponse{}, nil
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	if ctx.Err() != nil {
+		ctx = timeoutCtx
 	}
 
 	var rvtoolsAgent *model.Agent

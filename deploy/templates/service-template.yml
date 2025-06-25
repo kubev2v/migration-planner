@@ -14,9 +14,9 @@ parameters:
   - name: IMAGE_TAG
     value: latest
   - name: MIGRATION_PLANNER_ISO_PATH
-    value: /iso/rhcos-live-iso.x86_64.iso
+    value: /iso/rhcos-live.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_URL
-    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live.x86_64.iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -102,7 +102,9 @@ parameters:
     value: docker.io/envoyproxy/envoy:v1.33.2
   - name: VALIDATION_CONTAINER_IMAGE
     description: Full registry path to the validation (OPA) container
-
+  - name: OPA_SERVER
+    description: Opa server address
+    value: "127.0.0.1:8181"
 objects:
   - kind: ServiceAccount
     apiVersion: v1
@@ -153,6 +155,23 @@ objects:
           port: 8080
           protocol: TCP
           targetPort: 8080
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner
+        port: opa
+      annotations:
+        description: Expose the OPA policy server endpoint
+      name: migration-planner-opa-sidecar
+    spec:
+      selector:
+        app: migration-planner
+      ports:
+        - name: opa
+          port: 8181
+          protocol: TCP
+          targetPort: 8181
   - kind: Service
     apiVersion: v1
     metadata:
@@ -394,6 +413,46 @@ objects:
             app: migration-planner
         spec:
           containers:
+            - name: opa
+              image: ${VALIDATION_CONTAINER_IMAGE}
+              imagePullPolicy: Always
+              command:
+                - /usr/bin/opa
+              args:
+                - run
+                - --server
+                - --addr=0.0.0.0:8181
+                - --log-level=info
+                - /usr/share/opa/policies
+              ports:
+              - containerPort: 8181
+                name: opa-port
+                protocol: TCP
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: 8181
+                initialDelaySeconds: 15
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: 8181
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+                periodSeconds: 5
+                successThreshold: 1
+                failureThreshold: 3
+              resources:
+                requests:
+                  memory: 256Mi
+                  cpu: 200m
+                limits:
+                  memory: 512Mi
+                  cpu: 500m
             - name: envoy
               image: ${ENVOY_IMAGE}
               imagePullPolicy: Always
@@ -478,6 +537,8 @@ objects:
                   value: ${DEBUG_MODE}
                 - name: VALIDATION_CONTAINER_IMAGE
                   value: ${VALIDATION_CONTAINER_IMAGE}
+                - name: OPA_SERVER
+                  value: ${OPA_SERVER}
                 - name: PERSISTENT_DISK_DEVICE
                   value: ${PERSISTENT_DISK_DEVICE}
                 - name:  INSECURE_REGISTRY
