@@ -138,15 +138,25 @@ components:
       properties:
         status:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,status"
         statusInfo:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,max=200"
         credentialUrl:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,url"
         version:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,max=20"
         sourceId:
           type: string
           format: uuid
+          x-oapi-codegen-extra-tags:
+            validate: "required,sourceId"
       required:
         - status
         - statusInfo

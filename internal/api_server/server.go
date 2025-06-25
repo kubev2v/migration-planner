@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
+	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -101,7 +102,7 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
-	h := service.NewServiceHandler(s.store)
+	h := handlers.NewServiceHandler(service.NewSourceService(s.store))
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
