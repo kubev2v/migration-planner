@@ -1,4 +1,4 @@
-package service_test
+package v1alpha1_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestAgent(t *testing.T) {
+func TestHandlers(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Agent Suite")
+	RunSpecs(t, "Handlers Suite")
 }

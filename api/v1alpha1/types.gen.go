@@ -43,9 +43,9 @@ type AgentStatus string
 
 // AgentProxy defines model for AgentProxy.
 type AgentProxy struct {
-	HttpUrl  *string `json:"httpUrl,omitempty"`
-	HttpsUrl *string `json:"httpsUrl,omitempty"`
-	NoProxy  *string `json:"noProxy,omitempty"`
+	HttpUrl  *string `json:"httpUrl,omitempty" validate:"url,startsnotwith=https"`
+	HttpsUrl *string `json:"httpsUrl,omitempty" validate:"url,startswith=https"`
+	NoProxy  *string `json:"noProxy,omitempty" validate:"max=1000"`
 }
 
 // Datastore defines model for Datastore.
@@ -140,10 +140,10 @@ type Source struct {
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	CertificateChain *string     `json:"certificateChain,omitempty"`
-	Name             string      `json:"name"`
+	CertificateChain *string     `json:"certificateChain,omitempty" validate:"omitnil,certs"`
+	Name             string      `json:"name" validate:"required,source_name,min=1,max=100"`
 	Proxy            *AgentProxy `json:"proxy,omitempty"`
-	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
+	SshPublicKey     *string     `json:"sshPublicKey,omitempty" validate:"omitnil,ssh_key"`
 }
 
 // SourceList defines model for SourceList.
