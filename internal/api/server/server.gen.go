@@ -550,6 +550,15 @@ func (response ListSources401JSONResponse) VisitListSourcesResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListSources500JSONResponse Error
+
+func (response ListSources500JSONResponse) VisitListSourcesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateSourceRequestObject struct {
 	Body *CreateSourceJSONRequestBody
 }

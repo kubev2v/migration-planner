@@ -3,6 +3,9 @@ package e2e_service
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -11,8 +14,6 @@ import (
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
 )
 
 // PlannerService defines the interface for interacting with the planner service
@@ -62,8 +63,8 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 		}
 
 		params.Proxy = &api.AgentProxy{
-			HttpUrl:  toStrPtr("127.0.0.1"),
-			HttpsUrl: toStrPtr("127.0.0.1"),
+			HttpUrl:  toStrPtr("http://127.0.0.1"),
+			HttpsUrl: toStrPtr("https://127.0.0.1"),
 			NoProxy:  toStrPtr("vcenter.com"),
 		}
 	}

@@ -34,6 +34,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
     post:
       tags:
         - source
@@ -444,22 +450,36 @@ components:
       properties:
         httpUrl:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "url,startsnotwith=https"
         httpsUrl:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "url,startswith=https"
         noProxy:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "max=1000"
 
     SourceCreate:
       type: object
       properties:
         name:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,source_name,min=1,max=100"
         sshPublicKey:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "omitnil,ssh_key"
         proxy:
           $ref: '#/components/schemas/AgentProxy'
+          x-oapi-codegen-extra-tags:
+            validate: "omitnil"
         certificateChain:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "omitnil,certs"
       required:
         - name
 

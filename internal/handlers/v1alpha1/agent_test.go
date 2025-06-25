@@ -1,4 +1,4 @@
-package service_test
+package v1alpha1_test
 
 import (
 	"context"
@@ -11,17 +11,12 @@ import (
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
-	service "github.com/kubev2v/migration-planner/internal/service/agent"
+	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
-)
-
-const (
-	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
-	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
-	insertAgentWithUpdateAtStm  = "INSERT INTO agents (id, status, status_info, cred_url, updated_at, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
 )
 
 var _ = Describe("agent service", Ordered, func() {
@@ -57,13 +52,13 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
+					CredentialUrl: "http://agent.com",
 					Version:       "version-1",
 					SourceId:      sourceID,
 				},
@@ -89,11 +84,43 @@ var _ = Describe("agent service", Ordered, func() {
 			credsUrl := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
 			Expect(tx.Error).To(BeNil())
-			Expect(credsUrl).To(Equal("creds-url"))
+			Expect(credsUrl).To(Equal("http://agent.com"))
+		})
+
+		It("failed to create the agent -- form not valid", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			agentID := uuid.New()
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
+				Id: agentID,
+				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
+					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
+					StatusInfo:    "waiting-for-credentials",
+					CredentialUrl: "creds_url",
+					Version:       "version-1",
+					SourceId:      sourceID,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateAgentStatus400JSONResponse{}).String()))
+
+			count := -1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
 		})
 
 		It("successfully updates the agent", func() {
-			sourceID := uuid.NewString()
+			sourceID := uuid.New()
 			agentID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
@@ -106,13 +133,14 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
+					SourceId:      sourceID,
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
+					CredentialUrl: "http://agent.com",
 					Version:       "version-1",
 				},
 			})
@@ -137,7 +165,7 @@ var _ = Describe("agent service", Ordered, func() {
 			credsUrl := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT cred_url from agents WHERE id = '%s';", agentID)).Scan(&credsUrl)
 			Expect(tx.Error).To(BeNil())
-			Expect(credsUrl).To(Equal("creds-url"))
+			Expect(credsUrl).To(Equal("http://agent.com"))
 		})
 
 		It("failed to update agent -- source id is missing", func() {
@@ -151,19 +179,18 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
 					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
 					StatusInfo:    "waiting-for-credentials",
-					CredentialUrl: "creds-url",
+					CredentialUrl: "http://agent.com",
 					Version:       "version-1",
-					SourceId:      uuid.New(),
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus400JSONResponse{}))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateAgentStatus400JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {
@@ -187,7 +214,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -228,7 +255,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			// first agent request
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -284,16 +311,16 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
-				Id: firstSourceID,
+				Id: secondSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId:   secondSourceID,
+					AgentId:   firstAgentID,
 					Inventory: v1alpha1.Inventory{},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory403JSONResponse{}).String()))
 		})
 
 		It("updates with a different vCenter are not allowed", func() {
@@ -310,7 +337,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewAgentServiceHandlerLogger(service.NewAgentServiceHandler(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -328,7 +355,7 @@ var _ = Describe("agent service", Ordered, func() {
 			resp, err = srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
-					AgentId: firstSourceID,
+					AgentId: firstAgentID,
 					Inventory: v1alpha1.Inventory{
 						Vcenter: v1alpha1.VCenter{
 							Id: "anotherVCenterID",
