@@ -8,8 +8,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/api/server"
-	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -19,144 +17,132 @@ import (
 	"go.uber.org/zap"
 )
 
-func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
-	source, err := h.store.Source().Get(ctx, request.Id)
+type SourceService struct {
+	store store.Store
+}
+
+func NewSourceService(store store.Store) *SourceService {
+	return &SourceService{store: store}
+}
+
+// TODO should be moved to ImageService (to be created)
+func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
+	source, err := s.store.Source().Get(ctx, id)
 	if err != nil {
-		return server.GetSourceDownloadURL404JSONResponse{}, nil
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return "", time.Now(), NewErrSourceNotFound(id)
+		}
+		return "", time.Time{}, err
 	}
 
 	// FIXME: refactor the environment vars + config.yaml
 	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
-	newURL, expiresAt, err := image.GenerateDownloadURLByToken(baseUrl, source)
+
+	url, expireAt, err := image.GenerateDownloadURLByToken(baseUrl, source)
 	if err != nil {
-		return server.GetSourceDownloadURL400JSONResponse{}, err
+		return "", time.Time{}, err
 	}
 
-	return server.GetSourceDownloadURL200JSONResponse{Url: newURL, ExpiresAt: (*time.Time)(expiresAt)}, nil
+	return url, time.Time(*expireAt), err
 }
 
-func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
-	// Get user content
-	user := auth.MustHaveUser(ctx)
-	filter := store.NewSourceQueryFilter().ByOrgID(user.Organization)
+func (s *SourceService) ListSources(ctx context.Context, filter *SourceFilter) ([]model.Source, error) {
+	storeFilter := store.NewSourceQueryFilter().ByOrgID(filter.OrgID)
 
-	userResult, err := h.store.Source().List(ctx, filter)
+	userResult, err := s.store.Source().List(ctx, storeFilter)
 	if err != nil {
 		return nil, err
 	}
 
-	includeDefault := request.Params.IncludeDefault
-	if includeDefault != nil && *includeDefault {
+	if filter.IncludeDefault {
 		// Get default content
-		defaultResult, err := h.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
+		defaultResult, err := s.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
 		if err != nil {
 			return nil, err
 		}
-		return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult, defaultResult)), nil
+		return append(userResult, defaultResult...), nil
 	}
 
-	return server.ListSources200JSONResponse(mappers.SourceListToApi(userResult)), nil
+	return userResult, nil
 }
 
-func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
-	user := auth.MustHaveUser(ctx)
-
-	ctx, err := h.store.NewTransactionContext(ctx)
+func (s *SourceService) GetSource(ctx context.Context, id uuid.UUID) (*model.Source, error) {
+	source, err := s.store.Source().Get(ctx, id)
 	if err != nil {
-		return server.CreateSource500JSONResponse{}, nil
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(id)
+		}
+		return nil, err
 	}
 
+	return source, nil
+}
+
+func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.SourceCreateForm) (model.Source, error) {
 	// Generate a signing key for tokens for the source
-	// TODO: merge imageTokenKey and sshPublickKey with the rest of image infra
 	imageTokenKey, err := image.HMACKey(32)
 	if err != nil {
-		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
+		return model.Source{}, err
 	}
 
-	source := mappers.SourceFromApi(uuid.New(), user, imageTokenKey, request.Body)
-	result, err := h.store.Source().Create(ctx, source)
+	ctx, err = s.store.NewTransactionContext(ctx)
 	if err != nil {
-		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
+		return model.Source{}, err
 	}
 
-	imageInfra := mappers.ImageInfraFromApi(source.ID, imageTokenKey, request.Body)
-	if _, err := h.store.ImageInfra().Create(ctx, imageInfra); err != nil {
+	result, err := s.store.Source().Create(ctx, sourceForm.ToSource())
+	if err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.CreateSource500JSONResponse{}, nil
+		return model.Source{}, err
+	}
+
+	imageInfra := sourceForm.ToImageInfra(result.ID, imageTokenKey)
+	if _, err := s.store.ImageInfra().Create(ctx, imageInfra); err != nil {
+		_, _ = store.Rollback(ctx)
+		return model.Source{}, err
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return server.CreateSource500JSONResponse{}, nil
+		return model.Source{}, err
 	}
 
-	return server.CreateSource201JSONResponse(mappers.SourceToApi(*result)), nil
+	return *result, nil
 }
 
-func (h *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
-	if err := h.store.Source().DeleteAll(ctx); err != nil {
-		if _, err := store.Rollback(ctx); err != nil {
-			return nil, err
-		}
-		return server.DeleteSources500JSONResponse{}, nil
+func (s *SourceService) DeleteSources(ctx context.Context) error {
+	if err := s.store.Source().DeleteAll(ctx); err != nil {
+		return err
 	}
 
-	return server.DeleteSources200JSONResponse{}, nil
+	return nil
 }
 
-func (h *ServiceHandler) GetSource(ctx context.Context, request server.GetSourceRequestObject) (server.GetSourceResponseObject, error) {
-	source, err := h.store.Source().Get(ctx, request.Id)
+func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
+	if err := s.store.Source().Delete(ctx, id); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.InventoryUpdateForm) (model.Source, error) {
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return model.Source{}, err
+	}
+
+	source, err := s.store.Source().Get(ctx, form.SourceID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			return server.GetSource404JSONResponse{}, nil
+			return model.Source{}, NewErrSourceNotFound(form.SourceID)
 		}
-		return server.GetSource500JSONResponse{}, nil
-	}
-
-	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
-		return server.GetSource403JSONResponse{}, nil
-	}
-
-	return server.GetSource200JSONResponse(mappers.SourceToApi(*source)), nil
-}
-
-func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
-	source, err := h.store.Source().Get(ctx, request.Id)
-	if err != nil {
-		return server.DeleteSource404JSONResponse{}, nil
-	}
-
-	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
-		return server.DeleteSource403JSONResponse{}, nil
-	}
-
-	if err := h.store.Source().Delete(ctx, request.Id); err != nil {
-		return server.DeleteSource500JSONResponse{}, nil
-	}
-
-	return server.DeleteSource200JSONResponse{}, nil
-}
-
-func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
-	ctx, err := h.store.NewTransactionContext(ctx)
-	if err != nil {
-		return server.UpdateSource404JSONResponse{}, nil
-	}
-
-	source, err := h.store.Source().Get(ctx, request.Id)
-	if err != nil {
-		return server.UpdateSource400JSONResponse{}, nil
-	}
-
-	if source == nil {
-		return server.UpdateSource404JSONResponse{}, nil
+		return model.Source{}, err
 	}
 
 	// create the agent if missing
 	var agent *model.Agent
 	for _, a := range source.Agents {
-		if a.ID == request.Body.AgentId {
+		if a.ID == form.AgentId {
 			agent = &a
 			break
 		}
@@ -164,114 +150,73 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 
 	if agent == nil {
 		newAgent := model.NewAgentForSource(uuid.New(), *source)
-		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
-			return server.UpdateSource500JSONResponse{}, nil
+		if _, err := s.store.Agent().Create(ctx, newAgent); err != nil {
+			return model.Source{}, err
 		}
 	}
 
-	user := auth.MustHaveUser(ctx)
-	if source.OrgID != user.Organization {
-		return server.UpdateSource403JSONResponse{}, nil
+	if source.VCenterID != "" && source.VCenterID != form.Inventory.Vcenter.Id {
+		_, _ = store.Rollback(ctx)
+		return model.Source{}, NewErrInvalidVCenterID(form.SourceID, form.Inventory.Vcenter.Id)
 	}
 
-	if source.VCenterID != "" && source.VCenterID != request.Body.Inventory.Vcenter.Id {
-		_, _ = store.Rollback(ctx)
-		return server.UpdateSource400JSONResponse{}, nil
-	}
+	source.OnPremises = true
+	source.VCenterID = form.Inventory.Vcenter.Id
+	source.Inventory = model.MakeJSONField(form.Inventory)
 
-	source = mappers.UpdateSourceOnPrem(source, request.Body.Inventory)
-
-	if _, err = h.store.Source().Update(ctx, *source); err != nil {
+	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.UpdateSource500JSONResponse{}, nil
+		return model.Source{}, err
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return server.UpdateSource500JSONResponse{}, nil
+		return model.Source{}, err
 	}
 
-	return server.UpdateSource200JSONResponse{}, nil
+	return *source, nil
 }
 
-func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.UploadRvtoolsFileRequestObject) (server.UploadRvtoolsFileResponseObject, error) {
-	multipartReader := request.Body
-	var rvtoolsContent []byte
-
-	source, err := h.store.Source().Get(ctx, request.Id)
+func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUID, reader io.Reader) error {
+	source, err := s.store.Source().Get(ctx, sourceID)
 	if err != nil {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: "Failed to retrieve source",
-		}, nil
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrSourceNotFound(sourceID)
+		}
+		return err
 	}
 
-	for {
-		part, err := multipartReader.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return server.UploadRvtoolsFile400JSONResponse{
-				Message: "Failed to read multipart data",
-			}, nil
-		}
-
-		if part.FormName() == "file" {
-			rvtoolsContent, err = io.ReadAll(part)
-			if err != nil {
-				return server.UploadRvtoolsFile400JSONResponse{
-					Message: "Failed to read uploaded file content",
-				}, nil
-			}
-			break
-		}
+	rvtoolsContent, err := io.ReadAll(reader)
+	if err != nil {
+		return fmt.Errorf("failed to read uploaded file content: %w", err)
 	}
 
 	if rvtoolsContent == nil {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: "No file was found in the request",
-		}, nil
+		return errors.New("no file was found in the request")
 	}
 
 	if len(rvtoolsContent) == 0 {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: "Empty file uploaded",
-		}, nil
+		return errors.New("empty file uploaded")
 	}
 
-	zap.S().Infof("Received RVTools data with size: %d bytes", len(rvtoolsContent))
+	zap.S().Infow("received RVTools data", "size [bytes]", len(rvtoolsContent))
 
 	//TODO: support csv files
 	if !rvtools.IsExcelFile(rvtoolsContent) {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: "The uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.",
-		}, nil
+		return NewErrExcelFileNotValid()
 	}
 
 	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
 	if err != nil {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: fmt.Sprintf("Error parsing RVTools file: %v", err),
-		}, nil
-	}
-
-	if source == nil {
-		return server.UploadRvtoolsFile404JSONResponse{}, nil
-	}
-
-	user := auth.MustHaveUser(ctx)
-	if source.OrgID != user.Organization {
-		return server.UploadRvtoolsFile403JSONResponse{}, nil
+		return fmt.Errorf("Error parsing RVTools file: %v", err)
 	}
 
 	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
-		return server.UploadRvtoolsFile400JSONResponse{
-			Message: "vCenter ID mismatch: existing source has different vCenter ID than the uploaded RVTools file",
-		}, nil
+		return NewErrInvalidVCenterID(sourceID, inventory.Vcenter.Id)
 	}
 
-	ctx, err = h.store.NewTransactionContext(ctx)
+	ctx, err = s.store.NewTransactionContext(ctx)
 	if err != nil {
-		return server.UploadRvtoolsFile500JSONResponse{}, nil
+		return err
 	}
 
 	var rvtoolsAgent *model.Agent
@@ -280,30 +225,71 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
 	} else {
 		newAgent := model.NewAgentForSource(uuid.New(), *source)
 
-		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
+		if _, err := s.store.Agent().Create(ctx, newAgent); err != nil {
 			_, _ = store.Rollback(ctx)
-			return server.UploadRvtoolsFile500JSONResponse{}, nil
+			return err
 		}
 		rvtoolsAgent = &newAgent
 	}
 
-	source = mappers.UpdateSourceOnPrem(source, *inventory)
+	source.OnPremises = true
+	source.VCenterID = inventory.Vcenter.Id
+	source.Inventory = model.MakeJSONField(*inventory)
 
-	if _, err = h.store.Source().Update(ctx, *source); err != nil {
+	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.UploadRvtoolsFile500JSONResponse{}, nil
+		return err
 	}
 
 	rvtoolsAgent.StatusInfo = "Last updated via RVTools upload on " + time.Now().Format(time.RFC3339)
 
-	if _, err = h.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
+	if _, err = s.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.UploadRvtoolsFile500JSONResponse{}, nil
+		return err
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return server.UploadRvtoolsFile500JSONResponse{}, nil
+		return err
 	}
 
-	return server.UploadRvtoolsFile200JSONResponse{}, nil
+	return nil
+}
+
+type SourceFilterFunc func(s *SourceFilter)
+
+type SourceFilter struct {
+	OrgID          string
+	ID             uuid.UUID
+	IncludeDefault bool
+}
+
+func NewSourceFilter(filters ...SourceFilterFunc) *SourceFilter {
+	s := &SourceFilter{}
+	for _, f := range filters {
+		f(s)
+	}
+	return s
+}
+
+func (s *SourceFilter) WithOption(o SourceFilterFunc) *SourceFilter {
+	o(s)
+	return s
+}
+
+func WithSourceID(id uuid.UUID) SourceFilterFunc {
+	return func(s *SourceFilter) {
+		s.ID = id
+	}
+}
+
+func WithOrgID(orgID string) SourceFilterFunc {
+	return func(s *SourceFilter) {
+		s.OrgID = orgID
+	}
+}
+
+func WithDefaultInventory() SourceFilterFunc {
+	return func(s *SourceFilter) {
+		s.IncludeDefault = true
+	}
 }

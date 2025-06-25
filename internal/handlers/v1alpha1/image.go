@@ -1,4 +1,4 @@
-package service
+package v1alpha1
 
 import (
 	"bytes"

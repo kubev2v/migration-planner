@@ -3,14 +3,13 @@ package service_test
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -58,16 +57,9 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
+			srv := service.NewSourceService(s)
+			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("batman")))
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
 			Expect(resp).To(HaveLen(1))
 		})
 
@@ -84,16 +76,9 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
+			srv := service.NewSourceService(s)
+			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("admin")))
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
 			Expect(resp).To(HaveLen(2))
 
 			count := 0
@@ -110,21 +95,9 @@ var _ = Describe("source handler", Ordered, func() {
 
 	Context("create", func() {
 		It("successfully creates a source", func() {
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
-				Body: &v1alpha1.CreateSourceJSONRequestBody{
-					Name: "test",
-				},
-			})
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin"})
 			Expect(err).To(BeNil())
-			source, ok := resp.(server.CreateSource201JSONResponse)
-			Expect(ok).To(BeTrue())
 			Expect(source.Name).To(Equal("test"))
 
 			count := 0
@@ -134,30 +107,16 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			toStrPtr := func(s string) *string {
-				return &s
-			}
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
-				Body: &v1alpha1.CreateSourceJSONRequestBody{
-					Name: "test",
-					Proxy: &v1alpha1.AgentProxy{
-						HttpUrl:  toStrPtr("http"),
-						HttpsUrl: toStrPtr("https"),
-						NoProxy:  toStrPtr("noproxy"),
-					},
-				},
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
+				Username: "admin",
+				OrgID:    "admin",
+				Name:     "test",
+				HttpUrl:  "http",
+				HttpsUrl: "https",
+				NoProxy:  "noproxy",
 			})
 			Expect(err).To(BeNil())
-			source, ok := resp.(server.CreateSource201JSONResponse)
-			Expect(ok).To(BeTrue())
 			Expect(source.Name).To(Equal("test"))
 
 			count := 0
@@ -167,26 +126,14 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with certificate chain defined", func() {
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			toStrPtr := func(s string) *string {
-				return &s
-			}
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
-				Body: &v1alpha1.CreateSourceJSONRequestBody{
-					Name:             "test",
-					CertificateChain: toStrPtr("chain"),
-				},
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
+				Username:         "admin",
+				OrgID:            "admin",
+				Name:             "test",
+				CertificateChain: "chain",
 			})
 			Expect(err).To(BeNil())
-			source, ok := resp.(server.CreateSource201JSONResponse)
-			Expect(ok).To(BeTrue())
 			Expect(source.Name).To(Equal("test"))
 
 			count := 0
@@ -222,54 +169,11 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			srv := service.NewSourceService(s)
+			source, err := srv.GetSource(ctx, firstSourceID)
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
-
-			source := resp.(server.GetSource200JSONResponse)
-			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
-			Expect(source.Agent).NotTo(BeNil())
-			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
-		})
-
-		It("successfully retrieve the source -- with labels", func() {
-			firstSourceID := uuid.New()
-			firstAgentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			secondSourceID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			tx = gormdb.Exec(fmt.Sprintf(insertLabelStm, "key", "value", firstSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
-
-			source := resp.(server.GetSource200JSONResponse)
-			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
-			Expect(source.Agent).NotTo(BeNil())
-			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
-			Expect(source.Labels).ToNot(BeNil())
-			Expect(*source.Labels).To(HaveLen(1))
-			labels := *source.Labels
-			Expect(labels[0].Key).To(Equal("key"))
-			Expect(labels[0].Value).To(Equal("value"))
+			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
+			Expect(source.Agents).To(HaveLen(1))
 		})
 
 		It("failed to get source - 404", func() {
@@ -286,42 +190,11 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
-		})
-
-		It("failed to get source - 403", func() {
-			firstSourceID := uuid.New()
-			firstAgentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			secondSourceID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			user := auth.User{
-				Username:     "joker",
-				Organization: "joker",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
+			srv := service.NewSourceService(s)
+			_, err := srv.GetSource(context.TODO(), uuid.New())
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
 		})
 
 		AfterEach(func() {
@@ -346,8 +219,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewServiceHandler(s)
-			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
+			srv := service.NewSourceService(s)
+			err := srv.DeleteSources(context.TODO())
 			Expect(err).To(BeNil())
 
 			count := 1
@@ -365,14 +238,8 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
+			srv := service.NewSourceService(s)
+			err := srv.DeleteSource(context.TODO(), firstSourceID)
 			Expect(err).To(BeNil())
 
 			count := 1
@@ -384,26 +251,6 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Raw("SELECT COUNT(*) FROM AGENTS;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(0))
-		})
-
-		It("fails to delete a source -- under user's scope", func() {
-			firstSourceID := uuid.New()
-			firstAgentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			user := auth.User{
-				Username:     "user",
-				Organization: "user",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {
@@ -418,26 +265,17 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
-				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
-					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+			srv := service.NewSourceService(s)
+			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID: firstSourceID,
+				AgentId:  uuid.New(),
+				Inventory: v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{
+						Id: "vcenter",
 					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
 
 			// agent must be created
 			count := 0
@@ -461,25 +299,17 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
-				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
-					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+			srv := service.NewSourceService(s)
+			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID: firstSourceID,
+				AgentId:  uuid.New(),
+				Inventory: v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{
+						Id: "vcenter",
 					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
 
 			vCenterID := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT v_center_id FROM SOURCES where id = '%s';", firstSourceID)).Scan(&vCenterID)
@@ -491,19 +321,16 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			Expect(onPrem).To(BeTrue())
 
-			resp, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
-				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
-					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+			_, err = srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID: firstSourceID,
+				AgentId:  uuid.New(),
+				Inventory: v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{
+						Id: "vcenter",
 					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
 		})
 
 		It("fails to update source on prem -- different vcenter", func() {
@@ -511,26 +338,17 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			srv := service.NewServiceHandler(s)
-			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
-				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
-					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+			srv := service.NewSourceService(s)
+			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID: firstSourceID,
+				AgentId:  uuid.New(),
+				Inventory: v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{
+						Id: "vcenter",
 					},
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
 
 			vCenterID := ""
 			tx = gormdb.Raw(fmt.Sprintf("SELECT v_center_id FROM SOURCES where id = '%s';", firstSourceID)).Scan(&vCenterID)
@@ -542,24 +360,43 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			Expect(onPrem).To(BeTrue())
 
-			resp, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
-				Id: firstSourceID,
-				Body: &v1alpha1.SourceUpdateOnPrem{
-					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "another-vcenter-id",
-						},
+			_, err = srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID: firstSourceID,
+				AgentId:  uuid.New(),
+				Inventory: v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{
+						Id: "another-vcenter-id",
 					},
 				},
 			})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource400JSONResponse{}).String()))
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrInvalidVCenterID)
+			Expect(ok).To(BeTrue())
 		})
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("source filter", func() {
+		It("filter does not have default inventory", func() {
+			f := service.NewSourceFilter()
+			Expect(f.IncludeDefault).To(BeFalse())
+		})
+		It("filter does have default inventory", func() {
+			f := service.NewSourceFilter(service.WithDefaultInventory())
+			Expect(f.IncludeDefault).To(BeTrue())
+		})
+		It("filter has orgID set properlly", func() {
+			f := service.NewSourceFilter(service.WithOrgID("test"))
+			Expect(f.OrgID).To(Equal("test"))
+		})
+		It("filter has id set properlly", func() {
+			id := uuid.New()
+			f := service.NewSourceFilter(service.WithSourceID(id))
+			Expect(f.ID).To(Equal(id))
 		})
 	})
 })
