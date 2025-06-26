@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"go.uber.org/zap"
 )
 
 func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
@@ -13,18 +14,11 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 	}
 
 	headers := rows[0]
-
 	colMap := make(map[string]int)
 	for i, header := range headers {
 		key := strings.ToLower(strings.TrimSpace(header))
 		colMap[key] = i
 	}
-
-	objectIdIdx := colMap["object id"]
-	typeIdx := colMap["Type"]
-	capacityMiBIdx, capacityMiBIdxOk := colMap["capacity mib"]
-	freeMiBIdx := colMap["free mib"]
-	freePercentIdx := colMap["free %"]
 
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
@@ -32,54 +26,36 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 			continue
 		}
 
-		if len(row) <= objectIdIdx || len(row) <= capacityMiBIdx {
+		name := getColumnValue(row, colMap, "name")
+		dsType := getColumnValue(row, colMap, "type")
+		
+		if name == "" {
 			continue
 		}
 
-		datastore := api.Datastore{}
-
-		if objectIdIdx >= 0 && objectIdIdx < len(row) && row[objectIdIdx] != "" {
-			datastore.DiskId = row[objectIdIdx]
+		datastore := api.Datastore{
+			DiskId:                  name,
+			Type:                    dsType,
+			Vendor:                  "N/A",
+			Model:                   "N/A",
+			ProtocolType:            "N/A",
+			HardwareAcceleratedMove: false,
 		}
 
-		if typeIdx >= 0 && typeIdx < len(row) && row[typeIdx] != "" {
-			datastore.Type = row[typeIdx]
-		}
-
-		if capacityMiBIdxOk {
-			capacityStr := cleanNumericString(row[capacityMiBIdx])
-
-			capacityMiB, err := strconv.ParseFloat(capacityStr, 64)
-			if err == nil && capacityMiB > 0 {
+		capacityStr := getColumnValue(row, colMap, "capacity mib")
+		if capacityStr != "" {
+			if capacityMiB, err := strconv.ParseFloat(cleanNumericString(capacityStr), 64); err == nil && capacityMiB > 0 {
 				datastore.TotalCapacityGB = int(capacityMiB / 1024)
-				if datastore.TotalCapacityGB == 0 {
-					datastore.TotalCapacityGB = 1
-				}
 			}
 		}
 
-		if freeMiBIdx >= 0 && freeMiBIdx < len(row) {
-			freeStr := cleanNumericString(row[freeMiBIdx])
-
-			freeMiB, err := strconv.ParseFloat(freeStr, 64)
-			if err == nil && freeMiB >= 0 {
+		freeStr := getColumnValue(row, colMap, "free mib")
+		if freeStr != "" {
+			if freeMiB, err := strconv.ParseFloat(cleanNumericString(freeStr), 64); err == nil && freeMiB >= 0 {
 				datastore.FreeCapacityGB = int(freeMiB / 1024)
 			}
-		} else if freePercentIdx >= 0 && freePercentIdx < len(row) && datastore.TotalCapacityGB > 0 {
-			freePercentStr := cleanNumericString(row[freePercentIdx])
-
-			freePercent, err := strconv.ParseFloat(freePercentStr, 64)
-			if err == nil && freePercent >= 0 {
-				if freePercent > 1.0 {
-					freePercent = freePercent / 100.0
-				}
-
-				datastore.FreeCapacityGB = int(float64(datastore.TotalCapacityGB) * freePercent)
-			}
 		}
 
-		// Ensure that the free capacity of the datastore does not exceed its total capacity.
-		// If FreeCapacityGB is greater than TotalCapacityGB, set FreeCapacityGB to TotalCapacityGB.
 		if datastore.FreeCapacityGB > datastore.TotalCapacityGB {
 			datastore.FreeCapacityGB = datastore.TotalCapacityGB
 		}
@@ -87,14 +63,120 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 		inventory.Infra.Datastores = append(inventory.Infra.Datastores, datastore)
 	}
 
+	zap.S().Named("rvtools").Infof("Processed %d datastores", len(inventory.Infra.Datastores))
 	return nil
 }
 
-func cleanNumericString(s string) string {
-	return strings.Map(func(r rune) rune {
-		if (r >= '0' && r <= '9') || r == '.' {
-			return r
+func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.Inventory) {
+	if len(inventory.Infra.Datastores) == 0 {
+		return
+	}
+
+	multipathInfo := extractMultipathInfo(multipathRows)
+
+	hasISCSIAdapter := hasISCSIHBA(hbaRows)
+
+	for i := range inventory.Infra.Datastores {
+		ds := &inventory.Infra.Datastores[i]
+		
+		if info, exists := multipathInfo[ds.DiskId]; exists {
+			ds.DiskId = info.NAA
+			
+			if info.Vendor != "" {
+				ds.Vendor = info.Vendor
+			}
+			if info.Model != "" {
+				ds.Model = info.Model
+			}
+
+			if strings.HasPrefix(info.NAA, "naa.") {
+				ds.ProtocolType = "iSCSI"
+			} else if strings.HasPrefix(info.NAA, "mpx.") {
+				ds.ProtocolType = "SAS"
+			}
+		} else {
+			if strings.ToUpper(ds.Type) == "NFS" {
+				ds.DiskId = "N/A"
+				ds.ProtocolType = "N/A"
+			} else if hasISCSIAdapter && strings.Contains(ds.DiskId, "naa.") {
+				ds.ProtocolType = "iSCSI"
+			}
 		}
-		return -1
-	}, s)
+	}
+}
+
+func extractMultipathInfo(multipathRows [][]string) map[string]struct {
+	NAA    string
+	Vendor string
+	Model  string
+} {
+	multipathInfo := make(map[string]struct {
+		NAA    string
+		Vendor string
+		Model  string
+	})
+
+	if len(multipathRows) <= 1 {
+		return multipathInfo
+	}
+
+	headers := multipathRows[0]
+	colMap := make(map[string]int)
+	for i, header := range headers {
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
+	}
+
+	for i := 1; i < len(multipathRows); i++ {
+		row := multipathRows[i]
+		if len(row) == 0 {
+			continue
+		}
+
+		datastoreName := getColumnValue(row, colMap, "datastore")
+		naaIdentifier := getColumnValue(row, colMap, "disk")
+		vendor := getColumnValue(row, colMap, "vendor")
+		model := getColumnValue(row, colMap, "model")
+
+		if datastoreName != "" && naaIdentifier != "" {
+			multipathInfo[datastoreName] = struct {
+				NAA    string
+				Vendor string
+				Model  string
+			}{
+				NAA:    naaIdentifier,
+				Vendor: vendor,
+				Model:  model,
+			}
+		}
+	}
+
+	return multipathInfo
+}
+
+func hasISCSIHBA(hbaRows [][]string) bool {
+	if len(hbaRows) <= 1 {
+		return false
+	}
+
+	headers := hbaRows[0]
+	colMap := make(map[string]int)
+	for i, header := range headers {
+		key := strings.ToLower(strings.TrimSpace(header))
+		colMap[key] = i
+	}
+
+	for i := 1; i < len(hbaRows); i++ {
+		row := hbaRows[i]
+		if len(row) == 0 {
+			continue
+		}
+
+		hbaType := getColumnValue(row, colMap, "type")
+		if hbaType == "ISCSI" {
+			return true
+		}
+	}
+
+	return false
 }
