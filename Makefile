@@ -26,6 +26,7 @@ PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
+OPA_SERVER ?= 127.0.0.1:8181
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
@@ -170,6 +171,7 @@ deploy-on-openshift: oc
 	oc process -f deploy/templates/s3-secret-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
+	   -p OPA_SERVER=$(OPA_SERVER) \
        -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
