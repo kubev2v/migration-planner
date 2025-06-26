@@ -9,6 +9,7 @@ import (
 
 type ImageInfra interface {
 	Create(ctx context.Context, imageInfra model.ImageInfra) (*model.ImageInfra, error)
+	Update(ctx context.Context, imageInfra model.ImageInfra) (*model.ImageInfra, error)
 }
 
 type ImageInfraStore struct {
@@ -24,6 +25,13 @@ func (i *ImageInfraStore) Create(ctx context.Context, image model.ImageInfra) (*
 		return nil, err
 	}
 
+	return &image, nil
+}
+
+func (i *ImageInfraStore) Update(ctx context.Context, image model.ImageInfra) (*model.ImageInfra, error) {
+	if err := i.getDB(ctx).WithContext(ctx).Save(&image).Error; err != nil {
+		return nil, err
+	}
 	return &image, nil
 }
 

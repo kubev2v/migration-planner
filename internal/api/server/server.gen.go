@@ -36,13 +36,16 @@ type ServerInterface interface {
 	GetSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/sources/{id})
-	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	UpdateSourceMetadata(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (HEAD /api/v1/sources/{id}/image)
 	HeadImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v1/sources/{id}/inventory)
+	UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -81,7 +84,7 @@ func (_ Unimplemented) GetSource(w http.ResponseWriter, r *http.Request, id open
 }
 
 // (PUT /api/v1/sources/{id})
-func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (_ Unimplemented) UpdateSourceMetadata(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -92,6 +95,11 @@ func (_ Unimplemented) HeadImage(w http.ResponseWriter, r *http.Request, id open
 
 // (GET /api/v1/sources/{id}/image-url)
 func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/sources/{id}/inventory)
+func (_ Unimplemented) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -224,8 +232,8 @@ func (siw *ServerInterfaceWrapper) GetSource(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// UpdateSource operation middleware
-func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.Request) {
+// UpdateSourceMetadata operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSourceMetadata(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -240,7 +248,7 @@ func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.R
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.UpdateSource(w, r, id)
+		siw.Handler.UpdateSourceMetadata(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -293,6 +301,32 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSourceDownloadURL(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdateSourceInventory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSourceInventory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSourceInventory(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -472,13 +506,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/sources/{id}", wrapper.GetSource)
 	})
 	r.Group(func(r chi.Router) {
-		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSource)
+		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSourceMetadata)
 	})
 	r.Group(func(r chi.Router) {
 		r.Head(options.BaseURL+"/api/v1/sources/{id}/image", wrapper.HeadImage)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/sources/{id}/image-url", wrapper.GetSourceDownloadURL)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory", wrapper.UpdateSourceInventory)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
@@ -718,63 +755,63 @@ func (response GetSource500JSONResponse) VisitGetSourceResponse(w http.ResponseW
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSourceRequestObject struct {
+type UpdateSourceMetadataRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
-	Body *UpdateSourceJSONRequestBody
+	Body *UpdateSourceMetadataJSONRequestBody
 }
 
-type UpdateSourceResponseObject interface {
-	VisitUpdateSourceResponse(w http.ResponseWriter) error
+type UpdateSourceMetadataResponseObject interface {
+	VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error
 }
 
-type UpdateSource200JSONResponse Source
+type UpdateSourceMetadata200JSONResponse Source
 
-func (response UpdateSource200JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata200JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSource400JSONResponse Error
+type UpdateSourceMetadata400JSONResponse Error
 
-func (response UpdateSource400JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata400JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSource401JSONResponse Error
+type UpdateSourceMetadata401JSONResponse Error
 
-func (response UpdateSource401JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata401JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSource403JSONResponse Error
+type UpdateSourceMetadata403JSONResponse Error
 
-func (response UpdateSource403JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata403JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSource404JSONResponse Error
+type UpdateSourceMetadata404JSONResponse Error
 
-func (response UpdateSource404JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata404JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateSource500JSONResponse Error
+type UpdateSourceMetadata500JSONResponse Error
 
-func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+func (response UpdateSourceMetadata500JSONResponse) VisitUpdateSourceMetadataResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -881,6 +918,69 @@ func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateSourceInventoryRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateSourceInventoryJSONRequestBody
+}
+
+type UpdateSourceInventoryResponseObject interface {
+	VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateSourceInventory200JSONResponse Source
+
+func (response UpdateSourceInventory200JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceInventory400JSONResponse Error
+
+func (response UpdateSourceInventory400JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceInventory401JSONResponse Error
+
+func (response UpdateSourceInventory401JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceInventory403JSONResponse Error
+
+func (response UpdateSourceInventory403JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceInventory404JSONResponse Error
+
+func (response UpdateSourceInventory404JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceInventory500JSONResponse Error
+
+func (response UpdateSourceInventory500JSONResponse) VisitUpdateSourceInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UploadRvtoolsFileRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *multipart.Reader
@@ -980,13 +1080,16 @@ type StrictServerInterface interface {
 	GetSource(ctx context.Context, request GetSourceRequestObject) (GetSourceResponseObject, error)
 
 	// (PUT /api/v1/sources/{id})
-	UpdateSource(ctx context.Context, request UpdateSourceRequestObject) (UpdateSourceResponseObject, error)
+	UpdateSourceMetadata(ctx context.Context, request UpdateSourceMetadataRequestObject) (UpdateSourceMetadataResponseObject, error)
 
 	// (HEAD /api/v1/sources/{id}/image)
 	HeadImage(ctx context.Context, request HeadImageRequestObject) (HeadImageResponseObject, error)
 
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(ctx context.Context, request GetSourceDownloadURLRequestObject) (GetSourceDownloadURLResponseObject, error)
+
+	// (PUT /api/v1/sources/{id}/inventory)
+	UpdateSourceInventory(ctx context.Context, request UpdateSourceInventoryRequestObject) (UpdateSourceInventoryResponseObject, error)
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
@@ -1157,13 +1260,13 @@ func (sh *strictHandler) GetSource(w http.ResponseWriter, r *http.Request, id op
 	}
 }
 
-// UpdateSource operation middleware
-func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request UpdateSourceRequestObject
+// UpdateSourceMetadata operation middleware
+func (sh *strictHandler) UpdateSourceMetadata(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateSourceMetadataRequestObject
 
 	request.Id = id
 
-	var body UpdateSourceJSONRequestBody
+	var body UpdateSourceMetadataJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
 		return
@@ -1171,18 +1274,18 @@ func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id
 	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.UpdateSource(ctx, request.(UpdateSourceRequestObject))
+		return sh.ssi.UpdateSourceMetadata(ctx, request.(UpdateSourceMetadataRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "UpdateSource")
+		handler = middleware(handler, "UpdateSourceMetadata")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(UpdateSourceResponseObject); ok {
-		if err := validResponse.VisitUpdateSourceResponse(w); err != nil {
+	} else if validResponse, ok := response.(UpdateSourceMetadataResponseObject); ok {
+		if err := validResponse.VisitUpdateSourceMetadataResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1235,6 +1338,39 @@ func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSourceDownloadURLResponseObject); ok {
 		if err := validResponse.VisitGetSourceDownloadURLResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSourceInventory operation middleware
+func (sh *strictHandler) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateSourceInventoryRequestObject
+
+	request.Id = id
+
+	var body UpdateSourceInventoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSourceInventory(ctx, request.(UpdateSourceInventoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSourceInventory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSourceInventoryResponseObject); ok {
+		if err := validResponse.VisitUpdateSourceInventoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

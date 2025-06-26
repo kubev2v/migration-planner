@@ -149,10 +149,19 @@ type SourceCreate struct {
 // SourceList defines model for SourceList.
 type SourceList = []Source
 
-// SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
-type SourceUpdateOnPrem struct {
+// SourceUpdateInventory defines model for SourceUpdateInventory.
+type SourceUpdateInventory struct {
 	AgentId   openapi_types.UUID `json:"agentId"`
 	Inventory Inventory          `json:"inventory"`
+}
+
+// SourceUpdateMetadata defines model for SourceUpdateMetadata.
+type SourceUpdateMetadata struct {
+	CertificateChain *string     `json:"certificateChain,omitempty"`
+	Labels           *[]Label    `json:"labels,omitempty"`
+	Name             *string     `json:"name,omitempty"`
+	Proxy            *AgentProxy `json:"proxy,omitempty"`
+	SshPublicKey     *string     `json:"sshPublicKey,omitempty"`
 }
 
 // Status Status is a return value for calls that don't return other objects.
@@ -220,8 +229,11 @@ type UploadRvtoolsFileMultipartBody struct {
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
-// UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
-type UpdateSourceJSONRequestBody = SourceUpdateOnPrem
+// UpdateSourceMetadataJSONRequestBody defines body for UpdateSourceMetadata for application/json ContentType.
+type UpdateSourceMetadataJSONRequestBody = SourceUpdateMetadata
+
+// UpdateSourceInventoryJSONRequestBody defines body for UpdateSourceInventory for application/json ContentType.
+type UpdateSourceInventoryJSONRequestBody = SourceUpdateInventory
 
 // UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
 type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody

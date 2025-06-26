@@ -108,16 +108,21 @@ type ClientInterface interface {
 	// GetSource request
 	GetSource(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSourceWithBody request with any body
-	UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// UpdateSourceMetadataWithBody request with any body
+	UpdateSourceMetadataWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+	UpdateSourceMetadata(ctx context.Context, id openapi_types.UUID, body UpdateSourceMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// HeadImage request
 	HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSourceDownloadURL request
 	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSourceInventoryWithBody request with any body
+	UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadRvtoolsFileWithBody request with any body
 	UploadRvtoolsFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -198,8 +203,8 @@ func (c *Client) GetSource(ctx context.Context, id openapi_types.UUID, reqEditor
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSourceRequestWithBody(c.Server, id, contentType, body)
+func (c *Client) UpdateSourceMetadataWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceMetadataRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -210,8 +215,8 @@ func (c *Client) UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID
 	return c.Client.Do(req)
 }
 
-func (c *Client) UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewUpdateSourceRequest(c.Server, id, body)
+func (c *Client) UpdateSourceMetadata(ctx context.Context, id openapi_types.UUID, body UpdateSourceMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceMetadataRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +241,30 @@ func (c *Client) HeadImage(ctx context.Context, id openapi_types.UUID, reqEditor
 
 func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSourceDownloadURLRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceInventoryRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceInventoryRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -454,19 +483,19 @@ func NewGetSourceRequest(server string, id openapi_types.UUID) (*http.Request, e
 	return req, nil
 }
 
-// NewUpdateSourceRequest calls the generic UpdateSource builder with application/json body
-func NewUpdateSourceRequest(server string, id openapi_types.UUID, body UpdateSourceJSONRequestBody) (*http.Request, error) {
+// NewUpdateSourceMetadataRequest calls the generic UpdateSourceMetadata builder with application/json body
+func NewUpdateSourceMetadataRequest(server string, id openapi_types.UUID, body UpdateSourceMetadataJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
 	buf, err := json.Marshal(body)
 	if err != nil {
 		return nil, err
 	}
 	bodyReader = bytes.NewReader(buf)
-	return NewUpdateSourceRequestWithBody(server, id, "application/json", bodyReader)
+	return NewUpdateSourceMetadataRequestWithBody(server, id, "application/json", bodyReader)
 }
 
-// NewUpdateSourceRequestWithBody generates requests for UpdateSource with any type of body
-func NewUpdateSourceRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+// NewUpdateSourceMetadataRequestWithBody generates requests for UpdateSourceMetadata with any type of body
+func NewUpdateSourceMetadataRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -565,6 +594,53 @@ func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateSourceInventoryRequest calls the generic UpdateSourceInventory builder with application/json body
+func NewUpdateSourceInventoryRequest(server string, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSourceInventoryRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateSourceInventoryRequestWithBody generates requests for UpdateSourceInventory with any type of body
+func NewUpdateSourceInventoryRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/inventory", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -692,16 +768,21 @@ type ClientWithResponsesInterface interface {
 	// GetSourceWithResponse request
 	GetSourceWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceResponse, error)
 
-	// UpdateSourceWithBodyWithResponse request with any body
-	UpdateSourceWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
+	// UpdateSourceMetadataWithBodyWithResponse request with any body
+	UpdateSourceMetadataWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceMetadataResponse, error)
 
-	UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
+	UpdateSourceMetadataWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceMetadataResponse, error)
 
 	// HeadImageWithResponse request
 	HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error)
 
 	// GetSourceDownloadURLWithResponse request
 	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
+
+	// UpdateSourceInventoryWithBodyWithResponse request with any body
+	UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
+
+	UpdateSourceInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
 
 	// UploadRvtoolsFileWithBodyWithResponse request with any body
 	UploadRvtoolsFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsFileResponse, error)
@@ -836,7 +917,7 @@ func (r GetSourceResponse) StatusCode() int {
 	return 0
 }
 
-type UpdateSourceResponse struct {
+type UpdateSourceMetadataResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *Source
@@ -848,7 +929,7 @@ type UpdateSourceResponse struct {
 }
 
 // Status returns HTTPResponse.Status
-func (r UpdateSourceResponse) Status() string {
+func (r UpdateSourceMetadataResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -856,7 +937,7 @@ func (r UpdateSourceResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r UpdateSourceResponse) StatusCode() int {
+func (r UpdateSourceMetadataResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -903,6 +984,33 @@ func (r GetSourceDownloadURLResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetSourceDownloadURLResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateSourceInventoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Source
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSourceInventoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSourceInventoryResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1012,21 +1120,21 @@ func (c *ClientWithResponses) GetSourceWithResponse(ctx context.Context, id open
 	return ParseGetSourceResponse(rsp)
 }
 
-// UpdateSourceWithBodyWithResponse request with arbitrary body returning *UpdateSourceResponse
-func (c *ClientWithResponses) UpdateSourceWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error) {
-	rsp, err := c.UpdateSourceWithBody(ctx, id, contentType, body, reqEditors...)
+// UpdateSourceMetadataWithBodyWithResponse request with arbitrary body returning *UpdateSourceMetadataResponse
+func (c *ClientWithResponses) UpdateSourceMetadataWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceMetadataResponse, error) {
+	rsp, err := c.UpdateSourceMetadataWithBody(ctx, id, contentType, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateSourceResponse(rsp)
+	return ParseUpdateSourceMetadataResponse(rsp)
 }
 
-func (c *ClientWithResponses) UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error) {
-	rsp, err := c.UpdateSource(ctx, id, body, reqEditors...)
+func (c *ClientWithResponses) UpdateSourceMetadataWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceMetadataJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceMetadataResponse, error) {
+	rsp, err := c.UpdateSourceMetadata(ctx, id, body, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseUpdateSourceResponse(rsp)
+	return ParseUpdateSourceMetadataResponse(rsp)
 }
 
 // HeadImageWithResponse request returning *HeadImageResponse
@@ -1045,6 +1153,23 @@ func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseGetSourceDownloadURLResponse(rsp)
+}
+
+// UpdateSourceInventoryWithBodyWithResponse request with arbitrary body returning *UpdateSourceInventoryResponse
+func (c *ClientWithResponses) UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error) {
+	rsp, err := c.UpdateSourceInventoryWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceInventoryResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSourceInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error) {
+	rsp, err := c.UpdateSourceInventory(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceInventoryResponse(rsp)
 }
 
 // UploadRvtoolsFileWithBodyWithResponse request with arbitrary body returning *UploadRvtoolsFileResponse
@@ -1307,15 +1432,15 @@ func ParseGetSourceResponse(rsp *http.Response) (*GetSourceResponse, error) {
 	return response, nil
 }
 
-// ParseUpdateSourceResponse parses an HTTP response from a UpdateSourceWithResponse call
-func ParseUpdateSourceResponse(rsp *http.Response) (*UpdateSourceResponse, error) {
+// ParseUpdateSourceMetadataResponse parses an HTTP response from a UpdateSourceMetadataWithResponse call
+func ParseUpdateSourceMetadataResponse(rsp *http.Response) (*UpdateSourceMetadataResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &UpdateSourceResponse{
+	response := &UpdateSourceMetadataResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
@@ -1425,6 +1550,67 @@ func ParseGetSourceDownloadURLResponse(rsp *http.Response) (*GetSourceDownloadUR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSourceInventoryResponse parses an HTTP response from a UpdateSourceInventoryWithResponse call
+func ParseUpdateSourceInventoryResponse(rsp *http.Response) (*UpdateSourceInventoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSourceInventoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Source
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

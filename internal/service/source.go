@@ -138,19 +138,29 @@ func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 	return server.DeleteSource200JSONResponse{}, nil
 }
 
-func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
+func (h *ServiceHandler) UpdateSourceInventory(ctx context.Context, request server.UpdateSourceInventoryRequestObject) (server.UpdateSourceInventoryResponseObject, error) {
 	ctx, err := h.store.NewTransactionContext(ctx)
 	if err != nil {
-		return server.UpdateSource404JSONResponse{}, nil
+		return server.UpdateSourceInventory404JSONResponse{}, nil
 	}
 
 	source, err := h.store.Source().Get(ctx, request.Id)
 	if err != nil {
-		return server.UpdateSource400JSONResponse{}, nil
+		return server.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
 	if source == nil {
-		return server.UpdateSource404JSONResponse{}, nil
+		return server.UpdateSourceInventory404JSONResponse{}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if source.OrgID != user.Organization {
+		return server.UpdateSourceInventory403JSONResponse{}, nil
+	}
+
+	if source.VCenterID != "" && source.VCenterID != request.Body.Inventory.Vcenter.Id {
+		_, _ = store.Rollback(ctx)
+		return server.UpdateSourceInventory400JSONResponse{}, nil
 	}
 
 	// create the agent if missing
@@ -165,32 +175,114 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 	if agent == nil {
 		newAgent := model.NewAgentForSource(uuid.New(), *source)
 		if _, err := h.store.Agent().Create(ctx, newAgent); err != nil {
-			return server.UpdateSource500JSONResponse{}, nil
+			return server.UpdateSourceInventory500JSONResponse{}, nil
 		}
-	}
-
-	user := auth.MustHaveUser(ctx)
-	if source.OrgID != user.Organization {
-		return server.UpdateSource403JSONResponse{}, nil
-	}
-
-	if source.VCenterID != "" && source.VCenterID != request.Body.Inventory.Vcenter.Id {
-		_, _ = store.Rollback(ctx)
-		return server.UpdateSource400JSONResponse{}, nil
 	}
 
 	source = mappers.UpdateSourceOnPrem(source, request.Body.Inventory)
 
 	if _, err = h.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)
-		return server.UpdateSource500JSONResponse{}, nil
+		return server.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
-		return server.UpdateSource500JSONResponse{}, nil
+		return server.UpdateSourceInventory500JSONResponse{}, nil
 	}
 
-	return server.UpdateSource200JSONResponse{}, nil
+	return server.UpdateSourceInventory200JSONResponse{}, nil
+}
+
+func (h *ServiceHandler) UpdateSourceMetadata(ctx context.Context, request server.UpdateSourceMetadataRequestObject) (server.UpdateSourceMetadataResponseObject, error) {
+	if request.Body == nil {
+		return server.UpdateSourceMetadata400JSONResponse{Message: "There is nothing to update"}, nil
+	}
+
+	ctx, err := h.store.NewTransactionContext(ctx)
+	if err != nil {
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to start transaction: " + err.Error()}, nil
+	}
+
+	source, err := h.store.Source().Get(ctx, request.Id)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.UpdateSourceMetadata404JSONResponse{Message: "Source not found"}, nil
+		}
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to get source: " + err.Error()}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if source.OrgID != user.Organization {
+		_, _ = store.Rollback(ctx)
+		return server.UpdateSourceMetadata403JSONResponse{Message: "Forbidden"}, nil
+	}
+
+	// Update source basic fields
+	if request.Body.Name != nil {
+		source.Name = *request.Body.Name
+	}
+
+	// Update labels if provided
+	if request.Body.Labels != nil {
+		// Convert API labels to model labels using the mapper
+		labels := mappers.LabelsFromApi(source.ID, request.Body.Labels)
+
+		// Update labels using the new UpdateLabels function
+		if err := h.store.Label().UpdateLabels(ctx, source.ID, labels); err != nil {
+			_, _ = store.Rollback(ctx)
+			return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to update labels: " + err.Error()}, nil
+		}
+		source.Labels = labels
+	}
+
+	// Update image infrastructure if any related fields are provided
+	if request.Body.SshPublicKey != nil || request.Body.CertificateChain != nil || request.Body.Proxy != nil {
+		imageInfra := source.ImageInfra
+
+		if request.Body.SshPublicKey != nil {
+			imageInfra.SshPublicKey = *request.Body.SshPublicKey
+		}
+		if request.Body.CertificateChain != nil {
+			imageInfra.CertificateChain = *request.Body.CertificateChain
+		}
+		if request.Body.Proxy != nil {
+			if request.Body.Proxy.HttpUrl != nil {
+				imageInfra.HttpProxyUrl = *request.Body.Proxy.HttpUrl
+			}
+			if request.Body.Proxy.HttpsUrl != nil {
+				imageInfra.HttpsProxyUrl = *request.Body.Proxy.HttpsUrl
+			}
+			if request.Body.Proxy.NoProxy != nil {
+				imageInfra.NoProxyDomains = *request.Body.Proxy.NoProxy
+			}
+		}
+
+		updatedImageInfra, err := h.store.ImageInfra().Update(ctx, imageInfra)
+		if err != nil {
+			_, _ = store.Rollback(ctx)
+			return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to update image infrastructure: " + err.Error()}, nil
+		}
+		source.ImageInfra = *updatedImageInfra
+	}
+
+	// Update source
+	if _, updateErr := h.store.Source().Update(ctx, *source); updateErr != nil {
+		_, _ = store.Rollback(ctx)
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to update source metadata: " + updateErr.Error()}, nil
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to commit transaction: " + err.Error()}, nil
+	}
+
+	// Fetch the source again with updated labels after commit
+	finalSource, err := h.store.Source().Get(context.Background(), request.Id)
+	if err != nil {
+		return server.UpdateSourceMetadata500JSONResponse{Message: "Failed to fetch updated source: " + err.Error()}, nil
+	}
+
+	return server.UpdateSourceMetadata200JSONResponse(mappers.SourceToApi(*finalSource)), nil
 }
 
 func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.UploadRvtoolsFileRequestObject) (server.UploadRvtoolsFileResponseObject, error) {
