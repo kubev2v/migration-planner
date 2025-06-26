@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/internal/reports"
 	"go.uber.org/zap"
 )
 
@@ -306,4 +308,70 @@ func (h *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request server.U
 	}
 
 	return server.UploadRvtoolsFile200JSONResponse{}, nil
+}
+
+func (h *ServiceHandler) GenerateSourceReport(ctx context.Context, request server.GenerateSourceReportRequestObject) (server.GenerateSourceReportResponseObject, error) {
+    source, err := h.store.Source().Get(ctx, request.Id)
+    if err != nil {
+        if errors.Is(err, store.ErrRecordNotFound) {
+            return server.GenerateSourceReport404JSONResponse{}, nil
+        }
+        return server.GenerateSourceReport500JSONResponse{}, nil
+    }
+
+    user := auth.MustHaveUser(ctx)
+    if user.Organization != source.OrgID {
+        return server.GenerateSourceReport403JSONResponse{}, nil
+    }
+
+    format := string(request.Params.Format)
+
+    validFormats := map[string]bool{"csv": true, "html": true}
+    if !validFormats[format] {
+        return server.GenerateSourceReport400JSONResponse{
+            Message: "Invalid format. Supported formats: csv, html",
+        }, nil
+    }
+
+    reportType := "summary"
+    if request.Params.ReportType != nil {
+        reportType = string(*request.Params.ReportType)
+    }
+
+    includeWarnings := true
+    if request.Params.IncludeWarnings != nil {
+        includeWarnings = *request.Params.IncludeWarnings
+    }
+
+    zap.S().Infof("Generating %s report for source %s in %s format with warnings=%v", 
+        reportType, request.Id, format, includeWarnings)
+
+    switch format {
+    case "csv":
+		csvContent, err := reports.GenerateCSVContent(source, reportType, includeWarnings)
+		if err != nil {
+			return server.GenerateSourceReport500JSONResponse{
+				Message: fmt.Sprintf("Failed to generate CSV report: %v", err),
+			}, nil
+		}
+		return server.GenerateSourceReport200TextcsvResponse{
+			Body: strings.NewReader(csvContent),
+		}, nil
+
+    case "html":
+		htmlContent, err := reports.GenerateHTMLContent(source, reportType, includeWarnings)
+		if err != nil {
+			return server.GenerateSourceReport500JSONResponse{
+				Message: fmt.Sprintf("Failed to generate HTML report: %v", err),
+			}, nil
+		}
+		return server.GenerateSourceReport200TexthtmlResponse{
+			Body: strings.NewReader(htmlContent),
+		}, nil
+
+    default:
+        return server.GenerateSourceReport400JSONResponse{
+            Message: "Unsupported format",
+        }, nil
+    }
 }
