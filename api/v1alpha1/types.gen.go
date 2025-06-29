@@ -109,6 +109,7 @@ type Label struct {
 type MigrationIssue struct {
 	Assessment string `json:"assessment"`
 	Count      int    `json:"count"`
+	Id         string `json:"id"`
 	Label      string `json:"label"`
 }
 

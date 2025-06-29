@@ -740,10 +740,13 @@ components:
     MigrationIssue:
       type: object
       required:
+      - id
       - label
       - assessment
       - count
       properties:
+        id:
+          type: string
         label:
           type: string
         assessment:
