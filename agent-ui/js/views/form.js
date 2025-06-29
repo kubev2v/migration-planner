@@ -6,14 +6,15 @@ import FormStates from "../commons/states.js";
 import InfoDiscovery from "../components/info.js";
 
 export default class FormView extends Observable {
-    constructor(store, formElement, btnElement) {
+    constructor(store, formElement, btnElement, infoView) {
         super({
             store: store,
-        })
+        });
 
         let self = this;
         self.formElement = formElement;
         self.btnElement = btnElement;
+        self.infoView = infoView;
     }
 
     clean() {
@@ -35,11 +36,13 @@ export default class FormView extends Observable {
                     window.open(
                         window.location.origin + "/api/v1/inventory",
                         "_blank"
-                    )
+                    );
                 },
                 goBackBtnCallback: () => {
-                    const serviceUrl = self.store.state.url || "http://localhost:3000/migrate/wizard";
-                    window.open(serviceUrl, '_blank', 'noopener,noreferrer');
+                    const serviceUrl =
+                        self.store.state.url ||
+                        "http://localhost:3000/migrate/wizard";
+                    window.open(serviceUrl, "_blank", "noopener,noreferrer");
                 },
             }).render();
 
@@ -51,10 +54,13 @@ export default class FormView extends Observable {
         // render login form
         const form = new LoginForm({
             dataSharingEnabled: self.store.state.dataSharingAccepted,
-            disabled: self.store.state.requestPending || self.store.state.formState == FormStates.CredentialsAccepted || self.store.state.formState == FormStates.GatheringInventory,
+            disabled:
+                self.store.state.requestPending ||
+                self.store.state.formState == FormStates.CredentialsAccepted ||
+                self.store.state.formState == FormStates.GatheringInventory,
             enableDataSharingCallback: (elem) => {
                 self.store.dispatch("enableDataSharing", {
-                    enabled: elem.checked
+                    enabled: elem.checked,
                 });
             },
             credentials: self.store.state.creds,
@@ -67,8 +73,9 @@ export default class FormView extends Observable {
 
         let msg = "Log in...";
         switch (self.store.state.formState) {
-            case FormStates.CredentialsAccepted || FormStates.GatheringInventory:
-                msg = "Gathering inventory..."
+            case FormStates.CredentialsAccepted ||
+                FormStates.GatheringInventory:
+                msg = "Gathering inventory...";
                 break;
             default:
                 "Log in...";
@@ -85,33 +92,47 @@ export default class FormView extends Observable {
                     return false;
                 }
 
-                return self.store.state.formState != FormStates.CredentialsAccepted && self.store.state.formState != FormStates.GatheringInventory
+                return (
+                    self.store.state.formState !=
+                        FormStates.CredentialsAccepted &&
+                    self.store.state.formState != FormStates.GatheringInventory
+                );
             },
-            spinnerEnabled: self.store.state.requestPending || self.store.state.formState == FormStates.CredentialsAccepted || self.store.state.formState == FormStates.GatheringInventory,
+            spinnerEnabled:
+                self.store.state.requestPending ||
+                self.store.state.formState == FormStates.CredentialsAccepted ||
+                self.store.state.formState == FormStates.GatheringInventory,
             postCallback: () => {
                 const credentials = {
-                    url: form.elements['url'].value,
-                    username: form.elements['username'].value,
-                    password: form.elements['password'].value,
-                }
-                self.store.dispatch('formCredentials', credentials);
+                    url: form.elements["url"].value,
+                    username: form.elements["username"].value,
+                    password: form.elements["password"].value,
+                };
+                self.store.dispatch("formCredentials", credentials);
 
-
-                const reUrl = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-./?%&=]*)?$/
+                const reUrl =
+                    /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w-./?%&=]*)?$/;
                 if (!reUrl.test(credentials.url)) {
-                    self.store.dispatch('formValidation', { valid: false, element: "url" });
-                    return
+                    self.store.dispatch("formValidation", {
+                        valid: false,
+                        element: "url",
+                    });
+                    return;
                 }
 
                 // validate the form first
-                const reEmail = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/i;
+                const reEmail =
+                    /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/i;
                 if (!reEmail.test(credentials.username)) {
-                    self.store.dispatch('formValidation', { valid: false, element: "username" });
-                    return
+                    self.store.dispatch("formValidation", {
+                        valid: false,
+                        element: "username",
+                    });
+                    return;
                 }
 
                 // post them
-                self.store.dispatch('postCredentials', {
+                self.store.dispatch("postCredentials", {
                     ...credentials,
                     isDataSharingAllowed: self.store.state.dataSharingAccepted,
                 });
