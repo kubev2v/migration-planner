@@ -40,7 +40,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("successfully validate the token -- no orgID", func() {
-			sToken, keyFn := generateCustomToken("user@company.com", nil)
+			sToken, keyFn := generateCustomToken("user@company.com", "", "")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -51,7 +51,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("failed validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("user@", nil)
+			sToken, keyFn := generateCustomToken("user@", "", "")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -60,13 +60,23 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("successfully validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("@user", nil)
+			sToken, keyFn := generateCustomToken("@user", "", "")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
 			user, err := authenticator.Authenticate(sToken)
 			Expect(err).To(BeNil())
 			Expect(user.Organization).To(Equal("user"))
+		})
+
+		It("successfully validate the token -- username is the email", func() {
+			sToken, keyFn := generateCustomToken("user", "org_id", "user@example.com")
+			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
+			Expect(err).To(BeNil())
+
+			user, err := authenticator.Authenticate(sToken)
+			Expect(err).To(BeNil())
+			Expect(user.Username).To(Equal("user@example.com"))
 		})
 	})
 	Context("rh auth middleware", func() {
@@ -226,22 +236,19 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 	}
 }
 
-func generateCustomToken(username string, orgID *string) (string, func(t *jwt.Token) (any, error)) {
+func generateCustomToken(username string, orgID string, email string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
 		Username string `json:"preferred_username"`
 		OrgID    string `json:"org_id,omitempty"`
+		Email    string `json:"email,omitempty"`
 		jwt.RegisteredClaims
-	}
-
-	o := ""
-	if orgID != nil {
-		o = *orgID
 	}
 
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		username,
-		o,
+		orgID,
+		email,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
