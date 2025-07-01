@@ -418,4 +418,83 @@ var _ = Describe("source store", Ordered, func() {
 			gormdb.Exec("DELETE from sources;")
 		})
 	})
+
+	Context("user information", Ordered, func() {
+		It("should have user information", func() {
+			sourceID := uuid.New()
+			m := model.Source{
+				ID:       sourceID,
+				Username: "admin",
+				OrgID:    "org",
+				User: &model.User{
+					Username:     "admin",
+					FirstName:    "Admin",
+					LastName:     "LastName",
+					Organization: "AdminOrganization",
+				},
+			}
+			source, err := s.Source().Create(context.TODO(), m)
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+
+			var count int
+			tx := gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM users;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			user := model.User{}
+			tx = gormdb.Raw("SELECT * FROM users LIMIT 1;").Scan(&user)
+			Expect(tx.Error).To(BeNil())
+			Expect(user.Username).To(Equal("admin"))
+			Expect(user.Organization).To(Equal("AdminOrganization"))
+			Expect(user.FirstName).To(Equal("Admin"))
+			Expect(user.LastName).To(Equal("LastName"))
+		})
+
+		It("list sources -- should have user information", func() {
+			insertUserStm := "INSERT INTO USERS VALUES ('%s','%s','%s','%s');"
+			tx := gormdb.Exec(fmt.Sprintf(insertUserStm, "admin", "FirstName", "LastName", "AdminOrganization"))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO sources (id, name, username, org_id, user_id) VALUES ('%s', '%s', '%s', '%s', '%s');", uuid.New(), "name", "admin", "admin_org", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			sources, err := s.Source().List(context.TODO(), store.NewSourceQueryFilter())
+			Expect(err).To(BeNil())
+			Expect(sources).To(HaveLen(1))
+
+			Expect(sources[0].User.Username).To(Equal("admin"))
+			Expect(sources[0].User.Organization).To(Equal("AdminOrganization"))
+			Expect(sources[0].User.FirstName).To(Equal("FirstName"))
+			Expect(sources[0].User.LastName).To(Equal("LastName"))
+		})
+
+		It("get source -- should have user information", func() {
+			insertUserStm := "INSERT INTO USERS VALUES ('%s','%s','%s','%s');"
+			tx := gormdb.Exec(fmt.Sprintf(insertUserStm, "admin", "FirstName", "LastName", "AdminOrganization"))
+			Expect(tx.Error).To(BeNil())
+
+			sourceID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO sources (id, name, username, org_id, user_id) VALUES ('%s', '%s', '%s', '%s', '%s');", sourceID, "name", "admin", "admin_org", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			source, err := s.Source().Get(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+
+			Expect(source.User.Username).To(Equal("admin"))
+			Expect(source.User.Organization).To(Equal("AdminOrganization"))
+			Expect(source.User.FirstName).To(Equal("FirstName"))
+			Expect(source.User.LastName).To(Equal("LastName"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE from sources;")
+			gormdb.Exec("DELETE from users;")
+		})
+	})
 })

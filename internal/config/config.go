@@ -31,6 +31,7 @@ type svcConfig struct {
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 	S3                   S3
+	EnableOCMClient      bool `envconfig:"MIGRATION_PLANNER_ENABLE_OCM_CLIENT" default:"false"`
 }
 
 type Auth struct {

@@ -16,12 +16,14 @@ import (
 )
 
 type ServiceHandler struct {
-	sourceSrv *service.SourceService
+	sourceSrv   *service.SourceService
+	userInfoSrv *service.UserInformationService
 }
 
-func NewServiceHandler(sourceService *service.SourceService) *ServiceHandler {
+func NewServiceHandler(sourceService *service.SourceService, userInfoSrv *service.UserInformationService) *ServiceHandler {
 	return &ServiceHandler{
-		sourceSrv: sourceService,
+		sourceSrv:   sourceService,
+		userInfoSrv: userInfoSrv,
 	}
 }
 
@@ -59,9 +61,18 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request apiServer.Cre
 	}
 
 	user := auth.MustHaveUser(ctx)
+
+	organization, err := s.userInfoSrv.GetOrganization(ctx, user.Token)
+	if err != nil {
+		return apiServer.CreateSource500JSONResponse{Message: "failed to get user information from ocm"}, nil
+	}
+
 	sourceCreateForm := mappers.SourceFormApi(form)
 	sourceCreateForm.Username = user.Username
 	sourceCreateForm.OrgID = user.Organization
+	sourceCreateForm.Organization = organization
+	sourceCreateForm.UserFirstName = user.FirstName
+	sourceCreateForm.UserLastName = user.LastName
 
 	source, err := s.sourceSrv.CreateSource(ctx, sourceCreateForm)
 	if err != nil {

@@ -37,7 +37,11 @@ func NewSource(db *gorm.DB) Source {
 
 func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error) {
 	var sources model.SourceList
-	tx := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents").Preload("ImageInfra").Preload("Labels")
+	tx := s.getDB(ctx).Model(&sources).Order("id").
+		Preload("Agents").
+		Preload("ImageInfra").
+		Preload("Labels").
+		Preload("User")
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -68,7 +72,12 @@ func (s *SourceStore) DeleteAll(ctx context.Context) error {
 
 func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, error) {
 	source := model.Source{ID: id}
-	result := s.getDB(ctx).Preload("Agents").Preload("ImageInfra").Preload("Labels").First(&source)
+	result := s.getDB(ctx).
+		Preload("Agents").
+		Preload("ImageInfra").
+		Preload("Labels").
+		Preload("User").
+		First(&source)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrRecordNotFound

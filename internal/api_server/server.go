@@ -21,6 +21,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
+	"github.com/kubev2v/migration-planner/pkg/ocm"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
 )
@@ -102,7 +103,16 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
-	h := handlers.NewServiceHandler(service.NewSourceService(s.store))
+	userInfoSrv := service.NewLocalUserInformationService()
+	if s.cfg.Service.EnableOCMClient {
+		ocmClient, err := ocm.NewClient()
+		if err != nil {
+			return fmt.Errorf("failed to create ocm client: %w", err)
+		}
+		userInfoSrv = service.NewUserInformationService(ocmClient)
+	}
+
+	h := handlers.NewServiceHandler(service.NewSourceService(s.store), userInfoSrv)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

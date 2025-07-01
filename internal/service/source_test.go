@@ -11,6 +11,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -142,9 +143,85 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(count).To(Equal(1))
 		})
 
+		It("successfully creates a source -- with user information", func() {
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
+				Username:         "admin",
+				OrgID:            "admin",
+				Name:             "test",
+				CertificateChain: "chain",
+				UserFirstName:    "admin",
+				UserLastName:     "admin",
+				Organization:     "AdminOrganization",
+			})
+			Expect(err).To(BeNil())
+			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM users;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			um := model.User{}
+			tx = gormdb.Raw("SELECT * FROM users LIMIT 1;").Scan(&um)
+			Expect(tx.Error).To(BeNil())
+			Expect(um.FirstName).To(Equal("admin"))
+			Expect(um.LastName).To(Equal("admin"))
+			Expect(um.Organization).To(Equal("AdminOrganization"))
+		})
+
+		It("successfully creates 2 sources -- with the same user information", func() {
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
+				Username:         "admin",
+				OrgID:            "admin",
+				Name:             "test",
+				CertificateChain: "chain",
+				UserFirstName:    "admin",
+				UserLastName:     "admin",
+				Organization:     "AdminOrganization",
+			})
+			Expect(err).To(BeNil())
+			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM users;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			um := model.User{}
+			tx = gormdb.Raw("SELECT * FROM users LIMIT 1;").Scan(&um)
+			Expect(tx.Error).To(BeNil())
+			Expect(um.FirstName).To(Equal("admin"))
+			Expect(um.LastName).To(Equal("admin"))
+			Expect(um.Organization).To(Equal("AdminOrganization"))
+
+			source, err = srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
+				Username:         "admin",
+				OrgID:            "admin",
+				Name:             "test2",
+				CertificateChain: "chain",
+				UserFirstName:    "admin",
+				UserLastName:     "admin",
+				Organization:     "AdminOrganization",
+			})
+			Expect(err).To(BeNil())
+
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM users;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE FROM users;")
 		})
 	})
 
