@@ -101,8 +101,8 @@ type Inventory struct {
 
 // Label defines model for Label.
 type Label struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `json:"key" validate:"required,label"`
+	Value string `json:"value" validate:"required,label"`
 }
 
 // MigrationIssue defines model for MigrationIssue.

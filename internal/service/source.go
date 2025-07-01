@@ -140,17 +140,13 @@ func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form map
 		return nil, err
 	}
 
-	// Update source basic fields
 	if form.Name != nil {
 		source.Name = *form.Name
 	}
 
-	// Update labels if provided
 	if form.Labels != nil {
-		// Convert API labels to model labels using the mapper
 		labels := mappers.LabelsFromApi(source.ID, form.Labels)
 
-		// Update labels using the new UpdateLabels function
 		if err := s.store.Label().UpdateLabels(ctx, source.ID, labels); err != nil {
 			_, _ = store.Rollback(ctx)
 			return nil, err
@@ -158,38 +154,35 @@ func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form map
 		source.Labels = labels
 	}
 
-	// Update image infrastructure if any related fields are provided
-	if form.SshPublicKey != nil || form.CertificateChain != nil || form.Proxy != nil {
-		imageInfra := source.ImageInfra
+	imageInfra := source.ImageInfra
 
-		if form.SshPublicKey != nil {
-			imageInfra.SshPublicKey = *form.SshPublicKey
+	if form.SshPublicKey != nil {
+		imageInfra.SshPublicKey = *form.SshPublicKey
+	}
+	if form.CertificateChain != nil {
+		imageInfra.CertificateChain = *form.CertificateChain
+	}
+	if form.Proxy != nil {
+		if form.Proxy.HttpUrl != nil {
+			imageInfra.HttpProxyUrl = *form.Proxy.HttpUrl
 		}
-		if form.CertificateChain != nil {
-			imageInfra.CertificateChain = *form.CertificateChain
+		if form.Proxy.HttpsUrl != nil {
+			imageInfra.HttpsProxyUrl = *form.Proxy.HttpsUrl
 		}
-		if form.Proxy != nil {
-			if form.Proxy.HttpUrl != nil {
-				imageInfra.HttpProxyUrl = *form.Proxy.HttpUrl
-			}
-			if form.Proxy.HttpsUrl != nil {
-				imageInfra.HttpsProxyUrl = *form.Proxy.HttpsUrl
-			}
-			if form.Proxy.NoProxy != nil {
-				imageInfra.NoProxyDomains = *form.Proxy.NoProxy
-			}
+		if form.Proxy.NoProxy != nil {
+			imageInfra.NoProxyDomains = *form.Proxy.NoProxy
 		}
-
-		updatedImageInfra, err := s.store.ImageInfra().Update(ctx, imageInfra)
-		if err != nil {
-			_, _ = store.Rollback(ctx)
-			return nil, err
-		}
-		source.ImageInfra = *updatedImageInfra
 	}
 
-	// Update source
-	if _, updateErr := s.store.Source().Update(ctx, *source); updateErr != nil {
+	updatedImageInfra, err := s.store.ImageInfra().Update(ctx, imageInfra)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		return nil, err
+	}
+	source.ImageInfra = *updatedImageInfra
+
+	updatedSource, updateErr := s.store.Source().Update(ctx, *source)
+	if updateErr != nil {
 		_, _ = store.Rollback(ctx)
 		return nil, updateErr
 	}
@@ -198,13 +191,7 @@ func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form map
 		return nil, err
 	}
 
-	// Fetch the source again with updated labels after commit
-	finalSource, err := s.store.Source().Get(context.Background(), id)
-	if err != nil {
-		return nil, err
-	}
-
-	return finalSource, nil
+	return updatedSource, nil
 }
 
 func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.InventoryUpdateForm) (model.Source, error) {

@@ -505,6 +505,13 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
+			// Create initial image_infra record
+			initialImageInfra := model.ImageInfra{
+				SourceID: uuid.MustParse(sourceID),
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",

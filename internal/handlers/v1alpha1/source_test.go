@@ -496,6 +496,64 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 	})
 
+	Context("update source", func() {
+		It("fails to update source with invalid label key", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			invalidLabels := []v1alpha1.Label{
+				{Key: "-invalid-key", Value: "valid-value"},
+			}
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: sourceID,
+				Body: &v1alpha1.SourceUpdate{
+					Labels: &invalidLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource400JSONResponse{}).String()))
+		})
+
+		It("fails to update source with invalid label value", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			invalidLabels := []v1alpha1.Label{
+				{Key: "valid-key", Value: "invalid value with space"},
+			}
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: sourceID,
+				Body: &v1alpha1.SourceUpdate{
+					Labels: &invalidLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource400JSONResponse{}).String()))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM labels;")
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
 	Context("update on prem", func() {
 		It("successfully update source on prem", func() {
 			firstSourceID := uuid.New()

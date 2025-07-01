@@ -880,8 +880,12 @@ components:
       properties:
         key:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
         value:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
       required:
         - key
         - value
