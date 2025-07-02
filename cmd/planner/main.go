@@ -1,6 +1,8 @@
 package main
 
 import (
+	"github.com/kubev2v/migration-planner/internal/cli/standalone"
+	"go.uber.org/zap"
 	"os"
 
 	"github.com/kubev2v/migration-planner/internal/cli"
@@ -8,6 +10,15 @@ import (
 )
 
 func main() {
+	logger, err := zap.NewProduction()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = logger.Sync()
+	}()
+	zap.ReplaceGlobals(logger)
+
 	command := NewPlannerCtlCommand()
 	if err := command.Execute(); err != nil {
 		os.Exit(1)
@@ -31,6 +42,7 @@ func NewPlannerCtlCommand() *cobra.Command {
 	cmd.AddCommand(cli.NewCmdDeploy())
 	cmd.AddCommand(cli.NewCmdSSO())
 	cmd.AddCommand(cli.NewCmdE2E())
+	cmd.AddCommand(standalone.NewCmdCollect())
 
 	return cmd
 }

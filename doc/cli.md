@@ -36,6 +36,7 @@ Usage:
   planner [command]
 
 Available Commands:
+  collect     Gather vCenter inventory
   completion  Generate the autocompletion script for the specified shell
   create      Create a source
   delete      Delete resources by resources or owner.
@@ -46,6 +47,52 @@ Available Commands:
   help        Help about any command
   sso         Generate either the token or the signing private key
   version     Print Planner version information
+```
+
+#### collect
+
+**Prerequisites**
+
+- OPA installed (used for policy validation).
+- A folder containing your `.rego` policy files.
+- A built copy of the agent-side UI placed in your `ui-dir` (default: `/var/www/planner`).
+You can override the OPA policy folder path via the `OPA_POLICY_FOLDER_PATH` environment variable (default: `/usr/share/opa/policies`).
+
+**Building the agent UI**
+
+Run these commands from the root of `migration-planner` cloned repository:
+
+```shell
+mkdir -p /var/www/planner/js && \
+cp -r ./agent-ui/* /var/www/planner && \
+wget -P /var/www/planner/js https://unpkg.com/axios/dist/axios.min.js && \
+cd /var/www/planner && \
+npm init -y && \
+npm install @patternfly/patternfly && \
+cp -r node_modules/@patternfly/patternfly/assets css/ && \
+cp node_modules/@patternfly/patternfly/patternfly.css css/
+```
+
+**Usage**
+
+```bash
+Gather vCenter inventory
+
+Usage:
+  planner collect [flags]
+
+Examples:
+planner collect --data-dir ~/Downloads --credentials-dir /tmp
+
+Flags:
+      --credentials-dir string   directory where credentials.json is stored (default $HOME)
+      --data-dir string          directory where the agent will write its data (e.g., inventory.json) (default $HOME)
+  -h, --help                     help for collect
+  -p, --password string          vsphere password
+      --ui-dir string            directory where the UI app stored (default "/var/www/planner")
+      --url string               vsphere url
+  -u, --username string          vsphere username
+
 ```
 
 #### get
