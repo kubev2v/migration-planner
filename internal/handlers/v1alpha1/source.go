@@ -2,8 +2,10 @@ package v1alpha1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -13,15 +15,19 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/internal/store"
+	"go.uber.org/zap"
 )
 
 type ServiceHandler struct {
 	sourceSrv *service.SourceService
+	reportSrv *service.ReportService // Add the new report service
 }
 
-func NewServiceHandler(sourceService *service.SourceService) *ServiceHandler {
+func NewServiceHandler(sourceService *service.SourceService, reportService *service.ReportService) *ServiceHandler {
 	return &ServiceHandler{
 		sourceSrv: sourceService,
+		reportSrv: reportService,
 	}
 }
 
@@ -205,4 +211,72 @@ func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServe
 // (GET /health)
 func (s *ServiceHandler) Health(ctx context.Context, request apiServer.HealthRequestObject) (apiServer.HealthResponseObject, error) {
 	return apiServer.Health200Response{}, nil
+}
+
+// (GET /api/v1/sources/{id}/reports?format={format})
+func (s *ServiceHandler) GenerateSourceReport(ctx context.Context, request apiServer.GenerateSourceReportRequestObject) (apiServer.GenerateSourceReportResponseObject, error) {
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return server.GenerateSourceReport404JSONResponse{}, nil
+		}
+		return server.GenerateSourceReport500JSONResponse{}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return server.GenerateSourceReport403JSONResponse{}, nil
+	}
+
+	format := service.ReportFormat(request.Params.Format)
+	validFormats := map[service.ReportFormat]bool{
+		service.ReportFormatCSV:  true,
+		service.ReportFormatHTML: true,
+	}
+	if !validFormats[format] {
+		return server.GenerateSourceReport400JSONResponse{
+			Message: "Invalid format. Supported formats: csv, html",
+		}, nil
+	}
+
+	reportType := service.ReportTypeSummary
+	if request.Params.ReportType != nil {
+		reportType = service.ReportType(*request.Params.ReportType)
+	}
+
+	includeWarnings := true
+	if request.Params.IncludeWarnings != nil {
+		includeWarnings = *request.Params.IncludeWarnings
+	}
+
+	options := service.ReportOptions{
+		Format:          format,
+		Type:            reportType,
+		IncludeWarnings: includeWarnings,
+	}
+
+	zap.S().Infof("Generating %s report for source %s in %s format with warnings=%v",
+		options.Type, request.Id, options.Format, options.IncludeWarnings)
+
+	reportContent, err := s.reportSrv.GenerateReport(source, options)
+	if err != nil {
+		return server.GenerateSourceReport500JSONResponse{
+			Message: fmt.Sprintf("Failed to generate %s report: %v", format, err),
+		}, nil
+	}
+
+	switch format {
+	case service.ReportFormatCSV:
+		return server.GenerateSourceReport200TextcsvResponse{
+			Body: strings.NewReader(reportContent),
+		}, nil
+	case service.ReportFormatHTML:
+		return server.GenerateSourceReport200TexthtmlResponse{
+			Body: strings.NewReader(reportContent),
+		}, nil
+	default:
+		return server.GenerateSourceReport400JSONResponse{
+			Message: "Unsupported format",
+		}, nil
+	}
 }
