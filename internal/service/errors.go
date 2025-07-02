@@ -36,7 +36,7 @@ type ErrExcelFileNotValid struct {
 }
 
 func NewErrExcelFileNotValid() *ErrExcelFileNotValid {
-	return &ErrExcelFileNotValid{errors.New("the uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.")}
+	return &ErrExcelFileNotValid{errors.New("the uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format")}
 }
 
 type ErrAgentUpdateForbidden struct {
