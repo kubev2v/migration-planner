@@ -2,9 +2,11 @@ package v1alpha1_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -13,6 +15,7 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -85,10 +88,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -111,10 +115,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -137,10 +142,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -161,6 +167,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -168,7 +175,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -194,6 +201,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -201,7 +209,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -226,6 +234,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -233,7 +242,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -255,6 +264,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -262,7 +272,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -279,9 +289,86 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(count).To(Equal(0))
 		})
 
+		It("successfully creates a source -- user's organization is correct", func() {
+			mockClient := &MockOcmClient{
+				orgResult:   "Wayne Enterprises",
+				shouldError: false,
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"org_id": "wayneOrgID",
+				"sub":    "test-user",
+			})
+			token.Raw = "fake-raw-token"
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "wayneOrgID",
+				Token:        generateToken("wayneOrgID"),
+				LastName:     "Wayne",
+				FirstName:    "Bruce",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewUserInformationService(mockClient))
+			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "test",
+				},
+			})
+			Expect(err).To(BeNil())
+			source, ok := resp.(server.CreateSource201JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(source.Name).To(Equal("test"))
+
+			count := 0
+			tx := gormdb.Raw("SELECT COUNT(*) FROM users;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			um := model.User{}
+			tx = gormdb.Raw("SELECT * from users LIMIT 1;").Scan(&um)
+			Expect(tx.Error).To(BeNil())
+			Expect(um.FirstName).To(Equal("Bruce"))
+			Expect(um.LastName).To(Equal("Wayne"))
+			Expect(um.Organization).To(Equal("Wayne Enterprises"))
+			Expect(um.Username).To(Equal("admin"))
+		})
+
+		It("fail to create a source -- should expect error from ocm client", func() {
+			mockClient := &MockOcmClient{
+				orgResult:   "Wayne Enterprises",
+				shouldError: true,
+			}
+			token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+				"org_id": "wayneOrgID",
+				"sub":    "test-user",
+			})
+			token.Raw = "fake-raw-token"
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "wayneOrgID",
+				Token:        generateToken("wayneOrgID"),
+				LastName:     "Wayne",
+				FirstName:    "Bruce",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewUserInformationService(mockClient))
+			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "test",
+				},
+			})
+			Expect(err).To(BeNil())
+			_, ok := resp.(server.CreateSource500JSONResponse)
+			Expect(ok).To(BeTrue())
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
+			gormdb.Exec("DELETE from users;")
 		})
 	})
 
@@ -303,10 +390,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -337,10 +425,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -373,10 +462,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
@@ -402,7 +492,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
@@ -430,7 +520,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -452,10 +542,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 
@@ -484,7 +575,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
@@ -505,10 +596,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -548,10 +640,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -598,10 +691,11 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				Token:        generateToken("admin"),
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewLocalUserInformationService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -646,4 +740,30 @@ var _ = Describe("source handler", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
+
+	Context("UserInformationService", func() {
+	})
 })
+
+func generateToken(orgID string) *jwt.Token {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"org_id": orgID,
+		"sub":    "test-user",
+	})
+	token.Raw = "fake-raw-token"
+	return token
+}
+
+// MockOcmClient implements the OcmClient interface for testing
+type MockOcmClient struct {
+	orgResult   string
+	shouldError bool
+	errorMsg    string
+}
+
+func (m *MockOcmClient) GetOrganization(ctx context.Context, authToken string, orgID string) (string, error) {
+	if m.shouldError {
+		return "", errors.New(m.errorMsg)
+	}
+	return m.orgResult, nil
+}

@@ -40,7 +40,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("successfully validate the token -- no orgID", func() {
-			sToken, keyFn := generateCustomToken("user@company.com", nil)
+			sToken, keyFn := generateCustomToken("user@company.com", "admin", "admin", nil)
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -51,7 +51,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("failed validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("user@", nil)
+			sToken, keyFn := generateCustomToken("user@", "admin", "admin", nil)
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -60,7 +60,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("successfully validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("@user", nil)
+			sToken, keyFn := generateCustomToken("@user", "admin", "admin", nil)
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -116,14 +116,18 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preferred_username"`
-		OrgID    string `json:"org_id"`
+		Username  string `json:"preferred_username"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"family_name"`
+		OrgID     string `json:"org_id"`
 		jwt.RegisteredClaims
 	}
 
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		"batman",
+		"Bruce",
+		"Wayne",
 		"GothamCity",
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
@@ -226,10 +230,12 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 	}
 }
 
-func generateCustomToken(username string, orgID *string) (string, func(t *jwt.Token) (any, error)) {
+func generateCustomToken(username, firstName, lastName string, orgID *string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preferred_username"`
-		OrgID    string `json:"org_id,omitempty"`
+		Username  string `json:"preferred_username"`
+		FirstName string `json:"first_name"`
+		LastName  string `json:"family_name"`
+		OrgID     string `json:"org_id,omitempty"`
 		jwt.RegisteredClaims
 	}
 
@@ -241,6 +247,8 @@ func generateCustomToken(username string, orgID *string) (string, func(t *jwt.To
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
 		username,
+		firstName,
+		lastName,
 		o,
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),

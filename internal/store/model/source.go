@@ -20,12 +20,14 @@ type Source struct {
 	Name       string    `gorm:"uniqueIndex:name_org_id;not null"`
 	VCenterID  string
 	Username   string
+	UserID     *string
 	OrgID      string                    `gorm:"uniqueIndex:name_org_id;not null"`
 	Inventory  *JSONField[api.Inventory] `gorm:"type:jsonb"`
 	OnPremises bool
 	Agents     []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
 	ImageInfra ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
 	Labels     []Label
+	User       *User `gorm:"foreignKey:UserID"`
 }
 
 type SourceList []Source
