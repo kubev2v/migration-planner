@@ -78,3 +78,8 @@ func Contains(slice []string, val string) bool {
 	}
 	return false
 }
+
+// IntPtr returns the address of given integer
+func IntPtr(i int) *int {
+	return &i
+}
