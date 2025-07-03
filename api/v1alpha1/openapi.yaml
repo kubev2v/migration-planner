@@ -599,10 +599,7 @@ components:
       type: object
       required:
       - totalHosts
-      - totalDatacenters
       - totalClusters
-      - clustersPerDatacenter
-      - hosts
       - hostsPerCluster
       - hostPowerStates
       - networks
