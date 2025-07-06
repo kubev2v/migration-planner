@@ -325,8 +325,8 @@ github.com/onsi/gomega v1.17.0/go.mod h1:HnhC7FXeEQY45zxNK3PPoIUhzk/80Xly9PcubAl
 github.com/onsi/gomega v1.18.1/go.mod h1:0q+aL8jAiMXy9hbwj2mr5GziHiwhAIQpFmmtT5hitRs=
 github.com/onsi/gomega v1.36.1 h1:bJDPBO7ibjxcbHMgSCoo4Yj18UWbKDlLwX1x9sybDcw=
 github.com/onsi/gomega v1.36.1/go.mod h1:PvZbdDc8J6XJEpDK4HCuRBm8a6Fzp9/DmhC9C7yFlog=
-github.com/openshift/api v0.0.0-20250627132400-41708f612339 h1:yYOcb/3hIyYG94/M4YnSU/gzx6ybwrOQv5zyyCqvfwM=
-github.com/openshift/api v0.0.0-20250627132400-41708f612339/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
+github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e h1:9hzClGu+YAziWP6X93S/To86Q6P8aIfAeasl7zIPYA8=
+github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/assisted-image-service v0.0.0-20250621070117-0128a587cae2 h1:GnLW6D/Yoc74FA31A4KZaa9K0cA5BNFswVQBQwqmOWA=
 github.com/openshift/assisted-image-service v0.0.0-20250621070117-0128a587cae2/go.mod h1:WGdSeSnK0voEWWwA4ar5eApNjGBLmGTpFurEKw/FXJc=
 github.com/openshift/client-go v0.0.0-20250603093317-900624865677 h1:OE7ZwLdTM4FmkzfHJMN+CwkyIHCNevv5jAnfkYhw4+U=
