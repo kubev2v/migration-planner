@@ -327,8 +327,8 @@ github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e h1:9hzClGu+YAziWP6X9
 github.com/openshift/api v0.0.0-20250704153732-ad766c4e6d8e/go.mod h1:yk60tHAmHhtVpJQo3TwVYq2zpuP70iJIFDCmeKMIzPw=
 github.com/openshift/assisted-image-service v0.0.0-20250621070117-0128a587cae2 h1:GnLW6D/Yoc74FA31A4KZaa9K0cA5BNFswVQBQwqmOWA=
 github.com/openshift/assisted-image-service v0.0.0-20250621070117-0128a587cae2/go.mod h1:WGdSeSnK0voEWWwA4ar5eApNjGBLmGTpFurEKw/FXJc=
-github.com/openshift/client-go v0.0.0-20250603093317-900624865677 h1:OE7ZwLdTM4FmkzfHJMN+CwkyIHCNevv5jAnfkYhw4+U=
-github.com/openshift/client-go v0.0.0-20250603093317-900624865677/go.mod h1:If4PFiis4Sp3vf5z7PYkZJy3gA9DP1kYZR9SdTjjKoY=
+github.com/openshift/client-go v0.0.0-20250701093119-6d8e53714277 h1:iju9VTJDaw6MjjuCid8BY31ammn0GbWs80u2ZH54XmY=
+github.com/openshift/client-go v0.0.0-20250701093119-6d8e53714277/go.mod h1:XdbrTCqQWLe1qJ/LgU5jcqJ2OX3VbhtZzgDjzlcbyzA=
 github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=
 github.com/openshift/custom-resource-status v1.1.2/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
 github.com/pelletier/go-toml/v2 v2.2.3 h1:YmeHyLY8mFWbdkNWwpr+qIL2bEqT0o95WSdkNHvL12M=
