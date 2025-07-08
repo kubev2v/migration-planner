@@ -125,6 +125,53 @@ func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
+func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form mappers.SourceUpdateForm) (*model.Source, error) {
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	source, err := s.store.Source().Get(ctx, id)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(id)
+		}
+		return nil, err
+	}
+
+	// Delegate field mapping to the mapper layer
+	imageInfra, labels := form.Apply(source)
+
+	// Persist label updates if provided
+	if labels != nil {
+		if err := s.store.Label().UpdateLabels(ctx, source.ID, labels); err != nil {
+			_, _ = store.Rollback(ctx)
+			return nil, err
+		}
+	}
+
+	// Persist ImageInfra changes
+	updatedImageInfra, err := s.store.ImageInfra().Update(ctx, imageInfra)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		return nil, err
+	}
+	source.ImageInfra = *updatedImageInfra
+
+	updatedSource, updateErr := s.store.Source().Update(ctx, *source)
+	if updateErr != nil {
+		_, _ = store.Rollback(ctx)
+		return nil, updateErr
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return updatedSource, nil
+}
+
 func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.InventoryUpdateForm) (model.Source, error) {
 	ctx, err := s.store.NewTransactionContext(ctx)
 	if err != nil {
@@ -207,7 +254,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
 	if err != nil {
-		return fmt.Errorf("Error parsing RVTools file: %v", err)
+		return fmt.Errorf("error parsing RVTools file: %v", err)
 	}
 
 	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {

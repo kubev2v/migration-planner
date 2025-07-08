@@ -197,7 +197,7 @@ func (s *plannerService) RemoveSources() error {
 func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
 	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	update := v1alpha1.UpdateSourceJSONRequestBody{
+	update := v1alpha1.UpdateInventoryJSONRequestBody{
 		AgentId:   uuid,
 		Inventory: *inventory,
 	}

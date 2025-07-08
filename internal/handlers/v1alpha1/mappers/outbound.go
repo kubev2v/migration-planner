@@ -29,11 +29,6 @@ func SourceToApi(s model.Source) api.Source {
 		source.Labels = &labels
 	}
 
-	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
-	// TODO:
-	// Remark: If multiple agents are deployed, we pass only the first one based on created_at timestamp
-	// while other agents in up-to-date states exists.
-	// Which one should be presented in the API response?
 	if len(s.Agents) == 0 {
 		return source
 	}

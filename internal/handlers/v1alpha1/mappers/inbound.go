@@ -5,30 +5,34 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 )
 
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 	form := mappers.SourceCreateForm{
-		Name: resource.Name,
+		Name:   resource.Name,
+		Labels: resource.Labels,
+		Proxy:  resource.Proxy,
 	}
 
-	if resource.SshPublicKey != nil {
-		form.SshPublicKey = *resource.SshPublicKey
-	}
+	form.SshPublicKey = derefString(resource.SshPublicKey)
+	form.CertificateChain = derefString(resource.CertificateChain)
 
-	if resource.Proxy != nil {
-		if resource.Proxy.HttpUrl != nil {
-			form.HttpUrl = *resource.Proxy.HttpUrl
-		}
-		if resource.Proxy.HttpsUrl != nil {
-			form.HttpsUrl = *resource.Proxy.HttpsUrl
-		}
-		if resource.Proxy.NoProxy != nil {
-			form.NoProxy = *resource.Proxy.NoProxy
-		}
-	}
+	return form
+}
 
-	if resource.CertificateChain != nil {
-		form.CertificateChain = *resource.CertificateChain
-	}
+func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateForm {
+	form := mappers.SourceUpdateForm{}
+
+	form.Name = resource.Name
+	form.Labels = resource.Labels
+	form.SshPublicKey = resource.SshPublicKey
+	form.CertificateChain = resource.CertificateChain
+	form.Proxy = resource.Proxy
 
 	return form
 }
