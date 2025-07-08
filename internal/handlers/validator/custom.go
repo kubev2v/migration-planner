@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"regexp"
+	"strings"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -96,4 +97,32 @@ func uuidValidator(fl validator.FieldLevel) bool {
 		return false
 	}
 	return val != uuid.UUID{}
+}
+
+func startsWithValidator(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Addr().Interface().(*string)
+	if !ok {
+		return false
+	}
+
+	if val == nil {
+		return true
+	}
+
+	param := fl.Param()
+	return strings.HasPrefix(*val, param)
+}
+
+func startsNotWithValidator(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Addr().Interface().(*string)
+	if !ok {
+		return false
+	}
+
+	if val == nil {
+		return true
+	}
+
+	param := fl.Param()
+	return !strings.HasPrefix(*val, param)
 }
