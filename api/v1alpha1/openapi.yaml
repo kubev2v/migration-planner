@@ -399,7 +399,84 @@ paths:
       responses:
         "200":
           description: OK
-
+  /api/v1/sources/{id}/reports:
+    get:
+      tags:
+        - reports
+      description: Generate a report for the specified source
+      operationId: generateSourceReport
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: format
+          in: query
+          description: Format of the report
+          required: true
+          schema:
+            type: string
+            enum: [csv, html]
+        - name: report_type
+          in: query
+          description: Type of report to generate
+          required: false
+          schema:
+            type: string
+            enum: [summary, detailed, migration_assessment]
+            default: summary
+        - name: include_warnings
+          in: query
+          description: Include migration warnings in the report
+          required: false
+          schema:
+            type: boolean
+            default: true
+      responses:
+        "200":
+          description: Report generated successfully
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            text/html:
+              schema:
+                type: string
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+                
 components:
   schemas:
     presigned-url:

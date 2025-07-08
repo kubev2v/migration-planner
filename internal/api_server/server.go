@@ -102,7 +102,9 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
-	h := handlers.NewServiceHandler(service.NewSourceService(s.store))
+	sourceService := service.NewSourceService(s.store)
+	reportService := service.NewReportService()
+	h := handlers.NewServiceHandler(sourceService, reportService)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

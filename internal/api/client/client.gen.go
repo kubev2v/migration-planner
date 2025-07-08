@@ -119,6 +119,9 @@ type ClientInterface interface {
 	// GetSourceDownloadURL request
 	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GenerateSourceReport request
+	GenerateSourceReport(ctx context.Context, id openapi_types.UUID, params *GenerateSourceReportParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UploadRvtoolsFileWithBody request with any body
 	UploadRvtoolsFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -236,6 +239,18 @@ func (c *Client) HeadImage(ctx context.Context, id openapi_types.UUID, reqEditor
 
 func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetSourceDownloadURLRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GenerateSourceReport(ctx context.Context, id openapi_types.UUID, params *GenerateSourceReportParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGenerateSourceReportRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -569,6 +584,90 @@ func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http
 	return req, nil
 }
 
+// NewGenerateSourceReportRequest generates requests for GenerateSourceReport
+func NewGenerateSourceReportRequest(server string, id openapi_types.UUID, params *GenerateSourceReportParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/reports", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if queryFrag, err := runtime.StyleParamWithLocation("form", true, "format", runtime.ParamLocationQuery, params.Format); err != nil {
+			return nil, err
+		} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+			return nil, err
+		} else {
+			for k, v := range parsed {
+				for _, v2 := range v {
+					queryValues.Add(k, v2)
+				}
+			}
+		}
+
+		if params.ReportType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "report_type", runtime.ParamLocationQuery, *params.ReportType); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		if params.IncludeWarnings != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_warnings", runtime.ParamLocationQuery, *params.IncludeWarnings); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewUploadRvtoolsFileRequestWithBody generates requests for UploadRvtoolsFile with any type of body
 func NewUploadRvtoolsFileRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
 	var err error
@@ -702,6 +801,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetSourceDownloadURLWithResponse request
 	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
+
+	// GenerateSourceReportWithResponse request
+	GenerateSourceReportWithResponse(ctx context.Context, id openapi_types.UUID, params *GenerateSourceReportParams, reqEditors ...RequestEditorFn) (*GenerateSourceReportResponse, error)
 
 	// UploadRvtoolsFileWithBodyWithResponse request with any body
 	UploadRvtoolsFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsFileResponse, error)
@@ -910,6 +1012,32 @@ func (r GetSourceDownloadURLResponse) StatusCode() int {
 	return 0
 }
 
+type GenerateSourceReportResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GenerateSourceReportResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GenerateSourceReportResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadRvtoolsFileResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -1046,6 +1174,15 @@ func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseGetSourceDownloadURLResponse(rsp)
+}
+
+// GenerateSourceReportWithResponse request returning *GenerateSourceReportResponse
+func (c *ClientWithResponses) GenerateSourceReportWithResponse(ctx context.Context, id openapi_types.UUID, params *GenerateSourceReportParams, reqEditors ...RequestEditorFn) (*GenerateSourceReportResponse, error) {
+	rsp, err := c.GenerateSourceReport(ctx, id, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGenerateSourceReportResponse(rsp)
 }
 
 // UploadRvtoolsFileWithBodyWithResponse request with arbitrary body returning *UploadRvtoolsFileResponse
@@ -1433,6 +1570,60 @@ func ParseGetSourceDownloadURLResponse(rsp *http.Response) (*GetSourceDownloadUR
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGenerateSourceReportResponse parses an HTTP response from a GenerateSourceReportWithResponse call
+func ParseGenerateSourceReportResponse(rsp *http.Response) (*GenerateSourceReportResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GenerateSourceReportResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 

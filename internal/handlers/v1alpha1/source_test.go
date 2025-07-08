@@ -88,7 +88,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -114,7 +114,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -140,7 +140,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -168,7 +168,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -201,7 +201,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -233,7 +233,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -262,7 +262,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -306,7 +306,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -340,7 +340,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -376,7 +376,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
@@ -402,7 +402,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
@@ -430,7 +430,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -455,7 +455,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 
@@ -484,7 +484,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
@@ -508,7 +508,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -551,7 +551,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -601,7 +601,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewReportService())
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{

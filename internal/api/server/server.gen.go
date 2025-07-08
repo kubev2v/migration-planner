@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 
@@ -43,6 +44,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/sources/{id}/reports)
+	GenerateSourceReport(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GenerateSourceReportParams)
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -92,6 +96,11 @@ func (_ Unimplemented) HeadImage(w http.ResponseWriter, r *http.Request, id open
 
 // (GET /api/v1/sources/{id}/image-url)
 func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/sources/{id}/reports)
+func (_ Unimplemented) GenerateSourceReport(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GenerateSourceReportParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -302,6 +311,66 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// GenerateSourceReport operation middleware
+func (siw *ServerInterfaceWrapper) GenerateSourceReport(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GenerateSourceReportParams
+
+	// ------------- Required query parameter "format" -------------
+
+	if paramValue := r.URL.Query().Get("format"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "format"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "format", r.URL.Query(), &params.Format)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "format", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "report_type" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "report_type", r.URL.Query(), &params.ReportType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_type", Err: err})
+		return
+	}
+
+	// ------------- Optional query parameter "include_warnings" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "include_warnings", r.URL.Query(), &params.IncludeWarnings)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_warnings", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GenerateSourceReport(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // UploadRvtoolsFile operation middleware
 func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -479,6 +548,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/sources/{id}/image-url", wrapper.GetSourceDownloadURL)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/reports", wrapper.GenerateSourceReport)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
@@ -890,6 +962,98 @@ func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GenerateSourceReportRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params GenerateSourceReportParams
+}
+
+type GenerateSourceReportResponseObject interface {
+	VisitGenerateSourceReportResponse(w http.ResponseWriter) error
+}
+
+type GenerateSourceReport200TextcsvResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response GenerateSourceReport200TextcsvResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/csv")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GenerateSourceReport200TexthtmlResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response GenerateSourceReport200TexthtmlResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "text/html")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GenerateSourceReport400JSONResponse Error
+
+func (response GenerateSourceReport400JSONResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateSourceReport401JSONResponse Error
+
+func (response GenerateSourceReport401JSONResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateSourceReport403JSONResponse Error
+
+func (response GenerateSourceReport403JSONResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateSourceReport404JSONResponse Error
+
+func (response GenerateSourceReport404JSONResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateSourceReport500JSONResponse Error
+
+func (response GenerateSourceReport500JSONResponse) VisitGenerateSourceReportResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UploadRvtoolsFileRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *multipart.Reader
@@ -996,6 +1160,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(ctx context.Context, request GetSourceDownloadURLRequestObject) (GetSourceDownloadURLResponseObject, error)
+
+	// (GET /api/v1/sources/{id}/reports)
+	GenerateSourceReport(ctx context.Context, request GenerateSourceReportRequestObject) (GenerateSourceReportResponseObject, error)
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
@@ -1244,6 +1411,33 @@ func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSourceDownloadURLResponseObject); ok {
 		if err := validResponse.VisitGetSourceDownloadURLResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GenerateSourceReport operation middleware
+func (sh *strictHandler) GenerateSourceReport(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GenerateSourceReportParams) {
+	var request GenerateSourceReportRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GenerateSourceReport(ctx, request.(GenerateSourceReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GenerateSourceReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GenerateSourceReportResponseObject); ok {
+		if err := validResponse.VisitGenerateSourceReportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

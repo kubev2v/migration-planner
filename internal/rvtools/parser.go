@@ -35,7 +35,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	if len(datastoreRows) > 0 {
 		datastoreMapping = buildDatastoreMapping(datastoreRows)
 	}
-	
+
 	zap.S().Named("rvtools").Infof("Process VMs")
 	var vms []vsphere.VM
 	if slices.Contains(sheets, "vInfo") {
@@ -46,7 +46,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		vDiskRows := readSheet(excelFile, sheets, "vDisk")
 		vNetworkRows := readSheet(excelFile, sheets, "vNetwork")
 		dvPortRows := readSheet(excelFile, sheets, "dvPort")
-		
+
 		vms, err = processVMInfo(vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows, datastoreMapping)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("VM processing failed: %v", err)
@@ -59,7 +59,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		vms, err = validateVMsWithOPA(vms)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("OPA validation failed, continuing without validation: %v", err)
-	}
+		}
 	}
 
 	zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
@@ -89,7 +89,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		} else {
 			multipathRows := readSheet(excelFile, sheets, "vMultiPath")
 			hbaRows := readSheet(excelFile, sheets, "vHBA")
-			
+
 			correlateDatastoreInfo(multipathRows, hbaRows, tempInventory)
 			datastores = tempInventory.Infra.Datastores
 		}
@@ -106,15 +106,15 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 
 	zap.S().Named("rvtools").Infof("Create Basic Inventory")
 	inventory := createBasicInventoryObj(
-		vcenterUUID, 
-		&vms, 
-		datastores, 
+		vcenterUUID,
+		&vms,
+		datastores,
 		networks,
-		hostPowerStates, 
-		clusterInfo.HostsPerCluster, 
+		hostPowerStates,
+		clusterInfo.HostsPerCluster,
 		clusterInfo.ClustersPerDatacenter,
-		clusterInfo.TotalHosts, 
-		clusterInfo.TotalClusters, 
+		clusterInfo.TotalHosts,
+		clusterInfo.TotalClusters,
 		clusterInfo.TotalDatacenters,
 	)
 
@@ -141,9 +141,9 @@ func createBasicInventoryObj(
 			Id: vCenterID,
 		},
 		Vms: api.VMs{
-			Total:       len(*vms),
-			PowerStates: map[string]int{},
-			Os:          map[string]int{},
+			Total:                len(*vms),
+			PowerStates:          map[string]int{},
+			Os:                   map[string]int{},
 			MigrationWarnings:    api.MigrationIssues{},
 			NotMigratableReasons: api.MigrationIssues{},
 		},
@@ -174,11 +174,11 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	}
 
 	colMap := buildColumnMap(vHostRows[0])
-	
+
 	hosts := make(map[string]struct{})
 	clusters := make(map[string]struct{})
 	datacenters := make(map[string]struct{})
-	
+
 	datacenterToClusters := make(map[string]map[string]struct{})
 	clusterToHosts := make(map[string]map[string]struct{})
 
@@ -196,15 +196,15 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 		cluster := getColumnValue(row, colMap, "cluster")
 
 		hosts[host] = struct{}{}
-		
+
 		if datacenter != "" {
 			datacenters[datacenter] = struct{}{}
 			ensureMapExists(datacenterToClusters, datacenter)
-			
+
 			if cluster != "" {
 				clusters[cluster] = struct{}{}
 				datacenterToClusters[datacenter][cluster] = struct{}{}
-				
+
 				ensureMapExists(clusterToHosts, cluster)
 				clusterToHosts[cluster][host] = struct{}{}
 			}
@@ -221,31 +221,30 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 }
 
 func extractHostPowerStates(rows [][]string) map[string]int {
-    if len(rows) <= 1 {
-        return map[string]int{}
-    }
+	if len(rows) <= 1 {
+		return map[string]int{}
+	}
 
-    colMap := buildColumnMap(rows[0])
-    hostPowerStates := map[string]int{}
+	colMap := buildColumnMap(rows[0])
+	hostPowerStates := map[string]int{}
 
-    for _, row := range rows[1:] {
-        if len(row) == 0 {
-            continue
-        }
+	for _, row := range rows[1:] {
+		if len(row) == 0 {
+			continue
+		}
 
-        status := getColumnValue(row, colMap, "config status")
-        
-        switch status {
-        case "red", "yellow", "green", "gray":
-            hostPowerStates[status]++
-        default:
-            hostPowerStates["green"]++
-        }
-    }
+		status := getColumnValue(row, colMap, "config status")
 
-    return hostPowerStates
+		switch status {
+		case "red", "yellow", "green", "gray":
+			hostPowerStates[status]++
+		default:
+			hostPowerStates["green"]++
+		}
+	}
+
+	return hostPowerStates
 }
-
 
 func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	networks := []api.Network{}
@@ -259,7 +258,7 @@ func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory); err == nil {
 		networks = tempInventory.Infra.Networks
 	}
-	
+
 	return networks
 }
 
@@ -299,11 +298,11 @@ func validateVMsWithOPA(vms []vsphere.VM) ([]vsphere.VM, error) {
 
 func isOPAServerAlive(opaServer string) bool {
 	zap.S().Named("rvtools").Infof("Check if OPA server is responding")
-	
+
 	client := &http.Client{
 		Timeout: 5 * time.Second, // 5 second timeout
 	}
-	
+
 	resp, err := client.Get("http://" + opaServer + "/health")
 	if err != nil || resp.StatusCode != http.StatusOK {
 		zap.S().Named("rvtools").Errorf("OPA server %s is not responding", opaServer)
