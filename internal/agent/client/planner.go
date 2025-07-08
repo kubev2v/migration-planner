@@ -44,7 +44,7 @@ func (p *planner) UpdateSourceStatus(ctx context.Context, id uuid.UUID, params a
 		defer resp.HTTPResponse.Body.Close()
 	}
 	if resp.StatusCode() != http.StatusOK {
-		return fmt.Errorf("failed to update source status: %s", resp.Status())
+		return fmt.Errorf("failed to update inventory: %s", resp.Status())
 	}
 
 	return nil
