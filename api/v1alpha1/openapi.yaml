@@ -451,15 +451,21 @@ components:
         httpUrl:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "url,startsnotwith=https"
+            validate: "omitnil,url,startsnotwith=https"
+          nullable: true
+          minLength: 1
         httpsUrl:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "url,startswith=https"
+            validate: "omitnil,url,startswith=https"
+          nullable: true
+          minLength: 1
         noProxy:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "max=1000"
+            validate: "omitnil,max=1000"
+          nullable: true
+          minLength: 1
 
     SourceCreate:
       type: object
@@ -470,6 +476,8 @@ components:
             validate: "required,source_name,min=1,max=100"
         sshPublicKey:
           type: string
+          nullable: true
+          minLength: 1
           x-oapi-codegen-extra-tags:
             validate: "omitnil,ssh_key"
         proxy:
@@ -478,6 +486,8 @@ components:
             validate: "omitnil"
         certificateChain:
           type: string
+          nullable: true
+          minLength: 1
           x-oapi-codegen-extra-tags:
             validate: "omitnil,certs"
       required:
