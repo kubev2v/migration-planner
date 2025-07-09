@@ -13,7 +13,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 type E2ETestOptions struct {
@@ -31,14 +30,11 @@ type E2ETestOptions struct {
 }
 
 const (
-	defaultClusterName        = "kind-e2e"
-	defaultPlannerAPIImage    = "custom/migration-planner-api"
-	defaultPullPolicy         = "Never"
-	defaultContainerRuntime   = "docker"
-	defaultRegistryPort       = "5000"
-	defaultPlannerServicePort = "3443"
-	defaultImagePort          = "11443"
-	defaultAgentPort          = "7443"
+	defaultClusterName      = "kind-e2e"
+	defaultPlannerAPIImage  = "custom/migration-planner-api"
+	defaultPullPolicy       = "Never"
+	defaultContainerRuntime = "docker"
+	defaultRegistryPort     = "5000"
 )
 
 func DefaultE2EOptions() *E2ETestOptions {
@@ -108,13 +104,6 @@ func (o *E2ETestOptions) Run(ctx context.Context) error {
 	}
 
 	log.Printf("[CLI] Cluster %s exists, proceeding...", o.clusterName)
-
-	if err := o.ensureFullConnectivity(); err != nil {
-		if err := destroyEnvironment(); err != nil {
-			log.Fatalf("[CLI] Failed to destroy environment. Error: %v", err)
-		}
-		return nil
-	}
 
 	if err := validateVmsDeletion(); err != nil {
 		log.Printf("[CLI] failed to delete old test VM's: %v", err)
@@ -257,67 +246,6 @@ func getInterfaceName(ip net.IP) string {
 	}
 
 	return ""
-}
-
-// portForwardCommand establishes a `oc port-forward` command to expose a given service or deployment
-// to the local machine on a specified port, if it is not already reachable
-func (o *E2ETestOptions) portForwardCommand(dest string, port string) error {
-
-	address := fmt.Sprintf("%s:%s", o.registryIP.String(), port)
-	conn, err := net.DialTimeout("tcp", address, 2*time.Second)
-	if err == nil {
-		log.Printf("[CLI] Destination: %s is already available. skipping port forward...\n", address)
-		_ = conn.Close()
-		return nil
-	}
-
-	log.Printf("[CLI] Destination: %s isn't available. need to run port forward...\n", address)
-
-	fixCommand := fmt.Sprintf("oc port-forward --address 0.0.0.0 %s %s:%s > /dev/null 2>&1 &", dest, port, port)
-	if err := runCommand(fixCommand); err != nil {
-		log.Printf("[CLI] error fix connection to %s: %v", address, err)
-		return fmt.Errorf("error fix connection to %s: %v", address, err)
-	}
-
-	time.Sleep(1 * time.Second)
-
-	conn, err = net.DialTimeout("tcp", address, 2*time.Second)
-	if err != nil {
-		log.Printf("[CLI] error after port-forward %v", err)
-		return err
-	}
-	_ = conn.Close()
-
-	log.Printf("[CLI] Destination: %s is now available during the execution.\n", address)
-
-	return nil
-}
-
-// ensureFullConnectivity establishes port-forwarding for all required services used in the E2E tests.
-// It skips destinations that are already connected and ensures each service is reachable before proceeding.
-func (o *E2ETestOptions) ensureFullConnectivity() error {
-
-	log.Printf("[CLI] Validating full connection to %s\n", o.registryIP)
-	time.Sleep(1 * time.Second) // Wait for port-forwarding from the deployment step to complete
-
-	services := []struct {
-		dest string
-		port string
-	}{
-		{"service/migration-planner", defaultPlannerServicePort},
-		{"service/migration-planner-image", defaultImagePort},
-		{"service/migration-planner-agent", defaultAgentPort},
-		{"deploy/registry", defaultRegistryPort},
-		{"deploy/vcsim1", Vsphere1Port},
-		{"deploy/vcsim2", Vsphere2Port},
-	}
-	for _, s := range services {
-		if err := o.portForwardCommand(s.dest, s.port); err != nil {
-			return fmt.Errorf("error establishing connection to port %s: %v", s.port, err)
-		}
-	}
-
-	return nil
 }
 
 // validateVmsDeletion connects to libvirt and destroys and undefines any VMs created for the test
