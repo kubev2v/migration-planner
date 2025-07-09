@@ -1,0 +1,88 @@
+name: Sync Main to Side Branches (Hard Reset & Create)
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  sync_to_side_branches:
+    # Only run this job if the pull request was merged
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # Needed for force push and branch creation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # Fetch all history to ensure we have the main branch's commits
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "GitHub Actions Bot"
+
+      - name: Get list of side branches
+        id: side_branches
+        run: |
+          SIDE_BRANCHES=("release-0.2")
+          echo "branches=${SIDE_BRANCHES[*]}" >> $GITHUB_OUTPUT
+
+      - name: Sync main to side branches (or create them)
+        run: |
+          MAIN_BRANCH="main"
+          # Get the latest commit hash of the main branch
+          MAIN_COMMIT_HASH=$(git rev-parse origin/$MAIN_BRANCH)
+          echo "Main branch's latest commit hash: $MAIN_COMMIT_HASH"
+
+          # Read the list of branches from the output of the previous step
+          IFS=' ' read -r -a BRANCH_ARRAY <<< "${{ steps.side_branches.outputs.branches }}"
+
+          for BRANCH in "${BRANCH_ARRAY[@]}"; do
+            echo "--- Processing branch: $BRANCH ---"
+            
+            # Always start by checking out the main branch to ensure a consistent base
+            git checkout $MAIN_BRANCH
+            
+            # Check if the remote branch already exists
+            if git show-ref --quiet refs/remotes/origin/$BRANCH; then
+              echo "Remote branch 'origin/$BRANCH' exists. Checking sync status."
+              
+              SIDE_BRANCH_HEAD_HASH=$(git rev-parse origin/$BRANCH)
+              
+              if [ "$SIDE_BRANCH_HEAD_HASH" == "$MAIN_COMMIT_HASH" ]; then
+                echo "Branch $BRANCH is already in sync with $MAIN_BRANCH. Skipping."
+              else
+                echo "Branch $BRANCH is out of sync. Performing hard reset."
+                
+                git checkout $BRANCH
+                
+                git reset --hard $MAIN_BRANCH
+                
+                if git push --force-with-lease origin $BRANCH; then
+                  echo "Successfully hard reset and force pushed $BRANCH to match $MAIN_BRANCH."
+                else
+                  echo "Failed to force push $BRANCH. This might indicate concurrent changes or protection rules."
+                fi
+              fi
+            else
+              # Branch does not exist remotely, create it as a copy of main
+              echo "Remote branch 'origin/$BRANCH' does not exist. Creating it as a copy of $MAIN_BRANCH."
+              
+              git checkout -b $BRANCH $MAIN_BRANCH
+              
+              if git push -u origin $BRANCH; then
+                echo "Successfully created and pushed new branch $BRANCH to match $MAIN_BRANCH."
+              else
+                echo "Failed to create and push new branch $BRANCH."
+              fi
+            fi
+            echo "" # Add a blank line for readability
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
