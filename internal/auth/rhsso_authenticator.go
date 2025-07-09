@@ -79,7 +79,7 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
 		return User{}, err
 	}
 
-	username := claims["username"].(string)
+	username := claims["preferred_username"].(string)
 	if email, ok := claims["email"].(string); ok {
 		if email != "" {
 			username = email
