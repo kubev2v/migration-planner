@@ -601,9 +601,9 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 	return total / 1024 / 1024 / 1024
 }
 
-func hasLabel(reasons apiplanner.MigrationIssues, label string) int {
+func hasID(reasons apiplanner.MigrationIssues, id string) int {
 	for i, reason := range reasons {
-		if label == reason.Label {
+		if id == *reason.Id {
 			return i
 		}
 	}
@@ -694,7 +694,7 @@ func Validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, e
 			return nil, err
 		}
 		for _, c := range vmValidation.Result {
-			vm.Concerns = append(vm.Concerns, vspheremodel.Concern{Label: c.Label, Assessment: c.Assessment, Category: c.Category})
+			vm.Concerns = append(vm.Concerns, vspheremodel.Concern{Id: c.Id, Label: c.Label, Assessment: c.Assessment, Category: c.Category})
 		}
 		resp.Body.Close()
 		res = append(res, vm)
@@ -708,10 +708,11 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 	for _, result := range concern {
 		if result.Category == "Critical" {
 			migratable = false
-			if i := hasLabel(inv.Vms.NotMigratableReasons, result.Label); i >= 0 {
+			if i := hasID(inv.Vms.NotMigratableReasons, result.Id); i >= 0 {
 				inv.Vms.NotMigratableReasons[i].Count++
 			} else {
 				inv.Vms.NotMigratableReasons = append(inv.Vms.NotMigratableReasons, apiplanner.MigrationIssue{
+					Id:         &result.Id,
 					Label:      result.Label,
 					Count:      1,
 					Assessment: result.Assessment,
@@ -720,10 +721,11 @@ func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) 
 		}
 		if result.Category == "Warning" {
 			hasWarning = true
-			if i := hasLabel(inv.Vms.MigrationWarnings, result.Label); i >= 0 {
+			if i := hasID(inv.Vms.MigrationWarnings, result.Id); i >= 0 {
 				inv.Vms.MigrationWarnings[i].Count++
 			} else {
 				inv.Vms.MigrationWarnings = append(inv.Vms.MigrationWarnings, apiplanner.MigrationIssue{
+					Id:         &result.Id,
 					Label:      result.Label,
 					Count:      1,
 					Assessment: result.Assessment,
