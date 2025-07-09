@@ -223,7 +223,18 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
-		inv.Vms.Os[vmGuestName(vm)]++
+
+		guestName := vmGuestName(vm)
+		inv.Vms.Os[guestName]++ // deprecated
+
+		osInfoMap := *inv.Vms.OsInfo
+		osInfo, found := osInfoMap[guestName]
+		if !found {
+			osInfo.Supported = isOsSupported(vm.Concerns)
+		}
+		osInfo.Count++
+		osInfoMap[guestName] = osInfo
+
 		inv.Vms.PowerStates[vm.PowerState]++
 
 		// Update total values
@@ -263,6 +274,15 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
 }
 
+func isOsSupported(concerns []vspheremodel.Concern) bool {
+	for _, concern := range concerns {
+		if concern.Id == "vmware.os.unsupported" {
+			return false
+		}
+	}
+	return true
+}
+
 func vmGuestName(vm vspheremodel.VM) string {
 	if vm.GuestNameFromVmwareTools != "" {
 		return vm.GuestNameFromVmwareTools
@@ -279,6 +299,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			Total:                len(*vms),
 			PowerStates:          map[string]int{},
 			Os:                   map[string]int{},
+			OsInfo:               &map[string]apiplanner.OsInfo{},
 			MigrationWarnings:    apiplanner.MigrationIssues{},
 			NotMigratableReasons: apiplanner.MigrationIssues{},
 		},
