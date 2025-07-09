@@ -107,9 +107,10 @@ type Label struct {
 
 // MigrationIssue defines model for MigrationIssue.
 type MigrationIssue struct {
-	Assessment string `json:"assessment"`
-	Count      int    `json:"count"`
-	Label      string `json:"label"`
+	Assessment string  `json:"assessment"`
+	Count      int     `json:"count"`
+	Id         *string `json:"id,omitempty"`
+	Label      string  `json:"label"`
 }
 
 // MigrationIssues defines model for MigrationIssues.
