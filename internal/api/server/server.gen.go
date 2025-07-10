@@ -20,6 +20,9 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /api/v1/shared/{token})
+	GetSharedSource(w http.ResponseWriter, r *http.Request, token string)
+
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
 
@@ -47,6 +50,12 @@ type ServerInterface interface {
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (DELETE /api/v1/sources/{id}/share-token)
+	DeleteShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v1/sources/{id}/share-token)
+	CreateShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
 }
@@ -54,6 +63,11 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (GET /api/v1/shared/{token})
+func (_ Unimplemented) GetSharedSource(w http.ResponseWriter, r *http.Request, token string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (DELETE /api/v1/sources)
 func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -100,6 +114,16 @@ func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (DELETE /api/v1/sources/{id}/share-token)
+func (_ Unimplemented) DeleteShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/sources/{id}/share-token)
+func (_ Unimplemented) CreateShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /health)
 func (_ Unimplemented) Health(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -113,6 +137,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetSharedSource operation middleware
+func (siw *ServerInterfaceWrapper) GetSharedSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "token" -------------
+	var token string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSharedSource(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // DeleteSources operation middleware
 func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -328,6 +378,58 @@ func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// DeleteShareToken operation middleware
+func (siw *ServerInterfaceWrapper) DeleteShareToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteShareToken(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateShareToken operation middleware
+func (siw *ServerInterfaceWrapper) CreateShareToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateShareToken(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // Health operation middleware
 func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -457,6 +559,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/shared/{token}", wrapper.GetSharedSource)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
 	})
 	r.Group(func(r chi.Router) {
@@ -484,10 +589,60 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/sources/{id}/share-token", wrapper.DeleteShareToken)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/sources/{id}/share-token", wrapper.CreateShareToken)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
 	})
 
 	return r
+}
+
+type GetSharedSourceRequestObject struct {
+	Token string `json:"token"`
+}
+
+type GetSharedSourceResponseObject interface {
+	VisitGetSharedSourceResponse(w http.ResponseWriter) error
+}
+
+type GetSharedSource200JSONResponse Source
+
+func (response GetSharedSource200JSONResponse) VisitGetSharedSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSharedSource400JSONResponse Error
+
+func (response GetSharedSource400JSONResponse) VisitGetSharedSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSharedSource404JSONResponse Error
+
+func (response GetSharedSource404JSONResponse) VisitGetSharedSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSharedSource500JSONResponse Error
+
+func (response GetSharedSource500JSONResponse) VisitGetSharedSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type DeleteSourcesRequestObject struct {
@@ -955,6 +1110,130 @@ func (response UploadRvtoolsFile500JSONResponse) VisitUploadRvtoolsFileResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
+type DeleteShareTokenRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteShareTokenResponseObject interface {
+	VisitDeleteShareTokenResponse(w http.ResponseWriter) error
+}
+
+type DeleteShareToken200JSONResponse Status
+
+func (response DeleteShareToken200JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteShareToken400JSONResponse Error
+
+func (response DeleteShareToken400JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteShareToken401JSONResponse Error
+
+func (response DeleteShareToken401JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteShareToken403JSONResponse Error
+
+func (response DeleteShareToken403JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteShareToken404JSONResponse Error
+
+func (response DeleteShareToken404JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteShareToken500JSONResponse Error
+
+func (response DeleteShareToken500JSONResponse) VisitDeleteShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareTokenRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type CreateShareTokenResponseObject interface {
+	VisitCreateShareTokenResponse(w http.ResponseWriter) error
+}
+
+type CreateShareToken200JSONResponse ShareToken
+
+func (response CreateShareToken200JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareToken400JSONResponse Error
+
+func (response CreateShareToken400JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareToken401JSONResponse Error
+
+func (response CreateShareToken401JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareToken403JSONResponse Error
+
+func (response CreateShareToken403JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareToken404JSONResponse Error
+
+func (response CreateShareToken404JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateShareToken500JSONResponse Error
+
+func (response CreateShareToken500JSONResponse) VisitCreateShareTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type HealthRequestObject struct {
 }
 
@@ -972,6 +1251,9 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+
+	// (GET /api/v1/shared/{token})
+	GetSharedSource(ctx context.Context, request GetSharedSourceRequestObject) (GetSharedSourceResponseObject, error)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
@@ -999,6 +1281,12 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
+
+	// (DELETE /api/v1/sources/{id}/share-token)
+	DeleteShareToken(ctx context.Context, request DeleteShareTokenRequestObject) (DeleteShareTokenResponseObject, error)
+
+	// (POST /api/v1/sources/{id}/share-token)
+	CreateShareToken(ctx context.Context, request CreateShareTokenRequestObject) (CreateShareTokenResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -1031,6 +1319,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetSharedSource operation middleware
+func (sh *strictHandler) GetSharedSource(w http.ResponseWriter, r *http.Request, token string) {
+	var request GetSharedSourceRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSharedSource(ctx, request.(GetSharedSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSharedSource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSharedSourceResponseObject); ok {
+		if err := validResponse.VisitGetSharedSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // DeleteSources operation middleware
@@ -1277,6 +1591,58 @@ func (sh *strictHandler) UploadRvtoolsFile(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadRvtoolsFileResponseObject); ok {
 		if err := validResponse.VisitUploadRvtoolsFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteShareToken operation middleware
+func (sh *strictHandler) DeleteShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteShareTokenRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteShareToken(ctx, request.(DeleteShareTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteShareToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteShareTokenResponseObject); ok {
+		if err := validResponse.VisitDeleteShareTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateShareToken operation middleware
+func (sh *strictHandler) CreateShareToken(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreateShareTokenRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateShareToken(ctx, request.(CreateShareTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateShareToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateShareTokenResponseObject); ok {
+		if err := validResponse.VisitCreateShareTokenResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

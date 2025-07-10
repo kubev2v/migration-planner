@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -48,8 +49,33 @@ func New(
 	}
 }
 
-func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
-	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
+func oapiErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	var statusCode int
+
+	// Check if error implements HTTPError interface
+	if httpErr, ok := err.(service.HTTPStatusCodeError); ok {
+		statusCode = httpErr.HTTPStatusCode()
+	} else {
+		// Fallback: check for known error types and patterns
+		statusCode = getStatusCodeFromError(err)
+	}
+
+	http.Error(w, fmt.Sprintf("API Error: %s", err.Error()), statusCode)
+}
+
+// getStatusCodeFromError provides fallback status code mapping for errors that don't implement HTTPError
+func getStatusCodeFromError(err error) int {
+	// Check error message patterns as last resort
+	errMsg := strings.ToLower(err.Error())
+	if strings.Contains(errMsg, "not found") {
+		return http.StatusNotFound
+	} else if strings.Contains(errMsg, "unauthorized") || strings.Contains(errMsg, "authentication") {
+		return http.StatusUnauthorized
+	} else if strings.Contains(errMsg, "forbidden") || strings.Contains(errMsg, "permission") {
+		return http.StatusForbidden
+	}
+
+	return http.StatusBadRequest
 }
 
 // Middleware to inject ResponseWriter into context
@@ -71,9 +97,7 @@ func (s *Server) Run(ctx context.Context) error {
 	// Skip server name validation
 	swagger.Servers = nil
 
-	oapiOpts := oapimiddleware.Options{
-		ErrorHandler: oapiErrorHandler,
-	}
+	oapiOpts := oapimiddleware.Options{}
 
 	authenticator, err := auth.NewAuthenticator(s.cfg.Service.Auth)
 	if err != nil {
@@ -85,6 +109,7 @@ func (s *Server) Run(ctx context.Context) error {
 	metricMiddleware := metrics.NewMiddleware("api_server")
 	metricMiddleware.MustRegisterDefault()
 
+	// Common middleware for all routes
 	router.Use(
 		metricMiddleware.Handler,
 		cors.Handler(cors.Options{
@@ -94,16 +119,34 @@ func (s *Server) Run(ctx context.Context) error {
 			AllowCredentials: true,
 			MaxAge:           300,
 		}),
-		authenticator.Authenticator,
 		middleware.RequestID,
 		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "router_api"),
 		middleware.Recoverer,
-		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,
 	)
 
-	h := handlers.NewServiceHandler(service.NewSourceService(s.store))
-	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
+	h := handlers.NewServiceHandler(service.NewSourceService(s.store), service.NewShareTokenService(s.store))
+	strictHandler := server.NewStrictHandler(h, nil)
+	wrapper := &server.ServerInterfaceWrapper{
+		Handler:            strictHandler,
+		HandlerMiddlewares: nil,
+		ErrorHandlerFunc:   oapiErrorHandler,
+	}
+
+	// Route group for public endpoints (no authentication required)
+	router.Group(func(r chi.Router) {
+		r.Use(oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts))
+		r.Get("/api/v1/shared/{token}", wrapper.GetSharedSource)
+	})
+
+	// Route group for authenticated endpoints
+	router.Group(func(r chi.Router) {
+		r.Use(
+			authenticator.Authenticator,
+			oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
+		)
+		server.HandlerFromMux(strictHandler, r)
+	})
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {
