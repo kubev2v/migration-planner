@@ -36,9 +36,24 @@ type agentCmd struct {
 func NewAgentCommand() *agentCmd {
 
 	a := &agentCmd{
-		config:   config.NewDefault(),
+		config: config.NewDefault(),
 	}
 
+	a.bind()
+
+	if err := a.config.ParseConfigFile(a.configFile); err != nil {
+		if err := a.config.CreateDefaultDirs(); err != nil {
+			panic(fmt.Sprintf("Config file not found. Error creating default directories: %v", err))
+		}
+	}
+	if err := a.config.Validate(); err != nil {
+		panic(fmt.Sprintf("Error validating config: %v", err))
+	}
+
+	return a
+}
+
+func (a *agentCmd) bind() {
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
 
 	flag.Usage = func() {
@@ -48,15 +63,6 @@ func NewAgentCommand() *agentCmd {
 	}
 
 	flag.Parse()
-
-	if err := a.config.ParseConfigFile(a.configFile); err != nil {
-		panic(fmt.Sprintf("Error parsing config: %v", err))
-	}
-	if err := a.config.Validate(); err != nil {
-		panic(fmt.Sprintf("Error validating config: %v", err))
-	}
-
-	return a
 }
 
 func (a *agentCmd) Execute() error {
@@ -73,7 +79,7 @@ func (a *agentCmd) Execute() error {
 
 	agentID, err := a.readFileFromPersistent(agentFilename)
 	if err != nil {
-		zap.S().Fatalf("failed to retreive agent_id: %v", err)
+		zap.S().Warnf("failed to retreive agent_id: %v", err)
 	}
 
 	// Try to read jwt from file.
@@ -81,7 +87,7 @@ func (a *agentCmd) Execute() error {
 	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
 	jwt, err := a.readFileFromVolatile(jwtFilename)
 	if err != nil {
-		zap.S().Errorf("failed to read jwt: %v", err)
+		zap.S().Warnf("failed to read jwt: %v", err)
 	}
 
 	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
@@ -91,23 +97,23 @@ func (a *agentCmd) Execute() error {
 	return nil
 }
 
-func (a *agentCmd) readFile(baseDir string, filename string) (string, error) {
+func (a *agentCmd) readFile(baseDir, filename, fallbackValue string) (string, error) {
 	filePath := path.Join(baseDir, filename)
 	if _, err := os.Stat(filePath); err == nil {
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			return "", err
+			return fallbackValue, err
 		}
 		return string(bytes.TrimSpace(content)), nil
 	}
 
-	return "", fmt.Errorf("file not found: %s", filePath)
+	return fallbackValue, fmt.Errorf("file not found: %s", filePath)
 }
 
 func (a *agentCmd) readFileFromVolatile(filename string) (string, error) {
-	return a.readFile(a.config.DataDir, filename)
+	return a.readFile(a.config.DataDir, filename, "")
 }
 
 func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
-	return a.readFile(a.config.PersistentDataDir, filename)
+	return a.readFile(a.config.PersistentDataDir, filename, uuid.Nil.String())
 }
