@@ -241,7 +241,6 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
 
 		guestName := vmGuestName(vm)
-		inv.Vms.Os[guestName]++ // deprecated
 
 		osInfoMap := *inv.Vms.OsInfo
 		osInfo, found := osInfoMap[guestName]
