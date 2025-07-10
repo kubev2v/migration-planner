@@ -326,14 +326,14 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			Hosts:                 getHosts(hosts),
 			TotalHosts:            len(*hosts),
 			TotalClusters:         len(*clusters),
-			TotalDatacenters:      len(*datacenters),
+			TotalDatacenters:      util.IntPtr(len(*datacenters)),
 			HostsPerCluster:       getHostsPerCluster(*clusters),
 			Networks:              getNetworks(collector),
 		},
 	}
 }
 
-func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) []int {
+func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
 	var h []int
 
 	folders := &[]vspheremodel.Folder{}
@@ -356,7 +356,7 @@ func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vs
 		}
 	}
 
-	return h
+	return &h
 }
 
 func countClustersRecursively(folder vspheremodel.Folder, folderByID map[string]vspheremodel.Folder) int {
@@ -606,7 +606,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	return res
 }
 
-func getHosts(hosts *[]vspheremodel.Host) []apiplanner.Host {
+func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
 	var l []apiplanner.Host
 
 	for _, host := range *hosts {
@@ -616,7 +616,7 @@ func getHosts(hosts *[]vspheremodel.Host) []apiplanner.Host {
 		})
 	}
 
-	return l
+	return &l
 }
 
 func totalCapacity(disks []vspheremodel.Disk) int {
