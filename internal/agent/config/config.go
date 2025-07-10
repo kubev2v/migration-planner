@@ -3,6 +3,9 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"os"
+	"path"
 	"path/filepath"
 	"time"
 
@@ -97,6 +100,35 @@ func NewDefault() *Config {
 	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
 	return c
+}
+
+func NewStandaloneConfig() (*Config, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Config{
+		DataDir:           path.Join(home, "data"),
+		PersistentDataDir: path.Join(home, "persistent-data"),
+		WwwDir:            "/app/www",
+		PlannerService:    PlannerService{Config: *client.NewDefault()},
+		SourceID:          uuid.Nil.String(),
+		UpdateInterval:    util.Duration{Duration: DefaultUpdateInterval},
+		reader:            fileio.NewReader(),
+		LogLevel:          logrus.InfoLevel.String(),
+	}
+	c.PlannerService.Service.Server = DefaultPlannerEndpoint
+
+	if err := os.MkdirAll(c.DataDir, 0700); err != nil {
+		return nil, err
+	}
+
+	if err := os.MkdirAll(c.PersistentDataDir, 0700); err != nil {
+		return nil, err
+	}
+
+	return c, nil
 }
 
 // Validate checks that the required fields are set and that the paths exist.
