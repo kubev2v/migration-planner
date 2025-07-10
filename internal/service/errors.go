@@ -31,6 +31,14 @@ func NewErrAgentNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "agent")
 }
 
+func NewErrShareTokenNotFoundBySourceID(sourceID uuid.UUID) *ErrResourceNotFound {
+	return &ErrResourceNotFound{fmt.Errorf("share token not found for source %s", sourceID)}
+}
+
+func NewErrSourceNotFoundByToken(token string) *ErrResourceNotFound {
+	return &ErrResourceNotFound{fmt.Errorf("share token not found for token %s", truncateToken(token))}
+}
+
 type ErrExcelFileNotValid struct {
 	error
 }
@@ -45,4 +53,12 @@ type ErrAgentUpdateForbidden struct {
 
 func NewErrAgentUpdateForbidden(sourceID, agentID uuid.UUID) *ErrAgentUpdateForbidden {
 	return &ErrAgentUpdateForbidden{fmt.Errorf("agent %s is not associated with source %s", agentID, sourceID)}
+}
+
+type ErrSourceNoInventory struct {
+	error
+}
+
+func NewErrSourceNoInventory(sourceID uuid.UUID) *ErrSourceNoInventory {
+	return &ErrSourceNoInventory{fmt.Errorf("source %s does not have an updated inventory", sourceID)}
 }

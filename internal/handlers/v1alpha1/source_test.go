@@ -89,7 +89,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -116,7 +116,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -129,6 +129,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -143,7 +144,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -177,7 +178,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -211,7 +212,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -244,7 +245,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -274,7 +275,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -292,6 +293,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -319,7 +321,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -354,7 +356,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -390,7 +392,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
@@ -417,13 +419,14 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -445,7 +448,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
 			Expect(err).To(BeNil())
 
@@ -471,7 +474,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 
@@ -501,13 +504,14 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -526,7 +530,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -570,7 +574,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -621,7 +625,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.SourceUpdateOnPrem{
@@ -662,6 +666,99 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("delete source with share token", func() {
+		It("deletes share token when source is deleted via handler", func() {
+			sourceID := uuid.New()
+
+			// Create source
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share token for the source
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify share token exists
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			// Delete the source via handler
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
+			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource200JSONResponse{}).String()))
+
+			// Verify source is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify share token is automatically deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("deletes all share tokens when all sources are deleted via handler", func() {
+			sourceID1 := uuid.New()
+			sourceID2 := uuid.New()
+
+			// Create two sources with different org_ids to avoid unique constraint violation
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID1, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID2, "user1", "group1"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share tokens for both sources
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-1", sourceID1))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-2", sourceID2))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify both share tokens exist
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Delete all sources via handler
+			srv := handlers.NewServiceHandler(service.NewSourceService(s), service.NewShareTokenService(s))
+			resp, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSources200JSONResponse{}).String()))
+
+			// Verify all sources are deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify all share tokens are deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})

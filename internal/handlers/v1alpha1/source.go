@@ -3,8 +3,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"io"
-
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	apiServer "github.com/kubev2v/migration-planner/internal/api/server"
@@ -13,15 +11,18 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
+	"io"
 )
 
 type ServiceHandler struct {
-	sourceSrv *service.SourceService
+	sourceSrv     *service.SourceService
+	shareTokenSrv *service.ShareTokenService
 }
 
-func NewServiceHandler(sourceService *service.SourceService) *ServiceHandler {
+func NewServiceHandler(sourceService *service.SourceService, shareTokenService *service.ShareTokenService) *ServiceHandler {
 	return &ServiceHandler{
-		sourceSrv: sourceService,
+		sourceSrv:     sourceService,
+		shareTokenSrv: shareTokenService,
 	}
 }
 
@@ -206,4 +207,130 @@ func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServe
 // (GET /health)
 func (s *ServiceHandler) Health(ctx context.Context, request apiServer.HealthRequestObject) (apiServer.HealthResponseObject, error) {
 	return apiServer.Health200Response{}, nil
+}
+
+// (POST /api/v1/sources/{id}/share-token)
+func (s *ServiceHandler) CreateShareToken(ctx context.Context, request apiServer.CreateShareTokenRequestObject) (apiServer.CreateShareTokenResponseObject, error) {
+	// Check if source exists and user has access
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.CreateShareToken404JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.CreateShareToken500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return apiServer.CreateShareToken403JSONResponse{Message: fmt.Sprintf("forbidden access to source %q", request.Id)}, nil
+	}
+
+	// Create or get existing share token
+	shareToken, err := s.shareTokenSrv.CreateShareToken(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.CreateShareToken404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrSourceNoInventory:
+			// Check if it's an inventory validation error
+			return apiServer.CreateShareToken400JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.CreateShareToken500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	return apiServer.CreateShareToken200JSONResponse(mappers.ShareTokenToApi(*shareToken)), nil
+}
+
+// (DELETE /api/v1/sources/{id}/share-token)
+func (s *ServiceHandler) DeleteShareToken(ctx context.Context, request apiServer.DeleteShareTokenRequestObject) (apiServer.DeleteShareTokenResponseObject, error) {
+	// Check if source exists and user has access
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.DeleteShareToken404JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.DeleteShareToken500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return apiServer.DeleteShareToken403JSONResponse{Message: fmt.Sprintf("forbidden access to source %q", request.Id)}, nil
+	}
+
+	// Delete share token
+	err = s.shareTokenSrv.DeleteShareToken(ctx, request.Id)
+	if err != nil {
+		return apiServer.DeleteShareToken500JSONResponse{Message: err.Error()}, nil
+	}
+
+	return apiServer.DeleteShareToken200JSONResponse{
+		Message: func() *string { s := "Share token deleted successfully"; return &s }(),
+		Status:  func() *string { s := "Success"; return &s }(),
+	}, nil
+}
+
+// (GET /api/v1/sources/shared/{token})
+func (s *ServiceHandler) GetSharedSource(ctx context.Context, request apiServer.GetSharedSourceRequestObject) (apiServer.GetSharedSourceResponseObject, error) {
+	// Get source by token (no authentication required)
+	source, err := s.shareTokenSrv.GetSourceByToken(ctx, request.Token)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.GetSharedSource404JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.GetSharedSource500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	return apiServer.GetSharedSource200JSONResponse(mappers.SourceToApi(*source)), nil
+}
+
+// (GET /api/v1/sources/{id}/share-token)
+func (s *ServiceHandler) GetShareToken(ctx context.Context, request apiServer.GetShareTokenRequestObject) (apiServer.GetShareTokenResponseObject, error) {
+	// Check if source exists and user has access
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.GetShareToken404JSONResponse{Message: err.Error()}, nil
+		default:
+			return apiServer.GetShareToken500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		return apiServer.GetShareToken403JSONResponse{Message: fmt.Sprintf("forbidden access to source %q", request.Id)}, nil
+	}
+
+	// Get share token for this source
+	shareToken, err := s.shareTokenSrv.GetShareTokenBySourceID(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return apiServer.GetShareToken404JSONResponse{Message: "share token not found"}, nil
+		default:
+			return apiServer.GetShareToken500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	return apiServer.GetShareToken200JSONResponse(mappers.ShareTokenToApi(*shareToken)), nil
+}
+
+// (GET /api/v1/sources/share-tokens)
+func (s *ServiceHandler) ListShareTokens(ctx context.Context, request apiServer.ListShareTokensRequestObject) (apiServer.ListShareTokensResponseObject, error) {
+	user := auth.MustHaveUser(ctx)
+
+	// List all share tokens for the user's organization
+	shareTokens, err := s.shareTokenSrv.ListShareTokens(ctx, user.Organization)
+	if err != nil {
+		return apiServer.ListShareTokens500JSONResponse{Message: err.Error()}, nil
+	}
+
+	return apiServer.ListShareTokens200JSONResponse(mappers.ShareTokenListToApi(shareTokens)), nil
 }

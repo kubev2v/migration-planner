@@ -41,7 +41,17 @@ var _ = Describe("migrations", Ordered, func() {
 
 		})
 
-		It("sucessfully migrate the db", func() {
+		BeforeEach(func() {
+			gormdb.Exec("DROP TABLE IF EXISTS agents;")
+			gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
+			gormdb.Exec("DROP TABLE IF EXISTS keys;")
+			gormdb.Exec("DROP TABLE IF EXISTS labels;")
+			gormdb.Exec("DROP TABLE IF EXISTS share_tokens;")
+			gormdb.Exec("DROP TABLE IF EXISTS sources;")
+			gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
+		})
+
+		It("successfully migrate the db", func() {
 			currentFolder, err := os.Getwd()
 			Expect(err).To(BeNil())
 
@@ -59,15 +69,6 @@ var _ = Describe("migrations", Ordered, func() {
 			for _, table := range []string{"agents", "sources", "keys", "image_infras"} {
 				Expect(tableExists(table)).To(BeTrue())
 			}
-		})
-
-		AfterEach(func() {
-			gormdb.Exec("DROP TABLE IF EXISTS agents;")
-			gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
-			gormdb.Exec("DROP TABLE IF EXISTS keys;")
-			gormdb.Exec("DROP TABLE IF EXISTS labels;")
-			gormdb.Exec("DROP TABLE IF EXISTS sources;")
-			gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
 		})
 	})
 })

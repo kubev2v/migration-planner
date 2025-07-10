@@ -123,6 +123,7 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE from agents;")
 			gormdb.Exec("DELETE from sources;")
 		})
@@ -163,6 +164,7 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE from agents;")
 			gormdb.Exec("DELETE from sources;")
 		})
@@ -211,6 +213,7 @@ var _ = Describe("source store", Ordered, func() {
 			})
 
 			AfterEach(func() {
+				gormdb.Exec("DELETE FROM share_tokens;")
 				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")
 			})
@@ -259,6 +262,7 @@ var _ = Describe("source store", Ordered, func() {
 			})
 
 			AfterEach(func() {
+				gormdb.Exec("DELETE FROM share_tokens;")
 				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")
 			})
@@ -330,6 +334,130 @@ var _ = Describe("source store", Ordered, func() {
 
 			count := 1
 			tx = gormdb.Raw("SELECT COUNT(*) FROM labels;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("deletes share token when source is deleted (CASCADE)", func() {
+			sourceID := uuid.New()
+
+			// Create source
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share token for the source
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify share token exists
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			// Delete the source
+			err := s.Source().Delete(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+
+			// Verify source is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify share token is automatically deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("deletes only the correct share token when multiple sources exist", func() {
+			sourceID1 := uuid.New()
+			sourceID2 := uuid.New()
+
+			// Create two sources
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID1, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID2, "source2", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share tokens for both sources
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-1", sourceID1))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-2", sourceID2))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify both share tokens exist
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Delete the first source
+			err := s.Source().Delete(context.TODO(), sourceID1)
+			Expect(err).To(BeNil())
+
+			// Verify first source is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID1).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify second source still exists
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID2).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			// Verify only the first share token is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID1).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify second share token still exists
+			count = 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID2).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+		})
+
+		It("deletes all share tokens when all sources are deleted", func() {
+			sourceID1 := uuid.New()
+			sourceID2 := uuid.New()
+
+			// Create two sources
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID1, "source1", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID2, "source2", "user1", "org_id_1"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share tokens for both sources
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-1", sourceID1))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-2", sourceID2))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify both share tokens exist
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Delete all sources
+			err := s.Source().DeleteAll(context.TODO())
+			Expect(err).To(BeNil())
+
+			// Verify all sources are deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify all share tokens are deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(0))
 		})
@@ -414,6 +542,7 @@ var _ = Describe("source store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
 			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE from sources;")
 		})
