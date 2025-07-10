@@ -173,7 +173,7 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
-       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}/api/migration-assessment \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc apply -f -; \
