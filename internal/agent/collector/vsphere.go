@@ -44,6 +44,22 @@ type VMValidation struct {
 	Result []vspheremodel.Concern `json:"result"`
 }
 
+var vendorMap = map[string]string{
+	"NETAPP":   "NetApp",
+	"EMC":      "Dell EMC",
+	"PURE":     "Pure Storage",
+	"3PARDATA": "HPE", // 3PAR is an HPE product line
+	"ATA":      "ATA",
+	"DELL EMC": "Dell EMC",
+	"DELL":     "Dell",
+	"HPE":      "HPE",
+	"IBM":      "IBM",
+	"HITACHI":  "Vantara",
+	"CISCO":    "Cisco",
+	"FUJITSU":  "Fujitsu",
+	"LENOVO":   "Lenovo",
+}
+
 func NewCollector(dataDir string, credentialsDir string) *Collector {
 	return &Collector{
 		dataDir:        dataDir,
@@ -556,6 +572,16 @@ func isHardwareAcceleratedMove(hosts []vspheremodel.Host, names []string) bool {
 	return supported
 }
 
+func transformVendorName(vendor string) string {
+	vendor = strings.ToUpper(strings.TrimSpace(vendor))
+
+	if transformed, exists := vendorMap[vendor]; exists {
+		return transformed
+	}
+
+	return strings.TrimSpace(vendor)
+}
+
 func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
 	datastores := &[]vspheremodel.Datastore{}
 	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
@@ -570,7 +596,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
 			Type:                    ds.Type,
-			Vendor:                  dsVendor,
+			Vendor:                  transformVendorName(dsVendor),
 			Model:                   dsModel,
 			ProtocolType:            dsProtocol,
 			DiskId:                  getNaa(&ds),
