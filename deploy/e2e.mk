@@ -82,8 +82,6 @@ deploy_assisted_migration: oc
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner 3443:3443 > /dev/null 2>&1 &
-	oc port-forward --address 0.0.0.0 service/migration-planner-image 11443:11443 > /dev/null 2>&1 &
 
 .PHONY: undeploy-e2e-environment
 undeploy-e2e-environment:
