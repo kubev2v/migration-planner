@@ -60,6 +60,7 @@ type IgnitionData struct {
 	HttpsProxyUrl              string
 	NoProxyDomain              string
 	ValidationContainerImage   string
+	RhcosPassword              string
 }
 
 type Proxy struct {
@@ -88,6 +89,7 @@ type ImageBuilder struct {
 	Template                   string
 	RHCOSImage                 string
 	imageType                  ImageType
+	RhcosPassword              string
 }
 
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
@@ -110,6 +112,9 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {
 		imageBuilder.InsecureRegistry = insecureRegistry
+	}
+	if rhcosPassword := os.Getenv("RHCOS_PASSWORD"); rhcosPassword != "" {
+		imageBuilder.RhcosPassword = rhcosPassword
 	}
 
 	return imageBuilder
@@ -197,6 +202,7 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		HttpsProxyUrl:              b.Proxy.HttpsUrl,
 		NoProxyDomain:              b.Proxy.NoProxyDomain,
 		ValidationContainerImage:   b.ValidationContainerImage,
+		RhcosPassword:              b.RhcosPassword,
 	}
 
 	var buf bytes.Buffer
