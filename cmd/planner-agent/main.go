@@ -31,23 +31,25 @@ func main() {
 type agentCmd struct {
 	config     *config.Config
 	configFile string
+	standalone bool
 }
 
 func NewAgentCommand() *agentCmd {
 
-	a := &agentCmd{
-		config:   config.NewDefault(),
+	a := &agentCmd{}
+
+	a.bind()
+
+	if a.standalone {
+		standaloneConfig, err := config.NewStandaloneConfig()
+		if err != nil {
+			panic(err)
+		}
+		a.config = standaloneConfig
+		return a
 	}
 
-	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
-
-	flag.Usage = func() {
-		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
-		fmt.Println("This program starts an agent with the specified configuration. Below are the available flags:")
-		flag.PrintDefaults()
-	}
-
-	flag.Parse()
+	a.config = config.NewDefault()
 
 	if err := a.config.ParseConfigFile(a.configFile); err != nil {
 		panic(fmt.Sprintf("Error parsing config: %v", err))
@@ -57,6 +59,19 @@ func NewAgentCommand() *agentCmd {
 	}
 
 	return a
+}
+
+func (a *agentCmd) bind() {
+	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
+	flag.BoolVar(&a.standalone, "standalone", false, "Boolean flag indicating whether the agent runs in standalone mode")
+
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
+		fmt.Println("This program starts an agent with the specified configuration. Below are the available flags:")
+		flag.PrintDefaults()
+	}
+
+	flag.Parse()
 }
 
 func (a *agentCmd) Execute() error {
@@ -105,9 +120,15 @@ func (a *agentCmd) readFile(baseDir string, filename string) (string, error) {
 }
 
 func (a *agentCmd) readFileFromVolatile(filename string) (string, error) {
+	if a.standalone {
+		return "", nil
+	}
 	return a.readFile(a.config.DataDir, filename)
 }
 
 func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
+	if a.standalone {
+		return uuid.Nil.String(), nil
+	}
 	return a.readFile(a.config.PersistentDataDir, filename)
 }
