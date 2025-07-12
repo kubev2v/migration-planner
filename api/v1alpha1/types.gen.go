@@ -184,11 +184,12 @@ type VMResourceBreakdown struct {
 
 // VMs defines model for VMs.
 type VMs struct {
-	CpuCores             VMResourceBreakdown `json:"cpuCores"`
-	DiskCount            VMResourceBreakdown `json:"diskCount"`
-	DiskGB               VMResourceBreakdown `json:"diskGB"`
-	MigrationWarnings    []MigrationIssue    `json:"migrationWarnings"`
-	NotMigratableReasons []MigrationIssue    `json:"notMigratableReasons"`
+	CpuCores             VMResourceBreakdown  `json:"cpuCores"`
+	DiskCount            VMResourceBreakdown  `json:"diskCount"`
+	DiskGB               VMResourceBreakdown  `json:"diskGB"`
+	MigrationWarnings    []MigrationIssue     `json:"migrationWarnings"`
+	NicCount             *VMResourceBreakdown `json:"nicCount,omitempty"`
+	NotMigratableReasons []MigrationIssue     `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          map[string]int      `json:"os"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`

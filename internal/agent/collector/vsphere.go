@@ -230,12 +230,16 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	memorySet := []int{}
 	diskGBSet := []int{}
 	diskCountSet := []int{}
+	nicCountSet := []int{}
 	for _, vm := range *vms {
+		nicCount := len(vm.NICs)
+
 		// histogram collection
 		cpuSet = append(cpuSet, int(vm.CpuCount))
 		memorySet = append(memorySet, int(vm.MemoryMB/1024))
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 		diskCountSet = append(diskCountSet, len(vm.Disks))
+		nicCountSet = append(nicCountSet, nicCount)
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
@@ -258,6 +262,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
 		inv.Vms.DiskCount.Total += len(vm.Disks)
 		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
+		inv.Vms.NicCount.Total += len(vm.NICs)
 
 		// Not Migratable
 		if !migratable {
@@ -265,6 +270,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
 			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
 			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
+			inv.Vms.NicCount.TotalForNotMigratable += len(vm.NICs)
 		} else {
 			// Migratable with warning(s)
 			if hasWarning {
@@ -272,12 +278,14 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) //Migratable
+				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
 				// Migratable without any warnings
 				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
+				inv.Vms.NicCount.TotalForMigratable += len(vm.NICs)
 			}
 		}
 
@@ -288,6 +296,17 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.RamGB.Histogram = Histogram(memorySet)
 	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
+
+	allZeroNics := len(nicCountSet) > 0 && slices.Max(nicCountSet) == 0
+	if allZeroNics {
+		inv.Vms.NicCount.Histogram = apiplanner.Histogram{
+			Data:     []int{},
+			Step:     0,
+			MinValue: 0,
+		}
+	} else {
+		inv.Vms.NicCount.Histogram = NicHistogram(nicCountSet)
+	}
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {
@@ -318,6 +337,7 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			OsInfo:               &map[string]apiplanner.OsInfo{},
 			MigrationWarnings:    apiplanner.MigrationIssues{},
 			NotMigratableReasons: apiplanner.MigrationIssues{},
+			NicCount:             CreateDefaultNicCount(),
 		},
 		Infra: apiplanner.Infra{
 			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
@@ -329,6 +349,20 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			TotalDatacenters:      util.IntPtr(len(*datacenters)),
 			HostsPerCluster:       getHostsPerCluster(*clusters),
 			Networks:              getNetworks(collector),
+		},
+	}
+}
+
+func CreateDefaultNicCount() *apiplanner.VMResourceBreakdown {
+	return &apiplanner.VMResourceBreakdown{
+		Total:                          0,
+		TotalForMigratable:             0,
+		TotalForMigratableWithWarnings: 0,
+		TotalForNotMigratable:          0,
+		Histogram: apiplanner.Histogram{
+			Data:     []int{0},
+			MinValue: 0,
+			Step:     0,
 		},
 	}
 }
@@ -403,6 +437,30 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
+func calculateBinIndexForNics(data, minVal int, binSize float64, rangeValues, numberOfBins int) int {
+	if rangeValues == 0 {
+		// All values are identical - put everything in bin 0
+		return 0
+	}
+
+	if binSize == 1.0 {
+		return data - minVal
+	}
+
+	// Division-based mapping for larger ranges
+	binIndex := int(float64(data-minVal) / binSize)
+
+	// Ensure bin index is within bounds
+	if binIndex >= numberOfBins {
+		return numberOfBins - 1
+	}
+	if binIndex < 0 {
+		return 0
+	}
+
+	return binIndex
+}
+
 func Histogram(d []int) apiplanner.Histogram {
 	minVal := slices.Min(d)
 	maxVal := slices.Max(d)
@@ -434,6 +492,60 @@ func Histogram(d []int) apiplanner.Histogram {
 	}
 }
 
+func NicHistogram(d []int) apiplanner.Histogram {
+	// If the data is empty, return an empty histogram
+	if len(d) == 0 {
+		return apiplanner.Histogram{
+			Data:     []int{},
+			Step:     0,
+			MinValue: 0,
+		}
+	}
+
+	minVal := slices.Min(d)
+	maxVal := slices.Max(d)
+	rangeValues := maxVal - minVal
+	numberOfDataPoints := len(d)
+	numberOfBins := int(math.Sqrt(float64(numberOfDataPoints)))
+	
+	if numberOfBins == 0 {
+		numberOfBins = 1
+	}
+
+	// For small ranges (like NIC counts), use 1 bin per value
+	// This gives more intuitive results for NICs
+	var binSize float64
+	if maxVal <= 10 {
+		numberOfBins = maxVal - minVal + 1
+		binSize = 1.0
+	} else {
+		// For larger ranges, use the original algorithm
+		if rangeValues == 0 {
+			binSize = 1.0
+		} else {
+			binSize = float64(rangeValues) / float64(numberOfBins)
+		}
+	}
+
+	bins := make([]int, numberOfBins)
+
+	for _, data := range d {
+		binIndex := calculateBinIndexForNics(data, minVal, binSize, rangeValues, numberOfBins)
+		bins[binIndex]++
+	}
+
+	step := int(math.Round(binSize))
+	if step == 0 && len(d) > 0 {
+		step = 1
+	}
+
+	return apiplanner.Histogram{
+		Data:     bins,
+		Step:     step,
+		MinValue: minVal,
+	}
+}
+
 func getNetworks(collector *vsphere.Collector) []apiplanner.Network {
 	r := []apiplanner.Network{}
 	networks := &[]vspheremodel.Network{}
@@ -461,13 +573,14 @@ func getNetworks(collector *vsphere.Collector) []apiplanner.Network {
 }
 
 func getNetworkType(n *vspheremodel.Network) string {
-	if n.Variant == vspheremodel.NetDvPortGroup {
-		return string(apiplanner.Distributed)
-	} else if n.Variant == vspheremodel.NetStandard {
-		return string(apiplanner.Standard)
-	} else if n.Variant == vspheremodel.NetDvSwitch {
-		return string(apiplanner.Dvswitch)
-	}
+	switch n.Variant {
+		case vspheremodel.NetDvPortGroup:
+			return string(apiplanner.Distributed)
+		case vspheremodel.NetStandard:
+			return string(apiplanner.Standard)
+		case vspheremodel.NetDvSwitch:
+			return string(apiplanner.Dvswitch)
+		}
 
 	return string(apiplanner.Unsupported)
 }

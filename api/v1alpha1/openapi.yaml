@@ -581,6 +581,12 @@ components:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskCount:
           $ref: '#/components/schemas/VMResourceBreakdown'
+        nicCount:
+          type: object
+          $ref: '#/components/schemas/VMResourceBreakdown'
+          nullable: false
+          x-oapi-codegen-extra-tags:
+            json: "nicCount,omitempty"
         powerStates:
           type: object
           additionalProperties:
