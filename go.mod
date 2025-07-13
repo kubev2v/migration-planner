@@ -126,7 +126,7 @@ require (
 	github.com/openshift/api v0.0.0-20250710082954-674ad74beffc // indirect
 	github.com/openshift/client-go v0.0.0-20250701093119-6d8e53714277 // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
-	github.com/pelletier/go-toml/v2 v2.2.3 // indirect
+	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pkg/xattr v0.4.9 // indirect
