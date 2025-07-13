@@ -18,7 +18,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.1
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.7.1
+	github.com/jackc/pgx/v5 v5.7.5
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubev2v/forklift v0.0.0-20250704111625-b8168b0c4d67
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
