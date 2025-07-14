@@ -207,7 +207,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
 	if err != nil {
-		return fmt.Errorf("Error parsing RVTools file: %v", err)
+		return fmt.Errorf("error parsing RVTools file: %v", err)
 	}
 
 	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
