@@ -32,7 +32,7 @@ var _ = Describe("e2e-multiple-users", func() {
 		// Iterate over each organization and user to authenticate and create a unique source per org-user pair
 		for _, org := range organizations {
 			for _, user := range users {
-				err = svc.ChangeCredentials(UserAuth(user, org))
+				err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
 				Expect(err).To(BeNil())
 				_, err = svc.CreateSource(fmt.Sprintf("%s-%s", org, user))
 				Expect(err).To(BeNil())
@@ -45,7 +45,7 @@ var _ = Describe("e2e-multiple-users", func() {
 		zap.S().Info("Cleaning up after test...")
 		for _, org := range organizations {
 			for _, user := range users {
-				err = svc.ChangeCredentials(UserAuth(user, org))
+				err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
 				Expect(err).To(BeNil())
 				err := svc.RemoveSources()
 				Expect(err).To(BeNil(), "Failed to remove sources from DB")
@@ -63,7 +63,7 @@ var _ = Describe("e2e-multiple-users", func() {
 			// Verify that each user sees only the sources created by their own organization
 			for _, org := range organizations {
 				for _, user := range users {
-					err = svc.ChangeCredentials(UserAuth(user, org))
+					err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
 					Expect(err).To(BeNil())
 					visibleSources, err := svc.GetSources()
 					Expect(err).To(BeNil())

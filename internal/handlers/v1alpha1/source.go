@@ -62,6 +62,7 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request apiServer.Cre
 	sourceCreateForm := mappers.SourceFormApi(form)
 	sourceCreateForm.Username = user.Username
 	sourceCreateForm.OrgID = user.Organization
+	sourceCreateForm.EmailDomain = user.EmailDomain
 
 	source, err := s.sourceSrv.CreateSource(ctx, sourceCreateForm)
 	if err != nil {

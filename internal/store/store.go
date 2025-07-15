@@ -81,7 +81,8 @@ func (s *DataStore) Seed() error {
 	}
 
 	if err := tx.tx.Clauses(clause.OnConflict{
-		UpdateAll: true,
+		Columns:   []clause.Column{{Name: "id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"inventory"}),
 	}).Create(&source).Error; err != nil {
 		_ = tx.Rollback()
 	}

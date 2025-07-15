@@ -2,10 +2,11 @@ package e2e_utils
 
 import (
 	"fmt"
+	"os"
+
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	"os"
 )
 
 // GetToken retrieves the private key from the specified path, parses it, and then generates a token
@@ -32,14 +33,15 @@ func GetToken(credentials *auth.User) (string, error) {
 }
 
 // UserAuth returns an auth.User object with the provided username and organization.
-func UserAuth(user string, org string) *auth.User {
+func UserAuth(user string, org string, emailDomain string) *auth.User {
 	return &auth.User{
 		Username:     user,
 		Organization: org,
+		EmailDomain:  emailDomain,
 	}
 }
 
 // DefaultUserAuth returns an auth.User object with the default username and organization.
 func DefaultUserAuth() *auth.User {
-	return UserAuth(DefaultUsername, DefaultOrganization)
+	return UserAuth(DefaultUsername, DefaultOrganization, DefaultEmailDomain)
 }
