@@ -68,27 +68,40 @@ func (rh *RHSSOAuthenticator) Authenticate(token string) (User, error) {
 	return user, nil
 }
 
-func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (User, error) {
+func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (user User, err error) {
 	claims, ok := userToken.Claims.(jwt.MapClaims)
 	if !ok {
 		return User{}, errors.New("failed to parse jwt token claims")
 	}
+
+	// recover from panic if any of the claims are missing
+	defer func() {
+		if r := recover(); r != nil {
+			user = User{}
+			err = fmt.Errorf("failed to parse token: %v", claims)
+		}
+	}()
 
 	orgID, err := rh.getOrgID(claims)
 	if err != nil {
 		return User{}, err
 	}
 
-	username := claims["preferred_username"].(string)
+	username := claims["username"].(string)
+	domain := ""
 	if email, ok := claims["email"].(string); ok {
 		if email != "" {
-			username = email
+			parts := strings.Split(email, "@")
+			if len(parts) == 2 {
+				domain = parts[1]
+			}
 		}
 	}
 
 	return User{
 		Username:     username,
 		Organization: orgID,
+		EmailDomain:  domain,
 		Token:        userToken,
 	}, nil
 }
@@ -131,7 +144,7 @@ func (rh *RHSSOAuthenticator) getOrgID(claims jwt.MapClaims) (string, error) {
 	}
 
 	// get orgID from username if possible
-	username := claims["preferred_username"].(string)
+	username := claims["username"].(string)
 	if strings.Contains(username, "@") {
 		orgID := strings.Split(username, "@")[1]
 		if strings.TrimSpace(orgID) == "" {

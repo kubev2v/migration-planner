@@ -14,6 +14,7 @@ var TestOptions = struct {
 const (
 	DefaultOrganization string = "admin"
 	DefaultUsername     string = "admin"
+	DefaultEmailDomain  string = "example.com"
 	VmName              string = "coreos-vm"
 	Vsphere1Port        string = "8989"
 	Vsphere2Port        string = "8990"

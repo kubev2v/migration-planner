@@ -27,6 +27,7 @@ var _ = Describe("sso authentication", func() {
 			Expect(err).To(BeNil())
 			Expect(user.Username).To(Equal("batman"))
 			Expect(user.Organization).To(Equal("GothamCity"))
+			Expect(user.EmailDomain).To(Equal("gothamcity.com"))
 		})
 
 		// FIXME: enable when token validation enabled again
@@ -40,7 +41,7 @@ var _ = Describe("sso authentication", func() {
 		})
 
 		It("successfully validate the token -- no orgID", func() {
-			sToken, keyFn := generateCustomToken("user@company.com", "", "")
+			sToken, keyFn := generateCustomToken("user@company.com", "", "user@company.com")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -50,8 +51,8 @@ var _ = Describe("sso authentication", func() {
 			Expect(user.Organization).To(Equal("company.com"))
 		})
 
-		It("failed validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("user@", "", "")
+		It("failed validate the token -- email is missing", func() {
+			sToken, keyFn := generateCustomToken("user", "", "")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
@@ -59,24 +60,14 @@ var _ = Describe("sso authentication", func() {
 			Expect(err).ToNot(BeNil())
 		})
 
-		It("successfully validate the token -- username malformatted", func() {
-			sToken, keyFn := generateCustomToken("@user", "", "")
+		It("failed to set email domain -- email is malformated", func() {
+			sToken, keyFn := generateCustomToken("user", "", "some-email")
 			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
 			Expect(err).To(BeNil())
 
 			user, err := authenticator.Authenticate(sToken)
-			Expect(err).To(BeNil())
-			Expect(user.Organization).To(Equal("user"))
-		})
-
-		It("successfully validate the token -- username is the email", func() {
-			sToken, keyFn := generateCustomToken("user", "org_id", "user@example.com")
-			authenticator, err := auth.NewRHSSOAuthenticatorWithKeyFn(keyFn)
-			Expect(err).To(BeNil())
-
-			user, err := authenticator.Authenticate(sToken)
-			Expect(err).To(BeNil())
-			Expect(user.Username).To(Equal("user@example.com"))
+			Expect(err).ToNot(BeNil())
+			Expect(user.EmailDomain).To(BeEmpty())
 		})
 	})
 	Context("rh auth middleware", func() {
@@ -126,8 +117,9 @@ func (h *handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preferred_username"`
+		Username string `json:"username"`
 		OrgID    string `json:"org_id"`
+		Email    string `json:"email"`
 		jwt.RegisteredClaims
 	}
 
@@ -135,6 +127,7 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 	claims := TokenClaims{
 		"batman",
 		"GothamCity",
+		"batman@gothamcity.com",
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -203,8 +196,9 @@ func generateValidToken() (string, func(t *jwt.Token) (any, error)) {
 
 func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preferred_username"`
+		Username string `json:"username"`
 		OrgID    string `json:"org_id"`
+		Email    string `json:"email"`
 		jwt.RegisteredClaims
 	}
 
@@ -212,6 +206,7 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 	claims := TokenClaims{
 		"batman",
 		"GothamCity",
+		"batman@gothamcity.com",
 		jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -238,7 +233,7 @@ func generateInvalidTokenWrongSigningMethod() (string, func(t *jwt.Token) (any, 
 
 func generateCustomToken(username string, orgID string, email string) (string, func(t *jwt.Token) (any, error)) {
 	type TokenClaims struct {
-		Username string `json:"preferred_username"`
+		Username string `json:"username"`
 		OrgID    string `json:"org_id,omitempty"`
 		Email    string `json:"email,omitempty"`
 		jwt.RegisteredClaims

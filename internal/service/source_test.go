@@ -17,10 +17,11 @@ import (
 )
 
 const (
-	insertAgentStm              = "INSERT INTO agents (id, status, status_info, cred_url,source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
-	insertSourceWithUsernameStm = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
-	insertSourceOnPremisesStm   = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s', '%s', '%s', '%s', TRUE);"
-	insertLabelStm              = "INSERT INTO labels (key, value, source_id) VALUES ('%s', '%s', '%s');"
+	insertAgentStm                 = "INSERT INTO agents (id, status, status_info, cred_url,source_id, version) VALUES ('%s', '%s', '%s', '%s', '%s', 'version_1');"
+	insertSourceWithUsernameStm    = "INSERT INTO sources (id, name, username, org_id) VALUES ('%s', 'source_name', '%s', '%s');"
+	insertSourceWithEmailDomainStm = "INSERT INTO sources (id, name, username, org_id, email_domain) VALUES ('%s', 'source_name', '%s', '%s', '%s');"
+	insertSourceOnPremisesStm      = "INSERT INTO sources (id, name, username, org_id, on_premises) VALUES ('%s', '%s', '%s', '%s', TRUE);"
+	insertLabelStm                 = "INSERT INTO labels (key, value, source_id) VALUES ('%s', '%s', '%s');"
 )
 
 var _ = Describe("source handler", Ordered, func() {
@@ -142,6 +143,15 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(count).To(Equal(1))
 		})
 
+		It("successfully creates a source -- email domain defined", func() {
+			srv := service.NewSourceService(s)
+			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin", EmailDomain: "domain.com"})
+			Expect(err).To(BeNil())
+			Expect(source.Name).To(Equal("test"))
+			Expect(source.EmailDomain).ToNot(BeNil())
+			Expect(*source.EmailDomain).To(Equal("domain.com"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -174,6 +184,25 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
 			Expect(source.Agents).To(HaveLen(1))
+		})
+
+		It("successfully retrieve the source -- with email domain", func() {
+			firstSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithEmailDomainStm, firstSourceID, "admin", "admin", "example.com"))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := service.NewSourceService(s)
+			source, err := srv.GetSource(ctx, firstSourceID)
+			Expect(err).To(BeNil())
+			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
+			Expect(source.EmailDomain).ToNot(BeNil())
+			Expect(*source.EmailDomain).To(Equal("example.com"))
 		})
 
 		It("failed to get source - 404", func() {

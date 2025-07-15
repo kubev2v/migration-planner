@@ -85,6 +85,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -111,6 +112,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -137,6 +139,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -155,12 +158,18 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Raw("SELECT COUNT(*) FROM image_infras;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
+
+			emailDomain := ""
+			tx = gormdb.Raw("SELECT email_domain FROM sources LIMIT 1;").Scan(&emailDomain)
+			Expect(tx.Error).To(BeNil())
+			Expect(emailDomain).To(Equal("admin.example.com"))
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -194,6 +203,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -226,6 +236,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -255,6 +266,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -303,6 +315,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -337,6 +350,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -399,6 +413,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "joker",
 				Organization: "joker",
+				EmailDomain:  "joker.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -452,6 +467,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -481,6 +497,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "user",
 				Organization: "user",
+				EmailDomain:  "user.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -505,6 +522,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -548,6 +566,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -598,6 +617,7 @@ var _ = Describe("source handler", Ordered, func() {
 			user := auth.User{
 				Username:     "admin",
 				Organization: "admin",
+				EmailDomain:  "admin.example.com",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 

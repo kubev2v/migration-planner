@@ -53,6 +53,7 @@ func NewTokenContext(ctx context.Context, t any) context.Context {
 type User struct {
 	Username     string
 	Organization string
+	EmailDomain  string
 	Token        *jwt.Token
 }
 

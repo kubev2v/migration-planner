@@ -30,10 +30,10 @@ var _ = Describe("migrations", Ordered, func() {
 
 		gormdb.Exec("DROP TABLE IF EXISTS agents;")
 		gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
-		gormdb.Exec("DROP TABLE IF EXISTS sources;")
 		gormdb.Exec("DROP TABLE IF EXISTS keys;")
-		gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
 		gormdb.Exec("DROP TABLE IF EXISTS labels;")
+		gormdb.Exec("DROP TABLE IF EXISTS sources;")
+		gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
 	})
 
 	AfterAll(func() {
