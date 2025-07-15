@@ -16,6 +16,7 @@ type SourceCreateForm struct {
 	SshPublicKey     string
 	Username         string
 	OrgID            string
+	EmailDomain      string
 	Labels           map[string]string
 }
 
@@ -43,6 +44,11 @@ func (s SourceCreateForm) ToSource() model.Source {
 	for k, v := range s.Labels {
 		source.Labels = append(source.Labels, model.Label{Key: k, Value: v, SourceID: source.ID.String()})
 	}
+
+	if s.EmailDomain != "" {
+		source.EmailDomain = &s.EmailDomain
+	}
+
 	return source
 }
 
