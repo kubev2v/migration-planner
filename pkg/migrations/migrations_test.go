@@ -28,12 +28,6 @@ var _ = Describe("migrations", Ordered, func() {
 		s = store.NewStore(db)
 		gormdb = db
 
-		gormdb.Exec("DROP TABLE IF EXISTS agents;")
-		gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
-		gormdb.Exec("DROP TABLE IF EXISTS keys;")
-		gormdb.Exec("DROP TABLE IF EXISTS labels;")
-		gormdb.Exec("DROP TABLE IF EXISTS sources;")
-		gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
 	})
 
 	AfterAll(func() {
@@ -67,5 +61,13 @@ var _ = Describe("migrations", Ordered, func() {
 			}
 		})
 
+		AfterEach(func() {
+			gormdb.Exec("DROP TABLE IF EXISTS agents;")
+			gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
+			gormdb.Exec("DROP TABLE IF EXISTS keys;")
+			gormdb.Exec("DROP TABLE IF EXISTS labels;")
+			gormdb.Exec("DROP TABLE IF EXISTS sources;")
+			gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
+		})
 	})
 })
