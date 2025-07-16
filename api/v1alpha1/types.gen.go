@@ -27,6 +27,19 @@ const (
 	Unsupported NetworkType = "unsupported"
 )
 
+// Defines values for GenerateSourceReportParamsFormat.
+const (
+	Csv  GenerateSourceReportParamsFormat = "csv"
+	Html GenerateSourceReportParamsFormat = "html"
+)
+
+// Defines values for GenerateSourceReportParamsReportType.
+const (
+	Detailed            GenerateSourceReportParamsReportType = "detailed"
+	MigrationAssessment GenerateSourceReportParamsReportType = "migration_assessment"
+	Summary             GenerateSourceReportParamsReportType = "summary"
+)
+
 // Agent defines model for Agent.
 type Agent struct {
 	CreatedAt     time.Time          `json:"createdAt"`
@@ -219,6 +232,24 @@ type ListSourcesParams struct {
 	// IncludeDefault control whatever the default report should be added to the result
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
+
+// GenerateSourceReportParams defines parameters for GenerateSourceReport.
+type GenerateSourceReportParams struct {
+	// Format Format of the report
+	Format GenerateSourceReportParamsFormat `form:"format" json:"format"`
+
+	// ReportType Type of report to generate
+	ReportType *GenerateSourceReportParamsReportType `form:"report_type,omitempty" json:"report_type,omitempty"`
+
+	// IncludeWarnings Include migration warnings in the report
+	IncludeWarnings *bool `form:"include_warnings,omitempty" json:"include_warnings,omitempty"`
+}
+
+// GenerateSourceReportParamsFormat defines parameters for GenerateSourceReport.
+type GenerateSourceReportParamsFormat string
+
+// GenerateSourceReportParamsReportType defines parameters for GenerateSourceReport.
+type GenerateSourceReportParamsReportType string
 
 // UploadRvtoolsFileMultipartBody defines parameters for UploadRvtoolsFile.
 type UploadRvtoolsFileMultipartBody struct {
