@@ -5,40 +5,50 @@ import (
 )
 
 func TestParseDomainName(t *testing.T) {
+	ptr := func(s string) *string {
+		return &s
+	}
+
 	tests := []struct {
-		username   string
+		source     Source
 		domainName string
 		wantErr    bool
 	}{
 		{
-			username:   "doejoe@redhat.com",
+			source: Source{
+				Username:    "doejoe@redhat.com",
+				EmailDomain: ptr("redhat.com"),
+			},
 			domainName: "redhat.com",
 			wantErr:    false,
 		},
 		{
-			username:   "doejoe@another.redhat.com",
+			source: Source{
+				Username:    "",
+				EmailDomain: ptr("redhat.com"),
+			},
 			domainName: "redhat.com",
 			wantErr:    false,
 		},
 		{
-			username:   "",
-			domainName: "",
-			wantErr:    true,
-		},
-		{
-			username:   "doejoe@com",
-			domainName: "com",
+			source: Source{
+				Username:    "doejoe",
+				EmailDomain: ptr("redhat.com"),
+			},
+			domainName: "redhat.com",
 			wantErr:    false,
 		},
 		{
-			username:   "doejoe",
+			source: Source{
+				Username: "",
+			},
 			domainName: "",
 			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.username, func(t *testing.T) {
-			got, err := getDomainName(tt.username)
+		t.Run(tt.source.Username, func(t *testing.T) {
+			got, err := getDomainName(tt.source)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("getDomainName: error = %v, wantErr %v", err, tt.wantErr)
 				return
