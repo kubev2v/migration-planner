@@ -64,7 +64,7 @@ func computeVmStats(sources []Source) VmStats {
 			}
 		}
 
-		domain, err := getDomainName(s.Username)
+		domain, err := getDomainName(s)
 		if err != nil {
 			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
 			domain = s.OrgID
@@ -120,7 +120,7 @@ func computeStorateStats(sources []Source) []StorageCustomerStats {
 			continue
 		}
 
-		domain, err := getDomainName(s.Username)
+		domain, err := getDomainName(s)
 		if err != nil {
 			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
 			domain = s.OrgID
@@ -194,19 +194,24 @@ func sum(m1, m2 map[string]int) map[string]int {
 	return result
 }
 
-func getDomainName(username string) (string, error) {
+func getDomainName(s Source) (string, error) {
 	const (
 		dotChar = "."
 		atChar  = "@"
 	)
 
-	if !strings.Contains(username, atChar) {
-		return "", fmt.Errorf("username is not an email")
+	if s.EmailDomain != nil && *s.EmailDomain != "" {
+		return *s.EmailDomain, nil
 	}
 
-	domain := strings.Split(username, atChar)[1]
+	// if email domain not set, try to get the domain from username
+	if !strings.Contains(s.Username, atChar) {
+		return "", fmt.Errorf("username %q is not an email", s.Username)
+	}
+
+	domain := strings.Split(s.Username, atChar)[1]
 	if strings.TrimSpace(domain) == "" {
-		return "", fmt.Errorf("preferred_username %q is malformatted", username)
+		return "", fmt.Errorf("username %q is malformatted", s.Username)
 	}
 
 	// split the domain name by subdomain and return only the top domain
