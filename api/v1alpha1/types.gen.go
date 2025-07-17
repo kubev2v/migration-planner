@@ -127,6 +127,16 @@ type Network struct {
 // NetworkType defines model for Network.Type.
 type NetworkType string
 
+// ShareToken defines model for ShareToken.
+type ShareToken struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	OrgId     string             `json:"orgId"`
+	SourceId  openapi_types.UUID `json:"sourceId"`
+	Token     string             `json:"token"`
+	UpdatedAt time.Time          `json:"updatedAt"`
+}
+
 // Source defines model for Source.
 type Source struct {
 	Agent      *Agent             `json:"agent,omitempty"`

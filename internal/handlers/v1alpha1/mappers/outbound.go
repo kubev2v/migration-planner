@@ -74,3 +74,14 @@ func AgentToApi(a model.Agent) api.Agent {
 		Version:       a.Version,
 	}
 }
+
+func ShareTokenToApi(s model.ShareToken) api.ShareToken {
+	return api.ShareToken{
+		Id:        s.ID,
+		Token:     s.Token,
+		SourceId:  s.SourceID,
+		OrgId:     s.OrgID,
+		CreatedAt: s.CreatedAt,
+		UpdatedAt: s.UpdatedAt,
+	}
+}
