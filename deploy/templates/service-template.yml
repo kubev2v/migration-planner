@@ -102,6 +102,8 @@ parameters:
     value: docker.io/envoyproxy/envoy:v1.33.2
   - name: VALIDATION_CONTAINER_IMAGE
     description: Full registry path to the validation (OPA) container
+  - name: RHCOS_PASSWORD
+    description: "Password to be set for the default RHCOS user"
 
 objects:
   - kind: ServiceAccount
@@ -501,6 +503,8 @@ objects:
                   value: ${MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL}
                 - name: MIGRATION_PLANNER_LOG_LEVEL
                   value: ${MIGRATION_PLANNER_LOG_LEVEL}
+                - name: RHCOS_PASSWORD
+                  value: "${RHCOS_PASSWORD}"
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}

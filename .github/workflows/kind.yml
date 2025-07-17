@@ -36,6 +36,7 @@ jobs:
       - name: Collect logs
         if: always()
         run: |
+          oc get deploy -o yaml
           for pod in $(oc get pods -o name); do
             echo "=== Logs for ${pod} ==="
             oc logs ${pod} || echo "Failed to get logs for ${pod}"
