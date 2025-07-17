@@ -325,3 +325,96 @@ func TestAgentUpdateFormValidators(t *testing.T) {
 		})
 	}
 }
+
+func TestLabelValidator(t *testing.T) {
+	tests := []struct {
+		name       string
+		label      string
+		shouldPass bool
+	}{
+		// Valid labels
+		{
+			name:       "valid alphanumeric string",
+			label:      "mylabel",
+			shouldPass: true,
+		},
+		{
+			name:       "valid label with numbers",
+			label:      "label123",
+			shouldPass: true,
+		},
+		{
+			name:       "valid label with hyphens",
+			label:      "my-label",
+			shouldPass: true,
+		},
+		{
+			name:       "valid label with underscores",
+			label:      "my_label",
+			shouldPass: true,
+		},
+		{
+			name:       "valid label with dots",
+			label:      "my.label",
+			shouldPass: true,
+		},
+		{
+			name:       "valid label with mixed special characters",
+			label:      "my-label_123.test",
+			shouldPass: true,
+		},
+
+		// Invalid labels
+		{
+			name:       "invalid empty string",
+			label:      "",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid starts with hyphen",
+			label:      "-mylabel",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid ends with hyphen",
+			label:      "mylabel-",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid contains space",
+			label:      "my label",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid contains special characters",
+			label:      "my@label",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid only special characters",
+			label:      "---",
+			shouldPass: false,
+		},
+	}
+
+	v := NewValidator()
+	sourceRules := NewSourceValidationRules()
+	v.Register(sourceRules...)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Create a test struct with the label field
+			testStruct := struct {
+				Label string `validate:"label"`
+			}{
+				Label: tt.label,
+			}
+
+			err := v.Struct(testStruct)
+			if (err == nil) != tt.shouldPass {
+				t.Errorf("labelValidator(%q): expected pass=%v, got pass=%v, error=%v",
+					tt.label, tt.shouldPass, err == nil, err)
+			}
+		})
+	}
+}

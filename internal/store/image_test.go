@@ -125,4 +125,53 @@ var _ = Describe("image infra store", Ordered, func() {
 			gormdb.Exec("DELETE from sources;")
 		})
 	})
+
+	Context("update", func() {
+		It("successfully updates an existing image infra", func() {
+			sourceID := uuid.New()
+			// create source
+			m := model.Source{ID: sourceID, Username: "admin", OrgID: "org"}
+			src, err := s.Source().Create(context.TODO(), m)
+			Expect(err).To(BeNil())
+			Expect(src).NotTo(BeNil())
+
+			// create initial image infra
+			img, err := s.ImageInfra().Create(context.TODO(), model.ImageInfra{
+				SourceID:         sourceID,
+				HttpProxyUrl:     "http1",
+				HttpsProxyUrl:    "https1",
+				NoProxyDomains:   "np1",
+				CertificateChain: "cert1",
+			})
+			Expect(err).To(BeNil())
+			Expect(img).ToNot(BeNil())
+
+			// update fields
+			img.HttpProxyUrl = "http2"
+			img.HttpsProxyUrl = "https2"
+			img.NoProxyDomains = "np2"
+			img.CertificateChain = "cert2"
+
+			upd, err := s.ImageInfra().Update(context.TODO(), *img)
+			Expect(err).To(BeNil())
+			Expect(upd).ToNot(BeNil())
+			Expect(upd.HttpProxyUrl).To(Equal("http2"))
+			Expect(upd.HttpsProxyUrl).To(Equal("https2"))
+			Expect(upd.NoProxyDomains).To(Equal("np2"))
+			Expect(upd.CertificateChain).To(Equal("cert2"))
+
+			// verify in DB
+			var fetched model.ImageInfra
+			gormdb.WithContext(context.TODO()).Where("source_id = ?", sourceID).First(&fetched)
+			Expect(fetched.HttpProxyUrl).To(Equal("http2"))
+			Expect(fetched.HttpsProxyUrl).To(Equal("https2"))
+			Expect(fetched.NoProxyDomains).To(Equal("np2"))
+			Expect(fetched.CertificateChain).To(Equal("cert2"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE from image_infras;")
+			gormdb.Exec("DELETE from sources;")
+		})
+	})
 })

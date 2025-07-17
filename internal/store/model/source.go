@@ -9,14 +9,14 @@ import (
 )
 
 type Label struct {
-	Key      string `gorm:"primaryKey;column:key;type:VARCHAR;size:100"`
-	Value    string `gorm:"column:value;type:VARCHAR;size:100"`
-	SourceID string `gorm:"primaryKey;column:source_id;type:TEXT"`
+	Key      string `gorm:"primaryKey;column:key;type:VARCHAR;size:100;"`
+	Value    string `gorm:"column:value;type:VARCHAR;size:100;not null"`
+	SourceID string `gorm:"primaryKey;column:source_id;type:TEXT;"`
 }
 
 type Source struct {
 	gorm.Model
-	ID          uuid.UUID `gorm:"primaryKey; not null"`
+	ID          uuid.UUID `gorm:"primaryKey;"`
 	Name        string    `gorm:"uniqueIndex:name_org_id;not null"`
 	VCenterID   string
 	Username    string
@@ -25,7 +25,7 @@ type Source struct {
 	OnPremises  bool
 	Agents      []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
 	ImageInfra  ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
-	Labels      []Label
+	Labels      []Label    `gorm:"foreignKey:SourceID;references:ID;constraint:OnDelete:CASCADE;"`
 	EmailDomain *string
 }
 
