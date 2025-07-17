@@ -18,6 +18,7 @@ MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
 DOWNLOAD_RHCOS ?= true
+RHCOS_PASSWORD ?= '$$$$y$$$$j9T$$$$hUUbW8zoB.Qcmpwm4/RuK1$$$$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529'
 IFACE ?= eth0
 GREP ?= grep
 PODMAN ?= podman
@@ -221,6 +222,7 @@ deploy-on-kind: oc
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
+	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
 	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** Migration Planner has been deployed successfully on Kind ***"
 
