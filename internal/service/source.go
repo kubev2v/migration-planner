@@ -214,10 +214,11 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 		return NewErrInvalidVCenterID(sourceID, inventory.Vcenter.Id)
 	}
 
-	ctx, err = s.store.NewTransactionContext(ctx)
-	if err != nil {
-		return err
-	}
+	// Fixes an issue where inventory is big and getting a timeout when writing to DB
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+	defer cancel()
+
+	ctx = timeoutCtx
 
 	var rvtoolsAgent *model.Agent
 	if len(source.Agents) > 0 {
