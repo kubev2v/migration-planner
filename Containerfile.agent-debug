@@ -1,47 +1,15 @@
-# UI stage
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi as ui
+ARG BASE_IMAGE
 
-WORKDIR /app
-RUN mkdir /app/www && \
-     curl -Lo /tmp/agent-latest.tgz https://github.com/kubev2v/migration-planner-ui/releases/download/latest/agent-latest.tgz && \
-     tar xf /tmp/agent-latest.tgz -C /app/www
-
-# Builder stage
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset as builder
-
-WORKDIR /app
-
-RUN GOBIN=/app go install github.com/go-delve/delve/cmd/dlv@latest
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-
-ARG VERSION
-ENV VERSION=${VERSION}
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset as dlv-builder
 
 USER 0
 
-# Build binary with debug flags
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false \
-  -gcflags "all=-N -l" \
-  -ldflags "-X github.com/kubev2v/migration-planner/internal/agent.version=${VERSION}" \
-  -o /planner-agent cmd/planner-agent/main.go
+RUN GOBIN=/app go install github.com/go-delve/delve/cmd/dlv@latest
 
-# Final image
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
+FROM ${BASE_IMAGE}
 
-WORKDIR /app
-
-# Install Delve runtime binary
-COPY --from=builder /app/dlv /app/dlv
-COPY --from=builder /planner-agent /app/planner-agent
-COPY --from=ui /app/www/package/dist /app/www
-
-# Use non-root user
-RUN chown -R 1001:0 /app
-USER 1001
+COPY --from=dlv-builder /app/dlv /app/dlv
 
 EXPOSE 3333 40001
+
 ENTRYPOINT ["/app/dlv", "exec", "/app/planner-agent", "--headless", "--listen=:40001", "--api-version=2", "--accept-multiclient", "--continue", "--"]
