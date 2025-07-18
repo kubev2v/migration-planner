@@ -230,12 +230,16 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	memorySet := []int{}
 	diskGBSet := []int{}
 	diskCountSet := []int{}
+	nicCountSet := []int{}
+
 	for _, vm := range *vms {
+		nicCount := len(vm.NICs)
 		// histogram collection
 		cpuSet = append(cpuSet, int(vm.CpuCount))
 		memorySet = append(memorySet, int(vm.MemoryMB/1024))
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 		diskCountSet = append(diskCountSet, len(vm.Disks))
+		nicCountSet = append(nicCountSet, nicCount)
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
@@ -257,6 +261,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
 		inv.Vms.DiskCount.Total += len(vm.Disks)
 		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
+		inv.Vms.NicCount.Total += len(vm.NICs)
 
 		// Not Migratable
 		if !migratable {
@@ -264,6 +269,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
 			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
 			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
+			inv.Vms.NicCount.TotalForNotMigratable += len(vm.NICs)
 		} else {
 			// Migratable with warning(s)
 			if hasWarning {
@@ -271,12 +277,14 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) //Migratable
+				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
 				// Migratable without any warnings
 				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
+				inv.Vms.NicCount.TotalForMigratable += len(vm.NICs)
 			}
 		}
 
@@ -287,6 +295,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.RamGB.Histogram = Histogram(memorySet)
 	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
+	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {
@@ -317,6 +326,11 @@ func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector
 			OsInfo:               &map[string]apiplanner.OsInfo{},
 			MigrationWarnings:    apiplanner.MigrationIssues{},
 			NotMigratableReasons: apiplanner.MigrationIssues{},
+			CpuCores:             apiplanner.VMResourceBreakdown{},
+			RamGB:                apiplanner.VMResourceBreakdown{},
+			DiskCount:            apiplanner.VMResourceBreakdown{},
+			DiskGB:               apiplanner.VMResourceBreakdown{},
+			NicCount:             &apiplanner.VMResourceBreakdown{},
 		},
 		Infra: apiplanner.Infra{
 			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
@@ -402,33 +416,82 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
+func calculateBinIndex(data, minVal int, binSize float64, rangeValues, numberOfBins int) int {
+	if rangeValues == 0 {
+		// All values are identical - put everything in bin 0
+		return 0
+	}
+
+	if binSize == 1.0 {
+		return data - minVal
+	}
+
+	// Division-based mapping for larger ranges
+	binIndex := int(float64(data-minVal) / binSize)
+
+	// Ensure bin index is within bounds
+	if binIndex >= numberOfBins {
+		return numberOfBins - 1
+	}
+	if binIndex < 0 {
+		return 0
+	}
+
+	return binIndex
+}
+
 func Histogram(d []int) apiplanner.Histogram {
+	// Handle empty data
+	if len(d) == 0 {
+		return apiplanner.Histogram{
+			Data:     []int{},
+			Step:     0,
+			MinValue: 0,
+		}
+	}
+
 	minVal := slices.Min(d)
 	maxVal := slices.Max(d)
-
-	// Calculate the range of values, number of data points, number of bins, and bin size
 	rangeValues := maxVal - minVal
 	numberOfDataPoints := len(d)
 	numberOfBins := int(math.Sqrt(float64(numberOfDataPoints)))
-	binSize := float64(rangeValues) / float64(numberOfBins)
+
+	// Handle corner case where numberOfBins is 0
+	if numberOfBins == 0 {
+		numberOfBins = 1
+	}
+
+	// For small ranges (like NIC counts), use 1 bin per value for more intuitive results
+	var binSize float64
+	if maxVal <= 10 {
+		numberOfBins = maxVal - minVal + 1
+		binSize = 1.0
+	} else {
+		// For larger ranges, use the original algorithm
+		if rangeValues == 0 {
+			binSize = 1.0
+		} else {
+			binSize = float64(rangeValues) / float64(numberOfBins)
+		}
+	}
 
 	// Initialize the bins with 0s
 	bins := make([]int, numberOfBins)
 
 	// Fill the bins based on data points
 	for _, data := range d {
-		binIndex := int(float64(data-minVal) / binSize)
-		if binIndex == numberOfBins {
-			binIndex--
-		} else if binIndex < 0 {
-			binIndex = 0
-		}
+		binIndex := calculateBinIndex(data, minVal, binSize, rangeValues, numberOfBins)
 		bins[binIndex]++
+	}
+
+	step := int(math.Round(binSize))
+	if step == 0 && len(d) > 0 {
+		step = 1
 	}
 
 	return apiplanner.Histogram{
 		Data:     bins,
-		Step:     int(math.Round(binSize)),
+		Step:     step,
 		MinValue: minVal,
 	}
 }
