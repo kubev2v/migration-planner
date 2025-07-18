@@ -128,10 +128,12 @@ build-cli: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) -f $(if $(DEBUG_MODE),Containerfile.agent-debug,Containerfile.agent) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.agent-debug -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . -f $(if $(DEBUG_MODE),Containerfile.api-debug,Containerfile.api) $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.api-debug -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
 
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
