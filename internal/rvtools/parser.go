@@ -10,6 +10,7 @@ import (
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
@@ -105,18 +106,18 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	networks := extractNetworks(dvswitchRows, dvportRows)
 
 	zap.S().Named("rvtools").Infof("Create Basic Inventory")
-	inventory := createBasicInventoryObj(
-		vcenterUUID,
-		&vms,
-		datastores,
-		networks,
-		hostPowerStates,
-		clusterInfo.HostsPerCluster,
-		clusterInfo.ClustersPerDatacenter,
-		clusterInfo.TotalHosts,
-		clusterInfo.TotalClusters,
-		clusterInfo.TotalDatacenters,
-	)
+	infraData := service.InfrastructureData{
+		Datastores:            datastores,
+		Networks:              networks,
+		HostPowerStates:       hostPowerStates,
+		Hosts:                 &[]api.Host{}, // RVTools doesn't provide detailed host info
+		HostsPerCluster:       clusterInfo.HostsPerCluster,
+		ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
+		TotalHosts:            clusterInfo.TotalHosts,
+		TotalClusters:         clusterInfo.TotalClusters,
+		TotalDatacenters:      clusterInfo.TotalDatacenters,
+	}
+	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
 	zap.S().Named("rvtools").Infof("Fill Inventory with VM Data")
 	if len(vms) > 0 {
@@ -124,46 +125,6 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	}
 
 	return inventory, nil
-}
-
-func createBasicInventoryObj(
-	vCenterID string,
-	vms *[]vsphere.VM,
-	datastores []api.Datastore,
-	networks []api.Network,
-	hostPowerStates map[string]int,
-	hostsPerCluster []int,
-	clustersPerDatacenter []int,
-	totalHosts, totalClusters, totalDatacenters int,
-) *api.Inventory {
-	return &api.Inventory{
-		Vcenter: api.VCenter{
-			Id: vCenterID,
-		},
-		Vms: api.VMs{
-			Total:                len(*vms),
-			PowerStates:          map[string]int{},
-			Os:                   map[string]int{},
-			OsInfo:               &map[string]api.OsInfo{},
-			MigrationWarnings:    api.MigrationIssues{},
-			NotMigratableReasons: api.MigrationIssues{},
-			CpuCores:             api.VMResourceBreakdown{},
-			RamGB:                api.VMResourceBreakdown{},
-			DiskCount:            api.VMResourceBreakdown{},
-			DiskGB:               api.VMResourceBreakdown{},
-			NicCount:             &api.VMResourceBreakdown{},
-		},
-		Infra: api.Infra{
-			ClustersPerDatacenter: &clustersPerDatacenter,
-			Datastores:            datastores,
-			HostPowerStates:       hostPowerStates,
-			TotalHosts:            totalHosts,
-			TotalClusters:         totalClusters,
-			TotalDatacenters:      &totalDatacenters,
-			HostsPerCluster:       hostsPerCluster,
-			Networks:              networks,
-		},
-	}
 }
 
 type ClusterInfo struct {

@@ -165,7 +165,18 @@ func (c *Collector) run() {
 
 	zap.S().Named("collector").Infof("Create inventory")
 
-	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters, datacenters)
+	infraData := service.InfrastructureData{
+		Datastores:            getDatastores(hosts, collector),
+		Networks:              getNetworks(collector),
+		HostPowerStates:       getHostPowerStates(*hosts),
+		Hosts:                 getHosts(hosts),
+		HostsPerCluster:       getHostsPerCluster(*clusters),
+		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, collector),
+		TotalHosts:            len(*hosts),
+		TotalClusters:         len(*clusters),
+		TotalDatacenters:      len(*datacenters),
+	}
+	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
 
 	opaServerAlive := c.getOpaServerStatus()
 	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
@@ -312,38 +323,6 @@ func vmGuestName(vm vspheremodel.VM) string {
 		return vm.GuestNameFromVmwareTools
 	}
 	return vm.GuestName
-}
-
-func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster, datacenters *[]vspheremodel.Datacenter) *apiplanner.Inventory {
-	return &apiplanner.Inventory{
-		Vcenter: apiplanner.VCenter{
-			Id: vCenterID,
-		},
-		Vms: apiplanner.VMs{
-			Total:                len(*vms),
-			PowerStates:          map[string]int{},
-			Os:                   map[string]int{},
-			OsInfo:               &map[string]apiplanner.OsInfo{},
-			MigrationWarnings:    apiplanner.MigrationIssues{},
-			NotMigratableReasons: apiplanner.MigrationIssues{},
-			CpuCores:             apiplanner.VMResourceBreakdown{},
-			RamGB:                apiplanner.VMResourceBreakdown{},
-			DiskCount:            apiplanner.VMResourceBreakdown{},
-			DiskGB:               apiplanner.VMResourceBreakdown{},
-			NicCount:             &apiplanner.VMResourceBreakdown{},
-		},
-		Infra: apiplanner.Infra{
-			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
-			Datastores:            getDatastores(hosts, collector),
-			HostPowerStates:       getHostPowerStates(*hosts),
-			Hosts:                 getHosts(hosts),
-			TotalHosts:            len(*hosts),
-			TotalClusters:         len(*clusters),
-			TotalDatacenters:      util.IntPtr(len(*datacenters)),
-			HostsPerCluster:       getHostsPerCluster(*clusters),
-			Networks:              getNetworks(collector),
-		},
-	}
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
