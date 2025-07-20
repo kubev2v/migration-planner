@@ -48,17 +48,28 @@ GO_LD_FLAGS := -ldflags "\
 	$(LD_FLAGS)"
 GO_BUILD_FLAGS += $(GO_LD_FLAGS)
 
+# OPA Configuration
+OPA_HOST ?= 127.0.0.1
+OPA_PORT ?= 8181
+OPA_SERVER ?= $(OPA_HOST):$(OPA_PORT)
+OPA_POLICIES_DIR ?= $(CURDIR)/policies
+FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
+
 .EXPORT_ALL_VARIABLES:
 
 all: build build-containers
 
 help:
 	@echo "Targets:"
-	@echo "    generate:        regenerate all generated files"
-	@echo "    tidy:            tidy go mod"
-	@echo "    lint:            run golangci-lint"
-	@echo "    build:           run all builds"
-	@echo "    clean:           clean up all containers and volumes"
+	@echo "    generate:               regenerate all generated files"
+	@echo "    tidy:                   tidy go mod"
+	@echo "    lint:                   run golangci-lint"
+	@echo "    build:                  run all builds"
+	@echo "    clean:                  clean up all containers and volumes"
+	@echo "    test:                   run unit tests"
+	@echo "    run:                    run the service for development"
+	@echo "    setup-opa-policies:     download OPA policies from Forklift project"
+	@echo "    clean-opa-policies:     clean OPA policies directory"
 
 GOBIN = $(shell pwd)/bin
 GINKGO ?= $(GOBIN)/ginkgo
@@ -103,7 +114,15 @@ lint: tools
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
-run:
+run: build setup-opa-policies
+	@echo ""
+	@echo "=== Migration Planner Development Setup ==="
+	@echo ""
+	@echo "✅ OPA policies downloaded to ./policies/"
+	@echo "✅ Built-in OPA server will start automatically"
+	@echo ""
+	@echo "Starting API server..."
+	@echo ""
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
 image:
@@ -270,3 +289,33 @@ $(GOBIN)/golangci-lint:
 # include the deployment targets
 include deploy/deploy.mk
 include deploy/e2e.mk
+
+# OPA Policies Setup for Local Development
+# Note: Container builds download policies automatically - this is only needed for local development
+.PHONY: setup-opa-policies
+setup-opa-policies:
+	@echo "Setting up OPA policies for local development..."
+	@mkdir -p $(OPA_POLICIES_DIR)
+	@if [ -z "$$(find $(OPA_POLICIES_DIR) -name '*.rego' 2>/dev/null)" ]; then \
+		echo "Downloading policies from Forklift GitHub repository..."; \
+		mkdir -p $(FORKLIFT_POLICIES_TMP_DIR); \
+		curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
+			| tar -xz -C $(FORKLIFT_POLICIES_TMP_DIR) \
+				--wildcards '*/validation/policies/io/konveyor/forklift/vmware/*' \
+				--strip-components=1; \
+		if [ -d "$(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware" ]; then \
+			cp $(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware/*.rego $(OPA_POLICIES_DIR)/; \
+			echo "Successfully downloaded VMware policies"; \
+		else \
+			echo "Failed to download policies from GitHub"; \
+			exit 1; \
+		fi; \
+		rm -rf $(FORKLIFT_POLICIES_TMP_DIR); \
+	fi
+	@echo "OPA policies ready in $(OPA_POLICIES_DIR)"
+	@echo "Found $$(find $(OPA_POLICIES_DIR) -name '*.rego' | wc -l) .rego files"
+
+.PHONY: clean-opa-policies  
+clean-opa-policies:
+	@echo "Cleaning OPA policies..."
+	@rm -rf $(OPA_POLICIES_DIR)

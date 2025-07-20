@@ -5,12 +5,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/iso"
@@ -22,6 +24,37 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+func discoverPoliciesDirectory() string {
+	candidates := []string{
+		"./policies",    // Local development (make setup-opa-policies)
+		"/app/policies", // Container deployment (downloaded during build)
+	}
+
+	for _, candidate := range candidates {
+		if isPoliciesDirectory(candidate) {
+			if absPath, err := filepath.Abs(candidate); err == nil {
+				return absPath
+			}
+			return candidate
+		}
+	}
+
+	return ""
+}
+
+func isPoliciesDirectory(dir string) bool {
+	if _, err := os.Stat(dir); os.IsNotExist(err) {
+		return false
+	}
+
+	files, err := filepath.Glob(filepath.Join(dir, "*.rego"))
+	if err != nil {
+		return false
+	}
+
+	return len(files) > 0
+}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -47,6 +80,24 @@ var runCmd = &cobra.Command{
 
 		zap.S().Info("Starting API service...")
 		zap.S().Infow("Build from git", "commit", version.Get().GitCommit)
+
+		// Initialize OPA manager for in-process validation
+		zap.S().Info("Initializing OPA manager")
+		policiesDir := discoverPoliciesDirectory()
+		if policiesDir == "" {
+			zap.S().Warn("No policies directory found")
+			zap.S().Info("For local development, run: make setup-opa-policies")
+			zap.S().Info("In containers, policies are available at /app/policies")
+			policiesDir = "./policies"
+		}
+
+		opaManager := opa.NewManager(policiesDir)
+		if err := opaManager.Initialize(); err != nil {
+			zap.S().Warnf("Failed to initialize OPA manager: %v", err)
+		} else {
+			zap.S().Info("OPA manager initialized successfully")
+		}
+
 		zap.S().Info("Initializing data store")
 		db, err := store.InitDB(cfg)
 		if err != nil {
@@ -82,7 +133,7 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			server := apiserver.New(cfg, store, listener)
+			server := apiserver.New(cfg, store, listener, opaManager)
 			if err := server.Run(ctx); err != nil {
 				zap.S().Fatalw("Error running server", "error", err)
 			}
@@ -126,6 +177,16 @@ var runCmd = &cobra.Command{
 			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener)
 			if err := metricsServer.Run(ctx); err != nil {
 				zap.S().Named("metrics_server").Fatalw("failed to run metrics server", "error", err)
+			}
+		}()
+
+		// Handle OPA manager shutdown in a separate goroutine
+		go func() {
+			<-ctx.Done()
+			// Shutdown OPA manager if it was initialized
+			if opaManager != nil {
+				zap.S().Info("Shutting down OPA manager")
+				opaManager.Shutdown()
 			}
 		}()
 

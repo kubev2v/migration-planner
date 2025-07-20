@@ -13,6 +13,15 @@ COPY . .
 USER 0
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /planner-api cmd/planner-api/*.go
 
+RUN mkdir -p /tmp/forklift-policies && \
+    curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
+        | tar -xz -C /tmp/forklift-policies \
+            --wildcards '*/validation/policies/io/konveyor/forklift/vmware/*' \
+            --strip-components=1 && \
+    mkdir -p /policies && \
+    cp /tmp/forklift-policies/validation/policies/io/konveyor/forklift/vmware/*.rego /policies/ && \
+    rm -rf /tmp/forklift-policies
+
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
 WORKDIR /app
@@ -20,6 +29,7 @@ WORKDIR /app
 COPY /data /app/data/
 COPY /pkg/migrations/sql /app/migrations/
 COPY --from=builder /planner-api /app/
+COPY --from=builder /policies /app/policies/
 
 # Use non-root user
 RUN chown -R 1001:0 /app

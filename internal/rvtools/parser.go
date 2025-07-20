@@ -3,19 +3,17 @@ package rvtools
 import (
 	"bytes"
 	"fmt"
-	"net/http"
 	"slices"
-	"time"
 
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
-	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
 )
 
-func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
+func ParseRVTools(rvtoolsContent []byte, opaManager *opa.Manager) (*api.Inventory, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -56,7 +54,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 
 	zap.S().Named("rvtools").Infof("Validate VMs against OPA")
 	if len(vms) > 0 {
-		vms, err = validateVMsWithOPA(vms)
+		vms, err = validateVMsWithOPA(vms, opaManager)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("OPA validation failed, continuing without validation: %v", err)
 		}
@@ -285,36 +283,18 @@ func extractVCenterUUID(rows [][]string) (string, error) {
 	return "", fmt.Errorf("VI SDK UUID column not found")
 }
 
-func validateVMsWithOPA(vms []vsphere.VM) ([]vsphere.VM, error) {
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-
-	if !isOPAServerAlive(opaServer) {
-		return vms, fmt.Errorf("OPA server %s is not responding", opaServer)
+func validateVMsWithOPA(vms []vsphere.VM, opaManager *opa.Manager) ([]vsphere.VM, error) {
+	// Use the passed OPA manager for validation
+	if opaManager != nil && opaManager.IsRunning() {
+		zap.S().Named("rvtools").Infof("Validating %d VMs using in-process OPA", len(vms))
+		validatedVMs, err := opaManager.ValidateVMs(&vms)
+		if err != nil {
+			zap.S().Named("rvtools").Warnf("OPA validation failed: %v", err)
+			return vms, err
+		}
+		return *validatedVMs, nil
 	}
 
-	zap.S().Named("rvtools").Infof("OPA server %s is alive, validating VMs", opaServer)
-
-	validatedVMs, err := collector.Validation(&vms, opaServer)
-	if err != nil {
-		return vms, err
-	}
-
-	return *validatedVMs, nil
-}
-
-func isOPAServerAlive(opaServer string) bool {
-	zap.S().Named("rvtools").Infof("Check if OPA server is responding")
-
-	client := &http.Client{
-		Timeout: 5 * time.Second, // 5 second timeout
-	}
-
-	resp, err := client.Get("http://" + opaServer + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("rvtools").Errorf("OPA server %s is not responding", opaServer)
-		return false
-	}
-	defer resp.Body.Close()
-	zap.S().Named("rvtools").Infof("OPA server %s is alive", opaServer)
-	return true
+	zap.S().Named("rvtools").Infof("OPA validation not available - skipping policy validation")
+	return vms, nil
 }
