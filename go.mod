@@ -37,7 +37,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.6-0.20210604193023-d5e0c0615ace
 	github.com/thoas/go-funk v0.9.3
-	github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi v0.51.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.5.9
@@ -180,5 +180,5 @@ require (
 replace (
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.80
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
-	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi => github.com/vmware/govmomi v0.51.0
 )
