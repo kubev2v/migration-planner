@@ -1,4 +1,4 @@
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi as ui
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi AS ui
 
 RUN dnf install -y npm wget
 
@@ -13,7 +13,7 @@ RUN cp -r ./node_modules/@patternfly/patternfly/assets css/
 RUN cp -r ./node_modules/@patternfly/patternfly/patternfly.css css/
 
 # Builder container
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset as builder
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS builder
 
 WORKDIR /app
 COPY go.mod go.sum ./
