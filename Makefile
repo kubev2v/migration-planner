@@ -30,6 +30,10 @@ DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
 
+# OPA Configuration for eval mode
+OPA_POLICIES_DIR ?= $(CURDIR)/policies
+FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
+
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
 SOURCE_GIT_COMMIT ?=$(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
@@ -56,11 +60,15 @@ all: build build-containers
 
 help:
 	@echo "Targets:"
-	@echo "    generate:        regenerate all generated files"
-	@echo "    tidy:            tidy go mod"
-	@echo "    lint:            run golangci-lint"
-	@echo "    build:           run all builds"
-	@echo "    clean:           clean up all containers and volumes"
+	@echo "    generate:               regenerate all generated files"
+	@echo "    tidy:                   tidy go mod"
+	@echo "    lint:                   run golangci-lint"
+	@echo "    build:                  run all builds"
+	@echo "    clean:                  clean up all containers and volumes"
+	@echo "    test:                   run unit tests"
+	@echo "    run:                    run the service for development"
+	@echo "    setup-opa-policies:     download OPA policies from Forklift project"
+	@echo "    clean-opa-policies:     clean OPA policies directory"
 
 GOBIN = $(shell pwd)/bin
 GINKGO ?= $(GOBIN)/ginkgo
@@ -107,6 +115,7 @@ run:
 	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	./bin/planner-api run
+	OPA_POLICIES_DIR=$(OPA_POLICIES_DIR) MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -285,6 +294,37 @@ lint: $(GOLANGCI_LINT)
 $(GOLANGCI_LINT):
 	$(MAKE) lint-install
 ##################### "make lint" support end   ##########################
+
+# OPA Policies Setup for Local Development
+.PHONY: setup-opa-policies
+setup-opa-policies:
+	@echo "Setting up OPA policies for local development..."
+	@mkdir -p $(OPA_POLICIES_DIR)
+	@if [ -z "$$(find $(OPA_POLICIES_DIR) -name '*.rego' 2>/dev/null)" ]; then \
+		echo "Downloading policies from Forklift GitHub repository..."; \
+		mkdir -p $(FORKLIFT_POLICIES_TMP_DIR); \
+		curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
+			| tar -xz -C $(FORKLIFT_POLICIES_TMP_DIR) \
+				--wildcards '*/validation/policies/io/konveyor/forklift/vmware/*' \
+				--strip-components=1 \
+				--exclude='*/..*' --exclude='*/.*'; \
+		if [ -d "$(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware" ]; then \
+			find $(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware \
+				-name "*.rego" ! -name "*_test.rego" -exec cp {} $(OPA_POLICIES_DIR)/ \; ; \
+			echo "Successfully downloaded VMware policies"; \
+		else \
+			echo "Failed to download policies from GitHub"; \
+			exit 1; \
+		fi; \
+		rm -rf $(FORKLIFT_POLICIES_TMP_DIR); \
+	fi
+	@echo "OPA policies ready in $(OPA_POLICIES_DIR)"
+	@echo "Found $$(find $(OPA_POLICIES_DIR) -name '*.rego' | wc -l) .rego files"
+
+.PHONY: clean-opa-policies  
+clean-opa-policies:
+	@echo "Cleaning OPA policies..."
+	@rm -rf $(OPA_POLICIES_DIR)
 
 # include the deployment targets
 include deploy/deploy.mk
