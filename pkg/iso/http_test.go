@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -16,36 +18,37 @@ import (
 var _ = Describe("http downloader", func() {
 	Context("http", func() {
 		It("it downloads ok", func() {
-			handler := &httpTestServerHandler{}
+			handler := newHttpTestServerHandler(false)
 			ts := httptest.NewServer(http.HandlerFunc(handler.getHandler()))
 			defer ts.Close()
 
-			downloader := iso.NewHttpDownloader(ts.URL)
+			downloader := iso.NewHttpDownloader(ts.URL, handler.sha256Sum)
 			buff := bytes.NewBuffer([]byte{})
 
 			err := downloader.Get(context.TODO(), buff)
 			Expect(err).To(BeNil())
+			Expect(fmt.Sprintf("%x", buff.Bytes())).To(Equal(fmt.Sprintf("%x", handler.testData)))
 			Expect(buff.Len()).To(Equal(100))
 		})
 
 		It("failed to download", func() {
-			handler := &httpTestServerHandler{shouldReturnError: true}
+			handler := newHttpTestServerHandler(true)
 			ts := httptest.NewServer(http.HandlerFunc(handler.getHandler()))
 			defer ts.Close()
 
-			downloader := iso.NewHttpDownloader(ts.URL)
+			downloader := iso.NewHttpDownloader(ts.URL, handler.sha256Sum)
 			buff := bytes.NewBuffer([]byte{})
 
 			err := downloader.Get(context.TODO(), buff)
 			Expect(err).ToNot(BeNil())
 		})
 
-		It("failed to download -- incomplete download", func() {
-			handler := &httpTestServerHandler{shouldReturnIncompleteDownload: true}
+		It("failed to download -- sha256 is different", func() {
+			handler := newHttpTestServerHandler(false)
 			ts := httptest.NewServer(http.HandlerFunc(handler.getHandler()))
 			defer ts.Close()
 
-			downloader := iso.NewHttpDownloader(ts.URL)
+			downloader := iso.NewHttpDownloader(ts.URL, "some another sha")
 			buff := bytes.NewBuffer([]byte{})
 
 			err := downloader.Get(context.TODO(), buff)
@@ -56,8 +59,22 @@ var _ = Describe("http downloader", func() {
 })
 
 type httpTestServerHandler struct {
-	shouldReturnError              bool
-	shouldReturnIncompleteDownload bool
+	shouldReturnError bool
+	sha256Sum         string
+	testData          []byte
+}
+
+func newHttpTestServerHandler(shouldReturnError bool) *httpTestServerHandler {
+	blk := make([]byte, 100)
+	_, _ = rand.Read(blk)
+	hasher := sha256.New()
+	hasher.Write(blk)
+
+	return &httpTestServerHandler{
+		shouldReturnError: shouldReturnError,
+		sha256Sum:         hex.EncodeToString(hasher.Sum(nil)),
+		testData:          blk,
+	}
 }
 
 func (h *httpTestServerHandler) getHandler() http.HandlerFunc {
@@ -65,18 +82,8 @@ func (h *httpTestServerHandler) getHandler() http.HandlerFunc {
 		if h.shouldReturnError {
 			http.Error(w, "error", http.StatusBadRequest)
 		}
-		blk := make([]byte, 100)
-		_, err := rand.Read(blk)
-		if err != nil {
-			http.Error(w, "error", http.StatusBadRequest)
-		}
 
-		if h.shouldReturnIncompleteDownload {
-			w.Header().Set("Content-Length", fmt.Sprintf("%d", 200))
-			_, _ = w.Write(blk)
-			return
-		}
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", 100))
-		_, _ = w.Write(blk)
+		_, _ = w.Write(h.testData)
 	}
 }

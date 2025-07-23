@@ -21,6 +21,7 @@ type minioConfig struct {
 	accessKey       string
 	secretAccessKey string
 	imageName       string
+	imageSha256     string
 	useSSL          bool
 }
 
@@ -70,14 +71,17 @@ func (s *minioDownloader) Get(ctx context.Context, dst io.Writer) error {
 
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	mw := newWrapper(newCtx, dst, objInfo.Size)
+	mw := newProgressWriter(newCtx, dst, objInfo.Size)
 
-	if _, err = io.Copy(mw, object); err != nil {
+	imageHasher := newImageHasher(mw)
+
+	if _, err = io.Copy(imageHasher, object); err != nil {
 		return err
 	}
 
-	if mw.downloadedBytes != mw.total {
-		return fmt.Errorf("failed to download the entire image. expected bytes %d received %d", mw.total, mw.downloadedBytes)
+	computedSum := imageHasher.Sum()
+	if s.cfg.imageSha256 != computedSum {
+		return fmt.Errorf("failed to download the image. expected sha256 %s received %s", s.cfg.imageSha256, computedSum)
 	}
 
 	return nil
@@ -99,9 +103,10 @@ func WithBucket(bucket string) MinioOpts {
 	}
 }
 
-func WithImageName(imageName string) MinioOpts {
+func WithImage(imageName, imageSha256 string) MinioOpts {
 	return func(c *minioConfig) {
 		c.imageName = imageName
+		c.imageSha256 = imageSha256
 	}
 }
 

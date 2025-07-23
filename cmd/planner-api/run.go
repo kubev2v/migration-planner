@@ -162,7 +162,7 @@ func initializeIso(ctx context.Context, cfg *config.Config) error {
 		iso.WithBucket(cfg.Service.S3.Bucket),
 		iso.WithAccessKey(cfg.Service.S3.AccessKey),
 		iso.WithSecretKey(cfg.Service.S3.SecretKey),
-		iso.WithImageName(cfg.Service.S3.IsoFileName),
+		iso.WithImage(cfg.Service.S3.IsoFileName, cfg.Service.RhcosImageSha256),
 	)
 	if err == nil {
 		md.Register(minio)
@@ -171,9 +171,11 @@ func initializeIso(ctx context.Context, cfg *config.Config) error {
 	}
 
 	// register the default downloader of the official RHCOS image.
-	md.Register(iso.NewRHCOSHttpDownloader())
+	md.Register(iso.NewHttpDownloader(cfg.Service.RhcosImageName, cfg.Service.RhcosImageSha256))
 
 	if err := md.Download(ctx, out); err != nil {
+		// Remove the file from disk to allow the planner to retry the image download after restart.
+		_ = os.Remove(isoPath)
 		return err
 	}
 
