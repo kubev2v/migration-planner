@@ -6,24 +6,15 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-
-	"github.com/kubev2v/migration-planner/internal/util"
-)
-
-const (
-	rhcosUrl string = "https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso"
 )
 
 type HttpDownloader struct {
-	imagePath string
+	imagePath   string
+	imageSha256 string
 }
 
-func NewRHCOSHttpDownloader() *HttpDownloader {
-	return NewHttpDownloader(util.GetEnv("MIGRATION_PLANNER_ISO_URL", rhcosUrl))
-}
-
-func NewHttpDownloader(imagePath string) *HttpDownloader {
-	return &HttpDownloader{imagePath: imagePath}
+func NewHttpDownloader(imagePath string, imageSha256 string) *HttpDownloader {
+	return &HttpDownloader{imagePath: imagePath, imageSha256: imageSha256}
 }
 
 func (h *HttpDownloader) Get(ctx context.Context, dst io.Writer) error {
@@ -50,15 +41,17 @@ func (h *HttpDownloader) Get(ctx context.Context, dst io.Writer) error {
 
 	newCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	mw := newWrapper(newCtx, dst, totalSize)
+	mw := newProgressWriter(newCtx, dst, totalSize)
+	imageHasher := newImageHasher(mw)
 
-	_, err = io.Copy(mw, resp.Body)
+	_, err = io.Copy(imageHasher, resp.Body)
 	if err != nil {
 		return err
 	}
 
-	if mw.total > 0 && (mw.total != mw.downloadedBytes) {
-		return fmt.Errorf("failed to download the entire image. expected bytes %d received %d", mw.total, mw.downloadedBytes)
+	computedSum := imageHasher.Sum()
+	if h.imageSha256 != computedSum {
+		return fmt.Errorf("failed to download the image. wanted %q received %q", h.imageSha256, computedSum)
 	}
 
 	return nil

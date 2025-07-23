@@ -16,7 +16,9 @@ parameters:
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_URL
-    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-4.19.0-x86_64-live-iso.x86_64.iso
+  - name: MIGRATION_PLANNER_ISO_SHA256
+    value: 6a9cf9df708e014a2b44f372ab870f873cf2db5685f9ef4518f52caa36160c36
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -488,6 +490,8 @@ objects:
                   value: ${MIGRATION_PLANNER_ISO_PATH}
                 - name: MIGRATION_PLANNER_ISO_URL
                   value: ${MIGRATION_PLANNER_ISO_URL}
+                - name: MIGRATION_PLANNER_ISO_SHA256
+                  value: ${MIGRATION_PLANNER_ISO_SHA256}
                 # Svc Config values
                 - name: MIGRATION_PLANNER_ADDRESS
                   value: ${MIGRATION_PLANNER_ADDRESS}

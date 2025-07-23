@@ -17,6 +17,8 @@ MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
 MIGRATION_PLANNER_AUTH ?= local
+MIGRATION_PLANNER_ISO_URL ?= https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-4.19.0-x86_64-live-iso.x86_64.iso
+MIGRATION_PLANNER_ISO_SHA256 ?= 6a9cf9df708e014a2b44f372ab870f873cf2db5685f9ef4518f52caa36160c36
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
 DOWNLOAD_RHCOS ?= true
@@ -104,7 +106,10 @@ migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
 run:
-	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
+	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
+	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
+	./bin/planner-api run
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
