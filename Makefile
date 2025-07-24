@@ -61,6 +61,10 @@ help:
 	@echo "    lint:            run golangci-lint"
 	@echo "    build:           run all builds"
 	@echo "    clean:           clean up all containers and volumes"
+	@echo "    migrate:         run database migrations"
+	@echo "    init:            initialize RHCOS ISO for migration planner"
+	@echo "    run:             run the migration planner API service"
+	@echo "    integration-test: run e2e integration tests"
 
 GOBIN = $(shell pwd)/bin
 GINKGO ?= $(GOBIN)/ginkgo
@@ -105,18 +109,22 @@ lint: tools
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
-run:
+init:
 	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
 	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
-	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
-	./bin/planner-api run
+	./bin/planner-api init
+
+run:
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
 	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
 endif
 
-integration-test: ginkgo
+integration-test: ginkgo build
+	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
+	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
 	$(GINKGO) -focus=$(FOCUS) run test/e2e
 
 build: bin image

@@ -12,8 +12,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/iso"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
@@ -67,14 +65,8 @@ var runCmd = &cobra.Command{
 			}
 		}
 
-		// Initialize ISOs
-		zap.S().Info("Initializing RHCOS ISO")
-		if err := initializeIso(context.TODO(), cfg); err != nil {
-			zap.S().Fatalw("failed to initilized iso", "error", err)
-		}
-		zap.S().Info("RHCOS ISO initialized")
-
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+
 		go func() {
 			defer cancel()
 			listener, err := newListener(cfg.Service.Address)
@@ -140,44 +132,4 @@ func newListener(address string) (net.Listener, error) {
 		address = "localhost:0"
 	}
 	return net.Listen("tcp", address)
-}
-
-func initializeIso(ctx context.Context, cfg *config.Config) error {
-	// Check if ISO already exists:
-	isoPath := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live-iso.x86_64.iso")
-	if _, err := os.Stat(isoPath); err == nil {
-		return nil
-	}
-
-	out, err := os.Create(isoPath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	md := iso.NewDownloaderManager()
-
-	minio, err := iso.NewMinioDownloader(
-		iso.WithEndpoint(cfg.Service.S3.Endpoint),
-		iso.WithBucket(cfg.Service.S3.Bucket),
-		iso.WithAccessKey(cfg.Service.S3.AccessKey),
-		iso.WithSecretKey(cfg.Service.S3.SecretKey),
-		iso.WithImage(cfg.Service.S3.IsoFileName, cfg.Service.RhcosImageSha256),
-	)
-	if err == nil {
-		md.Register(minio)
-	} else {
-		zap.S().Errorw("failed to create minio downloader", "error", err)
-	}
-
-	// register the default downloader of the official RHCOS image.
-	md.Register(iso.NewHttpDownloader(cfg.Service.RhcosImageName, cfg.Service.RhcosImageSha256))
-
-	if err := md.Download(ctx, out); err != nil {
-		// Remove the file from disk to allow the planner to retry the image download after restart.
-		_ = os.Remove(isoPath)
-		return err
-	}
-
-	return nil
 }
