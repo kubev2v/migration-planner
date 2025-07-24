@@ -7,10 +7,10 @@ import (
 	"slices"
 
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
-	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
@@ -276,7 +276,7 @@ func validateVMsWithOPA(ctx context.Context, vms []vsphere.VM, opaValidator *opa
 				continue
 			}
 
-			concern := vspheremodel.Concern{}
+			concern := vsphere.Concern{}
 			if id, ok := concernMap["id"].(string); ok {
 				concern.Id = id
 			} else {
