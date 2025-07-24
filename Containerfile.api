@@ -13,6 +13,11 @@ COPY . .
 USER 0
 RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /planner-api cmd/planner-api/*.go
 
+# Download OPA policies from Forklift repository
+RUN echo "Downloading OPA policies using Makefile target..." && \
+    OPA_POLICIES_DIR=/app/policies make setup-opa-policies
+
+# Final runtime image
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
 
 WORKDIR /app
@@ -20,6 +25,7 @@ WORKDIR /app
 COPY /data /app/data/
 COPY /pkg/migrations/sql /app/migrations/
 COPY --from=builder /planner-api /app/
+COPY --from=builder /app/policies /app/policies/
 
 # Use non-root user
 RUN chown -R 1001:0 /app
