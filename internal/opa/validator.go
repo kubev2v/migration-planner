@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
 	"go.uber.org/zap"
@@ -23,10 +24,7 @@ func NewPolicyReader() *PolicyReader {
 func (pr *PolicyReader) DiscoverPoliciesDirectory() string {
 	logger := zap.S().Named("opa")
 
-	policiesDir := os.Getenv("OPA_POLICIES_DIR")
-	if policiesDir == "" {
-		policiesDir = "/app/policies" // Default for container deployment
-	}
+	policiesDir := util.GetEnv("OPA_POLICIES_DIR", "/app/policies")
 
 	if isPoliciesDirectory(policiesDir) {
 		logger.Infof("Found policies directory: %s", policiesDir)
