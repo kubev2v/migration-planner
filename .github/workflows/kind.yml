@@ -40,5 +40,11 @@ jobs:
           for pod in $(oc get pods -o name); do
             echo "=== Logs for ${pod} ==="
             oc logs ${pod} || echo "Failed to get logs for ${pod}"
+            
+            # Collect logs for migration-planner-init container if pod starts with migration-planner
+            if [[ ${pod} == *"migration-planner"* ]]; then
+              echo "=== Logs for ${pod} migration-planner-init container ==="
+              oc logs ${pod} -c migration-planner-init || echo "Failed to get logs for migration-planner-init container in ${pod}"
+            fi
             echo "======================="
           done

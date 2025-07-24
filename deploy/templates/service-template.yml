@@ -112,6 +112,18 @@ objects:
     apiVersion: v1
     metadata:
       name: migration-planner
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: migration-planner-iso-storage
+      labels:
+        app: migration-planner
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
   - kind: Service
     apiVersion: v1
     metadata:
@@ -397,6 +409,46 @@ objects:
           labels:
             app: migration-planner
         spec:
+          initContainers:
+            - name: migration-planner-init
+              image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: ${MIGRATION_PLANNER_API_IMAGE_PULL_POLICY}
+              command: ["/app/planner-api", "init"]
+              env:
+                - name: MIGRATION_PLANNER_ISO_PATH
+                  value: ${MIGRATION_PLANNER_ISO_PATH}
+                - name: MIGRATION_PLANNER_ISO_URL
+                  value: ${MIGRATION_PLANNER_ISO_URL}
+                - name: MIGRATION_PLANNER_ISO_SHA256
+                  value: ${MIGRATION_PLANNER_ISO_SHA256}
+                - name: MIGRATION_PLANNER_LOG_LEVEL
+                  value: ${MIGRATION_PLANNER_LOG_LEVEL}
+                - name: MIGRATION_PLANNER_S3_ENDPOINT
+                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
+                - name: MIGRATION_PLANNER_S3_BUCKET
+                  value: ${MIGRATION_PLANNER_S3_BUCKET}
+                - name: MIGRATION_PLANNER_S3_ISO_FILENAME
+                  value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
+                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: access_key
+                - name: MIGRATION_PLANNER_S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: secret_key
+              volumeMounts:
+                - name: iso-storage
+                  mountPath: /iso
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
           containers:
             - name: envoy
               image: ${ENVOY_IMAGE}
@@ -574,7 +626,8 @@ objects:
           serviceAccountName: migration-planner
           volumes:
             - name: iso-storage
-              emptyDir: {}
+              persistentVolumeClaim:
+                claimName: migration-planner-iso-storage
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi
