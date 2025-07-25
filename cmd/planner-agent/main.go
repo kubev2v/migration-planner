@@ -5,6 +5,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"os"
 	"path"
 
@@ -29,8 +30,9 @@ func main() {
 }
 
 type agentCmd struct {
-	config     *config.Config
-	configFile string
+	config      *config.Config
+	configFile  string
+	credentials config.Credentials
 }
 
 func NewAgentCommand() *agentCmd {
@@ -55,6 +57,9 @@ func NewAgentCommand() *agentCmd {
 
 func (a *agentCmd) bind() {
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
+	flag.StringVar(&a.credentials.Username, "vsphere-username", "", "vSphere username for connecting to the vCenter API")
+	flag.StringVar(&a.credentials.Password, "vsphere-password", "", "vSphere password for connecting to the vCenter API")
+	flag.StringVar(&a.credentials.URL, "vsphere-url", "", "vSphere server URL (e.g. https://vcenter.example.com/sdk)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
@@ -90,8 +95,10 @@ func (a *agentCmd) Execute() error {
 		zap.S().Warnf("failed to read jwt: %v", err)
 	}
 
+	ctx := context.WithValue(context.Background(), common.CmdCredentialsKey, a.credentials)
+
 	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
-	if err := agentInstance.Run(context.Background()); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		zap.S().Fatalf("running device agent: %v", err)
 	}
 	return nil
