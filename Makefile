@@ -97,9 +97,6 @@ generate:
 tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
 
-lint: tools
-	$(GOBIN)/golangci-lint run -v --timeout 2m
-
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
@@ -261,11 +258,28 @@ bin:
 clean:
 	- rm -f -r bin
 
-.PHONY: tools
-tools: $(GOBIN)/golangci-lint
+##################### "make lint" support start ##########################
+GOLANGCI_LINT_VERSION := v1.64.8
+GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
-$(GOBIN)/golangci-lint:
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) v1.54.0
+.PHONY: lint lint-install
+
+# Download golangci-lint locally if not already present
+lint-install:
+	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
+
+# Run linter
+lint: $(GOLANGCI_LINT)
+	@echo "Running golangci-lint..."
+	@$(GOLANGCI_LINT) run --timeout=5m
+	@echo "✅ Lint passed successfully!"
+
+# Ensure binary exists
+$(GOLANGCI_LINT):
+	$(MAKE) lint-install
+##################### "make lint" support end   ##########################
 
 # include the deployment targets
 include deploy/deploy.mk
