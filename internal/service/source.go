@@ -110,6 +110,8 @@ func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.Sou
 }
 
 func (s *SourceService) DeleteSources(ctx context.Context) error {
+	// Note: Share tokens for all sources will be automatically deleted by database CASCADE constraint
+	// when sources are deleted. No need for explicit share token deletion in bulk delete operation.
 	if err := s.store.Source().DeleteAll(ctx); err != nil {
 		return err
 	}
@@ -118,6 +120,13 @@ func (s *SourceService) DeleteSources(ctx context.Context) error {
 }
 
 func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
+	// Delete share token for this source if it exists
+	// Note: This is also handled by database CASCADE constraint, but we do it explicitly for better control
+	if err := s.store.ShareToken().Delete(ctx, id); err != nil {
+		zap.S().Named("source_service").Warnf("Failed to delete share token for source %s: %v", id, err)
+		// Don't fail the entire operation if share token deletion fails
+	}
+
 	if err := s.store.Source().Delete(ctx, id); err != nil {
 		return err
 	}
