@@ -152,17 +152,27 @@ func credentialHandler(dataDir string, w http.ResponseWriter, r *http.Request) {
 	}
 
 	credPath := filepath.Join(dataDir, config.CredentialsFile)
-	buf, _ := json.Marshal(credentials)
-	writer := fileio.NewWriter()
-
-	err = writer.WriteFile(credPath, buf)
-	if err != nil {
+	if err := saveCredentials(credPath, credentials); err != nil {
 		http.Error(w, fmt.Sprintf("failed saving credentials: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	zap.S().Named("rest").Info("successfully wrote credentials to file")
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func saveCredentials(credPath string, credentials *config.Credentials) error {
+	buf, err := json.Marshal(credentials)
+	if err != nil {
+		return err
+	}
+	writer := fileio.NewWriter()
+
+	if err := writer.WriteFile(credPath, buf); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func parseUrl(credentials *config.Credentials) (*url.URL, error) {
