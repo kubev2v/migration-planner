@@ -18,7 +18,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.7.1
+	github.com/jackc/pgx/v5 v5.7.4
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubev2v/forklift v0.0.0-20250727131226-5e5d7007c3da
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
@@ -31,7 +31,7 @@ require (
 	github.com/onsi/gomega v1.36.1
 	github.com/openshift/assisted-image-service v0.0.0-20250710050955-1b29aba9d5be
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.0.0-00010101000000-000000000000
+	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sirupsen/logrus v1.9.4-0.20250620175740-70b809335b84
 	github.com/spf13/cobra v1.8.1
@@ -132,7 +132,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.4 // indirect
 	github.com/rs/xid v1.6.0 // indirect
@@ -179,6 +179,6 @@ require (
 
 replace (
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.80
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
