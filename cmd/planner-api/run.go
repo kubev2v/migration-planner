@@ -11,7 +11,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/iso"
@@ -75,22 +74,6 @@ var runCmd = &cobra.Command{
 		}
 		zap.S().Info("RHCOS ISO initialized")
 
-		// Initialize OPA validator for policy validation
-		var opaValidator *opa.Validator
-
-		reader := opa.NewPolicyReader()
-		policiesDir := reader.DiscoverPoliciesDirectory()
-		if policiesDir == "" {
-			zap.S().Warn("No OPA policies directory found - validation will be disabled")
-		} else if policies, err := reader.ReadPolicies(policiesDir); err != nil {
-			zap.S().Warnf("Failed to read OPA policies from %s: %v - validation will be disabled", policiesDir, err)
-		} else if validator, err := opa.NewValidator(policies); err != nil {
-			zap.S().Warnf("Failed to initialize OPA validator: %v - validation will be disabled", err)
-		} else {
-			opaValidator = validator
-			zap.S().Infof("OPA validator initialized with %d policies from %s", len(policies), policiesDir)
-		}
-
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		go func() {
 			defer cancel()
@@ -99,7 +82,7 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			server := apiserver.New(cfg, store, listener, opaValidator)
+			server := apiserver.New(cfg, store, listener)
 			if err := server.Run(ctx); err != nil {
 				zap.S().Fatalw("Error running server", "error", err)
 			}

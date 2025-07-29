@@ -58,7 +58,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("batman")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(1))
@@ -77,7 +77,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("admin")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(2))
@@ -96,7 +96,7 @@ var _ = Describe("source handler", Ordered, func() {
 
 	Context("create", func() {
 		It("successfully creates a source", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin"})
 			Expect(err).To(BeNil())
 			Expect(source.Name).To(Equal("test"))
@@ -108,7 +108,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
 				Username: "admin",
 				OrgID:    "admin",
@@ -127,7 +127,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with certificate chain defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
 				Username:         "admin",
 				OrgID:            "admin",
@@ -144,7 +144,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- email domain defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin", EmailDomain: "domain.com"})
 			Expect(err).To(BeNil())
 			Expect(source.Name).To(Equal("test"))
@@ -179,7 +179,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.GetSource(ctx, firstSourceID)
 			Expect(err).To(BeNil())
 			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
@@ -197,7 +197,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			source, err := srv.GetSource(ctx, firstSourceID)
 			Expect(err).To(BeNil())
 			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
@@ -219,7 +219,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			_, err := srv.GetSource(context.TODO(), uuid.New())
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrResourceNotFound)
@@ -248,7 +248,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			err := srv.DeleteSources(context.TODO())
 			Expect(err).To(BeNil())
 
@@ -267,7 +267,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			err := srv.DeleteSource(context.TODO(), firstSourceID)
 			Expect(err).To(BeNil())
 
@@ -294,7 +294,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID: firstSourceID,
 				AgentId:  uuid.New(),
@@ -328,7 +328,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID: firstSourceID,
 				AgentId:  uuid.New(),
@@ -367,7 +367,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID: firstSourceID,
 				AgentId:  uuid.New(),

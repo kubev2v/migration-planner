@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/image"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -19,15 +18,11 @@ import (
 )
 
 type SourceService struct {
-	store        store.Store
-	opaValidator *opa.Validator
+	store store.Store
 }
 
-func NewSourceService(store store.Store, opaValidator *opa.Validator) *SourceService {
-	return &SourceService{
-		store:        store,
-		opaValidator: opaValidator,
-	}
+func NewSourceService(store store.Store) *SourceService {
+	return &SourceService{store: store}
 }
 
 // TODO should be moved to ImageService (to be created)
@@ -210,7 +205,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 		return NewErrExcelFileNotValid()
 	}
 
-	inventory, err := rvtools.ParseRVTools(ctx, rvtoolsContent, s.opaValidator)
+	inventory, err := rvtools.ParseRVTools(rvtoolsContent)
 	if err != nil {
 		return fmt.Errorf("error parsing RVTools file: %v", err)
 	}
