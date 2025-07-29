@@ -48,6 +48,24 @@ type AgentProxy struct {
 	NoProxy  *string `json:"noProxy" validate:"omitnil,max=1000"`
 }
 
+// Assessment defines model for Assessment.
+type Assessment struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Inventory Inventory          `json:"inventory"`
+	Name      string             `json:"name"`
+	SourceID  openapi_types.UUID `json:"sourceID"`
+}
+
+// AssessmentForm defines model for AssessmentForm.
+type AssessmentForm struct {
+	Name     string             `json:"name"`
+	SourceID openapi_types.UUID `json:"sourceID"`
+}
+
+// AssessmentList defines model for AssessmentList.
+type AssessmentList = []Assessment
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`
@@ -226,6 +244,9 @@ type UploadRvtoolsFileMultipartBody struct {
 	// File The RVTools file (Excel)
 	File openapi_types.File `json:"file"`
 }
+
+// CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
+type CreateAssessmentJSONRequestBody = AssessmentForm
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
