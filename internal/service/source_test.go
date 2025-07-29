@@ -428,4 +428,117 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(f.ID).To(Equal(id))
 		})
 	})
+
+	Context("delete source with share token", func() {
+		It("deletes share token when source is deleted via service", func() {
+			sourceID := uuid.New()
+
+			// Create source
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share token for the source
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify share token exists
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			// Delete the source via service
+			srv := service.NewSourceService(s)
+			err := srv.DeleteSource(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+
+			// Verify source is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify share token is automatically deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("deletes all share tokens when all sources are deleted via service", func() {
+			sourceID1 := uuid.New()
+			sourceID2 := uuid.New()
+
+			// Create two sources
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID1, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID2, "user", "user"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create share tokens for both sources
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-1", sourceID1))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO share_tokens (token, source_id) VALUES ('%s', '%s');", "test-token-2", sourceID2))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify both share tokens exist
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Delete all sources via service
+			srv := service.NewSourceService(s)
+			err := srv.DeleteSources(context.TODO())
+			Expect(err).To(BeNil())
+
+			// Verify all sources are deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Verify all share tokens are deleted due to CASCADE
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("successfully deletes source without share token", func() {
+			sourceID := uuid.New()
+
+			// Create source without share token
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Verify source exists but no share token
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(1))
+
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM share_tokens WHERE source_id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+
+			// Delete the source via service
+			srv := service.NewSourceService(s)
+			err := srv.DeleteSource(context.TODO(), sourceID)
+			Expect(err).To(BeNil())
+
+			// Verify source is deleted
+			count = 1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM sources WHERE id = ?", sourceID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM share_tokens;")
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
 })

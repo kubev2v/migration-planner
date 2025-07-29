@@ -74,3 +74,18 @@ func AgentToApi(a model.Agent) api.Agent {
 		Version:       a.Version,
 	}
 }
+
+func ShareTokenToApi(s model.ShareToken) api.ShareToken {
+	return api.ShareToken{
+		SourceId: s.SourceID,
+		Token:    s.Token,
+	}
+}
+
+func ShareTokenListToApi(shareTokens []model.ShareToken) api.ShareTokenList {
+	result := make(api.ShareTokenList, len(shareTokens))
+	for i, shareToken := range shareTokens {
+		result[i] = ShareTokenToApi(shareToken)
+	}
+	return result
+}
