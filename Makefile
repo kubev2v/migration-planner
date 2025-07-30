@@ -79,7 +79,6 @@ help:
 	@echo "    run:             run the migration planner API service"
 	@echo "    integration-test: run e2e integration tests"
 
-GOBIN = $(shell pwd)/bin
 GINKGO ?= $(GOBIN)/ginkgo
 ginkgo: ## Download ginkgo locally if necessary.
 ifeq (, $(shell which ginkgo 2> /dev/null))
@@ -108,10 +107,6 @@ TEST_PACKAGES := ./...
 GINKGO_OPTIONS ?= --skip e2e
 test: ginkgo
 	$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(GINKGO_OPTIONS) $(TEST_PACKAGES)
-
-generate:
-	go generate -v $(shell go list ./...)
-	hack/mockgen.sh
 
 tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
@@ -290,24 +285,69 @@ clean:
 GOLANGCI_LINT_VERSION := v1.64.8
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
-.PHONY: lint lint-install
-
 # Download golangci-lint locally if not already present
-lint-install:
-	@echo "Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+$(GOLANGCI_LINT):
+	@echo "⚠️ Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
+	@echo "✅ 'golangci-lint' installed successfully."
 
 # Run linter
 lint: $(GOLANGCI_LINT)
 	@echo "Running golangci-lint..."
 	@$(GOLANGCI_LINT) run --timeout=5m
 	@echo "✅ Lint passed successfully!"
-
-# Ensure binary exists
-$(GOLANGCI_LINT):
-	$(MAKE) lint-install
 ##################### "make lint" support end   ##########################
+
+##################### "make generate" support start ##########################
+MOQ := $(GOBIN)/moq
+
+# Install moq if not already present
+$(MOQ):
+	@echo "⚠️ Installing moq..."
+	@go install github.com/matryer/moq@latest
+	@echo "✅ 'moq' installed successfully."
+
+# Code generation
+generate: $(MOQ)
+	@echo "Running go generate..."
+	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./...)
+	@echo "Running mockgen script..."
+	@hack/mockgen.sh
+	@$(MAKE) format
+	@echo "✅ Generate complete."
+
+# Check if generate changes the repo
+check-generate: generate
+	@echo "Checking if generated files are up to date..."
+	@git diff --quiet || (echo "❌ Detected uncommitted changes after generate. Run 'make generate' and commit the result." && git status && exit 1)
+	@echo "✅ All generated files are up to date."
+##################### "make generate" support end   ##########################
+
+##################### "make format" support start ##########################
+GOIMPORTS := $(GOBIN)/goimports
+
+# Install goimports if not already available
+$(GOIMPORTS):
+	@echo "⚠️ Installing goimports..."
+	@go install golang.org/x/tools/cmd/goimports@latest
+	@echo "✅ 'goimports' installed successfully."
+
+# Format Go code using gofmt and goimports
+format: $(GOIMPORTS)
+	@echo "Formatting Go code..."
+	@gofmt -s -w .
+	@$(GOIMPORTS) -w .
+	@echo "✅ Format complete."
+
+# Check that formatting does not introduce changes
+check-format: format
+	@echo "Checking if formatting is up to date..."
+	@git diff --quiet || (echo "❌ Detected uncommitted changes after format. Run 'make format' and commit the result." && git status && exit 1)
+	@echo "✅ All formatted files are up to date."
+##################### "make format" support end   ##########################
+
+validate-all: lint check-generate check-format
 
 # OPA Policies Setup for Local Development
 .PHONY: setup-opa-policies
