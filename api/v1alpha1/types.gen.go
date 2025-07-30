@@ -19,6 +19,13 @@ const (
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
 )
 
+// Defines values for AssessmentSourceType.
+const (
+	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
+	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
+	AssessmentSourceTypeSource    AssessmentSourceType = "source"
+)
+
 // Defines values for NetworkType.
 const (
 	Distributed NetworkType = "distributed"
@@ -50,21 +57,53 @@ type AgentProxy struct {
 
 // Assessment defines model for Assessment.
 type Assessment struct {
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
-	Inventory Inventory          `json:"inventory"`
-	Name      string             `json:"name"`
-	SourceID  openapi_types.UUID `json:"sourceID"`
+	CreatedAt  time.Time             `json:"createdAt"`
+	Id         openapi_types.UUID    `json:"id"`
+	Labels     *[]Label              `json:"labels,omitempty"`
+	Name       string                `json:"name"`
+	Snapshots  []Snapshot            `json:"snapshots"`
+	SourceType *AssessmentSourceType `json:"sourceType,omitempty"`
+	SourceId   *openapi_types.UUID   `json:"source_id,omitempty"`
 }
+
+// AssessmentSourceType defines model for Assessment.SourceType.
+type AssessmentSourceType string
 
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
-	Name     string             `json:"name"`
-	SourceID openapi_types.UUID `json:"sourceID"`
+	Inventory *Inventory          `json:"inventory,omitempty"`
+	Labels    *[]Label            `json:"labels,omitempty"`
+	Name      string              `json:"name" validate:"required,assessment_name,min=1,max=100"`
+	SourceId  *openapi_types.UUID `json:"sourceId,omitempty" validate:"required_if=sourceType source"`
+
+	// SourceType Source of the assessment data:
+	//  * `inventory` - Manual inventory upload via JSON
+	//  * `agent` - Collected by migration planner agent
+	SourceType *string `json:"sourceType,omitempty" validate:"required,oneof=inventory agent"`
 }
 
 // AssessmentList defines model for AssessmentList.
 type AssessmentList = []Assessment
+
+// AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
+type AssessmentRvtoolsForm struct {
+	// File File upload for assessment data
+	File openapi_types.File `json:"file" validate:"required"`
+
+	// Labels Labels for the assessment
+	Labels *[]Label `json:"labels,omitempty"`
+
+	// Name Name of the assessment
+	Name string `json:"name" validate:"required,assessment_name,min=1,max=100"`
+}
+
+// AssessmentUpdate Update form of the assessment.
+type AssessmentUpdate struct {
+	Labels *[]Label `json:"labels,omitempty"`
+
+	// Name Name of the assessment
+	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
+}
 
 // Datastore defines model for Datastore.
 type Datastore struct {
@@ -144,6 +183,12 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// Snapshot defines model for Snapshot.
+type Snapshot struct {
+	CreatedAt time.Time `json:"createdAt"`
+	Inventory Inventory `json:"inventory"`
+}
 
 // Source defines model for Source.
 type Source struct {
@@ -269,6 +314,12 @@ type UploadRvtoolsFileMultipartBody struct {
 
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
+
+// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
+type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
+
+// UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
+type UpdateAssessmentJSONRequestBody = AssessmentUpdate
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate

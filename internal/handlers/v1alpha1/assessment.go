@@ -21,6 +21,11 @@ func (s *ServiceHandler) GetAssessment(ctx context.Context, request apiServer.Ge
 	return apiServer.GetAssessment500JSONResponse{Message: "not implemented yet"}, nil
 }
 
+// (PUT /api/v1/assessments/{id})
+func (s *ServiceHandler) UpdateAssessment(ctx context.Context, request apiServer.UpdateAssessmentRequestObject) (apiServer.UpdateAssessmentResponseObject, error) {
+	return apiServer.UpdateAssessment500JSONResponse{Message: "not implemented yet"}, nil
+}
+
 // (DELETE /api/v1/assessments/{id})
 func (s *ServiceHandler) DeleteAssessment(ctx context.Context, request apiServer.DeleteAssessmentRequestObject) (apiServer.DeleteAssessmentResponseObject, error) {
 	return apiServer.DeleteAssessment500JSONResponse{Message: "not implemented yet"}, nil

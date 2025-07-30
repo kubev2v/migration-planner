@@ -105,6 +105,11 @@ type ClientInterface interface {
 	// GetAssessment request
 	GetAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateAssessmentWithBody request with any body
+	UpdateAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAssessment(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteSources request
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -195,6 +200,30 @@ func (c *Client) DeleteAssessment(ctx context.Context, id openapi_types.UUID, re
 
 func (c *Client) GetAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAssessmentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAssessmentRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAssessment(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAssessmentRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -504,6 +533,53 @@ func NewGetAssessmentRequest(server string, id openapi_types.UUID) (*http.Reques
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateAssessmentRequest calls the generic UpdateAssessment builder with application/json body
+func NewUpdateAssessmentRequest(server string, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAssessmentRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateAssessmentRequestWithBody generates requests for UpdateAssessment with any type of body
+func NewUpdateAssessmentRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -974,6 +1050,11 @@ type ClientWithResponsesInterface interface {
 	// GetAssessmentWithResponse request
 	GetAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentResponse, error)
 
+	// UpdateAssessmentWithBodyWithResponse request with any body
+	UpdateAssessmentWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error)
+
+	UpdateAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error)
+
 	// DeleteSourcesWithResponse request
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
 
@@ -1111,6 +1192,33 @@ func (r GetAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetAssessmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateAssessmentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Assessment
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAssessmentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAssessmentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1438,6 +1546,23 @@ func (c *ClientWithResponses) GetAssessmentWithResponse(ctx context.Context, id 
 	return ParseGetAssessmentResponse(rsp)
 }
 
+// UpdateAssessmentWithBodyWithResponse request with arbitrary body returning *UpdateAssessmentResponse
+func (c *ClientWithResponses) UpdateAssessmentWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error) {
+	rsp, err := c.UpdateAssessmentWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAssessmentResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error) {
+	rsp, err := c.UpdateAssessment(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAssessmentResponse(rsp)
+}
+
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
 func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error) {
 	rsp, err := c.DeleteSources(ctx, reqEditors...)
@@ -1718,6 +1843,67 @@ func ParseGetAssessmentResponse(rsp *http.Response) (*GetAssessmentResponse, err
 	}
 
 	response := &GetAssessmentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Assessment
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAssessmentResponse parses an HTTP response from a UpdateAssessmentWithResponse call
+func ParseUpdateAssessmentResponse(rsp *http.Response) (*UpdateAssessmentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAssessmentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
