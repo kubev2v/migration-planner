@@ -7,6 +7,35 @@ on:  # yamllint disable-line rule:truthy
     branches: [main]
 
 jobs:
+  check-generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+
+      - name: Check generated files are up to date
+        run: |
+          make check-generate
+          # The Makefile only checks for uncommitted changes, allowing users to keep untracked files in the repository.
+          # Here, we also check for untracked files, as none are expected at this stage.
+          if [[ $(git ls-files --others --exclude-standard) ]]; then git ls-files --others --exclude-standard; echo "These files are not tracked by git"; exit 1; fi
+
+  check-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+
+      - name: Check that formatting does not introduce changes
+        run: |
+          make check-format
+
   test:
     runs-on: ubuntu-latest
     env:
@@ -58,7 +87,6 @@ jobs:
         # FIXME: Move to Makefile!
         go install github.com/matryer/moq@latest
         export PATH=$PATH:$(go env GOPATH)/bin
-        make generate
         DOWNLOAD_RHCOS=false make build
 
     - name: Migrate the db
@@ -68,11 +96,6 @@ jobs:
     - name: Test
       run: |
         MIGRATION_PLANNER_MIGRATIONS_FOLDER=${{ github.workspace }}/pkg/migrations/sql make test
-
-    - name: Checking generated files are up to date
-      run: |
-        if [[ $(git ls-files --others --exclude-standard) ]]; then git ls-files --others --exclude-standard; echo "These files are not tracked by git"; exit 1; fi
-        if [ -n "$(git status --porcelain)" ]; then echo "There are uncommitted changes:"; git status --short; exit 1; fi
 
   Lint:
     name: Lint code
@@ -85,9 +108,6 @@ jobs:
         run: |
           sudo apt update
           sudo apt install libvirt-dev
-
-      - name: Install golangci-lint
-        run: make lint-install
 
       - name: Run golangci-lint
         run: make lint
