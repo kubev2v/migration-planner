@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -688,7 +689,8 @@ func (response ListAssessments500JSONResponse) VisitListAssessmentsResponse(w ht
 }
 
 type CreateAssessmentRequestObject struct {
-	Body *CreateAssessmentJSONRequestBody
+	JSONBody      *CreateAssessmentJSONRequestBody
+	MultipartBody *multipart.Reader
 }
 
 type CreateAssessmentResponseObject interface {
@@ -1504,12 +1506,23 @@ func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request)
 func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request) {
 	var request CreateAssessmentRequestObject
 
-	var body CreateAssessmentJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body CreateAssessmentJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
 	}
-	request.Body = &body
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateAssessment(ctx, request.(CreateAssessmentRequestObject))
