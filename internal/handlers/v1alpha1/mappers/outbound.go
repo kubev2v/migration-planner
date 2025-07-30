@@ -74,3 +74,37 @@ func AgentToApi(a model.Agent) api.Agent {
 		Version:       a.Version,
 	}
 }
+
+func AssessmentToApi(a model.Assessment) api.Assessment {
+	assessment := api.Assessment{
+		Id:        a.ID,
+		Name:      a.Name,
+		CreatedAt: a.CreatedAt,
+		Snapshots: make([]api.Snapshot, len(a.Snapshots)),
+	}
+
+	// Convert snapshots
+	for i, snapshot := range a.Snapshots {
+		assessment.Snapshots[i] = api.Snapshot{
+			CreatedAt: snapshot.CreatedAt,
+		}
+		if snapshot.Inventory != nil {
+			assessment.Snapshots[i].Inventory = snapshot.Inventory.Data
+		}
+	}
+
+	// Set source type based on source field
+	sourceType := api.AssessmentSourceType(a.SourceType)
+	assessment.SourceType = sourceType
+	assessment.SourceId = a.SourceID
+
+	return assessment
+}
+
+func AssessmentListToApi(assessments []model.Assessment) api.AssessmentList {
+	assessmentList := make([]api.Assessment, len(assessments))
+	for i, assessment := range assessments {
+		assessmentList[i] = AssessmentToApi(assessment)
+	}
+	return assessmentList
+}

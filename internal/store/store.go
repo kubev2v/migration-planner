@@ -16,6 +16,7 @@ type Store interface {
 	ImageInfra() ImageInfra
 	PrivateKey() PrivateKey
 	Label() Label
+	Assessment() Assessment
 	Seed() error
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
@@ -28,6 +29,7 @@ type DataStore struct {
 	imageInfra ImageInfra
 	privateKey PrivateKey
 	label      Label
+	assessment Assessment
 }
 
 func NewStore(db *gorm.DB) Store {
@@ -37,6 +39,7 @@ func NewStore(db *gorm.DB) Store {
 		imageInfra: NewImageInfraStore(db),
 		privateKey: NewCacheKeyStore(NewPrivateKey(db)),
 		label:      NewLabelStore(db),
+		assessment: NewAssessmentStore(db),
 		db:         db,
 	}
 }
@@ -63,6 +66,10 @@ func (s *DataStore) ImageInfra() ImageInfra {
 
 func (s *DataStore) Label() Label {
 	return s.label
+}
+
+func (s *DataStore) Assessment() Assessment {
+	return s.assessment
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {

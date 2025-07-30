@@ -1,7 +1,13 @@
 package mappers
 
 import (
+	"bytes"
+	"io"
+	"mime/multipart"
+
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
@@ -89,4 +95,78 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 	}
 
 	return form
+}
+
+// Assessment-related mappers
+
+func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, orgID string) mappers.AssessmentCreateForm {
+	form := mappers.AssessmentCreateForm{
+		ID:     uuid.New(),
+		Name:   resource.Name,
+		OrgID:  orgID,
+		Source: resource.SourceType,
+	}
+
+	// Set source ID if provided
+	if resource.SourceId != nil {
+		form.SourceID = resource.SourceId
+	}
+
+	// Set inventory if provided
+	if resource.Inventory != nil {
+		form.Inventory = *resource.Inventory
+	}
+
+	return form
+}
+
+func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
+	return mappers.InventoryForm{
+		Data: inventory,
+	}
+}
+
+func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, orgID string) (mappers.AssessmentCreateForm, error) {
+	form := mappers.AssessmentCreateForm{
+		ID:     uuid.New(),
+		OrgID:  orgID,
+		Source: service.SourceTypeRvtools,
+	}
+
+	for {
+		part, err := multipartBody.NextPart()
+		if err != nil {
+			if err.Error() == "EOF" {
+				break
+			}
+			return form, err
+		}
+		defer part.Close()
+
+		switch part.FormName() {
+		case "name":
+			nameBytes, err := io.ReadAll(part)
+			if err != nil {
+				return form, err
+			}
+			form.Name = string(nameBytes)
+		case "file":
+			buff := bytes.NewBuffer([]byte{})
+			_, err := io.Copy(buff, part)
+			if err != nil {
+				return form, err
+			}
+			// Store the entire part as RVToolsFile for processing
+			form.RVToolsFile = buff
+		case "labels":
+			// Handle labels if provided in multipart form
+			// This is optional based on the API spec
+		}
+	}
+
+	// For RVTools, we'll set an empty inventory initially
+	// The service layer should process the RVToolsFile to populate inventory
+	form.Inventory = v1alpha1.Inventory{}
+
+	return form, nil
 }

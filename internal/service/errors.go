@@ -46,3 +46,23 @@ type ErrAgentUpdateForbidden struct {
 func NewErrAgentUpdateForbidden(sourceID, agentID uuid.UUID) *ErrAgentUpdateForbidden {
 	return &ErrAgentUpdateForbidden{fmt.Errorf("agent %s is not associated with source %s", agentID, sourceID)}
 }
+
+func NewErrAssessmentNotFound(id uuid.UUID) *ErrResourceNotFound {
+	return NewErrResourceNotFound(id, "assessment")
+}
+
+type ErrAssessmentCreationForbidden struct {
+	error
+}
+
+func NewErrAssessmentCreationForbidden(sourceID uuid.UUID) *ErrAssessmentCreationForbidden {
+	return &ErrAssessmentCreationForbidden{fmt.Errorf("forbidden to create assessment from source id:%s", sourceID)}
+}
+
+type ErrSourceHasNoInventory struct {
+	error
+}
+
+func NewErrSourceHasNoInventory(sourceID uuid.UUID) *ErrSourceHasNoInventory {
+	return &ErrSourceHasNoInventory{fmt.Errorf("source has no inventory: %s", sourceID)}
+}

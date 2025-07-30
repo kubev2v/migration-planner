@@ -27,6 +27,10 @@ func (v *Validator) Register(rules ...ValidationRule) {
 	v.rules = rules
 }
 
+func (v *Validator) RegisterStructValidation(fnValidation validator.StructLevelFunc, s any) {
+	v.validator.RegisterStructValidation(fnValidation, s)
+}
+
 func (v *Validator) Struct(s any) error {
 	return v.validator.Struct(s)
 }
