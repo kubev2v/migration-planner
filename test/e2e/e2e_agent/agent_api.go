@@ -5,11 +5,12 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	coreAgent "github.com/kubev2v/migration-planner/internal/agent"
 	"go.uber.org/zap"
-	"io"
-	"net/http"
 )
 
 // AgentApi provides a client to interact with the Planner Agent API

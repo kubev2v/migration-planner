@@ -3,16 +3,17 @@ package cli
 import (
 	"context"
 	"fmt"
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	"github.com/libvirt/libvirt-go"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 	"log"
 	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/libvirt/libvirt-go"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 type E2ETestOptions struct {

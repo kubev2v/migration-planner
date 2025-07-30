@@ -5,9 +5,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"os"
 	"path"
+
+	"github.com/kubev2v/migration-planner/internal/agent/common"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/agent"

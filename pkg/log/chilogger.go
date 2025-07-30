@@ -78,7 +78,7 @@ func ConditionalLogger(logLevel string, l *zap.Logger, name string) func(next ht
 		logger.Info("HTTP request logging enabled (debug mode)")
 		return Logger(l, name)
 	}
-	
+
 	logger.Info("HTTP request logging disabled (info mode) - using Envoy for access logs")
 	return func(next http.Handler) http.Handler {
 		return next // Pass through without logging
