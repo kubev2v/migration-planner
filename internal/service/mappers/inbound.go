@@ -1,6 +1,8 @@
 package mappers
 
 import (
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -130,4 +132,35 @@ func (f *SourceUpdateForm) ToLabels() []model.Label {
 		labels[i] = model.Label{Key: label.Key, Value: label.Value}
 	}
 	return labels
+}
+
+// Assessment-related mappers
+
+type AssessmentCreateForm struct {
+	ID          uuid.UUID
+	Name        string
+	OrgID       string
+	Source      string
+	SourceID    *uuid.UUID
+	Inventory   v1alpha1.Inventory
+	RVToolsFile io.Reader
+}
+
+func (f *AssessmentCreateForm) ToModel() model.Assessment {
+	return model.Assessment{
+		ID:         f.ID,
+		Name:       f.Name,
+		OrgID:      f.OrgID,
+		SourceType: f.Source,
+		SourceID:   f.SourceID,
+	}
+}
+
+type InventoryForm struct {
+	Data v1alpha1.Inventory
+}
+
+type AssessmentUpdateForm struct {
+	Name      *string
+	Inventory v1alpha1.Inventory
 }

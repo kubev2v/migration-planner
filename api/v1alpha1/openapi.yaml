@@ -482,6 +482,9 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AssessmentForm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssessmentRvtoolsForm'
         required: true
       responses:
         "201":
@@ -555,6 +558,62 @@ paths:
                 $ref: '#/components/schemas/Error'
         "500":
           description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+        - assessment
+      description: Update an assessment
+      operationId: updateAssessment
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentUpdate'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -1082,6 +1141,18 @@ components:
         - key
         - value
 
+    Snapshot:
+      type: object
+      properties:
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - inventory
+        - createdAt
+
     Assessment:
       type: object
       properties:
@@ -1090,33 +1161,77 @@ components:
           format: uuid
         name:
           type: string
+        sourceType:
+          type: string
+          enum: [inventory, rvtools, source]
+        sourceId:
+          type: string
+          format: uuid
         createdAt:
           type: string
           format: date-time
-        inventory:
-          $ref: '#/components/schemas/Inventory'
-        sourceID:
-          type: string
-          format: uuid
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Snapshot'
       required:
         - id
         - name
+        - sourceType
         - createdAt
-        - inventory
-        - sourceID
+        - snapshots
 
     AssessmentForm:
       type: object
       properties:
         name:
           type: string
-          minLength: 1
-        sourceID:
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
+        sourceType:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,oneof=inventory agent"
+          description: >
+            Source of the assessment data:
+             * `inventory` - Manual inventory upload via JSON
+             * `agent` - Collected by migration planner agent
+        sourceId:
           type: string
           format: uuid
+        inventory:
+          $ref: '#/components/schemas/Inventory'
       required:
         - name
-        - sourceID
+        - sourceType
+
+    AssessmentRvtoolsForm:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the assessment
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
+        file:
+          type: string
+          format: binary
+          description: File upload for assessment data
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
+        - name
+        - file
+
+    AssessmentUpdate:
+      type: object
+      description: Update form of the assessment.
+      properties:
+        name:
+          type: string
+          description: Name of the assessment
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
 
     AssessmentList:
       type: array

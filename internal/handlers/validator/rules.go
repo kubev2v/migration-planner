@@ -41,3 +41,14 @@ func NewSourceValidationRules() []ValidationRule {
 		},
 	}
 }
+
+func NewAssessmentValidationRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Rule: registerFn("assessment_name", nameValidator),
+		},
+		{
+			Rule: registerFn("inventory_not_empty", inventoryNotEmptyValidator),
+		},
+	}
+}

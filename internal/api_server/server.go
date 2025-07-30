@@ -106,7 +106,10 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
-	h := handlers.NewServiceHandler(service.NewSourceService(s.store, s.opaValidator))
+	h := handlers.NewServiceHandler(
+		service.NewSourceService(s.store, s.opaValidator),
+		service.NewAssessmentService(s.store),
+	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
