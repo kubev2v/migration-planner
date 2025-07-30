@@ -9,7 +9,7 @@ import (
 )
 
 func InitLog(lvl zap.AtomicLevel) *zap.Logger {
-	const sampleInitial = 1 //first log message at each level will always be logged.
+	const sampleInitial = 1    //first log message at each level will always be logged.
 	const sampleThereafter = 5 //after the initial log, only every 5th subsequent log message at each level will be logged.
 
 	cfg := zap.NewProductionConfig()

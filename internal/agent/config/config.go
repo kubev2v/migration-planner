@@ -3,10 +3,11 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/internal/agent/client"
 	"github.com/kubev2v/migration-planner/internal/agent/fileio"

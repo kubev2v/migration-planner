@@ -28,7 +28,7 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 
 		name := getColumnValue(row, colMap, "name")
 		dsType := getColumnValue(row, colMap, "type")
-		
+
 		if name == "" {
 			continue
 		}
@@ -78,10 +78,10 @@ func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.In
 
 	for i := range inventory.Infra.Datastores {
 		ds := &inventory.Infra.Datastores[i]
-		
+
 		if info, exists := multipathInfo[ds.DiskId]; exists {
 			ds.DiskId = info.NAA
-			
+
 			if info.Vendor != "" {
 				ds.Vendor = info.Vendor
 			}

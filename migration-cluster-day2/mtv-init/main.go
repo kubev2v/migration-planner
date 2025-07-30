@@ -1,8 +1,8 @@
 package main
 
 import (
+	_ "embed"
 	"errors"
-    _ "embed"
 	"fmt"
 	"html/template"
 	"io"
@@ -18,11 +18,11 @@ func main() {
 	http.HandleFunc("/", bootstrapHandler)
 	http.HandleFunc("/migrations/bootstrap", bootstrapHandler)
 	http.HandleFunc("/upload", uploadHandler)
-    err := os.Mkdir(savePath, os.ModePerm)
-    if err != nil && !errors.Is(err, os.ErrExist){
-        panic(err)
-    }
-	http.Handle("/vmware/", http.StripPrefix("/vmware/",http.FileServer(http.Dir(savePath))))
+	err := os.Mkdir(savePath, os.ModePerm)
+	if err != nil && !errors.Is(err, os.ErrExist) {
+		panic(err)
+	}
+	http.Handle("/vmware/", http.StripPrefix("/vmware/", http.FileServer(http.Dir(savePath))))
 	fmt.Println("Starting server on :8080...")
 	http.ListenAndServe(":8080", nil)
 }
@@ -58,7 +58,7 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	target, err := os.Create(path.Join(savePath,"vddk.tar.gz"))
+	target, err := os.Create(path.Join(savePath, "vddk.tar.gz"))
 	if err != nil {
 		http.Error(w, "Error creating destination file", http.StatusInternalServerError)
 		return
@@ -71,14 +71,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	envFile, err := os.Create(path.Join(savePath,"env"))
+	envFile, err := os.Create(path.Join(savePath, "env"))
 	if err != nil {
 		http.Error(w, "Error creating destination file", http.StatusInternalServerError)
 		return
 	}
 	defer envFile.Close()
 
-    j := fmt.Sprintf("url=%s\nusername=%s\npassword=%s\n",
+	j := fmt.Sprintf("url=%s\nusername=%s\npassword=%s\n",
 		r.FormValue("url"),
 		r.FormValue("username"),
 		r.FormValue("password"))
@@ -88,14 +88,14 @@ func uploadHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-    err = os.WriteFile(path.Join(savePath, "done"), nil, os.ModePerm)
-    if err != nil {
+	err = os.WriteFile(path.Join(savePath, "done"), nil, os.ModePerm)
+	if err != nil {
 		http.Error(w, "Error writing done file", http.StatusInternalServerError)
-        return 
-    }
+		return
+	}
 	// For now, just return a simple confirmatio
 	fmt.Fprintf(w, "<html><body>vddk.tar.gz and vmware credentials recieved and avaiable under <a href=\"/vmware\" />/vmware</a></body></html>\n")
 }
 
 //go:embed index.html
-var indexhtml string 
+var indexhtml string

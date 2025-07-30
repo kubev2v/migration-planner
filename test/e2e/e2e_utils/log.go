@@ -1,10 +1,11 @@
 package e2e_utils
 
 import (
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	"go.uber.org/zap"
 	"sort"
 	"time"
+
+	. "github.com/kubev2v/migration-planner/test/e2e"
+	"go.uber.org/zap"
 )
 
 // LogExecutionSummary logs the execution time of all tests stored in the TestsExecutionTime map.

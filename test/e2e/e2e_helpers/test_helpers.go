@@ -2,6 +2,7 @@ package e2e_helpers
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"

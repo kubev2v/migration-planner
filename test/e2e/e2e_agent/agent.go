@@ -2,13 +2,14 @@ package e2e_agent
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
 	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
-	"time"
 )
 
 // PlannerAgent defines the interface for interacting with a planner agent instance
