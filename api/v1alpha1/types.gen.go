@@ -59,12 +59,22 @@ type Assessment struct {
 
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
-	Name     string             `json:"name"`
-	SourceID openapi_types.UUID `json:"sourceID"`
+	Inventory *Inventory          `json:"inventory,omitempty"`
+	Name      string              `json:"name"`
+	SourceID  *openapi_types.UUID `json:"sourceID,omitempty"`
 }
 
 // AssessmentList defines model for AssessmentList.
 type AssessmentList = []Assessment
+
+// AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
+type AssessmentRvtoolsForm struct {
+	// File Optional file upload for assessment data
+	File openapi_types.File `json:"file"`
+
+	// Name Name of the assessment
+	Name string `json:"name"`
+}
 
 // Datastore defines model for Datastore.
 type Datastore struct {
@@ -269,6 +279,9 @@ type UploadRvtoolsFileMultipartBody struct {
 
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
+
+// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
+type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
