@@ -79,12 +79,6 @@ help:
 	@echo "    run:             run the migration planner API service"
 	@echo "    integration-test: run e2e integration tests"
 
-GINKGO ?= $(GOBIN)/ginkgo
-ginkgo: ## Download ginkgo locally if necessary.
-ifeq (, $(shell which ginkgo 2> /dev/null))
-	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
-endif
-
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OC_VERSION ?= 4.17.9
 OC_BIN := $(shell command -v oc)
@@ -102,11 +96,6 @@ ifeq ($(OC_BIN),)
 else
 	@echo "oc is already installed at $(OC_BIN)"
 endif
-
-TEST_PACKAGES := ./...
-GINKGO_OPTIONS ?= --skip e2e
-test: ginkgo
-	$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(GINKGO_OPTIONS) $(TEST_PACKAGES)
 
 tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
@@ -128,11 +117,6 @@ image:
 ifeq ($(DOWNLOAD_RHCOS), true)
 	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
 endif
-
-integration-test: ginkgo build
-	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
-	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
-	$(GINKGO) -focus=$(FOCUS) run test/e2e
 
 build: bin image
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
@@ -287,14 +271,14 @@ GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 # Download golangci-lint locally if not already present
 $(GOLANGCI_LINT):
-	@echo "⚠️ Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	@echo "🔍 Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
 	@echo "✅ 'golangci-lint' installed successfully."
 
 # Run linter
 lint: $(GOLANGCI_LINT)
-	@echo "Running golangci-lint..."
+	@echo "🔍 Running golangci-lint..."
 	@$(GOLANGCI_LINT) run --timeout=5m
 	@echo "✅ Lint passed successfully!"
 ##################### "make lint" support end   ##########################
@@ -304,22 +288,22 @@ MOQ := $(GOBIN)/moq
 
 # Install moq if not already present
 $(MOQ):
-	@echo "⚠️ Installing moq..."
+	@echo "📦 Installing moq..."
 	@go install github.com/matryer/moq@latest
 	@echo "✅ 'moq' installed successfully."
 
 # Code generation
 generate: $(MOQ)
-	@echo "Running go generate..."
+	@echo "⚙️ Running go generate..."
 	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./...)
-	@echo "Running mockgen script..."
+	@echo "⚙️ Running mockgen script..."
 	@hack/mockgen.sh
 	@$(MAKE) format
 	@echo "✅ Generate complete."
 
 # Check if generate changes the repo
 check-generate: generate
-	@echo "Checking if generated files are up to date..."
+	@echo "🔍 Checking if generated files are up to date..."
 	@git diff --quiet || (echo "❌ Detected uncommitted changes after generate. Run 'make generate' and commit the result." && git status && exit 1)
 	@echo "✅ All generated files are up to date."
 ##################### "make generate" support end   ##########################
@@ -329,25 +313,58 @@ GOIMPORTS := $(GOBIN)/goimports
 
 # Install goimports if not already available
 $(GOIMPORTS):
-	@echo "⚠️ Installing goimports..."
+	@echo "📦 Installing goimports..."
 	@go install golang.org/x/tools/cmd/goimports@latest
 	@echo "✅ 'goimports' installed successfully."
 
 # Format Go code using gofmt and goimports
 format: $(GOIMPORTS)
-	@echo "Formatting Go code..."
+	@echo "🧹 Formatting Go code..."
 	@gofmt -s -w .
 	@$(GOIMPORTS) -w .
 	@echo "✅ Format complete."
 
 # Check that formatting does not introduce changes
 check-format: format
-	@echo "Checking if formatting is up to date..."
+	@echo "🔍 Checking if formatting is up to date..."
 	@git diff --quiet || (echo "❌ Detected uncommitted changes after format. Run 'make format' and commit the result." && git status && exit 1)
 	@echo "✅ All formatted files are up to date."
 ##################### "make format" support end   ##########################
 
-validate-all: lint check-generate check-format
+##################### tests support start ##########################
+GINKGO := $(GOBIN)/ginkgo
+UNIT_TEST_PACKAGES := ./...
+UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e
+
+# Install ginkgo if not already available
+$(GINKGO):
+	@echo "📦 Installing ginkgo..."
+	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
+	@echo "✅ 'ginkgo' installed successfully."
+
+# Run unit tests using ginkgo
+test: $(GINKGO)
+	@echo "🧪 Running Unit tests..."
+	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
+	@echo "✅ All Unit tests passed successfully."
+
+# Build the migration-planner without downloading the RHCOS image
+build-no-rhcos:
+	@DOWNLOAD_RHCOS=false make build
+
+# Full unit test cycle: build, prepare DB, run tests, and clean up
+unit-test: build-no-rhcos kill-db deploy-db migrate test kill-db
+
+# Run integration tests using ginkgo
+integration-test: $(GINKGO) build
+	@echo "🧪 Running integration tests..."
+	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
+	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
+	$(GINKGO) -focus=$(FOCUS) run test/e2e
+	@echo "✅ All Integration tests passed successfully."
+##################### tests support end   ##########################
+
+validate-all: lint check-generate check-format unit-test
 
 # OPA Policies Setup for Local Development
 .PHONY: setup-opa-policies
@@ -383,3 +400,20 @@ clean-opa-policies:
 # include the deployment targets
 include deploy/deploy.mk
 include deploy/e2e.mk
+
+################################################################################
+# Emoji Legend for Makefile Targets
+#
+# Action Type        | Emoji | Description
+# -------------------|--------|------------------------------------------------
+# Install tool        📦     Installing a dependency or binary
+# Running task        ⚙️     Executing tasks like generate, build, etc.
+# Linting/validation  🔍     Checking format, lint, static analysis, etc.
+# Formatting          🧹     Formatting source code
+# Tests               🧪     Running unit or integration tests
+# Warnings/info       ⚠️     Temporary notice, caution, or pre-check
+# Success/complete    ✅     Task completed successfully
+# Failure/alert       ❌     An error or failure occurred
+# Deploy operations   🚀     Launching or bringing up environments/services
+# Teardown/cleanup    🗑️     Stopping, removing, or cleaning up resources
+################################################################################

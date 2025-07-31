@@ -7,6 +7,20 @@ on:  # yamllint disable-line rule:truthy
     branches: [main]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Setup libvirt
+        run: |
+          sudo apt update
+          sudo apt install libvirt-dev
+
+      - name: Run golangci-lint
+        run: make lint
+
   check-generate:
     runs-on: ubuntu-latest
     steps:
@@ -33,18 +47,13 @@ jobs:
         uses: actions/setup-go@v5
 
       - name: Check that formatting does not introduce changes
-        run: |
-          make check-format
+        run: make check-format
 
-  test:
+  unit-test:
     runs-on: ubuntu-latest
-    env:
-      PGHOST: localhost
-      PGDATABASE: planner
-      PGUSERNAME: admin
-      PGPASSWORD: adminpass
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out code
+      uses: actions/checkout@v4
 
     - name: Set up Go
       uses: actions/setup-go@v5
@@ -54,60 +63,10 @@ jobs:
         sudo apt update
         sudo apt install libvirt-dev
 
-    - name: Add PostgreSQL binaries to PATH
-      shell: bash
+    - name: Setup Podman
       run: |
-        echo "$(pg_config --bindir)" >> $GITHUB_PATH
-    - name: Start preinstalled PostgreSQL
-      shell: bash
-      run: |
-        echo "Initializing database cluster..."
-        # Convert backslashes to forward slashes in RUNNER_TEMP for Windows Git Bash
-        export PGHOST="${RUNNER_TEMP//\\//}/postgres"
-        export PGDATA="$PGHOST/pgdata"
-        mkdir -p "$PGDATA"
-        
-        # initdb requires file for password in non-interactive mode
-        export PWFILE="$RUNNER_TEMP/pwfile"
-        echo "postgres" > "$PWFILE"
-        initdb --pgdata="$PGDATA" --username="postgres" --pwfile="$PWFILE"
+        sudo apt update
+        sudo apt install -y podman podman-compose
 
-        echo "Starting PostgreSQL..."
-        echo "unix_socket_directories = '$PGHOST'" >> "$PGDATA/postgresql.conf"
-        pg_ctl start
-
-        echo "Creating user..."
-        psql --host "$PGHOST" --username="postgres" --dbname="postgres" --command="CREATE USER $PGUSERNAME PASSWORD '$PGPASSWORD'" --command="\du"
-
-        echo "Creating database..."
-        createdb --owner="$PGUSERNAME" --username="postgres" "$PGDATABASE"
-
-    - name: Prepare
-      run: |
-        # FIXME: Move to Makefile!
-        go install github.com/matryer/moq@latest
-        export PATH=$PATH:$(go env GOPATH)/bin
-        DOWNLOAD_RHCOS=false make build
-
-    - name: Migrate the db
-      run: |
-        MIGRATION_PLANNER_MIGRATIONS_FOLDER=${{ github.workspace }}/pkg/migrations/sql make migrate
-
-    - name: Test
-      run: |
-        MIGRATION_PLANNER_MIGRATIONS_FOLDER=${{ github.workspace }}/pkg/migrations/sql make test
-
-  Lint:
-    name: Lint code
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-
-      - name: Setup libvirt
-        run: |
-          sudo apt update
-          sudo apt install libvirt-dev
-
-      - name: Run golangci-lint
-        run: make lint
+    - name: Run the tests
+      run: make unit-test
