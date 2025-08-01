@@ -106,6 +106,9 @@ parameters:
     description: Full registry path to the validation (OPA) container
   - name: RHCOS_PASSWORD
     description: "Password to be set for the default RHCOS user"
+  - name: ISO_PV_ACCESS_MODE
+    description: "Access type for ISO PV"
+    value: ReadWriteOnce
 
 objects:
   - kind: ServiceAccount
@@ -120,7 +123,7 @@ objects:
         app: migration-planner
     spec:
       accessModes:
-        - ReadWriteOnce
+        - ${ISO_PV_ACCESS_MODE}
       resources:
         requests:
           storage: 5Gi
