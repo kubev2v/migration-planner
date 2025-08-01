@@ -185,6 +185,7 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}/api/migration-assessment \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+  	   -p ISO_PV_STORAGE_CLASS_NAME=standard \
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
@@ -204,6 +205,7 @@ delete-from-openshift: oc
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+  	   -p ISO_PV_STORAGE_CLASS_NAME=standard \
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
 	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
@@ -231,6 +233,7 @@ deploy-on-kind: oc
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
 	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
+  	   -p ISO_PV_STORAGE_CLASS_NAME=standard \
 	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** Migration Planner has been deployed successfully on Kind ***"
 
@@ -246,6 +249,7 @@ delete-from-kind: oc
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
+  	   -p ISO_PV_STORAGE_CLASS_NAME=standard \
 	   | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/pk-secret-template.yml \
