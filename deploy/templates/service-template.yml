@@ -109,6 +109,9 @@ parameters:
   - name: ISO_PV_ACCESS_MODE
     description: "Access type for ISO PV"
     value: ReadWriteOnce
+  - name: ISO_PV_STORAGE_CLASS_NAME
+    description: "Storage class name for pvc ISO"
+    required: true
 
 objects:
   - kind: ServiceAccount
@@ -122,6 +125,7 @@ objects:
       labels:
         app: migration-planner
     spec:
+      storageClassName: ${ISO_PV_STORAGE_CLASS_NAME}
       accessModes:
         - ${ISO_PV_ACCESS_MODE}
       resources:
