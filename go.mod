@@ -41,7 +41,7 @@ require (
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
-	gorm.io/driver/postgres v1.5.9
+	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.11
 	k8s.io/api v0.33.3
