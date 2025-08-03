@@ -134,7 +134,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 		zap.S().Named("agent").Errorf("failed to use provided credentials: %v", err)
 	}
 
-	c := collector.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
+	c := collector.NewCollector(a.config.DataDir, a.config.PersistentDataDir, a.config.OpaPoliciesDir)
 	c.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})

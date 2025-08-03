@@ -30,6 +30,7 @@ type svcConfig struct {
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
+	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	S3                   S3
 	RhcosImageName       string `envconfig:"MIGRATION_PLANNER_ISO_URL" default:""`
 	RhcosImageSha256     string `envconfig:"MIGRATION_PLANNER_ISO_SHA256" default:""`

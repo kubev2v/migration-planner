@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 )
 
 const testPolicy = `package io.konveyor.forklift.vmware
@@ -20,52 +22,22 @@ concerns[flag] {
         "assessment": "This is a test concern."
     }
 }
+
+concerns[flag] {
+    input.guestId == "rhel6guest"
+    flag := {
+        "id":         "test.simple.concern",
+        "category":   "Warning",
+        "label":      "Test VM detected",
+        "assessment": "This is a test concern."
+    }
+}
 `
 
 func TestNewPolicyReader(t *testing.T) {
 	reader := NewPolicyReader()
 	if reader == nil {
 		t.Error("NewPolicyReader() returned nil")
-	}
-}
-
-func TestPolicyReader_DiscoverPoliciesDirectory(t *testing.T) {
-	originalEnv := os.Getenv("OPA_POLICIES_DIR")
-	defer func() {
-		if originalEnv != "" {
-			os.Setenv("OPA_POLICIES_DIR", originalEnv)
-		} else {
-			os.Unsetenv("OPA_POLICIES_DIR")
-		}
-	}()
-
-	reader := NewPolicyReader()
-
-	// Test with environment variable set to existing directory
-	dir := t.TempDir()
-	policyFile := filepath.Join(dir, "test.rego")
-	if err := os.WriteFile(policyFile, []byte(testPolicy), 0644); err != nil {
-		t.Fatalf("Failed to write test policy: %v", err)
-	}
-
-	os.Setenv("OPA_POLICIES_DIR", dir)
-	result := reader.DiscoverPoliciesDirectory()
-	if result != dir {
-		t.Errorf("DiscoverPoliciesDirectory() should return env var directory, got: %s", result)
-	}
-
-	// Test with environment variable set to non-existent directory
-	os.Setenv("OPA_POLICIES_DIR", "/non/existent/path")
-	result = reader.DiscoverPoliciesDirectory()
-	if result != "" {
-		t.Errorf("DiscoverPoliciesDirectory() should return empty string for non-existent directory, got: %s", result)
-	}
-
-	// Test with no environment variable (should use default)
-	os.Unsetenv("OPA_POLICIES_DIR")
-	result = reader.DiscoverPoliciesDirectory()
-	if result != "" {
-		t.Errorf("DiscoverPoliciesDirectory() should return empty string for default non-existent directory, got: %s", result)
 	}
 }
 
@@ -99,9 +71,6 @@ func TestPolicyReader_ReadPolicies_NonExistentDirectory(t *testing.T) {
 	_, err := reader.ReadPolicies("/non/existent/path")
 	if err == nil {
 		t.Error("ReadPolicies() expected error for non-existent directory")
-	}
-	if !strings.Contains(err.Error(), "policies directory does not exist") {
-		t.Errorf("ReadPolicies() error should mention missing directory, got: %v", err)
 	}
 }
 
@@ -163,7 +132,7 @@ func TestNewValidator_EmptyPolicies(t *testing.T) {
 	}
 }
 
-func TestValidator_ValidateConcerns_WithConcern(t *testing.T) {
+func TestValidator_Concerns_WithConcern(t *testing.T) {
 	policies := map[string]string{
 		"test.rego": testPolicy,
 	}
@@ -178,9 +147,9 @@ func TestValidator_ValidateConcerns_WithConcern(t *testing.T) {
 		"name": "test-vm-with-concern",
 	}
 
-	concerns, err := validator.ValidateConcerns(context.Background(), vmInput)
+	concerns, err := validator.concerns(context.Background(), vmInput)
 	if err != nil {
-		t.Fatalf("ValidateConcerns() failed: %v", err)
+		t.Fatalf("concerns() failed: %v", err)
 	}
 
 	if len(concerns) != 1 {
@@ -188,7 +157,36 @@ func TestValidator_ValidateConcerns_WithConcern(t *testing.T) {
 	}
 }
 
-func TestValidator_ValidateConcerns_WithoutConcern(t *testing.T) {
+func TestValidator_ValidateVMS(t *testing.T) {
+	policies := map[string]string{
+		"test.rego": testPolicy,
+	}
+
+	validator, err := NewValidator(policies)
+	if err != nil {
+		t.Fatalf("Failed to create validator: %v", err)
+	}
+
+	var vms []vsphere.VM
+	vms = append(vms, vsphere.VM{
+		GuestID: "rhel6guest",
+	})
+
+	validatedVMs, err := validator.ValidateVMs(context.Background(), vms)
+	if err != nil {
+		t.Fatalf("concerns() failed: %v", err)
+	}
+
+	if len(validatedVMs) != 1 {
+		t.Errorf("Expected 1 vm, got %d", len(validatedVMs))
+	}
+
+	if len(validatedVMs[0].Concerns) != 1 {
+		t.Errorf("Expected 1 concern, got %d", len(validatedVMs[0].Concerns))
+	}
+}
+
+func TestValidator_Concerns_WithoutConcern(t *testing.T) {
 	policies := map[string]string{
 		"test.rego": testPolicy,
 	}
@@ -203,9 +201,9 @@ func TestValidator_ValidateConcerns_WithoutConcern(t *testing.T) {
 		"name": "clean-vm",
 	}
 
-	concerns, err := validator.ValidateConcerns(context.Background(), vmInput)
+	concerns, err := validator.concerns(context.Background(), vmInput)
 	if err != nil {
-		t.Fatalf("ValidateConcerns() failed: %v", err)
+		t.Fatalf("concerns() failed: %v", err)
 	}
 
 	if len(concerns) != 0 {
@@ -213,7 +211,7 @@ func TestValidator_ValidateConcerns_WithoutConcern(t *testing.T) {
 	}
 }
 
-func TestSetupValidator(t *testing.T) {
+func TestNewValidatorFromDir(t *testing.T) {
 	// Save original environment
 	originalEnv := os.Getenv("OPA_POLICIES_DIR")
 	defer func() {
@@ -231,34 +229,12 @@ func TestSetupValidator(t *testing.T) {
 		t.Fatalf("Failed to write test policy: %v", err)
 	}
 
-	os.Setenv("OPA_POLICIES_DIR", dir)
-
-	validator, err := SetupValidator()
+	validator, err := NewValidatorFromDir(dir)
 	if err != nil {
-		t.Fatalf("SetupValidator() failed: %v", err)
+		t.Fatalf("NewValidatorFromDir() failed: %v", err)
 	}
 
 	if validator == nil {
-		t.Error("SetupValidator() returned nil validator")
-	}
-}
-
-// Test helper functions
-
-func TestIsPoliciesDirectory(t *testing.T) {
-	// Test with directory containing .rego files
-	dir := t.TempDir()
-	policyFile := filepath.Join(dir, "test.rego")
-	if err := os.WriteFile(policyFile, []byte(testPolicy), 0644); err != nil {
-		t.Fatalf("Failed to write test policy: %v", err)
-	}
-
-	if !isPoliciesDirectory(dir) {
-		t.Error("isPoliciesDirectory() should return true for directory with .rego files")
-	}
-
-	// Test with non-existent directory
-	if isPoliciesDirectory("/non/existent/path") {
-		t.Error("isPoliciesDirectory() should return false for non-existent directory")
+		t.Error("NewValidatorFromDir() returned nil validator")
 	}
 }

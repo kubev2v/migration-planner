@@ -7,7 +7,6 @@ import (
 	"slices"
 
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
-	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
@@ -55,11 +54,13 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		}
 	}
 
-	zap.S().Named("rvtools").Infof("Validate VMs against OPA")
-	if len(vms) > 0 {
-		vms, err = validateVMsWithOPA(ctx, vms, opaValidator)
+	if len(vms) > 0 && opaValidator != nil {
+		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
+		validatedVms, err := opaValidator.ValidateVMs(ctx, vms)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("OPA validation failed, continuing without validation: %v", err)
+		} else {
+			vms = validatedVms
 		}
 	}
 
@@ -244,65 +245,4 @@ func extractVCenterUUID(rows [][]string) (string, error) {
 	}
 
 	return "", fmt.Errorf("VI SDK UUID column not found")
-}
-
-func validateVMsWithOPA(ctx context.Context, vms []vsphere.VM, opaValidator *opa.Validator) ([]vsphere.VM, error) {
-	if opaValidator == nil {
-		zap.S().Named("rvtools").Warn("OPA validator not available, skipping validation")
-		return vms, nil
-	}
-
-	zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
-
-	validatedVMs := make([]vsphere.VM, 0, len(vms))
-
-	for _, vm := range vms {
-		// Prepare the JSON data in MTV OPA server format
-		workload := web.Workload{}
-		workload.With(&vm)
-
-		concerns, err := opaValidator.ValidateConcerns(ctx, workload)
-		if err != nil {
-			zap.S().Named("rvtools").Warnf("Failed to evaluate VM %s: %v", vm.Name, err)
-			validatedVMs = append(validatedVMs, vm)
-			continue
-		}
-
-		// Convert concerns to vsphere.Concern format
-		for _, concernData := range concerns {
-			concernMap, ok := concernData.(map[string]interface{})
-			if !ok {
-				zap.S().Named("rvtools").Warnf("Unexpected concern data type for VM %s", vm.Name)
-				continue
-			}
-
-			concern := vsphere.Concern{}
-			if id, ok := concernMap["id"].(string); ok {
-				concern.Id = id
-			} else {
-				zap.S().Named("rvtools").Warnf("Missing or invalid 'id' field in concern for VM %s", vm.Name)
-			}
-
-			if label, ok := concernMap["label"].(string); ok {
-				concern.Label = label
-			} else {
-				zap.S().Named("rvtools").Warnf("Missing or invalid 'label' field in concern for VM %s", vm.Name)
-			}
-
-			if assessment, ok := concernMap["assessment"].(string); ok {
-				concern.Assessment = assessment
-			}
-
-			if category, ok := concernMap["category"].(string); ok {
-				concern.Category = category
-			}
-
-			vm.Concerns = append(vm.Concerns, concern)
-		}
-
-		validatedVMs = append(validatedVMs, vm)
-	}
-
-	zap.S().Named("rvtools").Infof("Successfully validated %d VMs", len(validatedVMs))
-	return validatedVMs, nil
 }
