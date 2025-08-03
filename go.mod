@@ -36,7 +36,7 @@ require (
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sirupsen/logrus v1.9.4-0.20250620175740-70b809335b84
 	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
+	github.com/spf13/pflag v1.0.7
 	github.com/thoas/go-funk v0.9.3
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.9.1
