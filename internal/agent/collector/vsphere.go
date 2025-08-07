@@ -401,12 +401,13 @@ func calculateBinIndex(data, minVal int, binSize float64, rangeValues, numberOfB
 		return 0
 	}
 
+	var binIndex int
 	if binSize == 1.0 {
-		return data - minVal
+		binIndex = data - minVal
+	} else {
+		// Division-based mapping for larger ranges
+		binIndex = int(float64(data-minVal) / binSize)
 	}
-
-	// Division-based mapping for larger ranges
-	binIndex := int(float64(data-minVal) / binSize)
 
 	// Ensure bin index is within bounds
 	if binIndex >= numberOfBins {
