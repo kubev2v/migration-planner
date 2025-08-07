@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -31,6 +32,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/assessments/{id})
 	GetAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v1/assessments/{id})
+	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
@@ -87,6 +91,11 @@ func (_ Unimplemented) DeleteAssessment(w http.ResponseWriter, r *http.Request, 
 
 // (GET /api/v1/assessments/{id})
 func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/assessments/{id})
+func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -227,6 +236,32 @@ func (siw *ServerInterfaceWrapper) GetAssessment(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdateAssessment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAssessment(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -617,6 +652,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/assessments/{id}", wrapper.GetAssessment)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
 	})
 	r.Group(func(r chi.Router) {
@@ -688,7 +726,8 @@ func (response ListAssessments500JSONResponse) VisitListAssessmentsResponse(w ht
 }
 
 type CreateAssessmentRequestObject struct {
-	Body *CreateAssessmentJSONRequestBody
+	JSONBody      *CreateAssessmentJSONRequestBody
+	MultipartBody *multipart.Reader
 }
 
 type CreateAssessmentResponseObject interface {
@@ -849,6 +888,69 @@ func (response GetAssessment404JSONResponse) VisitGetAssessmentResponse(w http.R
 type GetAssessment500JSONResponse Error
 
 func (response GetAssessment500JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateAssessmentJSONRequestBody
+}
+
+type UpdateAssessmentResponseObject interface {
+	VisitUpdateAssessmentResponse(w http.ResponseWriter) error
+}
+
+type UpdateAssessment200JSONResponse Assessment
+
+func (response UpdateAssessment200JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment400JSONResponse Error
+
+func (response UpdateAssessment400JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment401JSONResponse Error
+
+func (response UpdateAssessment401JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment403JSONResponse Error
+
+func (response UpdateAssessment403JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment404JSONResponse Error
+
+func (response UpdateAssessment404JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment500JSONResponse Error
+
+func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1413,6 +1515,9 @@ type StrictServerInterface interface {
 	// (GET /api/v1/assessments/{id})
 	GetAssessment(ctx context.Context, request GetAssessmentRequestObject) (GetAssessmentResponseObject, error)
 
+	// (PUT /api/v1/assessments/{id})
+	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
+
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
 
@@ -1504,12 +1609,23 @@ func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request)
 func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request) {
 	var request CreateAssessmentRequestObject
 
-	var body CreateAssessmentJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body CreateAssessmentJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
 	}
-	request.Body = &body
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateAssessment(ctx, request.(CreateAssessmentRequestObject))
@@ -1576,6 +1692,39 @@ func (sh *strictHandler) GetAssessment(w http.ResponseWriter, r *http.Request, i
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAssessmentResponseObject); ok {
 		if err := validResponse.VisitGetAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAssessment operation middleware
+func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateAssessmentRequestObject
+
+	request.Id = id
+
+	var body UpdateAssessmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAssessment(ctx, request.(UpdateAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
+		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

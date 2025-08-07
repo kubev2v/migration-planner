@@ -62,6 +62,7 @@ var _ = Describe("migrations", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DROP TABLE IF EXISTS snapshots;")
 			gormdb.Exec("DROP TABLE IF EXISTS assessments;")
 			gormdb.Exec("DROP TABLE IF EXISTS agents;")
 			gormdb.Exec("DROP TABLE IF EXISTS image_infras;")
