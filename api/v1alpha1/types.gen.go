@@ -148,6 +148,7 @@ type Infra struct {
 	TotalClusters         int            `json:"totalClusters"`
 	TotalDatacenters      *int           `json:"totalDatacenters,omitempty"`
 	TotalHosts            int            `json:"totalHosts"`
+	VmsPerCluster         *[]int         `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.

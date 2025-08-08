@@ -120,6 +120,19 @@ func calculateHostsPerCluster(clusterToHosts map[string]map[string]struct{}) []i
 	return hostsPerCluster
 }
 
+func calculateVMsPerCluster(clusterToVMs map[string]map[string]struct{}) []int {
+	if len(clusterToVMs) == 0 {
+		return []int{}
+	}
+
+	vmsPerCluster := make([]int, 0, len(clusterToVMs))
+	for _, vms := range clusterToVMs {
+		vmsPerCluster = append(vmsPerCluster, len(vms))
+	}
+
+	return vmsPerCluster
+}
+
 func calculateClustersPerDatacenter(datacenterToClusters map[string]map[string]struct{}) []int {
 	if len(datacenterToClusters) == 0 {
 		return []int{}
@@ -305,4 +318,8 @@ func cleanNumericString(s string) string {
 		}
 		return -1
 	}, s)
+}
+
+func hasValue(s string) bool {
+	return strings.TrimSpace(s) != ""
 }

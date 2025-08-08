@@ -39,7 +39,6 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	zap.S().Named("rvtools").Infof("Process VMs")
 	var vms []vsphere.VM
 	if slices.Contains(sheets, "vInfo") {
-		vInfoRows := readSheet(excelFile, sheets, "vInfo")
 		vHostRows := readSheet(excelFile, sheets, "vHost")
 		vCpuRows := readSheet(excelFile, sheets, "vCPU")
 		vMemoryRows := readSheet(excelFile, sheets, "vMemory")
@@ -127,6 +126,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		TotalHosts:            clusterInfo.TotalHosts,
 		TotalClusters:         clusterInfo.TotalClusters,
 		TotalDatacenters:      clusterInfo.TotalDatacenters,
+		VmsPerCluster:         extractVmsPerCluster(vInfoRows),
 	}
 	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
@@ -166,7 +166,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 		}
 
 		host := getColumnValue(row, colMap, "host")
-		if host == "" {
+		if !hasValue(host) {
 			continue
 		}
 
@@ -175,18 +175,19 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 
 		hosts[host] = struct{}{}
 
-		if datacenter != "" {
+		if hasValue(datacenter) {
 			datacenters[datacenter] = struct{}{}
 			ensureMapExists(datacenterToClusters, datacenter)
-
-			if cluster != "" {
-				clusters[cluster] = struct{}{}
-				datacenterToClusters[datacenter][cluster] = struct{}{}
-
-				ensureMapExists(clusterToHosts, cluster)
-				clusterToHosts[cluster][host] = struct{}{}
-			}
 		}
+
+		if hasValue(datacenter) && hasValue(cluster) {
+			clusters[cluster] = struct{}{}
+			datacenterToClusters[datacenter][cluster] = struct{}{}
+
+			ensureMapExists(clusterToHosts, cluster)
+			clusterToHosts[cluster][host] = struct{}{}
+		}
+
 	}
 
 	return ClusterInfo{
@@ -257,6 +258,27 @@ func extractHostPowerStates(rows [][]string) map[string]int {
 	}
 
 	return hostPowerStates
+}
+
+func extractVmsPerCluster(rows [][]string) []int {
+	if len(rows) <= 1 {
+		return []int{}
+	}
+
+	colMap := buildColumnMap(rows[0])
+	clusterToVMs := make(map[string]map[string]struct{})
+
+	for _, row := range rows[1:] {
+		cluster := getColumnValue(row, colMap, "cluster")
+		vm := getColumnValue(row, colMap, "vm")
+
+		if hasValue(cluster) && hasValue(vm) {
+			ensureMapExists(clusterToVMs, cluster)
+			clusterToVMs[cluster][vm] = struct{}{}
+		}
+	}
+
+	return calculateVMsPerCluster(clusterToVMs)
 }
 
 func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
