@@ -33,6 +33,8 @@ const (
 	DefaultPersistentDataDir = ".migration-planner/persistent-data"
 	// DefaultWwwDir is the default directory from which the agent serves static files
 	DefaultWwwDir = "/app/www"
+	// DefaultOpaPoliciesDir is the default directory where the OPA policies are stored
+	DefaultOpaPoliciesDir = "/app/policies"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
 	// DefaultHealthCheck is the default value for health check interval in seconds.
@@ -61,6 +63,9 @@ type Config struct {
 	PersistentDataDir string `json:"persistent-data-dir"`
 	// WwwDir is the directory from which the agent serves static files
 	WwwDir string `json:"www-dir"`
+	// OpaPoliciesDir is the path to the directory containing OPA policy files
+	OpaPoliciesDir string `json:"policies-dir"`
+
 	// SourceID is the ID of this source in the planner
 	SourceID string `json:"source-id"`
 
@@ -96,6 +101,7 @@ func NewDefault() *Config {
 		DataDir:           DefaultDataDir,
 		PersistentDataDir: DefaultPersistentDataDir,
 		WwwDir:            DefaultWwwDir,
+		OpaPoliciesDir:    DefaultOpaPoliciesDir,
 		SourceID:          DefaultSourceId,
 		PlannerService:    PlannerService{Config: *client.NewDefault()},
 		UpdateInterval:    util.Duration{Duration: DefaultUpdateInterval},
