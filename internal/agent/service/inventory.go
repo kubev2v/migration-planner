@@ -36,6 +36,7 @@ type InfrastructureData struct {
 	TotalHosts            int
 	TotalClusters         int
 	TotalDatacenters      int
+	VmsPerCluster         []int
 }
 
 // CreateBasicInventory creates a basic inventory object with the provided data
@@ -73,6 +74,7 @@ func CreateBasicInventory(
 			TotalDatacenters:      &infraData.TotalDatacenters,
 			HostsPerCluster:       infraData.HostsPerCluster,
 			Networks:              infraData.Networks,
+			VmsPerCluster:         &infraData.VmsPerCluster,
 		},
 	}
 }
