@@ -2,7 +2,7 @@ module github.com/kubev2v/migration-planner
 
 go 1.24.0
 
-toolchain go1.24.5
+toolchain go1.24.6
 
 require (
 	github.com/MicahParks/jwkset v0.5.19
