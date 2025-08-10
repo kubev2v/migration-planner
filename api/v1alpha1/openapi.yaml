@@ -1014,6 +1014,10 @@ components:
           type: string
         model:
           type: string
+        hostId:
+          type: string
+          description: Identifier of the host where this datastore is attached
+          nullable: true
 
     VMResourceBreakdown:
       type: object

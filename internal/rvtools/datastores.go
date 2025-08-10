@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
+func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.Inventory) error {
 	if len(rows) <= 1 {
 		return nil
 	}
@@ -19,6 +19,8 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 		key := strings.ToLower(strings.TrimSpace(header))
 		colMap[key] = i
 	}
+
+	hostIPToObjectID := createHostIPToObjectIDMap(vHostRows)
 
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
@@ -58,6 +60,25 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 
 		if datastore.FreeCapacityGB > datastore.TotalCapacityGB {
 			datastore.FreeCapacityGB = datastore.TotalCapacityGB
+		}
+
+		hostsStr := getColumnValue(row, colMap, "hosts")
+		if hostsStr != "" {
+			hostList := strings.Split(hostsStr, ",")
+			var objectIDs []string
+			for _, host := range hostList {
+				ip := strings.TrimSpace(host)
+				if ip == "" {
+					continue
+				}
+				if objID, ok := hostIPToObjectID[ip]; ok && objID != "" {
+					objectIDs = append(objectIDs, objID)
+				}
+			}
+			if len(objectIDs) > 0 {
+				joined := strings.Join(objectIDs, ", ")
+				datastore.HostId = &joined
+			}
 		}
 
 		inventory.Infra.Datastores = append(inventory.Infra.Datastores, datastore)
