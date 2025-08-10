@@ -32,7 +32,7 @@ require (
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/assisted-image-service v0.0.0-20250710050955-1b29aba9d5be
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.0.0-00010101000000-000000000000
+	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sirupsen/logrus v1.9.4-0.20250804143300-cb253f3080f1
 	github.com/spf13/cobra v1.9.1
@@ -138,7 +138,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.62.0 // indirect
-	github.com/prometheus/procfs v0.15.1 // indirect
+	github.com/prometheus/procfs v0.16.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.4 // indirect
@@ -197,6 +197,6 @@ require (
 
 replace (
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.1
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
