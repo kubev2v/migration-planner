@@ -132,9 +132,12 @@ type Host struct {
 	CpuCores *int `json:"cpuCores"`
 
 	// CpuSockets Number of CPU sockets
-	CpuSockets *int   `json:"cpuSockets"`
-	Model      string `json:"model"`
-	Vendor     string `json:"vendor"`
+	CpuSockets *int `json:"cpuSockets"`
+
+	// MemoryMB Host memory in MB
+	MemoryMB *int64 `json:"memoryMB"`
+	Model    string `json:"model"`
+	Vendor   string `json:"vendor"`
 }
 
 // Infra defines model for Infra.
