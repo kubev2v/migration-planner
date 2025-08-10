@@ -637,9 +637,24 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	if err != nil {
 		return nil
 	}
+
+	// Create datastore-to-hostID mapping once for better performance
+	datastoreToHostID := make(map[string]string)
+	for _, host := range *hosts {
+		for _, dsRef := range host.Datastores {
+			datastoreToHostID[dsRef.ID] = host.ID
+		}
+	}
+
 	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
 		dsVendor, dsModel, dsProtocol := findDataStoreInfo(*hosts, ds.BackingDevicesNames)
+		hostID := datastoreToHostID[ds.ID]
+		var hostIDPtr *string
+		if hostID != "" {
+			hostIDPtr = &hostID
+		}
+
 		res = append(res, apiplanner.Datastore{
 			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
@@ -649,6 +664,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 			Model:                   dsModel,
 			ProtocolType:            dsProtocol,
 			DiskId:                  getNaa(&ds),
+			HostId:                  hostIDPtr,
 		})
 	}
 

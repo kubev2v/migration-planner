@@ -93,7 +93,8 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	if len(datastoreRows) > 0 {
 		tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
-		err := processDatastoreInfo(datastoreRows, tempInventory)
+		vHostRows := readSheet(excelFile, sheets, "vHost")
+		err := processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("Failed to process datastore info: %v", err)
 			datastores = []api.Datastore{}

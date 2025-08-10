@@ -103,11 +103,14 @@ type Datastore struct {
 	DiskId                  string `json:"diskId"`
 	FreeCapacityGB          int    `json:"freeCapacityGB"`
 	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
-	Model                   string `json:"model"`
-	ProtocolType            string `json:"protocolType"`
-	TotalCapacityGB         int    `json:"totalCapacityGB"`
-	Type                    string `json:"type"`
-	Vendor                  string `json:"vendor"`
+
+	// HostId Identifier of the host where this datastore is attached
+	HostId          *string `json:"hostId"`
+	Model           string  `json:"model"`
+	ProtocolType    string  `json:"protocolType"`
+	TotalCapacityGB int     `json:"totalCapacityGB"`
+	Type            string  `json:"type"`
+	Vendor          string  `json:"vendor"`
 }
 
 // Error defines model for Error.
