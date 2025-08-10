@@ -961,6 +961,14 @@ components:
           type: string
         model:
           type: string
+        cpuCores:
+          type: integer
+          description: Number of CPU cores
+          nullable: true
+        cpuSockets:
+          type: integer
+          description: Number of CPU sockets
+          nullable: true
 
     Network:
       type: object

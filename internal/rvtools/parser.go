@@ -66,6 +66,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
 	var hostPowerStates map[string]int
+	var hosts []api.Host
 
 	hostPowerStates = map[string]int{"green": 0}
 
@@ -74,9 +75,17 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	if len(vHostRows) > 0 {
 		clusterInfo = extractClusterAndDatacenterInfo(vHostRows)
 		hostPowerStates = extractHostPowerStates(vHostRows)
+
+		var err error
+		hosts, err = extractHostsInfo(vHostRows)
+		if err != nil {
+			zap.S().Named("rvtools").Warnf("Failed to extract host info: %v", err)
+			hosts = []api.Host{}
+		}
 	} else {
 		zap.S().Named("rvtools").Infof("vHost sheet not found, using default values")
 		clusterInfo = ClusterInfo{}
+		hosts = []api.Host{}
 	}
 
 	zap.S().Named("rvtools").Infof("Process Datastores")
@@ -111,7 +120,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		Datastores:            datastores,
 		Networks:              networks,
 		HostPowerStates:       hostPowerStates,
-		Hosts:                 &[]api.Host{}, // RVTools doesn't provide detailed host info
+		Hosts:                 &hosts,
 		HostsPerCluster:       clusterInfo.HostsPerCluster,
 		ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
 		TotalHosts:            clusterInfo.TotalHosts,
@@ -186,6 +195,41 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 		TotalClusters:         len(clusters),
 		TotalDatacenters:      len(datacenters),
 	}
+}
+
+func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
+	if len(vHostRows) <= 1 {
+		return []api.Host{}, nil
+	}
+
+	colMap := buildColumnMap(vHostRows[0])
+
+	// Validate required columns exist
+	requiredCols := []string{"vendor", "model"}
+	for _, col := range requiredCols {
+		if _, exists := colMap[col]; !exists {
+			return nil, fmt.Errorf("missing required column: %s", col)
+		}
+	}
+
+	var hosts []api.Host
+	for _, row := range vHostRows[1:] {
+		if len(row) == 0 {
+			continue
+		}
+
+		host := api.Host{
+			Vendor: getColumnValue(row, colMap, "vendor"),
+			Model:  getColumnValue(row, colMap, "model"),
+		}
+
+		host.CpuCores = parseIntPtr(getColumnValue(row, colMap, "# cores"))
+		host.CpuSockets = parseIntPtr(getColumnValue(row, colMap, "# cpu"))
+
+		hosts = append(hosts, host)
+	}
+
+	return hosts, nil
 }
 
 func extractHostPowerStates(rows [][]string) map[string]int {

@@ -38,6 +38,18 @@ func parseIntOrZero(s string) int32 {
 	return int32(val)
 }
 
+// parseIntPtr parses a string to *int, returning nil for empty/invalid/zero values
+func parseIntPtr(s string) *int {
+	if s == "" {
+		return nil
+	}
+	if val := parseIntOrZero(s); val > 0 {
+		result := int(val)
+		return &result
+	}
+	return nil
+}
+
 func parseFormattedInt64(s string) int64 {
 	cleanStr := strings.Map(func(r rune) rune {
 		if r >= '0' && r <= '9' {
