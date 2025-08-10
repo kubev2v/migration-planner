@@ -125,8 +125,13 @@ type Histogram struct {
 
 // Host defines model for Host.
 type Host struct {
-	Model  string `json:"model"`
-	Vendor string `json:"vendor"`
+	// CpuCores Number of CPU cores
+	CpuCores *int `json:"cpuCores"`
+
+	// CpuSockets Number of CPU sockets
+	CpuSockets *int   `json:"cpuSockets"`
+	Model      string `json:"model"`
+	Vendor     string `json:"vendor"`
 }
 
 // Infra defines model for Infra.
