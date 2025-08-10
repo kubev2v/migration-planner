@@ -700,12 +700,18 @@ func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
 	for _, host := range *hosts {
 		cpuCores := int(host.CpuCores)
 		cpuSockets := int(host.CpuSockets)
+		var memoryMB *int64
+		if host.MemoryBytes > 0 {
+			mb := util.ConvertBytesToMB(host.MemoryBytes)
+			memoryMB = &mb
+		}
 
 		l = append(l, apiplanner.Host{
 			Model:      host.Model,
 			Vendor:     host.Vendor,
 			CpuCores:   &cpuCores,
 			CpuSockets: &cpuSockets,
+			MemoryMB:   memoryMB,
 		})
 	}
 

@@ -973,6 +973,11 @@ components:
           type: integer
           description: Number of CPU sockets
           nullable: true
+        memoryMB:
+          type: integer
+          format: int64
+          description: Host memory in MB
+          nullable: true
 
     Network:
       type: object

@@ -228,6 +228,13 @@ func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
 		host.CpuCores = parseIntPtr(getColumnValue(row, colMap, "# cores"))
 		host.CpuSockets = parseIntPtr(getColumnValue(row, colMap, "# cpu"))
 
+		if memStr := getColumnValue(row, colMap, "# memory"); memStr != "" {
+			if memMB := parseMemoryMB(memStr); memMB > 0 {
+				mem := int64(memMB)
+				host.MemoryMB = &mem
+			}
+		}
+
 		hosts = append(hosts, host)
 	}
 
