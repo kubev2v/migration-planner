@@ -8,6 +8,7 @@ import (
 	"io"
 	"mime/multipart"
 	"os"
+	"path/filepath"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -107,14 +108,17 @@ func (o *UploadOptions) uploadRVTools(ctx context.Context) error {
 
 	var buf bytes.Buffer
 	mw := multipart.NewWriter(&buf)
-	defer mw.Close()
 
-	part, err := mw.CreateFormFile("file", "")
+	part, err := mw.CreateFormFile("file", filepath.Base(o.filePath))
 	if err != nil {
-		return err
+		return fmt.Errorf("creating form file: %w", err)
 	}
 	if _, err := io.Copy(part, f); err != nil {
-		return err
+		return fmt.Errorf("copying file into multipart: %w", err)
+	}
+
+	if err := mw.Close(); err != nil {
+		return fmt.Errorf("closing multipart writer: %w", err)
 	}
 
 	sourceUUID, err := uuid.Parse(o.sourceId)
