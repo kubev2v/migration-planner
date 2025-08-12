@@ -30,7 +30,7 @@ DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
 
 # OPA Configuration for eval mode
-OPA_POLICIES_DIR ?= $(CURDIR)/policies
+MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
 FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
@@ -109,8 +109,12 @@ init:
 
 run:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
-	OPA_POLICIES_DIR=$(OPA_POLICIES_DIR) \
+	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	./bin/planner-api run
+
+run-agent:
+	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
+	./bin/planner-agent
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -367,8 +371,8 @@ validate-all: lint check-generate check-format unit-test
 .PHONY: setup-opa-policies
 setup-opa-policies:
 	@echo "Setting up OPA policies for local development..."
-	@mkdir -p $(OPA_POLICIES_DIR)
-	@if [ -z "$$(find $(OPA_POLICIES_DIR) -name '*.rego' 2>/dev/null)" ]; then \
+	@mkdir -p $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
+	@if [ -z "$$(find $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) -name '*.rego' 2>/dev/null)" ]; then \
 		echo "Downloading policies from Forklift GitHub repository..."; \
 		mkdir -p $(FORKLIFT_POLICIES_TMP_DIR); \
 		curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
@@ -378,7 +382,7 @@ setup-opa-policies:
 				--exclude='*/..*' --exclude='*/.*'; \
 		if [ -d "$(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware" ]; then \
 			find $(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware \
-				-name "*.rego" ! -name "*_test.rego" -exec cp {} $(OPA_POLICIES_DIR)/ \; ; \
+				-name "*.rego" ! -name "*_test.rego" -exec cp {} $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)/ \; ; \
 			echo "Successfully downloaded VMware policies"; \
 		else \
 			echo "Failed to download policies from GitHub"; \
@@ -386,13 +390,13 @@ setup-opa-policies:
 		fi; \
 		rm -rf $(FORKLIFT_POLICIES_TMP_DIR); \
 	fi
-	@echo "OPA policies ready in $(OPA_POLICIES_DIR)"
-	@echo "Found $$(find $(OPA_POLICIES_DIR) -name '*.rego' | wc -l) .rego files"
+	@echo "OPA policies ready in $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)"
+	@echo "Found $$(find $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) -name '*.rego' | wc -l) .rego files"
 
 .PHONY: clean-opa-policies  
 clean-opa-policies:
 	@echo "Cleaning OPA policies..."
-	@rm -rf $(OPA_POLICIES_DIR)
+	@rm -rf $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
 
 # include the deployment targets
 include deploy/deploy.mk
