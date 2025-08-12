@@ -34,7 +34,7 @@ const (
 	// DefaultWwwDir is the default directory from which the agent serves static files
 	DefaultWwwDir = "/app/www"
 	// DefaultOpaPoliciesDir is the default directory where the OPA policies are stored
-	DefaultOpaPoliciesDir = "/app/policies"
+	DefaultOpaPoliciesDir = "./policies"
 	// DefaultPlannerEndpoint is the default address of the migration planner server
 	DefaultPlannerEndpoint = "https://localhost:7443"
 	// DefaultHealthCheck is the default value for health check interval in seconds.
@@ -96,12 +96,18 @@ func (s *PlannerService) Equal(s2 *PlannerService) bool {
 }
 
 func NewDefault() *Config {
+	opaPoliciesDir := DefaultOpaPoliciesDir
+	// Override with environment variable if set when running locally
+	if envDir := os.Getenv("MIGRATION_PLANNER_OPA_POLICIES_FOLDER"); envDir != "" {
+		opaPoliciesDir = envDir
+	}
+
 	c := &Config{
 		ConfigDir:         DefaultConfigDir,
 		DataDir:           DefaultDataDir,
 		PersistentDataDir: DefaultPersistentDataDir,
 		WwwDir:            DefaultWwwDir,
-		OpaPoliciesDir:    DefaultOpaPoliciesDir,
+		OpaPoliciesDir:    opaPoliciesDir,
 		SourceID:          DefaultSourceId,
 		PlannerService:    PlannerService{Config: *client.NewDefault()},
 		UpdateInterval:    util.Duration{Duration: DefaultUpdateInterval},
