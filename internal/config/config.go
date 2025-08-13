@@ -32,6 +32,9 @@ type svcConfig struct {
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	S3                   S3
+	IsoServerBaseURL     string `envconfig:"MIGRATION_PLANNER_ISO_SERVER_URL" default:"http://127.0.0.1"`
+	IsoServerPort        string `envconfig:"MIGRATION_PLANNER_ISO_SERVER_PORT" default:"8080"`
+	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	RhcosImageName       string `envconfig:"MIGRATION_PLANNER_ISO_URL" default:""`
 	RhcosImageSha256     string `envconfig:"MIGRATION_PLANNER_ISO_SHA256" default:""`
 }

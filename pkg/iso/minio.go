@@ -2,7 +2,6 @@ package iso
 
 import (
 	"context"
-	"fmt"
 	"io"
 
 	"github.com/minio/minio-go/v7"
@@ -69,22 +68,7 @@ func (s *minioDownloader) Get(ctx context.Context, dst io.Writer) error {
 		return err
 	}
 
-	newCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	mw := newProgressWriter(newCtx, dst, objInfo.Size)
-
-	imageHasher := newImageHasher(mw)
-
-	if _, err = io.Copy(imageHasher, object); err != nil {
-		return err
-	}
-
-	computedSum := imageHasher.Sum()
-	if s.cfg.imageSha256 != computedSum {
-		return fmt.Errorf("failed to download the image. expected sha256 %s received %s", s.cfg.imageSha256, computedSum)
-	}
-
-	return nil
+	return DownloadWithValidation(ctx, object, dst, s.cfg.imageSha256, objInfo.Size)
 }
 
 func (s *minioDownloader) Type() string {

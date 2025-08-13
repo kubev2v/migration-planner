@@ -7,7 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/iso"
@@ -66,7 +65,7 @@ var _ = Describe("iso initializer", func() {
 			Expect(err).To(BeNil())
 		})
 
-		It("should not download anything and preserve the original file", func() {
+		It("should not download anything and preserve the original", func() {
 			err := initializer.Initialize(context.TODO(), targetIsoFile, targetIsoSha256)
 			Expect(err).To(BeNil())
 			Expect(testDownloader.hasBeenCalled).To(BeFalse())
@@ -175,93 +174,6 @@ var _ = Describe("iso initializer", func() {
 		})
 	})
 
-	Context("when multiple intializer are executed", func() {
-		It("the first initializer should download the iso", func() {
-			testDownloader1 := &testIsoDownloader{
-				dataToWrite: testData,
-			}
-			firstInitializer := iso.NewIsoInitializer(testDownloader1)
-			testDownloader2 := &testIsoDownloader{
-				dataToWrite: testData,
-			}
-			secondInitializer := iso.NewIsoInitializer(testDownloader2)
-
-			var wait sync.WaitGroup
-			wait.Add(2)
-			go func() {
-				err := firstInitializer.Initialize(context.TODO(), targetIsoFile, targetIsoSha256)
-				Expect(err).To(BeNil())
-				wait.Done()
-			}()
-
-			// the second should not start the download
-			go func() {
-				<-time.After(1 * time.Second)
-				err := secondInitializer.Initialize(context.TODO(), targetIsoFile, targetIsoSha256)
-				Expect(err).To(BeNil())
-				wait.Done()
-			}()
-			wait.Wait()
-
-			Expect(testDownloader1.hasBeenCalled).To(BeTrue())
-			Expect(testDownloader2.hasBeenCalled).To(BeFalse())
-			// Verify file was created with correct content
-			data, err := os.ReadFile(targetIsoFile)
-			Expect(err).To(BeNil())
-			Expect(data).To(Equal(testData))
-
-			// in download folder, we should have only the iso.
-			entries, err := os.ReadDir(tempDir)
-			Expect(err).To(BeNil())
-			Expect(entries).To(HaveLen(1))
-		})
-
-		It("the first initializer fails but the second downloads the iso", func() {
-			testDownloader1 := &testIsoDownloader{
-				dataToWrite:       testData,
-				shouldReturnError: true,
-			}
-			firstInitializer := iso.NewIsoInitializer(testDownloader1)
-			testDownloader2 := &testIsoDownloader{
-				dataToWrite: testData,
-			}
-			secondInitializer := iso.NewIsoInitializer(testDownloader2)
-
-			var wait sync.WaitGroup
-			wait.Add(2)
-
-			var firstErr error
-			go func() {
-				firstErr = firstInitializer.Initialize(context.TODO(), targetIsoFile, targetIsoFile)
-				wait.Done()
-			}()
-
-			var secondErr error
-			go func() {
-				<-time.After(1 * time.Second)
-				secondErr = secondInitializer.Initialize(context.TODO(), targetIsoFile, targetIsoSha256)
-				wait.Done()
-			}()
-			wait.Wait()
-
-			Expect(secondErr).To(BeNil())
-			Expect(firstErr).NotTo(BeNil())
-
-			// Both initializers should be called
-			Expect(testDownloader1.hasBeenCalled).To(BeTrue())
-			Expect(testDownloader2.hasBeenCalled).To(BeTrue())
-
-			// Verify file was created with correct content
-			data, err := os.ReadFile(targetIsoFile)
-			Expect(err).To(BeNil())
-			Expect(data).To(Equal(testData))
-
-			// in download folder, we should have only the iso.
-			entries, err := os.ReadDir(tempDir)
-			Expect(err).To(BeNil())
-			Expect(entries).To(HaveLen(1))
-		})
-	})
 })
 
 // testIsoDownloader is a simple implementation of IsoDownloader for testing

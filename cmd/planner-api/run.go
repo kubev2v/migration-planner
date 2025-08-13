@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/signal"
@@ -13,7 +14,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/iso"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -153,7 +153,7 @@ func newListener(address string) (net.Listener, error) {
 
 func initializeIso(ctx context.Context, cfg *config.Config) error {
 	// Check if ISO already exists:
-	isoPath := util.GetEnv("MIGRATION_PLANNER_ISO_PATH", "rhcos-live-iso.x86_64.iso")
+	isoPath := cfg.Service.IsoPath
 	if _, err := os.Stat(isoPath); err == nil {
 		return nil
 	}
@@ -166,20 +166,20 @@ func initializeIso(ctx context.Context, cfg *config.Config) error {
 
 	md := iso.NewDownloaderManager()
 
-	minio, err := iso.NewMinioDownloader(
-		iso.WithEndpoint(cfg.Service.S3.Endpoint),
-		iso.WithBucket(cfg.Service.S3.Bucket),
-		iso.WithAccessKey(cfg.Service.S3.AccessKey),
-		iso.WithSecretKey(cfg.Service.S3.SecretKey),
-		iso.WithImage(cfg.Service.S3.IsoFileName, cfg.Service.RhcosImageSha256),
+	isoServerUrl := fmt.Sprintf("%s:%s", cfg.Service.IsoServerBaseURL, cfg.Service.IsoServerPort)
+	isoServerDownloader, err := iso.NewIsoServerDownloader(
+		isoServerUrl,
+		cfg.Service.RhcosImageSha256,
 	)
+
 	if err == nil {
-		md.Register(minio)
-	} else {
-		zap.S().Errorw("failed to create minio downloader", "error", err)
+		if err := isoServerDownloader.HealthCheck(ctx); err == nil {
+			md.Register(isoServerDownloader)
+			zap.S().Infow("Registered ISO server downloader", "url", isoServerUrl)
+		}
 	}
 
-	// register the default downloader of the official RHCOS image.
+	// Fallback: Official RHCOS HTTP downloader
 	md.Register(iso.NewHttpDownloader(cfg.Service.RhcosImageName, cfg.Service.RhcosImageSha256))
 
 	if err := md.Download(ctx, out); err != nil {

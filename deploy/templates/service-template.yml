@@ -19,6 +19,12 @@ parameters:
     value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-4.19.0-x86_64-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_SHA256
     value: 6a9cf9df708e014a2b44f372ab870f873cf2db5685f9ef4518f52caa36160c36
+  - name: MIGRATION_PLANNER_ISO_SERVER_URL
+    description: URL of the internal ISO server
+    value: "http://migration-planner-iso-server"
+  - name: MIGRATION_PLANNER_ISO_SERVER_PORT
+    description: Port of the internal ISO server
+    value: "8080"
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -404,6 +410,18 @@ objects:
           labels:
             app: migration-planner
         spec:
+          initContainers:
+            - name: wait-for-iso-server
+              image: curlimages/curl:8.10.1
+              command: [ "sh", "-ceu" ]
+              args:
+                - |
+                  i=0
+                  until curl -fsS -I -m 3 "${MIGRATION_PLANNER_ISO_SERVER_URL}:${MIGRATION_PLANNER_ISO_SERVER_PORT}/iso" >/dev/null; do
+                    i=$((i+1))
+                    [ "$i" -ge 120 ] && echo "Timed out, proceeding without ISO server" >&2 && break
+                    sleep 2
+                  done
           containers:
             - name: envoy
               image: ${ENVOY_IMAGE}
@@ -533,16 +551,10 @@ objects:
                   value: ${MIGRATION_PLANNER_S3_BUCKET}
                 - name: MIGRATION_PLANNER_S3_ISO_FILENAME
                   value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
-                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: access_key
-                - name: MIGRATION_PLANNER_S3_SECRET_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: secret_key
+                - name: MIGRATION_PLANNER_ISO_SERVER_URL
+                  value: ${MIGRATION_PLANNER_ISO_SERVER_URL}
+                - name: MIGRATION_PLANNER_ISO_SERVER_PORT
+                  value: ${MIGRATION_PLANNER_ISO_SERVER_PORT}
                 # DB Config values
                 - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
                   value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}
@@ -589,3 +601,112 @@ objects:
             - name: envoy-unix-sockets
               emptyDir:
                 medium: Memory
+  - kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: migration-planner-iso-storage
+      labels:
+        app: migration-planner-iso-server
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner-iso-server
+      name: migration-planner-iso-server
+    spec:
+      ports:
+        - name: iso-server
+          port: ${{MIGRATION_PLANNER_ISO_SERVER_PORT}}
+          protocol: TCP
+          targetPort: ${{MIGRATION_PLANNER_ISO_SERVER_PORT}}
+      selector:
+        app: migration-planner-iso-server
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: migration-planner-iso-server
+    spec:
+      replicas: 1
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: migration-planner-iso-server
+      template:
+        metadata:
+          labels:
+            app: migration-planner-iso-server
+        spec:
+          containers:
+            - name: migration-planner-iso-server
+              image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: ${MIGRATION_PLANNER_API_IMAGE_PULL_POLICY}
+              command:
+                - /app/planner-api
+              args:
+                - init
+                - --listen
+                - --port
+                - "${MIGRATION_PLANNER_ISO_SERVER_PORT}"
+              ports:
+                - containerPort: ${{MIGRATION_PLANNER_ISO_SERVER_PORT}}
+                  name: iso-server
+              env:
+                - name: MIGRATION_PLANNER_ISO_PATH
+                  value: /iso-storage/rhcos-live-iso.x86_64.iso
+                - name: MIGRATION_PLANNER_ISO_URL
+                  value: ${MIGRATION_PLANNER_ISO_URL}
+                - name: MIGRATION_PLANNER_ISO_SHA256
+                  value: ${MIGRATION_PLANNER_ISO_SHA256}
+                - name: MIGRATION_PLANNER_LOG_LEVEL
+                  value: ${MIGRATION_PLANNER_LOG_LEVEL}
+                - name: MIGRATION_PLANNER_S3_ENDPOINT
+                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
+                - name: MIGRATION_PLANNER_S3_BUCKET
+                  value: ${MIGRATION_PLANNER_S3_BUCKET}
+                - name: MIGRATION_PLANNER_S3_ISO_FILENAME
+                  value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
+                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: access_key
+                - name: MIGRATION_PLANNER_S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: secret_key
+              volumeMounts:
+                - name: iso-storage
+                  mountPath: /iso-storage
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 256Mi
+                limits:
+                  cpu: 400m
+                  memory: 512Mi
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: ${{MIGRATION_PLANNER_ISO_SERVER_PORT}}
+                initialDelaySeconds: 60
+                timeoutSeconds: 5
+                periodSeconds: 30
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: ${{MIGRATION_PLANNER_ISO_SERVER_PORT}}
+                initialDelaySeconds: 60
+                timeoutSeconds: 5
+                periodSeconds: 30
+          volumes:
+            - name: iso-storage
+              persistentVolumeClaim:
+                claimName: migration-planner-iso-storage
