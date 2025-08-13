@@ -107,7 +107,7 @@ init:
 	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
 	./bin/planner-api init
 
-run:
+run: image
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	./bin/planner-api run
@@ -118,10 +118,12 @@ run-agent:
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
-	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+	@if [ ! -f rhcos-live-iso.x86_64.iso ]; then \
+		curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso; \
+	fi
 endif
 
-build: bin image
+build: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin

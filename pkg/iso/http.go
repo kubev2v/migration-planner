@@ -39,22 +39,7 @@ func (h *HttpDownloader) Get(ctx context.Context, dst io.Writer) error {
 		totalSize = n
 	}
 
-	newCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-	mw := newProgressWriter(newCtx, dst, totalSize)
-	imageHasher := newImageHasher(mw)
-
-	_, err = io.Copy(imageHasher, resp.Body)
-	if err != nil {
-		return err
-	}
-
-	computedSum := imageHasher.Sum()
-	if h.imageSha256 != computedSum {
-		return fmt.Errorf("failed to download the image. wanted %q received %q", h.imageSha256, computedSum)
-	}
-
-	return nil
+	return DownloadWithValidation(ctx, resp.Body, dst, h.imageSha256, totalSize)
 }
 
 func (h *HttpDownloader) Type() string {
