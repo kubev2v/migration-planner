@@ -661,21 +661,22 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 		return nil
 	}
 
-	// Create datastore-to-hostID mapping once for better performance
-	datastoreToHostID := make(map[string]string)
+	// Create datastore-to-hostIDs mapping once for better performance
+	datastoreToHostIDs := make(map[string][]string)
 	for _, host := range *hosts {
 		for _, dsRef := range host.Datastores {
-			datastoreToHostID[dsRef.ID] = host.ID
+			datastoreToHostIDs[dsRef.ID] = append(datastoreToHostIDs[dsRef.ID], host.ID)
 		}
 	}
 
 	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
 		dsVendor, dsModel, dsProtocol := findDataStoreInfo(*hosts, ds.BackingDevicesNames)
-		hostID := datastoreToHostID[ds.ID]
+		hostIDs := datastoreToHostIDs[ds.ID]
 		var hostIDPtr *string
-		if hostID != "" {
-			hostIDPtr = &hostID
+		if len(hostIDs) > 0 {
+			joined := strings.Join(hostIDs, ", ")
+			hostIDPtr = &joined
 		}
 
 		res = append(res, apiplanner.Datastore{
