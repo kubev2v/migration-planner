@@ -72,7 +72,7 @@ require (
 	github.com/diskfs/go-diskfs v1.4.1 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/elliotwutingfeng/asciiset v0.0.0-20250521213949-458fd813c616 // indirect
+	github.com/elliotwutingfeng/asciiset v0.0.0-20250812055617-fb43ac3ba420 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
