@@ -961,6 +961,9 @@ components:
         - vendor
         - model
       properties:
+        id:
+          type: string
+          description: Unique identifier for this host
         vendor:
           type: string
         model:

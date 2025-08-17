@@ -207,7 +207,7 @@ func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
 	colMap := buildColumnMap(vHostRows[0])
 
 	// Validate required columns exist
-	requiredCols := []string{"vendor", "model"}
+	requiredCols := []string{"vendor", "model", "object id"}
 	for _, col := range requiredCols {
 		if _, exists := colMap[col]; !exists {
 			return nil, fmt.Errorf("missing required column: %s", col)
@@ -221,6 +221,7 @@ func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
 		}
 
 		host := api.Host{
+			Id:     stringPtrIfNotEmpty(getColumnValue(row, colMap, "object id")),
 			Vendor: getColumnValue(row, colMap, "vendor"),
 			Model:  getColumnValue(row, colMap, "model"),
 		}

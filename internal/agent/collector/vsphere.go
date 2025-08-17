@@ -708,6 +708,7 @@ func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
 		}
 
 		l = append(l, apiplanner.Host{
+			Id:         &host.ID,
 			Model:      host.Model,
 			Vendor:     host.Vendor,
 			CpuCores:   &cpuCores,

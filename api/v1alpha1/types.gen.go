@@ -134,6 +134,9 @@ type Host struct {
 	// CpuSockets Number of CPU sockets
 	CpuSockets *int `json:"cpuSockets"`
 
+	// Id Unique identifier for this host
+	Id *string `json:"id,omitempty"`
+
 	// MemoryMB Host memory in MB
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`

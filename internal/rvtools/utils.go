@@ -85,6 +85,13 @@ func getColumnValue(row []string, colMap map[string]int, key string) string {
 	return ""
 }
 
+func stringPtrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}
+
 func buildColumnMap(headers []string) map[string]int {
 	colMap := make(map[string]int)
 	for i, header := range headers {
