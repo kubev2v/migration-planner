@@ -1,4 +1,5 @@
 /bin/
+policies/
 /rpmbuild/
 /.vscode/
 /reports/

@@ -38,7 +38,17 @@ make kill-db
 make deploy-db
 ```
 
-### 3. Configure Environment Variables
+### 3. Download OPA Policies
+
+Download the OPA (Open Policy Agent) policies required for validation. These policies are used to assess and validate the source environment.
+
+```bash
+make setup-opa-policies
+```
+
+> **Note:** Once you are done with your work, you can run `make clean-opa-policies` to remove the downloaded policies from your local machine.
+
+### 4. Configure Environment Variables
 
 Set the required environment variables for local development:
 
@@ -49,7 +59,7 @@ export MIGRATION_PLANNER_AUTH=none
 
 These settings disable authentication for local development, making it easier to test and develop the application.
 
-### 4. Run the Application
+### 5. Run the Application
 
 Start the Migration Planner API server:
 
@@ -57,7 +67,7 @@ Start the Migration Planner API server:
 make run
 ```
 
-### 5. Verify API is Running
+### 6. Verify API is Running
 
 The migration-planner API should be running on `http://localhost:3443`. Verify it's working:
 

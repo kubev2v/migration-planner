@@ -376,10 +376,7 @@ setup-opa-policies:
 		echo "Downloading policies from Forklift GitHub repository..."; \
 		mkdir -p $(FORKLIFT_POLICIES_TMP_DIR); \
 		curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
-			| tar -xz -C $(FORKLIFT_POLICIES_TMP_DIR) \
-				--wildcards '*/validation/policies/io/konveyor/forklift/vmware/*' \
-				--strip-components=1 \
-				--exclude='*/..*' --exclude='*/.*'; \
+			| tar -xz -C $(FORKLIFT_POLICIES_TMP_DIR) --strip-components=1; \
 		if [ -d "$(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware" ]; then \
 			find $(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware \
 				-name "*.rego" ! -name "*_test.rego" -exec cp {} $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)/ \; ; \
