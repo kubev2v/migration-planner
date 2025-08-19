@@ -1,0 +1,6 @@
+tests:
+- as: unit
+  commands: make test
+  container:
+    from: src
+
