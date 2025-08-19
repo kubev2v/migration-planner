@@ -27,7 +27,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	var vcenterUUID string
 	vInfoRows := readSheet(excelFile, sheets, "vInfo")
 	if len(vInfoRows) > 1 {
-		vcenterUUID, _ = extractVCenterUUID(vInfoRows)
+		vcenterUUID, _ = ExtractVCenterUUID(vInfoRows)
 	}
 
 	datastoreRows := readSheet(excelFile, sheets, "vDatastore")
@@ -72,11 +72,11 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	vHostRows := readSheet(excelFile, sheets, "vHost")
 	var clusterInfo ClusterInfo
 	if len(vHostRows) > 0 {
-		clusterInfo = extractClusterAndDatacenterInfo(vHostRows)
-		hostPowerStates = extractHostPowerStates(vHostRows)
+		clusterInfo = ExtractClusterAndDatacenterInfo(vHostRows)
+		hostPowerStates = ExtractHostPowerStates(vHostRows)
 
 		var err error
-		hosts, err = extractHostsInfo(vHostRows)
+		hosts, err = ExtractHostsInfo(vHostRows)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("Failed to extract host info: %v", err)
 			hosts = []api.Host{}
@@ -113,7 +113,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	dvswitchRows := readSheet(excelFile, sheets, "dvSwitch")
 	dvportRows := readSheet(excelFile, sheets, "dvPort")
 
-	networks := extractNetworks(dvswitchRows, dvportRows)
+	networks := ExtractNetworks(dvswitchRows, dvportRows)
 
 	zap.S().Named("rvtools").Infof("Create Basic Inventory")
 	infraData := service.InfrastructureData{
@@ -126,7 +126,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		TotalHosts:            clusterInfo.TotalHosts,
 		TotalClusters:         clusterInfo.TotalClusters,
 		TotalDatacenters:      clusterInfo.TotalDatacenters,
-		VmsPerCluster:         extractVmsPerCluster(vInfoRows),
+		VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
 	}
 	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
@@ -146,7 +146,7 @@ type ClusterInfo struct {
 	TotalDatacenters      int
 }
 
-func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
+func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	if len(vHostRows) <= 1 {
 		return ClusterInfo{}
 	}
@@ -199,7 +199,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	}
 }
 
-func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
+func ExtractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
 	if len(vHostRows) <= 1 {
 		return []api.Host{}, nil
 	}
@@ -242,7 +242,7 @@ func extractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
 	return hosts, nil
 }
 
-func extractHostPowerStates(rows [][]string) map[string]int {
+func ExtractHostPowerStates(rows [][]string) map[string]int {
 	if len(rows) <= 1 {
 		return map[string]int{}
 	}
@@ -268,7 +268,7 @@ func extractHostPowerStates(rows [][]string) map[string]int {
 	return hostPowerStates
 }
 
-func extractVmsPerCluster(rows [][]string) []int {
+func ExtractVmsPerCluster(rows [][]string) []int {
 	if len(rows) <= 1 {
 		return []int{}
 	}
@@ -289,7 +289,7 @@ func extractVmsPerCluster(rows [][]string) []int {
 	return calculateVMsPerCluster(clusterToVMs)
 }
 
-func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
+func ExtractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	networks := []api.Network{}
 
 	if len(dvswitchRows) == 0 && len(dvportRows) == 0 {
@@ -305,7 +305,7 @@ func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	return networks
 }
 
-func extractVCenterUUID(rows [][]string) (string, error) {
+func ExtractVCenterUUID(rows [][]string) (string, error) {
 	if len(rows) < 2 {
 		return "", fmt.Errorf("insufficient data")
 	}
