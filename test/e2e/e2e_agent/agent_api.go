@@ -81,13 +81,13 @@ func (api *AgentApi) request(method string, path string, body []byte, result any
 	return res, nil
 }
 
-// Version retrieves the agent's version string
-func (api *AgentApi) Version() (string, error) {
+// Info retrieves the agent's version string
+func (api *AgentApi) Info() (string, error) {
 	var result struct {
 		Version string `json:"version"`
 	}
 
-	res, err := api.request(http.MethodGet, "version", nil, &result)
+	res, err := api.request(http.MethodGet, "info", nil, &result)
 	if err != nil || res.StatusCode != http.StatusOK {
 		return "", err
 	}
