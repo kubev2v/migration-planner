@@ -16,8 +16,6 @@ MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
 MIGRATION_PLANNER_AUTH ?= local
-MIGRATION_PLANNER_ISO_URL ?= https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-4.19.0-x86_64-live-iso.x86_64.iso
-MIGRATION_PLANNER_ISO_SHA256 ?= 6a9cf9df708e014a2b44f372ab870f873cf2db5685f9ef4518f52caa36160c36
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
 DOWNLOAD_RHCOS ?= true
@@ -75,7 +73,6 @@ help:
 	@echo "    build:           run all builds"
 	@echo "    clean:           clean up all containers and volumes"
 	@echo "    migrate:         run database migrations"
-	@echo "    init:            initialize RHCOS ISO for migration planner"
 	@echo "    run:             run the migration planner API service"
 	@echo "    integration-test: run e2e integration tests"
 
@@ -103,12 +100,7 @@ tidy:
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
-init:
-	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
-	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
-	./bin/planner-api init
-
-run:
+run: image
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	./bin/planner-api run
@@ -119,10 +111,12 @@ run-agent:
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
-	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+	@if [ ! -f rhcos-live-iso.x86_64.iso ]; then \
+    	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso; \
+    fi
 endif
 
-build: bin image
+build: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin
@@ -350,18 +344,12 @@ test: $(GINKGO)
 	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
 	@echo "✅ All Unit tests passed successfully."
 
-# Build the migration-planner without downloading the RHCOS image
-build-no-rhcos:
-	@DOWNLOAD_RHCOS=false make build
-
 # Full unit test cycle: build, prepare DB, run tests, and clean up
-unit-test: build-no-rhcos kill-db deploy-db migrate test kill-db
+unit-test: build kill-db deploy-db migrate test kill-db
 
 # Run integration tests using ginkgo
 integration-test: $(GINKGO) build
 	@echo "🧪 Running integration tests..."
-	MIGRATION_PLANNER_ISO_URL=$(MIGRATION_PLANNER_ISO_URL) \
-	MIGRATION_PLANNER_ISO_SHA256=$(MIGRATION_PLANNER_ISO_SHA256) \
 	$(GINKGO) -focus=$(FOCUS) run test/e2e
 	@echo "✅ All Integration tests passed successfully."
 ##################### tests support end   ##########################
