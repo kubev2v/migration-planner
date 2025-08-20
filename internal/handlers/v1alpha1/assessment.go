@@ -67,7 +67,6 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 			// source has no inventory
 			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 		default:
-			fmt.Println(err)
 			return server.CreateAssessment500JSONResponse{Message: fmt.Sprintf("failed to create assessment: %v", err)}, nil
 		}
 	}

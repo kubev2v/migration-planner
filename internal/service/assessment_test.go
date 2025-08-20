@@ -36,7 +36,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAssessmentService(s)
+		svc = service.NewAssessmentService(s, nil)
 	})
 
 	AfterAll(func() {
@@ -246,24 +246,6 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).ToNot(BeNil())
 				Expect(assessment).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("record not found"))
-			})
-		})
-
-		Context("with rvtools source", func() {
-			It("handles rvtools source (not implemented yet)", func() {
-				createForm := mappers.AssessmentCreateForm{
-					ID:     uuid.New(),
-					Name:   "Test Assessment",
-					OrgID:  "org1",
-					Source: service.SourceTypeRvtools,
-				}
-
-				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
-
-				// Since rvtools is not implemented, it should create with empty inventory
-				Expect(err).To(BeNil())
-				Expect(assessment).ToNot(BeNil())
-				Expect(assessment.SourceType).To(Equal(service.SourceTypeRvtools))
 			})
 		})
 
