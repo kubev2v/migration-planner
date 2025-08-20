@@ -15,10 +15,8 @@ parameters:
     value: latest
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
-  - name: MIGRATION_PLANNER_ISO_URL
-    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-4.19.0-x86_64-live-iso.x86_64.iso
-  - name: MIGRATION_PLANNER_ISO_SHA256
-    value: 6a9cf9df708e014a2b44f372ab870f873cf2db5685f9ef4518f52caa36160c36
+  - name: MIGRATION_PLANNER_ISO_IMAGE
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-iso:latest
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -404,6 +402,24 @@ objects:
           labels:
             app: migration-planner
         spec:
+          initContainers:
+            - name: pull-iso
+              image: ${MIGRATION_PLANNER_ISO_IMAGE}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  cp /rhcos.iso ${MIGRATION_PLANNER_ISO_PATH}
+                  chmod 0644 ${MIGRATION_PLANNER_ISO_PATH}
+              volumeMounts:
+                - name: iso-storage
+                  mountPath: /iso
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  cpu: 200m
+                  memory: 512Mi
           containers:
             - name: envoy
               image: ${ENVOY_IMAGE}
@@ -493,10 +509,6 @@ objects:
                   value: ${INSECURE_REGISTRY}
                 - name: MIGRATION_PLANNER_ISO_PATH
                   value: ${MIGRATION_PLANNER_ISO_PATH}
-                - name: MIGRATION_PLANNER_ISO_URL
-                  value: ${MIGRATION_PLANNER_ISO_URL}
-                - name: MIGRATION_PLANNER_ISO_SHA256
-                  value: ${MIGRATION_PLANNER_ISO_SHA256}
                 # Svc Config values
                 - name: MIGRATION_PLANNER_ADDRESS
                   value: ${MIGRATION_PLANNER_ADDRESS}
@@ -527,22 +539,6 @@ objects:
                   value: ${MIGRATION_PLANNER_JWK_URL}
                 - name: MIGRATION_PLANNER_AGENT_AUTH_ENABLED
                   value: ${MIGRATION_PLANNER_AGENT_AUTH_ENABLED}
-                - name: MIGRATION_PLANNER_S3_ENDPOINT
-                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
-                - name: MIGRATION_PLANNER_S3_BUCKET
-                  value: ${MIGRATION_PLANNER_S3_BUCKET}
-                - name: MIGRATION_PLANNER_S3_ISO_FILENAME
-                  value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
-                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: access_key
-                - name: MIGRATION_PLANNER_S3_SECRET_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: secret_key
                 # DB Config values
                 - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
                   value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}
