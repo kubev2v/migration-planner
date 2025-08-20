@@ -118,6 +118,11 @@ bin/planner delete sources/<source-id>
 bin/planner --help
 ```
 
+#### f. Get info
+```bash
+bin/planner info
+```
+
 ### 3. Use curl to access the API
 
 You can use curl to perform API calls directly.
@@ -151,6 +156,12 @@ curl http://localhost:3443/api/v1/sources/{source-id}/image-url
 ```bash
 curl -X DELETE http://localhost:3443/api/v1/sources/{source-id}
 ```
+
+#### f. Get info:
+```bash
+curl http://localhost:3443/api/v1/info
+```
+
 ## Run the Migration Planner Agent locally
 
 Follow these steps to get the agent running locally:

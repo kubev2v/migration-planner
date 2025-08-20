@@ -143,6 +143,15 @@ type Host struct {
 	Vendor   string `json:"vendor"`
 }
 
+// Info Migration planner information
+type Info struct {
+	// GitCommit Git commit hash
+	GitCommit string `json:"gitCommit"`
+
+	// VersionName Version name, based on git tag
+	VersionName string `json:"versionName"`
+}
+
 // Infra defines model for Infra.
 type Infra struct {
 	ClustersPerDatacenter *[]int         `json:"clustersPerDatacenter,omitempty"`

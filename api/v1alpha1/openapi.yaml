@@ -668,6 +668,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/info:
+    get:
+      tags:
+        - info
+      description: Get migration planner information
+      operationId: getInfo
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /health:
     get:
       tags:
@@ -1261,3 +1280,19 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Assessment'
+
+    Info:
+      type: object
+      description: Migration planner information
+      properties:
+        gitCommit:
+          type: string
+          description: Git commit hash
+          example: "c5a1661465a25b17ceeeb77d1ec40deb57d8da44"
+        versionName:
+          type: string
+          description: Version name, based on git tag
+          example: "0.1.4-40-gc5a1661"
+      required:
+        - gitCommit
+        - versionName
