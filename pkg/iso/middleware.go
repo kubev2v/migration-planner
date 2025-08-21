@@ -80,3 +80,29 @@ func (ih *imageHasher) Write(p []byte) (n int, err error) {
 func (ih *imageHasher) Sum() string {
 	return fmt.Sprintf("%x", ih.hasher.Sum(nil))
 }
+
+// DownloadWithValidation downloads data from src to dst with progress tracking and SHA256 validation
+func DownloadWithValidation(ctx context.Context, src io.Reader, dst io.Writer, expectedSha256 string, totalSize int64) error {
+	newCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// Create progress tracking writer
+	mw := newProgressWriter(newCtx, dst, totalSize)
+
+	// Create hash validation writer
+	imageHasher := newImageHasher(mw)
+
+	// Copy data through the validation chain
+	_, err := io.Copy(imageHasher, src)
+	if err != nil {
+		return fmt.Errorf("failed to copy data: %w", err)
+	}
+
+	// Verify SHA256 hash
+	computedSum := imageHasher.Sum()
+	if expectedSha256 != computedSum {
+		return fmt.Errorf("SHA256 hash mismatch. expected %q, got %q", expectedSha256, computedSum)
+	}
+
+	return nil
+}

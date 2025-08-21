@@ -9,19 +9,11 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
+
 	"go.uber.org/zap"
 )
-
-const (
-	sentinelFile string = "planner-iso-download"
-)
-
-type waitResult struct {
-	Err error
-}
 
 type IsoDownloader interface {
 	Download(context.Context, io.WriteSeeker) error
@@ -40,69 +32,11 @@ func NewIsoInitializer(downloader IsoDownloader) *IsoInitializer {
 // If the file is missing or has an incorrect hash, it downloads the new image to a temporary file,
 // then atomically replaces the existing file using intermediate naming to prevent corruption.
 // The method includes rollback logic and cleanup of temporary files to maintain system integrity.
-
-// The planner is typically deployed in Kubernetes with multiple replicas (usually 3+).
-// Using a persistent volume for ISO storage can create race conditions
-// when multiple pods attempt to download the same ISO file simultaneously.
-//
-// A simple solution is to retry downloads or fail until one pod succeeds.
-// However, repeated crashes may trigger false-positive monitoring alerts.
-// Therefore, a more elegant solution is to serialize pod dowload ops.
-// For that, each instance is looking for sentinelFile.
-// It waits until the sentinelFile is removed by the owner and start the process again.
-// If the another instance succeeded in downloading the iso return. If not start the process again.
 func (i *IsoInitializer) Initialize(ctx context.Context, targetIsoFile string, targetIsoSha256 string) error {
-	workingFolder := path.Dir(targetIsoFile)
-
-	waitCh := make(chan waitResult)
-	go func(ctx context.Context, c chan waitResult) {
-		for {
-			_, err := os.Stat(path.Join(workingFolder, sentinelFile))
-			if err != nil {
-				if errors.Is(err, os.ErrNotExist) {
-					c <- waitResult{}
-					return
-				}
-				c <- waitResult{Err: err}
-				return
-			}
-
-			// the sentinelFile is present on disk
-			// wait for the another instance to finish or for context to be canceled
-
-			t := time.NewTicker(2 * time.Second)
-			defer t.Stop()
-
-			zap.S().Debug("waiting for another instance to download iso")
-
-			select {
-			case <-ctx.Done():
-				c <- waitResult{Err: ctx.Err()}
-				return
-			case <-t.C:
-			}
-		}
-	}(ctx, waitCh)
-
-	result := <-waitCh
-	if result.Err != nil {
-		return result.Err
-	}
-
 	statErr := i.verifyIso(targetIsoFile, targetIsoSha256)
 	if statErr == nil {
 		return nil
 	}
-
-	// touch the sentinelFile
-	sf, err := os.Create(path.Join(workingFolder, sentinelFile))
-	if err != nil {
-		return fmt.Errorf("failed to create sentinel file: %w", err)
-	}
-	sf.Close()
-	defer func() {
-		_ = os.Remove(path.Join(workingFolder, sentinelFile))
-	}()
 
 	zap.S().Debugw("failed to verify the integrity of the existing image", "error", statErr, "target iso", targetIsoFile, "target sha256", targetIsoSha256)
 
@@ -134,11 +68,15 @@ func (i *IsoInitializer) Initialize(ctx context.Context, targetIsoFile string, t
 	}
 
 	if err := os.Rename(tempIsoFile.Name(), targetIsoFile); err != nil {
-		// try to rollback the old image
-		return os.Rename(intermediateFilename, targetIsoFile)
+		// try to roll back the old image
+		rbErr := os.Rename(intermediateFilename, targetIsoFile)
+		if rbErr != nil {
+			return fmt.Errorf("failed to promote new iso to target: %v; rollback also failed: %w", err, rbErr)
+		}
+		return fmt.Errorf("failed to promote new iso to target: %w", err)
 	}
 
-	// safe to remove the oldfile
+	// safe to remove the old file
 	if err := os.Remove(intermediateFilename); err != nil {
 		zap.S().Warnw("failed to remove the old iso image from storage", "error", err)
 	}
