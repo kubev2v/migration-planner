@@ -8,7 +8,7 @@ require (
 	github.com/MicahParks/jwkset v0.5.19
 	github.com/MicahParks/keyfunc/v3 v3.3.5
 	github.com/coreos/butane v0.22.0
-	github.com/getkin/kin-openapi v0.126.0
+	github.com/getkin/kin-openapi v0.132.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/cors v1.2.2
@@ -25,7 +25,7 @@ require (
 	github.com/lthibault/jitterbug v2.0.0+incompatible
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
-	github.com/oapi-codegen/nethttp-middleware v1.0.2
+	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
@@ -103,7 +103,6 @@ require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/invopop/yaml v0.3.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
@@ -126,6 +125,8 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/mohae/deepcopy v0.0.0-20170929034955-c48cc78d4826 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
+	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/openshift/api v0.0.0-20250812222054-88b2b21555f3 // indirect
 	github.com/openshift/client-go v0.0.0-20250811163556-6193816ae379 // indirect
