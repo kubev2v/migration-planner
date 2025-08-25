@@ -2,6 +2,7 @@ package mappers
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"mime/multipart"
 
@@ -152,9 +153,12 @@ func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, orgID st
 			form.Name = string(nameBytes)
 		case "file":
 			buff := bytes.NewBuffer([]byte{})
-			_, err := io.Copy(buff, part)
+			n, err := io.Copy(buff, part)
 			if err != nil {
 				return form, err
+			}
+			if n == 0 {
+				return form, fmt.Errorf("rvtools file body is empty")
 			}
 			// Store the entire part as RVToolsFile for processing
 			form.RVToolsFile = buff

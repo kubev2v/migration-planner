@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -20,11 +23,12 @@ const (
 )
 
 type AssessmentService struct {
-	store store.Store
+	store        store.Store
+	opaValidator *opa.Validator
 }
 
-func NewAssessmentService(store store.Store) *AssessmentService {
-	return &AssessmentService{store: store}
+func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *AssessmentService {
+	return &AssessmentService{store: store, opaValidator: opaValidator}
 }
 
 func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
@@ -88,7 +92,15 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	case SourceTypeInventory:
 		inventory = createForm.Inventory
 	case SourceTypeRvtools:
-		// TODO: parse the rvtools if source == rvtools
+		content, err := io.ReadAll(createForm.RVToolsFile)
+		if err != nil {
+			return nil, err
+		}
+		rvtoolInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
+		if err != nil {
+			return nil, fmt.Errorf("Error parsing RVTools file: %v", err)
+		}
+		inventory = *rvtoolInventory
 	}
 
 	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory)
@@ -101,7 +113,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		return nil, err
 	}
 
-	zap.S().Named("assessment_service").Infow("Created assessment %s with initial snapshot", "assessment_id", createdAssessment.ID)
+	zap.S().Named("assessment_service").Infow("Created assessment with initial snapshot", "assessment_id", createdAssessment.ID)
 
 	return createdAssessment, nil
 }
