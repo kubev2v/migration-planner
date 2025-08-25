@@ -23,7 +23,11 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
 
         run: |
-          IFS=$'\n' commit_messages=($(git log --pretty=format:"%s" $BASE_SHA...$HEAD_SHA))          
+          echo "BASE_SHA: $BASE_SHA"
+          echo "HEAD_SHA: $HEAD_SHA"
+          MERGE_BASE=$(git merge-base $BASE_SHA $HEAD_SHA)
+          echo "MERGE_BASE: $MERGE_BASE"
+          IFS=$'\n' commit_messages=($(git log --pretty=format:"%s" $MERGE_BASE..$HEAD_SHA))
           
           # Lists of GitHub users for whom the commit validation should be skipped:
           # * red-hat-konflux[bot] - automatic bot responsible for any library or konflux integration update
