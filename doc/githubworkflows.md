@@ -37,10 +37,10 @@ Customizing the repository destination for the UI image follows similar steps to
 
 First, create dedicated repositories in your Quay environment that will replace the destination for the `migration-planner-agent` and `migration-planner-api` images. The replacements will be as follows:
 
-- **Old Destination**: `quay.io/kubev2v/migration-planner-agent`  
+- **Old Destination**: `quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent`  
   **New Destination**: `quay.io/<YOUR-QUAY-USERNAME>/migration-planner-agent`
 
-- **Old Destination**: `quay.io/kubev2v/migration-planner-api`  
+- **Old Destination**: `quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-api`  
   **New Destination**: `quay.io/<YOUR-QUAY-USERNAME>/migration-planner-api`
 
 2. Create a Quay Bot Account
@@ -62,8 +62,8 @@ To ensure that the workflow pushes the images to your custom Quay repositories, 
 
 Before modification, the `Makefile` contains:
 
-    `MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/kubev2v/migration-planner-agent`
-    `MIGRATION_PLANNER_API_IMAGE ?= quay.io/kubev2v/migration-planner-api`
+    `MIGRATION_PLANNER_AGENT_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent`
+    `MIGRATION_PLANNER_API_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-api`
 
 After modification, update the repository destination to your custom Quay repositories:
 
