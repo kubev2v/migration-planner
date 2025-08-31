@@ -10,7 +10,7 @@ require (
 	github.com/coreos/butane v0.22.0
 	github.com/getkin/kin-openapi v0.126.0
 	github.com/go-chi/chi v1.5.5
-	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/cors v1.2.2
 	github.com/go-chi/render v1.0.3
 	github.com/go-openapi/strfmt v0.23.0
@@ -37,6 +37,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4-0.20250804143300-cb253f3080f1
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.7
+	github.com/stretchr/testify v1.10.0
 	github.com/thoas/go-funk v0.9.3
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.9.1
@@ -144,7 +145,6 @@ require (
 	github.com/richardlehane/msoleps v1.0.4 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
 	github.com/tiendc/go-deepcopy v1.6.1 // indirect
 	github.com/tinylib/msgp v1.3.0 // indirect
