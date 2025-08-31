@@ -644,14 +644,15 @@ func isHardwareAcceleratedMove(hosts []vspheremodel.Host, names []string) bool {
 	return supported
 }
 
-func transformVendorName(vendor string) string {
-	vendor = strings.ToUpper(strings.TrimSpace(vendor))
+func TransformVendorName(vendor string) string {
+	raw := strings.TrimSpace(vendor) // Preserve original case
+	key := strings.ToUpper(raw)      // Use uppercase for lookup only
 
-	if transformed, exists := vendorMap[vendor]; exists {
+	if transformed, exists := vendorMap[key]; exists {
 		return transformed
 	}
 
-	return strings.TrimSpace(vendor)
+	return raw // Return original case for unmapped
 }
 
 func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
@@ -684,7 +685,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
 			Type:                    ds.Type,
-			Vendor:                  transformVendorName(dsVendor),
+			Vendor:                  TransformVendorName(dsVendor),
 			Model:                   dsModel,
 			ProtocolType:            dsProtocol,
 			DiskId:                  getNaa(&ds),

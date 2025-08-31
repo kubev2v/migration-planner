@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/agent/collector"
 	"go.uber.org/zap"
 )
 
@@ -156,7 +157,7 @@ func extractMultipathInfo(multipathRows [][]string) map[string]struct {
 
 		datastoreName := getColumnValue(row, colMap, "datastore")
 		naaIdentifier := getColumnValue(row, colMap, "disk")
-		vendor := getColumnValue(row, colMap, "vendor")
+		vendor := collector.TransformVendorName(getColumnValue(row, colMap, "vendor"))
 		model := getColumnValue(row, colMap, "model")
 
 		if datastoreName != "" && naaIdentifier != "" {
