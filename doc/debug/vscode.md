@@ -3,7 +3,7 @@
 This guide will walk you through configuring a debugger for your specific development environment.
 
 ## Prerequisites for remote debugging
-If you want to execute the remote debugger, please follow the [guide](debugdeployment.md) to setup the environment with remote debugging enabled.
+If you want to execute the remote debugger, please follow the [guide](debug-deployment) to setup the environment with remote debugging enabled.
 
 ## VSCode
 
@@ -74,8 +74,8 @@ This file contains four types run targets:
 ### Run the target
 In order to run any of the target you need select the target as shown in following image
 
-![Run view](../img/runtarget.jpg)
+![Run view](../img/runTarget.jpg)
 
 Then select a specific target and hit F5 to run it:
 
-![Select target](../img/selecttarget.jpg)
+![Select target](../img/selectTarget.jpg)
