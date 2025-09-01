@@ -14,6 +14,7 @@ type Assessment struct {
 	UpdatedAt  *time.Time
 	Name       string     `gorm:"not null;uniqueIndex:org_id_name"`
 	OrgID      string     `gorm:"not null;uniqueIndex:org_id_name;index:assessments_org_id_idx"`
+	Username   string     `gorm:"not null;type:VARCHAR(255)"`
 	SourceType string     `gorm:"not null;type:VARCHAR(100)"`
 	SourceID   *uuid.UUID `gorm:"type:TEXT"`
 	Snapshots  []Snapshot `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
