@@ -28,7 +28,7 @@ func DefaultGenerateOptions() *GenerateOptions {
 	return &GenerateOptions{
 		GlobalOptions: DefaultGlobalOptions(),
 		ImageType:     "ova",
-		AgentImageURL: "quay.io/kubev2v/migration-planner-agent:latest",
+		AgentImageURL: "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest",
 	}
 }
 
@@ -101,7 +101,7 @@ func (o *GenerateOptions) Bind(fs *pflag.FlagSet) {
 	o.GlobalOptions.Bind(fs)
 
 	fs.StringVarP(&o.ImageType, "image-type", "", "ova", "Type of the image. Only accepts ova and iso")
-	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "", "quay.io/kubev2v/migration-planner-agent:latest", "Quay url of the agent's image. Defaults to quay.io/kubev2v/migration-planner-agent:latest")
+	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "", "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest", "Quay url of the agent's image. Defaults to quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest")
 	fs.StringVarP(&o.OutputImageFilePath, "output-file", "", "", "Output image file path")
 	fs.StringVarP(&o.HttpProxyUrl, "http-proxy", "", "", "Url of HTTP_PROXY")
 	fs.StringVarP(&o.HttpsProxyUrl, "https-proxy", "", "", "Url of HTTPS_PROXY")

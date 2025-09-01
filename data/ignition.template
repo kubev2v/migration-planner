@@ -119,7 +119,7 @@ storage:
           fi
 
           if [ -f $IMAGE_STORAGE/migration-planner-agent ]; then
-              skopeo copy oci-archive:$IMAGE_STORAGE/migration-planner-agent containers-storage:quay.io/kubev2v/migration-planner-agent:latest
+              skopeo copy oci-archive:$IMAGE_STORAGE/migration-planner-agent containers-storage:quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest
           fi
           if [ -f $IMAGE_STORAGE/forklift-validation ]; then
               skopeo copy oci-archive:$IMAGE_STORAGE/forklift-validation containers-storage:quay.io/kubev2v/forklift-validation:release-v2.6.4

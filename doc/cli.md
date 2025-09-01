@@ -79,7 +79,7 @@ The user must suply the source-id as required argument.
 The optional flags are:
 ```bash
 Flags:
-      --agent-image-url string    Quay url of the agent's image. Defaults to quay.io/kubev2v/migration-planner-agent:latest (default "quay.io/kubev2v/migration-planner-agent:latest")
+      --agent-image-url string    Quay url of the agent's image. Defaults to quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest (default "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest")
   -h, --help                      help for generate
       --http-proxy string         Url of HTTP_PROXY
       --https-proxy string        Url of HTTPS_PROXY

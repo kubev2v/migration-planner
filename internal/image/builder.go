@@ -32,7 +32,7 @@ const (
 )
 
 const (
-	defaultAgentImage            = "quay.io/kubev2v/migration-planner-agent"
+	defaultAgentImage            = "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent"
 	defaultPlannerService        = "http://127.0.0.1:7443"
 	defaultPersistenceDiskDevice = "/dev/sda"
 	defaultConfigServerUI        = "http://localhost:3000/migrate/wizard"
