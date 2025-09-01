@@ -1,4 +1,4 @@
-package e2e_utils
+package utils
 
 import (
 	"bytes"

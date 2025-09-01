@@ -5,9 +5,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/auth"
+
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/service"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -15,26 +17,24 @@ import (
 
 var _ = Describe("e2e-multiple-users", func() {
 	var (
-		users         = []string{"user", "admin", "koko"}
-		organizations = []string{"redhat", "intel", "apple", "microsoft", "nvidia"}
-		svc           PlannerService
-		err           error
-		startTime     time.Time
+		users            = []string{"user", "admin", "koko"}
+		organizations    = []string{"redhat", "intel", "apple", "microsoft", "nvidia"}
+		serviceInstances = make(map[auth.User]PlannerService)
+		err              error
+		startTime        time.Time
 	)
 
 	BeforeEach(func() {
 		startTime = time.Now()
 		TestOptions.DisconnectedEnvironment = false
 
-		svc, err = DefaultPlannerService()
-		Expect(err).To(BeNil())
-
 		// Iterate over each organization and user to authenticate and create a unique source per org-user pair
 		for _, org := range organizations {
 			for _, user := range users {
-				err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
+				cred := UserAuth(user, org, DefaultEmailDomain)
+				serviceInstances[*cred], err = NewPlannerService(cred)
 				Expect(err).To(BeNil())
-				_, err = svc.CreateSource(fmt.Sprintf("%s-%s", org, user))
+				_, err = serviceInstances[*cred].CreateSource(fmt.Sprintf("%s-%s", org, user))
 				Expect(err).To(BeNil())
 			}
 		}
@@ -45,9 +45,7 @@ var _ = Describe("e2e-multiple-users", func() {
 		zap.S().Info("Cleaning up after test...")
 		for _, org := range organizations {
 			for _, user := range users {
-				err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
-				Expect(err).To(BeNil())
-				err := svc.RemoveSources()
+				err := serviceInstances[*UserAuth(user, org, DefaultEmailDomain)].RemoveSources()
 				Expect(err).To(BeNil(), "Failed to remove sources from DB")
 			}
 		}
@@ -63,9 +61,7 @@ var _ = Describe("e2e-multiple-users", func() {
 			// Verify that each user sees only the sources created by their own organization
 			for _, org := range organizations {
 				for _, user := range users {
-					err = svc.ChangeCredentials(UserAuth(user, org, DefaultEmailDomain))
-					Expect(err).To(BeNil())
-					visibleSources, err := svc.GetSources()
+					visibleSources, err := serviceInstances[*UserAuth(user, org, DefaultEmailDomain)].GetSources()
 					Expect(err).To(BeNil())
 					Expect(*visibleSources).To(HaveLen(len(users)))
 					for _, source := range *visibleSources {
