@@ -1,12 +1,12 @@
-package e2e_agent
+package agent
 
 import (
 	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/service"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
@@ -14,21 +14,18 @@ import (
 
 // PlannerAgent defines the interface for interacting with a planner agent instance
 type PlannerAgent interface {
-	AgentApi() *AgentApi
 	DumpLogs(string)
 	GetIp() (string, error)
 	IsServiceRunning(string, string) bool
 	Run() error
 	Restart() error
 	Remove() error
-	SetAgentApi(*AgentApi)
 }
 
 // plannerAgentLibvirt is an implementation of the PlannerAgent interface
 type plannerAgentLibvirt struct {
 	agentEndToEndTestID string
 	con                 *libvirt.Connect
-	localApi            *AgentApi
 	name                string
 	service             PlannerService
 	sourceID            uuid.UUID
@@ -43,11 +40,6 @@ func NewPlannerAgent(sourceID uuid.UUID, name string, idForTest string, svc Plan
 	}
 	return &plannerAgentLibvirt{agentEndToEndTestID: idForTest, con: conn,
 		name: name, service: svc, sourceID: sourceID}, nil
-}
-
-// AgentApi returns the associated Agent API instance
-func (p *plannerAgentLibvirt) AgentApi() *AgentApi {
-	return p.localApi
 }
 
 // DumpLogs prints journal logs from the agent VM to the GinkgoWriter
@@ -164,9 +156,4 @@ func (p *plannerAgentLibvirt) Remove() error {
 	}
 
 	return nil
-}
-
-// SetAgentApi allows assigning a reference to the AgentApi instance used by the agent
-func (p *plannerAgentLibvirt) SetAgentApi(agentApi *AgentApi) {
-	p.localApi = agentApi
 }

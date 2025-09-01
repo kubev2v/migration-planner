@@ -1,12 +1,12 @@
-package e2e_helpers
+package helpers
 
 import (
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
+	. "github.com/kubev2v/migration-planner/test/e2e/agent"
+	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	"go.uber.org/zap"
 )
 
@@ -21,7 +21,7 @@ func CreateAgent(idForTest string, uuid uuid.UUID, vmName string, svc PlannerSer
 	if err != nil {
 		return nil, err
 	}
-	zap.S().Info("Agent created successfully")
+	zap.S().Info("agent created successfully")
 	return agent, nil
 }
 
@@ -35,7 +35,7 @@ func AgentIsUpToDate(svc PlannerService, uuid uuid.UUID) (bool, error) {
 	return source.Agent.Status == v1alpha1.AgentStatusUpToDate, nil
 }
 
-// CredentialURL helper function which return credential url for an Agent by source UUID
+// CredentialURL helper function which return credential url for an agent by source UUID
 func CredentialURL(svc PlannerService, uuid uuid.UUID) (string, error) {
 	zap.S().Info("try to retrieve valid credentials url")
 	s, err := svc.GetSource(uuid)
