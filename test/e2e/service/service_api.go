@@ -1,4 +1,4 @@
-package e2e_service
+package service
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/auth"
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"go.uber.org/zap"
 )
 

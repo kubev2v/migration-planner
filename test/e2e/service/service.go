@@ -1,4 +1,4 @@
-package e2e_service
+package service
 
 import (
 	"encoding/json"
@@ -13,21 +13,9 @@ import (
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"go.uber.org/zap"
 )
-
-// PlannerService defines the interface for interacting with the planner service
-type PlannerService interface {
-	CreateSource(string) (*api.Source, error)
-	GetImageUrl(uuid.UUID) (string, error)
-	GetSource(uuid.UUID) (*api.Source, error)
-	GetSources() (*api.SourceList, error)
-	RemoveSource(uuid.UUID) error
-	RemoveSources() error
-	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
-	ChangeCredentials(user *auth.User) error
-}
 
 // plannerService is the concrete implementation of PlannerService
 type plannerService struct {
@@ -220,20 +208,4 @@ func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Invent
 	}
 
 	return err
-}
-
-// ChangeCredentials sets the plannerService's credentials and initializes a new Service API instance
-// if the provided credentials differ from the currently stored ones.
-func (s *plannerService) ChangeCredentials(newCredentials *auth.User) error {
-	if s.credentials.Organization == newCredentials.Organization &&
-		s.credentials.Username == newCredentials.Username {
-		return nil
-	}
-	newApi, err := NewServiceApi(newCredentials)
-	if err != nil {
-		return fmt.Errorf("error creating new Service api instance %s", err)
-	}
-	s.api = newApi
-	s.credentials = newCredentials
-	return nil
 }

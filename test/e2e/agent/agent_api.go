@@ -1,4 +1,4 @@
-package e2e_agent
+package agent
 
 import (
 	"bytes"
