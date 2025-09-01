@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/util"
@@ -100,12 +101,13 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 
 // Assessment-related mappers
 
-func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, orgID string) mappers.AssessmentCreateForm {
+func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User) mappers.AssessmentCreateForm {
 	form := mappers.AssessmentCreateForm{
-		ID:     uuid.New(),
-		Name:   resource.Name,
-		OrgID:  orgID,
-		Source: resource.SourceType,
+		ID:       uuid.New(),
+		Name:     resource.Name,
+		OrgID:    user.Organization,
+		Username: user.Username,
+		Source:   resource.SourceType,
 	}
 
 	// Set source ID if provided
@@ -127,11 +129,12 @@ func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
 	}
 }
 
-func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, orgID string) (mappers.AssessmentCreateForm, error) {
+func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, user auth.User) (mappers.AssessmentCreateForm, error) {
 	form := mappers.AssessmentCreateForm{
-		ID:     uuid.New(),
-		OrgID:  orgID,
-		Source: service.SourceTypeRvtools,
+		ID:       uuid.New(),
+		OrgID:    user.Organization,
+		Username: user.Username,
+		Source:   service.SourceTypeRvtools,
 	}
 
 	for {
