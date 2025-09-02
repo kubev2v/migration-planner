@@ -51,6 +51,20 @@ var _ = Describe("assessment store", Ordered, func() {
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
 			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(3))
+		})
+
+		It("successfully list all assessments -- without default assessment", func() {
+			assessmentID1 := uuid.New()
+			assessmentID2 := uuid.New()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "inventory", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "rvtools", "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithDefaultInventory(false))
+			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 		})
 

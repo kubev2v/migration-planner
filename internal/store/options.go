@@ -1,8 +1,13 @@
 package store
 
 import (
-	"github.com/google/uuid"
 	"gorm.io/gorm"
+)
+
+const (
+	// Gorm don't preload the inventory of the snapshot when assessment_id = '000000-000..'
+	// therefore we need to set the assessment's id generated but stable.
+	exampleAssessmentID = "ed7ff57a-8db5-410b-99ce-34dc87de5974"
 )
 
 type BaseQuerier struct {
@@ -71,20 +76,6 @@ func (sf *SourceQueryFilter) ByOrgID(id string) *SourceQueryFilter {
 	return sf
 }
 
-func (sf *SourceQueryFilter) ByDefaultInventory() *SourceQueryFilter {
-	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id = ?", uuid.UUID{})
-	})
-	return sf
-}
-
-func (sf *SourceQueryFilter) WithoutDefaultInventory() *SourceQueryFilter {
-	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id != ?", uuid.UUID{})
-	})
-	return sf
-}
-
 func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter {
 	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		if isOnPremises {
@@ -139,6 +130,19 @@ func (f *AssessmentQueryFilter) WithSourceID(sourceID string) *AssessmentQueryFi
 func (f *AssessmentQueryFilter) WithNameLike(pattern string) *AssessmentQueryFilter {
 	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("name ILIKE ?", "%"+pattern+"%")
+	})
+	return f
+}
+
+func (f *AssessmentQueryFilter) WithDefaultInventory(includeInventory bool) *AssessmentQueryFilter {
+	if includeInventory {
+		f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("id = ?", exampleAssessmentID)
+		})
+		return f
+	}
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id != ?", exampleAssessmentID)
 	})
 	return f
 }

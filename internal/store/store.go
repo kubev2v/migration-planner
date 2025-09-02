@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -73,7 +74,7 @@ func (s *DataStore) Assessment() Assessment {
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
-	sources, err := s.Source().List(ctx, NewSourceQueryFilter().WithoutDefaultInventory())
+	sources, err := s.Source().List(ctx, NewSourceQueryFilter())
 	if err != nil {
 		return model.InventoryStats{}, err
 	}
@@ -81,24 +82,48 @@ func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error
 }
 
 func (s *DataStore) Seed() error {
-	sourceUuid := uuid.UUID{}
+	assessmentId := uuid.MustParse(exampleAssessmentID)
 
 	tx, err := newTransaction(s.db)
 	if err != nil {
 		return err
 	}
-	// Create/update default source
-	source := model.Source{
-		ID:        sourceUuid,
-		Name:      "Example",
-		Inventory: model.MakeJSONField(GenerateDefaultInventory()),
+
+	assessment := model.Assessment{
+		ID:         assessmentId,
+		CreatedAt:  time.Now(),
+		Name:       "Example",
+		OrgID:      "example",
+		SourceType: "inventory",
+	}
+
+	if err := tx.tx.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "id"}},
+		DoNothing: true,
+	}).Create(&assessment).Error; err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	// backwards compability: find if we already have a snapshot for this assessment
+	foundId := 0
+	_ = tx.tx.Select("id").Table("snapshots").Where("assessment_id = ?", assessmentId).Scan(&foundId) // ignore error
+
+	snapshot := model.Snapshot{
+		AssessmentID: assessmentId,
+		Inventory:    model.MakeJSONField(GenerateDefaultInventory()),
+	}
+
+	if foundId > 0 {
+		snapshot.ID = uint(foundId)
 	}
 
 	if err := tx.tx.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"inventory"}),
-	}).Create(&source).Error; err != nil {
+	}).Create(&snapshot).Error; err != nil {
 		_ = tx.Rollback()
+		return err
 	}
 
 	if err := tx.Commit(); err != nil {

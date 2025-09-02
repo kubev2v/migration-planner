@@ -609,14 +609,6 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 	})
 
 	Context("source filter", func() {
-		It("filter does not have default inventory", func() {
-			f := service.NewSourceFilter()
-			Expect(f.IncludeDefault).To(BeFalse())
-		})
-		It("filter does have default inventory", func() {
-			f := service.NewSourceFilter(service.WithDefaultInventory())
-			Expect(f.IncludeDefault).To(BeTrue())
-		})
 		It("filter has orgID set properlly", func() {
 			f := service.NewSourceFilter(service.WithOrgID("test"))
 			Expect(f.OrgID).To(Equal("test"))
