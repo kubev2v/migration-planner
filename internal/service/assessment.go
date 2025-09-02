@@ -43,6 +43,15 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 	assessments, err := as.store.Assessment().List(ctx, storeFilter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assessments: %w", err)
+
+	}
+
+	if filter.IncludeDefault {
+		defaultAssessment, err := as.store.Assessment().List(ctx, store.NewAssessmentQueryFilter().WithDefaultInventory(true))
+		if err != nil {
+			return nil, err
+		}
+		return append(assessments, defaultAssessment...), nil
 	}
 
 	return assessments, nil
@@ -180,12 +189,13 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 
 // AssessmentFilter represents filtering options for listing assessments
 type AssessmentFilter struct {
-	OrgID    string
-	Source   string
-	SourceID string
-	NameLike string
-	Limit    int
-	Offset   int
+	OrgID          string
+	Source         string
+	SourceID       string
+	NameLike       string
+	Limit          int
+	Offset         int
+	IncludeDefault bool
 }
 
 func NewAssessmentFilter(orgID string) *AssessmentFilter {
@@ -216,5 +226,10 @@ func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 
 func (f *AssessmentFilter) WithOffset(offset int) *AssessmentFilter {
 	f.Offset = offset
+	return f
+}
+
+func (f *AssessmentFilter) WithDefaultInventory() *AssessmentFilter {
+	f.IncludeDefault = true
 	return f
 }

@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -85,6 +86,63 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(assessments).To(HaveLen(2))
 			for _, assessment := range assessments {
 				Expect(assessment.Name).To(ContainSubstring("Test"))
+			}
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessments;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("ListAssessments with IncludeDefault", func() {
+		BeforeEach(func() {
+			// Seed the database first to create default assessment
+			err := s.Seed()
+			Expect(err).To(BeNil())
+
+			// Create regular test assessments
+			assessment1ID := uuid.New()
+			assessment2ID := uuid.New()
+			assessment3ID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", service.SourceTypeRvtools, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+		})
+
+		It("includes default assessment when IncludeDefault is true", func() {
+			filter := service.NewAssessmentFilter("org1").WithDefaultInventory()
+			assessments, err := svc.ListAssessments(context.TODO(), filter)
+
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(3)) // 2 regular org1 assessments + 1 default
+
+			// Verify we have the default assessment
+			var hasDefault bool
+			for _, assessment := range assessments {
+				if strings.ToLower(assessment.Name) == "example" && assessment.OrgID == "example" {
+					hasDefault = true
+					break
+				}
+			}
+			Expect(hasDefault).To(BeTrue(), "should include default assessment")
+		})
+
+		It("excludes default assessment when IncludeDefault is false", func() {
+			filter := service.NewAssessmentFilter("org1") // IncludeDefault is false by default
+			assessments, err := svc.ListAssessments(context.TODO(), filter)
+
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(2)) // Only 2 regular org1 assessments
+
+			// Verify no default assessment is included
+			for _, assessment := range assessments {
+				Expect(assessment.ID).ToNot(Equal(uuid.UUID{}), "should not include default assessment")
+				Expect(assessment.OrgID).To(Equal("org1"), "should only include org1 assessments")
 			}
 		})
 
@@ -583,6 +641,28 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(filter.NameLike).To(Equal("test"))
 			Expect(filter.Limit).To(Equal(10))
 			Expect(filter.Offset).To(Equal(5))
+		})
+
+		It("filter does not include default inventory by default", func() {
+			filter := service.NewAssessmentFilter("org1")
+			Expect(filter.IncludeDefault).To(BeFalse())
+		})
+
+		It("filter includes default inventory when WithDefaultInventory is called", func() {
+			filter := service.NewAssessmentFilter("org1").WithDefaultInventory()
+			Expect(filter.IncludeDefault).To(BeTrue())
+		})
+
+		It("chains WithDefaultInventory with other methods", func() {
+			filter := service.NewAssessmentFilter("org1").
+				WithSource(service.SourceTypeInventory).
+				WithDefaultInventory().
+				WithNameLike("test")
+
+			Expect(filter.OrgID).To(Equal("org1"))
+			Expect(filter.Source).To(Equal(service.SourceTypeInventory))
+			Expect(filter.IncludeDefault).To(BeTrue())
+			Expect(filter.NameLike).To(Equal("test"))
 		})
 	})
 

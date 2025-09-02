@@ -11,7 +11,6 @@ import (
 	"text/tabwriter"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"github.com/spf13/cobra"
@@ -108,8 +107,7 @@ func (o *GetOptions) Run(ctx context.Context, args []string) error { // nolint: 
 	case kind == SourceKind && id != nil:
 		response, err = c.GetSourceWithResponse(ctx, *id)
 	case kind == SourceKind && id == nil:
-		params := v1alpha1.ListSourcesParams{}
-		response, err = c.ListSourcesWithResponse(ctx, &params)
+		response, err = c.ListSourcesWithResponse(ctx)
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", kind)
 	}

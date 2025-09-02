@@ -40,11 +40,6 @@ func (s *ServiceHandler) ListSources(ctx context.Context, request apiServer.List
 
 	filter := service.NewSourceFilter(service.WithOrgID(user.Organization))
 
-	includeDefault := request.Params.IncludeDefault
-	if includeDefault != nil && *includeDefault {
-		filter = filter.WithOption(service.WithDefaultInventory())
-	}
-
 	sources, err := s.sourceSrv.ListSources(ctx, filter)
 	if err != nil {
 		return server.ListSources500JSONResponse{}, nil
