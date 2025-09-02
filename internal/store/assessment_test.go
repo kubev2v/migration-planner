@@ -5,13 +5,14 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"gorm.io/gorm"
+
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"gorm.io/gorm"
 )
 
 const (
@@ -40,7 +41,8 @@ var _ = Describe("assessment store", Ordered, func() {
 	})
 
 	Context("list", func() {
-		It("successfully list all assessments", func() {
+		It("successfully list all assessments -- with default assessment", func() {
+			_ = s.Seed()
 			assessmentID1 := uuid.New()
 			assessmentID2 := uuid.New()
 
@@ -50,6 +52,20 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(3))
+		})
+
+		It("successfully list all assessments -- without default assessment", func() {
+			assessmentID1 := uuid.New()
+			assessmentID2 := uuid.New()
+
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "inventory", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "rvtools", "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithDefaultInventory(false))
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 		})
