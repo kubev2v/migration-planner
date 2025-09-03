@@ -22,6 +22,8 @@
 
 set -euo pipefail
 
+echo "📤 Starting Slack notification..." >&2
+
 # Check required arguments
 if [ $# -ne 2 ]; then
   echo "Usage: $0 \"message_type_part\" \"change_details\"" >&2
@@ -169,4 +171,4 @@ else
   fi
 fi
 
-echo "Slack notification completed."
+echo "✅ Slack notification completed successfully" >&2

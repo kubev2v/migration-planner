@@ -18,6 +18,8 @@
 
 set -euo pipefail
 
+echo "🔄 Starting Slack message generation with JIRA integration..." >&2
+
 # Check if we have bash 4.0+ for associative arrays
 if [ "${BASH_VERSION%%.*}" -lt 4 ]; then
   echo "Error: This script requires Bash 4.0 or later for associative arrays." >&2
@@ -82,7 +84,17 @@ is_bot_user() {
   return 1 # not a bot
 }
 
+COMMIT_COUNT=0
 while IFS=$'\n' read -r line; do
+  COMMIT_COUNT=$((COMMIT_COUNT + 1))
+  if [ $COMMIT_COUNT -eq 1 ]; then
+    echo "📥 Processing commits:" >&2
+  fi
+  if [ $COMMIT_COUNT -le 5 ]; then
+    echo "$line" >&2
+  elif [ $COMMIT_COUNT -eq 6 ]; then
+    echo "... (showing first 5 commits)" >&2
+  fi
   AUTHOR=$(echo "$line" | cut -d'|' -f1 | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
   COMMIT_SUBJECT=$(echo "$line" | cut -d'|' -f2- | sed 's/^[[:space:]]*//')
 
@@ -90,7 +102,7 @@ while IFS=$'\n' read -r line; do
     FORMATTED_COMMIT="• $COMMIT_SUBJECT"
     COMMITS_BY_TYPE[bot]+="$FORMATTED_COMMIT"$'\n'
   else
-    JIRA_TICKET=$(echo "$COMMIT_SUBJECT" | grep -o -E '^\w+-\d+' || echo "NO-JIRA")
+    JIRA_TICKET=$(echo "$COMMIT_SUBJECT" | grep -o -E '^[A-Z]+-[0-9]+' || echo "NO-JIRA")
     
     # Extract commit type - look for pattern "type:" in commit message
     if echo "$COMMIT_SUBJECT" | grep -q -iE '(feat|fix|docs|style|refactor|perf|test|build|ci):'; then
@@ -134,6 +146,9 @@ while IFS=$'\n' read -r line; do
   fi
 done
 
+echo "📊 Processed $COMMIT_COUNT commits total" >&2
+echo "" >&2
+
 # Second pass: Process all collected JIRA tickets
 for JIRA_TICKET in "${!JIRA_TICKETS_SEEN[@]}"; do
   COMMIT_TYPE=${JIRA_TICKET_TYPES[$JIRA_TICKET]}
@@ -142,9 +157,19 @@ for JIRA_TICKET in "${!JIRA_TICKETS_SEEN[@]}"; do
   # Try to fetch JIRA ticket title if API is available
   JIRA_TITLE=""
   if [ -n "${JIRA_BASE_URL:-}" ] && [ -n "${JIRA_API_TOKEN:-}" ]; then
-    JIRA_TITLE=$(curl -s -H "Authorization: Bearer $JIRA_API_TOKEN" \
-      "$JIRA_BASE_URL/rest/api/2/issue/$JIRA_TICKET" | \
-      jq -r '.fields.summary // empty' 2>/dev/null || echo "")
+    # Make the API call
+    JIRA_RESPONSE=$(curl -s -w "\nHTTP_CODE:%{http_code}" \
+      -H "Authorization: Bearer $JIRA_API_TOKEN" \
+      "$JIRA_BASE_URL/rest/api/2/issue/$JIRA_TICKET" 2>&1)
+    
+    HTTP_CODE=$(echo "$JIRA_RESPONSE" | grep "HTTP_CODE:" | cut -d: -f2)
+    JIRA_JSON=$(echo "$JIRA_RESPONSE" | sed '/HTTP_CODE:/d')
+    
+    if [ "$HTTP_CODE" = "200" ]; then
+      JIRA_TITLE=$(echo "$JIRA_JSON" | jq -r '.fields.summary // empty' 2>/dev/null || echo "")
+    else
+      echo "⚠ JIRA API failed for $JIRA_TICKET (HTTP $HTTP_CODE)" >&2
+    fi
   fi
   
   # Use JIRA title if available, otherwise use commit message
@@ -182,4 +207,5 @@ MESSAGE_TEXT=""
 [ ! -z "${COMMITS_BY_TYPE[misc]}" ] && MESSAGE_TEXT+=$'\n'":file_folder: *Other Changes*"$'\n'"${COMMITS_BY_TYPE[misc]}"$'\n'
 [ ! -z "${COMMITS_BY_TYPE[bot]}" ] && MESSAGE_TEXT+=$'\n'":robot_face: *Bot Commits*"$'\n'"${COMMITS_BY_TYPE[bot]}"$'\n'
 
+echo "✅ Slack message generation completed successfully" >&2
 jq -n --arg msg "$MESSAGE_TEXT" '{"text": $msg}'
