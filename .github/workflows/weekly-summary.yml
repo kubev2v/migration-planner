@@ -45,7 +45,14 @@ jobs:
           else
             # Generate detailed changes message
             DETAILS_PAYLOAD=$(echo "$COMMITS" | ./ci/create-slack-message.sh)
-            CHANGE_DETAILS=$(echo "$DETAILS_PAYLOAD" | jq -r '.text')
+            
+            # Parse JSON to get the text content
+            if [ -n "$DETAILS_PAYLOAD" ] && CHANGE_DETAILS=$(echo "$DETAILS_PAYLOAD" | jq -r '.text' 2>/dev/null); then
+              echo "Successfully generated weekly summary with JIRA integration"
+            else
+              echo "WARNING: Could not parse JSON output, using fallback"
+              CHANGE_DETAILS="Unable to parse commit details"
+            fi
           fi
 
           # Use the new send-slack-message script
