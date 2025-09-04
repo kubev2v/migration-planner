@@ -112,7 +112,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			includeDefault := true
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{
 				Params: v1alpha1.ListAssessmentsParams{
 					IncludeDefault: &includeDefault,
