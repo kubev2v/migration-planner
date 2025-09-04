@@ -140,7 +140,6 @@ type AssessmentCreateForm struct {
 	ID          uuid.UUID
 	Name        string
 	OrgID       string
-	Username    string
 	Source      string
 	SourceID    *uuid.UUID
 	Inventory   v1alpha1.Inventory
@@ -152,7 +151,6 @@ func (f *AssessmentCreateForm) ToModel() model.Assessment {
 		ID:         f.ID,
 		Name:       f.Name,
 		OrgID:      f.OrgID,
-		Username:   f.Username,
 		SourceType: f.Source,
 		SourceID:   f.SourceID,
 	}
