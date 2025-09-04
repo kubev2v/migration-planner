@@ -14,6 +14,13 @@ paths:
         - source
       description: List sources
       operationId: listSources
+      parameters:
+        - name: include_default
+          in: query
+          description: control whatever the default report should be added to the result
+          required: false
+          schema:
+            type: boolean
       responses:
         "200":
           description: OK
@@ -446,13 +453,6 @@ paths:
         - assessment
       description: List assessments
       operationId: listAssessments
-      parameters:
-        - name: include_default
-          in: query
-          description: control whatever the default report should be added to the result
-          required: false
-          schema:
-            type: boolean
       responses:
         "200":
           description: OK

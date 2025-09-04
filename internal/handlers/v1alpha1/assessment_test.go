@@ -99,32 +99,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(assessmentList).To(HaveLen(0))
 		})
 
-		It("returns default assessment when include_default=true and no regular assessments exist", func() {
-			// Seed the database to create default assessment
-			err := s.Seed()
-			Expect(err).To(BeNil())
-
-			user := auth.User{
-				Username:     "empty",
-				Organization: "empty",
-				EmailDomain:  "empty.example.com",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			includeDefault := true
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s))
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{
-				Params: v1alpha1.ListAssessmentsParams{
-					IncludeDefault: &includeDefault,
-				},
-			})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
-
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			Expect(assessmentList).To(HaveLen(1)) // Only default assessment
-		})
-
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")

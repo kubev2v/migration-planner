@@ -22,7 +22,7 @@ import (
 type ServerInterface interface {
 
 	// (GET /api/v1/assessments)
-	ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams)
+	ListAssessments(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/assessments)
 	CreateAssessment(w http.ResponseWriter, r *http.Request)
@@ -43,7 +43,7 @@ type ServerInterface interface {
 	DeleteSources(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/sources)
-	ListSources(w http.ResponseWriter, r *http.Request)
+	ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams)
 
 	// (POST /api/v1/sources)
 	CreateSource(w http.ResponseWriter, r *http.Request)
@@ -78,7 +78,7 @@ type ServerInterface interface {
 type Unimplemented struct{}
 
 // (GET /api/v1/assessments)
-func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams) {
+func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -113,7 +113,7 @@ func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
 }
 
 // (GET /api/v1/sources)
-func (_ Unimplemented) ListSources(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -175,21 +175,8 @@ type MiddlewareFunc func(http.Handler) http.Handler
 func (siw *ServerInterfaceWrapper) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAssessmentsParams
-
-	// ------------- Optional query parameter "include_default" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "include_default", r.URL.Query(), &params.IncludeDefault)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_default", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAssessments(w, r, params)
+		siw.Handler.ListAssessments(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -326,8 +313,21 @@ func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.
 func (siw *ServerInterfaceWrapper) ListSources(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSourcesParams
+
+	// ------------- Optional query parameter "include_default" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "include_default", r.URL.Query(), &params.IncludeDefault)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "include_default", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListSources(w, r)
+		siw.Handler.ListSources(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -718,7 +718,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ListAssessmentsRequestObject struct {
-	Params ListAssessmentsParams
 }
 
 type ListAssessmentsResponseObject interface {
@@ -1044,6 +1043,7 @@ func (response DeleteSources500JSONResponse) VisitDeleteSourcesResponse(w http.R
 }
 
 type ListSourcesRequestObject struct {
+	Params ListSourcesParams
 }
 
 type ListSourcesResponseObject interface {
@@ -1636,10 +1636,8 @@ type strictHandler struct {
 }
 
 // ListAssessments operation middleware
-func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams) {
+func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	var request ListAssessmentsRequestObject
-
-	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAssessments(ctx, request.(ListAssessmentsRequestObject))
@@ -1837,8 +1835,10 @@ func (sh *strictHandler) DeleteSources(w http.ResponseWriter, r *http.Request) {
 }
 
 // ListSources operation middleware
-func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListSources(w http.ResponseWriter, r *http.Request, params ListSourcesParams) {
 	var request ListSourcesRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListSources(ctx, request.(ListSourcesRequestObject))

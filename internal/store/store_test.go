@@ -92,7 +92,7 @@ var _ = Describe("Store", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			count := 0
-			err = gormDB.Raw("SELECT COUNT(*) from assessments;").Scan(&count).Error
+			err = gormDB.Raw("SELECT COUNT(*) from sources;").Scan(&count).Error
 			Expect(err).To(BeNil())
 			Expect(count).To(Equal(1))
 		})
