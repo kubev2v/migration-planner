@@ -45,13 +45,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
 		}
 
-		createForm = mappers.AssessmentFormToCreateForm(form, user)
+		createForm = mappers.AssessmentFormToCreateForm(form, user.Organization)
 	}
 
 	// Handle multipart content type (RVTools upload)
 	if request.MultipartBody != nil {
 		var err error
-		createForm, err = mappers.AssessmentCreateFormFromMultipart(request.MultipartBody, user)
+		createForm, err = mappers.AssessmentCreateFormFromMultipart(request.MultipartBody, user.Organization)
 		if err != nil {
 			return server.CreateAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err)}, nil
 		}
