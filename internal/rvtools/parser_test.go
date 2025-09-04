@@ -369,14 +369,16 @@ var _ = Describe("Parser", func() {
 				// Create a properly initialized OPA validator with a simple test policy
 				testPolicy := `package io.konveyor.forklift.vmware
 
-concerns[flag] {
-    input.name == "test-vm"
-    flag := {
-        "id": "test.concern",
-        "category": "Warning", 
-        "label": "Test concern",
-        "assessment": "This is a test VM with a concern."
-    }
+import rego.v1
+
+concerns contains flag if {
+	input.name == "test-vm"
+	flag := {
+		"id": "test.concern",
+		"category": "Warning",
+		"label": "Test concern",
+		"assessment": "This is a test VM with a concern.",
+	}
 }`
 				policies := map[string]string{
 					"test.rego": testPolicy,
@@ -949,7 +951,9 @@ invalid syntax here`
 
 			testPolicy := `package io.konveyor.forklift.vmware
 			
-			concerns[flag] {
+			import rego.v1
+
+			concerns contains flag if {
 				false  # No concerns for this test
 				flag := {}
 			}`

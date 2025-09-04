@@ -55,11 +55,8 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	if len(vms) > 0 && opaValidator != nil {
 		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
-		validatedVms, err := opaValidator.ValidateVMs(ctx, vms)
-		if err != nil {
-			zap.S().Named("rvtools").Warnf("OPA validation failed, continuing without validation: %v", err)
-		} else {
-			vms = validatedVms
+		if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
+			zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
 		}
 	}
 
