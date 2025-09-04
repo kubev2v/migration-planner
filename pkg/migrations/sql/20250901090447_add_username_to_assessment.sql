@@ -1,6 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
-ALTER TABLE assessments ADD COLUMN username VARCHAR(255) NOT NULL;
+ALTER TABLE assessments ADD COLUMN username VARCHAR(255);
 -- +goose StatementEnd
 
 -- +goose Down
