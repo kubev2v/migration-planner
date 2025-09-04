@@ -12,22 +12,22 @@ var TestOptions = struct {
 }{}
 
 const (
-	DefaultOrganization string = "admin"
-	DefaultUsername     string = "admin"
-	DefaultEmailDomain  string = "example.com"
-	VmName              string = "coreos-vm"
-	Vsphere1Port        string = "8989"
-	Vsphere2Port        string = "8990"
+	DefaultOrganization = "admin"
+	DefaultUsername     = "admin"
+	DefaultEmailDomain  = "example.com"
+	VmName              = "coreos-vm"
+	Vsphere1Port        = "8989"
+	Vsphere2Port        = "8990"
 )
 
 var (
-	DefaultAgentTestID string = "1"
-	DefaultBasePath    string = "/tmp/untarova/"
-	DefaultVmdkName    string = filepath.Join(DefaultBasePath, "persistence-disk.vmdk")
-	DefaultOvaPath     string = filepath.Join(Home, "myimage.ova")
-	DefaultServiceUrl  string = fmt.Sprintf("http://%s:7443/api/migration-assessment", SystemIP)
-	Home               string = os.Getenv("HOME")
-	PrivateKeyPath     string = filepath.Join(os.Getenv("E2E_PRIVATE_KEY_FOLDER_PATH"), "private-key")
-	SystemIP           string = os.Getenv("PLANNER_IP")
-	TestsExecutionTime        = make(map[string]time.Duration)
+	DefaultAgentTestID = "1"
+	DefaultBasePath    = "/tmp/untarova/"
+	DefaultVmdkName    = filepath.Join(DefaultBasePath, "persistence-disk.vmdk")
+	DefaultOvaPath     = filepath.Join(Home, "myimage.ova")
+	DefaultServiceUrl  = fmt.Sprintf("http://%s:7443/api/migration-assessment", SystemIP)
+	Home               = os.Getenv("HOME")
+	PrivateKeyPath     = filepath.Join(os.Getenv("E2E_PRIVATE_KEY_FOLDER_PATH"), "private-key")
+	SystemIP           = os.Getenv("PLANNER_IP")
+	TestsExecutionTime = make(map[string]time.Duration)
 )

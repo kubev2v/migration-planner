@@ -1,4 +1,4 @@
-package e2e_agent
+package agent
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"time"
 
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"github.com/libvirt/libvirt-go"
 	"go.uber.org/zap"
 )
