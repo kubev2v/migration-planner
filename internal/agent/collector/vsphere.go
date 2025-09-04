@@ -177,7 +177,7 @@ func (c *Collector) run(ctx context.Context) {
 
 	zap.S().Named("collector").Infof("Run the validation of VMs")
 	if err := c.validateVMs(ctx, vms); err != nil {
-		zap.S().Named("collector").Errorf("failed to validate VMs: %v", err)
+		zap.S().Named("collector").Warnf("At least one error during VMs validation: %v", err)
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
@@ -197,14 +197,7 @@ func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) err
 		return fmt.Errorf("failed to initialize OPA validator from %s: %w", c.opaPoliciesDir, err)
 	}
 
-	validatedVMs, err := opaValidator.ValidateVMs(ctx, *vms)
-	if err != nil {
-		return fmt.Errorf("failed to validate VMs: %w", err)
-	}
-
-	*vms = validatedVMs
-
-	return nil
+	return opaValidator.ValidateVMs(ctx, vms)
 }
 
 func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
@@ -264,10 +257,9 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
 
 		guestName := vmGuestName(vm)
-
 		osInfoMap := *inv.Vms.OsInfo
 		osInfo, found := osInfoMap[guestName]
-		if !found {
+		if !found || osInfo.Supported {
 			osInfo.Supported = isOsSupported(vm.Concerns)
 		}
 		osInfo.Count++

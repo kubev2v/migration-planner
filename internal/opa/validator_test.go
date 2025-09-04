@@ -11,26 +11,27 @@ import (
 )
 
 const testPolicy = `package io.konveyor.forklift.vmware
-import future.keywords.in
 
-concerns[flag] {
-    input.name == "test-vm-with-concern"
-    flag := {
-        "id": "test.simple.concern",
-        "category": "Warning", 
-        "label": "Test VM detected",
-        "assessment": "This is a test concern."
-    }
+import rego.v1
+
+concerns contains flag if {
+	input.name == "test-vm-with-concern"
+	flag := {
+		"id": "test.simple.concern",
+		"category": "Warning",
+		"label": "Test VM detected",
+		"assessment": "This is a test concern.",
+	}
 }
 
-concerns[flag] {
-    input.guestId == "rhel6guest"
-    flag := {
-        "id":         "test.simple.concern",
-        "category":   "Warning",
-        "label":      "Test VM detected",
-        "assessment": "This is a test concern."
-    }
+concerns contains flag if {
+	input.guestId == "rhel6guest"
+	flag := {
+		"id": "test.simple.concern",
+		"category": "Warning",
+		"label": "Test VM detected",
+		"assessment": "This is a test concern.",
+	}
 }
 `
 
@@ -172,17 +173,16 @@ func TestValidator_ValidateVMS(t *testing.T) {
 		GuestID: "rhel6guest",
 	})
 
-	validatedVMs, err := validator.ValidateVMs(context.Background(), vms)
-	if err != nil {
+	if err := validator.ValidateVMs(context.Background(), &vms); err != nil {
 		t.Fatalf("concerns() failed: %v", err)
 	}
 
-	if len(validatedVMs) != 1 {
-		t.Errorf("Expected 1 vm, got %d", len(validatedVMs))
+	if len(vms) != 1 {
+		t.Errorf("Expected 1 vm, got %d", len(vms))
 	}
 
-	if len(validatedVMs[0].Concerns) != 1 {
-		t.Errorf("Expected 1 concern, got %d", len(validatedVMs[0].Concerns))
+	if len(vms[0].Concerns) != 1 {
+		t.Errorf("Expected 1 concern, got %d", len(vms[0].Concerns))
 	}
 }
 
