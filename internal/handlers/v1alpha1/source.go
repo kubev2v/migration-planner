@@ -268,6 +268,32 @@ func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServe
 	return server.UploadRvtoolsFile200JSONResponse{}, nil
 }
 
+// (GET /api/v1/sources/{id}/agent-token)
+func (s *ServiceHandler) GetAgentJwt(ctx context.Context, request apiServer.GetAgentJwtRequestObject) (apiServer.GetAgentJwtResponseObject, error) {
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.GetAgentJwt404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.GetAgentJwt500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to get agent token for source %s by user with org_id %s", request.Id, user.Organization)
+		return server.GetAgentJwt403JSONResponse{Message: message}, nil
+	}
+
+	agentToken, err := s.sourceSrv.GetAgentJwt(ctx, source)
+	if err != nil {
+		return server.GetAgentJwt500JSONResponse{Message: err.Error()}, nil
+	}
+
+	return server.GetAgentJwt200JSONResponse(v1alpha1.AgentToken{Token: agentToken}), nil
+}
+
 // (GET /health)
 func (s *ServiceHandler) Health(ctx context.Context, request apiServer.HealthRequestObject) (apiServer.HealthResponseObject, error) {
 	return apiServer.Health200Response{}, nil

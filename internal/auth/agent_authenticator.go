@@ -17,11 +17,15 @@ import (
 )
 
 const (
-	defaultExpirationPeriod = 3 * 30 * 24 // 3 months
+	defaultExpirationPeriod = 3 * 30 * 24 * time.Hour // 3 months
 	AgentTokenHeader        = "X-Agent-Token"
 )
 
-func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
+type GenerateAgentJWTOptions struct {
+	ExpirationPeriod time.Duration
+}
+
+func GenerateAgentJWTAndKey(source *model.Source, options *GenerateAgentJWTOptions) (*model.Key, string, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate agent private key: %s", err)
@@ -34,7 +38,7 @@ func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
 		PrivateKey: privateKey,
 	}
 
-	token, err := GenerateAgentJWT(key, source)
+	token, err := GenerateAgentJWT(key, source, options)
 	if err != nil {
 		return nil, "", err
 	}
@@ -42,17 +46,25 @@ func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
 	return key, token, nil
 }
 
-func GenerateAgentJWT(signingKey *model.Key, source *model.Source) (string, error) {
+func GenerateAgentJWT(signingKey *model.Key, source *model.Source, options *GenerateAgentJWTOptions) (string, error) {
 	type jwtToken struct {
 		SourceID string `json:"source_id"`
 		jwt.RegisteredClaims
+	}
+
+	expirationPeriod := defaultExpirationPeriod
+
+	if options != nil {
+		if options.ExpirationPeriod > 0 {
+			expirationPeriod = options.ExpirationPeriod
+		}
 	}
 
 	// Create claims with multiple fields populated
 	claims := jwtToken{
 		source.ID.String(),
 		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(defaultExpirationPeriod * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(expirationPeriod)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "assisted-migrations",

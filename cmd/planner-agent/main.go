@@ -34,6 +34,7 @@ type agentCmd struct {
 	config      *config.Config
 	configFile  string
 	credentials config.Credentials
+	token       string
 }
 
 func NewAgentCommand() *agentCmd {
@@ -57,6 +58,9 @@ func NewAgentCommand() *agentCmd {
 }
 
 func (a *agentCmd) bind() {
+	flag.StringVar(&a.config.SourceID, "source-id", config.DefaultSourceId, "Source ID")
+	flag.StringVar(&a.config.PlannerService.Service.Server, "server-url", config.DefaultPlannerEndpoint, "url of the server")
+	flag.StringVar(&a.token, "token", "", "JWT token for sending updates to the service")
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
 	flag.StringVar(&a.credentials.Username, "vsphere-username", "", "vSphere username for connecting to the vCenter API")
 	flag.StringVar(&a.credentials.Password, "vsphere-password", "", "vSphere password for connecting to the vCenter API")
@@ -88,17 +92,19 @@ func (a *agentCmd) Execute() error {
 		zap.S().Warnf("failed to retreive agent_id: %v", err)
 	}
 
-	// Try to read jwt from file.
+	// Try to read jwt from file if not provided via 'config.yaml' file.
 	// We're assuming the jwt is valid.
 	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
-	jwt, err := a.readFileFromVolatile(jwtFilename)
-	if err != nil {
-		zap.S().Warnf("failed to read jwt: %v", err)
+	if a.token == "" {
+		a.token, err = a.readFileFromVolatile(jwtFilename)
+		if err != nil {
+			zap.S().Warnf("failed to read jwt: %v", err)
+		}
 	}
 
 	ctx := context.WithValue(context.Background(), common.CmdCredentialsKey, a.credentials)
 
-	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
+	agentInstance := agent.New(uuid.MustParse(agentID), a.token, a.config)
 	if err := agentInstance.Run(ctx); err != nil {
 		zap.S().Fatalf("running device agent: %v", err)
 	}

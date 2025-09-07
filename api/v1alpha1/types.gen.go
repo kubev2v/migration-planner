@@ -302,6 +302,12 @@ type ValidatedSSHPublicKey = string
 // ValidatedSourceName defines model for ValidatedSourceName.
 type ValidatedSourceName = string
 
+// AgentToken defines model for agent-token.
+type AgentToken struct {
+	// Token JWT token required for sending updates to the service
+	Token string `json:"token"`
+}
+
 // OsInfo defines model for osInfo.
 type OsInfo struct {
 	Count     int  `json:"count"`

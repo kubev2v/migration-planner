@@ -108,13 +108,11 @@ func NewDefault() *Config {
 		PersistentDataDir: DefaultPersistentDataDir,
 		WwwDir:            DefaultWwwDir,
 		OpaPoliciesDir:    opaPoliciesDir,
-		SourceID:          DefaultSourceId,
 		PlannerService:    PlannerService{Config: *client.NewDefault()},
 		UpdateInterval:    util.Duration{Duration: DefaultUpdateInterval},
 		reader:            fileio.NewReader(),
 		LogLevel:          logrus.InfoLevel.String(),
 	}
-	c.PlannerService.Service.Server = DefaultPlannerEndpoint
 
 	return c
 }

@@ -57,6 +57,9 @@ type ServerInterface interface {
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (GET /api/v1/sources/{id}/agent-token)
+	GetAgentJwt(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (HEAD /api/v1/sources/{id}/image)
 	HeadImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -134,6 +137,11 @@ func (_ Unimplemented) GetSource(w http.ResponseWriter, r *http.Request, id open
 
 // (PUT /api/v1/sources/{id})
 func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/sources/{id}/agent-token)
+func (_ Unimplemented) GetAgentJwt(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -430,6 +438,32 @@ func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// GetAgentJwt operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentJwt(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentJwt(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // HeadImage operation middleware
 func (siw *ServerInterfaceWrapper) HeadImage(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -697,6 +731,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSource)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/agent-token", wrapper.GetAgentJwt)
 	})
 	r.Group(func(r chi.Router) {
 		r.Head(options.BaseURL+"/api/v1/sources/{id}/image", wrapper.HeadImage)
@@ -1308,6 +1345,59 @@ func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetAgentJwtRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAgentJwtResponseObject interface {
+	VisitGetAgentJwtResponse(w http.ResponseWriter) error
+}
+
+type GetAgentJwt200JSONResponse AgentToken
+
+func (response GetAgentJwt200JSONResponse) VisitGetAgentJwtResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentJwt401JSONResponse Error
+
+func (response GetAgentJwt401JSONResponse) VisitGetAgentJwtResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentJwt403JSONResponse Error
+
+func (response GetAgentJwt403JSONResponse) VisitGetAgentJwtResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentJwt404JSONResponse Error
+
+func (response GetAgentJwt404JSONResponse) VisitGetAgentJwtResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentJwt500JSONResponse Error
+
+func (response GetAgentJwt500JSONResponse) VisitGetAgentJwtResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type HeadImageRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
@@ -1589,6 +1679,9 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(ctx context.Context, request UpdateSourceRequestObject) (UpdateSourceResponseObject, error)
+
+	// (GET /api/v1/sources/{id}/agent-token)
+	GetAgentJwt(ctx context.Context, request GetAgentJwtRequestObject) (GetAgentJwtResponseObject, error)
 
 	// (HEAD /api/v1/sources/{id}/image)
 	HeadImage(ctx context.Context, request HeadImageRequestObject) (HeadImageResponseObject, error)
@@ -1969,6 +2062,32 @@ func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateSourceResponseObject); ok {
 		if err := validResponse.VisitUpdateSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentJwt operation middleware
+func (sh *strictHandler) GetAgentJwt(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAgentJwtRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentJwt(ctx, request.(GetAgentJwtRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentJwt")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentJwtResponseObject); ok {
+		if err := validResponse.VisitGetAgentJwtResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

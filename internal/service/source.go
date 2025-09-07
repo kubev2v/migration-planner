@@ -7,6 +7,8 @@ import (
 	"io"
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/auth"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/opa"
@@ -307,6 +309,34 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 	}
 
 	return nil
+}
+
+func (s *SourceService) GetAgentJwt(ctx context.Context, source *model.Source) (string, error) {
+	// get the key associated with source orgID to generate agent token
+	tokenExpirationPeriod := time.Hour * 24
+
+	key, err := s.store.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return "", err
+		}
+
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source, &auth.GenerateAgentJWTOptions{ExpirationPeriod: tokenExpirationPeriod})
+		if err != nil {
+			return "", err
+		}
+		if _, err := s.store.PrivateKey().Create(ctx, *newKey); err != nil {
+			return "", err
+		}
+
+		return token, nil
+	}
+
+	token, err := auth.GenerateAgentJWT(key, source, &auth.GenerateAgentJWTOptions{ExpirationPeriod: tokenExpirationPeriod})
+	if err != nil {
+		return "", err
+	}
+	return token, nil
 }
 
 type SourceFilterFunc func(s *SourceFilter)

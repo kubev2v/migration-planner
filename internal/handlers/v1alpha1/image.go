@@ -112,7 +112,7 @@ func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeIn
 		if !errors.Is(err, store.ErrRecordNotFound) {
 			return err
 		}
-		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source, nil)
 		if err != nil {
 			return err
 		}
@@ -121,7 +121,7 @@ func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeIn
 		}
 		imageBuilder.WithAgentToken(token)
 	} else {
-		token, err := auth.GenerateAgentJWT(key, source)
+		token, err := auth.GenerateAgentJWT(key, source, nil)
 		if err != nil {
 			return err
 		}
