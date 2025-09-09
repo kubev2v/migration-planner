@@ -317,8 +317,8 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
-// ListSourcesParams defines parameters for ListSources.
-type ListSourcesParams struct {
+// ListAssessmentsParams defines parameters for ListAssessments.
+type ListAssessmentsParams struct {
 	// IncludeDefault control whatever the default report should be added to the result
 	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
 }
