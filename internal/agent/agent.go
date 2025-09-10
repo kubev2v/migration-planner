@@ -30,7 +30,7 @@ const (
 	defaultAgentPort = 3333
 )
 
-// This varible is set during build time.
+// This variable is set during build time.
 // It contains the version of the code.
 // For more info take a look into Makefile.
 var (
