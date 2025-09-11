@@ -33,12 +33,12 @@ FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
 
 SOURCE_GIT_COMMIT ?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
 SOURCE_GIT_COMMIT_SHORT ?=$(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
-SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match '[0-9]*\.[0-9]*\.[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT_SHORT)')
+SOURCE_GIT_TAG ?=$(shell git describe --always --tags --abbrev=7 --match '[0-9]*\.[0-9]*\.[0-9]*' --match 'v[0-9]*\.[0-9]*\.[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT_SHORT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
 BIN_TIMESTAMP ?=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
-MAJOR := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$1}')
-MINOR := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$2}')
-PATCH := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$3}')
+MAJOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$1}')
+MINOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$2}')
+PATCH := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$3}')
 
 GO_LD_FLAGS := -ldflags "\
 	-X github.com/kubev2v/migration-planner/pkg/version.majorFromGit=$(MAJOR) \
