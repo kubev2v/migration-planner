@@ -428,8 +428,8 @@ github.com/openshift/api v0.0.0-20250913232110-61248d910ff7 h1:/eH2atonY3tAbCCvY
 github.com/openshift/api v0.0.0-20250913232110-61248d910ff7/go.mod h1:SPLf21TYPipzCO67BURkCfK6dcIIxx0oNRVWaOyRcXM=
 github.com/openshift/assisted-image-service v0.0.0-20250818171248-81f77275e72c h1:962gBRYE0YDAKKg267M97QfeTCNZyej4YMNAfqEY51M=
 github.com/openshift/assisted-image-service v0.0.0-20250818171248-81f77275e72c/go.mod h1:WGdSeSnK0voEWWwA4ar5eApNjGBLmGTpFurEKw/FXJc=
-github.com/openshift/client-go v0.0.0-20250811163556-6193816ae379 h1:Xr47DBqFVjpLdU4BTtCS5l2XojbRYap2FIPdSj8YYzU=
-github.com/openshift/client-go v0.0.0-20250811163556-6193816ae379/go.mod h1:HouQRy4JgvTBpxcyw1YSD/Lp+wjOaUrxjWFHlMtZsk8=
+github.com/openshift/client-go v0.0.0-20250911202206-1bc0cb0da03b h1:VQpSjWE8jmsPj+EXB+XABTLmDgg9xtT8/fudB/31/aI=
+github.com/openshift/client-go v0.0.0-20250911202206-1bc0cb0da03b/go.mod h1:w7sV33ASK/HcuEb0Ll9qvChZdJwNwqo8GocVAnd7fVY=
 github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=
 github.com/openshift/custom-resource-status v1.1.2/go.mod h1:DB/Mf2oTeiAmVVX1gN+NEqweonAPY0TKUwADizj8+ZA=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
