@@ -798,6 +798,9 @@ components:
         message:
           type: string
           description: Error message
+        requestId:
+          type: string
+          description: Id of the request generating the error
       required:
         - message
 
