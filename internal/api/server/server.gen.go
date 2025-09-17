@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -19,6 +20,24 @@ import (
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /api/v1/assessments)
+	ListAssessments(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v1/assessments)
+	CreateAssessment(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/v1/assessments/{id})
+	DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/assessments/{id})
+	GetAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v1/assessments/{id})
+	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/info)
+	GetInfo(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
@@ -44,6 +63,9 @@ type ServerInterface interface {
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (PUT /api/v1/sources/{id}/inventory)
+	UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -54,6 +76,36 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (GET /api/v1/assessments)
+func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments)
+func (_ Unimplemented) CreateAssessment(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/assessments/{id})
+func (_ Unimplemented) DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/assessments/{id})
+func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/assessments/{id})
+func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/info)
+func (_ Unimplemented) GetInfo(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (DELETE /api/v1/sources)
 func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +147,11 @@ func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (PUT /api/v1/sources/{id}/inventory)
+func (_ Unimplemented) UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (PUT /api/v1/sources/{id}/rvtools)
 func (_ Unimplemented) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -113,6 +170,129 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAssessments operation middleware
+func (siw *ServerInterfaceWrapper) ListAssessments(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAssessments(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateAssessment operation middleware
+func (siw *ServerInterfaceWrapper) CreateAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAssessment(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteAssessment operation middleware
+func (siw *ServerInterfaceWrapper) DeleteAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAssessment operation middleware
+func (siw *ServerInterfaceWrapper) GetAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdateAssessment operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetInfo operation middleware
+func (siw *ServerInterfaceWrapper) GetInfo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInfo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // DeleteSources operation middleware
 func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.Request) {
@@ -302,6 +482,32 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// UpdateInventory operation middleware
+func (siw *ServerInterfaceWrapper) UpdateInventory(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateInventory(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // UploadRvtoolsFile operation middleware
 func (siw *ServerInterfaceWrapper) UploadRvtoolsFile(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -457,6 +663,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/assessments", wrapper.ListAssessments)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments", wrapper.CreateAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/assessments/{id}", wrapper.DeleteAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/assessments/{id}", wrapper.GetAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
 	})
 	r.Group(func(r chi.Router) {
@@ -481,6 +705,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/v1/sources/{id}/image-url", wrapper.GetSourceDownloadURL)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory", wrapper.UpdateInventory)
+	})
+	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/rvtools", wrapper.UploadRvtoolsFile)
 	})
 	r.Group(func(r chi.Router) {
@@ -488,6 +715,297 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 
 	return r
+}
+
+type ListAssessmentsRequestObject struct {
+}
+
+type ListAssessmentsResponseObject interface {
+	VisitListAssessmentsResponse(w http.ResponseWriter) error
+}
+
+type ListAssessments200JSONResponse AssessmentList
+
+func (response ListAssessments200JSONResponse) VisitListAssessmentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessments401JSONResponse Error
+
+func (response ListAssessments401JSONResponse) VisitListAssessmentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessments500JSONResponse Error
+
+func (response ListAssessments500JSONResponse) VisitListAssessmentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessmentRequestObject struct {
+	JSONBody      *CreateAssessmentJSONRequestBody
+	MultipartBody *multipart.Reader
+}
+
+type CreateAssessmentResponseObject interface {
+	VisitCreateAssessmentResponse(w http.ResponseWriter) error
+}
+
+type CreateAssessment201JSONResponse Assessment
+
+func (response CreateAssessment201JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessment400JSONResponse Error
+
+func (response CreateAssessment400JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessment401JSONResponse Error
+
+func (response CreateAssessment401JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessment500JSONResponse Error
+
+func (response CreateAssessment500JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessmentRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type DeleteAssessmentResponseObject interface {
+	VisitDeleteAssessmentResponse(w http.ResponseWriter) error
+}
+
+type DeleteAssessment200JSONResponse Assessment
+
+func (response DeleteAssessment200JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessment400JSONResponse Error
+
+func (response DeleteAssessment400JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessment401JSONResponse Error
+
+func (response DeleteAssessment401JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessment403JSONResponse Error
+
+func (response DeleteAssessment403JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessment404JSONResponse Error
+
+func (response DeleteAssessment404JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteAssessment500JSONResponse Error
+
+func (response DeleteAssessment500JSONResponse) VisitDeleteAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAssessmentResponseObject interface {
+	VisitGetAssessmentResponse(w http.ResponseWriter) error
+}
+
+type GetAssessment200JSONResponse Assessment
+
+func (response GetAssessment200JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessment400JSONResponse Error
+
+func (response GetAssessment400JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessment401JSONResponse Error
+
+func (response GetAssessment401JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessment403JSONResponse Error
+
+func (response GetAssessment403JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessment404JSONResponse Error
+
+func (response GetAssessment404JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessment500JSONResponse Error
+
+func (response GetAssessment500JSONResponse) VisitGetAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateAssessmentJSONRequestBody
+}
+
+type UpdateAssessmentResponseObject interface {
+	VisitUpdateAssessmentResponse(w http.ResponseWriter) error
+}
+
+type UpdateAssessment200JSONResponse Assessment
+
+func (response UpdateAssessment200JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment400JSONResponse Error
+
+func (response UpdateAssessment400JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment401JSONResponse Error
+
+func (response UpdateAssessment401JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment403JSONResponse Error
+
+func (response UpdateAssessment403JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment404JSONResponse Error
+
+func (response UpdateAssessment404JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessment500JSONResponse Error
+
+func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetInfoRequestObject struct {
+}
+
+type GetInfoResponseObject interface {
+	VisitGetInfoResponse(w http.ResponseWriter) error
+}
+
+type GetInfo200JSONResponse Info
+
+func (response GetInfo200JSONResponse) VisitGetInfoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetInfo500JSONResponse Error
+
+func (response GetInfo500JSONResponse) VisitGetInfoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type DeleteSourcesRequestObject struct {
@@ -890,6 +1408,69 @@ func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateInventoryRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateInventoryJSONRequestBody
+}
+
+type UpdateInventoryResponseObject interface {
+	VisitUpdateInventoryResponse(w http.ResponseWriter) error
+}
+
+type UpdateInventory200JSONResponse Source
+
+func (response UpdateInventory200JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateInventory400JSONResponse Error
+
+func (response UpdateInventory400JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateInventory401JSONResponse Error
+
+func (response UpdateInventory401JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateInventory403JSONResponse Error
+
+func (response UpdateInventory403JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateInventory404JSONResponse Error
+
+func (response UpdateInventory404JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateInventory500JSONResponse Error
+
+func (response UpdateInventory500JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UploadRvtoolsFileRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *multipart.Reader
@@ -973,6 +1554,24 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (GET /api/v1/assessments)
+	ListAssessments(ctx context.Context, request ListAssessmentsRequestObject) (ListAssessmentsResponseObject, error)
+
+	// (POST /api/v1/assessments)
+	CreateAssessment(ctx context.Context, request CreateAssessmentRequestObject) (CreateAssessmentResponseObject, error)
+
+	// (DELETE /api/v1/assessments/{id})
+	DeleteAssessment(ctx context.Context, request DeleteAssessmentRequestObject) (DeleteAssessmentResponseObject, error)
+
+	// (GET /api/v1/assessments/{id})
+	GetAssessment(ctx context.Context, request GetAssessmentRequestObject) (GetAssessmentResponseObject, error)
+
+	// (PUT /api/v1/assessments/{id})
+	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
+
+	// (GET /api/v1/info)
+	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
+
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
 
@@ -996,6 +1595,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/sources/{id}/image-url)
 	GetSourceDownloadURL(ctx context.Context, request GetSourceDownloadURLRequestObject) (GetSourceDownloadURLResponseObject, error)
+
+	// (PUT /api/v1/sources/{id}/inventory)
+	UpdateInventory(ctx context.Context, request UpdateInventoryRequestObject) (UpdateInventoryResponseObject, error)
 
 	// (PUT /api/v1/sources/{id}/rvtools)
 	UploadRvtoolsFile(ctx context.Context, request UploadRvtoolsFileRequestObject) (UploadRvtoolsFileResponseObject, error)
@@ -1031,6 +1633,181 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAssessments operation middleware
+func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request) {
+	var request ListAssessmentsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAssessments(ctx, request.(ListAssessmentsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAssessments")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAssessmentsResponseObject); ok {
+		if err := validResponse.VisitListAssessmentsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateAssessment operation middleware
+func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request) {
+	var request CreateAssessmentRequestObject
+
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
+
+		var body CreateAssessmentJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
+	}
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAssessment(ctx, request.(CreateAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAssessmentResponseObject); ok {
+		if err := validResponse.VisitCreateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteAssessment operation middleware
+func (sh *strictHandler) DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request DeleteAssessmentRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteAssessment(ctx, request.(DeleteAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteAssessmentResponseObject); ok {
+		if err := validResponse.VisitDeleteAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAssessment operation middleware
+func (sh *strictHandler) GetAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAssessmentRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssessment(ctx, request.(GetAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssessmentResponseObject); ok {
+		if err := validResponse.VisitGetAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAssessment operation middleware
+func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateAssessmentRequestObject
+
+	request.Id = id
+
+	var body UpdateAssessmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAssessment(ctx, request.(UpdateAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
+		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetInfo operation middleware
+func (sh *strictHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
+	var request GetInfoRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetInfo(ctx, request.(GetInfoRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetInfo")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetInfoResponseObject); ok {
+		if err := validResponse.VisitGetInfoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // DeleteSources operation middleware
@@ -1244,6 +2021,39 @@ func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetSourceDownloadURLResponseObject); ok {
 		if err := validResponse.VisitGetSourceDownloadURLResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateInventory operation middleware
+func (sh *strictHandler) UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateInventoryRequestObject
+
+	request.Id = id
+
+	var body UpdateInventoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateInventory(ctx, request.(UpdateInventoryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateInventory")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateInventoryResponseObject); ok {
+		if err := validResponse.VisitUpdateInventoryResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

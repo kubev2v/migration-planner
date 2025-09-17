@@ -1,0 +1,10 @@
+staging-data/
+backups/
+*.bak
+*.log
+*.tmp
+*.local
+*.env
+*.env.*
+private-key.txt
+

@@ -5,10 +5,11 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/agent/collector"
 	"go.uber.org/zap"
 )
 
-func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
+func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.Inventory) error {
 	if len(rows) <= 1 {
 		return nil
 	}
@@ -20,6 +21,8 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 		colMap[key] = i
 	}
 
+	hostIPToObjectID := createHostIPToObjectIDMap(vHostRows)
+
 	for i := 1; i < len(rows); i++ {
 		row := rows[i]
 		if len(row) == 0 {
@@ -28,7 +31,7 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 
 		name := getColumnValue(row, colMap, "name")
 		dsType := getColumnValue(row, colMap, "type")
-		
+
 		if name == "" {
 			continue
 		}
@@ -60,6 +63,25 @@ func processDatastoreInfo(rows [][]string, inventory *api.Inventory) error {
 			datastore.FreeCapacityGB = datastore.TotalCapacityGB
 		}
 
+		hostsStr := getColumnValue(row, colMap, "hosts")
+		if hostsStr != "" {
+			hostList := strings.Split(hostsStr, ",")
+			var objectIDs []string
+			for _, host := range hostList {
+				ip := strings.TrimSpace(host)
+				if ip == "" {
+					continue
+				}
+				if objID, ok := hostIPToObjectID[ip]; ok && objID != "" {
+					objectIDs = append(objectIDs, objID)
+				}
+			}
+			if len(objectIDs) > 0 {
+				joined := strings.Join(objectIDs, ", ")
+				datastore.HostId = &joined
+			}
+		}
+
 		inventory.Infra.Datastores = append(inventory.Infra.Datastores, datastore)
 	}
 
@@ -78,10 +100,10 @@ func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.In
 
 	for i := range inventory.Infra.Datastores {
 		ds := &inventory.Infra.Datastores[i]
-		
+
 		if info, exists := multipathInfo[ds.DiskId]; exists {
 			ds.DiskId = info.NAA
-			
+
 			if info.Vendor != "" {
 				ds.Vendor = info.Vendor
 			}
@@ -135,7 +157,7 @@ func extractMultipathInfo(multipathRows [][]string) map[string]struct {
 
 		datastoreName := getColumnValue(row, colMap, "datastore")
 		naaIdentifier := getColumnValue(row, colMap, "disk")
-		vendor := getColumnValue(row, colMap, "vendor")
+		vendor := collector.TransformVendorName(getColumnValue(row, colMap, "vendor"))
 		model := getColumnValue(row, colMap, "model")
 
 		if datastoreName != "" && naaIdentifier != "" {

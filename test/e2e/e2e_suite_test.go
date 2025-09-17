@@ -2,12 +2,13 @@ package e2e_test
 
 import (
 	"fmt"
+	"testing"
+
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
-	"testing"
 )
 
 func TestE2e(t *testing.T) {

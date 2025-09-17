@@ -2,20 +2,20 @@ package rvtools
 
 import (
 	"bytes"
+	"context"
 	"fmt"
-	"net/http"
 	"slices"
-	"time"
 
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
-	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
+	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
 )
 
-func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*api.Inventory, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -27,7 +27,7 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	var vcenterUUID string
 	vInfoRows := readSheet(excelFile, sheets, "vInfo")
 	if len(vInfoRows) > 1 {
-		vcenterUUID, _ = extractVCenterUUID(vInfoRows)
+		vcenterUUID, _ = ExtractVCenterUUID(vInfoRows)
 	}
 
 	datastoreRows := readSheet(excelFile, sheets, "vDatastore")
@@ -39,7 +39,6 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	zap.S().Named("rvtools").Infof("Process VMs")
 	var vms []vsphere.VM
 	if slices.Contains(sheets, "vInfo") {
-		vInfoRows := readSheet(excelFile, sheets, "vInfo")
 		vHostRows := readSheet(excelFile, sheets, "vHost")
 		vCpuRows := readSheet(excelFile, sheets, "vCPU")
 		vMemoryRows := readSheet(excelFile, sheets, "vMemory")
@@ -54,27 +53,38 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 		}
 	}
 
-	zap.S().Named("rvtools").Infof("Validate VMs against OPA")
-	if len(vms) > 0 {
-		vms, err = validateVMsWithOPA(vms)
+	if len(vms) > 0 && opaValidator != nil {
+		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
+		validatedVms, err := opaValidator.ValidateVMs(ctx, vms)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("OPA validation failed, continuing without validation: %v", err)
+		} else {
+			vms = validatedVms
 		}
 	}
 
 	zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
 	var hostPowerStates map[string]int
+	var hosts []api.Host
 
 	hostPowerStates = map[string]int{"green": 0}
 
 	vHostRows := readSheet(excelFile, sheets, "vHost")
 	var clusterInfo ClusterInfo
 	if len(vHostRows) > 0 {
-		clusterInfo = extractClusterAndDatacenterInfo(vHostRows)
-		hostPowerStates = extractHostPowerStates(vHostRows)
+		clusterInfo = ExtractClusterAndDatacenterInfo(vHostRows)
+		hostPowerStates = ExtractHostPowerStates(vHostRows)
+
+		var err error
+		hosts, err = ExtractHostsInfo(vHostRows)
+		if err != nil {
+			zap.S().Named("rvtools").Warnf("Failed to extract host info: %v", err)
+			hosts = []api.Host{}
+		}
 	} else {
 		zap.S().Named("rvtools").Infof("vHost sheet not found, using default values")
 		clusterInfo = ClusterInfo{}
+		hosts = []api.Host{}
 	}
 
 	zap.S().Named("rvtools").Infof("Process Datastores")
@@ -82,7 +92,8 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 
 	if len(datastoreRows) > 0 {
 		tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
-		err := processDatastoreInfo(datastoreRows, tempInventory)
+		vHostRows := readSheet(excelFile, sheets, "vHost")
+		err := processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("Failed to process datastore info: %v", err)
 			datastores = []api.Datastore{}
@@ -102,21 +113,22 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	dvswitchRows := readSheet(excelFile, sheets, "dvSwitch")
 	dvportRows := readSheet(excelFile, sheets, "dvPort")
 
-	networks := extractNetworks(dvswitchRows, dvportRows)
+	networks := ExtractNetworks(dvswitchRows, dvportRows)
 
 	zap.S().Named("rvtools").Infof("Create Basic Inventory")
-	inventory := createBasicInventoryObj(
-		vcenterUUID,
-		&vms,
-		datastores,
-		networks,
-		hostPowerStates,
-		clusterInfo.HostsPerCluster,
-		clusterInfo.ClustersPerDatacenter,
-		clusterInfo.TotalHosts,
-		clusterInfo.TotalClusters,
-		clusterInfo.TotalDatacenters,
-	)
+	infraData := service.InfrastructureData{
+		Datastores:            datastores,
+		Networks:              networks,
+		HostPowerStates:       hostPowerStates,
+		Hosts:                 &hosts,
+		HostsPerCluster:       clusterInfo.HostsPerCluster,
+		ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
+		TotalHosts:            clusterInfo.TotalHosts,
+		TotalClusters:         clusterInfo.TotalClusters,
+		TotalDatacenters:      clusterInfo.TotalDatacenters,
+		VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
+	}
+	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
 	zap.S().Named("rvtools").Infof("Fill Inventory with VM Data")
 	if len(vms) > 0 {
@@ -124,46 +136,6 @@ func ParseRVTools(rvtoolsContent []byte) (*api.Inventory, error) {
 	}
 
 	return inventory, nil
-}
-
-func createBasicInventoryObj(
-	vCenterID string,
-	vms *[]vsphere.VM,
-	datastores []api.Datastore,
-	networks []api.Network,
-	hostPowerStates map[string]int,
-	hostsPerCluster []int,
-	clustersPerDatacenter []int,
-	totalHosts, totalClusters, totalDatacenters int,
-) *api.Inventory {
-	return &api.Inventory{
-		Vcenter: api.VCenter{
-			Id: vCenterID,
-		},
-		Vms: api.VMs{
-			Total:                len(*vms),
-			PowerStates:          map[string]int{},
-			Os:                   map[string]int{},
-			OsInfo:               &map[string]api.OsInfo{},
-			MigrationWarnings:    api.MigrationIssues{},
-			NotMigratableReasons: api.MigrationIssues{},
-			CpuCores:             api.VMResourceBreakdown{},
-			RamGB:                api.VMResourceBreakdown{},
-			DiskCount:            api.VMResourceBreakdown{},
-			DiskGB:               api.VMResourceBreakdown{},
-			NicCount:             &api.VMResourceBreakdown{},
-		},
-		Infra: api.Infra{
-			ClustersPerDatacenter: &clustersPerDatacenter,
-			Datastores:            datastores,
-			HostPowerStates:       hostPowerStates,
-			TotalHosts:            totalHosts,
-			TotalClusters:         totalClusters,
-			TotalDatacenters:      &totalDatacenters,
-			HostsPerCluster:       hostsPerCluster,
-			Networks:              networks,
-		},
-	}
 }
 
 type ClusterInfo struct {
@@ -174,7 +146,7 @@ type ClusterInfo struct {
 	TotalDatacenters      int
 }
 
-func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
+func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	if len(vHostRows) <= 1 {
 		return ClusterInfo{}
 	}
@@ -194,7 +166,7 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 		}
 
 		host := getColumnValue(row, colMap, "host")
-		if host == "" {
+		if !hasValue(host) {
 			continue
 		}
 
@@ -203,18 +175,19 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 
 		hosts[host] = struct{}{}
 
-		if datacenter != "" {
+		if hasValue(datacenter) {
 			datacenters[datacenter] = struct{}{}
 			ensureMapExists(datacenterToClusters, datacenter)
-
-			if cluster != "" {
-				clusters[cluster] = struct{}{}
-				datacenterToClusters[datacenter][cluster] = struct{}{}
-
-				ensureMapExists(clusterToHosts, cluster)
-				clusterToHosts[cluster][host] = struct{}{}
-			}
 		}
+
+		if hasValue(datacenter) && hasValue(cluster) {
+			clusters[cluster] = struct{}{}
+			datacenterToClusters[datacenter][cluster] = struct{}{}
+
+			ensureMapExists(clusterToHosts, cluster)
+			clusterToHosts[cluster][host] = struct{}{}
+		}
+
 	}
 
 	return ClusterInfo{
@@ -226,7 +199,50 @@ func extractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	}
 }
 
-func extractHostPowerStates(rows [][]string) map[string]int {
+func ExtractHostsInfo(vHostRows [][]string) ([]api.Host, error) {
+	if len(vHostRows) <= 1 {
+		return []api.Host{}, nil
+	}
+
+	colMap := buildColumnMap(vHostRows[0])
+
+	// Validate required columns exist
+	requiredCols := []string{"vendor", "model", "object id"}
+	for _, col := range requiredCols {
+		if _, exists := colMap[col]; !exists {
+			return nil, fmt.Errorf("missing required column: %s", col)
+		}
+	}
+
+	var hosts []api.Host
+	for _, row := range vHostRows[1:] {
+		if len(row) == 0 {
+			continue
+		}
+
+		host := api.Host{
+			Id:     stringPtrIfNotEmpty(getColumnValue(row, colMap, "object id")),
+			Vendor: getColumnValue(row, colMap, "vendor"),
+			Model:  getColumnValue(row, colMap, "model"),
+		}
+
+		host.CpuCores = parseIntPtr(getColumnValue(row, colMap, "# cores"))
+		host.CpuSockets = parseIntPtr(getColumnValue(row, colMap, "# cpu"))
+
+		if memStr := getColumnValue(row, colMap, "# memory"); memStr != "" {
+			if memMB := parseMemoryMB(memStr); memMB > 0 {
+				mem := int64(memMB)
+				host.MemoryMB = &mem
+			}
+		}
+
+		hosts = append(hosts, host)
+	}
+
+	return hosts, nil
+}
+
+func ExtractHostPowerStates(rows [][]string) map[string]int {
 	if len(rows) <= 1 {
 		return map[string]int{}
 	}
@@ -252,7 +268,28 @@ func extractHostPowerStates(rows [][]string) map[string]int {
 	return hostPowerStates
 }
 
-func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
+func ExtractVmsPerCluster(rows [][]string) []int {
+	if len(rows) <= 1 {
+		return []int{}
+	}
+
+	colMap := buildColumnMap(rows[0])
+	clusterToVMs := make(map[string]map[string]struct{})
+
+	for _, row := range rows[1:] {
+		cluster := getColumnValue(row, colMap, "cluster")
+		vm := getColumnValue(row, colMap, "vm")
+
+		if hasValue(cluster) && hasValue(vm) {
+			ensureMapExists(clusterToVMs, cluster)
+			clusterToVMs[cluster][vm] = struct{}{}
+		}
+	}
+
+	return calculateVMsPerCluster(clusterToVMs)
+}
+
+func ExtractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	networks := []api.Network{}
 
 	if len(dvswitchRows) == 0 && len(dvportRows) == 0 {
@@ -268,7 +305,7 @@ func extractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	return networks
 }
 
-func extractVCenterUUID(rows [][]string) (string, error) {
+func ExtractVCenterUUID(rows [][]string) (string, error) {
 	if len(rows) < 2 {
 		return "", fmt.Errorf("insufficient data")
 	}
@@ -283,38 +320,4 @@ func extractVCenterUUID(rows [][]string) (string, error) {
 	}
 
 	return "", fmt.Errorf("VI SDK UUID column not found")
-}
-
-func validateVMsWithOPA(vms []vsphere.VM) ([]vsphere.VM, error) {
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-
-	if !isOPAServerAlive(opaServer) {
-		return vms, fmt.Errorf("OPA server %s is not responding", opaServer)
-	}
-
-	zap.S().Named("rvtools").Infof("OPA server %s is alive, validating VMs", opaServer)
-
-	validatedVMs, err := collector.Validation(&vms, opaServer)
-	if err != nil {
-		return vms, err
-	}
-
-	return *validatedVMs, nil
-}
-
-func isOPAServerAlive(opaServer string) bool {
-	zap.S().Named("rvtools").Infof("Check if OPA server is responding")
-
-	client := &http.Client{
-		Timeout: 5 * time.Second, // 5 second timeout
-	}
-
-	resp, err := client.Get("http://" + opaServer + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("rvtools").Errorf("OPA server %s is not responding", opaServer)
-		return false
-	}
-	defer resp.Body.Close()
-	zap.S().Named("rvtools").Infof("OPA server %s is alive", opaServer)
-	return true
 }

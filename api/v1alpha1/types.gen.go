@@ -19,6 +19,13 @@ const (
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
 )
 
+// Defines values for AssessmentSourceType.
+const (
+	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
+	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
+	AssessmentSourceTypeSource    AssessmentSourceType = "source"
+)
+
 // Defines values for NetworkType.
 const (
 	Distributed NetworkType = "distributed"
@@ -48,16 +55,62 @@ type AgentProxy struct {
 	NoProxy  *string `json:"noProxy" validate:"omitnil,max=1000"`
 }
 
+// Assessment defines model for Assessment.
+type Assessment struct {
+	CreatedAt  time.Time            `json:"createdAt"`
+	Id         openapi_types.UUID   `json:"id"`
+	Name       string               `json:"name"`
+	Snapshots  []Snapshot           `json:"snapshots"`
+	SourceId   *openapi_types.UUID  `json:"sourceId,omitempty"`
+	SourceType AssessmentSourceType `json:"sourceType"`
+}
+
+// AssessmentSourceType defines model for Assessment.SourceType.
+type AssessmentSourceType string
+
+// AssessmentForm defines model for AssessmentForm.
+type AssessmentForm struct {
+	Inventory *Inventory          `json:"inventory,omitempty"`
+	Name      string              `json:"name" validate:"required,assessment_name,min=1,max=100"`
+	SourceId  *openapi_types.UUID `json:"sourceId,omitempty"`
+
+	// SourceType Source of the assessment data:
+	//  * `inventory` - Manual inventory upload via JSON
+	//  * `agent` - Collected by migration planner agent
+	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent"`
+}
+
+// AssessmentList defines model for AssessmentList.
+type AssessmentList = []Assessment
+
+// AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
+type AssessmentRvtoolsForm struct {
+	// File File upload for assessment data
+	File openapi_types.File `json:"file" validate:"required"`
+
+	// Name Name of the assessment
+	Name string `json:"name" validate:"required,assessment_name,min=1,max=100"`
+}
+
+// AssessmentUpdate Update form of the assessment.
+type AssessmentUpdate struct {
+	// Name Name of the assessment
+	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
+}
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`
 	FreeCapacityGB          int    `json:"freeCapacityGB"`
 	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
-	Model                   string `json:"model"`
-	ProtocolType            string `json:"protocolType"`
-	TotalCapacityGB         int    `json:"totalCapacityGB"`
-	Type                    string `json:"type"`
-	Vendor                  string `json:"vendor"`
+
+	// HostId Identifier of the host where this datastore is attached
+	HostId          *string `json:"hostId"`
+	Model           string  `json:"model"`
+	ProtocolType    string  `json:"protocolType"`
+	TotalCapacityGB int     `json:"totalCapacityGB"`
+	Type            string  `json:"type"`
+	Vendor          string  `json:"vendor"`
 }
 
 // Error defines model for Error.
@@ -75,8 +128,28 @@ type Histogram struct {
 
 // Host defines model for Host.
 type Host struct {
-	Model  string `json:"model"`
-	Vendor string `json:"vendor"`
+	// CpuCores Number of CPU cores
+	CpuCores *int `json:"cpuCores"`
+
+	// CpuSockets Number of CPU sockets
+	CpuSockets *int `json:"cpuSockets"`
+
+	// Id Unique identifier for this host
+	Id *string `json:"id,omitempty"`
+
+	// MemoryMB Host memory in MB
+	MemoryMB *int64 `json:"memoryMB"`
+	Model    string `json:"model"`
+	Vendor   string `json:"vendor"`
+}
+
+// Info Migration planner information
+type Info struct {
+	// GitCommit Git commit hash
+	GitCommit string `json:"gitCommit"`
+
+	// VersionName Version name, based on git tag
+	VersionName string `json:"versionName"`
 }
 
 // Infra defines model for Infra.
@@ -90,6 +163,7 @@ type Infra struct {
 	TotalClusters         int            `json:"totalClusters"`
 	TotalDatacenters      *int           `json:"totalDatacenters,omitempty"`
 	TotalHosts            int            `json:"totalHosts"`
+	VmsPerCluster         *[]int         `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.
@@ -101,8 +175,8 @@ type Inventory struct {
 
 // Label defines model for Label.
 type Label struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
+	Key   string `json:"key" validate:"required,label"`
+	Value string `json:"value" validate:"required,label"`
 }
 
 // MigrationIssue defines model for MigrationIssue.
@@ -127,6 +201,12 @@ type Network struct {
 // NetworkType defines model for Network.Type.
 type NetworkType string
 
+// Snapshot defines model for Snapshot.
+type Snapshot struct {
+	CreatedAt time.Time `json:"createdAt"`
+	Inventory Inventory `json:"inventory"`
+}
+
 // Source defines model for Source.
 type Source struct {
 	Agent      *Agent             `json:"agent,omitempty"`
@@ -141,19 +221,23 @@ type Source struct {
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
-	CertificateChain *string     `json:"certificateChain" validate:"omitnil,certs"`
-	Name             string      `json:"name" validate:"required,source_name,min=1,max=100"`
-	Proxy            *AgentProxy `json:"proxy,omitempty"`
-	SshPublicKey     *string     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
+	Labels           *[]Label                   `json:"labels,omitempty" validate:"omitempty,dive,required"`
+	Name             ValidatedSourceName        `json:"name" validate:"required,source_name,min=1,max=100"`
+	Proxy            *AgentProxy                `json:"proxy,omitempty"`
+	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 }
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
 
-// SourceUpdateOnPrem defines model for SourceUpdateOnPrem.
-type SourceUpdateOnPrem struct {
-	AgentId   openapi_types.UUID `json:"agentId"`
-	Inventory Inventory          `json:"inventory"`
+// SourceUpdate defines model for SourceUpdate.
+type SourceUpdate struct {
+	CertificateChain *ValidatedCertificateChain   `json:"certificateChain" validate:"omitnil,certs"`
+	Labels           *[]Label                     `json:"labels,omitempty" validate:"omitempty,dive,required"`
+	Name             *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name,min=1,max=100"`
+	Proxy            *AgentProxy                  `json:"proxy,omitempty"`
+	SshPublicKey     *ValidatedSSHPublicKey       `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 }
 
 // Status Status is a return value for calls that don't return other objects.
@@ -166,6 +250,12 @@ type Status struct {
 
 	// Status Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *string `json:"status,omitempty"`
+}
+
+// UpdateInventory defines model for UpdateInventory.
+type UpdateInventory struct {
+	AgentId   openapi_types.UUID `json:"agentId"`
+	Inventory Inventory          `json:"inventory"`
 }
 
 // VCenter defines model for VCenter.
@@ -200,6 +290,18 @@ type VMs struct {
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 }
 
+// ValidatedCertificateChain defines model for ValidatedCertificateChain.
+type ValidatedCertificateChain = string
+
+// ValidatedOptionalSourceName defines model for ValidatedOptionalSourceName.
+type ValidatedOptionalSourceName = string
+
+// ValidatedSSHPublicKey defines model for ValidatedSSHPublicKey.
+type ValidatedSSHPublicKey = string
+
+// ValidatedSourceName defines model for ValidatedSourceName.
+type ValidatedSourceName = string
+
 // OsInfo defines model for osInfo.
 type OsInfo struct {
 	Count     int  `json:"count"`
@@ -227,11 +329,23 @@ type UploadRvtoolsFileMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
 
+// CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
+type CreateAssessmentJSONRequestBody = AssessmentForm
+
+// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
+type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
+
+// UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
+type UpdateAssessmentJSONRequestBody = AssessmentUpdate
+
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
 // UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
-type UpdateSourceJSONRequestBody = SourceUpdateOnPrem
+type UpdateSourceJSONRequestBody = SourceUpdate
+
+// UpdateInventoryJSONRequestBody defines body for UpdateInventory for application/json ContentType.
+type UpdateInventoryJSONRequestBody = UpdateInventory
 
 // UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
 type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody

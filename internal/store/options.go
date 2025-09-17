@@ -94,3 +94,75 @@ func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter 
 	})
 	return qf
 }
+
+type AssessmentQueryFilter struct {
+	QueryFn []func(*gorm.DB) *gorm.DB
+}
+
+type AssessmentQueryOptions struct {
+	QueryFn []func(*gorm.DB) *gorm.DB
+}
+
+func NewAssessmentQueryFilter() *AssessmentQueryFilter {
+	return &AssessmentQueryFilter{}
+}
+
+func NewAssessmentQueryOptions() *AssessmentQueryOptions {
+	return &AssessmentQueryOptions{}
+}
+
+// Filter by organization ID
+func (f *AssessmentQueryFilter) WithOrgID(orgID string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("org_id = ?", orgID)
+	})
+	return f
+}
+
+// Filter by source
+func (f *AssessmentQueryFilter) WithSourceType(sourceType string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("source_type = ?", sourceType)
+	})
+	return f
+}
+
+// Filter by source ID
+func (f *AssessmentQueryFilter) WithSourceID(sourceID string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("source_id = ?", sourceID)
+	})
+	return f
+}
+
+// Filter by name pattern
+func (f *AssessmentQueryFilter) WithNameLike(pattern string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("name ILIKE ?", "%"+pattern+"%")
+	})
+	return f
+}
+
+// Limit results
+func (o *AssessmentQueryOptions) WithLimit(limit int) *AssessmentQueryOptions {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Limit(limit)
+	})
+	return o
+}
+
+// Offset results
+func (o *AssessmentQueryOptions) WithOffset(offset int) *AssessmentQueryOptions {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Offset(offset)
+	})
+	return o
+}
+
+// Order by specific field
+func (o *AssessmentQueryOptions) WithOrder(order string) *AssessmentQueryOptions {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Order(order)
+	})
+	return o
+}

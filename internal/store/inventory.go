@@ -2,6 +2,7 @@ package store
 
 import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/util"
 )
 
 func GenerateDefaultInventory() api.Inventory {
@@ -13,6 +14,7 @@ func GenerateDefaultInventory() api.Inventory {
 	vlanTrunk := "0-4094"
 	return api.Inventory{
 		Infra: api.Infra{
+			ClustersPerDatacenter: &[]int{1, 1, 1},
 			Datastores: []api.Datastore{
 				{FreeCapacityGB: 615, TotalCapacityGB: 766, Type: "VMFS", Vendor: "NETAPP", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
 				{FreeCapacityGB: 650, TotalCapacityGB: 766, Type: "VMFS", Vendor: "3PARdata", DiskId: "naa.600a098038314648593f517773636465", Model: "N/A", ProtocolType: "N/A"},
@@ -29,7 +31,16 @@ func GenerateDefaultInventory() api.Inventory {
 			HostPowerStates: map[string]int{
 				"Green": 8,
 			},
-			HostsPerCluster: []int{1, 7, 0},
+			Hosts: &[]api.Host{
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+				{Model: "ProLiant DL380 Gen10", Vendor: "HPE"},
+			},
+			HostsPerCluster: []int{1, 5, 1},
 			Networks: []api.Network{
 				{Name: dvSwitch, Type: "dvswitch"},
 				{Dvswitch: &dvSwitch, Name: "mgmt", Type: "distributed", VlanId: &vlanid100},
@@ -38,8 +49,10 @@ func GenerateDefaultInventory() api.Inventory {
 				{Dvswitch: &dvSwitch, Name: "vMotion", Type: "distributed", VlanId: &vlanid100},
 				{Dvswitch: &dvSwitch, Name: "trunk", Type: "distributed", VlanId: &vlanTrunk},
 			},
-			TotalClusters: 3,
-			TotalHosts:    8,
+			TotalClusters:    3,
+			TotalDatacenters: util.IntPtr(3),
+			TotalHosts:       7,
+			VmsPerCluster:    &[]int{60, 25, 22},
 		},
 		Vcenter: api.VCenter{
 			Id: "00000000-0000-0000-0000-000000000000",
@@ -107,6 +120,30 @@ func GenerateDefaultInventory() api.Inventory {
 				"Rocky Linux (64-bit)":                   1,
 				"Ubuntu Linux (64-bit)":                  3,
 				"VMware ESXi 8.0 or later":               5,
+				"VMware Photon OS (64-bit)":              15,
+			},
+			OsInfo: &map[string]api.OsInfo{
+				"Amazon Linux 2 (64-bit)":                {Count: 1, Supported: true},
+				"CentOS 7 (64-bit)":                      {Count: 1, Supported: true},
+				"CentOS 8 (64-bit)":                      {Count: 1, Supported: true},
+				"Debian GNU/Linux 12 (64-bit)":           {Count: 1, Supported: true},
+				"FreeBSD (64-bit)":                       {Count: 2, Supported: true},
+				"Microsoft Windows 10 (64-bit)":          {Count: 2, Supported: true},
+				"Microsoft Windows 11 (64-bit)":          {Count: 2, Supported: true},
+				"Microsoft Windows Server 2019 (64-bit)": {Count: 8, Supported: true},
+				"Microsoft Windows Server 2022 (64-bit)": {Count: 3, Supported: true},
+				"Microsoft Windows Server 2025 (64-bit)": {Count: 2, Supported: true},
+				"Other (32-bit)":                         {Count: 12, Supported: true},
+				"Other (64-bit)":                         {Count: 1, Supported: true},
+				"Other 2.6.x Linux (64-bit)":             {Count: 13, Supported: true},
+				"Other Linux (64-bit)":                   {Count: 1, Supported: true},
+				"Red Hat Enterprise Linux 8 (64-bit)":    {Count: 5, Supported: true},
+				"Red Hat Enterprise Linux 9 (64-bit)":    {Count: 41, Supported: true},
+				"Red Hat Fedora (64-bit)":                {Count: 2, Supported: true},
+				"Rocky Linux (64-bit)":                   {Count: 1, Supported: true},
+				"Ubuntu Linux (64-bit)":                  {Count: 3, Supported: true},
+				"VMware ESXi 8.0 or later":               {Count: 5, Supported: true},
+				"VMware Photon OS (64-bit)":              {Count: 15, Supported: false},
 			},
 			MigrationWarnings: api.MigrationIssues{
 				{
@@ -133,6 +170,13 @@ func GenerateDefaultInventory() api.Inventory {
 					Label:      "Independent disk detected",
 					Count:      2,
 					Assessment: "Independent disks cannot be transferred using recent versions of VDDK. It is recommended to change them in vSphere to 'Dependent' mode, or alternatively, to export the VM to an OVA.",
+				},
+			},
+			NicCount: &api.VMResourceBreakdown{
+				Histogram: api.Histogram{
+					Data:     []int{2, 200, 6, 0, 3, 0, 3},
+					MinValue: 0,
+					Step:     1,
 				},
 			},
 			Total:                       107,

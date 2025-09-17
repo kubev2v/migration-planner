@@ -12,7 +12,6 @@ MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
 MIGRATION_PLANNER_AGENT_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/migration-planner-api
-VALIDATION_CONTAINER_IMAGE ?= quay.io/kubev2v/forklift-validation:latest
 MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
@@ -28,13 +27,18 @@ DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
 
-SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
+# OPA Configuration for eval mode
+MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
+FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
+
+SOURCE_GIT_COMMIT ?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
+SOURCE_GIT_COMMIT_SHORT ?=$(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
+SOURCE_GIT_TAG ?=$(shell git describe --always --tags --abbrev=7 --match '[0-9]*\.[0-9]*\.[0-9]*' --match 'v[0-9]*\.[0-9]*\.[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT_SHORT)')
 SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
-SOURCE_GIT_COMMIT ?=$(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
 BIN_TIMESTAMP ?=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
-MAJOR := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$1}')
-MINOR := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$2}')
-PATCH := $(shell echo $(SOURCE_GIT_TAG) | awk -F'[._~-]' '{print $$3}')
+MAJOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$1}')
+MINOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$2}')
+PATCH := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$3}')
 
 GO_LD_FLAGS := -ldflags "\
 	-X github.com/kubev2v/migration-planner/pkg/version.majorFromGit=$(MAJOR) \
@@ -54,18 +58,23 @@ all: build build-containers
 
 help:
 	@echo "Targets:"
+	@echo "    generate:               regenerate all generated files"
+	@echo "    tidy:                   tidy go mod"
+	@echo "    lint:                   run golangci-lint"
+	@echo "    build:                  run all builds"
+	@echo "    clean:                  clean up all containers and volumes"
+	@echo "    test:                   run unit tests"
+	@echo "    run:                    run the service for development"
+	@echo "    setup-opa-policies:     download OPA policies from Forklift project"
+	@echo "    clean-opa-policies:     clean OPA policies directory"
 	@echo "    generate:        regenerate all generated files"
 	@echo "    tidy:            tidy go mod"
 	@echo "    lint:            run golangci-lint"
 	@echo "    build:           run all builds"
 	@echo "    clean:           clean up all containers and volumes"
-
-GOBIN = $(shell pwd)/bin
-GINKGO ?= $(GOBIN)/ginkgo
-ginkgo: ## Download ginkgo locally if necessary.
-ifeq (, $(shell which ginkgo 2> /dev/null))
-	go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
-endif
+	@echo "    migrate:         run database migrations"
+	@echo "    run:             run the migration planner API service"
+	@echo "    integration-test: run e2e integration tests"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OC_VERSION ?= 4.17.9
@@ -85,46 +94,39 @@ else
 	@echo "oc is already installed at $(OC_BIN)"
 endif
 
-TEST_PACKAGES := ./...
-GINKGO_OPTIONS ?= --skip e2e
-test: ginkgo
-	$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(GINKGO_OPTIONS) $(TEST_PACKAGES)
-
-generate:
-	go generate -v $(shell go list ./...)
-	hack/mockgen.sh
-
 tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
-
-lint: tools
-	$(GOBIN)/golangci-lint run -v --timeout 2m
 
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate
 
-run:
-	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api run
+run: image
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
+	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
+	./bin/planner-api run
+
+run-agent:
+	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
+	./bin/planner-agent
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
-	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+	@if [ ! -f rhcos-live-iso.x86_64.iso ]; then \
+    	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso; \
+    fi
 endif
 
-integration-test: ginkgo
-	$(GINKGO) -focus=$(FOCUS) run test/e2e
-
-build: bin image
+build: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api ...
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api
 
 build-agent: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent ...
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent
 
 build-cli: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner ...
+	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
@@ -173,7 +175,6 @@ deploy-on-openshift: oc
 	oc process -f deploy/templates/s3-secret-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
-       -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
@@ -219,7 +220,6 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
-	   -p VALIDATION_CONTAINER_IMAGE=$(VALIDATION_CONTAINER_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
@@ -261,12 +261,146 @@ bin:
 clean:
 	- rm -f -r bin
 
-.PHONY: tools
-tools: $(GOBIN)/golangci-lint
+##################### "make lint" support start ##########################
+GOLANGCI_LINT_VERSION := v1.64.8
+GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
-$(GOBIN)/golangci-lint:
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(GOBIN) v1.54.0
+# Download golangci-lint locally if not already present
+$(GOLANGCI_LINT):
+	@echo "🔍 Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
+	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
+	@echo "✅ 'golangci-lint' installed successfully."
+
+# Run linter
+lint: $(GOLANGCI_LINT)
+	@echo "🔍 Running golangci-lint..."
+	@$(GOLANGCI_LINT) run --timeout=5m
+	@echo "✅ Lint passed successfully!"
+##################### "make lint" support end   ##########################
+
+##################### "make generate" support start ##########################
+MOQ := $(GOBIN)/moq
+
+# Install moq if not already present
+$(MOQ):
+	@echo "📦 Installing moq..."
+	@go install github.com/matryer/moq@latest
+	@echo "✅ 'moq' installed successfully."
+
+# Code generation
+generate: $(MOQ)
+	@echo "⚙️ Running go generate..."
+	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./...)
+	@echo "⚙️ Running mockgen script..."
+	@hack/mockgen.sh
+	@$(MAKE) format
+	@echo "✅ Generate complete."
+
+# Check if generate changes the repo
+check-generate: generate
+	@echo "🔍 Checking if generated files are up to date..."
+	@git diff --quiet || (echo "❌ Detected uncommitted changes after generate. Run 'make generate' and commit the result." && git status && exit 1)
+	@echo "✅ All generated files are up to date."
+##################### "make generate" support end   ##########################
+
+##################### "make format" support start ##########################
+GOIMPORTS := $(GOBIN)/goimports
+
+# Install goimports if not already available
+$(GOIMPORTS):
+	@echo "📦 Installing goimports..."
+	@go install golang.org/x/tools/cmd/goimports@latest
+	@echo "✅ 'goimports' installed successfully."
+
+# Format Go code using gofmt and goimports
+format: $(GOIMPORTS)
+	@echo "🧹 Formatting Go code..."
+	@gofmt -s -w .
+	@$(GOIMPORTS) -w .
+	@echo "✅ Format complete."
+
+# Check that formatting does not introduce changes
+check-format: format
+	@echo "🔍 Checking if formatting is up to date..."
+	@git diff --quiet || (echo "❌ Detected uncommitted changes after format. Run 'make format' and commit the result." && git status && exit 1)
+	@echo "✅ All formatted files are up to date."
+##################### "make format" support end   ##########################
+
+##################### tests support start ##########################
+GINKGO := $(GOBIN)/ginkgo
+UNIT_TEST_PACKAGES := ./...
+UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e
+
+# Install ginkgo if not already available
+$(GINKGO):
+	@echo "📦 Installing ginkgo..."
+	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
+	@echo "✅ 'ginkgo' installed successfully."
+
+# Run unit tests using ginkgo
+test: $(GINKGO)
+	@echo "🧪 Running Unit tests..."
+	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
+	@echo "✅ All Unit tests passed successfully."
+
+# Full unit test cycle: build, prepare DB, run tests, and clean up
+unit-test: build kill-db deploy-db migrate test kill-db
+
+# Run integration tests using ginkgo
+integration-test: $(GINKGO) build
+	@echo "🧪 Running integration tests..."
+	$(GINKGO) -focus=$(FOCUS) run test/e2e
+	@echo "✅ All Integration tests passed successfully."
+##################### tests support end   ##########################
+
+validate-all: lint check-generate check-format unit-test
+
+# OPA Policies Setup for Local Development
+.PHONY: setup-opa-policies
+setup-opa-policies:
+	@echo "Setting up OPA policies for local development..."
+	@mkdir -p $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
+	@if [ -z "$$(find $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) -name '*.rego' 2>/dev/null)" ]; then \
+		echo "Downloading policies from Forklift GitHub repository..."; \
+		mkdir -p $(FORKLIFT_POLICIES_TMP_DIR); \
+		curl -L https://github.com/kubev2v/forklift/archive/main.tar.gz \
+			| tar -xz -C $(FORKLIFT_POLICIES_TMP_DIR) --strip-components=1; \
+		if [ -d "$(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware" ]; then \
+			find $(FORKLIFT_POLICIES_TMP_DIR)/validation/policies/io/konveyor/forklift/vmware \
+				-name "*.rego" ! -name "*_test.rego" -exec cp {} $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)/ \; ; \
+			echo "Successfully downloaded VMware policies"; \
+		else \
+			echo "Failed to download policies from GitHub"; \
+			exit 1; \
+		fi; \
+		rm -rf $(FORKLIFT_POLICIES_TMP_DIR); \
+	fi
+	@echo "OPA policies ready in $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)"
+	@echo "Found $$(find $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) -name '*.rego' | wc -l) .rego files"
+
+.PHONY: clean-opa-policies  
+clean-opa-policies:
+	@echo "Cleaning OPA policies..."
+	@rm -rf $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
 
 # include the deployment targets
 include deploy/deploy.mk
 include deploy/e2e.mk
+
+################################################################################
+# Emoji Legend for Makefile Targets
+#
+# Action Type        | Emoji | Description
+# -------------------|--------|------------------------------------------------
+# Install tool        📦     Installing a dependency or binary
+# Running task        ⚙️     Executing tasks like generate, build, etc.
+# Linting/validation  🔍     Checking format, lint, static analysis, etc.
+# Formatting          🧹     Formatting source code
+# Tests               🧪     Running unit or integration tests
+# Warnings/info       ⚠️     Temporary notice, caution, or pre-check
+# Success/complete    ✅     Task completed successfully
+# Failure/alert       ❌     An error or failure occurred
+# Deploy operations   🚀     Launching or bringing up environments/services
+# Teardown/cleanup    🗑️     Stopping, removing, or cleaning up resources
+################################################################################

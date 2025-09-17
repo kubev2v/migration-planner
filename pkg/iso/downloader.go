@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -30,7 +29,7 @@ func (m *Manager) Register(downloader Downloader) *Manager {
 	return m
 }
 
-func (m *Manager) Download(ctx context.Context, dst io.Writer) error {
+func (m *Manager) Download(ctx context.Context, dst io.WriteSeeker) error {
 	for i := 0; i < len(m.downloaders); i++ {
 		downloader := m.downloaders[i]
 
@@ -38,6 +37,12 @@ func (m *Manager) Download(ctx context.Context, dst io.Writer) error {
 
 		if err := downloader.Get(ctx, dst); err != nil {
 			zap.S().Errorw("failed to download image", "error", err, "downloader_type", downloader.Type())
+
+			// rewind buffer
+			if _, err := dst.Seek(0, io.SeekStart); err != nil {
+				return fmt.Errorf("failed to rewind the buffer to 0 again: %w", err)
+			}
+
 			continue
 		}
 
@@ -45,49 +50,4 @@ func (m *Manager) Download(ctx context.Context, dst io.Writer) error {
 	}
 
 	return errors.New("failed to download image. All downloaders failed")
-}
-
-// wrapper is a wrapper around the io.Writer to get metrics about download progress.
-type wrapper struct {
-	downloadedBytes int64
-	total           int64
-	w               io.Writer
-}
-
-func newWrapper(ctx context.Context, w io.Writer, totalBytesToDownload int64) *wrapper {
-	mw := &wrapper{w: w, total: totalBytesToDownload}
-	go mw.start(ctx)
-
-	return mw
-}
-
-func (m *wrapper) start(ctx context.Context) {
-	oldValue := int64(0)
-	ticker := time.NewTicker(10 * time.Second)
-	for {
-		select {
-		case <-ctx.Done():
-			ticker.Stop()
-			return
-		case <-ticker.C:
-			if m.total == 0 {
-				progress := fmt.Sprintf("%.2f Mb", float32(m.downloadedBytes)/(1024*1024))
-				zap.S().Debugw("iso downloading", "progress", progress)
-				continue
-			}
-
-			progress := fmt.Sprintf("%.2f%%", 100*(float32(m.downloadedBytes)/float32(m.total)))
-			rate := fmt.Sprintf("%.2f MB/s", (float32(m.downloadedBytes)-float32(oldValue))/(1024*1024*10))
-			zap.S().Debugw("iso downloading", "progress", progress, "rate", rate)
-			oldValue = m.downloadedBytes
-		}
-	}
-}
-
-func (m *wrapper) Write(p []byte) (n int, err error) {
-	n, err = m.w.Write(p)
-	if err == nil {
-		m.downloadedBytes += int64(n)
-	}
-	return
 }

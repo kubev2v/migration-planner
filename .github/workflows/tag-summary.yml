@@ -1,0 +1,63 @@
+name: Release Tag Summary
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  summarize-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate summary and send to Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+          SLACK_CHANNEL: ${{ secrets.SLACK_CHANNEL }}
+          NEW_TAG: ${{ github.ref_name }}
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+        run: |
+          set -e
+          
+          # Validate required environment variables
+          if [ -z "$SLACK_WEBHOOK_URL" ] && ([ -z "$SLACK_BOT_TOKEN" ] || [ -z "$SLACK_CHANNEL" ]); then
+            echo "Error: Either SLACK_WEBHOOK_URL or (SLACK_BOT_TOKEN + SLACK_CHANNEL) must be set"
+            echo "For threading support, use: SLACK_BOT_TOKEN and SLACK_CHANNEL"
+            echo "For simple messaging, use: SLACK_WEBHOOK_URL"
+            exit 1
+          fi
+          
+          PREV_TAG=$(git tag --sort=-committerdate | head -n 2 | tail -n 1)
+
+          if [ -z "$PREV_TAG" ]; then
+            COMMITS=$(git log --pretty=format:"%an|%s")
+            MESSAGE_TYPE="New Tag was created: $NEW_TAG 🎉"
+          else
+            MERGE_BASE=$(git merge-base $PREV_TAG $NEW_TAG)
+            COMMITS=$(git log --pretty=format:"%an|%s" $MERGE_BASE..$NEW_TAG)
+            MESSAGE_TYPE="New Tag was created: $NEW_TAG (changes since $PREV_TAG) 🎉"
+          fi
+
+          if [ -z "$COMMITS" ]; then
+            CHANGE_DETAILS="No new commits were found."
+          else
+            # Generate detailed changes message
+            DETAILS_PAYLOAD=$(echo "$COMMITS" | ./ci/create-slack-message.sh)
+            
+            # Parse JSON to get the text content
+            if [ -n "$DETAILS_PAYLOAD" ] && CHANGE_DETAILS=$(echo "$DETAILS_PAYLOAD" | jq -r '.text' 2>/dev/null); then
+              echo "Successfully generated commit details with JIRA integration"
+            else
+              echo "WARNING: Could not parse JSON output, using fallback"
+              CHANGE_DETAILS="Unable to parse commit details"
+            fi
+          fi
+
+          # Use the new send-slack-message script
+          ./ci/send-slack-message.sh "$MESSAGE_TYPE" "$CHANGE_DETAILS"

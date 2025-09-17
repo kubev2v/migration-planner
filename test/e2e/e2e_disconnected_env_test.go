@@ -5,12 +5,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/test/e2e/model"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_agent"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_helpers"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_service"
-	. "github.com/kubev2v/migration-planner/test/e2e/e2e_utils"
+	. "github.com/kubev2v/migration-planner/test/e2e/agent"
+	. "github.com/kubev2v/migration-planner/test/e2e/helpers"
+	. "github.com/kubev2v/migration-planner/test/e2e/service"
+	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"go.uber.org/zap"
@@ -20,7 +22,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 	var (
 		svc       PlannerService
-		agent     PlannerAgent
+		e2eAgent  model.E2EAgent
 		agentIP   string
 		err       error
 		source    *v1alpha1.Source
@@ -38,32 +40,32 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
+		e2eAgent.Agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
 		Eventually(func() error {
-			agentIP, err = agent.GetIp()
+			agentIP, err = e2eAgent.Agent.GetIp()
 			if err != nil {
 				return err
 			}
 			return nil
 		}, "3m", "2s").Should(BeNil())
-		zap.S().Infof("Agent ip is: %s", agentIP)
+		zap.S().Infof("agent ip is: %s", agentIP)
 
 		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
-		agent.SetAgentApi(DefaultAgentApi(agentApiBaseUrl))
-		zap.S().Infof("Agent Api base url: %s", agentApiBaseUrl)
+		e2eAgent.Api = DefaultAgentApi(agentApiBaseUrl)
+		zap.S().Infof("agent Api base url: %s", agentApiBaseUrl)
 
 		zap.S().Info("Wait for planner-agent to be running...")
 		Eventually(func() bool {
-			return agent.IsServiceRunning(agentIP, "planner-agent")
+			return e2eAgent.Agent.IsServiceRunning(agentIP, "planner-agent")
 		}, "3m", "2s").Should(BeTrue())
 		zap.S().Info("Planner-agent is now running")
 
 		zap.S().Info("Wait for agent server to start...")
 		Eventually(func() bool {
-			if _, err := agent.AgentApi().Status(); err != nil {
+			if _, err := e2eAgent.Api.Status(); err != nil {
 				return false
 			}
 			return true
@@ -76,7 +78,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		zap.S().Info("Cleaning up after test...")
 		err = svc.RemoveSources()
 		Expect(err).To(BeNil(), "Failed to remove sources from DB")
-		err = agent.Remove()
+		err = e2eAgent.Agent.Remove()
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
@@ -84,7 +86,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 	})
 
 	AfterFailed(func() {
-		agent.DumpLogs(agentIP)
+		e2eAgent.Agent.DumpLogs(agentIP)
 	})
 
 	Context("Flow", func() {
@@ -100,7 +102,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			// Login to Vcenter
 			Eventually(func() bool {
-				res, err := agent.AgentApi().Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
+				res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
 					"core", "123456")
 				return err == nil && res.StatusCode == http.StatusNoContent
 			}, "3m", "2s").Should(BeTrue())
@@ -108,7 +110,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
-				statusReply, err := agent.AgentApi().Status()
+				statusReply, err := e2eAgent.Api.Status()
 				if err != nil {
 					return false
 				}
@@ -117,7 +119,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			}, "3m", "2s").Should(BeTrue())
 
 			// Get inventory
-			inventory, err := agent.AgentApi().Inventory()
+			inventory, err := e2eAgent.Api.Inventory()
 			Expect(err).To(BeNil())
 
 			// Manually upload the collected inventory data

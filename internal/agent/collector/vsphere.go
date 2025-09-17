@@ -1,7 +1,6 @@
 package collector
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,6 +13,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/kubev2v/migration-planner/internal/opa"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
@@ -35,13 +36,10 @@ import (
 )
 
 type Collector struct {
-	dataDir        string
-	credentialsDir string
-	once           sync.Once
-}
-
-type VMValidation struct {
-	Result []vspheremodel.Concern `json:"result"`
+	dataDir           string
+	persistentDataDir string
+	opaPoliciesDir    string
+	once              sync.Once
 }
 
 var vendorMap = map[string]string{
@@ -60,10 +58,11 @@ var vendorMap = map[string]string{
 	"LENOVO":   "Lenovo",
 }
 
-func NewCollector(dataDir string, credentialsDir string) *Collector {
+func NewCollector(dataDir, persistentDataDir, opaPoliciesDir string) *Collector {
 	return &Collector{
-		dataDir:        dataDir,
-		credentialsDir: credentialsDir,
+		dataDir:           dataDir,
+		persistentDataDir: persistentDataDir,
+		opaPoliciesDir:    opaPoliciesDir,
 	}
 }
 
@@ -75,19 +74,16 @@ func (c *Collector) Collect(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				default:
-					c.run()
-					if c.getOpaServerStatus() {
-						return
-					}
-					c.waitUntilOpaIsRunning()
+					c.run(ctx)
+					return
 				}
 			}
 		}()
 	})
 }
 
-func (c *Collector) run() {
-	credentialsFilePath := filepath.Join(c.credentialsDir, config.CredentialsFile)
+func (c *Collector) run(ctx context.Context) {
+	credentialsFilePath := filepath.Join(c.persistentDataDir, config.CredentialsFile)
 	zap.S().Named("collector").Infof("Waiting for credentials")
 	waitForFile(credentialsFilePath)
 
@@ -165,17 +161,23 @@ func (c *Collector) run() {
 
 	zap.S().Named("collector").Infof("Create inventory")
 
-	inv := createBasicInventoryObj(about.InstanceUuid, vms, collector, hosts, clusters, datacenters)
+	infraData := service.InfrastructureData{
+		Datastores:            getDatastores(hosts, collector),
+		Networks:              getNetworks(collector),
+		HostPowerStates:       getHostPowerStates(*hosts),
+		Hosts:                 getHosts(hosts),
+		HostsPerCluster:       getHostsPerCluster(*clusters),
+		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, collector),
+		TotalHosts:            len(*hosts),
+		TotalClusters:         len(*clusters),
+		TotalDatacenters:      len(*datacenters),
+		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
+	}
+	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
 
-	opaServerAlive := c.getOpaServerStatus()
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	if opaServerAlive {
-		zap.S().Named("collector").Infof("Run the validation of VMs")
-		vms, err = Validation(vms, opaServer)
-		if err != nil {
-			zap.S().Named("collector").Errorf("failed to run validation: %v", err)
-			return
-		}
+	zap.S().Named("collector").Infof("Run the validation of VMs")
+	if err := c.validateVMs(ctx, vms); err != nil {
+		zap.S().Named("collector").Errorf("failed to validate VMs: %v", err)
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
@@ -186,6 +188,23 @@ func (c *Collector) run() {
 		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
 		return
 	}
+}
+
+func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
+
+	opaValidator, err := opa.NewValidatorFromDir(c.opaPoliciesDir)
+	if err != nil {
+		return fmt.Errorf("failed to initialize OPA validator from %s: %w", c.opaPoliciesDir, err)
+	}
+
+	validatedVMs, err := opaValidator.ValidateVMs(ctx, *vms)
+	if err != nil {
+		return fmt.Errorf("failed to validate VMs: %w", err)
+	}
+
+	*vms = validatedVMs
+
+	return nil
 }
 
 func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
@@ -314,38 +333,6 @@ func vmGuestName(vm vspheremodel.VM) string {
 	return vm.GuestName
 }
 
-func createBasicInventoryObj(vCenterID string, vms *[]vspheremodel.VM, collector *vsphere.Collector, hosts *[]vspheremodel.Host, clusters *[]vspheremodel.Cluster, datacenters *[]vspheremodel.Datacenter) *apiplanner.Inventory {
-	return &apiplanner.Inventory{
-		Vcenter: apiplanner.VCenter{
-			Id: vCenterID,
-		},
-		Vms: apiplanner.VMs{
-			Total:                len(*vms),
-			PowerStates:          map[string]int{},
-			Os:                   map[string]int{},
-			OsInfo:               &map[string]apiplanner.OsInfo{},
-			MigrationWarnings:    apiplanner.MigrationIssues{},
-			NotMigratableReasons: apiplanner.MigrationIssues{},
-			CpuCores:             apiplanner.VMResourceBreakdown{},
-			RamGB:                apiplanner.VMResourceBreakdown{},
-			DiskCount:            apiplanner.VMResourceBreakdown{},
-			DiskGB:               apiplanner.VMResourceBreakdown{},
-			NicCount:             &apiplanner.VMResourceBreakdown{},
-		},
-		Infra: apiplanner.Infra{
-			ClustersPerDatacenter: clustersPerDatacenter(datacenters, collector),
-			Datastores:            getDatastores(hosts, collector),
-			HostPowerStates:       getHostPowerStates(*hosts),
-			Hosts:                 getHosts(hosts),
-			TotalHosts:            len(*hosts),
-			TotalClusters:         len(*clusters),
-			TotalDatacenters:      util.IntPtr(len(*datacenters)),
-			HostsPerCluster:       getHostsPerCluster(*clusters),
-			Networks:              getNetworks(collector),
-		},
-	}
-}
-
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
 	var h []int
 
@@ -422,12 +409,13 @@ func calculateBinIndex(data, minVal int, binSize float64, rangeValues, numberOfB
 		return 0
 	}
 
+	var binIndex int
 	if binSize == 1.0 {
-		return data - minVal
+		binIndex = data - minVal
+	} else {
+		// Division-based mapping for larger ranges
+		binIndex = int(float64(data-minVal) / binSize)
 	}
-
-	// Division-based mapping for larger ranges
-	binIndex := int(float64(data-minVal) / binSize)
 
 	// Ensure bin index is within bounds
 	if binIndex >= numberOfBins {
@@ -542,6 +530,28 @@ func getHostsPerCluster(clusters []vspheremodel.Cluster) []int {
 	return res
 }
 
+func getVMsPerCluster(vms []vspheremodel.VM, hosts []vspheremodel.Host, clusters []vspheremodel.Cluster) []int {
+	clusterIndex := make(map[string]int, len(clusters))
+	for i, c := range clusters {
+		clusterIndex[c.ID] = i
+	}
+
+	hostToClusterIdx := make(map[string]int, len(hosts))
+	for _, h := range hosts {
+		if idx, ok := clusterIndex[h.Cluster]; ok {
+			hostToClusterIdx[h.ID] = idx
+		}
+	}
+
+	counts := make([]int, len(clusters))
+	for _, vm := range vms {
+		if idx, ok := hostToClusterIdx[vm.Host]; ok {
+			counts[idx]++
+		}
+	}
+	return counts
+}
+
 func getHostPowerStates(hosts []vspheremodel.Host) map[string]int {
 	states := map[string]int{}
 
@@ -634,14 +644,15 @@ func isHardwareAcceleratedMove(hosts []vspheremodel.Host, names []string) bool {
 	return supported
 }
 
-func transformVendorName(vendor string) string {
-	vendor = strings.ToUpper(strings.TrimSpace(vendor))
+func TransformVendorName(vendor string) string {
+	raw := strings.TrimSpace(vendor) // Preserve original case
+	key := strings.ToUpper(raw)      // Use uppercase for lookup only
 
-	if transformed, exists := vendorMap[vendor]; exists {
+	if transformed, exists := vendorMap[key]; exists {
 		return transformed
 	}
 
-	return strings.TrimSpace(vendor)
+	return raw // Return original case for unmapped
 }
 
 func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
@@ -650,18 +661,35 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 	if err != nil {
 		return nil
 	}
+
+	// Create datastore-to-hostIDs mapping once for better performance
+	datastoreToHostIDs := make(map[string][]string)
+	for _, host := range *hosts {
+		for _, dsRef := range host.Datastores {
+			datastoreToHostIDs[dsRef.ID] = append(datastoreToHostIDs[dsRef.ID], host.ID)
+		}
+	}
+
 	res := []apiplanner.Datastore{}
 	for _, ds := range *datastores {
 		dsVendor, dsModel, dsProtocol := findDataStoreInfo(*hosts, ds.BackingDevicesNames)
+		hostIDs := datastoreToHostIDs[ds.ID]
+		var hostIDPtr *string
+		if len(hostIDs) > 0 {
+			joined := strings.Join(hostIDs, ", ")
+			hostIDPtr = &joined
+		}
+
 		res = append(res, apiplanner.Datastore{
 			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
 			Type:                    ds.Type,
-			Vendor:                  transformVendorName(dsVendor),
+			Vendor:                  TransformVendorName(dsVendor),
 			Model:                   dsModel,
 			ProtocolType:            dsProtocol,
 			DiskId:                  getNaa(&ds),
+			HostId:                  hostIDPtr,
 		})
 	}
 
@@ -672,9 +700,21 @@ func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
 	var l []apiplanner.Host
 
 	for _, host := range *hosts {
+		cpuCores := int(host.CpuCores)
+		cpuSockets := int(host.CpuSockets)
+		var memoryMB *int64
+		if host.MemoryBytes > 0 {
+			mb := util.ConvertBytesToMB(host.MemoryBytes)
+			memoryMB = &mb
+		}
+
 		l = append(l, apiplanner.Host{
-			Model:  host.Model,
-			Vendor: host.Vendor,
+			Id:         &host.ID,
+			Model:      host.Model,
+			Vendor:     host.Vendor,
+			CpuCores:   &cpuCores,
+			CpuSockets: &cpuSockets,
+			MemoryMB:   memoryMB,
 		})
 	}
 
@@ -729,65 +769,6 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	}
 
 	return nil
-}
-
-func Validation(vms *[]vspheremodel.VM, opaServer string) (*[]vspheremodel.VM, error) {
-	res := []vspheremodel.VM{}
-	for _, vm := range *vms {
-		// Prepare the JSON data to MTV OPA server format.
-		r := web.Workload{}
-		r.With(&vm)
-		vmJson := map[string]interface{}{
-			"input": r,
-		}
-
-		vmData, err := json.Marshal(vmJson)
-		if err != nil {
-			return nil, err
-		}
-
-		// Prepare the HTTP request to OPA server
-		req, err := http.NewRequest(
-			"POST",
-			fmt.Sprintf("http://%s/v1/data/io/konveyor/forklift/vmware/concerns", opaServer),
-			bytes.NewBuffer(vmData),
-		)
-		if err != nil {
-			return nil, err
-		}
-		req.Header.Set("Content-Type", "application/json")
-
-		// Send the HTTP request to OPA server
-		client := &http.Client{}
-		resp, err := client.Do(req)
-		if err != nil {
-			continue
-		}
-
-		// Check the response status
-		if resp.StatusCode != http.StatusOK {
-			return nil, fmt.Errorf("invalid status code")
-		}
-
-		// Read the response body
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return nil, err
-		}
-
-		// Save the report to map
-		var vmValidation VMValidation
-		err = json.Unmarshal(body, &vmValidation)
-		if err != nil {
-			return nil, err
-		}
-		for _, c := range vmValidation.Result {
-			vm.Concerns = append(vm.Concerns, vspheremodel.Concern{Id: c.Id, Label: c.Label, Assessment: c.Assessment, Category: c.Category})
-		}
-		resp.Body.Close()
-		res = append(res, vm)
-	}
-	return &res, nil
 }
 
 func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) (bool, bool) {
@@ -846,27 +827,5 @@ func waitForFile(filename string) {
 		} else {
 			return
 		}
-	}
-}
-
-func (c *Collector) getOpaServerStatus() bool {
-	opaServer := util.GetEnv("OPA_SERVER", "127.0.0.1:8181")
-	zap.S().Named("collector").Infof("Check if opaServer is responding")
-	resp, err := http.Get("http://" + opaServer + "/health")
-	if err != nil || resp.StatusCode != http.StatusOK {
-		zap.S().Named("collector").Errorf("OPA server %s is not responding", opaServer)
-		return false
-	}
-	defer resp.Body.Close()
-	zap.S().Named("collector").Infof("OPA server %s is alive", opaServer)
-	return true
-}
-
-func (c *Collector) waitUntilOpaIsRunning() {
-	for {
-		if c.getOpaServerStatus() {
-			break
-		}
-		time.Sleep(2 * time.Second)
 	}
 }

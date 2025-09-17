@@ -1,0 +1,11 @@
+--- webpack.standalone.js.orig	2025-09-11 12:00:00.000000000 +0000
++++ webpack.standalone.js	2025-09-11 12:00:00.000000000 +0000
+@@ -121,7 +121,7 @@
+     proxy: process.env.PLANNER_LOCAL_DEV === 'true' ? {
+       // Local development with migration-planner API
+       '/planner': {
+-        target: 'http://localhost:3443',
++        target: process.env.PLANNER_PROXY_TARGET || 'http://localhost:3443',
+         secure: false,
+         changeOrigin: true,
+         pathRewrite: {

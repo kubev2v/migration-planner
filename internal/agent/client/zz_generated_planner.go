@@ -5,9 +5,10 @@ package client
 
 import (
 	"context"
+	"sync"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
-	"sync"
 )
 
 // Ensure, that PlannerMock does implement Planner.

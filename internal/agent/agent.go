@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -97,8 +98,9 @@ func (a *Agent) Stop() {
 }
 
 func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
-	inventoryUpdater := service.NewInventoryUpdater(uuid.MustParse(a.config.SourceID), a.id, plannerClient)
-	statusUpdater := service.NewStatusUpdater(uuid.MustParse(a.config.SourceID), a.id, version, a.credUrl, a.config, plannerClient)
+	interceptor := client.NewInterceptor(plannerClient)
+	inventoryUpdater := service.NewInventoryUpdater(uuid.MustParse(a.config.SourceID), a.id, interceptor)
+	statusUpdater := service.NewStatusUpdater(uuid.MustParse(a.config.SourceID), a.id, version, a.credUrl, a.config, interceptor)
 
 	// insert jwt into the context if any
 	if a.jwt != "" {
@@ -115,7 +117,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 
 	// start server
 	a.server = NewServer(defaultAgentPort, a.config, cert, key)
-	go a.server.Start(statusUpdater)
+	go a.server.Start(statusUpdater, interceptor)
 
 	protocol := "http"
 	if a.server.tlsConfig != nil {
@@ -128,7 +130,11 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 	}
 	zap.S().Infof("Discovered Agent IP address: %s", a.credUrl)
 
-	c := collector.NewCollector(a.config.DataDir, a.config.PersistentDataDir)
+	if err := a.storeCmdCredentialsIfProvided(ctx); err != nil {
+		zap.S().Named("agent").Errorf("failed to use provided credentials: %v", err)
+	}
+
+	c := collector.NewCollector(a.config.DataDir, a.config.PersistentDataDir, a.config.OpaPoliciesDir)
 	c.Collect(ctx)
 
 	updateTicker := jitterbug.New(time.Duration(a.config.UpdateInterval.Duration), &jitterbug.Norm{Stdev: 30 * time.Millisecond, Mean: 0})
@@ -204,4 +210,34 @@ func newPlannerClient(cfg *config.Config) (client.Planner, error) {
 		return nil, err
 	}
 	return client.NewPlanner(httpClient), nil
+}
+
+func (a *Agent) storeCmdCredentialsIfProvided(ctx context.Context) error {
+	cmdCred := ctx.Value(common.CmdCredentialsKey)
+	cred, ok := cmdCred.(config.Credentials)
+	if !ok {
+		return fmt.Errorf("invalid credentials in context (expected %T, got %T)", config.Credentials{}, cmdCred)
+	}
+
+	if cred.URL == "" && cred.Username == "" && cred.Password == "" {
+		return nil // no credentials provided
+	}
+
+	if len(cred.URL) == 0 || len(cred.Username) == 0 || len(cred.Password) == 0 {
+		return fmt.Errorf("must pass url, username, and password")
+	}
+
+	_, err := testVmwareConnection(ctx, &cred)
+	if err != nil {
+		return err
+	}
+
+	credPath := filepath.Join(a.config.PersistentDataDir, config.CredentialsFile)
+	if err := saveCredentials(credPath, &cred); err != nil {
+		return fmt.Errorf("failed saving credentials: %v", err)
+	}
+
+	zap.S().Infof("Command-line credentials written to: %s", credPath)
+
+	return nil
 }

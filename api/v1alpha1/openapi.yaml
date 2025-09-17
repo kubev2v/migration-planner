@@ -154,7 +154,7 @@ paths:
     put:
       tags:
         - source
-      description: Update a source from inventory file
+      description: Update source
       operationId: updateSource
       parameters:
         - name: id
@@ -168,11 +168,11 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourceUpdateOnPrem'
+              $ref: '#/components/schemas/SourceUpdate'
         required: true
       responses:
         "200":
-          description: An OVA image
+          description: Updated source
           content:
             application/json:
               schema:
@@ -253,6 +253,63 @@ paths:
                 $ref: '#/components/schemas/Error'
         "500":
           description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/sources/{id}/inventory:
+    put:
+      tags:
+        - source
+      description: Update inventory
+      operationId: updateInventory
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateInventory'
+      responses:
+        "200":
+          description: Updated source inventory
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -390,6 +447,246 @@ paths:
           description: NotFound
         "500":
           description: Internal Server Error
+  /api/v1/assessments:
+    get:
+      tags:
+        - assessment
+      description: List assessments
+      operationId: listAssessments
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssessmentList'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    post:
+      tags:
+        - assessment
+      description: Create an assessment
+      operationId: createAssessment
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentForm'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssessmentRvtoolsForm'
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assessments/{id}:
+    get:
+      tags:
+        - assessment
+      description: Get the specified assessment
+      operationId: getAssessment
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      tags:
+        - assessment
+      description: Update an assessment
+      operationId: updateAssessment
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssessmentUpdate'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - assessment
+      description: Delete an assessment
+      operationId: deleteAssessment
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Assessment'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/info:
+    get:
+      tags:
+        - info
+      description: Get migration planner information
+      operationId: getInfo
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /health:
     get:
       tags:
@@ -402,6 +699,32 @@ paths:
 
 components:
   schemas:
+
+    # Reusable validation components
+    ValidatedSourceName:
+      type: string
+      x-oapi-codegen-extra-tags:
+        validate: "required,source_name,min=1,max=100"
+
+    ValidatedOptionalSourceName:
+      type: string
+      x-oapi-codegen-extra-tags:
+        validate: "omitempty,source_name,min=1,max=100"
+
+    ValidatedSSHPublicKey:
+      type: string
+      nullable: true
+      minLength: 1
+      x-oapi-codegen-extra-tags:
+        validate: "omitnil,ssh_key"
+
+    ValidatedCertificateChain:
+      type: string
+      nullable: true
+      minLength: 1
+      x-oapi-codegen-extra-tags:
+        validate: "omitnil,certs"
+
     presigned-url:
       type: object
       required:
@@ -414,6 +737,7 @@ components:
           type: string
           format: date-time
           description: Expiration time for the URL token.
+
     Source:
       type: object
       properties:
@@ -471,39 +795,25 @@ components:
       type: object
       properties:
         name:
-          type: string
-          x-oapi-codegen-extra-tags:
-            validate: "required,source_name,min=1,max=100"
+          $ref: '#/components/schemas/ValidatedSourceName'
         sshPublicKey:
-          type: string
-          nullable: true
-          minLength: 1
-          x-oapi-codegen-extra-tags:
-            validate: "omitnil,ssh_key"
+          $ref: '#/components/schemas/ValidatedSSHPublicKey'
         proxy:
           $ref: '#/components/schemas/AgentProxy'
           x-oapi-codegen-extra-tags:
             validate: "omitnil"
         certificateChain:
-          type: string
-          nullable: true
-          minLength: 1
+          $ref: '#/components/schemas/ValidatedCertificateChain'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+            x-oapi-codegen-extra-tags:
+              validate: "required,label"
           x-oapi-codegen-extra-tags:
-            validate: "omitnil,certs"
+            validate: "omitempty,dive,required"
       required:
         - name
-
-    SourceUpdateOnPrem:
-      type: object
-      properties:
-        agentId:
-          type: string
-          format: uuid
-        inventory:
-          $ref: '#/components/schemas/Inventory'
-      required:
-        - inventory
-        - agentId
 
     SourceList:
       type: array
@@ -647,6 +957,10 @@ components:
           type: array
           items:
             type: integer
+        vmsPerCluster:
+          type: array
+          items:
+            type: integer
         hostPowerStates:
           type: object
           additionalProperties:
@@ -666,10 +980,26 @@ components:
         - vendor
         - model
       properties:
+        id:
+          type: string
+          description: Unique identifier for this host
         vendor:
           type: string
         model:
           type: string
+        cpuCores:
+          type: integer
+          description: Number of CPU cores
+          nullable: true
+        cpuSockets:
+          type: integer
+          description: Number of CPU sockets
+          nullable: true
+        memoryMB:
+          type: integer
+          format: int64
+          description: Host memory in MB
+          nullable: true
 
     Network:
       type: object
@@ -715,6 +1045,10 @@ components:
           type: string
         model:
           type: string
+        hostId:
+          type: string
+          description: Identifier of the host where this datastore is attached
+          nullable: true
 
     VMResourceBreakdown:
       type: object
@@ -803,13 +1137,162 @@ components:
         - updatedAt
         - version
 
+    SourceUpdate:
+      type: object
+      properties:
+        name:
+          $ref: '#/components/schemas/ValidatedOptionalSourceName'
+        labels:
+          type: array
+          items:
+            $ref: '#/components/schemas/Label'
+            x-oapi-codegen-extra-tags:
+              validate: "required,label"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive,required"
+        sshPublicKey:
+          $ref: '#/components/schemas/ValidatedSSHPublicKey'
+        certificateChain:
+          $ref: '#/components/schemas/ValidatedCertificateChain'
+        proxy:
+          $ref: '#/components/schemas/AgentProxy'
+
+    UpdateInventory:
+      type: object
+      properties:
+        agentId:
+          type: string
+          format: uuid
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+      required:
+        - inventory
+        - agentId
+
     Label:
       type: object
       properties:
         key:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
         value:
           type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,label"
       required:
         - key
         - value
+
+    Snapshot:
+      type: object
+      properties:
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - inventory
+        - createdAt
+
+    Assessment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sourceType:
+          type: string
+          enum: [inventory, rvtools, source]
+        sourceId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/Snapshot'
+      required:
+        - id
+        - name
+        - sourceType
+        - createdAt
+        - snapshots
+
+    AssessmentForm:
+      type: object
+      properties:
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
+        sourceType:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,oneof=inventory agent"
+          description: >
+            Source of the assessment data:
+             * `inventory` - Manual inventory upload via JSON
+             * `agent` - Collected by migration planner agent
+        sourceId:
+          type: string
+          format: uuid
+        inventory:
+          $ref: '#/components/schemas/Inventory'
+      required:
+        - name
+        - sourceType
+
+    AssessmentRvtoolsForm:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Name of the assessment
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
+        file:
+          type: string
+          format: binary
+          description: File upload for assessment data
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
+        - name
+        - file
+
+    AssessmentUpdate:
+      type: object
+      description: Update form of the assessment.
+      properties:
+        name:
+          type: string
+          description: Name of the assessment
+          x-oapi-codegen-extra-tags:
+            validate: "required,assessment_name,min=1,max=100"
+
+    AssessmentList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Assessment'
+
+    Info:
+      type: object
+      description: Migration planner information
+      properties:
+        gitCommit:
+          type: string
+          description: Git commit hash
+          example: "c5a1661465a25b17ceeeb77d1ec40deb57d8da44"
+        versionName:
+          type: string
+          description: Version name, based on git tag
+          example: "0.1.4-40-gc5a1661"
+      required:
+        - gitCommit
+        - versionName

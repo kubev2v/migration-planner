@@ -18,7 +18,7 @@ func parseMemoryMB(s string) int32 {
 	if s == "" {
 		return 0
 	}
-	cleanS := strings.ReplaceAll(s, ",", "")	
+	cleanS := strings.ReplaceAll(s, ",", "")
 	match := numberRegex.FindString(cleanS)
 	if match == "" {
 		return 0
@@ -36,6 +36,18 @@ func parseIntOrZero(s string) int32 {
 		return 0
 	}
 	return int32(val)
+}
+
+// parseIntPtr parses a string to *int, returning nil for empty/invalid/zero values
+func parseIntPtr(s string) *int {
+	if s == "" {
+		return nil
+	}
+	if val := parseIntOrZero(s); val > 0 {
+		result := int(val)
+		return &result
+	}
+	return nil
 }
 
 func parseFormattedInt64(s string) int64 {
@@ -58,7 +70,6 @@ func parseFormattedInt64(s string) int64 {
 	return val
 }
 
-
 func parseBooleanValue(s string) bool {
 	if s == "" {
 		return false
@@ -72,6 +83,13 @@ func getColumnValue(row []string, colMap map[string]int, key string) string {
 		return strings.TrimSpace(row[idx])
 	}
 	return ""
+}
+
+func stringPtrIfNotEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func buildColumnMap(headers []string) map[string]int {
@@ -93,51 +111,64 @@ func calculateHostsPerCluster(clusterToHosts map[string]map[string]struct{}) []i
 	if len(clusterToHosts) == 0 {
 		return []int{}
 	}
-	
+
 	// Sort cluster names for consistent ordering
 	clusterNames := make([]string, 0, len(clusterToHosts))
 	for cluster := range clusterToHosts {
 		clusterNames = append(clusterNames, cluster)
 	}
 	sort.Strings(clusterNames)
-	
+
 	hostsPerCluster := make([]int, 0, len(clusterNames))
 	for _, cluster := range clusterNames {
 		hostsPerCluster = append(hostsPerCluster, len(clusterToHosts[cluster]))
 	}
-	
+
 	return hostsPerCluster
+}
+
+func calculateVMsPerCluster(clusterToVMs map[string]map[string]struct{}) []int {
+	if len(clusterToVMs) == 0 {
+		return []int{}
+	}
+
+	vmsPerCluster := make([]int, 0, len(clusterToVMs))
+	for _, vms := range clusterToVMs {
+		vmsPerCluster = append(vmsPerCluster, len(vms))
+	}
+
+	return vmsPerCluster
 }
 
 func calculateClustersPerDatacenter(datacenterToClusters map[string]map[string]struct{}) []int {
 	if len(datacenterToClusters) == 0 {
 		return []int{}
 	}
-	
+
 	clustersPerDatacenter := make([]int, 0, len(datacenterToClusters))
 	for _, clusters := range datacenterToClusters {
 		clustersPerDatacenter = append(clustersPerDatacenter, len(clusters))
 	}
-	
+
 	return clustersPerDatacenter
 }
 
 func groupRowsByVM(rows [][]string, colMap map[string]int) map[string][][]string {
 	vmData := make(map[string][][]string)
-	
+
 	for _, row := range rows {
 		if len(row) == 0 {
 			continue
 		}
-		
+
 		vmName := getColumnValue(row, colMap, "vm")
 		if vmName == "" {
 			continue
 		}
-		
+
 		vmData[vmName] = append(vmData[vmName], row)
 	}
-	
+
 	return vmData
 }
 
@@ -154,32 +185,32 @@ func parseDatastoreFromPath(path string) string {
 
 func buildDatastoreMapping(datastoreRows [][]string) map[string]string {
 	datastoreNameToID := make(map[string]string)
-	
+
 	if len(datastoreRows) <= 1 {
 		return datastoreNameToID
 	}
-	
+
 	headers := datastoreRows[0]
 	colMap := make(map[string]int)
 	for i, header := range headers {
 		key := strings.ToLower(strings.TrimSpace(header))
 		colMap[key] = i
 	}
-	
+
 	for _, row := range datastoreRows[1:] {
 		if len(row) == 0 {
 			continue
 		}
-		
+
 		// Extract datastore name and object ID
 		datastoreName := getColumnValue(row, colMap, "name")
 		objectID := getColumnValue(row, colMap, "object id")
-		
+
 		if datastoreName != "" && objectID != "" {
 			datastoreNameToID[datastoreName] = objectID
 		}
 	}
-	
+
 	return datastoreNameToID
 }
 
@@ -199,7 +230,7 @@ func readSheet(excelFile *excelize.File, sheets []string, sheetName string) [][]
 
 func createNetworkNameToIDMap(dvPortRows [][]string) map[string]string {
 	networkMap := make(map[string]string)
-	
+
 	if len(dvPortRows) <= 1 {
 		return networkMap // Return empty map if no dvPort data
 	}
@@ -213,12 +244,12 @@ func createNetworkNameToIDMap(dvPortRows [][]string) map[string]string {
 
 		networkName := getColumnValue(row, dvPortColMap, "port")
 		objectID := getColumnValue(row, dvPortColMap, "object id")
-		
+
 		if networkName != "" && objectID != "" {
 			networkMap[networkName] = objectID
 		}
 	}
-	
+
 	return networkMap
 }
 
@@ -248,7 +279,7 @@ func splitSheet(rows [][]string) (header []string, data [][]string) {
 
 func (ct *ControllerTracker) GetControllerKey(controllerName string) int32 {
 	controllerName = strings.ToLower(controllerName)
-	
+
 	switch {
 	case strings.Contains(controllerName, "ide"):
 		key := 200 + ct.ideCount
@@ -287,7 +318,6 @@ func mapControllerNameToBus(controllerName string) string {
 	return "scsi" // default
 }
 
-
 func cleanNumericString(s string) string {
 	return strings.Map(func(r rune) rune {
 		if (r >= '0' && r <= '9') || r == '.' {
@@ -295,4 +325,8 @@ func cleanNumericString(s string) string {
 		}
 		return -1
 	}, s)
+}
+
+func hasValue(s string) bool {
+	return strings.TrimSpace(s) != ""
 }

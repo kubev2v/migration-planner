@@ -3,11 +3,8 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"net"
 	"path/filepath"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,14 +20,12 @@ const (
 )
 
 type StatusUpdater struct {
-	AgentID   uuid.UUID
-	sourceID  uuid.UUID
-	version   string
-	config    *config.Config
-	client    client.Planner
-	credUrl   string
-	l         sync.Mutex
-	connected bool
+	AgentID  uuid.UUID
+	sourceID uuid.UUID
+	version  string
+	config   *config.Config
+	client   client.Planner
+	credUrl  string
 }
 
 func NewStatusUpdater(sourceID, agentID uuid.UUID, version, credUrl string, config *config.Config, client client.Planner) *StatusUpdater {
@@ -57,18 +52,11 @@ func (s *StatusUpdater) UpdateStatus(ctx context.Context, status api.AgentStatus
 	}
 
 	err := s.client.UpdateAgentStatus(ctx, s.AgentID, bodyParameters)
-	var netOpErr *net.OpError
-	if errors.As(err, &netOpErr) {
-		s.l.Lock()
-		s.connected = false
-		s.l.Unlock()
+	if err != nil {
 		return err
 	}
 
-	s.l.Lock()
-	s.connected = true
-	s.l.Unlock()
-	return err
+	return nil
 }
 
 func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Inventory) {
@@ -97,10 +85,4 @@ func (s *StatusUpdater) CalculateStatus() (api.AgentStatus, string, *api.Invento
 		return api.AgentStatusError, inventory.Error, &inventory.Inventory
 	}
 	return api.AgentStatusUpToDate, "Inventory successfully collected", &inventory.Inventory
-}
-
-func (s *StatusUpdater) IsConnected() bool {
-	s.l.Lock()
-	defer s.l.Unlock()
-	return s.connected
 }

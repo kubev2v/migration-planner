@@ -15,8 +15,8 @@ parameters:
     value: latest
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
-  - name: MIGRATION_PLANNER_ISO_URL
-    value: https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso
+  - name: MIGRATION_PLANNER_ISO_IMAGE
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-iso:latest
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -100,8 +100,6 @@ parameters:
   - name: ENVOY_IMAGE
     description: Envoy container image
     value: docker.io/envoyproxy/envoy:v1.33.2
-  - name: VALIDATION_CONTAINER_IMAGE
-    description: Full registry path to the validation (OPA) container
   - name: RHCOS_PASSWORD
     description: "Password to be set for the default RHCOS user"
 
@@ -305,6 +303,9 @@ objects:
                     skip_xff_append: false
                     xff_num_trusted_hops: 1
                     stat_prefix: backend-agent-api
+                    request_id_extension:
+                      typed_config:
+                        "@type": type.googleapis.com/envoy.extensions.request_id.uuid.v3.UuidRequestIdConfig
                     access_log:
                     - name: envoy.access_loggers.file
                       typed_config:
@@ -376,6 +377,15 @@ objects:
                               pattern:
                                 regex: "^/api/migration-assessment/api/v1/image"
                               substitution: "/api/v1/image"
+                        - match:
+                            prefix: "/api/migration-assessment/api/v1/assessments"
+                          route:
+                            cluster: backend-api
+                            timeout: 0s
+                            regex_rewrite:
+                              pattern:
+                                regex: "^/api/migration-assessment/api/v1/assessments"
+                              substitution: "/api/v1/assessments"
                     http_filters:
                     - name: envoy.filters.http.router
                       typed_config:
@@ -395,6 +405,24 @@ objects:
           labels:
             app: migration-planner
         spec:
+          initContainers:
+            - name: pull-iso
+              image: ${MIGRATION_PLANNER_ISO_IMAGE}
+              command: ["/bin/bash", "-c"]
+              args:
+                - |
+                  cp /rhcos.iso ${MIGRATION_PLANNER_ISO_PATH}
+                  chmod 0644 ${MIGRATION_PLANNER_ISO_PATH}
+              volumeMounts:
+                - name: iso-storage
+                  mountPath: /iso
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 256Mi
+                limits:
+                  cpu: 200m
+                  memory: 512Mi
           containers:
             - name: envoy
               image: ${ENVOY_IMAGE}
@@ -478,16 +506,12 @@ objects:
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE
                   value: ${DEBUG_MODE}
-                - name: VALIDATION_CONTAINER_IMAGE
-                  value: ${VALIDATION_CONTAINER_IMAGE}
                 - name: PERSISTENT_DISK_DEVICE
                   value: ${PERSISTENT_DISK_DEVICE}
                 - name:  INSECURE_REGISTRY
                   value: ${INSECURE_REGISTRY}
                 - name: MIGRATION_PLANNER_ISO_PATH
                   value: ${MIGRATION_PLANNER_ISO_PATH}
-                - name: MIGRATION_PLANNER_ISO_URL
-                  value: ${MIGRATION_PLANNER_ISO_URL}
                 # Svc Config values
                 - name: MIGRATION_PLANNER_ADDRESS
                   value: ${MIGRATION_PLANNER_ADDRESS}
@@ -518,22 +542,6 @@ objects:
                   value: ${MIGRATION_PLANNER_JWK_URL}
                 - name: MIGRATION_PLANNER_AGENT_AUTH_ENABLED
                   value: ${MIGRATION_PLANNER_AGENT_AUTH_ENABLED}
-                - name: MIGRATION_PLANNER_S3_ENDPOINT
-                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
-                - name: MIGRATION_PLANNER_S3_BUCKET
-                  value: ${MIGRATION_PLANNER_S3_BUCKET}
-                - name: MIGRATION_PLANNER_S3_ISO_FILENAME
-                  value: ${MIGRATION_PLANNER_S3_ISO_FILENAME}
-                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: access_key
-                - name: MIGRATION_PLANNER_S3_SECRET_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: ${S3_SECRET_NAME}
-                      key: secret_key
                 # DB Config values
                 - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
                   value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}

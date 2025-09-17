@@ -1,0 +1,55 @@
+#!/bin/bash
+# generate-user-tokens.sh - Generate authentication tokens for different org users
+
+set -e
+
+# Check if private key file exists (created during local auth setup)
+if [ ! -f "auth_local/private-key.txt" ]; then
+    echo "❌ Private key file not found!"
+    echo "💡 This script only works with local authentication mode."
+    echo "   Run debug-with-staging-complete.sh and select local auth first."
+    exit 1
+fi
+
+PRIVATE_KEY=$(cat auth_local/private-key.txt)
+API_REPO="${MIGRATION_PLANNER_REPO:-~/code/migration-planner}"
+API_REPO="${API_REPO/#\~/$HOME}"
+
+echo "🔑 Generating authentication tokens for different organizations..."
+echo ""
+
+# Generate tokens for different orgs found in staging data
+echo "=== Organization Tokens ==="
+echo ""
+
+echo "📄 ORG: 11009103 (numeric org)"
+TOKEN_11009103=$(cd "$API_REPO" && ./bin/planner sso token --private-key "$PRIVATE_KEY" --username testuser --org 11009103)
+echo "export TOKEN_11009103='$TOKEN_11009103'"
+echo ""
+
+echo "📄 ORG: example (text org)"
+TOKEN_EXAMPLE=$(cd "$API_REPO" && ./bin/planner sso token --private-key "$PRIVATE_KEY" --username testuser --org example)
+echo "export TOKEN_EXAMPLE='$TOKEN_EXAMPLE'"
+echo ""
+
+echo "📄 ORG: redhat.com (domain org)"
+TOKEN_REDHAT=$(cd "$API_REPO" && ./bin/planner sso token --private-key "$PRIVATE_KEY" --username testuser --org redhat.com)
+echo "export TOKEN_REDHAT='$TOKEN_REDHAT'"
+echo ""
+
+echo "=== Usage Examples ==="
+echo ""
+echo "# Set tokens in your environment:"
+echo "export TOKEN_11009103='$TOKEN_11009103'"
+echo "export TOKEN_EXAMPLE='$TOKEN_EXAMPLE'"
+echo "export TOKEN_REDHAT='$TOKEN_REDHAT'"
+echo ""
+echo "# Use tokens in API calls:"
+echo 'curl -H "X-Authorization: Bearer $TOKEN_11009103" http://localhost:3443/api/v1/sources'
+echo 'curl -H "X-Authorization: Bearer $TOKEN_EXAMPLE" http://localhost:3443/api/v1/assessments'
+echo 'curl -H "X-Authorization: Bearer $TOKEN_REDHAT" http://localhost:3443/api/v1/sources'
+echo ""
+echo "# Test different organizations to see org-specific data filtering!"
+echo ""
+echo "💡 Each token represents a user from a different organization."
+echo "   You should only see data belonging to that organization."

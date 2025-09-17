@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
+	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentapi "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/client"
@@ -22,6 +23,60 @@ type InventoryUpdater struct {
 type InventoryData struct {
 	Inventory api.Inventory `json:"inventory"`
 	Error     string        `json:"error"`
+}
+
+// InfrastructureData contains all the infrastructure-related data needed to create an inventory
+type InfrastructureData struct {
+	Datastores            []api.Datastore
+	Networks              []api.Network
+	HostPowerStates       map[string]int
+	Hosts                 *[]api.Host
+	HostsPerCluster       []int
+	ClustersPerDatacenter []int
+	TotalHosts            int
+	TotalClusters         int
+	TotalDatacenters      int
+	VmsPerCluster         []int
+}
+
+// CreateBasicInventory creates a basic inventory object with the provided data
+// This function consolidates the duplicated createBasicInventoryObj functions from
+// vsphere.go and parser.go to ensure consistency and reduce duplication.
+func CreateBasicInventory(
+	vCenterID string,
+	vms *[]vsphere.VM,
+	infraData InfrastructureData,
+) *api.Inventory {
+	return &api.Inventory{
+		Vcenter: api.VCenter{
+			Id: vCenterID,
+		},
+		Vms: api.VMs{
+			Total:                len(*vms),
+			PowerStates:          map[string]int{},
+			Os:                   map[string]int{},
+			OsInfo:               &map[string]api.OsInfo{},
+			MigrationWarnings:    api.MigrationIssues{},
+			NotMigratableReasons: api.MigrationIssues{},
+			CpuCores:             api.VMResourceBreakdown{},
+			RamGB:                api.VMResourceBreakdown{},
+			DiskCount:            api.VMResourceBreakdown{},
+			DiskGB:               api.VMResourceBreakdown{},
+			NicCount:             &api.VMResourceBreakdown{},
+		},
+		Infra: api.Infra{
+			ClustersPerDatacenter: &infraData.ClustersPerDatacenter,
+			Datastores:            infraData.Datastores,
+			HostPowerStates:       infraData.HostPowerStates,
+			Hosts:                 infraData.Hosts,
+			TotalHosts:            infraData.TotalHosts,
+			TotalClusters:         infraData.TotalClusters,
+			TotalDatacenters:      &infraData.TotalDatacenters,
+			HostsPerCluster:       infraData.HostsPerCluster,
+			Networks:              infraData.Networks,
+			VmsPerCluster:         &infraData.VmsPerCluster,
+		},
+	}
 }
 
 func NewInventoryUpdater(sourceID, agentID uuid.UUID, client client.Planner) *InventoryUpdater {

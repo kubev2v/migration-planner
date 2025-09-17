@@ -1,11 +1,19 @@
 package mappers
 
 import (
+	"io"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
+
+// Label represents a simple key-value pair for form data
+type Label struct {
+	Key   string
+	Value string
+}
 
 type SourceCreateForm struct {
 	CertificateChain string
@@ -82,4 +90,79 @@ func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source
 	m.Inventory = model.MakeJSONField(inventory)
 	m.VCenterID = inventory.Vcenter.Id
 	return m
+}
+
+type SourceUpdateForm struct {
+	Name             *string
+	Labels           []Label
+	SshPublicKey     *string
+	CertificateChain *string
+	HttpUrl          *string
+	HttpsUrl         *string
+	NoProxy          *string
+}
+
+func (f *SourceUpdateForm) ToSource(source *model.Source) {
+	if f.Name != nil {
+		source.Name = *f.Name
+	}
+}
+
+func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
+	if f.SshPublicKey != nil {
+		imageInfra.SshPublicKey = *f.SshPublicKey
+	}
+	if f.CertificateChain != nil {
+		imageInfra.CertificateChain = *f.CertificateChain
+	}
+	if f.HttpUrl != nil {
+		imageInfra.HttpProxyUrl = *f.HttpUrl
+	}
+	if f.HttpsUrl != nil {
+		imageInfra.HttpsProxyUrl = *f.HttpsUrl
+	}
+	if f.NoProxy != nil {
+		imageInfra.NoProxyDomains = *f.NoProxy
+	}
+}
+
+func (f *SourceUpdateForm) ToLabels() []model.Label {
+	labels := make([]model.Label, len(f.Labels))
+	for i, label := range f.Labels {
+		labels[i] = model.Label{Key: label.Key, Value: label.Value}
+	}
+	return labels
+}
+
+// Assessment-related mappers
+
+type AssessmentCreateForm struct {
+	ID          uuid.UUID
+	Name        string
+	OrgID       string
+	Username    string
+	Source      string
+	SourceID    *uuid.UUID
+	Inventory   v1alpha1.Inventory
+	RVToolsFile io.Reader
+}
+
+func (f *AssessmentCreateForm) ToModel() model.Assessment {
+	return model.Assessment{
+		ID:         f.ID,
+		Name:       f.Name,
+		OrgID:      f.OrgID,
+		Username:   f.Username,
+		SourceType: f.Source,
+		SourceID:   f.SourceID,
+	}
+}
+
+type InventoryForm struct {
+	Data v1alpha1.Inventory
+}
+
+type AssessmentUpdateForm struct {
+	Name      *string
+	Inventory v1alpha1.Inventory
 }

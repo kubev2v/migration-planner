@@ -40,5 +40,11 @@ jobs:
           for pod in $(oc get pods -o name); do
             echo "=== Logs for ${pod} ==="
             oc logs ${pod} || echo "Failed to get logs for ${pod}"
+            
+            # Collect logs for migration-planner container if pod starts with migration-planner but exclude postgres
+            if [[ ${pod} == *"migration-planner"* && ${pod} != *"postgres"* ]]; then
+              echo "=== Logs for ${pod} migration-planner container ==="
+              oc logs ${pod} -c migration-planner || echo "Failed to get logs for migration-planner container in ${pod}"
+            fi
             echo "======================="
           done

@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 
+	"github.com/kubev2v/migration-planner/internal/agent/common"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/agent"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
@@ -29,17 +31,36 @@ func main() {
 }
 
 type agentCmd struct {
-	config     *config.Config
-	configFile string
+	config      *config.Config
+	configFile  string
+	credentials config.Credentials
 }
 
 func NewAgentCommand() *agentCmd {
 
 	a := &agentCmd{
-		config:   config.NewDefault(),
+		config: config.NewDefault(),
 	}
 
+	a.bind()
+
+	if err := a.config.ParseConfigFile(a.configFile); err != nil {
+		if err := a.config.CreateDefaultDirs(); err != nil {
+			panic(fmt.Sprintf("Config file not found. Error creating default directories: %v", err))
+		}
+	}
+	if err := a.config.Validate(); err != nil {
+		panic(fmt.Sprintf("Error validating config: %v", err))
+	}
+
+	return a
+}
+
+func (a *agentCmd) bind() {
 	flag.StringVar(&a.configFile, "config", config.DefaultConfigFile, "Path to the agent's configuration file.")
+	flag.StringVar(&a.credentials.Username, "vsphere-username", "", "vSphere username for connecting to the vCenter API")
+	flag.StringVar(&a.credentials.Password, "vsphere-password", "", "vSphere password for connecting to the vCenter API")
+	flag.StringVar(&a.credentials.URL, "vsphere-url", "", "vSphere server URL (e.g. https://vcenter.example.com/sdk)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(flag.CommandLine.Output(), "Usage of %s:\n", os.Args[0])
@@ -48,15 +69,6 @@ func NewAgentCommand() *agentCmd {
 	}
 
 	flag.Parse()
-
-	if err := a.config.ParseConfigFile(a.configFile); err != nil {
-		panic(fmt.Sprintf("Error parsing config: %v", err))
-	}
-	if err := a.config.Validate(); err != nil {
-		panic(fmt.Sprintf("Error validating config: %v", err))
-	}
-
-	return a
 }
 
 func (a *agentCmd) Execute() error {
@@ -73,7 +85,7 @@ func (a *agentCmd) Execute() error {
 
 	agentID, err := a.readFileFromPersistent(agentFilename)
 	if err != nil {
-		zap.S().Fatalf("failed to retreive agent_id: %v", err)
+		zap.S().Warnf("failed to retreive agent_id: %v", err)
 	}
 
 	// Try to read jwt from file.
@@ -81,33 +93,35 @@ func (a *agentCmd) Execute() error {
 	// The agent will not try to validate the jwt. The backend is responsible for validating the token.
 	jwt, err := a.readFileFromVolatile(jwtFilename)
 	if err != nil {
-		zap.S().Errorf("failed to read jwt: %v", err)
+		zap.S().Warnf("failed to read jwt: %v", err)
 	}
 
+	ctx := context.WithValue(context.Background(), common.CmdCredentialsKey, a.credentials)
+
 	agentInstance := agent.New(uuid.MustParse(agentID), jwt, a.config)
-	if err := agentInstance.Run(context.Background()); err != nil {
+	if err := agentInstance.Run(ctx); err != nil {
 		zap.S().Fatalf("running device agent: %v", err)
 	}
 	return nil
 }
 
-func (a *agentCmd) readFile(baseDir string, filename string) (string, error) {
+func (a *agentCmd) readFile(baseDir, filename, fallbackValue string) (string, error) {
 	filePath := path.Join(baseDir, filename)
 	if _, err := os.Stat(filePath); err == nil {
 		content, err := os.ReadFile(filePath)
 		if err != nil {
-			return "", err
+			return fallbackValue, err
 		}
 		return string(bytes.TrimSpace(content)), nil
 	}
 
-	return "", fmt.Errorf("file not found: %s", filePath)
+	return fallbackValue, fmt.Errorf("file not found: %s", filePath)
 }
 
 func (a *agentCmd) readFileFromVolatile(filename string) (string, error) {
-	return a.readFile(a.config.DataDir, filename)
+	return a.readFile(a.config.DataDir, filename, "")
 }
 
 func (a *agentCmd) readFileFromPersistent(filename string) (string, error) {
-	return a.readFile(a.config.PersistentDataDir, filename)
+	return a.readFile(a.config.PersistentDataDir, filename, uuid.Nil.String())
 }

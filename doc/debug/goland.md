@@ -5,7 +5,7 @@ This guide provides step-by-step instructions on how to debug a Go application b
 ## 📌 Prerequisites
 
 For remote debugging your application should be already set up and running. please follow the instructions in 
-**[debugdeployment.md](debugdeployment.md)** for how to deploy migration-planner on OpenShift in Debug Mode.
+**[debugdeployment.md](debug-deployment)** for how to deploy migration-planner on OpenShift in Debug Mode.
 
 ## Step 1: Open the Project in GoLand  
 

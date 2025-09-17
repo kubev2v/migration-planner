@@ -1,0 +1,61 @@
+# following the contribution guide this check enforces the commit format
+# [JIRA-TICKET] | [TYPE]: <MESSAGE>
+name: 'Commit'
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  commit-message-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Validate Commit Message(s)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+
+        run: |
+          echo "BASE_SHA: $BASE_SHA"
+          echo "HEAD_SHA: $HEAD_SHA"
+          MERGE_BASE=$(git merge-base $BASE_SHA $HEAD_SHA)
+          echo "MERGE_BASE: $MERGE_BASE"
+          IFS=$'\n' commit_messages=($(git log --pretty=format:"%s" $MERGE_BASE..$HEAD_SHA))
+          
+          # Lists of GitHub users for whom the commit validation should be skipped:
+          # * red-hat-konflux[bot] - automatic bot responsible for any library or konflux integration update
+          declare -a skip_pr_authors=(
+            "red-hat-konflux[bot]"
+          )
+          echo "The PR Author is \"${PR_AUTHOR}\""
+          for skip_pr_author in "${skip_pr_authors[@]}"
+          do
+            if [ "${PR_AUTHOR}" = "${skip_pr_author}" ]; then
+              echo "The commits created by this PR author (probably bot) should be skipped!!!"
+              exit 0
+            fi
+          done
+
+          VALID_TYPES="fix|feat|build|ci|docs|perf|refactor|style|test"
+          PATTERN="^(NO-JIRA|[A-Z]+-[0-9]+) \| ($VALID_TYPES): .+"
+          
+          for message in "${commit_messages[@]}"
+          do
+            echo "validating commit message:\"$message\""
+            if ! echo "$message" | grep -qE "$PATTERN"; then
+              echo "Invalid commit message format."
+              echo "Expected: JIRA_TICKET (or NO-JIRA) | TYPE: MESSAGE"
+              echo "Where:"
+              echo "   JIRA_TICKET is jira ticket ID (for example ECOPROJECT-xxx)"
+              echo "   NO-JIRA is allowed if the change isn't tied to a ticket"
+              echo "   TYPE must be one of:"
+              echo "       $VALID_TYPES"
+              echo "See: https://github.com/kubev2v/migration-planner/blob/main/CONTRIBUTING.md"
+              exit 1
+            fi
+          done

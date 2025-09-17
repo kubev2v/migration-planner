@@ -131,6 +131,7 @@ storage:
           data-dir: /agent/data
           persistent-data-dir: /agent/persistent-data
           www-dir: /app/www
+          policies-dir: /app/policies
           log-level: debug
           update-interval: 5s
           source-id: {{.SourceID}}
@@ -149,8 +150,6 @@ storage:
         inline: |
           [Unit]
           Description=Planner agent quadlet
-          Wants=planner-agent-opa.service
-          After=planner-agent-opa.service
 
           [Container]
           Image={{.MigrationPlannerAgentImage}}
@@ -163,7 +162,6 @@ storage:
           {{ end }}
           Volume=/home/core/.migration-planner:/agent:Z
           Volume=/var/lib/data:/agent/persistent-data:Z
-          Environment=OPA_SERVER=127.0.0.1:8181
 {{ if .HttpProxyUrl }}
           Environment=HTTP_PROXY={{ .HttpProxyUrl }}
 {{ end }}
@@ -180,28 +178,6 @@ storage:
           Restart=on-failure
           RestartSec=5
           ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done'
-
-          [Install]
-          WantedBy=multi-user.target default.target
-    - path: /home/core/.config/containers/systemd/planner-agent-opa.container
-      mode: 0644
-      contents:
-        inline: |
-          [Unit]
-          Description=OPA quadlet
-          Before=planner-agent.service
-
-          [Container]
-          ContainerName=opa
-          Image={{ .ValidationContainerImage }}
-          Entrypoint=/usr/bin/opa
-          PublishPort=8181:8181
-          Exec=run --server /usr/share/opa/policies
-          Network=host
-
-          [Service]
-          Restart=on-failure
-          RestartSec=5
 
           [Install]
           WantedBy=multi-user.target default.target

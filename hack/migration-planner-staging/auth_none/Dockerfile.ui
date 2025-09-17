@@ -1,0 +1,30 @@
+FROM node:18-alpine
+
+# Install patch utility
+RUN apk add --no-cache patch
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Apply webpack proxy patch for container networking
+COPY webpack-proxy.patch /tmp/webpack-proxy.patch
+RUN patch -p0 < /tmp/webpack-proxy.patch
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables for local development
+ENV PLANNER_LOCAL_DEV=true
+ENV PLANNER_API_BASE_URL=/api/migration-assessment
+
+# Start the UI in federated mode
+CMD ["npm", "run", "start:standalone"]

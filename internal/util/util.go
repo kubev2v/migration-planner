@@ -79,7 +79,30 @@ func Contains(slice []string, val string) bool {
 	return false
 }
 
-// IntPtr returns the address of given integer
+// ConvertBytesToMB converts bytes to megabytes safely
+func ConvertBytesToMB(bytes int64) int64 {
+	return bytes / (1024 * 1024)
+}
+
+// ConvertMBToBytes converts megabytes to bytes safely
+func ConvertMBToBytes(mb int64) int64 {
+	return mb * 1024 * 1024
+}
+
+// DerefString safely dereferences a string pointer, returning an empty string if the pointer is nil
+func DerefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// ToStrPtr returns a pointer to the given string
+func ToStrPtr(s string) *string {
+	return &s
+}
+
+// IntPtr returns a pointer to the given int
 func IntPtr(i int) *int {
 	return &i
 }

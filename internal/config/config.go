@@ -30,7 +30,9 @@ type svcConfig struct {
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
+	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	S3                   S3
+	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 }
 
 type Auth struct {
@@ -46,6 +48,7 @@ type S3 struct {
 	AccessKey   string `envconfig:"MIGRATION_PLANNER_S3_ACCESS_KEY" default:""`
 	SecretKey   string `envconfig:"MIGRATION_PLANNER_S3_SECRET_KEY" default:""`
 	IsoFileName string `envconfig:"MIGRATION_PLANNER_S3_ISO_FILENAME" default:""`
+	IsoSha256   string `envconfig:"MIGRATION_PLANNER_S3_ISO_SHA256" default:""`
 }
 
 func New() (*Config, error) {

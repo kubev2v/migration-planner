@@ -31,10 +31,24 @@ func NewSourceValidationRules() []ValidationRule {
 			Rule: registerFn("certs", certificateValidator),
 		},
 		{
+			Rule: registerFn("label", labelValidator),
+		},
+		{
 			Rule: registerFn("startswith", startsWithValidator),
 		},
 		{
 			Rule: registerFn("startsnotwith", startsNotWithValidator),
+		},
+	}
+}
+
+func NewAssessmentValidationRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Rule: registerFn("assessment_name", nameValidator),
+		},
+		{
+			Rule: registerFn("inventory_not_empty", inventoryNotEmptyValidator),
 		},
 	}
 }

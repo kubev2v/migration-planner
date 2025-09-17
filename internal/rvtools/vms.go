@@ -73,19 +73,18 @@ func processVMInfo(
 	return vms, nil
 }
 
-
 func populateVMInfoData(vm *vsphere.VM, row []string, colMap map[string]int, hostIPToObjectID map[string]string) {
 
 	vm.ID = getColumnValue(row, colMap, "vm id")
 	vm.Name = getColumnValue(row, colMap, "vm")
 	vm.Folder = getColumnValue(row, colMap, "folder id")
-	
+
 	// Resolve host IP to Object ID
 	hostIP := getColumnValue(row, colMap, "host")
 	if objectID, exists := hostIPToObjectID[hostIP]; exists {
 		vm.Host = objectID
 	}
-	
+
 	vm.UUID = getColumnValue(row, colMap, "smbios uuid")
 	vm.Firmware = getColumnValue(row, colMap, "firmware")
 	vm.PowerState = getColumnValue(row, colMap, "powerstate")
@@ -117,10 +116,10 @@ func populateVMMemoryData(vm *vsphere.VM, memRow []string, colMap map[string]int
 }
 
 type ControllerTracker struct {
-	ideCount   int32
-	scsiCount  int32
-	sataCount  int32
-	nvmeCount  int32
+	ideCount  int32
+	scsiCount int32
+	sataCount int32
+	nvmeCount int32
 }
 
 func NewControllerTracker() *ControllerTracker {
@@ -132,16 +131,16 @@ func processVMDisksFromDiskSheet(diskRows [][]string, colMap map[string]int, dat
 
 	controllerTracker := NewControllerTracker()
 	controllerKeyMap := make(map[string]int32)
-	
+
 	for _, diskRow := range diskRows {
 		capacityMiB := parseFormattedInt64(getColumnValue(diskRow, colMap, "capacity mib"))
 		disk := vsphere.Disk{
-			Key:           parseIntOrZero(getColumnValue(diskRow, colMap, "disk key")),
-			UnitNumber:    parseIntOrZero(getColumnValue(diskRow, colMap, "unit #")),
-			File:          getColumnValue(diskRow, colMap, "path"),
-			Capacity:      capacityMiB * 1024 * 1024,
-			Mode:          getColumnValue(diskRow, colMap, "disk mode"),
-			Serial:        getColumnValue(diskRow, colMap, "disk uuid"),
+			Key:        parseIntOrZero(getColumnValue(diskRow, colMap, "disk key")),
+			UnitNumber: parseIntOrZero(getColumnValue(diskRow, colMap, "unit #")),
+			File:       getColumnValue(diskRow, colMap, "path"),
+			Capacity:   capacityMiB * 1024 * 1024,
+			Mode:       getColumnValue(diskRow, colMap, "disk mode"),
+			Serial:     getColumnValue(diskRow, colMap, "disk uuid"),
 		}
 
 		// Parse datastore from disk path and map to object ID
@@ -172,18 +171,18 @@ func processVMDisksFromDiskSheet(diskRows [][]string, colMap map[string]int, dat
 			controllerKeyMap[controllerName] = newKey
 			disk.ControllerKey = newKey
 		}
-		
+
 		disk.Bus = mapControllerNameToBus(controllerName)
 
 		disks = append(disks, disk)
 	}
-	
+
 	return disks
 }
 
 func createHostIPToObjectIDMap(vHostRows [][]string) map[string]string {
 	hostMap := make(map[string]string)
-	
+
 	if len(vHostRows) <= 1 {
 		return hostMap
 	}
@@ -195,15 +194,15 @@ func createHostIPToObjectIDMap(vHostRows [][]string) map[string]string {
 		if len(row) == 0 {
 			continue
 		}
-		
+
 		hostIP := getColumnValue(row, vHostColMap, "host")
 		objectID := getColumnValue(row, vHostColMap, "object id")
-		
+
 		if hostIP != "" && objectID != "" {
 			hostMap[hostIP] = objectID
 		}
 	}
-	
+
 	return hostMap
 }
 
@@ -212,9 +211,9 @@ func processVMNICs(nicRows [][]string, colMap map[string]int, networkNameToID ma
 
 	for _, nicRow := range nicRows {
 		networkName := getColumnValue(nicRow, colMap, "network")
-		
+
 		nic := vsphere.NIC{
-			MAC:       getColumnValue(nicRow, colMap, "mac address"),
+			MAC: getColumnValue(nicRow, colMap, "mac address"),
 		}
 
 		if networkName != "" {
@@ -234,7 +233,7 @@ func processVMNICs(nicRows [][]string, colMap map[string]int, networkNameToID ma
 
 func processVMNetworksFromInfo(row []string, colMap map[string]int, networkNameToID map[string]string) []vsphere.Ref {
 	networks := []vsphere.Ref{}
-	
+
 	// Check for Network #1, Network #2, etc. columns
 	// Dynamically find all 'network #<number>' columns
 	networkKeys := []string{}
@@ -257,7 +256,6 @@ func processVMNetworksFromInfo(row []string, colMap map[string]int, networkNameT
 			}
 		}
 	}
-	
+
 	return networks
 }
-

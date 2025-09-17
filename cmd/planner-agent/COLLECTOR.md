@@ -35,18 +35,11 @@ cat <<EOF > /tmp/data/credentials.json
 EOF
 ```
 
-### OPA
-Run the OPA server for VM validations.
-
-```
-podman run -p 8181:8181 -d --name opa --entrypoint '/usr/bin/opa' quay.io/kubev2v/forklift-validation:release-v2.6.4 run --server /usr/share/opa/policies
-```
-
 ## Run
 Build & run the collector code specifying credentials file as first argument and as second path to inventory file, where data should be written.
 
 ```
-go run cmd/planner-agent/main.go -config ~/.planner-agent/config.yaml
+go run cmd/planner-agent/main.go -config -config ~/.planner-agent/config.yaml
 ```
 
 Explore `/tmp/data/inventory.json`
