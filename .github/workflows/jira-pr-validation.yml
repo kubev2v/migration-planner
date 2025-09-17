@@ -1,0 +1,55 @@
+name: jira
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  jira-validation-and-linking:
+    runs-on: ubuntu-latest
+    env:
+      JIRA_BASE_URL: https://issues.redhat.com
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find Jira issue keys in commits
+        id: find-issues
+        uses: atlassian/gajira-find-issue-key@master
+        with:
+          from: commits
+
+      - name: Validate Jira issues exist and are accessible
+        if: steps.find-issues.outputs.issue
+        uses: atlassian/gajira-transition@master
+        with:
+          issue: ${{ steps.find-issues.outputs.issue }}
+          transition: "none"
+        continue-on-error: false
+        env:
+          JIRA_API_TOKEN: ${{ secrets.JIRA_TOKEN }}
+
+      - name: Add Jira description to PR (smart duplicate avoidance)
+        if: steps.find-issues.outputs.issue
+        uses: cakeinpanic/jira-description-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          jira-token: ${{ secrets.JIRA_TOKEN }}
+          jira-base-url: ${{ env.JIRA_BASE_URL }}
+          custom-issue-number-regexp: 'ECOPROJECT-\d+'
+          fail-when-jira-issue-not-found: true
+
+      - name: Add PR link to Jira issue
+        if: steps.find-issues.outputs.issue
+        uses: atlassian/gajira-comment@master
+        with:
+          issue: ${{ steps.find-issues.outputs.issue }}
+          comment: |
+            🔗 **GitHub Pull Request**: [${{ github.event.pull_request.title }}](${{ github.event.pull_request.html_url }})
+            
+            **Author**: @${{ github.event.pull_request.user.login }}
+            **Status**: ${{ github.event.pull_request.state }}
+            
+            _Automatically linked by GitHub Actions_
