@@ -19,6 +19,11 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 
 	filter := service.NewAssessmentFilter(user.Organization)
 
+	includeDefault := request.Params.IncludeDefault
+	if includeDefault != nil && *includeDefault {
+		filter = filter.WithDefaultInventory()
+	}
+
 	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
