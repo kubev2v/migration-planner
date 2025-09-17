@@ -2,6 +2,7 @@ package opa
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -49,9 +50,9 @@ func (v *Validator) compilePolicies(policies map[string]string) error {
 	modules := make(map[string]*ast.Module)
 
 	for filename, content := range policies {
-		// Parse with v0 for compatibility with existing Forklift policies
+		// Parse with Rego v1; ensure policies are v1-compatible
 		module, err := ast.ParseModuleWithOpts(filename, content, ast.ParserOptions{
-			RegoVersion: ast.RegoV0,
+			RegoVersion: ast.RegoV1,
 		})
 		if err != nil {
 			return fmt.Errorf("failed to parse policy %s: %w", filename, err)
@@ -101,20 +102,24 @@ func (v *Validator) concerns(ctx context.Context, input interface{}) ([]interfac
 	return result, nil
 }
 
-func (v *Validator) ValidateVMs(ctx context.Context, vms []vsphere.VM) ([]vsphere.VM, error) {
+func (v *Validator) ValidateVMs(ctx context.Context, vms *[]vsphere.VM) error {
+	if vms == nil || len(*vms) == 0 {
+		return nil
+	}
 
 	var validationErrors []error
 
-	validatedVMs := make([]vsphere.VM, 0, len(vms))
+	for i := range *vms {
+		vm := &(*vms)[i] // take a pointer to the real element
 
-	for _, vm := range vms {
 		// Prepare the JSON data in MTV OPA server format
 		workload := web.Workload{}
-		workload.With(&vm)
+		workload.With(vm)
 
 		concerns, err := v.concerns(ctx, workload)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("failed to validate VM %q: %w", vm.Name, err))
+			validationErrors = append(validationErrors,
+				fmt.Errorf("failed to validate VM %q: %w", vm.Name, err))
 			continue
 		}
 
@@ -122,7 +127,7 @@ func (v *Validator) ValidateVMs(ctx context.Context, vms []vsphere.VM) ([]vspher
 		for _, c := range concerns {
 			concernMap, ok := c.(map[string]interface{})
 			if !ok {
-				return nil, fmt.Errorf(
+				return fmt.Errorf(
 					"unexpected concern data type for VM %q: got %T, expected map[string]interface{}",
 					vm.Name,
 					c,
@@ -148,13 +153,11 @@ func (v *Validator) ValidateVMs(ctx context.Context, vms []vsphere.VM) ([]vspher
 
 			vm.Concerns = append(vm.Concerns, concern)
 		}
-
-		validatedVMs = append(validatedVMs, vm)
 	}
 
 	if len(validationErrors) > 0 {
-		return validatedVMs, fmt.Errorf("validation completed with %d error(s): %v", len(validationErrors), validationErrors)
+		return fmt.Errorf("validation completed with %d error(s): %w", len(validationErrors), errors.Join(validationErrors...))
 	}
 
-	return validatedVMs, nil
+	return nil
 }
