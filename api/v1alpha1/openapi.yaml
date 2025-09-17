@@ -381,6 +381,53 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/sources/{id}/agent-token:
+    get:
+      tags:
+        - source
+      description: Get the JWT token required for sending updates to the service.
+                    This is needed for cases where users want to paste the Podman command into the terminal,
+                      which will perform the assessment and send the updates to the service.
+      operationId: GetAgentJwt
+      parameters:
+        - name: id
+          in: path
+          description: Source id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: JWT token required for sending updates to the service
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/agent-token'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/sources/{id}/image-url:
     get:
       tags:
@@ -737,6 +784,15 @@ components:
           type: string
           format: date-time
           description: Expiration time for the URL token.
+
+    agent-token:
+      type: object
+      required:
+        - token
+      properties:
+        token:
+          type: string
+          description: JWT token required for sending updates to the service
 
     Source:
       type: object
