@@ -9,3 +9,18 @@ policies/
 *.local.*
 cover.out
 rhcos-live-iso.x86_64.iso
+
+# Sensitive files and directories
+staging-data/
+backups/
+*.bak
+*.log
+*.tmp
+*.local
+*.env
+*.env.*
+.env*
+private-key.txt
+
+# Exceptions
+!hack/staging-debug-tool/.env-debug.example

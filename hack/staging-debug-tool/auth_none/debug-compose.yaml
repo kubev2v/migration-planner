@@ -1,0 +1,98 @@
+services:
+  planner-db-staging:
+    container_name: planner-db-staging
+    image: quay.io/sclorg/postgresql-15-c9s:latest
+    env_file:
+      - ../.env-debug
+    ports:
+      - "5432:5432"
+    volumes:
+      - staging-db-data:/var/lib/pgsql/data
+      - ../staging-data:/staging-data:ro,Z # Mount your extracted data
+    networks:
+      - planner-network
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U demouser -d planner"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Run database migrations first
+  db-migrator:
+    container_name: db-migrator
+    image: localhost/migration-planner-api:latest-debug
+    entrypoint: ["/app/planner-api", "migrate"]
+    env_file:
+      - ../.env-debug
+    environment:
+      - MIGRATION_PLANNER_AUTH=none
+      - MIGRATION_PLANNER_AGENT_AUTH_ENABLED=false
+    networks:
+      - planner-network
+    depends_on:
+      planner-db-staging:
+        condition: service_healthy
+
+  # Load staging data after migrations complete
+  data-loader:
+    container_name: data-loader
+    image: quay.io/sclorg/postgresql-15-c9s:latest
+    command: ["bash", "/scripts/load-data.sh"]
+    volumes:
+      - ../staging-data:/staging-data:ro,Z
+      - ../load-data.sh:/scripts/load-data.sh:ro,Z
+    networks:
+      - planner-network
+    depends_on:
+      db-migrator:
+        condition: service_completed_successfully
+
+  planner-api-debug:
+    container_name: planner-api-debug
+    image: localhost/migration-planner-api:latest-debug
+    ports:
+      - "3443:3443"
+      - "40000:40000"
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        exec /app/dlv --continue --listen=:40000 --headless=true --api-version=2 --accept-multiclient exec /app/planner-api run
+    env_file:
+      - ../.env-debug
+    environment:
+      - MIGRATION_PLANNER_AUTH=none
+      - MIGRATION_PLANNER_AGENT_AUTH_ENABLED=false
+    volumes:
+      - dummy-iso:/tmp:Z
+    networks:
+      - planner-network
+    restart: unless-stopped
+    depends_on:
+      db-migrator:
+        condition: service_completed_successfully
+      data-loader:
+        condition: service_completed_successfully
+      iso-creator:
+        condition: service_completed_successfully
+
+  planner-ui:
+    container_name: planner-ui
+    image: localhost/stagedb_planner-ui:latest
+    network_mode: host
+    environment:
+      - PLANNER_LOCAL_DEV=true
+      - PLANNER_API_BASE_URL=http://localhost:3443/api/v1
+
+  iso-creator:
+    image: quay.io/sclorg/postgresql-15-c9s:latest
+    command: ["sh", "-c", "touch /tmp/debug-rhcos.iso && sleep 1"]
+    volumes:
+      - dummy-iso:/tmp:Z
+
+networks:
+  planner-network:
+
+volumes:
+  dummy-iso:
+  staging-db-data:
