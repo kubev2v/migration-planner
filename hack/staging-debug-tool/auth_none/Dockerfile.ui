@@ -1,0 +1,27 @@
+FROM node:20-alpine
+
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source code
+COPY . .
+
+# Update webpack proxy target for container networking
+RUN sed -i "s#target: 'http://localhost:3443'#target: process.env.PLANNER_PROXY_TARGET || 'http://localhost:3443'#g" webpack.standalone.js
+
+# Expose port
+EXPOSE 3000
+
+# Set environment variables for local development
+ENV PLANNER_LOCAL_DEV=true
+ENV PLANNER_API_BASE_URL=/api/migration-assessment
+
+# Start the UI in federated mode
+CMD ["npm", "run", "start:standalone"]
