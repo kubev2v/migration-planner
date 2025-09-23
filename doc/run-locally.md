@@ -162,6 +162,23 @@ curl -X DELETE http://localhost:3443/api/v1/sources/{source-id}
 curl http://localhost:3443/api/v1/info
 ```
 
+#### g. List all assessments:
+```bash
+curl http://localhost:3443/api/v1/assessments
+```
+
+#### h. Create new assessment of type agent:
+```bash
+curl -X POST "http://localhost:3443/api/v1/assessments" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "test-from-source",
+    "sourceType": "agent",
+    "sourceId": "{source-id}"
+  }'
+curl http://localhost:3443/api/v1/assessments
+```
+
 ## Run the Migration Planner Agent locally
 
 Follow these steps to get the agent running locally:
