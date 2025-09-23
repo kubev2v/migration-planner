@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, org_id, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', %s);"
+	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, org_id, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', %s);"
 	insertSnapshotStm   = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s', '%s');"
 )
 
@@ -50,11 +50,11 @@ var _ = Describe("assessment handler", Ordered, func() {
 			assessmentID3 := uuid.New()
 
 			// Create assessments for different organizations
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1.String(), "assessment1", "admin", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1.String(), "assessment1", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2.String(), "assessment2", "admin", service.SourceTypeInventory, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2.String(), "assessment2", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3.String(), "assessment3", "batman", service.SourceTypeInventory, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3.String(), "assessment3", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			// Create snapshots for assessments
@@ -70,6 +70,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 				EmailDomain:  "admin.example.com",
+				FirstName:    "John",
+				LastName:     "Doe",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -80,6 +82,14 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			assessmentList := resp.(server.ListAssessments200JSONResponse)
 			Expect(assessmentList).To(HaveLen(2)) // Only admin assessments
+
+			// Verify owner fields are included in API responses
+			for _, assessment := range assessmentList {
+				Expect(assessment.OwnerFirstName).ToNot(BeNil())
+				Expect(*assessment.OwnerFirstName).To(Equal("John"))
+				Expect(assessment.OwnerLastName).ToNot(BeNil())
+				Expect(*assessment.OwnerLastName).To(Equal("Doe"))
+			}
 		})
 
 		It("returns empty list when no assessments exist for the organization", func() {
@@ -111,6 +121,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Username:     "admin",
 				Organization: "admin",
 				EmailDomain:  "admin.example.com",
+				FirstName:    "Alice",
+				LastName:     "Johnson",
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
@@ -135,6 +147,53 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(assessment.Name).To(Equal("test-assessment"))
 			Expect(assessment.SourceType).To(Equal(v1alpha1.AssessmentSourceType(service.SourceTypeInventory)))
 			Expect(assessment.Snapshots).To(HaveLen(1))
+			// Verify owner fields are populated from user context, not from API request
+			Expect(assessment.OwnerFirstName).ToNot(BeNil())
+			Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
+			Expect(assessment.OwnerLastName).ToNot(BeNil())
+			Expect(*assessment.OwnerLastName).To(Equal("Johnson"))
+		})
+
+		It("verifies owner fields security - populated from user context only", func() {
+			// This test verifies the security design: owner fields cannot be spoofed via API requests
+			// They are populated from authenticated user context only (like username)
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+				FirstName:    "RealUser",     // This is what should appear
+				LastName:     "RealLastName", // This is what should appear
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			inventory := v1alpha1.Inventory{
+				Vcenter: v1alpha1.VCenter{
+					Id: "test-vcenter",
+				},
+			}
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+
+			// Note: AssessmentForm schema deliberately excludes owner fields
+			// This prevents users from spoofing owner information via API requests
+			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
+				JSONBody: &v1alpha1.AssessmentForm{
+					Name:       "security-test-assessment",
+					SourceType: service.SourceTypeInventory,
+					Inventory:  &inventory,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateAssessment201JSONResponse{}).String()))
+
+			assessment := resp.(server.CreateAssessment201JSONResponse)
+			Expect(assessment.Name).To(Equal("security-test-assessment"))
+
+			// Verify owner fields come from authenticated user context only
+			Expect(assessment.OwnerFirstName).ToNot(BeNil())
+			Expect(*assessment.OwnerFirstName).To(Equal("RealUser"))
+			Expect(assessment.OwnerLastName).ToNot(BeNil())
+			Expect(*assessment.OwnerLastName).To(Equal("RealLastName"))
 		})
 
 		It("successfully creates an assessment with sourceID - agent type", func() {
@@ -557,7 +616,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 	Context("get assessment", func() {
 		It("successfully retrieves an assessment", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -600,7 +659,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment from different organization", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -629,7 +688,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 	Context("update assessment", func() {
 		It("successfully updates an assessment name", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "original-name", "admin", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "original-name", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -704,7 +763,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment from different organization", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -732,7 +791,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("successfully updates assessment created from inventory sourceType but keeps same number of snapshots", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "inventory-assessment", "admin", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "inventory-assessment", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -768,7 +827,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("successfully updates assessment created from rvtools sourceType but keeps same number of snapshots", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "rvtools-assessment", "admin", service.SourceTypeRvtools, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "rvtools-assessment", "admin", "John", "Doe", service.SourceTypeRvtools, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -812,8 +871,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			// Create assessment with agent sourceType
 			assessmentID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO assessments (id, created_at, name, org_id, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s');",
-				assessmentID.String(), "agent-assessment", "admin", service.SourceTypeAgent, sourceID.String()))
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO assessments (id, created_at, name, org_id, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s');",
+				assessmentID.String(), "agent-assessment", "admin", "John", "Doe", service.SourceTypeAgent, sourceID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			// Create initial snapshot
@@ -854,7 +913,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 	Context("delete assessment", func() {
 		It("successfully deletes an assessment", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`
@@ -903,7 +962,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment from different organization", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			inventory := `{"vcenter": {"id": "test-vcenter"}}`

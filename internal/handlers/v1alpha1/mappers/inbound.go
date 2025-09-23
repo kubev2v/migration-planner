@@ -110,6 +110,14 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 		Source:   resource.SourceType,
 	}
 
+	// Set owner fields from user context (like username)
+	if user.FirstName != "" {
+		form.OwnerFirstName = &user.FirstName
+	}
+	if user.LastName != "" {
+		form.OwnerLastName = &user.LastName
+	}
+
 	// Set source ID if provided
 	if resource.SourceId != nil {
 		form.SourceID = resource.SourceId
@@ -135,6 +143,14 @@ func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, user aut
 		OrgID:    user.Organization,
 		Username: user.Username,
 		Source:   service.SourceTypeRvtools,
+	}
+
+	// Set owner fields from user context (like username)
+	if user.FirstName != "" {
+		form.OwnerFirstName = &user.FirstName
+	}
+	if user.LastName != "" {
+		form.OwnerLastName = &user.LastName
 	}
 
 	for {

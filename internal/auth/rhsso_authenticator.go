@@ -98,10 +98,28 @@ func (rh *RHSSOAuthenticator) parseToken(userToken *jwt.Token) (user User, err e
 		}
 	}
 
+	// Extract first and last name from JWT claims
+	// Following the same pattern as OpenShift assisted-service
+	firstName := ""
+	if first, ok := claims["first_name"].(string); ok {
+		firstName = first
+	} else if given, ok := claims["given_name"].(string); ok {
+		firstName = given
+	}
+
+	lastName := ""
+	if last, ok := claims["last_name"].(string); ok {
+		lastName = last
+	} else if family, ok := claims["family_name"].(string); ok {
+		lastName = family
+	}
+
 	return User{
 		Username:     username,
 		Organization: orgID,
 		EmailDomain:  domain,
+		FirstName:    firstName,
+		LastName:     lastName,
 		Token:        userToken,
 	}, nil
 }

@@ -10,15 +10,17 @@ import (
 )
 
 type Assessment struct {
-	ID         uuid.UUID `gorm:"primaryKey;column:id;type:VARCHAR(255);"`
-	CreatedAt  time.Time `gorm:"not null;default:now()"`
-	UpdatedAt  *time.Time
-	Name       string     `gorm:"not null;uniqueIndex:org_id_name"`
-	OrgID      string     `gorm:"not null;uniqueIndex:org_id_name;index:assessments_org_id_idx"`
-	Username   string     `gorm:"type:VARCHAR(255)"`
-	SourceType string     `gorm:"not null;type:VARCHAR(100)"`
-	SourceID   *uuid.UUID `gorm:"type:TEXT"`
-	Snapshots  []Snapshot `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
+	ID             uuid.UUID `gorm:"primaryKey;column:id;type:VARCHAR(255);"`
+	CreatedAt      time.Time `gorm:"not null;default:now()"`
+	UpdatedAt      *time.Time
+	Name           string     `gorm:"not null;uniqueIndex:org_id_name"`
+	OrgID          string     `gorm:"not null;uniqueIndex:org_id_name;index:assessments_org_id_idx"`
+	Username       string     `gorm:"type:VARCHAR(255)"`
+	OwnerFirstName *string    `gorm:"type:VARCHAR(100)"`
+	OwnerLastName  *string    `gorm:"type:VARCHAR(100)"`
+	SourceType     string     `gorm:"not null;type:VARCHAR(100)"`
+	SourceID       *uuid.UUID `gorm:"type:TEXT"`
+	Snapshots      []Snapshot `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
 }
 
 type Snapshot struct {
