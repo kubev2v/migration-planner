@@ -137,24 +137,28 @@ func (f *SourceUpdateForm) ToLabels() []model.Label {
 // Assessment-related mappers
 
 type AssessmentCreateForm struct {
-	ID          uuid.UUID
-	Name        string
-	OrgID       string
-	Username    string
-	Source      string
-	SourceID    *uuid.UUID
-	Inventory   v1alpha1.Inventory
-	RVToolsFile io.Reader
+	ID             uuid.UUID
+	Name           string
+	OrgID          string
+	Username       string
+	OwnerFirstName *string
+	OwnerLastName  *string
+	Source         string
+	SourceID       *uuid.UUID
+	Inventory      v1alpha1.Inventory
+	RVToolsFile    io.Reader
 }
 
 func (f *AssessmentCreateForm) ToModel() model.Assessment {
 	return model.Assessment{
-		ID:         f.ID,
-		Name:       f.Name,
-		OrgID:      f.OrgID,
-		Username:   f.Username,
-		SourceType: f.Source,
-		SourceID:   f.SourceID,
+		ID:             f.ID,
+		Name:           f.Name,
+		OrgID:          f.OrgID,
+		Username:       f.Username,
+		OwnerFirstName: f.OwnerFirstName,
+		OwnerLastName:  f.OwnerLastName,
+		SourceType:     f.Source,
+		SourceID:       f.SourceID,
 	}
 }
 
@@ -163,6 +167,8 @@ type InventoryForm struct {
 }
 
 type AssessmentUpdateForm struct {
-	Name      *string
-	Inventory v1alpha1.Inventory
+	Name           *string
+	OwnerFirstName *string
+	OwnerLastName  *string
+	Inventory      v1alpha1.Inventory
 }

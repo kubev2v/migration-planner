@@ -57,12 +57,18 @@ type AgentProxy struct {
 
 // Assessment defines model for Assessment.
 type Assessment struct {
-	CreatedAt  time.Time            `json:"createdAt"`
-	Id         openapi_types.UUID   `json:"id"`
-	Name       string               `json:"name"`
-	Snapshots  []Snapshot           `json:"snapshots"`
-	SourceId   *openapi_types.UUID  `json:"sourceId,omitempty"`
-	SourceType AssessmentSourceType `json:"sourceType"`
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Name      string             `json:"name"`
+
+	// OwnerFirstName Owner's first name
+	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
+
+	// OwnerLastName Owner's last name
+	OwnerLastName *string              `json:"ownerLastName,omitempty"`
+	Snapshots     []Snapshot           `json:"snapshots"`
+	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
+	SourceType    AssessmentSourceType `json:"sourceType"`
 }
 
 // AssessmentSourceType defines model for Assessment.SourceType.

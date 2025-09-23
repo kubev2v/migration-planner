@@ -1204,6 +1204,12 @@ components:
           format: uuid
         name:
           type: string
+        ownerFirstName:
+          type: string
+          description: Owner's first name
+        ownerLastName:
+          type: string
+          description: Owner's last name
         sourceType:
           type: string
           enum: [inventory, rvtools, source]

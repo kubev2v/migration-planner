@@ -16,6 +16,8 @@ func (n *NoneAuthenticator) Authenticator(next http.Handler) http.Handler {
 		user := User{
 			Username:     "admin",
 			Organization: "internal",
+			FirstName:    "Admin",
+			LastName:     "User",
 		}
 		ctx := NewTokenContext(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))

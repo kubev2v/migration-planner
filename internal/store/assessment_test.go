@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	insertAssessmentStm = "INSERT INTO assessments (id, name, org_id, username, source_type, source_id) VALUES ('%s', '%s', '%s', '%s', '%s', %s);"
+	insertAssessmentStm = "INSERT INTO assessments (id, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', %s);"
 	insertSnapshotStm   = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
 )
 
@@ -44,14 +44,22 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessmentID1 := uuid.New()
 			assessmentID2 := uuid.New()
 
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "inventory", "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "user2", "rvtools", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "user2", "John", "Doe", "rvtools", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
+
+			// Verify owner fields are properly loaded
+			for _, assessment := range assessments {
+				Expect(assessment.OwnerFirstName).ToNot(BeNil())
+				Expect(*assessment.OwnerFirstName).To(Equal("John"))
+				Expect(assessment.OwnerLastName).ToNot(BeNil())
+				Expect(*assessment.OwnerLastName).To(Equal("Doe"))
+			}
 		})
 
 		It("successfully list assessments filtered by org_id", func() {
@@ -59,11 +67,11 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessmentID2 := uuid.New()
 			assessmentID3 := uuid.New()
 
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "inventory", "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org2", "user2", "rvtools", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org2", "user2", "John", "Doe", "rvtools", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "agent", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "John", "Doe", "agent", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithOrgID("org1"))
@@ -80,11 +88,11 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessmentID2 := uuid.New()
 			assessmentID3 := uuid.New()
 
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "inventory", "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1, "assessment1", "org1", "user1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "user2", "rvtools", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "user2", "John", "Doe", "rvtools", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "agent", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "John", "Doe", "agent", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithSourceType("rvtools"))
@@ -96,7 +104,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		It("successfully list assessments with snapshots", func() {
 			assessmentID := uuid.New()
 
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "assessment1", "org1", "user1", "inventory", "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "assessment1", "org1", "user1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			// Add snapshots
@@ -117,6 +125,25 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(assessments).To(HaveLen(0))
 		})
 
+		It("successfully handles assessments with NULL owner fields (backward compatibility)", func() {
+			assessmentID := uuid.New()
+
+			// Insert assessment with NULL owner fields
+			tx := gormdb.Exec("INSERT INTO assessments (id, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ($1, $2, $3, $4, NULL, NULL, $5, NULL);",
+				assessmentID, "legacy-assessment", "org1", "legacy-user", "inventory")
+			Expect(tx.Error).To(BeNil())
+
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(1))
+
+			// Verify NULL owner fields are handled correctly
+			assessment := assessments[0]
+			Expect(assessment.OwnerFirstName).To(BeNil())
+			Expect(assessment.OwnerLastName).To(BeNil())
+			Expect(assessment.Username).To(Equal("legacy-user"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
@@ -128,7 +155,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		It("successfully get an assessment", func() {
 			assessmentID := uuid.New()
 
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "test-assessment", "org1", "testuser", "inventory", "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "test-assessment", "org1", "testuser", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			// Add a snapshot
@@ -194,6 +221,47 @@ var _ = Describe("assessment store", Ordered, func() {
 			tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
+		})
+
+		It("successfully creates an assessment with owner fields", func() {
+			assessmentID := uuid.New()
+			inventory := api.Inventory{
+				Vcenter: api.VCenter{Id: "test-vcenter"},
+				Vms:     api.VMs{Total: 10},
+				Infra:   api.Infra{TotalHosts: 5},
+			}
+
+			ownerFirstName := "Alice"
+			ownerLastName := "Johnson"
+			assessment := model.Assessment{
+				ID:             assessmentID,
+				Name:           "test-assessment-with-owner",
+				OrgID:          "org1",
+				Username:       "alice",
+				OwnerFirstName: &ownerFirstName,
+				OwnerLastName:  &ownerLastName,
+				SourceType:     "inventory",
+			}
+
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			Expect(err).To(BeNil())
+			Expect(created).ToNot(BeNil())
+			Expect(created.ID).To(Equal(assessmentID))
+			Expect(created.Name).To(Equal("test-assessment-with-owner"))
+
+			// Verify owner fields are stored and returned correctly
+			Expect(created.OwnerFirstName).ToNot(BeNil())
+			Expect(*created.OwnerFirstName).To(Equal("Alice"))
+			Expect(created.OwnerLastName).ToNot(BeNil())
+			Expect(*created.OwnerLastName).To(Equal("Johnson"))
+
+			// Verify by retrieving from database
+			retrieved, err := s.Assessment().Get(context.TODO(), assessmentID)
+			Expect(err).To(BeNil())
+			Expect(retrieved.OwnerFirstName).ToNot(BeNil())
+			Expect(*retrieved.OwnerFirstName).To(Equal("Alice"))
+			Expect(retrieved.OwnerLastName).ToNot(BeNil())
+			Expect(*retrieved.OwnerLastName).To(Equal("Johnson"))
 		})
 
 		It("successfully creates an assessment with valid source_id", func() {
@@ -552,11 +620,11 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessment1ID := uuid.New()
 			assessment2ID := uuid.New()
 			assessment3ID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID.String(), "Test Assessment 1", "org1", "testuser1", "inventory", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID.String(), "Test Assessment 1", "org1", "testuser1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID.String(), "Another Test", "org1", "testuser2", "rvtools", "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID.String(), "Another Test", "org1", "testuser2", "John", "Doe", "rvtools", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID.String(), "Production Assessment", "org2", "produser", "agent", "'12345678-1234-1234-1234-123456789012'"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID.String(), "Production Assessment", "org2", "produser", "John", "Doe", "agent", "'12345678-1234-1234-1234-123456789012'"))
 			Expect(tx.Error).To(BeNil())
 		})
 

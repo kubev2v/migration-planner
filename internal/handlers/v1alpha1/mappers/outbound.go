@@ -77,10 +77,12 @@ func AgentToApi(a model.Agent) api.Agent {
 
 func AssessmentToApi(a model.Assessment) api.Assessment {
 	assessment := api.Assessment{
-		Id:        a.ID,
-		Name:      a.Name,
-		CreatedAt: a.CreatedAt,
-		Snapshots: make([]api.Snapshot, len(a.Snapshots)),
+		Id:             a.ID,
+		Name:           a.Name,
+		OwnerFirstName: a.OwnerFirstName,
+		OwnerLastName:  a.OwnerLastName,
+		CreatedAt:      a.CreatedAt,
+		Snapshots:      make([]api.Snapshot, len(a.Snapshots)),
 	}
 
 	// Convert snapshots
