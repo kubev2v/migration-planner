@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Migration Planner - Set Authentication Token</title>
+    <style>
+      body {
+        font-family: "Red Hat Text", Arial, sans-serif;
+        max-width: 800px;
+        margin: 0 auto;
+        padding: 20px;
+        background-color: #f5f5f5;
+      }
+      .container {
+        background: white;
+        border-radius: 8px;
+        padding: 30px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #151515;
+        border-bottom: 3px solid #ee0000;
+        padding-bottom: 10px;
+      }
+      .token-section {
+        margin: 20px 0;
+        padding: 20px;
+        background-color: #f9f9f9;
+        border-radius: 4px;
+        border-left: 4px solid #0066cc;
+      }
+      textarea {
+        width: 100%;
+        padding: 8px;
+        margin: 10px 0;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-family: monospace;
+      }
+      textarea {
+        height: 100px;
+        resize: vertical;
+      }
+      button {
+        background-color: #0066cc;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 10px;
+      }
+      button:hover {
+        background-color: #004499;
+      }
+      .success {
+        color: #3e8635;
+        font-weight: bold;
+      }
+      .error {
+        color: #c9190b;
+        font-weight: bold;
+      }
+      .info {
+        background-color: #e7f1fa;
+        border: 1px solid #bee1f4;
+        border-radius: 4px;
+        padding: 15px;
+        margin: 20px 0;
+      }
+      .current-token {
+        background-color: #f0f0f0;
+        padding: 10px;
+        border-radius: 4px;
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>🔑 Migration Planner - Authentication Setup</h1>
+
+      <div class="info">
+        <strong>📋 Instructions:</strong>
+        <ol>
+          <li>
+            Generate tokens by running <code>./generate-user-tokens.sh</code> in
+            your debug environment
+          </li>
+          <li>Copy one of the generated tokens from the script output</li>
+          <li>Paste the token below and click "Set Token"</li>
+          <li>Refresh the Migration Planner UI to use the new token</li>
+        </ol>
+      </div>
+
+      <div class="token-section">
+        <h3>Authentication Token:</h3>
+        <textarea
+          id="tokenInput"
+          placeholder="Paste your JWT token here..."
+        ></textarea>
+
+        <button onclick="setToken()">Set Token</button>
+        <button onclick="clearToken()">Clear Token</button>
+        <button onclick="copyInstructions()">Copy Terminal Commands</button>
+      </div>
+
+      <div class="token-section">
+        <h3>Current Token Status:</h3>
+        <div id="currentToken" class="current-token">No token set</div>
+        <p id="status"></p>
+      </div>
+
+      <div class="info">
+        <strong>🔄 Token Switching:</strong><br />
+        You can switch between different organization tokens to test
+        multi-tenant functionality. Each token will show only data belonging to
+        that organization.
+      </div>
+    </div>
+
+    <script>
+      // Base64url decoder for JWT payloads
+      function b64urlDecode(s) {
+        s = s.replace(/-/g, "+").replace(/_/g, "/");
+        const pad = s.length % 4;
+        if (pad) s += "=".repeat(4 - pad);
+        return atob(s);
+      }
+
+      // Load current token on page load
+      updateCurrentToken();
+
+      function setToken() {
+        const token = document.getElementById("tokenInput").value.trim();
+        if (!token) {
+          showStatus("Please enter a token", "error");
+          return;
+        }
+
+        try {
+          // Validate it's a proper JWT (basic check)
+          const parts = token.split(".");
+          if (parts.length !== 3) {
+            throw new Error(
+              "Invalid JWT format - must have 3 parts separated by dots"
+            );
+          }
+
+          // Decode base64url payload to verify it's valid JSON
+          const payload = JSON.parse(b64urlDecode(parts[1]));
+          if (!payload.org_id && !payload.org) {
+            throw new Error("Invalid JWT - missing organization information");
+          }
+
+          localStorage.setItem("MIGRATION_PLANNER_TOKEN", token);
+          showStatus(
+            "Token set successfully! Refresh the Migration Planner UI to use it.",
+            "success"
+          );
+          updateCurrentToken();
+        } catch (error) {
+          showStatus(`Invalid token: ${error.message}`, "error");
+        }
+      }
+
+      function clearToken() {
+        localStorage.removeItem("MIGRATION_PLANNER_TOKEN");
+        showStatus("Token cleared", "success");
+        updateCurrentToken();
+        document.getElementById("tokenInput").value = "";
+      }
+
+      function updateCurrentToken() {
+        const token = localStorage.getItem("MIGRATION_PLANNER_TOKEN");
+        const currentTokenDiv = document.getElementById("currentToken");
+
+        if (token) {
+          currentTokenDiv.textContent = token.substring(0, 50) + "...";
+          try {
+            const payload = JSON.parse(b64urlDecode(token.split(".")[1]));
+            const org = payload.org_id || payload.org || "unknown";
+            showStatus(`Token set for organization: ${org}`, "success");
+          } catch (e) {
+            showStatus("Token is set but format may be invalid", "error");
+          }
+        } else {
+          currentTokenDiv.textContent = "No token set";
+          showStatus("No authentication token set", "error");
+        }
+      }
+
+      function showStatus(message, type) {
+        const status = document.getElementById("status");
+        status.textContent = message;
+        status.className = type;
+      }
+
+      function copyInstructions() {
+        const instructions = `# Generate authentication tokens
+./generate-user-tokens.sh
+
+# Example usage with curl:
+export TOKEN_REDHAT_COM='<your_token_here>'
+curl -H 'X-Authorization: Bearer $TOKEN_REDHAT_COM' http://localhost:3443/api/v1/sources
+
+# Or use individual organization tokens:
+export TOKEN_13043082='<your_token_here>'
+curl -H 'X-Authorization: Bearer $TOKEN_13043082' http://localhost:3443/api/v1/sources`;
+
+        navigator.clipboard.writeText(instructions).then(() => {
+          showStatus("Instructions copied to clipboard!", "success");
+        });
+      }
+    </script>
+  </body>
+</html>
