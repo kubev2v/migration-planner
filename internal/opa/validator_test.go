@@ -172,17 +172,16 @@ func TestValidator_ValidateVMS(t *testing.T) {
 		GuestID: "rhel6guest",
 	})
 
-	validatedVMs, err := validator.ValidateVMs(context.Background(), vms)
-	if err != nil {
+	if err := validator.ValidateVMs(context.Background(), &vms); err != nil {
 		t.Fatalf("concerns() failed: %v", err)
 	}
 
-	if len(validatedVMs) != 1 {
-		t.Errorf("Expected 1 vm, got %d", len(validatedVMs))
+	if len(vms) != 1 {
+		t.Errorf("Expected 1 vm, got %d", len(vms))
 	}
 
-	if len(validatedVMs[0].Concerns) != 1 {
-		t.Errorf("Expected 1 concern, got %d", len(validatedVMs[0].Concerns))
+	if len(vms[0].Concerns) != 1 {
+		t.Errorf("Expected 1 concern, got %d", len(vms[0].Concerns))
 	}
 }
 
