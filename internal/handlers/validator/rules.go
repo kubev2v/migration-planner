@@ -39,6 +39,9 @@ func NewSourceValidationRules() []ValidationRule {
 		{
 			Rule: registerFn("startsnotwith", startsNotWithValidator),
 		},
+		{
+			Rule: registerFn("ip_address", ipAddressValidator),
+		},
 	}
 }
 

@@ -230,6 +230,7 @@ type SourceCreate struct {
 	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
 	Labels           *[]Label                   `json:"labels,omitempty" validate:"omitempty,dive,required"`
 	Name             ValidatedSourceName        `json:"name" validate:"required,source_name,min=1,max=100"`
+	Network          *VmNetwork                 `json:"network,omitempty"`
 	Proxy            *AgentProxy                `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 }
@@ -307,6 +308,14 @@ type ValidatedSSHPublicKey = string
 
 // ValidatedSourceName defines model for ValidatedSourceName.
 type ValidatedSourceName = string
+
+// VmNetwork defines model for VmNetwork.
+type VmNetwork struct {
+	DefaultGateway string `json:"defaultGateway" validate:"required,ip_address"`
+	Dns            string `json:"dns" validate:"required,ip_address"`
+	IpAddress      string `json:"ipAddress" validate:"required,ip_address"`
+	SubnetMask     int    `json:"subnetMask" validate:"required"`
+}
 
 // OsInfo defines model for osInfo.
 type OsInfo struct {
