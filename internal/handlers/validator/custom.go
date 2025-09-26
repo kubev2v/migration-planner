@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"net"
 	"regexp"
 	"strings"
 
@@ -126,6 +127,19 @@ func startsWithValidator(fl validator.FieldLevel) bool {
 
 	param := fl.Param()
 	return strings.HasPrefix(*val, param)
+}
+
+func ipAddressValidator(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
+		return false
+	}
+
+	if len(val) > 20 {
+		return false
+	}
+
+	return net.ParseIP(val) != nil
 }
 
 func startsNotWithValidator(fl validator.FieldLevel) bool {

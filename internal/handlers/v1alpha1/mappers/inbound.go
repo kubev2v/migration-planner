@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"strconv"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -24,6 +25,17 @@ func mapLabels(apiLabels *[]v1alpha1.Label) map[string]string {
 		labels[label.Key] = label.Value
 	}
 	return labels
+}
+
+func mapNetworkFields(vmnetwork *v1alpha1.VmNetwork) (ipAddress, subnetMask, defaultGateway, dns string) {
+	if vmnetwork == nil {
+		return "", "", "", ""
+	}
+
+	return vmnetwork.IpAddress,
+		strconv.Itoa(vmnetwork.SubnetMask),
+		vmnetwork.DefaultGateway,
+		vmnetwork.Dns
 }
 
 // mapProxyFields extracts proxy fields from API proxy struct
@@ -47,13 +59,18 @@ func mapProxyFieldsForUpdate(proxy *v1alpha1.AgentProxy) (httpUrl, httpsUrl, noP
 
 func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 	httpUrl, httpsUrl, noProxy := mapProxyFields(resource.Proxy)
+	ipAddress, subnetMask, defaultGateway, dns := mapNetworkFields(resource.Network)
 
 	form := mappers.SourceCreateForm{
-		Name:     string(resource.Name),
-		Labels:   mapLabels(resource.Labels),
-		HttpUrl:  httpUrl,
-		HttpsUrl: httpsUrl,
-		NoProxy:  noProxy,
+		Name:           string(resource.Name),
+		Labels:         mapLabels(resource.Labels),
+		HttpUrl:        httpUrl,
+		HttpsUrl:       httpsUrl,
+		NoProxy:        noProxy,
+		IpAddress:      ipAddress,
+		SubnetMask:     subnetMask,
+		DefaultGateway: defaultGateway,
+		Dns:            dns,
 	}
 
 	if resource.SshPublicKey != nil {

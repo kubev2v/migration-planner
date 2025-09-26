@@ -14,4 +14,8 @@ type ImageInfra struct {
 	CertificateChain string
 	SshPublicKey     string
 	ImageTokenKey    string
+	IpAddress        string
+	SubnetMask       string
+	DefaultGateway   string
+	Dns              string
 }

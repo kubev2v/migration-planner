@@ -804,6 +804,8 @@ components:
             validate: "omitnil"
         certificateChain:
           $ref: '#/components/schemas/ValidatedCertificateChain'
+        network:
+          $ref: '#/components/schemas/VmNetwork'
         labels:
           type: array
           items:
@@ -814,6 +816,31 @@ components:
             validate: "omitempty,dive,required"
       required:
         - name
+
+    VmNetwork:
+      type: object
+      properties:
+        ipAddress:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip_address,max=20"
+        subnetMask:
+          type: integer
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        defaultGateway:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip_address,max=20"
+        dns:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip_address,max=20"
+      required:
+        - ipAddress
+        - subnetMask
+        - defaultGateway
+        - dns
 
     SourceList:
       type: array
