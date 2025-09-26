@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/go-playground/validator/v10"
@@ -124,6 +125,19 @@ func startsWithValidator(fl validator.FieldLevel) bool {
 
 	param := fl.Param()
 	return strings.HasPrefix(*val, param)
+}
+
+func subnetMaskValidator(fl validator.FieldLevel) bool {
+	val, ok := fl.Field().Interface().(string)
+	if !ok {
+		return false
+	}
+
+	maskInt, err := strconv.Atoi(val)
+	if err != nil {
+		return false
+	}
+	return maskInt >= 0 && maskInt <= 32
 }
 
 func startsNotWithValidator(fl validator.FieldLevel) bool {
