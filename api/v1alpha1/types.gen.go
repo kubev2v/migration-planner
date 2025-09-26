@@ -179,6 +179,14 @@ type Inventory struct {
 	Vms     VMs     `json:"vms"`
 }
 
+// Ipv4Config defines model for Ipv4Config.
+type Ipv4Config struct {
+	DefaultGateway string `json:"defaultGateway" validate:"required,ip4_addr,max=15"`
+	Dns            string `json:"dns" validate:"required,ip4_addr,max=15"`
+	IpAddress      string `json:"ipAddress" validate:"required,ip4_addr,max=15"`
+	SubnetMask     string `json:"subnetMask" validate:"required,subnet_mask,max=2"`
+}
+
 // Label defines model for Label.
 type Label struct {
 	Key   string `json:"key" validate:"required,label"`
@@ -230,6 +238,7 @@ type SourceCreate struct {
 	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
 	Labels           *[]Label                   `json:"labels,omitempty" validate:"omitempty,dive,required"`
 	Name             ValidatedSourceName        `json:"name" validate:"required,source_name,min=1,max=100"`
+	Network          *VmNetwork                 `json:"network,omitempty"`
 	Proxy            *AgentProxy                `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 }
@@ -242,6 +251,7 @@ type SourceUpdate struct {
 	CertificateChain *ValidatedCertificateChain   `json:"certificateChain" validate:"omitnil,certs"`
 	Labels           *[]Label                     `json:"labels,omitempty" validate:"omitempty,dive,required"`
 	Name             *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name,min=1,max=100"`
+	Network          *VmNetwork                   `json:"network,omitempty"`
 	Proxy            *AgentProxy                  `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey       `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 }
@@ -307,6 +317,11 @@ type ValidatedSSHPublicKey = string
 
 // ValidatedSourceName defines model for ValidatedSourceName.
 type ValidatedSourceName = string
+
+// VmNetwork defines model for VmNetwork.
+type VmNetwork struct {
+	Ipv4 *Ipv4Config `json:"ipv4,omitempty"`
+}
 
 // OsInfo defines model for osInfo.
 type OsInfo struct {

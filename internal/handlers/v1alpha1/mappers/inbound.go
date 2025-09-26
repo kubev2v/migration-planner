@@ -45,15 +45,28 @@ func mapProxyFieldsForUpdate(proxy *v1alpha1.AgentProxy) (httpUrl, httpsUrl, noP
 	return proxy.HttpUrl, proxy.HttpsUrl, proxy.NoProxy
 }
 
+func mapIpv4Fields(vmnetwork *v1alpha1.VmNetwork) (ipAddress, subnetMask, defaultGateway, dns string) {
+	if vmnetwork == nil || vmnetwork.Ipv4 == nil {
+		return "", "", "", ""
+	}
+
+	return vmnetwork.Ipv4.IpAddress, vmnetwork.Ipv4.SubnetMask, vmnetwork.Ipv4.DefaultGateway, vmnetwork.Ipv4.Dns
+}
+
 func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 	httpUrl, httpsUrl, noProxy := mapProxyFields(resource.Proxy)
+	ipAddress, subnetMask, defaultGateway, dns := mapIpv4Fields(resource.Network)
 
 	form := mappers.SourceCreateForm{
-		Name:     string(resource.Name),
-		Labels:   mapLabels(resource.Labels),
-		HttpUrl:  httpUrl,
-		HttpsUrl: httpsUrl,
-		NoProxy:  noProxy,
+		Name:           string(resource.Name),
+		Labels:         mapLabels(resource.Labels),
+		HttpUrl:        httpUrl,
+		HttpsUrl:       httpsUrl,
+		NoProxy:        noProxy,
+		IpAddress:      ipAddress,
+		SubnetMask:     subnetMask,
+		DefaultGateway: defaultGateway,
+		Dns:            dns,
 	}
 
 	if resource.SshPublicKey != nil {
@@ -68,11 +81,16 @@ func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 
 func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateForm {
 	httpUrl, httpsUrl, noProxy := mapProxyFieldsForUpdate(resource.Proxy)
+	ipAddress, subnetMask, defaultGateway, dns := mapIpv4Fields(resource.Network)
 
 	form := mappers.SourceUpdateForm{
-		HttpUrl:  httpUrl,
-		HttpsUrl: httpsUrl,
-		NoProxy:  noProxy,
+		HttpUrl:        httpUrl,
+		HttpsUrl:       httpsUrl,
+		NoProxy:        noProxy,
+		IpAddress:      &ipAddress,
+		SubnetMask:     &subnetMask,
+		DefaultGateway: &defaultGateway,
+		Dns:            &dns,
 	}
 
 	if resource.Name != nil {
