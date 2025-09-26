@@ -39,6 +39,9 @@ func NewSourceValidationRules() []ValidationRule {
 		{
 			Rule: registerFn("startsnotwith", startsNotWithValidator),
 		},
+		{
+			Rule: registerFn("subnet_mask", subnetMaskValidator),
+		},
 	}
 }
 

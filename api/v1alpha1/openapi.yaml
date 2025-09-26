@@ -804,6 +804,10 @@ components:
             validate: "omitnil"
         certificateChain:
           $ref: '#/components/schemas/ValidatedCertificateChain'
+        network:
+          $ref: '#/components/schemas/VmNetwork'
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
         labels:
           type: array
           items:
@@ -814,6 +818,40 @@ components:
             validate: "omitempty,dive,required"
       required:
         - name
+
+    Ipv4Config:
+      type: object
+      properties:
+        ipAddress:
+          type: string
+          format: ipv4
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip4_addr,max=15"
+        subnetMask:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,subnet_mask,max=2"
+        defaultGateway:
+          type: string
+          format: ipv4
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip4_addr,max=15"
+        dns:
+          type: string
+          format: ipv4
+          x-oapi-codegen-extra-tags:
+            validate: "required,ip4_addr,max=15"
+      required:
+        - ipAddress
+        - subnetMask
+        - defaultGateway
+        - dns
+
+    VmNetwork:
+      type: object
+      properties:
+        ipv4:
+          $ref: '#/components/schemas/Ipv4Config'
 
     SourceList:
       type: array
@@ -1156,6 +1194,10 @@ components:
           $ref: '#/components/schemas/ValidatedCertificateChain'
         proxy:
           $ref: '#/components/schemas/AgentProxy'
+        network:
+          $ref: '#/components/schemas/VmNetwork'
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
 
     UpdateInventory:
       type: object

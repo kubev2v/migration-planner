@@ -77,6 +77,25 @@ storage:
       group:
         name: core
   files:
+    {{if .IpAddress}}
+    - path: /etc/NetworkManager/system-connections/static.nmconnection
+      mode: 0600
+      overwrite: true
+      contents:
+        inline: |
+          [connection]
+          id=static
+          type=ethernet
+          autoconnect=true
+
+          [ipv4]
+          method=manual
+          address1={{.IpAddress}}/{{.SubnetMask}},{{.DefaultGateway}}
+          dns={{.Dns}};
+
+          [ipv6]
+          method=disabled
+    {{end}}
     {{if .InsecureRegistry}}
     - path: /etc/containers/registries.conf.d/myregistry.conf
       overwrite: true

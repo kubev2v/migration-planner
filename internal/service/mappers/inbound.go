@@ -26,6 +26,10 @@ type SourceCreateForm struct {
 	OrgID            string
 	EmailDomain      string
 	Labels           map[string]string
+	IpAddress        string
+	SubnetMask       string
+	DefaultGateway   string
+	Dns              string
 }
 
 func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string) model.ImageInfra {
@@ -37,6 +41,10 @@ func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string)
 		HttpProxyUrl:     s.HttpUrl,
 		HttpsProxyUrl:    s.HttpsUrl,
 		NoProxyDomains:   s.NoProxy,
+		IpAddress:        s.IpAddress,
+		SubnetMask:       s.SubnetMask,
+		DefaultGateway:   s.DefaultGateway,
+		Dns:              s.Dns,
 	}
 	return imageInfra
 }
@@ -100,6 +108,10 @@ type SourceUpdateForm struct {
 	HttpUrl          *string
 	HttpsUrl         *string
 	NoProxy          *string
+	IpAddress        *string
+	SubnetMask       *string
+	DefaultGateway   *string
+	Dns              *string
 }
 
 func (f *SourceUpdateForm) ToSource(source *model.Source) {
@@ -123,6 +135,18 @@ func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
 	}
 	if f.NoProxy != nil {
 		imageInfra.NoProxyDomains = *f.NoProxy
+	}
+	if f.IpAddress != nil {
+		imageInfra.IpAddress = *f.IpAddress
+	}
+	if f.SubnetMask != nil {
+		imageInfra.SubnetMask = *f.SubnetMask
+	}
+	if f.DefaultGateway != nil {
+		imageInfra.DefaultGateway = *f.DefaultGateway
+	}
+	if f.Dns != nil {
+		imageInfra.Dns = *f.Dns
 	}
 }
 

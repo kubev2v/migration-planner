@@ -59,12 +59,23 @@ type IgnitionData struct {
 	HttpsProxyUrl              string
 	NoProxyDomain              string
 	RhcosPassword              string
+	IpAddress                  string
+	SubnetMask                 string
+	DefaultGateway             string
+	Dns                        string
 }
 
 type Proxy struct {
 	HttpUrl       string
 	HttpsUrl      string
 	NoProxyDomain string
+}
+
+type VmNetwork struct {
+	IpAddress      string
+	SubnetMask     string
+	DefaultGateway string
+	Dns            string
 }
 
 type ImageBuilder struct {
@@ -87,6 +98,7 @@ type ImageBuilder struct {
 	RHCOSImage                 string
 	imageType                  ImageType
 	RhcosPassword              string
+	VmNetwork                  VmNetwork
 }
 
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
@@ -198,6 +210,10 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		HttpsProxyUrl:              b.Proxy.HttpsUrl,
 		NoProxyDomain:              b.Proxy.NoProxyDomain,
 		RhcosPassword:              b.RhcosPassword,
+		IpAddress:                  b.VmNetwork.IpAddress,
+		SubnetMask:                 b.VmNetwork.SubnetMask,
+		DefaultGateway:             b.VmNetwork.DefaultGateway,
+		Dns:                        b.VmNetwork.Dns,
 	}
 
 	var buf bytes.Buffer
@@ -346,6 +362,15 @@ func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder
 		b.WithCertificateChain(imageInfra.CertificateChain)
 	}
 
+	if imageInfra.IpAddress != "" {
+		b.WithVmNetwork(VmNetwork{
+			IpAddress:      imageInfra.IpAddress,
+			SubnetMask:     imageInfra.SubnetMask,
+			DefaultGateway: imageInfra.DefaultGateway,
+			Dns:            imageInfra.Dns,
+		})
+	}
+
 	return b
 }
 
@@ -426,6 +451,11 @@ func (b *ImageBuilder) WithProxy(proxy Proxy) *ImageBuilder {
 
 func (b *ImageBuilder) WithCertificateChain(certs string) *ImageBuilder {
 	b.CertificateChain = certs
+	return b
+}
+
+func (b *ImageBuilder) WithVmNetwork(network VmNetwork) *ImageBuilder {
+	b.VmNetwork = network
 	return b
 }
 
