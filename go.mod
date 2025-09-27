@@ -39,7 +39,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi v0.52.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.5.9
@@ -210,7 +210,7 @@ require (
 replace (
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
-	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi => github.com/vmware/govmomi v0.52.0
 	// Pin kube-openapi to avoid structured-merge-diff/v6 conflict with v4 used by other k8s deps
 	// Remove when all k8s.io deps (api, apimachinery, client-go) migrate to structured-merge-diff/v6
 	k8s.io/kube-openapi => k8s.io/kube-openapi v0.0.0-20250701173324-9bd5c66d9911
