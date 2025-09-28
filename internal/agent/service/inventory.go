@@ -56,6 +56,7 @@ func CreateBasicInventory(
 			PowerStates:          map[string]int{},
 			Os:                   map[string]int{},
 			OsInfo:               &map[string]api.OsInfo{},
+			DiskSizeTier:         &map[string]api.DiskSizeTierSummary{},
 			MigrationWarnings:    api.MigrationIssues{},
 			NotMigratableReasons: api.MigrationIssues{},
 			CpuCores:             api.VMResourceBreakdown{},

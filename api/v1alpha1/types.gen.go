@@ -298,12 +298,13 @@ type VMResourceBreakdown struct {
 
 // VMs defines model for VMs.
 type VMs struct {
-	CpuCores             VMResourceBreakdown  `json:"cpuCores"`
-	DiskCount            VMResourceBreakdown  `json:"diskCount"`
-	DiskGB               VMResourceBreakdown  `json:"diskGB"`
-	MigrationWarnings    []MigrationIssue     `json:"migrationWarnings"`
-	NicCount             *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons []MigrationIssue     `json:"notMigratableReasons"`
+	CpuCores             VMResourceBreakdown             `json:"cpuCores"`
+	DiskCount            VMResourceBreakdown             `json:"diskCount"`
+	DiskGB               VMResourceBreakdown             `json:"diskGB"`
+	DiskSizeTier         *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	MigrationWarnings    []MigrationIssue                `json:"migrationWarnings"`
+	NicCount             *VMResourceBreakdown            `json:"nicCount,omitempty"`
+	NotMigratableReasons []MigrationIssue                `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          map[string]int      `json:"os"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
@@ -329,6 +330,15 @@ type ValidatedSourceName = string
 // VmNetwork defines model for VmNetwork.
 type VmNetwork struct {
 	Ipv4 *Ipv4Config `json:"ipv4,omitempty"`
+}
+
+// DiskSizeTierSummary defines model for diskSizeTierSummary.
+type DiskSizeTierSummary struct {
+	// TotalSizeTB Total disk size in TB for this tier
+	TotalSizeTB float64 `json:"totalSizeTB"`
+
+	// VmCount Number of VMs in this tier
+	VmCount int `json:"vmCount"`
 }
 
 // OsInfo defines model for osInfo.

@@ -861,6 +861,10 @@ components:
           type: integer
         cpuCores:
           $ref: '#/components/schemas/VMResourceBreakdown'
+        diskSizeTier:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/diskSizeTierSummary'
         ramGB:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
@@ -893,6 +897,20 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/MigrationIssue'
+
+    diskSizeTierSummary:
+      type: object
+      required:
+        - totalSizeTB
+        - vmCount
+      properties:
+        totalSizeTB:
+          type: number
+          format: double
+          description: Total disk size in TB for this tier
+        vmCount:
+          type: integer
+          description: Number of VMs in this tier
 
     osInfo:
       type: object
