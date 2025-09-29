@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/pkg/errors"
 )
