@@ -130,19 +130,17 @@ storage:
       contents:
         inline: |
           #!/usr/bin/bash
-          IMAGE_STORAGE=/usr/share/assisted-migrations/images
+          IMAGE_STORAGE=/run/media/iso/images/migration-planner-agent.tar
           if ! command -v skopeo 2>&1 >/dev/null
           then
             echo "skopeo could not be found"
             exit 0
           fi
 
-          if [ -f $IMAGE_STORAGE/migration-planner-agent ]; then
-              skopeo copy oci-archive:$IMAGE_STORAGE/migration-planner-agent containers-storage:quay.io/kubev2v/migration-planner-agent:latest
+          if [ -f $IMAGE_STORAGE ]; then
+              skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:localhost/migration-planner-agent:latest
           fi
-          if [ -f $IMAGE_STORAGE/forklift-validation ]; then
-              skopeo copy oci-archive:$IMAGE_STORAGE/forklift-validation containers-storage:quay.io/kubev2v/forklift-validation:release-v2.6.4
-          fi
+
     - path: /home/core/.migration-planner/config/config.yaml
       contents:
         inline: |
@@ -171,7 +169,7 @@ storage:
           Description=Planner agent quadlet
 
           [Container]
-          Image={{.MigrationPlannerAgentImage}}
+          Image=localhost/migration-planner-agent:latest
           ContainerName=planner-agent
           AutoUpdate=registry
           Exec= -config /agent/config/config.yaml

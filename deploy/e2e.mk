@@ -2,7 +2,7 @@ E2E_PRIVATE_KEY_FOLDER_PATH ?= /etc/planner/e2e
 E2E_CLUSTER_NAME ?= kind-e2e
 
 .PHONY: deploy-e2e-environment
-deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_registry deploy_vcsim build_assisted_migration_containers deploy_assisted_migration
+deploy-e2e-environment: install_qemu_img ignore_insecure_registry create_kind_e2e_cluster setup_libvirt generate_private_key deploy_vcsim build_planner_api_container deploy_assisted_migration
 
 .PHONY: install_qemu_img
 install_qemu_img:
@@ -43,13 +43,6 @@ generate_private_key:
 		openssl rsa -in $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key -out $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key -traditional; \
 	fi
 
-.PHONY: deploy_registry
-deploy_registry: oc
-	oc create deployment registry --image=docker.io/registry
-	oc rollout status deployment/registry --timeout=60s
-	oc wait --for=condition=Ready pods --all --timeout=240s
-	oc port-forward --address 0.0.0.0 deploy/registry 5000:5000 > /dev/null 2>&1 &
-
 .PHONY: deploy_vcsim
 deploy_vcsim: oc
 	oc process --local -f deploy/templates/vcsim-template.yml \
@@ -68,11 +61,9 @@ deploy_vcsim: oc
 	oc port-forward --address 0.0.0.0 deploy/vcsim1 8989:8989 > /dev/null 2>&1 &
 	oc port-forward --address 0.0.0.0 deploy/vcsim2 8990:8990 > /dev/null 2>&1 &
 
-.PHONY: build_assisted_migration_containers
-build_assisted_migration_containers:
-	make migration-planner-agent-container
+.PHONY: build_planner_api_container
+build_planner_api_container:
 	make migration-planner-api-container
-	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE)
 	kind load docker-image $(MIGRATION_PLANNER_API_IMAGE) --name $(E2E_CLUSTER_NAME)
 	$(PODMAN) rmi $(MIGRATION_PLANNER_API_IMAGE)
 
