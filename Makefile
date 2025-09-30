@@ -176,7 +176,6 @@ deploy-on-openshift: oc
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-       -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}/api/migration-assessment \
@@ -195,7 +194,6 @@ delete-from-openshift: oc
 	openshift_project=$$(oc project -q); \
 	oc process -f deploy/templates/service-template.yml \
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-       -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
@@ -221,7 +219,6 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
@@ -238,7 +235,6 @@ delete-from-kind: oc
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
 	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-	   -p MIGRATION_PLANNER_AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \

@@ -46,19 +46,18 @@ const (
 
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
-	DebugMode                  string
-	SshKey                     string
-	PlannerServiceUI           string
-	PlannerService             string
-	MigrationPlannerAgentImage string
-	InsecureRegistry           string
-	Token                      string
-	PersistentDiskDevice       string
-	SourceID                   string
-	HttpProxyUrl               string
-	HttpsProxyUrl              string
-	NoProxyDomain              string
-	RhcosPassword              string
+	DebugMode            string
+	SshKey               string
+	PlannerServiceUI     string
+	PlannerService       string
+	InsecureRegistry     string
+	Token                string
+	PersistentDiskDevice string
+	SourceID             string
+	HttpProxyUrl         string
+	HttpsProxyUrl        string
+	NoProxyDomain        string
+	RhcosPassword        string
 }
 
 type Proxy struct {
@@ -68,42 +67,40 @@ type Proxy struct {
 }
 
 type ImageBuilder struct {
-	SourceID                   string
-	SshKey                     string
-	Proxy                      Proxy
-	CertificateChain           string
-	DebugMode                  string
-	PlannerServiceUI           string
-	PlannerService             string
-	MigrationPlannerAgentImage string
-	InsecureRegistry           string
-	Token                      string
-	PersistentDiskDevice       string
-	PersistentDiskImage        string
-	IsoImageName               string
-	OvfFile                    string
-	OvfName                    string
-	Template                   string
-	RHCOSImage                 string
-	imageType                  ImageType
-	RhcosPassword              string
+	SourceID             string
+	SshKey               string
+	Proxy                Proxy
+	CertificateChain     string
+	DebugMode            string
+	PlannerServiceUI     string
+	PlannerService       string
+	InsecureRegistry     string
+	Token                string
+	PersistentDiskDevice string
+	PersistentDiskImage  string
+	IsoImageName         string
+	OvfFile              string
+	OvfName              string
+	Template             string
+	RHCOSImage           string
+	imageType            ImageType
+	RhcosPassword        string
 }
 
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	imageBuilder := &ImageBuilder{
-		SourceID:                   sourceID.String(),
-		DebugMode:                  util.GetEnv("DEBUG_MODE", ""),
-		PlannerService:             util.GetEnv("CONFIG_SERVER", defaultPlannerService),
-		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
-		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", defaultAgentImage),
-		PersistentDiskDevice:       util.GetEnv("PERSISTENT_DISK_DEVICE", defaultPersistenceDiskDevice),
-		PersistentDiskImage:        defaultPersistentDiskImage,
-		IsoImageName:               defaultIsoImageName,
-		OvfFile:                    defaultOvfFile,
-		OvfName:                    defaultOvfName,
-		Template:                   defaultTemplate,
-		RHCOSImage:                 util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
-		imageType:                  OVAImageType,
+		SourceID:             sourceID.String(),
+		DebugMode:            util.GetEnv("DEBUG_MODE", ""),
+		PlannerService:       util.GetEnv("CONFIG_SERVER", defaultPlannerService),
+		PlannerServiceUI:     util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
+		PersistentDiskDevice: util.GetEnv("PERSISTENT_DISK_DEVICE", defaultPersistenceDiskDevice),
+		PersistentDiskImage:  defaultPersistentDiskImage,
+		IsoImageName:         defaultIsoImageName,
+		OvfFile:              defaultOvfFile,
+		OvfName:              defaultOvfName,
+		Template:             defaultTemplate,
+		RHCOSImage:           util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
+		imageType:            OVAImageType,
 	}
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {
@@ -185,19 +182,18 @@ func (b *ImageBuilder) Validate() error {
 
 func (b *ImageBuilder) generateIgnition() (string, error) {
 	ignData := IgnitionData{
-		DebugMode:                  b.DebugMode,
-		SourceID:                   b.SourceID,
-		SshKey:                     b.SshKey,
-		PlannerServiceUI:           b.PlannerServiceUI,
-		PlannerService:             b.PlannerService,
-		MigrationPlannerAgentImage: b.MigrationPlannerAgentImage,
-		InsecureRegistry:           b.InsecureRegistry,
-		Token:                      b.Token,
-		PersistentDiskDevice:       b.PersistentDiskDevice,
-		HttpProxyUrl:               b.Proxy.HttpUrl,
-		HttpsProxyUrl:              b.Proxy.HttpsUrl,
-		NoProxyDomain:              b.Proxy.NoProxyDomain,
-		RhcosPassword:              b.RhcosPassword,
+		DebugMode:            b.DebugMode,
+		SourceID:             b.SourceID,
+		SshKey:               b.SshKey,
+		PlannerServiceUI:     b.PlannerServiceUI,
+		PlannerService:       b.PlannerService,
+		InsecureRegistry:     b.InsecureRegistry,
+		Token:                b.Token,
+		PersistentDiskDevice: b.PersistentDiskDevice,
+		HttpProxyUrl:         b.Proxy.HttpUrl,
+		HttpsProxyUrl:        b.Proxy.HttpsUrl,
+		NoProxyDomain:        b.Proxy.NoProxyDomain,
+		RhcosPassword:        b.RhcosPassword,
 	}
 
 	var buf bytes.Buffer
@@ -351,11 +347,6 @@ func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder
 
 func (b *ImageBuilder) WithSshKey(sshKey string) *ImageBuilder {
 	b.SshKey = sshKey
-	return b
-}
-
-func (b *ImageBuilder) WithPlannerAgentImage(imageUrl string) *ImageBuilder {
-	b.MigrationPlannerAgentImage = imageUrl
 	return b
 }
 
