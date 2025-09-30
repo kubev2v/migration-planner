@@ -16,7 +16,8 @@ parameters:
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_IMAGE
-    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-iso:latest
+    description: The container registry and image name for the migration planner ISO
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
     required: true
@@ -25,9 +26,6 @@ parameters:
     required: true
   - name: MIGRATION_PLANNER_IMAGE_URL
     description: The URL for the Agent OVA file
-    required: true
-  - name: MIGRATION_PLANNER_AGENT_IMAGE
-    description: Migration Discovery Service image
     required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
@@ -407,7 +405,7 @@ objects:
         spec:
           initContainers:
             - name: pull-iso
-              image: ${MIGRATION_PLANNER_ISO_IMAGE}
+              image: ${MIGRATION_PLANNER_ISO_IMAGE}:${IMAGE_TAG}
               command: ["/bin/bash", "-c"]
               args:
                 - |
@@ -500,8 +498,6 @@ objects:
                   value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
                 - name: MIGRATION_PLANNER_IMAGE_URL
                   value: ${MIGRATION_PLANNER_IMAGE_URL}
-                - name: MIGRATION_PLANNER_AGENT_IMAGE
-                  value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE
