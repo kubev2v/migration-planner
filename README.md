@@ -44,4 +44,4 @@ VMs:
 ![Flow Diagram](doc/img/flow.svg)
 
 ## Contributing to the project
-Detailed documentation for developing and contributing to Migration Planner can be found in our [contribution guide](CONTRIBUTING.md).
+Detailed documentation for developing and contributing to Migration Planner can be found in the [contribution guide](CONTRIBUTING.md).
