@@ -5,7 +5,7 @@ ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE AGENT_TAG
 USER root
 
 # Copy the configuration script into the container
-COPY build-ove-image.sh /tmp/
+COPY build/migration-planner-iso/build-ove-image.sh /tmp/
 
 RUN chmod +x /tmp/build-ove-image.sh
 
