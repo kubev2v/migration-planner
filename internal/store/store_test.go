@@ -87,16 +87,6 @@ var _ = Describe("Store", Ordered, func() {
 			Expect(count).To(Equal(0))
 		})
 
-		It("Seed the databsae", func() {
-			err := store.Seed()
-			Expect(err).To(BeNil())
-
-			count := 0
-			err = gormDB.Raw("SELECT COUNT(*) from sources;").Scan(&count).Error
-			Expect(err).To(BeNil())
-			Expect(count).To(Equal(1))
-		})
-
 		AfterEach(func() {
 			gormDB.Exec("DELETE from agents;")
 			gormDB.Exec("DELETE from sources;")

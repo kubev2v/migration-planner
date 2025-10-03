@@ -117,7 +117,7 @@ type ClientInterface interface {
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSources request
-	ListSources(ctx context.Context, params *ListSourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSourceWithBody request with any body
 	CreateSourceWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -261,8 +261,8 @@ func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorF
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListSources(ctx context.Context, params *ListSourcesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListSourcesRequest(c.Server, params)
+func (c *Client) ListSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSourcesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -654,7 +654,7 @@ func NewDeleteSourcesRequest(server string) (*http.Request, error) {
 }
 
 // NewListSourcesRequest generates requests for ListSources
-func NewListSourcesRequest(server string, params *ListSourcesParams) (*http.Request, error) {
+func NewListSourcesRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -670,28 +670,6 @@ func NewListSourcesRequest(server string, params *ListSourcesParams) (*http.Requ
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.IncludeDefault != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "include_default", runtime.ParamLocationQuery, *params.IncludeDefault); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -1104,7 +1082,7 @@ type ClientWithResponsesInterface interface {
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
 
 	// ListSourcesWithResponse request
-	ListSourcesWithResponse(ctx context.Context, params *ListSourcesParams, reqEditors ...RequestEditorFn) (*ListSourcesResponse, error)
+	ListSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSourcesResponse, error)
 
 	// CreateSourceWithBodyWithResponse request with any body
 	CreateSourceWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSourceResponse, error)
@@ -1650,8 +1628,8 @@ func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, req
 }
 
 // ListSourcesWithResponse request returning *ListSourcesResponse
-func (c *ClientWithResponses) ListSourcesWithResponse(ctx context.Context, params *ListSourcesParams, reqEditors ...RequestEditorFn) (*ListSourcesResponse, error) {
-	rsp, err := c.ListSources(ctx, params, reqEditors...)
+func (c *ClientWithResponses) ListSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSourcesResponse, error) {
+	rsp, err := c.ListSources(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
