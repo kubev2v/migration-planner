@@ -59,15 +59,6 @@ func (s *SourceService) ListSources(ctx context.Context, filter *SourceFilter) (
 		return nil, err
 	}
 
-	if filter.IncludeDefault {
-		// Get default content
-		defaultResult, err := s.store.Source().List(ctx, store.NewSourceQueryFilter().ByDefaultInventory())
-		if err != nil {
-			return nil, err
-		}
-		return append(userResult, defaultResult...), nil
-	}
-
 	return userResult, nil
 }
 
@@ -254,7 +245,7 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 
 	zap.S().Infow("received RVTools data", "size [bytes]", len(rvtoolsContent))
 
-	//TODO: support csv files
+	// TODO: support csv files
 	if !rvtools.IsExcelFile(rvtoolsContent) {
 		return NewErrExcelFileNotValid()
 	}
@@ -312,9 +303,8 @@ func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUI
 type SourceFilterFunc func(s *SourceFilter)
 
 type SourceFilter struct {
-	OrgID          string
-	ID             uuid.UUID
-	IncludeDefault bool
+	OrgID string
+	ID    uuid.UUID
 }
 
 func NewSourceFilter(filters ...SourceFilterFunc) *SourceFilter {
@@ -339,11 +329,5 @@ func WithSourceID(id uuid.UUID) SourceFilterFunc {
 func WithOrgID(orgID string) SourceFilterFunc {
 	return func(s *SourceFilter) {
 		s.OrgID = orgID
-	}
-}
-
-func WithDefaultInventory() SourceFilterFunc {
-	return func(s *SourceFilter) {
-		s.IncludeDefault = true
 	}
 }

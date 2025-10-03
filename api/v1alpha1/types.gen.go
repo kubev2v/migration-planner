@@ -338,12 +338,6 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
-// ListSourcesParams defines parameters for ListSources.
-type ListSourcesParams struct {
-	// IncludeDefault control whatever the default report should be added to the result
-	IncludeDefault *bool `form:"include_default,omitempty" json:"include_default,omitempty"`
-}
-
 // UploadRvtoolsFileMultipartBody defines parameters for UploadRvtoolsFile.
 type UploadRvtoolsFileMultipartBody struct {
 	// File The RVTools file (Excel)

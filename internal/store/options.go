@@ -1,7 +1,6 @@
 package store
 
 import (
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -67,20 +66,6 @@ func (sf *SourceQueryFilter) ByUsername(username string) *SourceQueryFilter {
 func (sf *SourceQueryFilter) ByOrgID(id string) *SourceQueryFilter {
 	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
 		return tx.Where("org_id = ?", id)
-	})
-	return sf
-}
-
-func (sf *SourceQueryFilter) ByDefaultInventory() *SourceQueryFilter {
-	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id = ?", uuid.UUID{})
-	})
-	return sf
-}
-
-func (sf *SourceQueryFilter) WithoutDefaultInventory() *SourceQueryFilter {
-	sf.QueryFn = append(sf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id != ?", uuid.UUID{})
 	})
 	return sf
 }

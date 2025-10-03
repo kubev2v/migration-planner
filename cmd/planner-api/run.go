@@ -61,13 +61,6 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("running initial migration", "error", err)
 		}
 
-		// Initialize database with basic example report
-		if v, b := os.LookupEnv("NO_SEED"); !b || v == "false" {
-			if err := store.Seed(); err != nil {
-				zap.S().Fatalw("seeding database with default report", "error", err)
-			}
-		}
-
 		// The migration planner API expects the RHCOS ISO to be on disk
 		if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
 			zap.S().Fatalw("validate iso", "error", err)
