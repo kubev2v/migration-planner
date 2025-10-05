@@ -11,7 +11,6 @@ export DIR_PATH=""
 export ISO_FILE_PATH=""
 export OUTPUT_FILE_PATH=""
 export AGENT_IMAGE=""
-export AGENT_TAG=""
 export REGISTRY=""
 export ORG=""
 export AGENT_IMAGE_NAME=""
@@ -91,10 +90,6 @@ parse_arguments() {
                 AGENT_IMAGE="$2"
                 shift 2
                 ;;
-            --agent-tag)
-                AGENT_TAG="$2"
-                shift 2
-                ;;
             --dry-run)
                 DRY_RUN=true
                 shift
@@ -128,8 +123,7 @@ OPTIONS:
     --iso-file PATH         Path to the RHCOS ISO file (required)
     --dir PATH              Working directory path (default: $DEFAULT_WORK_DIR)
     --output-file PATH      Full path to the output ISO file (required)
-    --agent-image NAME      Agent image name (required)
-    --agent-tag TAG         Agent image tag (required)
+    --agent-image NAME      Agent image pull spec with tag (required)
     --dry-run               Show what would be done without executing
     -h, --help              Show this help message
 
@@ -137,18 +131,17 @@ ENVIRONMENT VARIABLES:
     ISO_FILE_PATH           Path to the RHCOS ISO file (overridden by --iso-file)
     DIR_PATH                Working directory path (overridden by --dir)
     OUTPUT_FILE_PATH        Full path to the output ISO file (overridden by --output-file)
-    AGENT_IMAGE             Agent image name (overridden by --agent-image)
-    AGENT_TAG               Agent image tag (overridden by --agent-tag)
+    AGENT_IMAGE             Agent image pull spec with tag (overridden by --agent-image)
 
 EXAMPLES:
     # Basic usage with all required parameters
-    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent --agent-tag latest
+    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent:latest
 
     # Specify custom working directory
-    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent --agent-tag latest --dir /tmp/work
+    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent:latest --dir /tmp/work
 
     # Dry run to preview operations
-    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent --agent-tag latest --dry-run
+    $(basename "$0") --iso-file /path/to/rhcos.iso --output-file /path/to/agent.iso --agent-image docker.io/myorg/my-agent:latest --dry-run
 
 OUTPUTS:
     The script will create the ISO file at the specified --output-file path
@@ -177,12 +170,6 @@ function setup_vars() {
 
     if [[ -z "$AGENT_IMAGE" ]]; then
         log_error "AGENT_IMAGE is required. Please provide --agent-image parameter."
-        log_error "Use --help for usage information."
-        exit 1
-    fi
-
-    if [[ -z "$AGENT_TAG" ]]; then
-        log_error "AGENT_TAG is required. Please provide --agent-tag parameter."
         log_error "Use --help for usage information."
         exit 1
     fi
@@ -224,7 +211,7 @@ function setup_vars() {
     log_info "Working directory: $DIR_PATH"
     log_info "Output file: $OUTPUT_FILE_PATH"
     log_info "ISO file: $ISO_FILE_PATH"
-    log_info "Agent image: ${AGENT_IMAGE}:${AGENT_TAG}"
+    log_info "Agent image: ${AGENT_IMAGE}"
 }
 
 function extract_live_iso() {
@@ -287,7 +274,7 @@ function wait_for_image_availability() {
 
 function setup_agent_artifacts() {
     local image_dir="${work_dir}/images"
-    local pull_spec="${AGENT_IMAGE}:${AGENT_TAG}"
+    local pull_spec="${AGENT_IMAGE}"
     local image_tar="${image_dir}/migration-planner-agent.tar"
 
     if [[ -f "${image_tar}" ]]; then

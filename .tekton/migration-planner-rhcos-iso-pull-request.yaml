@@ -25,6 +25,8 @@ spec:
     value: '{{revision}}'
   - name: output-image
     value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso:on-pr-{{revision}}
+  - name: agent-output-image
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso:migration-planner-agent-on-pr-{{revision}}
   - name: image-expires-after
     value: 5d
   - name: dockerfile
@@ -46,6 +48,9 @@ spec:
     - default: ""
       description: Revision of the Source Repository
       name: revision
+      type: string
+    - description: Fully Qualified Agent Output Image
+      name: agent-output-image
       type: string
     - description: Fully Qualified Output Image
       name: output-image
@@ -187,6 +192,47 @@ spec:
         workspace: git-auth
       - name: netrc
         workspace: netrc
+    - name: build-planner-agent-container
+      params:
+        - name: IMAGE
+          value: $(params.agent-output-image)
+        - name: DOCKERFILE
+          value: Containerfile.agent
+        - name: CONTEXT
+          value: .
+        - name: HERMETIC
+          value: ""
+        - name: PREFETCH_INPUT
+          value: $(params.prefetch-input)
+        - name: IMAGE_EXPIRES_AFTER
+          value: "1d"
+        - name: COMMIT_SHA
+          value: $(tasks.clone-repository.results.commit)
+        - name: PRIVILEGED_NESTED
+          value: $(params.privileged-nested)
+        - name: SOURCE_URL
+          value: $(tasks.clone-repository.results.url)
+        - name: BUILDAH_FORMAT
+          value: $(params.buildah-format)
+      runAfter:
+        - prefetch-dependencies
+      taskRef:
+        params:
+          - name: name
+            value: buildah
+          - name: bundle
+            value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.5@sha256:9ac12870766a980e1f7ae7ddd0852f767da000d8a6d24f5b37e906eb14932355
+          - name: kind
+            value: task
+        resolver: bundles
+      when:
+        - input: $(tasks.init.results.build)
+          operator: in
+          values:
+            - "true"
+      workspaces:
+        - name: source
+          workspace: workspace
     - name: build-container
       params:
       - name: IMAGE
@@ -206,7 +252,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
-        - AGENT_TAG=on-pr-$(tasks.clone-repository.results.commit)
+        - AGENT_IMAGE=$(params.agent-output-image)
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       - name: PRIVILEGED_NESTED
@@ -216,7 +262,7 @@ spec:
       - name: BUILDAH_FORMAT
         value: $(params.buildah-format)
       runAfter:
-      - prefetch-dependencies
+      - build-planner-agent-container
       taskRef:
         params:
         - name: name

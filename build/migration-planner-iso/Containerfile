@@ -1,6 +1,6 @@
 FROM --platform=linux/amd64 quay.io/centos/centos:stream9 AS builder
 
-ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE AGENT_TAG
+ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE
 
 USER root
 
@@ -37,7 +37,6 @@ RUN /tmp/build-ove-image.sh \
     --dir / \
     --output-file /output/final.iso \
     --agent-image ${AGENT_IMAGE} \
-    --agent-tag ${AGENT_TAG} \
     && rm /initial-rhcos.iso && rm -rf /isomnt
 
 # Final stage with minimal image
