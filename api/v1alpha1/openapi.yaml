@@ -755,6 +755,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Label'
+        infra:
+          type: object
+          properties:
+            proxy:
+              $ref: '#/components/schemas/AgentProxy'
+            sshPublicKey:
+              $ref: '#/components/schemas/ValidatedSSHPublicKey'
+            vmNetwork:
+              $ref: '#/components/schemas/VmNetwork'
       required:
         - id
         - name
