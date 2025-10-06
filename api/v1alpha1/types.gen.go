@@ -223,14 +223,19 @@ type Snapshot struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agent      *Agent             `json:"agent,omitempty"`
-	CreatedAt  time.Time          `json:"createdAt"`
-	Id         openapi_types.UUID `json:"id"`
-	Inventory  *Inventory         `json:"inventory,omitempty"`
-	Labels     *[]Label           `json:"labels,omitempty"`
-	Name       string             `json:"name"`
-	OnPremises bool               `json:"onPremises"`
-	UpdatedAt  time.Time          `json:"updatedAt"`
+	Agent     *Agent             `json:"agent,omitempty"`
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Infra     *struct {
+		Proxy        *AgentProxy            `json:"proxy,omitempty"`
+		SshPublicKey *ValidatedSSHPublicKey `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+		VmNetwork    *VmNetwork             `json:"vmNetwork,omitempty"`
+	} `json:"infra,omitempty"`
+	Inventory  *Inventory `json:"inventory,omitempty"`
+	Labels     *[]Label   `json:"labels,omitempty"`
+	Name       string     `json:"name"`
+	OnPremises bool       `json:"onPremises"`
+	UpdatedAt  time.Time  `json:"updatedAt"`
 }
 
 // SourceCreate defines model for SourceCreate.

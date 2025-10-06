@@ -330,6 +330,107 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
 		})
 
+		It("successfully retrieve the source -- with infra fields", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra data with proxy, SSH key, and network config
+			insertImageInfraStm := `INSERT INTO image_infras
+				(source_id, http_proxy_url, https_proxy_url, no_proxy_domains, ssh_public_key, ip_address, subnet_mask, default_gateway, dns)
+				VALUES ('%s', 'http://proxy.example.com', 'https://proxy.example.com', 'localhost,127.0.0.1', 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ', '192.168.1.100', '24', '192.168.1.1', '8.8.8.8');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+			Expect(source.Agent).NotTo(BeNil())
+			Expect(source.Agent.Id.String()).To(Equal(firstAgentID.String()))
+
+			// Verify infra fields
+			Expect(source.Infra).NotTo(BeNil())
+
+			// Verify proxy
+			Expect(source.Infra.Proxy).NotTo(BeNil())
+			Expect(source.Infra.Proxy.HttpUrl).NotTo(BeNil())
+			Expect(*source.Infra.Proxy.HttpUrl).To(Equal("http://proxy.example.com"))
+			Expect(source.Infra.Proxy.HttpsUrl).NotTo(BeNil())
+			Expect(*source.Infra.Proxy.HttpsUrl).To(Equal("https://proxy.example.com"))
+			Expect(source.Infra.Proxy.NoProxy).NotTo(BeNil())
+			Expect(*source.Infra.Proxy.NoProxy).To(Equal("localhost,127.0.0.1"))
+
+			// Verify SSH public key
+			Expect(source.Infra.SshPublicKey).NotTo(BeNil())
+			Expect(*source.Infra.SshPublicKey).To(Equal("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"))
+
+			// Verify VM network
+			Expect(source.Infra.VmNetwork).NotTo(BeNil())
+			Expect(source.Infra.VmNetwork.Ipv4).NotTo(BeNil())
+			Expect(source.Infra.VmNetwork.Ipv4.IpAddress).To(Equal("192.168.1.100"))
+			Expect(source.Infra.VmNetwork.Ipv4.SubnetMask).To(Equal("24"))
+			Expect(source.Infra.VmNetwork.Ipv4.DefaultGateway).To(Equal("192.168.1.1"))
+			Expect(source.Infra.VmNetwork.Ipv4.Dns).To(Equal("8.8.8.8"))
+		})
+
+		It("successfully retrieve the source -- with partial infra fields", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra data with only SSH key (no proxy, no network)
+			insertImageInfraStm := `INSERT INTO image_infras
+				(source_id, ssh_public_key)
+				VALUES ('%s', 'ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+
+			// Verify infra fields
+			Expect(source.Infra).NotTo(BeNil())
+
+			// Verify proxy is nil (no proxy data)
+			Expect(source.Infra.Proxy).To(BeNil())
+
+			// Verify SSH public key exists
+			Expect(source.Infra.SshPublicKey).NotTo(BeNil())
+			Expect(*source.Infra.SshPublicKey).To(Equal("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ"))
+
+			// Verify VM network is nil (no network data)
+			Expect(source.Infra.VmNetwork).To(BeNil())
+		})
+
 		It("successfully retrieve the source -- with labels", func() {
 			firstSourceID := uuid.New()
 			firstAgentID := uuid.New()
@@ -426,6 +527,7 @@ var _ = Describe("source handler", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM image_infras;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})

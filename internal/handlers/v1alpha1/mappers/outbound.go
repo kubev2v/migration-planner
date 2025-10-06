@@ -29,6 +29,44 @@ func SourceToApi(s model.Source) api.Source {
 		source.Labels = &labels
 	}
 
+	// Map ImageInfra fields to API infra
+	source.Infra = &struct {
+		Proxy        *api.AgentProxy            `json:"proxy,omitempty"`
+		SshPublicKey *api.ValidatedSSHPublicKey `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+		VmNetwork    *api.VmNetwork             `json:"vmNetwork,omitempty"`
+	}{}
+
+	// Map proxy fields
+	if s.ImageInfra.HttpProxyUrl != "" || s.ImageInfra.HttpsProxyUrl != "" || s.ImageInfra.NoProxyDomains != "" {
+		source.Infra.Proxy = &api.AgentProxy{}
+		if s.ImageInfra.HttpProxyUrl != "" {
+			source.Infra.Proxy.HttpUrl = &s.ImageInfra.HttpProxyUrl
+		}
+		if s.ImageInfra.HttpsProxyUrl != "" {
+			source.Infra.Proxy.HttpsUrl = &s.ImageInfra.HttpsProxyUrl
+		}
+		if s.ImageInfra.NoProxyDomains != "" {
+			source.Infra.Proxy.NoProxy = &s.ImageInfra.NoProxyDomains
+		}
+	}
+
+	// Map SSH public key
+	if s.ImageInfra.SshPublicKey != "" {
+		source.Infra.SshPublicKey = &s.ImageInfra.SshPublicKey
+	}
+
+	// Map VM network fields
+	if s.ImageInfra.IpAddress != "" || s.ImageInfra.SubnetMask != "" || s.ImageInfra.DefaultGateway != "" || s.ImageInfra.Dns != "" {
+		source.Infra.VmNetwork = &api.VmNetwork{
+			Ipv4: &api.Ipv4Config{
+				IpAddress:      s.ImageInfra.IpAddress,
+				SubnetMask:     s.ImageInfra.SubnetMask,
+				DefaultGateway: s.ImageInfra.DefaultGateway,
+				Dns:            s.ImageInfra.Dns,
+			},
+		}
+	}
+
 	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
 	// TODO:
 	// Remark: If multiple agents are deployed, we pass only the first one based on created_at timestamp
