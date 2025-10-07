@@ -25,7 +25,7 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso:{{revision}}
   - name: agent-output-image
-    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso:migration-planner-agent:{{revision}}
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso:migration-planner-agent-{{revision}}
   - name: dockerfile
     value: build/migration-planner-iso/Containerfile
   - name: path-context
