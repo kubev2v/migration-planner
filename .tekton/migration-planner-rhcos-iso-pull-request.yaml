@@ -194,45 +194,45 @@ spec:
         workspace: netrc
     - name: build-planner-agent-container
       params:
-        - name: IMAGE
-          value: $(params.agent-output-image)
-        - name: DOCKERFILE
-          value: Containerfile.agent
-        - name: CONTEXT
-          value: .
-        - name: HERMETIC
-          value: ""
-        - name: PREFETCH_INPUT
-          value: $(params.prefetch-input)
-        - name: IMAGE_EXPIRES_AFTER
-          value: "1d"
-        - name: COMMIT_SHA
-          value: $(tasks.clone-repository.results.commit)
-        - name: PRIVILEGED_NESTED
-          value: $(params.privileged-nested)
-        - name: SOURCE_URL
-          value: $(tasks.clone-repository.results.url)
-        - name: BUILDAH_FORMAT
-          value: $(params.buildah-format)
+      - name: IMAGE
+        value: $(params.agent-output-image)
+      - name: DOCKERFILE
+        value: Containerfile.agent
+      - name: CONTEXT
+        value: $(params.path-context)
+      - name: HERMETIC
+        value: $(params.hermetic)
+      - name: PREFETCH_INPUT
+        value: $(params.prefetch-input)
+      - name: IMAGE_EXPIRES_AFTER
+        value: "1d"
+      - name: COMMIT_SHA
+        value: $(tasks.clone-repository.results.commit)
+      - name: PRIVILEGED_NESTED
+        value: $(params.privileged-nested)
+      - name: SOURCE_URL
+        value: $(tasks.clone-repository.results.url)
+      - name: BUILDAH_FORMAT
+        value: $(params.buildah-format)
       runAfter:
-        - prefetch-dependencies
+      - prefetch-dependencies
       taskRef:
         params:
-          - name: name
-            value: buildah
-          - name: bundle
-            value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.5@sha256:9ac12870766a980e1f7ae7ddd0852f767da000d8a6d24f5b37e906eb14932355
-          - name: kind
-            value: task
+        - name: name
+          value: buildah
+        - name: bundle
+          value: quay.io/konflux-ci/tekton-catalog/task-buildah:0.5@sha256:9ac12870766a980e1f7ae7ddd0852f767da000d8a6d24f5b37e906eb14932355
+        - name: kind
+          value: task
         resolver: bundles
       when:
-        - input: $(tasks.init.results.build)
-          operator: in
-          values:
-            - "true"
+      - input: $(tasks.init.results.build)
+        operator: in
+        values:
+        - "true"
       workspaces:
-        - name: source
-          workspace: workspace
+      - name: source
+        workspace: workspace
     - name: build-container
       params:
       - name: IMAGE
