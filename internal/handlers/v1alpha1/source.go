@@ -3,7 +3,6 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
-	"io"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -226,41 +225,6 @@ func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request apiSe
 		}
 	}
 	return apiServer.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
-}
-
-// (PUT /api/v1/sources/{id}/rvtools)
-func (s *ServiceHandler) UploadRvtoolsFile(ctx context.Context, request apiServer.UploadRvtoolsFileRequestObject) (apiServer.UploadRvtoolsFileResponseObject, error) {
-	multipartReader := request.Body
-
-	for {
-		part, err := multipartReader.NextPart()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return server.UploadRvtoolsFile400JSONResponse{
-				Message: "Failed to read multipart data",
-			}, nil
-		}
-
-		if part.FormName() == "file" {
-			err := s.sourceSrv.UploadRvtoolsFile(ctx, request.Id, part)
-			if err != nil {
-				switch err.(type) {
-				case *service.ErrExcelFileNotValid:
-					return apiServer.UploadRvtoolsFile400JSONResponse{Message: err.Error()}, nil
-				case *service.ErrResourceNotFound:
-					return apiServer.UploadRvtoolsFile404JSONResponse{Message: err.Error()}, nil
-				default:
-					return server.UploadRvtoolsFile400JSONResponse{
-						Message: "Failed to read uploaded file content",
-					}, nil
-				}
-			}
-			break
-		}
-	}
-	return server.UploadRvtoolsFile200JSONResponse{}, nil
 }
 
 // (GET /health)
