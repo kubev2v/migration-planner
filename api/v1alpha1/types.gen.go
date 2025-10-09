@@ -343,12 +343,6 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
-// UploadRvtoolsFileMultipartBody defines parameters for UploadRvtoolsFile.
-type UploadRvtoolsFileMultipartBody struct {
-	// File The RVTools file (Excel)
-	File openapi_types.File `json:"file"`
-}
-
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
@@ -366,6 +360,3 @@ type UpdateSourceJSONRequestBody = SourceUpdate
 
 // UpdateInventoryJSONRequestBody defines body for UpdateInventory for application/json ContentType.
 type UpdateInventoryJSONRequestBody = UpdateInventory
-
-// UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
-type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody
