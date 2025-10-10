@@ -6,11 +6,16 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
+	"go.uber.org/zap"
+	"gopkg.in/yaml.v3"
+
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -22,8 +27,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
-	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
-	"go.uber.org/zap"
 )
 
 const (
@@ -106,9 +109,33 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
+	var authzService service.Authz
+	switch s.cfg.Service.Authz.AuthorizationEnabled {
+	case true:
+		authzService = service.NewAuthzService(s.store)
+		// read the platform file and create relationships
+		content, err := os.ReadFile(s.cfg.Service.Authz.PlatformDefinitionFile)
+		if err != nil {
+			zap.S().Errorw("failed to read platform file", "error", err, "file", s.cfg.Service.Authz.PlatformDefinitionFile)
+			break
+		}
+		var platformDef map[string][]string
+		if err := yaml.Unmarshal(content, &platformDef); err != nil {
+			zap.S().Errorw("failed to parse platform file", "error", err)
+			break
+		}
+		if err := authzService.InitilizePlatform(ctx, platformDef); err != nil {
+			zap.S().Errorw("failed to initialize platform relationships", "error", err, "platform_definitions", platformDef)
+		}
+		zap.S().Infow("platform relationships ok", "platform_definitions", platformDef)
+	case false:
+		authzService = service.NewNoopAuthzService(s.store)
+	}
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		service.NewAssessmentService(s.store, s.opaValidator),
+		authzService,
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
