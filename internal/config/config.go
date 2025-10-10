@@ -33,6 +33,7 @@ type svcConfig struct {
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	S3                   S3
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
+	Authz                Authz
 }
 
 type Auth struct {
@@ -40,6 +41,13 @@ type Auth struct {
 	JwkCertURL                 string `envconfig:"MIGRATION_PLANNER_JWK_URL" default:""`
 	LocalPrivateKey            string `envconfig:"MIGRATION_PLANNER_PRIVATE_KEY" default:""`
 	AgentAuthenticationEnabled bool   `envconfig:"MIGRATION_PLANNER_AGENT_AUTH_ENABLED" default:"true"`
+}
+
+type Authz struct {
+	AuthorizationKind      string `envconfig:"MIGRATION_PLANNER_AUTHZ_KIND" default:"none"` // possible value: none, legacy, spicedb
+	PlatformDefinitionFile string `envconfig:"MIGRATION_PLANNER_AUTHZ_PLATFORM_FILE" default:""`
+	SpiceDBURL             string `envconfig:"MIGRATION_PLANNER_AUTHZ_SPICEDB_URL" default:"localhost:50051"`
+	SpiceDBToken           string `envconfig:"MIGRATION_PLANNER_AUTHZ_SPICEDB_TOKEN" default:""`
 }
 
 type S3 struct {

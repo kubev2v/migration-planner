@@ -14,6 +14,10 @@ const (
 	// Agent metrics
 	AgentStatusCount = "agent_status_count"
 
+	// Authz metrics
+	authzTotalRelationships = "authz_total_relationships"
+	authzValidRelationships = "authz_valid_relationships"
+
 	// Labels
 	agentStateLabel        = "state"
 	ovaDownloadStatusLabel = "state"
@@ -48,6 +52,22 @@ var agentStatusCountMetric = prometheus.NewGaugeVec(
 	agentStateCountLabels,
 )
 
+var authzTotalRelationshipsMetric = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Subsystem: assistedMigration,
+		Name:      authzTotalRelationships,
+		Help:      "total number of authz relationships computed",
+	},
+)
+
+var authzValidRelationshipsMetric = prometheus.NewCounter(
+	prometheus.CounterOpts{
+		Subsystem: assistedMigration,
+		Name:      authzValidRelationships,
+		Help:      "total number of authz relationships written successfully",
+	},
+)
+
 func IncreaseOvaDownloadsTotalMetric(state string) {
 	labels := prometheus.Labels{
 		ovaDownloadStatusLabel: state,
@@ -62,10 +82,20 @@ func UpdateAgentStateCounterMetric(state string, count int) {
 	agentStatusCountMetric.With(labels).Set(float64(count))
 }
 
+func IncreaseAuthzTotalRelationshipsMetric(count int) {
+	authzTotalRelationshipsMetric.Add(float64(count))
+}
+
+func IncreaseAuthzValidRelationshipsMetric(count int) {
+	authzValidRelationshipsMetric.Add(float64(count))
+}
+
 func RegisterMetrics(s store.Store) {
 	inventoryStatsCollector := newInventoryStatsCollector(s)
 
 	prometheus.MustRegister(inventoryStatsCollector)
 	prometheus.MustRegister(ovaDownloadsTotalMetric)
 	prometheus.MustRegister(agentStatusCountMetric)
+	prometheus.MustRegister(authzTotalRelationshipsMetric)
+	prometheus.MustRegister(authzValidRelationshipsMetric)
 }

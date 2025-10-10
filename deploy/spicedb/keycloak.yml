@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: keycloak
+  namespace: spicedb
+  labels:
+    app: keycloak
+spec:
+  containers:
+    - name: keycloak
+      image: quay.io/keycloak/keycloak:23.0
+      command:
+        - /bin/bash
+        - -c
+      args:
+        - /opt/keycloak/bin/kc.sh --spi-login-protocol-openid-connect-legacy-logout-redirect-uri=true start-dev
+      ports:
+        - hostPort: 8000
+          containerPort: 8080
+      env:
+        - name: KEYCLOAK_ADMIN
+          value: admin
+        - name: KEYCLOAK_ADMIN_PASSWORD
+          value: admin
+        - name: KC_DB
+          value: postgres
+        - name: KC_DB_URL
+          value: jdbc:postgresql://keycloak-postgres:5432/keycloak
+        - name: KC_DB_USERNAME
+          value: admin
+        - name: KC_DB_PASSWORD
+          value: adminpass
+    - name: postgres
+      image: docker.io/postgres:17
+      ports:
+      - containerPort: 5432
+        hostPort: 5433
+      env:
+      - name: POSTGRES_USER
+        value: "admin"
+      - name: POSTGRES_PASSWORD
+        value: "adminpass"
+      - name: POSTGRES_DB
+        value: "keycloak"
+      volumeMounts:
+      - name: postgres-storage
+        mountPath: /var/lib/postgresql/data
+  volumes:
+  - name: postgres-storage
+    persistentVolumeClaim:
+      claimName: pg-keycloak-pvc
+  restartPolicy: Always
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-keycloak-pvc
+  namespace: spicedb
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

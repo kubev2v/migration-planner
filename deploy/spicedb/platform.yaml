@@ -1,0 +1,10 @@
+# Platform role definitions
+# Each role accepts a list of user emails
+# Example:
+#   admin:
+#     - user-id-1@domain.com
+#   editor:
+#     - user-id-2@domain.com
+admin:
+editor:
+viewer:

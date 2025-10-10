@@ -36,7 +36,7 @@ func NewDefault() *Config {
 
 // Planner is the client interface for migration planning.
 //
-//go:generate moq -out zz_generated_planner.go . Planner
+//go:generate moq -fmt=goimports -out zz_generated_planner.go . Planner
 type Planner interface {
 	UpdateSourceStatus(ctx context.Context, id uuid.UUID, params api.SourceStatusUpdate) error
 	// UpdateAgentStatus updates the agent status.
