@@ -9,6 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
@@ -19,9 +23,6 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var runCmd = &cobra.Command{
@@ -54,7 +55,14 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("initializing data store", "error", err)
 		}
 
-		store := store.NewStore(db)
+		// Initialize SpiceDB client
+		spiceDBClient, err := store.InitSpiceDbClient(cfg.Service.Authz.SpiceDBURL, cfg.Service.Authz.SpiceDBToken)
+		if err != nil {
+			zap.S().Fatalw("initializing SpiceDB client", "error", err)
+		}
+		defer spiceDBClient.Close()
+
+		store := store.NewStoreWithAuthz(db, spiceDBClient)
 		defer store.Close()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
@@ -62,10 +70,10 @@ var runCmd = &cobra.Command{
 		}
 
 		// The migration planner API expects the RHCOS ISO to be on disk
-		if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
-			zap.S().Fatalw("validate iso", "error", err)
-			return err
-		}
+		// if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
+		// 	zap.S().Fatalw("validate iso", "error", err)
+		// 	return err
+		// }
 
 		// Initialize OPA validator for policy validation
 		zap.S().Info("initializing OPA validator...")

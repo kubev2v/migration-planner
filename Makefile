@@ -295,7 +295,6 @@ generate: $(MOQ)
 	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./...)
 	@echo "⚙️ Running mockgen script..."
 	@hack/mockgen.sh
-	@$(MAKE) format
 	@echo "✅ Generate complete."
 
 # Check if generate changes the repo

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -57,6 +58,10 @@ type User struct {
 	FirstName    string
 	LastName     string
 	Token        *jwt.Token
+}
+
+func (u User) IsSuperOrgMember() bool {
+	return strings.ToLower(u.Organization) == "super_org"
 }
 
 type AgentJWT struct {

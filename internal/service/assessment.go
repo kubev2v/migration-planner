@@ -32,7 +32,7 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *Asses
 }
 
 func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
-	storeFilter := store.NewAssessmentQueryFilter().WithOrgID(filter.OrgID)
+	storeFilter := store.NewAssessmentQueryFilter().WithIdIn(filter.IdInArray)
 
 	if filter.Source != "" {
 		storeFilter = storeFilter.WithSourceType(filter.Source)
@@ -192,18 +192,16 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 
 // AssessmentFilter represents filtering options for listing assessments
 type AssessmentFilter struct {
-	OrgID    string
-	Source   string
-	SourceID string
-	NameLike string
-	Limit    int
-	Offset   int
+	Source    string
+	SourceID  string
+	NameLike  string
+	Limit     int
+	Offset    int
+	IdInArray []string
 }
 
-func NewAssessmentFilter(orgID string) *AssessmentFilter {
-	return &AssessmentFilter{
-		OrgID: orgID,
-	}
+func NewAssessmentFilter() *AssessmentFilter {
+	return &AssessmentFilter{}
 }
 
 func (f *AssessmentFilter) WithSource(source string) *AssessmentFilter {
@@ -228,5 +226,10 @@ func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 
 func (f *AssessmentFilter) WithOffset(offset int) *AssessmentFilter {
 	f.Offset = offset
+	return f
+}
+
+func (f *AssessmentFilter) WithArrayIn(ids []string) *AssessmentFilter {
+	f.IdInArray = ids
 	return f
 }

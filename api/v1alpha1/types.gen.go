@@ -4,8 +4,11 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
+	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -17,6 +20,14 @@ const (
 	AgentStatusSourceGone                AgentStatus = "source-gone"
 	AgentStatusUpToDate                  AgentStatus = "up-to-date"
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
+)
+
+// Defines values for AssessmentPermissions.
+const (
+	Delete AssessmentPermissions = "delete"
+	Edit   AssessmentPermissions = "edit"
+	Read   AssessmentPermissions = "read"
+	Share  AssessmentPermissions = "share"
 )
 
 // Defines values for AssessmentSourceType.
@@ -32,6 +43,12 @@ const (
 	Dvswitch    NetworkType = "dvswitch"
 	Standard    NetworkType = "standard"
 	Unsupported NetworkType = "unsupported"
+)
+
+// Defines values for ShareAssessmentRequestRelationship.
+const (
+	Editor ShareAssessmentRequestRelationship = "editor"
+	Viewer ShareAssessmentRequestRelationship = "viewer"
 )
 
 // Agent defines model for Agent.
@@ -65,11 +82,15 @@ type Assessment struct {
 	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
 
 	// OwnerLastName Owner's last name
-	OwnerLastName *string              `json:"ownerLastName,omitempty"`
-	Snapshots     []Snapshot           `json:"snapshots"`
-	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
-	SourceType    AssessmentSourceType `json:"sourceType"`
+	OwnerLastName *string                 `json:"ownerLastName,omitempty"`
+	Permissions   []AssessmentPermissions `json:"permissions"`
+	Snapshots     []Snapshot              `json:"snapshots"`
+	SourceId      *openapi_types.UUID     `json:"sourceId,omitempty"`
+	SourceType    AssessmentSourceType    `json:"sourceType"`
 }
+
+// AssessmentPermissions defines model for Assessment.Permissions.
+type AssessmentPermissions string
 
 // AssessmentSourceType defines model for Assessment.SourceType.
 type AssessmentSourceType string
@@ -215,6 +236,23 @@ type Network struct {
 // NetworkType defines model for Network.Type.
 type NetworkType string
 
+// ShareAssessmentRequest defines model for ShareAssessmentRequest.
+type ShareAssessmentRequest struct {
+	OrgId        *string                            `json:"orgId,omitempty"`
+	Relationship ShareAssessmentRequestRelationship `json:"relationship"`
+	UserId       *string                            `json:"userId,omitempty"`
+	union        json.RawMessage
+}
+
+// ShareAssessmentRequestRelationship defines model for ShareAssessmentRequest.Relationship.
+type ShareAssessmentRequestRelationship string
+
+// ShareAssessmentRequest0 defines model for .
+type ShareAssessmentRequest0 = interface{}
+
+// ShareAssessmentRequest1 defines model for .
+type ShareAssessmentRequest1 = interface{}
+
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
 	CreatedAt time.Time `json:"createdAt"`
@@ -358,6 +396,12 @@ type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
 
+// UnshareAssessmentJSONRequestBody defines body for UnshareAssessment for application/json ContentType.
+type UnshareAssessmentJSONRequestBody = ShareAssessmentRequest
+
+// ShareAssessmentJSONRequestBody defines body for ShareAssessment for application/json ContentType.
+type ShareAssessmentJSONRequestBody = ShareAssessmentRequest
+
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
 
@@ -369,3 +413,125 @@ type UpdateInventoryJSONRequestBody = UpdateInventory
 
 // UploadRvtoolsFileMultipartRequestBody defines body for UploadRvtoolsFile for multipart/form-data ContentType.
 type UploadRvtoolsFileMultipartRequestBody UploadRvtoolsFileMultipartBody
+
+// AsShareAssessmentRequest0 returns the union data inside the ShareAssessmentRequest as a ShareAssessmentRequest0
+func (t ShareAssessmentRequest) AsShareAssessmentRequest0() (ShareAssessmentRequest0, error) {
+	var body ShareAssessmentRequest0
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromShareAssessmentRequest0 overwrites any union data inside the ShareAssessmentRequest as the provided ShareAssessmentRequest0
+func (t *ShareAssessmentRequest) FromShareAssessmentRequest0(v ShareAssessmentRequest0) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeShareAssessmentRequest0 performs a merge with any union data inside the ShareAssessmentRequest, using the provided ShareAssessmentRequest0
+func (t *ShareAssessmentRequest) MergeShareAssessmentRequest0(v ShareAssessmentRequest0) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsShareAssessmentRequest1 returns the union data inside the ShareAssessmentRequest as a ShareAssessmentRequest1
+func (t ShareAssessmentRequest) AsShareAssessmentRequest1() (ShareAssessmentRequest1, error) {
+	var body ShareAssessmentRequest1
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromShareAssessmentRequest1 overwrites any union data inside the ShareAssessmentRequest as the provided ShareAssessmentRequest1
+func (t *ShareAssessmentRequest) FromShareAssessmentRequest1(v ShareAssessmentRequest1) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeShareAssessmentRequest1 performs a merge with any union data inside the ShareAssessmentRequest, using the provided ShareAssessmentRequest1
+func (t *ShareAssessmentRequest) MergeShareAssessmentRequest1(v ShareAssessmentRequest1) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+func (t ShareAssessmentRequest) MarshalJSON() ([]byte, error) {
+	b, err := t.union.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	object := make(map[string]json.RawMessage)
+	if t.union != nil {
+		err = json.Unmarshal(b, &object)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if t.OrgId != nil {
+		object["orgId"], err = json.Marshal(t.OrgId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'orgId': %w", err)
+		}
+	}
+
+	object["relationship"], err = json.Marshal(t.Relationship)
+	if err != nil {
+		return nil, fmt.Errorf("error marshaling 'relationship': %w", err)
+	}
+
+	if t.UserId != nil {
+		object["userId"], err = json.Marshal(t.UserId)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'userId': %w", err)
+		}
+	}
+	b, err = json.Marshal(object)
+	return b, err
+}
+
+func (t *ShareAssessmentRequest) UnmarshalJSON(b []byte) error {
+	err := t.union.UnmarshalJSON(b)
+	if err != nil {
+		return err
+	}
+	object := make(map[string]json.RawMessage)
+	err = json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["orgId"]; found {
+		err = json.Unmarshal(raw, &t.OrgId)
+		if err != nil {
+			return fmt.Errorf("error reading 'orgId': %w", err)
+		}
+	}
+
+	if raw, found := object["relationship"]; found {
+		err = json.Unmarshal(raw, &t.Relationship)
+		if err != nil {
+			return fmt.Errorf("error reading 'relationship': %w", err)
+		}
+	}
+
+	if raw, found := object["userId"]; found {
+		err = json.Unmarshal(raw, &t.UserId)
+		if err != nil {
+			return fmt.Errorf("error reading 'userId': %w", err)
+		}
+	}
+
+	return err
+}
