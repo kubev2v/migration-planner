@@ -141,10 +141,17 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 	return assessment
 }
 
-func AssessmentListToApi(assessments []model.Assessment) api.AssessmentList {
+func AssessmentListToApi(assessments []model.Assessment, permissions map[string][]model.Permission) api.AssessmentList {
 	assessmentList := make([]api.Assessment, len(assessments))
 	for i, assessment := range assessments {
-		assessmentList[i] = AssessmentToApi(assessment)
+		apiAssessment := AssessmentToApi(assessment)
+		apiAssessment.Permissions = make([]api.AssessmentPermissions, 0)
+		if perm, ok := permissions[assessment.ID.String()]; ok {
+			for _, p := range perm {
+				apiAssessment.Permissions = append(apiAssessment.Permissions, api.AssessmentPermissions(p.String()))
+			}
+		}
+		assessmentList[i] = apiAssessment
 	}
 	return assessmentList
 }
