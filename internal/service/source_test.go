@@ -29,7 +29,7 @@ const (
 	insertLabelStm                 = "INSERT INTO labels (key, value, source_id) VALUES ('%s', '%s', '%s');"
 )
 
-var _ = Describe("source handler", Ordered, func() {
+var _ = Describe("Source Service", Ordered, func() {
 	var (
 		s      store.Store
 		gormdb *gorm.DB
@@ -434,7 +434,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewNoopAuthzService(s))
 			newName := "updated-name"
 			newLabels := []v1alpha1.Label{
 				{Key: "env", Value: "prod"},
@@ -503,7 +503,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewNoopAuthzService(s))
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.New(),
 				Body: &v1alpha1.SourceUpdate{},
@@ -523,7 +523,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewNoopAuthzService(s))
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.MustParse(sourceID),
 				Body: &v1alpha1.SourceUpdate{},
@@ -550,7 +550,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewNoopAuthzService(s))
 
 			// First set initial labels
 			initialLabels := []v1alpha1.Label{

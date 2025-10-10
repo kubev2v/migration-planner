@@ -113,7 +113,7 @@ func AgentToApi(a model.Agent) api.Agent {
 	}
 }
 
-func AssessmentToApi(a model.Assessment) api.Assessment {
+func AssessmentToApi(a model.Assessment, permissions []model.Permission) api.Assessment {
 	assessment := api.Assessment{
 		Id:             a.ID,
 		Name:           a.Name,
@@ -121,6 +121,7 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 		OwnerLastName:  a.OwnerLastName,
 		CreatedAt:      a.CreatedAt,
 		Snapshots:      make([]api.Snapshot, len(a.Snapshots)),
+		Permissions:    make([]api.AssessmentPermissions, 0, len(permissions)),
 	}
 
 	// Convert snapshots
@@ -133,6 +134,10 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 		}
 	}
 
+	for _, p := range permissions {
+		assessment.Permissions = append(assessment.Permissions, api.AssessmentPermissions(p.String()))
+	}
+
 	// Set source type based on source field
 	sourceType := api.AssessmentSourceType(a.SourceType)
 	assessment.SourceType = sourceType
@@ -141,10 +146,14 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 	return assessment
 }
 
-func AssessmentListToApi(assessments []model.Assessment) api.AssessmentList {
+func AssessmentListToApi(assessments []model.Assessment, permissions map[string][]model.Permission) api.AssessmentList {
 	assessmentList := make([]api.Assessment, len(assessments))
 	for i, assessment := range assessments {
-		assessmentList[i] = AssessmentToApi(assessment)
+		if perm, ok := permissions[assessment.ID.String()]; ok {
+			assessmentList[i] = AssessmentToApi(assessment, perm)
+			continue
+		}
+		assessmentList[i] = AssessmentToApi(assessment, []model.Permission{})
 	}
 	return assessmentList
 }
