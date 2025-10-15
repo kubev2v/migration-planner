@@ -128,6 +128,13 @@ func (f *AssessmentQueryFilter) WithNameLike(pattern string) *AssessmentQueryFil
 	return f
 }
 
+func (o *AssessmentQueryFilter) WithIdIn(ids []string) *AssessmentQueryFilter {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id IN ?", ids)
+	})
+	return o
+}
+
 // Limit results
 func (o *AssessmentQueryOptions) WithLimit(limit int) *AssessmentQueryOptions {
 	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {

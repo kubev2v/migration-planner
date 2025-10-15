@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"go.uber.org/zap"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -11,20 +13,78 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 // (GET /api/v1/assessments)
 func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.ListAssessmentsRequestObject) (server.ListAssessmentsResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
-	filter := service.NewAssessmentFilter(user.Organization)
+	// first touch the user
+	if err := h.authzSrv.CreateUser(ctx, user); err != nil {
+		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to add user and org to spicedb: %v", err)}, nil
+	}
+
+	// list assessments for which the user has read permission
+	assessmentIds, err := h.authzSrv.ListAssessments(ctx, user)
+	if err != nil {
+		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list permissions: %v", err)}, nil
+	}
+
+	filter := service.NewAssessmentFilter().WithArrayIn(assessmentIds)
 
 	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
 	}
 
-	return server.ListAssessments200JSONResponse(mappers.AssessmentListToApi(assessments)), nil
+	// Get permissions for all assessments in bulk
+	var assessmentIDs []string
+	for _, a := range assessments {
+		assessmentIDs = append(assessmentIDs, a.ID.String())
+	}
+
+	perms, err := h.authzSrv.GetBulkPermissions(ctx, assessmentIDs, user)
+	if err != nil {
+		zap.S().Warnw("failed to read bulk permissions", "error", err)
+		// Continue with empty permissions rather than failing the request
+		perms = make(map[string][]model.Permission)
+	}
+
+	return server.ListAssessments200JSONResponse(mappers.AssessmentListToApi(assessments, perms)), nil
+}
+
+func (h *ServiceHandler) ShareAssessment(ctx context.Context, request server.ShareAssessmentRequestObject) (server.ShareAssessmentResponseObject, error) {
+	if request.Body.OrgId == nil && request.Body.UserId == nil {
+		return server.ShareAssessment400JSONResponse{Message: "either userId or orgId must be present"}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+
+	if _, err := h.assessmentSrv.GetAssessment(ctx, request.Id); err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.ShareAssessment404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.ShareAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
+		}
+	}
+
+	// check if user has the right to share assessment
+	hasPermission, err := h.authzSrv.HasPermission(ctx, request.Id.String(), user, model.SharePermission)
+	if err != nil {
+		return server.ShareAssessment500JSONResponse{Message: fmt.Sprintf("failed to read permissions for assessment %s: %v", request.Id, err)}, nil
+	}
+
+	if !hasPermission {
+		return server.ShareAssessment403JSONResponse{Message: fmt.Sprintf("user %s does not have sharing permission on assessment %s", user.Username, request.Id)}, nil
+	}
+
+	if err := h.authzSrv.WriteRelationship(ctx, request.Id.String(), model.NewUserSubject(*request.Body.UserId), model.ReaderRelationshipKind); err != nil {
+		return server.ShareAssessment500JSONResponse{Message: fmt.Sprintf("failed to write share permission on assessment %s for user %s", user.Username, request.Id)}, nil
+	}
+
+	return server.ShareAssessment201JSONResponse{}, nil
 }
 
 // (POST /api/v1/assessments)
@@ -57,6 +117,11 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		}
 	}
 
+	// add permissions
+	if err := h.authzSrv.CreateAssessmentRelationship(ctx, createForm.ID.String(), user); err != nil {
+		return server.CreateAssessment500JSONResponse{Message: fmt.Sprintf("failed to write permission for the assessment: %v", err)}, nil
+	}
+
 	assessment, err := h.assessmentSrv.CreateAssessment(ctx, createForm)
 	if err != nil {
 		switch err.(type) {
@@ -72,12 +137,12 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	}
 
 	return server.CreateAssessment201JSONResponse(mappers.AssessmentToApi(*assessment)), nil
-
 }
 
 // (GET /api/v1/assessments/{id})
 func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAssessmentRequestObject) (server.GetAssessmentResponseObject, error) {
 	assessmentID := request.Id
+	user := auth.MustHaveUser(ctx)
 
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
@@ -89,10 +154,14 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 		}
 	}
 
-	user := auth.MustHaveUser(ctx)
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user with org_id %s", assessmentID, user.Organization)
-		return server.GetAssessment403JSONResponse{Message: message}, nil
+	// Check if user has read permission on the assessment
+	hasReadPermission, err := h.authzSrv.HasPermission(ctx, assessmentID.String(), user, model.ReadPermission)
+	if err != nil {
+		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to check permissions for assessment %s: %v", assessmentID, err)}, nil
+	}
+
+	if !hasReadPermission {
+		return server.GetAssessment403JSONResponse{Message: fmt.Sprintf("user %s does not have read permission on assessment %s", user.Username, assessmentID)}, nil
 	}
 
 	return server.GetAssessment200JSONResponse(mappers.AssessmentToApi(*assessment)), nil
@@ -105,9 +174,10 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 	}
 
 	assessmentID := request.Id
+	user := auth.MustHaveUser(ctx)
 
-	// Get assessment to check ownership
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
+	// check if assessment exists before checking for permissions
+	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -117,10 +187,14 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		}
 	}
 
-	user := auth.MustHaveUser(ctx)
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to update assessment %s by user with org_id %s", assessmentID, user.Organization)
-		return server.UpdateAssessment403JSONResponse{Message: message}, nil
+	// Check if user has edit permission on the assessment
+	hasEditPermission, err := h.authzSrv.HasPermission(ctx, assessmentID.String(), user, model.EditPermission)
+	if err != nil {
+		return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to check permissions for assessment %s: %v", assessmentID, err)}, nil
+	}
+
+	if !hasEditPermission {
+		return server.UpdateAssessment403JSONResponse{Message: fmt.Sprintf("user %s does not have edit permission on assessment %s", user.Username, assessmentID)}, nil
 	}
 
 	updatedAssessment, err := h.assessmentSrv.UpdateAssessment(ctx, assessmentID, request.Body.Name)
@@ -138,12 +212,17 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 	return server.UpdateAssessment200JSONResponse(mappers.AssessmentToApi(*updatedAssessment)), nil
 }
 
+func (h *ServiceHandler) UnshareAssessment(ctx context.Context, request server.UnshareAssessmentRequestObject) (server.UnshareAssessmentResponseObject, error) {
+	return nil, nil
+}
+
 // (DELETE /api/v1/assessments/{id})
 func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.DeleteAssessmentRequestObject) (server.DeleteAssessmentResponseObject, error) {
 	assessmentID := request.Id
+	user := auth.MustHaveUser(ctx)
 
-	// Get assessment to check ownership
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
+	// Get assessment to check if it exists
+	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -153,14 +232,22 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 		}
 	}
 
-	user := auth.MustHaveUser(ctx)
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to delete assessment %s by user with org_id %s", assessmentID, user.Organization)
-		return server.DeleteAssessment403JSONResponse{Message: message}, nil
+	// Check if user has delete permission on the assessment
+	hasDeletePermission, err := h.authzSrv.HasPermission(ctx, assessmentID.String(), user, model.DeletePermission)
+	if err != nil {
+		return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to check permissions for assessment %s: %v", assessmentID, err)}, nil
+	}
+
+	if !hasDeletePermission {
+		return server.DeleteAssessment403JSONResponse{Message: fmt.Sprintf("user %s does not have delete permission on assessment %s", user.Username, assessmentID)}, nil
 	}
 
 	if err := h.assessmentSrv.DeleteAssessment(ctx, assessmentID); err != nil {
 		return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err)}, nil
+	}
+
+	if err := h.authzSrv.DeleteAssessmentAllRelationships(ctx, assessmentID.String()); err != nil {
+		zap.S().Warnw("failed to delete relationships for assessment", "id", assessmentID.String(), "error", err) // don't really care if we succed or not
 	}
 
 	return server.DeleteAssessment200JSONResponse{}, nil

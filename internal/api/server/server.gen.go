@@ -36,6 +36,12 @@ type ServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (DELETE /api/v1/assessments/{id}/share)
+	UnshareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v1/assessments/{id}/share)
+	ShareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
 
@@ -99,6 +105,16 @@ func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id 
 
 // (PUT /api/v1/assessments/{id})
 func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/assessments/{id}/share)
+func (_ Unimplemented) UnshareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/share)
+func (_ Unimplemented) ShareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -270,6 +286,58 @@ func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UnshareAssessment operation middleware
+func (siw *ServerInterfaceWrapper) UnshareAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnshareAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ShareAssessment operation middleware
+func (siw *ServerInterfaceWrapper) ShareAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ShareAssessment(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -665,6 +733,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/assessments/{id}/share", wrapper.UnshareAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/share", wrapper.ShareAssessment)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
 	})
 	r.Group(func(r chi.Router) {
@@ -964,6 +1038,132 @@ func (response UpdateAssessment404JSONResponse) VisitUpdateAssessmentResponse(w 
 type UpdateAssessment500JSONResponse Error
 
 func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UnshareAssessmentJSONRequestBody
+}
+
+type UnshareAssessmentResponseObject interface {
+	VisitUnshareAssessmentResponse(w http.ResponseWriter) error
+}
+
+type UnshareAssessment200JSONResponse Status
+
+func (response UnshareAssessment200JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessment400JSONResponse Error
+
+func (response UnshareAssessment400JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessment401JSONResponse Error
+
+func (response UnshareAssessment401JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessment403JSONResponse Error
+
+func (response UnshareAssessment403JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessment404JSONResponse Error
+
+func (response UnshareAssessment404JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessment500JSONResponse Error
+
+func (response UnshareAssessment500JSONResponse) VisitUnshareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *ShareAssessmentJSONRequestBody
+}
+
+type ShareAssessmentResponseObject interface {
+	VisitShareAssessmentResponse(w http.ResponseWriter) error
+}
+
+type ShareAssessment201JSONResponse Status
+
+func (response ShareAssessment201JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessment400JSONResponse Error
+
+func (response ShareAssessment400JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessment401JSONResponse Error
+
+func (response ShareAssessment401JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessment403JSONResponse Error
+
+func (response ShareAssessment403JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessment404JSONResponse Error
+
+func (response ShareAssessment404JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessment500JSONResponse Error
+
+func (response ShareAssessment500JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1555,6 +1755,12 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
 
+	// (DELETE /api/v1/assessments/{id}/share)
+	UnshareAssessment(ctx context.Context, request UnshareAssessmentRequestObject) (UnshareAssessmentResponseObject, error)
+
+	// (POST /api/v1/assessments/{id}/share)
+	ShareAssessment(ctx context.Context, request ShareAssessmentRequestObject) (ShareAssessmentResponseObject, error)
+
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
 
@@ -1765,6 +1971,72 @@ func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
 		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnshareAssessment operation middleware
+func (sh *strictHandler) UnshareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UnshareAssessmentRequestObject
+
+	request.Id = id
+
+	var body UnshareAssessmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnshareAssessment(ctx, request.(UnshareAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnshareAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnshareAssessmentResponseObject); ok {
+		if err := validResponse.VisitUnshareAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ShareAssessment operation middleware
+func (sh *strictHandler) ShareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ShareAssessmentRequestObject
+
+	request.Id = id
+
+	var body ShareAssessmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ShareAssessment(ctx, request.(ShareAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ShareAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ShareAssessmentResponseObject); ok {
+		if err := validResponse.VisitShareAssessmentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
