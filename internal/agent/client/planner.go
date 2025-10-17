@@ -18,6 +18,7 @@ var _ Planner = (*planner)(nil)
 var (
 	ErrEmptyResponse = errors.New("empty response")
 	ErrSourceGone    = errors.New("source is gone")
+	ErrUnauthorized  = errors.New("agent is not authorized")
 )
 
 func NewPlanner(client *client.ClientWithResponses) Planner {
@@ -63,13 +64,19 @@ func (p *planner) UpdateAgentStatus(ctx context.Context, id uuid.UUID, params ap
 	if resp.HTTPResponse != nil {
 		defer resp.HTTPResponse.Body.Close()
 	}
-	if resp.StatusCode() == http.StatusGone {
+
+	switch resp.StatusCode() {
+	case http.StatusOK:
+		return nil
+	case http.StatusCreated:
+		return nil
+	case http.StatusGone:
 		return ErrSourceGone
-	}
-	if resp.StatusCode() != http.StatusOK && resp.StatusCode() != http.StatusCreated {
+	case http.StatusUnauthorized:
+		return ErrUnauthorized
+	default:
 		return fmt.Errorf("failed to update agent status: %s", resp.Status())
 	}
-	return nil
 }
 
 func (p *planner) jwtFromContext(ctx context.Context) (string, bool) {
