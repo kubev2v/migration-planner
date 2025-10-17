@@ -5,56 +5,62 @@ import (
 )
 
 func TestParseDomainName(t *testing.T) {
-	ptr := func(s string) *string {
-		return &s
-	}
-
 	tests := []struct {
-		source     Source
+		name       string
+		assessment Assessment
 		domainName string
 		wantErr    bool
 	}{
 		{
-			source: Source{
-				Username:    "doejoe@redhat.com",
-				EmailDomain: ptr("redhat.com"),
+			name: "valid email username",
+			assessment: Assessment{
+				Username: "doejoe@redhat.com",
 			},
 			domainName: "redhat.com",
 			wantErr:    false,
 		},
 		{
-			source: Source{
-				Username:    "",
-				EmailDomain: ptr("redhat.com"),
+			name: "email with subdomain",
+			assessment: Assessment{
+				Username: "user@mail.example.com",
 			},
-			domainName: "redhat.com",
+			domainName: "example.com",
 			wantErr:    false,
 		},
 		{
-			source: Source{
-				Username:    "doejoe",
-				EmailDomain: ptr("redhat.com"),
+			name: "invalid username without @",
+			assessment: Assessment{
+				Username: "doejoe",
 			},
-			domainName: "redhat.com",
-			wantErr:    false,
+			domainName: "",
+			wantErr:    true,
 		},
 		{
-			source: Source{
+			name: "empty username",
+			assessment: Assessment{
 				Username: "",
+			},
+			domainName: "",
+			wantErr:    true,
+		},
+		{
+			name: "malformed email with @ but no domain",
+			assessment: Assessment{
+				Username: "doejoe@",
 			},
 			domainName: "",
 			wantErr:    true,
 		},
 	}
 	for _, tt := range tests {
-		t.Run(tt.source.Username, func(t *testing.T) {
-			got, err := getDomainName(tt.source)
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := getDomainNameFromAssessment(tt.assessment)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getDomainName: error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getDomainNameFromAssessment: error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.domainName {
-				t.Errorf("getDomainName: got = %v, want %v", got, tt.domainName)
+				t.Errorf("getDomainNameFromAssessment: got = %v, want %v", got, tt.domainName)
 			}
 		})
 	}

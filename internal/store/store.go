@@ -70,11 +70,11 @@ func (s *DataStore) Assessment() Assessment {
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
-	sources, err := s.Source().List(ctx, NewSourceQueryFilter())
+	assessments, err := s.Assessment().List(ctx, NewAssessmentQueryFilter())
 	if err != nil {
 		return model.InventoryStats{}, err
 	}
-	return model.NewInventoryStats(sources), nil
+	return model.NewInventoryStats(assessments), nil
 }
 
 func (s *DataStore) Close() error {

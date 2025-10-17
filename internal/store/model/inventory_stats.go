@@ -35,27 +35,49 @@ type InventoryStats struct {
 	Storage          []StorageCustomerStats
 }
 
-func NewInventoryStats(sources []Source) InventoryStats {
+type domainSnapshot struct {
+	Snapshot Snapshot
+	OrgID    string
+}
+
+func NewInventoryStats(assessments []Assessment) InventoryStats {
+	domainSnapshots := make([]domainSnapshot, 0, len(assessments))
+	orgIDs := make(map[string]struct{})
+
+	for _, a := range assessments {
+		latesSnapshot := a.Snapshots[0] // we called List which orders snapshots by created_at. So we get the latest here
+
+		domain, err := getDomainNameFromAssessment(a)
+		if err != nil {
+			zap.S().Debugw("failed to get domain from username", "error", err, "username", a.Username)
+			domain = a.OrgID
+		}
+
+		domainSnapshots = append(domainSnapshots, domainSnapshot{
+			Snapshot: latesSnapshot,
+			OrgID:    domain,
+		})
+		orgIDs[a.OrgID] = struct{}{}
+	}
+
 	return InventoryStats{
-		Vms:              computeVmStats(sources),
-		Os:               computeOsStats(sources),
-		TotalInventories: computeInventories(sources),
-		TotalAssessments: len(sources),
-		TotalCustomers:   computeTotalCustomers(sources),
-		Storage:          computeStorateStats(sources),
+		Vms:              computeVmStats(domainSnapshots),
+		Os:               computeOsStats(domainSnapshots),
+		TotalInventories: len(domainSnapshots),
+		TotalAssessments: len(assessments),
+		TotalCustomers:   len(orgIDs),
+		Storage:          computeStorageStats(domainSnapshots),
 	}
 }
 
-func computeVmStats(sources []Source) VmStats {
+func computeVmStats(domainSnapshots []domainSnapshot) VmStats {
 	total := 0
 	os := make(map[string]int)
 	orgTotal := make(map[string]int)
-	for _, s := range sources {
-		if s.Inventory == nil {
-			continue
-		}
-		total += s.Inventory.Data.Vms.Total
-		for k, v := range s.Inventory.Data.Vms.Os {
+
+	for _, ds := range domainSnapshots {
+		total += ds.Snapshot.Inventory.Data.Vms.Total
+		for k, v := range ds.Snapshot.Inventory.Data.Vms.Os {
 			if oldValue, found := os[k]; found {
 				oldValue += v
 				os[k] = oldValue
@@ -63,13 +85,7 @@ func computeVmStats(sources []Source) VmStats {
 				os[k] = v
 			}
 		}
-
-		domain, err := getDomainName(s)
-		if err != nil {
-			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
-			domain = s.OrgID
-		}
-		orgTotal[domain] = s.Inventory.Data.Vms.Total
+		orgTotal[ds.OrgID] = ds.Snapshot.Inventory.Data.Vms.Total
 	}
 
 	return VmStats{
@@ -79,62 +95,32 @@ func computeVmStats(sources []Source) VmStats {
 	}
 }
 
-func computeOsStats(sources []Source) OsStats {
-	os := make(map[string]any)
-	for _, s := range sources {
-		if s.Inventory == nil {
-			continue
-		}
-		for k := range s.Inventory.Data.Vms.Os {
+func computeOsStats(domainSnapshots []domainSnapshot) OsStats {
+	os := make(map[string]struct{})
+
+	for _, ds := range domainSnapshots {
+		for k := range ds.Snapshot.Inventory.Data.Vms.Os {
 			os[k] = struct{}{}
 		}
 	}
 
-	total := 0
-	for range os {
-		total += 1
-	}
-
-	return OsStats{Total: total}
+	return OsStats{Total: len(os)}
 }
 
-func computeTotalCustomers(sources []Source) int {
-	orgIDs := make(map[string]any)
-	for _, s := range sources {
-		orgIDs[s.OrgID] = struct{}{}
-	}
-
-	total := 0
-	for range orgIDs {
-		total += 1
-	}
-
-	return total
-}
-
-func computeStorateStats(sources []Source) []StorageCustomerStats {
-	stats := make([]StorageCustomerStats, 0, len(sources))
+func computeStorageStats(domainSnapshots []domainSnapshot) []StorageCustomerStats {
+	stats := make([]StorageCustomerStats, 0, len(domainSnapshots))
 	statsPerCustomer := make(map[string]StorageCustomerStats)
-	for _, s := range sources {
-		if s.Inventory == nil {
-			continue
-		}
 
-		domain, err := getDomainName(s)
-		if err != nil {
-			zap.S().Debugw("failed to get domain from username", "error", err, "username", s.Username)
-			domain = s.OrgID
-		}
-
-		storageSourceStats := computeSourceStorageStats(s)
-		val, found := statsPerCustomer[domain]
+	for _, ds := range domainSnapshots {
+		storageSnapshotStats := computeSnapshotStorageStats(&ds.Snapshot)
+		val, found := statsPerCustomer[ds.OrgID]
 		if found {
-			statsPerCustomer[domain] = StorageCustomerStats{
-				Domain:          domain,
-				TotalByProvider: sum(val.TotalByProvider, storageSourceStats),
+			statsPerCustomer[ds.OrgID] = StorageCustomerStats{
+				Domain:          ds.OrgID,
+				TotalByProvider: sum(val.TotalByProvider, storageSnapshotStats),
 			}
 		} else {
-			statsPerCustomer[domain] = StorageCustomerStats{Domain: domain, TotalByProvider: storageSourceStats}
+			statsPerCustomer[ds.OrgID] = StorageCustomerStats{Domain: ds.OrgID, TotalByProvider: storageSnapshotStats}
 		}
 	}
 
@@ -145,10 +131,10 @@ func computeStorateStats(sources []Source) []StorageCustomerStats {
 	return stats
 }
 
-func computeSourceStorageStats(source Source) map[string]int {
+func computeSnapshotStorageStats(snapshot *Snapshot) map[string]int {
 	totalByProvider := make(map[string]int)
 
-	for _, storage := range source.Inventory.Data.Infra.Datastores {
+	for _, storage := range snapshot.Inventory.Data.Infra.Datastores {
 		if val, found := totalByProvider[storage.Type]; found {
 			val += storage.TotalCapacityGB
 			totalByProvider[storage.Type] = val
@@ -158,17 +144,6 @@ func computeSourceStorageStats(source Source) map[string]int {
 	}
 
 	return totalByProvider
-}
-
-func computeInventories(sources []Source) int {
-	total := 0
-	for _, s := range sources {
-		if s.Inventory == nil {
-			continue
-		}
-		total += 1
-	}
-	return total
 }
 
 func sum(m1, m2 map[string]int) map[string]int {
@@ -194,24 +169,20 @@ func sum(m1, m2 map[string]int) map[string]int {
 	return result
 }
 
-func getDomainName(s Source) (string, error) {
+func getDomainNameFromAssessment(a Assessment) (string, error) {
 	const (
 		dotChar = "."
 		atChar  = "@"
 	)
 
-	if s.EmailDomain != nil && *s.EmailDomain != "" {
-		return *s.EmailDomain, nil
-	}
-
 	// if email domain not set, try to get the domain from username
-	if !strings.Contains(s.Username, atChar) {
-		return "", fmt.Errorf("username %q is not an email", s.Username)
+	if !strings.Contains(a.Username, atChar) {
+		return "", fmt.Errorf("username %q is not an email", a.Username)
 	}
 
-	domain := strings.Split(s.Username, atChar)[1]
+	domain := strings.Split(a.Username, atChar)[1]
 	if strings.TrimSpace(domain) == "" {
-		return "", fmt.Errorf("username %q is malformatted", s.Username)
+		return "", fmt.Errorf("username %q is malformatted", a.Username)
 	}
 
 	// split the domain name by subdomain and return only the top domain
