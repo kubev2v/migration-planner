@@ -144,7 +144,7 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 		The status of agent is always computed even if we don't have connectivity with the backend.
 		If we're connected to the backend, the agent sends its status and if the status is UpToDate,
 		it sends the inventory.
-		In case of "source gone", it stops everything and break from the loop.
+		In case of "source gone" or "unauthorized", it stops everything and break from the loop.
 	*/
 	go func() {
 		for {
@@ -161,8 +161,8 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 			status, statusInfo, inventory := statusUpdater.CalculateStatus()
 
 			if err := statusUpdater.UpdateStatus(ctx, status, statusInfo, a.credUrl); err != nil {
-				if errors.Is(err, client.ErrSourceGone) {
-					zap.S().Info("Source is gone..Stop sending requests")
+				if errors.Is(err, client.ErrSourceGone) || errors.Is(err, client.ErrUnauthorized) {
+					zap.S().Infow("received error code from backend. stop sending requests", "error", err.Error())
 					// stop the server and the healthchecker
 					a.Stop()
 					break
