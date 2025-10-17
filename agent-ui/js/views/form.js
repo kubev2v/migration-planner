@@ -38,8 +38,7 @@ export default class FormView extends Observable {
                     )
                 },
                 goBackBtnCallback: () => {
-                    const serviceUrl = self.store.state.url || "http://localhost:3000/migrate/wizard";
-                    window.open(serviceUrl, '_blank', 'noopener,noreferrer');
+                    window.close();
                 },
             }).render();
 
