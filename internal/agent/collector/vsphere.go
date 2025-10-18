@@ -307,6 +307,9 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
 	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
+
+	// Update the disk size tier
+	updateDiskSizeTier(diskGBSet, inv)
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {
@@ -323,6 +326,37 @@ func vmGuestName(vm vspheremodel.VM) string {
 		return vm.GuestNameFromVmwareTools
 	}
 	return vm.GuestName
+}
+
+func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.Inventory) {
+	diskSizeTier := *(inv.Vms.DiskSizeTier)
+
+	for _, diskGB := range diskGBSet {
+		diskTB := float64(diskGB) / 1024.0
+		var tierKey string
+
+		switch {
+		case diskTB < 10:
+			tierKey = "Easy (0-10TB)"
+		case diskTB < 20:
+			tierKey = "Medium (10-20TB)"
+		case diskTB < 50:
+			tierKey = "Hard (20-50TB)"
+		default:
+			tierKey = "White Glove (>50TB)"
+		}
+
+		tier := diskSizeTier[tierKey]
+		tier.TotalSizeTB += diskTB
+		tier.VmCount++
+		diskSizeTier[tierKey] = tier
+	}
+
+	for k, v := range diskSizeTier {
+		v.TotalSizeTB = math.Round(v.TotalSizeTB*100) / 100
+		diskSizeTier[k] = v
+	}
+
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
