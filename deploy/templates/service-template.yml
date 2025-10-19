@@ -27,6 +27,8 @@ parameters:
   - name: MIGRATION_PLANNER_IMAGE_URL
     description: The URL for the Agent OVA file
     required: true
+  - name: MIGRATION_PLANNER_AGENT_IMAGE
+    description: Migration Discovery Service image.
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
     value: "3"
@@ -498,6 +500,8 @@ objects:
                   value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
                 - name: MIGRATION_PLANNER_IMAGE_URL
                   value: ${MIGRATION_PLANNER_IMAGE_URL}
+                - name: MIGRATION_PLANNER_AGENT_IMAGE
+                  value: ${MIGRATION_PLANNER_AGENT_IMAGE}:${IMAGE_TAG}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE

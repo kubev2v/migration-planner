@@ -138,7 +138,7 @@ storage:
           fi
 
           if [ -f $IMAGE_STORAGE ]; then
-              skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:localhost/migration-planner-agent:latest
+              skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:{{.MigrationPlannerAgentImage}}
           fi
 
     - path: /home/core/.migration-planner/config/config.yaml
@@ -169,7 +169,7 @@ storage:
           Description=Planner agent quadlet
 
           [Container]
-          Image=localhost/migration-planner-agent:latest
+          Image={{.MigrationPlannerAgentImage}}
           ContainerName=planner-agent
           AutoUpdate=registry
           Exec= -config /agent/config/config.yaml

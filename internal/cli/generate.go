@@ -127,6 +127,7 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 	source := *resp.JSON200
 
 	imageBuilder := image.NewImageBuilder(source.Id).
+		WithPlannerAgentImage(o.AgentImageURL).
 		WithPlannerService(o.ServiceIP).
 		WithProxy(image.Proxy{
 			HttpUrl:       o.HttpProxyUrl,

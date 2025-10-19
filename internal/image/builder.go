@@ -32,6 +32,7 @@ const (
 )
 
 const (
+	defaultAgentImage            = "localhost/migration-planner-agent:latest" // The agent image is embedded in the ISO
 	defaultPlannerService        = "http://127.0.0.1:7443"
 	defaultPersistenceDiskDevice = "/dev/sda"
 	defaultConfigServerUI        = "http://localhost:3000/migrate/wizard"
@@ -45,22 +46,23 @@ const (
 
 // IgnitionData defines modifiable fields in ignition config
 type IgnitionData struct {
-	DebugMode            string
-	SshKey               string
-	PlannerServiceUI     string
-	PlannerService       string
-	InsecureRegistry     string
-	Token                string
-	PersistentDiskDevice string
-	SourceID             string
-	HttpProxyUrl         string
-	HttpsProxyUrl        string
-	NoProxyDomain        string
-	RhcosPassword        string
-	IpAddress            string
-	SubnetMask           string
-	DefaultGateway       string
-	Dns                  string
+	DebugMode                  string
+	SshKey                     string
+	PlannerServiceUI           string
+	PlannerService             string
+	MigrationPlannerAgentImage string
+	InsecureRegistry           string
+	Token                      string
+	PersistentDiskDevice       string
+	SourceID                   string
+	HttpProxyUrl               string
+	HttpsProxyUrl              string
+	NoProxyDomain              string
+	RhcosPassword              string
+	IpAddress                  string
+	SubnetMask                 string
+	DefaultGateway             string
+	Dns                        string
 }
 
 type Proxy struct {
@@ -77,41 +79,43 @@ type VmNetwork struct {
 }
 
 type ImageBuilder struct {
-	SourceID             string
-	SshKey               string
-	Proxy                Proxy
-	CertificateChain     string
-	DebugMode            string
-	PlannerServiceUI     string
-	PlannerService       string
-	InsecureRegistry     string
-	Token                string
-	PersistentDiskDevice string
-	PersistentDiskImage  string
-	IsoImageName         string
-	OvfFile              string
-	OvfName              string
-	Template             string
-	RHCOSImage           string
-	imageType            ImageType
-	RhcosPassword        string
-	VmNetwork            VmNetwork
+	SourceID                   string
+	SshKey                     string
+	Proxy                      Proxy
+	CertificateChain           string
+	DebugMode                  string
+	PlannerServiceUI           string
+	PlannerService             string
+	MigrationPlannerAgentImage string
+	InsecureRegistry           string
+	Token                      string
+	PersistentDiskDevice       string
+	PersistentDiskImage        string
+	IsoImageName               string
+	OvfFile                    string
+	OvfName                    string
+	Template                   string
+	RHCOSImage                 string
+	imageType                  ImageType
+	RhcosPassword              string
+	VmNetwork                  VmNetwork
 }
 
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	imageBuilder := &ImageBuilder{
-		SourceID:             sourceID.String(),
-		DebugMode:            util.GetEnv("DEBUG_MODE", ""),
-		PlannerService:       util.GetEnv("CONFIG_SERVER", defaultPlannerService),
-		PlannerServiceUI:     util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
-		PersistentDiskDevice: util.GetEnv("PERSISTENT_DISK_DEVICE", defaultPersistenceDiskDevice),
-		PersistentDiskImage:  defaultPersistentDiskImage,
-		IsoImageName:         defaultIsoImageName,
-		OvfFile:              defaultOvfFile,
-		OvfName:              defaultOvfName,
-		Template:             defaultTemplate,
-		RHCOSImage:           util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
-		imageType:            OVAImageType,
+		SourceID:                   sourceID.String(),
+		DebugMode:                  util.GetEnv("DEBUG_MODE", ""),
+		PlannerService:             util.GetEnv("CONFIG_SERVER", defaultPlannerService),
+		PlannerServiceUI:           util.GetEnv("CONFIG_SERVER_UI", defaultConfigServerUI),
+		MigrationPlannerAgentImage: util.GetEnv("MIGRATION_PLANNER_AGENT_IMAGE", defaultAgentImage),
+		PersistentDiskDevice:       util.GetEnv("PERSISTENT_DISK_DEVICE", defaultPersistenceDiskDevice),
+		PersistentDiskImage:        defaultPersistentDiskImage,
+		IsoImageName:               defaultIsoImageName,
+		OvfFile:                    defaultOvfFile,
+		OvfName:                    defaultOvfName,
+		Template:                   defaultTemplate,
+		RHCOSImage:                 util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
+		imageType:                  OVAImageType,
 	}
 
 	if insecureRegistry := os.Getenv("INSECURE_REGISTRY"); insecureRegistry != "" {
@@ -193,22 +197,23 @@ func (b *ImageBuilder) Validate() error {
 
 func (b *ImageBuilder) generateIgnition() (string, error) {
 	ignData := IgnitionData{
-		DebugMode:            b.DebugMode,
-		SourceID:             b.SourceID,
-		SshKey:               b.SshKey,
-		PlannerServiceUI:     b.PlannerServiceUI,
-		PlannerService:       b.PlannerService,
-		InsecureRegistry:     b.InsecureRegistry,
-		Token:                b.Token,
-		PersistentDiskDevice: b.PersistentDiskDevice,
-		HttpProxyUrl:         b.Proxy.HttpUrl,
-		HttpsProxyUrl:        b.Proxy.HttpsUrl,
-		NoProxyDomain:        b.Proxy.NoProxyDomain,
-		RhcosPassword:        b.RhcosPassword,
-		IpAddress:            b.VmNetwork.IpAddress,
-		SubnetMask:           b.VmNetwork.SubnetMask,
-		DefaultGateway:       b.VmNetwork.DefaultGateway,
-		Dns:                  b.VmNetwork.Dns,
+		DebugMode:                  b.DebugMode,
+		SourceID:                   b.SourceID,
+		SshKey:                     b.SshKey,
+		PlannerServiceUI:           b.PlannerServiceUI,
+		PlannerService:             b.PlannerService,
+		MigrationPlannerAgentImage: b.MigrationPlannerAgentImage,
+		InsecureRegistry:           b.InsecureRegistry,
+		Token:                      b.Token,
+		PersistentDiskDevice:       b.PersistentDiskDevice,
+		HttpProxyUrl:               b.Proxy.HttpUrl,
+		HttpsProxyUrl:              b.Proxy.HttpsUrl,
+		NoProxyDomain:              b.Proxy.NoProxyDomain,
+		RhcosPassword:              b.RhcosPassword,
+		IpAddress:                  b.VmNetwork.IpAddress,
+		SubnetMask:                 b.VmNetwork.SubnetMask,
+		DefaultGateway:             b.VmNetwork.DefaultGateway,
+		Dns:                        b.VmNetwork.Dns,
 	}
 
 	var buf bytes.Buffer
@@ -371,6 +376,11 @@ func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder
 
 func (b *ImageBuilder) WithSshKey(sshKey string) *ImageBuilder {
 	b.SshKey = sshKey
+	return b
+}
+
+func (b *ImageBuilder) WithPlannerAgentImage(imageUrl string) *ImageBuilder {
+	b.MigrationPlannerAgentImage = imageUrl
 	return b
 }
 
