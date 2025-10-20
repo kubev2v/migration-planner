@@ -26,7 +26,7 @@ func NewServiceApi(cred *auth.User) (*ServiceApi, error) {
 		return nil, fmt.Errorf("error getting token: %v", err)
 	}
 	return &ServiceApi{
-		baseURL:    fmt.Sprintf("%s/api/v1/sources/", DefaultServiceUrl),
+		baseURL:    DefaultServiceUrl,
 		httpClient: &http.Client{},
 		jwtToken:   token,
 	}, nil
@@ -62,7 +62,8 @@ func (api *ServiceApi) request(method string, path string, body []byte) (*http.R
 	var req *http.Request
 	var err error
 
-	queryPath := strings.TrimRight(api.baseURL+path, "/")
+	// Always expect a full API-relative path (e.g. "/api/v1/sources/...", "/api/v1/assessments/...")
+	queryPath := strings.TrimRight(fmt.Sprintf("%s%s", api.baseURL, path), "/")
 
 	switch method {
 	case http.MethodGet:
