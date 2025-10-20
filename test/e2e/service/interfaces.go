@@ -9,6 +9,7 @@ import (
 type PlannerService interface {
 	sourceApi
 	imageApi
+	assessmentApi
 }
 
 type sourceApi interface {
@@ -22,4 +23,12 @@ type sourceApi interface {
 
 type imageApi interface {
 	GetImageUrl(uuid.UUID) (string, error)
+}
+
+type assessmentApi interface {
+	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
+	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
+	GetAssessments() (*v1alpha1.AssessmentList, error)
+	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)
+	RemoveAssessment(uuid.UUID) error
 }
