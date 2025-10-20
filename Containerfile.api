@@ -11,7 +11,10 @@ RUN go mod download
 COPY . .
 
 USER 0
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} -o /planner-api cmd/planner-api/*.go
+RUN source hack/version.sh && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} \
+    -ldflags "${GO_LDFLAGS}" \
+    -o /planner-api cmd/planner-api/*.go
 
 # Download OPA policies from Forklift repository
 RUN echo "Downloading OPA policies using Makefile target..." && \

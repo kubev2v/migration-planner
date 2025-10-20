@@ -22,13 +22,12 @@ RUN go mod download
 COPY . .
 
 ARG GCFLAGS=""
-ARG VERSION
-ENV VERSION=${VERSION}
 
 USER 0
-RUN CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} \
-  -ldflags "-X github.com/kubev2v/migration-planner/internal/agent.version=${VERSION}" \
-  -o /planner-agent cmd/planner-agent/main.go
+RUN source hack/version.sh && \
+    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} \
+    -ldflags "-X github.com/kubev2v/migration-planner/internal/agent.version=${SOURCE_GIT_TAG}" \
+    -o /planner-agent cmd/planner-agent/main.go
 
 RUN echo "Downloading OPA policies using Makefile target..." && \
     OPA_POLICIES_DIR=/app/policies make setup-opa-policies
