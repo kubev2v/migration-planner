@@ -179,8 +179,18 @@ func (a *Agent) start(ctx context.Context, plannerClient client.Planner) {
 }
 
 func (a *Agent) initializeCredentialUrl() *net.TCPAddr {
+	server := a.config.PlannerService.Service.Server
+
+	if httpProxy := os.Getenv("HTTP_PROXY"); httpProxy != "" {
+		server = httpProxy
+	}
+
+	if httpsProxy := os.Getenv("HTTPS_PROXY"); httpsProxy != "" {
+		server = httpsProxy
+	}
+
 	// Parse the service URL
-	parsedURL, err := url.Parse(a.config.PlannerService.Service.Server)
+	parsedURL, err := url.Parse(server)
 	if err != nil {
 		zap.S().Errorf("falied to parse service URL: %v", err)
 		return nil
