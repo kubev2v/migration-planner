@@ -32,25 +32,8 @@ PKG_MANAGER ?= apt
 MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
 FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
 
-SOURCE_GIT_COMMIT ?=$(shell git rev-parse "HEAD^{commit}" 2>/dev/null)
-SOURCE_GIT_COMMIT_SHORT ?=$(shell git rev-parse --short "HEAD^{commit}" 2>/dev/null)
-SOURCE_GIT_TAG ?=$(shell git describe --always --tags --abbrev=7 --match '[0-9]*\.[0-9]*\.[0-9]*' --match 'v[0-9]*\.[0-9]*\.[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT_SHORT)')
-SOURCE_GIT_TREE_STATE ?=$(shell ( ( [ ! -d ".git/" ] || git diff --quiet ) && echo 'clean' ) || echo 'dirty')
-BIN_TIMESTAMP ?=$(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
-MAJOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$1}')
-MINOR := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$2}')
-PATCH := $(shell echo $(SOURCE_GIT_TAG) | sed 's/^v//' | awk -F'[._~-]' '{print $$3}')
-
-GO_LD_FLAGS := -ldflags "\
-	-X github.com/kubev2v/migration-planner/pkg/version.majorFromGit=$(MAJOR) \
-	-X github.com/kubev2v/migration-planner/pkg/version.minorFromGit=$(MINOR) \
-	-X github.com/kubev2v/migration-planner/pkg/version.patchFromGit=$(PATCH) \
-	-X github.com/kubev2v/migration-planner/pkg/version.versionFromGit=$(SOURCE_GIT_TAG) \
-	-X github.com/kubev2v/migration-planner/pkg/version.commitFromGit=$(SOURCE_GIT_COMMIT) \
-	-X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=$(SOURCE_GIT_TREE_STATE) \
-	-X github.com/kubev2v/migration-planner/pkg/version.buildDate=$(BIN_TIMESTAMP) \
-	-X github.com/kubev2v/migration-planner/internal/agent.version=$(SOURCE_GIT_TAG) \
-	$(LD_FLAGS)"
+# Get version ldflags from script
+GO_LD_FLAGS := -ldflags "$(shell bash -c 'source hack/version.sh && echo $$GO_LDFLAGS')"
 GO_BUILD_FLAGS += $(GO_LD_FLAGS)
 
 .EXPORT_ALL_VARIABLES:
@@ -131,7 +114,7 @@ build-cli: bin
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . --build-arg VERSION=$(SOURCE_GIT_TAG) $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.agent-debug -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
