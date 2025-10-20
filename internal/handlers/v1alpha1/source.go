@@ -15,14 +15,16 @@ import (
 )
 
 type ServiceHandler struct {
-	sourceSrv     *service.SourceService
-	assessmentSrv *service.AssessmentService
+	sourceSrv          *service.SourceService
+	assessmentSrv      *service.AssessmentService
+	asyncAssessmentSrv *service.AsyncAssessmentService
 }
 
-func NewServiceHandler(sourceService *service.SourceService, a *service.AssessmentService) *ServiceHandler {
+func NewServiceHandler(sourceService *service.SourceService, a *service.AssessmentService, asyncAssessmentSrv *service.AsyncAssessmentService) *ServiceHandler {
 	return &ServiceHandler{
-		sourceSrv:     sourceService,
-		assessmentSrv: a,
+		sourceSrv:          sourceService,
+		assessmentSrv:      a,
+		asyncAssessmentSrv: asyncAssessmentSrv,
 	}
 }
 

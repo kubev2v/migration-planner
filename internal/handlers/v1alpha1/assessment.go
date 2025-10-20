@@ -257,6 +257,80 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 	return server.DeleteAssessment200JSONResponse{}, nil
 }
 
+// (POST /api/v1/assessments/async)
+func (h *ServiceHandler) CreateAssessmentAsync(ctx context.Context, request server.CreateAssessmentAsyncRequestObject) (server.CreateAssessmentAsyncResponseObject, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if request.Body == nil {
+		return server.CreateAssessmentAsync400JSONResponse{Message: "multipart body required"}, nil
+	}
+
+	var createForm srvMappers.AssessmentCreateForm
+	createForm.OrgID = user.Organization
+
+	var err error
+	createForm, err = mappers.AssessmentCreateFormFromMultipart(request.Body, user)
+	if err != nil {
+		return server.CreateAssessmentAsync400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err)}, nil
+	}
+
+	// Create async job
+	job := h.asyncAssessmentSrv.CreateJob()
+
+	// Start processing in background
+	h.asyncAssessmentSrv.ProcessAssessmentAsync(ctx, job.ID, createForm)
+
+	// Convert to API response
+	apiJob := v1alpha1.AsyncJob{
+		Id:        job.ID,
+		Status:    mapAsyncJobStatus(job.Status),
+		CreatedAt: job.CreatedAt,
+	}
+
+	return server.CreateAssessmentAsync202JSONResponse(apiJob), nil
+}
+
+// (GET /api/v1/jobs/{id})
+func (h *ServiceHandler) GetAsyncJob(ctx context.Context, request server.GetAsyncJobRequestObject) (server.GetAsyncJobResponseObject, error) {
+	jobID := request.Id
+
+	job := h.asyncAssessmentSrv.GetJob(jobID)
+	if job == nil {
+		return server.GetAsyncJob404JSONResponse{Message: "job not found"}, nil
+	}
+
+	// Convert to API response
+	apiJob := v1alpha1.AsyncJob{
+		Id:        job.ID,
+		Status:    mapAsyncJobStatus(job.Status),
+		CreatedAt: job.CreatedAt,
+	}
+
+	if job.Error != "" {
+		apiJob.Error = &job.Error
+	}
+	if job.AssessmentID != nil {
+		apiJob.AssessmentId = job.AssessmentID
+	}
+
+	return server.GetAsyncJob200JSONResponse(apiJob), nil
+}
+
+func mapAsyncJobStatus(status service.AsyncJobStatus) v1alpha1.AsyncJobStatus {
+	switch status {
+	case service.AsyncJobStatusPending:
+		return v1alpha1.Pending
+	case service.AsyncJobStatusRunning:
+		return v1alpha1.Running
+	case service.AsyncJobStatusCompleted:
+		return v1alpha1.Completed
+	case service.AsyncJobStatusFailed:
+		return v1alpha1.Failed
+	default:
+		return v1alpha1.Pending
+	}
+}
+
 func validateAssessmentData(data interface{}) error {
 	v := validator.NewValidator()
 	v.Register(validator.NewAssessmentValidationRules()...)
