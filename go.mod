@@ -5,8 +5,8 @@ go 1.24.0
 toolchain go1.24.6
 
 require (
-	github.com/MicahParks/jwkset v0.5.19
-	github.com/MicahParks/keyfunc/v3 v3.3.5
+	github.com/MicahParks/jwkset v0.11.0
+	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/coreos/butane v0.22.0
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-chi/chi v1.5.5
