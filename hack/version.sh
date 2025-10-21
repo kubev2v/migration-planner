@@ -7,14 +7,26 @@
 set -e
 
 # Get git commit
-export SOURCE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null || echo "")
-export SOURCE_GIT_COMMIT_SHORT=$(git rev-parse --short "HEAD^{commit}" 2>/dev/null || echo "")
+# If SOURCE_GIT_COMMIT is already set (from build args), use it
+if [ -z "$SOURCE_GIT_COMMIT" ]; then
+    export SOURCE_GIT_COMMIT=$(git rev-parse "HEAD^{commit}" 2>/dev/null || echo "")
+fi
+
+# Calculate short commit from full commit or from git
+if [ -n "$SOURCE_GIT_COMMIT" ]; then
+    export SOURCE_GIT_COMMIT_SHORT="${SOURCE_GIT_COMMIT:0:7}"
+else
+    export SOURCE_GIT_COMMIT_SHORT=$(git rev-parse --short "HEAD^{commit}" 2>/dev/null || echo "")
+fi
 
 # Get git tag
-export SOURCE_GIT_TAG=$(git describe --always --tags --abbrev=7 \
-    --match '[0-9]*.[0-9]*.[0-9]*' \
-    --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null \
-    || echo "v0.0.0-unknown-${SOURCE_GIT_COMMIT_SHORT}")
+# If SOURCE_GIT_TAG is already set (from build args), use it
+if [ -z "$SOURCE_GIT_TAG" ]; then
+    export SOURCE_GIT_TAG=$(git describe --always --tags --abbrev=7 \
+        --match '[0-9]*.[0-9]*.[0-9]*' \
+        --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null \
+        || echo "v0.0.0-${SOURCE_GIT_COMMIT_SHORT}")
+fi
 
 # Get git tree state
 if [ ! -d ".git/" ] || git diff --quiet 2>/dev/null; then
