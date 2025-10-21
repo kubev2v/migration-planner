@@ -22,7 +22,7 @@ spec:
   - name: revision
     value: '{{revision}}'
   - name: output-image
-    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-api:{{git_tag}}
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-api:{{revision}}
   - name: dockerfile
     value: Containerfile.api
   - name: path-context
