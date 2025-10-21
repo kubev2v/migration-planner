@@ -124,7 +124,7 @@ staging-debug-tool/
 
 **Access**:
 
-- **UI**: http://localhost:3000
+- **UI**: http://localhost:3000/openshift/migration-assessment
 - **API**: http://localhost:3443
 - **Database**: localhost:5432 (use `demouser`/`demopass` to connect)
 - **Debugger**: localhost:40000
@@ -161,11 +161,11 @@ curl http://localhost:3443/api/v1/sources
 1. Open http://localhost:3000/set-ui-token.html
 2. Copy a token from the generator output
 3. Paste and set the token
-4. Navigate to http://localhost:3000
+4. Navigate to http://localhost:3000/openshift/migration-assessment
 
 **Access**:
 
-- **UI**: http://localhost:3000 (requires token)
+- **UI**: http://localhost:3000/openshift/migration-assessment (requires token)
 - **Token Page**: http://localhost:3000/set-ui-token.html
 - **API**: http://localhost:3443 (requires authentication)
 - **Database**: localhost:5432 (use `demouser`/`demopass` to connect)
