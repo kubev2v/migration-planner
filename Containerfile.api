@@ -2,6 +2,8 @@
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS builder
 
 ARG GCFLAGS=""
+ARG SOURCE_GIT_COMMIT=""
+ARG SOURCE_GIT_TAG=""
 
 WORKDIR /app
 
@@ -12,6 +14,13 @@ COPY . .
 
 USER 0
 RUN source hack/version.sh && \
+    echo "=== VERSION BUILD INFO ===" && \
+    echo "SOURCE_GIT_COMMIT=${SOURCE_GIT_COMMIT}" && \
+    echo "SOURCE_GIT_COMMIT_SHORT=${SOURCE_GIT_COMMIT_SHORT}" && \
+    echo "SOURCE_GIT_TAG=${SOURCE_GIT_TAG}" && \
+    echo "MAJOR=${MAJOR} MINOR=${MINOR} PATCH=${PATCH}" && \
+    echo "GO_LDFLAGS=${GO_LDFLAGS}" && \
+    echo "=== END VERSION BUILD INFO ===" && \
     CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -buildvcs=false ${GCFLAGS:+-gcflags "$GCFLAGS"} \
     -ldflags "${GO_LDFLAGS}" \
     -o /planner-api cmd/planner-api/*.go
