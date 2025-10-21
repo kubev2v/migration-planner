@@ -46,7 +46,6 @@ query_and_convert() {
     # Check for errors
     local error_msg=$(jq -r '.error // empty' "$json_file")
     if [ -n "$error_msg" ]; then
-        # Workaround for GABI prepared statement cache error by selecting explicit columns
         if echo "$error_msg" | grep -qi "cached plan must not change result type"; then
             # Fetch explicit column list from information_schema
             local cols_json="/tmp/gabi_cols_${table}.json"
@@ -99,17 +98,27 @@ query_and_convert() {
         # Build VALUES clause by processing each column
         local values=""
         local col_count=$(jq "(.result[0] // .results[0]) | length" "$json_file")
-        
+        local skip_row=false
+
         for ((j=0; j<col_count; j++)); do
             local value
             value=$(jq -r "(.result[$i] // .results[$i])[$j]" "$json_file")
-            
+
             # Handle different value types
             local col_name="${HEADER_ARR[$j]}"
+
+            # Skip zero-UUID records to prevent FK integrity issues
+            if [ "$value" = "00000000-0000-0000-0000-000000000000" ]; then
+                if [ "$col_name" = "id" ] || [ "$col_name" = "source_id" ]; then
+                    skip_row=true
+                    break
+                fi
+            fi
+
             if [ "$value" = "null" ] || [ "$value" = "" ]; then
                 values="${values}NULL"
             else
-                # Normalize org_id when not preserving orgs
+                # Normalize org_id to 'internal' for single-tenant (auth=none) mode
                 if [ "$col_name" = "org_id" ] && [ "${PRESERVE_ORGS:-}" != "true" ]; then
                     values="${values}'internal'"
                 else
@@ -118,40 +127,27 @@ query_and_convert() {
                     values="${values}'${escaped_value}'"
                 fi
             fi
-            
+
             # Add comma if not last column
             if [ $j -lt $((col_count - 1)) ]; then
                 values="${values}, "
             fi
         done
-        
-        echo "INSERT INTO $table ($headers) VALUES ($values);" >> "$file"
+
+        # Only write INSERT if we didn't skip the row
+        if [ "$skip_row" = false ]; then
+            echo "INSERT INTO $table ($headers) VALUES ($values);" >> "$file"
+        fi
     done
     
     echo "✅ $table exported: $data_rows records → $file"
     rm -f "$json_file"
     
-    # Post-process sources table for schema compatibility
+    # Post-process sources table for single-tenant mode
     if [ "$table" = "sources" ]; then
-        echo "🔧 Applying schema compatibility fixes for sources table..."
-        
-        # Remove extra columns from headers and corresponding values from all INSERT statements
-        sed -i.bak '
-            # Remove extra columns from headers
-            s/, ssh_public_key, image_token_key//g
-            # Remove corresponding values from INSERT statements - remove last 3 values before closing paren
-            s/, [^,)]*, [^,)]*);$/);/g
-        ' "$file"
-        
-        # org_id normalization now happens during generation (see loop above)
-        if [ "${PRESERVE_ORGS:-}" = "true" ]; then
-          echo "✅ Sources table org_ids preserved for multi-tenant debugging"
-        else
-          echo "✅ Sources table org_ids normalized during generation"
-        fi
-        
-        # Add unique suffixes to names only in single-tenant mode to avoid duplicates
+        # Add unique suffixes to names for single-tenant (auth=none) mode to avoid duplicates
         if [ "${PRESERVE_ORGS:-}" != "true" ]; then
+            echo "🔧 Adding unique name suffixes for single-tenant mode..."
             counter=1
             while IFS= read -r line; do
                 if [[ $line == INSERT\ INTO\ sources* ]]; then
@@ -163,29 +159,14 @@ query_and_convert() {
                 fi
             done < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
         fi
-        
-        rm -f "${file}.bak"
-        
-        # Replace any zero-UUID INSERT with a safe minimal row and set org to 'default' (both auth modes)
-        sed -i "/^INSERT INTO sources.*'00000000-0000-0000-0000-000000000000'/d" "$file"
-        cat >> "$file" <<'EOF'
-INSERT INTO sources (id, created_at, updated_at, deleted_at, name, v_center_id, username, org_id, inventory, on_premises, email_domain) VALUES ('00000000-0000-0000-0000-000000000000', now(), now(), NULL, 'Example-22', NULL, NULL, 'default', NULL, 'false', NULL);
-EOF
     fi
     
     # Post-process assessments table for org_id compatibility
     if [ "$table" = "assessments" ]; then
         echo "🔧 Applying schema compatibility fixes for assessments table..."
-        
-        # org_id normalization now happens during generation (see loop above)
-        if [ "${PRESERVE_ORGS:-}" = "true" ]; then
-            # Consolidate RH numeric orgs to redhat.com for parity with sources
-            sed -i "s/'\(11009103\|13872092\|19194072\|18692352\|19006254\|19009423\|19010322\|19012400\)'/'redhat.com'/g" "$file"
-            echo "✅ Assessments table org_ids consolidated to 'redhat.com' where applicable"
-        else
-            echo "✅ Assessments table org_ids normalized during generation"
-            
-            # Add unique suffixes to names to avoid (org_id, name) uniqueness collisions
+
+        # Add unique suffixes to names for single-tenant (auth=none) mode to avoid (org_id, name) uniqueness collisions
+        if [ "${PRESERVE_ORGS:-}" != "true" ]; then
             counter=1
             while IFS= read -r line; do
                 if [[ $line == INSERT\ INTO\ assessments* ]]; then
@@ -198,6 +179,7 @@ EOF
             done < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
         fi
     fi
+
 }
 
 # Extract all relevant tables
@@ -205,7 +187,8 @@ echo ""
 echo "🗃️  Extracting all staging database tables..."
 
 # Core application tables
-query_and_convert "sources" "SELECT * FROM sources;"
+# Export sources with explicit column list for schema compatibility
+query_and_convert "sources" "SELECT id, created_at, updated_at, deleted_at, name, v_center_id, username, org_id, inventory FROM sources;"
 query_and_convert "assessments" "SELECT * FROM assessments;"
 query_and_convert "agents" "SELECT * FROM agents;"
 query_and_convert "keys" "SELECT * FROM keys;"
