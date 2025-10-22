@@ -384,6 +384,14 @@ objects:
                               pattern:
                                 regex: "^/api/migration-assessment/api/v1/assessments"
                               substitution: "/api/v1/assessments"
+                        - match:
+                            prefix: "/api/migration-assessment/api/v1/info"
+                          route:
+                            cluster: backend-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^/api/migration-assessment/api/v1/info"
+                              substitution: "/api/v1/info"
                     http_filters:
                     - name: envoy.filters.http.router
                       typed_config:
