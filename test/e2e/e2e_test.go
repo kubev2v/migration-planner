@@ -269,4 +269,48 @@ var _ = Describe("e2e", func() {
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 	})
+
+	Context("Assessments", func() {
+		It("Test Assessment Endpoints With inventory", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+				"core", "123456")
+			Expect(err).To(BeNil())
+			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
+			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+
+			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
+			Eventually(func() bool {
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				Expect(err).To(BeNil())
+				return isAgentIsUpToDate
+			}, "3m", "2s").Should(BeTrue())
+
+			inventory, err := e2eAgent.Api.Inventory()
+			Expect(err).To(BeNil())
+
+			// Create an assessment from an environment (source)
+			assessment, err := svc.CreateAssessment("assessment", "agent", &source.Id, inventory)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+
+			assessment, err = svc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(assessment.Name).To(Equal("assessment"))
+
+			assessment, err = svc.UpdateAssessment(assessment.Id, "assessment1")
+			Expect(err).To(BeNil())
+			Expect(assessment.Name).To(Equal("assessment1"))
+
+			assessments, err := svc.GetAssessments()
+			Expect(err).To(BeNil())
+			Expect(*assessments).To(HaveLen(1))
+
+			err = svc.RemoveAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
 })
