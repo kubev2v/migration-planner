@@ -3,7 +3,11 @@ package service
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -56,9 +60,7 @@ func (api *ServiceApi) DeleteRequest(path string) (*http.Response, error) {
 	return api.request(http.MethodDelete, path, nil)
 }
 
-// request is a helper function that performs an HTTP request based on the method (GET, POST, PUT, DELETE),
-// path, body, and JWT token, returning the HTTP response.
-func (api *ServiceApi) request(method string, path string, body []byte) (*http.Response, error) {
+func (api *ServiceApi) prepareRequest(method string, path string, body []byte) (*http.Request, error) {
 	var req *http.Request
 	var err error
 
@@ -82,8 +84,19 @@ func (api *ServiceApi) request(method string, path string, body []byte) (*http.R
 		return nil, err
 	}
 
-	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("X-Authorization", fmt.Sprintf("Bearer %s", api.jwtToken))
+	return req, nil
+}
+
+// request is a helper function that performs an HTTP request based on the method (GET, POST, PUT, DELETE),
+// path, body, and JWT token, returning the HTTP response.
+func (api *ServiceApi) request(method string, path string, body []byte) (*http.Response, error) {
+	req, err := api.prepareRequest(method, path, body)
+	if err != nil {
+		return nil, fmt.Errorf("error preparing request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", "application/json")
 
 	zap.S().Infof("[Service-API] %s [Method: %s]", req.URL.String(), req.Method)
 
@@ -93,4 +106,42 @@ func (api *ServiceApi) request(method string, path string, body []byte) (*http.R
 	}
 
 	return res, nil
+}
+
+// MultipartRequest uploads a file and optional fields using multipart/form-data
+func (api *ServiceApi) MultipartRequest(path, filepathStr, assessmentName string) (*http.Response, error) {
+	file, err := os.Open(filepathStr)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+
+	if err := writer.WriteField("name", assessmentName); err != nil {
+		return nil, err
+	}
+
+	part, err := writer.CreateFormFile("file", filepath.Base(filepathStr))
+	if err != nil {
+		return nil, err
+	}
+
+	if _, err := io.Copy(part, file); err != nil {
+		return nil, err
+	}
+
+	if err := writer.Close(); err != nil {
+		return nil, err
+	}
+
+	req, err := api.prepareRequest(http.MethodPost, path, buf.Bytes())
+	if err != nil {
+		return nil, fmt.Errorf("error preparing request: %v", err)
+	}
+
+	req.Header.Add("Content-Type", writer.FormDataContentType())
+
+	return api.httpClient.Do(req)
 }
