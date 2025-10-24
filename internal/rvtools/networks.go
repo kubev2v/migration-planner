@@ -14,7 +14,6 @@ const (
 )
 
 func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.Inventory) error {
-
 	dvswitchMap := make(map[string]bool)
 
 	networksMap := make(map[string]api.Network)
@@ -27,11 +26,11 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 		processDvPortSheet(dvportRows, dvswitchMap, networksMap)
 	}
 
+	inventory.Infra.Networks = []api.Network{}
+
 	if len(dvswitchMap) == 0 && len(networksMap) == 0 {
 		return nil
 	}
-
-	inventory.Infra.Networks = []api.Network{}
 
 	for switchName := range dvswitchMap {
 		inventory.Infra.Networks = append(inventory.Infra.Networks, api.Network{
