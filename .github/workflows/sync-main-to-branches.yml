@@ -30,14 +30,22 @@ jobs:
       - name: Sync main to active release branch (or create it)
         run: |
           MAIN_BRANCH="main"
-          ACTIVE_RELEASE_BRANCH="${{ vars.ACTIVE_RELEASE_BRANCH }}"
+          ACTIVE_RELEASE_BRANCH=$(cat .github/release-config.txt)
 
           # Validate that the variable is set
           if [ -z "$ACTIVE_RELEASE_BRANCH" ]; then
-            echo "Error: ACTIVE_RELEASE_BRANCH repository variable is not set"
-            echo "Please set it in Settings -> Secrets and variables -> Actions -> Variables"
+            echo "Error: ACTIVE_RELEASE_BRANCH is not configured in .github/release-config.txt"
             exit 1
           fi
+
+          # Validate format: release-<number>.<number>
+          if ! echo "$ACTIVE_RELEASE_BRANCH" | grep -qE '^release-[0-9]+\.[0-9]+$'; then
+            echo "Error: ACTIVE_RELEASE_BRANCH has invalid format: '$ACTIVE_RELEASE_BRANCH'"
+            echo "Expected format: release-<number>.<number> (e.g., release-0.2)"
+            exit 1
+          fi
+
+          echo "Using active release branch: $ACTIVE_RELEASE_BRANCH"
 
           # Get the latest commit hash of the main branch
           MAIN_COMMIT_HASH=$(git rev-parse origin/$MAIN_BRANCH)
