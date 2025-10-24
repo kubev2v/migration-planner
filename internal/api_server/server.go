@@ -106,9 +106,13 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
+	assessmentService := service.NewAssessmentService(s.store, s.opaValidator)
+	asyncAssessmentService := service.NewAsyncAssessmentService(assessmentService)
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
-		service.NewAssessmentService(s.store, s.opaValidator),
+		assessmentService,
+		asyncAssessmentService,
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}

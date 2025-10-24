@@ -27,6 +27,9 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments)
 	CreateAssessment(w http.ResponseWriter, r *http.Request)
 
+	// (POST /api/v1/assessments/async)
+	CreateAssessmentAsync(w http.ResponseWriter, r *http.Request)
+
 	// (DELETE /api/v1/assessments/{id})
 	DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -38,6 +41,9 @@ type ServerInterface interface {
 
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/jobs/{id})
+	GetAsyncJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
@@ -84,6 +90,11 @@ func (_ Unimplemented) CreateAssessment(w http.ResponseWriter, r *http.Request) 
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (POST /api/v1/assessments/async)
+func (_ Unimplemented) CreateAssessmentAsync(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (DELETE /api/v1/assessments/{id})
 func (_ Unimplemented) DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -101,6 +112,11 @@ func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, 
 
 // (GET /api/v1/info)
 func (_ Unimplemented) GetInfo(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/jobs/{id})
+func (_ Unimplemented) GetAsyncJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -184,6 +200,21 @@ func (siw *ServerInterfaceWrapper) CreateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAssessment(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateAssessmentAsync operation middleware
+func (siw *ServerInterfaceWrapper) CreateAssessmentAsync(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateAssessmentAsync(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -277,6 +308,32 @@ func (siw *ServerInterfaceWrapper) GetInfo(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetInfo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAsyncJob operation middleware
+func (siw *ServerInterfaceWrapper) GetAsyncJob(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAsyncJob(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -622,6 +679,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/assessments", wrapper.CreateAssessment)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/async", wrapper.CreateAssessmentAsync)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/assessments/{id}", wrapper.DeleteAssessment)
 	})
 	r.Group(func(r chi.Router) {
@@ -632,6 +692,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/jobs/{id}", wrapper.GetAsyncJob)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
@@ -740,6 +803,50 @@ func (response CreateAssessment401JSONResponse) VisitCreateAssessmentResponse(w 
 type CreateAssessment500JSONResponse Error
 
 func (response CreateAssessment500JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessmentAsyncRequestObject struct {
+	Body *multipart.Reader
+}
+
+type CreateAssessmentAsyncResponseObject interface {
+	VisitCreateAssessmentAsyncResponse(w http.ResponseWriter) error
+}
+
+type CreateAssessmentAsync202JSONResponse AsyncJob
+
+func (response CreateAssessmentAsync202JSONResponse) VisitCreateAssessmentAsyncResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessmentAsync400JSONResponse Error
+
+func (response CreateAssessmentAsync400JSONResponse) VisitCreateAssessmentAsyncResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessmentAsync401JSONResponse Error
+
+func (response CreateAssessmentAsync401JSONResponse) VisitCreateAssessmentAsyncResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateAssessmentAsync500JSONResponse Error
+
+func (response CreateAssessmentAsync500JSONResponse) VisitCreateAssessmentAsyncResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -952,6 +1059,41 @@ func (response GetInfo200JSONResponse) VisitGetInfoResponse(w http.ResponseWrite
 type GetInfo500JSONResponse Error
 
 func (response GetInfo500JSONResponse) VisitGetInfoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAsyncJobRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAsyncJobResponseObject interface {
+	VisitGetAsyncJobResponse(w http.ResponseWriter) error
+}
+
+type GetAsyncJob200JSONResponse AsyncJob
+
+func (response GetAsyncJob200JSONResponse) VisitGetAsyncJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAsyncJob404JSONResponse Error
+
+func (response GetAsyncJob404JSONResponse) VisitGetAsyncJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAsyncJob500JSONResponse Error
+
+func (response GetAsyncJob500JSONResponse) VisitGetAsyncJobResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1444,6 +1586,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments)
 	CreateAssessment(ctx context.Context, request CreateAssessmentRequestObject) (CreateAssessmentResponseObject, error)
 
+	// (POST /api/v1/assessments/async)
+	CreateAssessmentAsync(ctx context.Context, request CreateAssessmentAsyncRequestObject) (CreateAssessmentAsyncResponseObject, error)
+
 	// (DELETE /api/v1/assessments/{id})
 	DeleteAssessment(ctx context.Context, request DeleteAssessmentRequestObject) (DeleteAssessmentResponseObject, error)
 
@@ -1455,6 +1600,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
+
+	// (GET /api/v1/jobs/{id})
+	GetAsyncJob(ctx context.Context, request GetAsyncJobRequestObject) (GetAsyncJobResponseObject, error)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
@@ -1582,6 +1730,37 @@ func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// CreateAssessmentAsync operation middleware
+func (sh *strictHandler) CreateAssessmentAsync(w http.ResponseWriter, r *http.Request) {
+	var request CreateAssessmentAsyncRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateAssessmentAsync(ctx, request.(CreateAssessmentAsyncRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateAssessmentAsync")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateAssessmentAsyncResponseObject); ok {
+		if err := validResponse.VisitCreateAssessmentAsyncResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // DeleteAssessment operation middleware
 func (sh *strictHandler) DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request DeleteAssessmentRequestObject
@@ -1684,6 +1863,32 @@ func (sh *strictHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetInfoResponseObject); ok {
 		if err := validResponse.VisitGetInfoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAsyncJob operation middleware
+func (sh *strictHandler) GetAsyncJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAsyncJobRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAsyncJob(ctx, request.(GetAsyncJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAsyncJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAsyncJobResponseObject); ok {
+		if err := validResponse.VisitGetAsyncJobResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

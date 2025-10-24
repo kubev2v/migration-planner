@@ -99,6 +99,9 @@ type ClientInterface interface {
 
 	CreateAssessment(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CreateAssessmentAsyncWithBody request with any body
+	CreateAssessmentAsyncWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAssessment request
 	DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -112,6 +115,9 @@ type ClientInterface interface {
 
 	// GetInfo request
 	GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAsyncJob request
+	GetAsyncJob(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSources request
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -186,6 +192,18 @@ func (c *Client) CreateAssessment(ctx context.Context, body CreateAssessmentJSON
 	return c.Client.Do(req)
 }
 
+func (c *Client) CreateAssessmentAsyncWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateAssessmentAsyncRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAssessmentRequest(c.Server, id)
 	if err != nil {
@@ -236,6 +254,18 @@ func (c *Client) UpdateAssessment(ctx context.Context, id openapi_types.UUID, bo
 
 func (c *Client) GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAsyncJob(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAsyncJobRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +499,35 @@ func NewCreateAssessmentRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewCreateAssessmentAsyncRequestWithBody generates requests for CreateAssessmentAsync with any type of body
+func NewCreateAssessmentAsyncRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/async")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteAssessmentRequest generates requests for DeleteAssessment
 func NewDeleteAssessmentRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -594,6 +653,40 @@ func NewGetInfoRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetAsyncJobRequest generates requests for GetAsyncJob
+func NewGetAsyncJobRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/jobs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1013,6 +1106,9 @@ type ClientWithResponsesInterface interface {
 
 	CreateAssessmentWithResponse(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error)
 
+	// CreateAssessmentAsyncWithBodyWithResponse request with any body
+	CreateAssessmentAsyncWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAssessmentAsyncResponse, error)
+
 	// DeleteAssessmentWithResponse request
 	DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error)
 
@@ -1026,6 +1122,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetInfoWithResponse request
 	GetInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInfoResponse, error)
+
+	// GetAsyncJobWithResponse request
+	GetAsyncJobWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAsyncJobResponse, error)
 
 	// DeleteSourcesWithResponse request
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
@@ -1107,6 +1206,31 @@ func (r CreateAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateAssessmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreateAssessmentAsyncResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *AsyncJob
+	JSON400      *Error
+	JSON401      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateAssessmentAsyncResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateAssessmentAsyncResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1211,6 +1335,30 @@ func (r GetInfoResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAsyncJobResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AsyncJob
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAsyncJobResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAsyncJobResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1491,6 +1639,15 @@ func (c *ClientWithResponses) CreateAssessmentWithResponse(ctx context.Context, 
 	return ParseCreateAssessmentResponse(rsp)
 }
 
+// CreateAssessmentAsyncWithBodyWithResponse request with arbitrary body returning *CreateAssessmentAsyncResponse
+func (c *ClientWithResponses) CreateAssessmentAsyncWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAssessmentAsyncResponse, error) {
+	rsp, err := c.CreateAssessmentAsyncWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateAssessmentAsyncResponse(rsp)
+}
+
 // DeleteAssessmentWithResponse request returning *DeleteAssessmentResponse
 func (c *ClientWithResponses) DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error) {
 	rsp, err := c.DeleteAssessment(ctx, id, reqEditors...)
@@ -1533,6 +1690,15 @@ func (c *ClientWithResponses) GetInfoWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseGetInfoResponse(rsp)
+}
+
+// GetAsyncJobWithResponse request returning *GetAsyncJobResponse
+func (c *ClientWithResponses) GetAsyncJobWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAsyncJobResponse, error) {
+	rsp, err := c.GetAsyncJob(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAsyncJobResponse(rsp)
 }
 
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
@@ -1709,6 +1875,53 @@ func ParseCreateAssessmentResponse(rsp *http.Response) (*CreateAssessmentRespons
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateAssessmentAsyncResponse parses an HTTP response from a CreateAssessmentAsyncWithResponse call
+func ParseCreateAssessmentAsyncResponse(rsp *http.Response) (*CreateAssessmentAsyncResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateAssessmentAsyncResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest AsyncJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
@@ -1939,6 +2152,46 @@ func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAsyncJobResponse parses an HTTP response from a GetAsyncJobWithResponse call
+func ParseGetAsyncJobResponse(rsp *http.Response) (*GetAsyncJobResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAsyncJobResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AsyncJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error
