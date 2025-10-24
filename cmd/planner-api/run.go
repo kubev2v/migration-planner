@@ -9,6 +9,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
@@ -19,9 +23,6 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 var runCmd = &cobra.Command{
@@ -54,8 +55,19 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("initializing data store", "error", err)
 		}
 
-		store := store.NewStore(db)
-		defer store.Close()
+		var st store.Store
+		if cfg.Service.Authz.AuthorizationEnabled {
+			spiceDBClient, err := store.InitSpiceDBClient(cfg.Service.Authz.SpiceDBURL, cfg.Service.Authz.SpiceDBToken)
+			if err != nil {
+				zap.S().Fatalw("initializing SpiceDB client", "error", err)
+			}
+			defer spiceDBClient.Close()
+
+			st = store.NewStoreWithAuthz(db, spiceDBClient)
+		} else {
+			st = store.NewStore(db)
+		}
+		defer st.Close()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
 			zap.S().Fatalw("running initial migration", "error", err)
@@ -83,14 +95,14 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			server := apiserver.New(cfg, store, listener, opaValidator)
+			server := apiserver.New(cfg, st, listener, opaValidator)
 			if err := server.Run(ctx); err != nil {
 				zap.S().Fatalw("Error running server", "error", err)
 			}
 		}()
 
 		// register metrics
-		metrics.RegisterMetrics(store)
+		metrics.RegisterMetrics(st)
 
 		go func() {
 			defer cancel()
@@ -99,7 +111,7 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			agentserver := agentserver.New(cfg, store, listener)
+			agentserver := agentserver.New(cfg, st, listener)
 			if err := agentserver.Run(ctx); err != nil {
 				zap.S().Fatalw("Error running server", "error", err)
 			}
@@ -112,7 +124,7 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			imageserver := imageserver.New(cfg, store, listener)
+			imageserver := imageserver.New(cfg, st, listener)
 			if err := imageserver.Run(ctx); err != nil {
 				zap.S().Fatalw("Error running server", "error", err)
 			}
