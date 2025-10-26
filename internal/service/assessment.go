@@ -100,14 +100,6 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		WithUUIDPtr("source_id", createForm.SourceID).
 		Build()
 
-	ctx, err := as.store.NewTransactionContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_, _ = store.Rollback(ctx)
-	}()
-
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
@@ -144,6 +136,14 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		inventory = *rvtoolInventory
 		tracer.Step("parsed_rvtools_inventory").Log()
 	}
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
 
 	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory)
 	if err != nil {
