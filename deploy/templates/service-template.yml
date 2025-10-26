@@ -29,19 +29,19 @@ parameters:
     required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
-    value: "3"
+    value: "2"
   - name: MIGRATION_PLANNER_MEMORY_REQUEST
     description: Memory request for the API pods.
-    value: "256Mi"
+    value: "512Mi"
   - name: MIGRATION_PLANNER_MEMORY_LIMIT
     description: Memory limit for the API pods.
-    value: "1024Mi"
+    value: "2048Mi"
   - name: MIGRATION_PLANNER_CPU_REQUEST
     description: CPU request for the API pods.
-    value: "200m"
+    value: "300m"
   - name: MIGRATION_PLANNER_CPU_LIMIT
     description: CPU limit for the API pods.
-    value: "400m"
+    value: "1000m"
   - name: DB_SECRET_NAME
     description: The name of the OpenShift Secret used for the database.
     displayName: Database Secret Name

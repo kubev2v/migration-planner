@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"runtime"
+	"sync"
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
@@ -107,53 +109,108 @@ func (v *Validator) ValidateVMs(ctx context.Context, vms *[]vsphere.VM) error {
 		return nil
 	}
 
+	// Use worker pool for parallel validation
+	numWorkers := runtime.NumCPU() * 2
+	if numWorkers > len(*vms) {
+		numWorkers = len(*vms)
+	}
+
+	// Channel for distributing work
+	type vmJob struct {
+		index int
+		vm    *vsphere.VM
+	}
+	jobs := make(chan vmJob, len(*vms))
+
+	// Shared state for collecting errors (protected by mutex)
+	var errorsMu sync.Mutex
 	var validationErrors []error
 
+	// WaitGroup to wait for all workers to finish
+	var wg sync.WaitGroup
+
+	// Start worker goroutines
+	for w := 0; w < numWorkers; w++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+
+			for job := range jobs {
+				// Check if context was canceled
+				select {
+				case <-ctx.Done():
+					errorsMu.Lock()
+					validationErrors = append(validationErrors,
+						fmt.Errorf("validation canceled: %w", ctx.Err()))
+					errorsMu.Unlock()
+					return
+				default:
+				}
+
+				vm := job.vm
+
+				// Prepare the JSON data in MTV OPA server format
+				workload := web.Workload{}
+				workload.With(vm)
+
+				concerns, err := v.concerns(ctx, workload)
+				if err != nil {
+					errorsMu.Lock()
+					validationErrors = append(validationErrors,
+						fmt.Errorf("failed to validate VM %q: %w", vm.Name, err))
+					errorsMu.Unlock()
+					continue
+				}
+
+				// Convert concerns to vsphere.Concern format
+				for _, c := range concerns {
+					concernMap, ok := c.(map[string]interface{})
+					if !ok {
+						errorsMu.Lock()
+						validationErrors = append(validationErrors, fmt.Errorf(
+							"unexpected concern data type for VM %q: got %T, expected map[string]interface{}",
+							vm.Name,
+							c,
+						))
+						errorsMu.Unlock()
+						continue
+					}
+
+					concern := vsphere.Concern{}
+					if id, ok := concernMap["id"].(string); ok {
+						concern.Id = id
+					}
+
+					if label, ok := concernMap["label"].(string); ok {
+						concern.Label = label
+					}
+
+					if assessment, ok := concernMap["assessment"].(string); ok {
+						concern.Assessment = assessment
+					}
+
+					if category, ok := concernMap["category"].(string); ok {
+						concern.Category = category
+					}
+
+					// Append concern to VM (safe because each worker processes different VMs)
+					vm.Concerns = append(vm.Concerns, concern)
+				}
+			}
+		}(w)
+	}
+
+	// Send all VMs to the jobs channel
 	for i := range *vms {
-		vm := &(*vms)[i] // take a pointer to the real element
-
-		// Prepare the JSON data in MTV OPA server format
-		workload := web.Workload{}
-		workload.With(vm)
-
-		concerns, err := v.concerns(ctx, workload)
-		if err != nil {
-			validationErrors = append(validationErrors,
-				fmt.Errorf("failed to validate VM %q: %w", vm.Name, err))
-			continue
-		}
-
-		// Convert concerns to vsphere.Concern format
-		for _, c := range concerns {
-			concernMap, ok := c.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf(
-					"unexpected concern data type for VM %q: got %T, expected map[string]interface{}",
-					vm.Name,
-					c,
-				)
-			}
-
-			concern := vsphere.Concern{}
-			if id, ok := concernMap["id"].(string); ok {
-				concern.Id = id
-			}
-
-			if label, ok := concernMap["label"].(string); ok {
-				concern.Label = label
-			}
-
-			if assessment, ok := concernMap["assessment"].(string); ok {
-				concern.Assessment = assessment
-			}
-
-			if category, ok := concernMap["category"].(string); ok {
-				concern.Category = category
-			}
-
-			vm.Concerns = append(vm.Concerns, concern)
+		jobs <- vmJob{
+			index: i,
+			vm:    &(*vms)[i],
 		}
 	}
+	close(jobs) // No more jobs to send
+
+	// Wait for all workers to finish
+	wg.Wait()
 
 	if len(validationErrors) > 0 {
 		return fmt.Errorf("validation completed with %d error(s): %w", len(validationErrors), errors.Join(validationErrors...))
