@@ -99,6 +99,9 @@ type ClientInterface interface {
 
 	CreateAssessment(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UploadRVToolsWithBody request with any body
+	UploadRVToolsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// DeleteAssessment request
 	DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -112,6 +115,9 @@ type ClientInterface interface {
 
 	// GetInfo request
 	GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetRVToolsJob request
+	GetRVToolsJob(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSources request
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -186,6 +192,18 @@ func (c *Client) CreateAssessment(ctx context.Context, body CreateAssessmentJSON
 	return c.Client.Do(req)
 }
 
+func (c *Client) UploadRVToolsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadRVToolsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAssessmentRequest(c.Server, id)
 	if err != nil {
@@ -236,6 +254,18 @@ func (c *Client) UpdateAssessment(ctx context.Context, id openapi_types.UUID, bo
 
 func (c *Client) GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetRVToolsJob(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetRVToolsJobRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -469,6 +499,35 @@ func NewCreateAssessmentRequestWithBody(server string, contentType string, body 
 	return req, nil
 }
 
+// NewUploadRVToolsRequestWithBody generates requests for UploadRVTools with any type of body
+func NewUploadRVToolsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/rvtools")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteAssessmentRequest generates requests for DeleteAssessment
 func NewDeleteAssessmentRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -594,6 +653,40 @@ func NewGetInfoRequest(server string) (*http.Request, error) {
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/info")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetRVToolsJobRequest generates requests for GetRVToolsJob
+func NewGetRVToolsJobRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/rvtools/jobs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -1013,6 +1106,9 @@ type ClientWithResponsesInterface interface {
 
 	CreateAssessmentWithResponse(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error)
 
+	// UploadRVToolsWithBodyWithResponse request with any body
+	UploadRVToolsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRVToolsResponse, error)
+
 	// DeleteAssessmentWithResponse request
 	DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error)
 
@@ -1026,6 +1122,9 @@ type ClientWithResponsesInterface interface {
 
 	// GetInfoWithResponse request
 	GetInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInfoResponse, error)
+
+	// GetRVToolsJobWithResponse request
+	GetRVToolsJobWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRVToolsJobResponse, error)
 
 	// DeleteSourcesWithResponse request
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
@@ -1107,6 +1206,31 @@ func (r CreateAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CreateAssessmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UploadRVToolsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON202      *AsyncJob
+	JSON400      *Error
+	JSON401      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadRVToolsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadRVToolsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1211,6 +1335,30 @@ func (r GetInfoResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetRVToolsJobResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AsyncJob
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetRVToolsJobResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetRVToolsJobResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1491,6 +1639,15 @@ func (c *ClientWithResponses) CreateAssessmentWithResponse(ctx context.Context, 
 	return ParseCreateAssessmentResponse(rsp)
 }
 
+// UploadRVToolsWithBodyWithResponse request with arbitrary body returning *UploadRVToolsResponse
+func (c *ClientWithResponses) UploadRVToolsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRVToolsResponse, error) {
+	rsp, err := c.UploadRVToolsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadRVToolsResponse(rsp)
+}
+
 // DeleteAssessmentWithResponse request returning *DeleteAssessmentResponse
 func (c *ClientWithResponses) DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error) {
 	rsp, err := c.DeleteAssessment(ctx, id, reqEditors...)
@@ -1533,6 +1690,15 @@ func (c *ClientWithResponses) GetInfoWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseGetInfoResponse(rsp)
+}
+
+// GetRVToolsJobWithResponse request returning *GetRVToolsJobResponse
+func (c *ClientWithResponses) GetRVToolsJobWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetRVToolsJobResponse, error) {
+	rsp, err := c.GetRVToolsJob(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetRVToolsJobResponse(rsp)
 }
 
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
@@ -1709,6 +1875,53 @@ func ParseCreateAssessmentResponse(rsp *http.Response) (*CreateAssessmentRespons
 			return nil, err
 		}
 		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadRVToolsResponse parses an HTTP response from a UploadRVToolsWithResponse call
+func ParseUploadRVToolsResponse(rsp *http.Response) (*UploadRVToolsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadRVToolsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest AsyncJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest Error
@@ -1939,6 +2152,46 @@ func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetRVToolsJobResponse parses an HTTP response from a GetRVToolsJobWithResponse call
+func ParseGetRVToolsJobResponse(rsp *http.Response) (*GetRVToolsJobResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetRVToolsJobResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AsyncJob
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

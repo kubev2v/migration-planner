@@ -26,6 +26,14 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
+// Defines values for AsyncJobStatus.
+const (
+	Completed AsyncJobStatus = "completed"
+	Failed    AsyncJobStatus = "failed"
+	Pending   AsyncJobStatus = "pending"
+	Running   AsyncJobStatus = "running"
+)
+
 // Defines values for NetworkType.
 const (
 	Distributed NetworkType = "distributed"
@@ -103,6 +111,27 @@ type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
 }
+
+// AsyncJob defines model for AsyncJob.
+type AsyncJob struct {
+	// AssessmentId ID of the created assessment (available when completed)
+	AssessmentId *openapi_types.UUID `json:"assessment_id,omitempty"`
+
+	// CreatedAt When the job was created
+	CreatedAt time.Time `json:"created_at"`
+
+	// Error Error message if job failed
+	Error *string `json:"error,omitempty"`
+
+	// Id Unique identifier for the async job
+	Id openapi_types.UUID `json:"id"`
+
+	// Status Current status of the job
+	Status AsyncJobStatus `json:"status"`
+}
+
+// AsyncJobStatus Current status of the job
+type AsyncJobStatus string
 
 // Datastore defines model for Datastore.
 type Datastore struct {
@@ -359,8 +388,8 @@ type PresignedUrl struct {
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
-// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
-type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
+// UploadRVToolsMultipartRequestBody defines body for UploadRVTools for multipart/form-data ContentType.
+type UploadRVToolsMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
