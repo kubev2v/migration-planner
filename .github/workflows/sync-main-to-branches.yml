@@ -1,15 +1,12 @@
 name: Sync Main to Release Branches
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches:
       - main
 
 jobs:
   sync_to_side_branches:
-    # Only run this job if the pull request was merged
-    if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
 
     permissions:
