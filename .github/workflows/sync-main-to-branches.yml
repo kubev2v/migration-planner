@@ -1,4 +1,4 @@
-name: Sync Main to Side Branches (Hard Reset & Create)
+name: Sync Main to Release Branches
 
 on:
   pull_request:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write # Needed for force push and branch creation
+      contents: write # Needed for pushing to release branches
 
     steps:
       - name: Checkout repository
@@ -53,9 +53,6 @@ jobs:
 
           echo "--- Processing branch: $ACTIVE_RELEASE_BRANCH ---"
 
-          # Always start by checking out the main branch to ensure a consistent base
-          git checkout $MAIN_BRANCH
-
           # Check if the remote branch already exists
           if git show-ref --quiet refs/remotes/origin/$ACTIVE_RELEASE_BRANCH; then
             echo "Remote branch 'origin/$ACTIVE_RELEASE_BRANCH' exists. Checking sync status."
@@ -65,28 +62,25 @@ jobs:
             if [ "$SIDE_BRANCH_HEAD_HASH" == "$MAIN_COMMIT_HASH" ]; then
               echo "Branch $ACTIVE_RELEASE_BRANCH is already in sync with $MAIN_BRANCH. Skipping."
             else
-              echo "Branch $ACTIVE_RELEASE_BRANCH is out of sync. Performing hard reset."
+              echo "Branch $ACTIVE_RELEASE_BRANCH is out of sync. Syncing with $MAIN_BRANCH."
 
-              git checkout $ACTIVE_RELEASE_BRANCH
-
-              git reset --hard $MAIN_BRANCH
-
-              if git push --force-with-lease origin $ACTIVE_RELEASE_BRANCH; then
-                echo "Successfully hard reset and force pushed $ACTIVE_RELEASE_BRANCH to match $MAIN_BRANCH."
+              if git push origin $MAIN_BRANCH:$ACTIVE_RELEASE_BRANCH; then
+                echo "Successfully synced $ACTIVE_RELEASE_BRANCH to $MAIN_BRANCH."
               else
-                echo "Failed to force push $ACTIVE_RELEASE_BRANCH. This might indicate concurrent changes or protection rules."
+                echo "Failed to sync $ACTIVE_RELEASE_BRANCH."
+                exit 1
               fi
             fi
           else
-            # Branch does not exist remotely, create it as a copy of main
-            echo "Remote branch 'origin/$ACTIVE_RELEASE_BRANCH' does not exist. Creating it as a copy of $MAIN_BRANCH."
+            echo "Remote branch '$ACTIVE_RELEASE_BRANCH' does not exist. Creating it from $MAIN_BRANCH."
 
             git checkout -b $ACTIVE_RELEASE_BRANCH $MAIN_BRANCH
 
             if git push -u origin $ACTIVE_RELEASE_BRANCH; then
-              echo "Successfully created and pushed new branch $ACTIVE_RELEASE_BRANCH to match $MAIN_BRANCH."
+              echo "Successfully created and pushed $ACTIVE_RELEASE_BRANCH."
             else
-              echo "Failed to create and push new branch $ACTIVE_RELEASE_BRANCH."
+              echo "Failed to create $ACTIVE_RELEASE_BRANCH."
+              exit 1
             fi
           fi
         env:
