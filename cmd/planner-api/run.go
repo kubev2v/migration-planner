@@ -7,22 +7,28 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
-	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
+
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
+
+type Server interface {
+	Run(ctx context.Context) error
+}
 
 var runCmd = &cobra.Command{
 	Use:   "run",
@@ -75,62 +81,29 @@ var runCmd = &cobra.Command{
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
-
-		go func() {
-			defer cancel()
-			listener, err := newListener(cfg.Service.Address)
-			if err != nil {
-				zap.S().Fatalw("creating listener", "error", err)
-			}
-
-			server := apiserver.New(cfg, store, listener, opaValidator)
-			if err := server.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
-			}
-		}()
-
+		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 		// register metrics
 		metrics.RegisterMetrics(store)
 
-		go func() {
-			defer cancel()
-			listener, err := newListener(cfg.Service.AgentEndpointAddress)
-			if err != nil {
-				zap.S().Fatalw("creating listener", "error", err)
-			}
+		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
+			return apiserver.New(cfg, store, l, opaValidator)
+		})
 
-			agentserver := agentserver.New(cfg, store, listener)
-			if err := agentserver.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
-			}
-		}()
+		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
+			return agentserver.New(cfg, store, l)
+		})
 
-		go func() {
-			defer cancel()
-			listener, err := newListener(cfg.Service.ImageEndpointAddress)
-			if err != nil {
-				zap.S().Fatalw("creating listener", "error", err)
-			}
+		runServer(ctx, &wg, cancel, cfg.Service.ImageEndpointAddress, "image_server", func(l net.Listener) Server {
+			return imageserver.New(cfg, store, l)
+		})
 
-			imageserver := imageserver.New(cfg, store, listener)
-			if err := imageserver.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
-			}
-		}()
-
-		go func() {
-			defer cancel()
-			listener, err := newListener("0.0.0.0:8080")
-			if err != nil {
-				zap.S().Named("metrics_server").Fatalw("creating listener", "error", err)
-			}
-			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener)
-			if err := metricsServer.Run(ctx); err != nil {
-				zap.S().Named("metrics_server").Fatalw("failed to run metrics server", "error", err)
-			}
-		}()
+		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
+			return apiserver.NewMetricServer("0.0.0.0:8080", l)
+		})
 
 		<-ctx.Done()
+		wg.Wait()
+		zap.S().Info("Service stopped gracefully")
 
 		return nil
 	},
@@ -153,4 +126,27 @@ func ensureIsoExist(path string) error {
 		return err
 	}
 	return nil
+}
+
+func runServer(ctx context.Context, wg *sync.WaitGroup, cancel context.CancelFunc,
+	address string, loggerName string, serverFactory func(net.Listener) Server) {
+
+	wg.Add(1)
+
+	go func() {
+		defer func() {
+			cancel()
+			wg.Done()
+		}()
+		listener, err := newListener(address)
+		if err != nil {
+			zap.S().Named(loggerName).Errorw("creating listener", "error", err)
+			return
+		}
+
+		server := serverFactory(listener)
+		if err := server.Run(ctx); err != nil {
+			zap.S().Named(loggerName).Errorw("Error running server", "error", err)
+		}
+	}()
 }

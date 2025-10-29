@@ -98,6 +98,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
+		zap.S().Named("agent_server").Info("agent server terminated")
 	}()
 
 	zap.S().Named("agent_server").Infof("Listening on %s...", s.listener.Addr().String())
