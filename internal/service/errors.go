@@ -1,7 +1,6 @@
 package service
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -31,12 +30,16 @@ func NewErrAgentNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "agent")
 }
 
-type ErrExcelFileNotValid struct {
+type ErrFileCorrupted struct {
 	error
 }
 
-func NewErrExcelFileNotValid() *ErrExcelFileNotValid {
-	return &ErrExcelFileNotValid{errors.New("the uploaded file is not a valid Excel (.xlsx) file. Please upload an RVTools export in Excel format.")}
+func NewErrFileCorrupted(message string) *ErrFileCorrupted {
+	return &ErrFileCorrupted{fmt.Errorf("bad request: %s", message)}
+}
+
+func NewErrRVToolsFileCorrupted(message string) *ErrFileCorrupted {
+	return NewErrFileCorrupted(fmt.Sprintf("The provided RVTools file is corrupted: %s", message))
 }
 
 type ErrAgentUpdateForbidden struct {

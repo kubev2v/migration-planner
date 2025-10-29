@@ -3,19 +3,15 @@ package service
 import (
 	"context"
 	"errors"
-	"fmt"
-	"io"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/opa"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"go.uber.org/zap"
 )
 
 type SourceService struct {
@@ -219,85 +215,6 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 	}
 
 	return *source, nil
-}
-
-func (s *SourceService) UploadRvtoolsFile(ctx context.Context, sourceID uuid.UUID, reader io.Reader) error {
-	source, err := s.store.Source().Get(ctx, sourceID)
-	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			return NewErrSourceNotFound(sourceID)
-		}
-		return err
-	}
-
-	rvtoolsContent, err := io.ReadAll(reader)
-	if err != nil {
-		return fmt.Errorf("failed to read uploaded file content: %w", err)
-	}
-
-	if rvtoolsContent == nil {
-		return errors.New("no file was found in the request")
-	}
-
-	if len(rvtoolsContent) == 0 {
-		return errors.New("empty file uploaded")
-	}
-
-	zap.S().Infow("received RVTools data", "size [bytes]", len(rvtoolsContent))
-
-	// TODO: support csv files
-	if !rvtools.IsExcelFile(rvtoolsContent) {
-		return NewErrExcelFileNotValid()
-	}
-
-	inventory, err := rvtools.ParseRVTools(ctx, rvtoolsContent, s.opaValidator)
-	if err != nil {
-		return fmt.Errorf("Error parsing RVTools file: %v", err)
-	}
-
-	if source.VCenterID != "" && source.VCenterID != inventory.Vcenter.Id {
-		return NewErrInvalidVCenterID(sourceID, inventory.Vcenter.Id)
-	}
-
-	ctx, err = s.store.NewTransactionContext(ctx)
-	if err != nil {
-		return err
-	}
-
-	var rvtoolsAgent *model.Agent
-	if len(source.Agents) > 0 {
-		rvtoolsAgent = &source.Agents[0]
-	} else {
-		newAgent := model.NewAgentForSource(uuid.New(), *source)
-
-		if _, err := s.store.Agent().Create(ctx, newAgent); err != nil {
-			_, _ = store.Rollback(ctx)
-			return err
-		}
-		rvtoolsAgent = &newAgent
-	}
-
-	source.OnPremises = true
-	source.VCenterID = inventory.Vcenter.Id
-	source.Inventory = model.MakeJSONField(*inventory)
-
-	if _, err = s.store.Source().Update(ctx, *source); err != nil {
-		_, _ = store.Rollback(ctx)
-		return err
-	}
-
-	rvtoolsAgent.StatusInfo = "Last updated via RVTools upload on " + time.Now().Format(time.RFC3339)
-
-	if _, err = s.store.Agent().Update(ctx, *rvtoolsAgent); err != nil {
-		_, _ = store.Rollback(ctx)
-		return err
-	}
-
-	if _, err := store.Commit(ctx); err != nil {
-		return err
-	}
-
-	return nil
 }
 
 type SourceFilterFunc func(s *SourceFilter)
