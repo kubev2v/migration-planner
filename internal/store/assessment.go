@@ -69,6 +69,9 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 	// Create the assessment first
 	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
 	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+			return nil, ErrDuplicateKey
+		}
 		return nil, result.Error
 	}
 

@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -195,6 +196,36 @@ var _ = Describe("assessment service", Ordered, func() {
 				// Verify owner fields are nil when not provided
 				Expect(assessment.OwnerFirstName).To(BeNil())
 				Expect(assessment.OwnerLastName).To(BeNil())
+			})
+
+			It("fails to create assessment when name already exists in same org", func() {
+				inventory := v1alpha1.Inventory{
+					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
+					Vms:     v1alpha1.VMs{Total: 10},
+					Infra:   v1alpha1.Infra{TotalHosts: 5},
+				}
+
+				name := "Duplicate Assessment"
+				// Insert first assessment directly via DB
+				assessmentID := uuid.New()
+				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), name, "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+				Expect(tx.Error).To(BeNil())
+
+				// Second creation with same name and org should fail via service
+				secondForm := mappers.AssessmentCreateForm{
+					ID:        uuid.New(),
+					Name:      name,   // duplicate name
+					OrgID:     "org1", // same org
+					Username:  "testuser",
+					Source:    service.SourceTypeInventory,
+					Inventory: inventory,
+				}
+
+				secondAssessment, secondErr := svc.CreateAssessment(context.TODO(), secondForm)
+				Expect(secondErr).ToNot(BeNil())
+				Expect(secondAssessment).To(BeNil())
+				var dupErr *service.ErrDuplicateKey
+				Expect(errors.As(secondErr, &dupErr)).To(BeTrue(), "expected ErrDuplicateKey error type")
 			})
 		})
 

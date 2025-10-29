@@ -69,3 +69,15 @@ type ErrSourceHasNoInventory struct {
 func NewErrSourceHasNoInventory(sourceID uuid.UUID) *ErrSourceHasNoInventory {
 	return &ErrSourceHasNoInventory{fmt.Errorf("source has no inventory: %s", sourceID)}
 }
+
+type ErrDuplicateKey struct {
+	error
+}
+
+func NewErrDuplicateKey(resourceType, key string) *ErrDuplicateKey {
+	return &ErrDuplicateKey{fmt.Errorf("%s with %s already exists", resourceType, key)}
+}
+
+func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
+	return NewErrDuplicateKey("assessment", fmt.Sprintf("name '%s'", name))
+}
