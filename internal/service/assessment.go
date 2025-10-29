@@ -131,7 +131,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		tracer.Step("read_rvtools_file").WithInt("file_size", len(content)).Log()
 		rvtoolInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing RVTools file: %v", err)
+			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
 		}
 		inventory = *rvtoolInventory
 		tracer.Step("parsed_rvtools_inventory").Log()

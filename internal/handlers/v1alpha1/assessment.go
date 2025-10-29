@@ -98,9 +98,12 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		case *service.ErrSourceHasNoInventory:
 			logger.Error(err).WithString("step", "inventory_check").Log()
 			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		case *service.ErrFileCorrupted:
+			logger.Error(err).WithString("step", "file_validation").Log()
+			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 		default:
 			logger.Error(err).Log()
-			return server.CreateAssessment500JSONResponse{Message: fmt.Sprintf("failed to create assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment500JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 		}
 	}
 
