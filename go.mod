@@ -54,7 +54,6 @@ require (
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/ajg/form v1.5.1 // indirect
-	github.com/anchore/go-lzo v0.1.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.39.2 // indirect
@@ -216,6 +215,7 @@ require (
 )
 
 replace (
+	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.4.1
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
