@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"sync"
 
 	"github.com/go-chi/chi"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -15,9 +16,10 @@ type MetricServer struct {
 	bindAddress string
 	httpServer  *http.Server
 	listener    net.Listener
+	wg          *sync.WaitGroup
 }
 
-func NewMetricServer(bindAddress string, listener net.Listener) *MetricServer {
+func NewMetricServer(bindAddress string, listener net.Listener, wg *sync.WaitGroup) *MetricServer {
 	router := chi.NewRouter()
 
 	prometheusMetricHandler := metrics.NewPrometheusMetricsHandler()
@@ -30,12 +32,14 @@ func NewMetricServer(bindAddress string, listener net.Listener) *MetricServer {
 			Addr:    bindAddress,
 			Handler: router,
 		},
+		wg: wg,
 	}
 
 	return s
 }
 
 func (m *MetricServer) Run(ctx context.Context) error {
+	m.wg.Add(1)
 	go func() {
 		<-ctx.Done()
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
@@ -44,6 +48,7 @@ func (m *MetricServer) Run(ctx context.Context) error {
 		m.httpServer.SetKeepAlivesEnabled(false)
 		_ = m.httpServer.Shutdown(ctxTimeout)
 		zap.S().Named("metrics_server").Info("metrics server terminated")
+		m.wg.Done()
 	}()
 
 	zap.S().Named("metrics_server").Infof("serving metrics: %s", m.bindAddress)

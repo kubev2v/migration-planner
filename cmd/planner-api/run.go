@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
@@ -75,6 +76,7 @@ var runCmd = &cobra.Command{
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
+		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
 		go func() {
 			defer cancel()
@@ -83,9 +85,9 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			server := apiserver.New(cfg, store, listener, opaValidator)
+			server := apiserver.New(cfg, store, listener, opaValidator, &wg)
 			if err := server.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
+				zap.S().Named("api_server").Errorw("Error running server: %v: %v", "error", err)
 			}
 		}()
 
@@ -99,9 +101,9 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			agentserver := agentserver.New(cfg, store, listener)
+			agentserver := agentserver.New(cfg, store, listener, &wg)
 			if err := agentserver.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
+				zap.S().Named("agent_server").Errorw("Error running server", "error", err)
 			}
 		}()
 
@@ -112,9 +114,9 @@ var runCmd = &cobra.Command{
 				zap.S().Fatalw("creating listener", "error", err)
 			}
 
-			imageserver := imageserver.New(cfg, store, listener)
+			imageserver := imageserver.New(cfg, store, listener, &wg)
 			if err := imageserver.Run(ctx); err != nil {
-				zap.S().Fatalw("Error running server", "error", err)
+				zap.S().Named("image_server").Errorw("Error running server", "error", err)
 			}
 		}()
 
@@ -124,13 +126,15 @@ var runCmd = &cobra.Command{
 			if err != nil {
 				zap.S().Named("metrics_server").Fatalw("creating listener", "error", err)
 			}
-			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener)
+			metricsServer := apiserver.NewMetricServer("0.0.0.0:8080", listener, &wg)
 			if err := metricsServer.Run(ctx); err != nil {
-				zap.S().Named("metrics_server").Fatalw("failed to run metrics server", "error", err)
+				zap.S().Named("metrics_server").Errorw("failed to run metrics server", "error", err)
 			}
 		}()
 
 		<-ctx.Done()
+		wg.Wait()
+		zap.S().Info("Service stopped gracefully")
 
 		return nil
 	},

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -35,6 +36,7 @@ type Server struct {
 	store        store.Store
 	listener     net.Listener
 	opaValidator *opa.Validator
+	wg           *sync.WaitGroup
 }
 
 // New returns a new instance of a migration-planner server.
@@ -43,12 +45,14 @@ func New(
 	store store.Store,
 	listener net.Listener,
 	opaValidator *opa.Validator,
+	wg *sync.WaitGroup,
 ) *Server {
 	return &Server{
 		cfg:          cfg,
 		store:        store,
 		listener:     listener,
 		opaValidator: opaValidator,
+		wg:           wg,
 	}
 }
 
@@ -67,6 +71,7 @@ func WithResponseWriter(next http.Handler) http.Handler {
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	s.wg.Add(1)
 	zap.S().Named("api_server").Info("Initializing API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
@@ -121,6 +126,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
+		zap.S().Named("api_server").Info("api server terminated")
+		s.wg.Done()
 	}()
 
 	zap.S().Named("api_server").Infof("Listening on %s...", s.listener.Addr().String())
