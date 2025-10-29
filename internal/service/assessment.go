@@ -148,6 +148,11 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory)
 	if err != nil {
 		_, _ = store.Rollback(ctx)
+
+		if errors.Is(err, store.ErrDuplicateKey) {
+			return nil, NewErrAssessmentDuplicateName(assessment.Name)
+		}
+
 		return nil, fmt.Errorf("failed to create assessment: %w", err)
 	}
 

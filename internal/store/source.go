@@ -11,10 +11,6 @@ import (
 	"gorm.io/gorm/clause"
 )
 
-var (
-	ErrRecordNotFound error = errors.New("record not found")
-)
-
 type Source interface {
 	List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error)
 	Create(ctx context.Context, source model.Source) (*model.Source, error)
