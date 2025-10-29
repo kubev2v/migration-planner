@@ -213,6 +213,7 @@ type Network struct {
 	Name     string      `json:"name"`
 	Type     NetworkType `json:"type"`
 	VlanId   *string     `json:"vlanId,omitempty"`
+	VmsCount *int        `json:"vmsCount,omitempty"`
 }
 
 // NetworkType defines model for Network.Type.
