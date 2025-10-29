@@ -1,0 +1,10 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for migration-planner - runs dependency updates weekly on Saturday mornings",
+  "extends": [
+    "config:base"
+  ],
+  "schedule": [
+    "before 6am on Saturday"
+  ]
+}
