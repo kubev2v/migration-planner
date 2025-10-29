@@ -121,6 +121,7 @@ func (s *Server) Run(ctx context.Context) error {
 
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
+		zap.S().Named("api_server").Info("api server terminated")
 	}()
 
 	zap.S().Named("api_server").Infof("Listening on %s...", s.listener.Addr().String())

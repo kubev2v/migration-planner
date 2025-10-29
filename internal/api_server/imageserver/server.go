@@ -96,6 +96,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
+		zap.S().Named("image_server").Info("image server terminated")
 	}()
 
 	zap.S().Named("image_server").Infof("Listening on %s...", s.listener.Addr().String())
