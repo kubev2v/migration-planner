@@ -1010,6 +1010,8 @@ components:
           type: string
         dvswitch:
           type: string
+        vmsCount:
+          type: integer
 
     Datastore:
       type: object
