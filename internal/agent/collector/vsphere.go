@@ -163,7 +163,7 @@ func (c *Collector) run(ctx context.Context) {
 
 	infraData := service.InfrastructureData{
 		Datastores:            getDatastores(hosts, collector),
-		Networks:              getNetworks(collector),
+		Networks:              getNetworks(collector, countVmsByNetwork(*vms)),
 		HostPowerStates:       getHostPowerStates(*hosts),
 		Hosts:                 getHosts(hosts),
 		HostsPerCluster:       getHostsPerCluster(*clusters),
@@ -429,6 +429,16 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
+func countVmsByNetwork(vms []vspheremodel.VM) map[string]int {
+	vmsPerNetwork := make(map[string]int)
+	for _, vm := range vms {
+		for _, network := range vm.Networks {
+			vmsPerNetwork[network.ID]++
+		}
+	}
+	return vmsPerNetwork
+}
+
 func calculateBinIndex(data, minVal int, binSize float64, rangeValues, numberOfBins int) int {
 	if rangeValues == 0 {
 		// All values are identical - put everything in bin 0
@@ -510,7 +520,7 @@ func Histogram(d []int) apiplanner.Histogram {
 	}
 }
 
-func getNetworks(collector *vsphere.Collector) []apiplanner.Network {
+func getNetworks(collector *vsphere.Collector, vmsPerNetwork map[string]int) []apiplanner.Network {
 	r := []apiplanner.Network{}
 	networks := &[]vspheremodel.Network{}
 	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
@@ -530,6 +540,7 @@ func getNetworks(collector *vsphere.Collector) []apiplanner.Network {
 			Type:     apiplanner.NetworkType(getNetworkType(&n)),
 			VlanId:   &vlanId,
 			Dvswitch: &dvNet.Name,
+			VmsCount: util.IntPtr(vmsPerNetwork[n.ID]),
 		})
 	}
 
