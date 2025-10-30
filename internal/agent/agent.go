@@ -19,7 +19,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/agent/common"
 	"github.com/kubev2v/migration-planner/internal/agent/config"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
-	"github.com/lthibault/jitterbug"
+	jitterbug "github.com/lthibault/jitterbug/v2"
 	"go.uber.org/zap"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 )
