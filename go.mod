@@ -22,7 +22,7 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubev2v/forklift v0.0.0-20251026141745-800c1f345f88
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
-	github.com/lthibault/jitterbug v2.2.2+incompatible
+	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.0.2
