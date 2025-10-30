@@ -29,7 +29,7 @@ parameters:
     required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
-    value: "3"
+    value: "2"
   - name: MIGRATION_PLANNER_MEMORY_REQUEST
     description: Memory request for the API pods.
     value: "512Mi"
