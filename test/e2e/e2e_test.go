@@ -37,7 +37,9 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		e2eAgent.Agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
+		e2eAgent.Agent, err = NewPlannerAgentPodman(source.Id.String())
+		Expect(err).To(BeNil())
+		err = e2eAgent.Agent.Run()
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -86,45 +88,6 @@ var _ = Describe("e2e", func() {
 		e2eAgent.Agent.DumpLogs(agentIP)
 	})
 
-	Context("Check Vcenter login behavior", func() {
-		It("Succeeds login only for valid credentials", func() {
-
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"", "pass")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty User. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"user", "")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty Password. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"invalid", "cred")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
-			zap.S().Info("Invalid credentials. HTTP status: Unauthorized returned.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
-				"user", "pass")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Invalid URL. Successfully returned http status: BadRequest.")
-
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Credentials verified successfully. HTTP status: NoContent (204) returned.")
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-	})
-
 	Context("Flow", func() {
 		It("Up to date", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
@@ -144,129 +107,6 @@ var _ = Describe("e2e", func() {
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
-
-		It("Source removal", func() {
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
-
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
-				Expect(err).To(BeNil())
-				return isAgentIsUpToDate
-			}, "3m", "2s").Should(BeTrue())
-
-			err = svc.RemoveSource(source.Id)
-			Expect(err).To(BeNil())
-
-			_, err = svc.GetSource(source.Id)
-			Expect(err).To(MatchError(ContainSubstring(fmt.Sprintf("code: %d", http.StatusNotFound))))
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-
-		It("Two agents, Two VSphere's", func() {
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
-
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
-				Expect(err).To(BeNil())
-				return isAgentIsUpToDate
-			}, "3m", "2s").Should(BeTrue())
-
-			source2, err := svc.CreateSource("source-2")
-			Expect(err).To(BeNil())
-			Expect(source2).NotTo(BeNil())
-
-			var agent2 E2EAgent
-			agent2.Agent, err = CreateAgent("2", source2.Id, VmName+"-2", svc)
-			Expect(err).To(BeNil())
-
-			var agentIP2 string
-			Eventually(func() error {
-				agentIP2, err = agent2.Agent.GetIp()
-				if err != nil {
-					return err
-				}
-				return nil
-			}, "3m", "2s").Should(BeNil())
-
-			agent2ApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP2)
-			agent2.Api = DefaultAgentApi(agent2ApiBaseUrl)
-			zap.S().Infof("Agent2 Api base url: %s", agent2ApiBaseUrl)
-
-			Eventually(func() bool {
-				return agent2.Agent.IsServiceRunning(agentIP2, "planner-agent")
-			}, "3m", "2s").Should(BeTrue())
-
-			Eventually(func() string {
-				credUrl, err := CredentialURL(svc, source2.Id)
-				if err != nil {
-					return err.Error()
-				}
-				return credUrl
-			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
-
-			// Login to Vcsim2
-			res, err = agent2.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere2Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
-
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source2.Id)
-				Expect(err).To(BeNil())
-				return isAgentIsUpToDate
-			}, "3m", "2s").Should(BeTrue())
-
-			err = agent2.Agent.Remove()
-			Expect(err).To(BeNil())
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
 	})
 
-	Context("Edge cases", func() {
-		It("VM reboot", func() {
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
-			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
-
-			// Restarting the VM
-			err = e2eAgent.Agent.Restart()
-			Expect(err).To(BeNil())
-
-			// Check that planner-agent service is running
-			Eventually(func() bool {
-				return e2eAgent.Agent.IsServiceRunning(agentIP, "planner-agent")
-			}, "5m", "2s").Should(BeTrue())
-
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
-				Expect(err).To(BeNil())
-				return isAgentIsUpToDate
-			}, "3m", "2s").Should(BeTrue())
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-	})
 })

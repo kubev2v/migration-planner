@@ -319,7 +319,7 @@ UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e
 # Install ginkgo if not already available
 $(GINKGO):
 	@echo "📦 Installing ginkgo..."
-	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
+	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.27.1
 	@echo "✅ 'ginkgo' installed successfully."
 
 # Run unit tests using ginkgo

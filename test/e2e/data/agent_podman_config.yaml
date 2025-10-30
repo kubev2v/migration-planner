@@ -1,0 +1,11 @@
+config-dir: /agent/config
+data-dir: /agent/data
+persistent-data-dir: /agent/persistent-data
+www-dir: /app/www
+policies-dir: /app/policies
+log-level: debug
+update-interval: 2s
+health-check-interval: 2
+planner-service:
+  service:
+    server: http://127.0.0.1:7443
