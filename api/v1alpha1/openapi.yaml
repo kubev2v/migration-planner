@@ -401,16 +401,13 @@ paths:
     post:
       tags:
         - assessment
-      description: Create an assessment
+      description: Create an assessment from agent or inventory JSON
       operationId: createAssessment
       requestBody:
         content:
           application/json:
             schema:
               $ref: '#/components/schemas/AssessmentForm'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AssessmentRvtoolsForm'
         required: true
       responses:
         "201":
@@ -607,6 +604,76 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Info'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assessments/rvtools:
+    post:
+      tags:
+        - rvtools
+      description: Upload RVTools file and create an assessment asynchronously
+      operationId: uploadRVTools
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/AssessmentRvtoolsForm'
+        required: true
+      responses:
+        "202":
+          description: Accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJob'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/rvtools/jobs/{id}:
+    get:
+      tags:
+        - rvtools
+      description: Get RVTools job status
+      operationId: getRVToolsJob
+      parameters:
+        - name: id
+          in: path
+          description: ID of the RVTools job
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsyncJob'
+        "404":
+          description: Job not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         "500":
           description: Internal error
           content:
@@ -1269,6 +1336,33 @@ components:
       required:
         - name
         - file
+
+    AsyncJob:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique identifier for the async job
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+          description: Current status of the job
+        error:
+          type: string
+          description: Error message if job failed
+        assessment_id:
+          type: string
+          format: uuid
+          description: ID of the created assessment (available when completed)
+        created_at:
+          type: string
+          format: date-time
+          description: When the job was created
+      required:
+        - id
+        - status
+        - created_at
 
     AssessmentUpdate:
       type: object

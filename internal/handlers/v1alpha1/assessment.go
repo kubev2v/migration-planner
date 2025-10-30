@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+	openapi_types "github.com/oapi-codegen/runtime/types"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -42,13 +45,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	logger := log.NewDebugLogger("assessment_handler").
 		WithContext(ctx).
 		Operation("create_assessment").
-		WithRequestBody("request_body", request.JSONBody).
+		WithRequestBody("request_body", request.Body).
 		Build()
 
 	user := auth.MustHaveUser(ctx)
 	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
-	if request.JSONBody == nil && request.MultipartBody == nil {
+	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
 		return server.CreateAssessment400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
@@ -56,30 +59,16 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	var createForm srvMappers.AssessmentCreateForm
 	createForm.OrgID = user.Organization
 
-	// Handle JSON content type
-	if request.JSONBody != nil {
-		logger.Step("process_json_body").Log()
-		form := v1alpha1.AssessmentForm(*request.JSONBody)
-		if err := validateAssessmentData(form); err != nil {
-			logger.Error(err).WithString("step", "validation").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-
-		createForm = mappers.AssessmentFormToCreateForm(form, user)
-		logger.Step("mapped_json_form").WithString("source_type", createForm.Source).Log()
+	// Handle JSON content type (agent or inventory uploads only)
+	logger.Step("process_json_body").Log()
+	form := v1alpha1.AssessmentForm(*request.Body)
+	if err := validateAssessmentData(form); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	// Handle multipart content type (RVTools upload)
-	if request.MultipartBody != nil {
-		logger.Step("process_multipart_body").Log()
-		var err error
-		createForm, err = mappers.AssessmentCreateFormFromMultipart(request.MultipartBody, user)
-		if err != nil {
-			logger.Error(err).WithString("step", "parse_multipart").Log()
-			return server.CreateAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-		logger.Step("mapped_multipart_form").WithString("source_type", createForm.Source).Log()
-	}
+	createForm = mappers.AssessmentFormToCreateForm(form, user)
+	logger.Step("mapped_json_form").WithString("source_type", createForm.Source).Log()
 
 	logger.Step("create_assessment").
 		WithUUID("id", createForm.ID).
@@ -261,6 +250,79 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 
 	logger.Success().WithString("deleted_assessment_name", assessment.Name).Log()
 	return server.DeleteAssessment200JSONResponse{}, nil
+}
+
+// (POST /api/v1/assessments/rvtools)
+func (h *ServiceHandler) UploadRVTools(ctx context.Context, request server.UploadRVToolsRequestObject) (server.UploadRVToolsResponseObject, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if request.Body == nil {
+		return server.UploadRVTools400JSONResponse{Message: "multipart body required", RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	var createForm srvMappers.AssessmentCreateForm
+	createForm.OrgID = user.Organization
+
+	var err error
+	createForm, err = mappers.AssessmentCreateFormFromMultipart(request.Body, user)
+	if err != nil {
+		return server.UploadRVTools400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	// Create async job
+	job := h.asyncAssessmentSrv.CreateJob()
+
+	// Start processing in background
+	h.asyncAssessmentSrv.ProcessAssessmentAsync(ctx, job.ID, createForm)
+
+	// Return job details
+	apiJob := v1alpha1.AsyncJob{
+		Id:        openapi_types.UUID(job.ID),
+		Status:    mapAsyncJobStatus(job.Status),
+		CreatedAt: job.CreatedAt,
+	}
+
+	return server.UploadRVTools202JSONResponse(apiJob), nil
+}
+
+// (GET /api/v1/rvtools/jobs/{id})
+func (h *ServiceHandler) GetRVToolsJob(ctx context.Context, request server.GetRVToolsJobRequestObject) (server.GetRVToolsJobResponseObject, error) {
+	job := h.asyncAssessmentSrv.GetJob(uuid.UUID(request.Id))
+	if job == nil {
+		return server.GetRVToolsJob404JSONResponse{Message: "job not found", RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	// Convert to API response
+	apiJob := v1alpha1.AsyncJob{
+		Id:        openapi_types.UUID(job.ID),
+		Status:    mapAsyncJobStatus(job.Status),
+		CreatedAt: job.CreatedAt,
+	}
+
+	if job.Error != "" {
+		apiJob.Error = &job.Error
+	}
+	if job.AssessmentID != nil {
+		assessmentUUID := openapi_types.UUID(*job.AssessmentID)
+		apiJob.AssessmentId = &assessmentUUID
+	}
+
+	return server.GetRVToolsJob200JSONResponse(apiJob), nil
+}
+
+func mapAsyncJobStatus(status service.AsyncJobStatus) v1alpha1.AsyncJobStatus {
+	switch status {
+	case service.AsyncJobStatusPending:
+		return v1alpha1.Pending
+	case service.AsyncJobStatusRunning:
+		return v1alpha1.Running
+	case service.AsyncJobStatusCompleted:
+		return v1alpha1.Completed
+	case service.AsyncJobStatusFailed:
+		return v1alpha1.Failed
+	default:
+		return v1alpha1.Pending
+	}
 }
 
 func validateAssessmentData(data interface{}) error {
