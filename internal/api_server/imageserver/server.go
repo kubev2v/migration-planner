@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -32,6 +33,7 @@ type ImageServer struct {
 	cfg      *config.Config
 	store    store.Store
 	listener net.Listener
+	wg       *sync.WaitGroup
 }
 
 // New returns a new instance of a migration-planner server.
@@ -39,11 +41,13 @@ func New(
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
+	wg *sync.WaitGroup,
 ) *ImageServer {
 	return &ImageServer{
 		cfg:      cfg,
 		store:    store,
 		listener: listener,
+		wg:       wg,
 	}
 }
 
@@ -52,6 +56,7 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 }
 
 func (s *ImageServer) Run(ctx context.Context) error {
+	s.wg.Add(1)
 	zap.S().Named("image_server").Info("Initializing Image-side API server")
 	swagger, err := api.GetSwagger()
 	if err != nil {
@@ -96,6 +101,8 @@ func (s *ImageServer) Run(ctx context.Context) error {
 
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
+		zap.S().Named("image_server").Info("image server terminated")
+		s.wg.Done()
 	}()
 
 	zap.S().Named("image_server").Infof("Listening on %s...", s.listener.Addr().String())
