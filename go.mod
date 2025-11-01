@@ -32,7 +32,7 @@ require (
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/assisted-image-service v0.0.0-20251028111153-dc980cdc1633
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 v3.26.0
 	github.com/prometheus/client_golang v1.22.0
 	github.com/sirupsen/logrus v1.9.4-0.20251023124752-b61f268f75b6
 	github.com/spf13/cobra v1.9.1
@@ -224,6 +224,6 @@ require (
 replace (
 	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.4.1
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.26.0
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
