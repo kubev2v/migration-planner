@@ -4,6 +4,10 @@ package rvtools
 import (
 	"strings"
 
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/migration-planner/internal/agent/collector"
+	"github.com/kubev2v/migration-planner/internal/util"
+
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
@@ -13,7 +17,7 @@ const (
 	NetDvPortGroup = "distributed"
 )
 
-func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.Inventory) error {
+func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.Inventory, vms []vsphere.VM) error {
 	dvswitchMap := make(map[string]bool)
 
 	networksMap := make(map[string]api.Network)
@@ -39,10 +43,14 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 		})
 	}
 
+	vmsPerNetwork := collector.CountVmsByNetwork(vms)
+	networkNameToID := createNetworkNameToIDMap(dvportRows)
+
 	for _, network := range networksMap {
 		netEntry := api.Network{
-			Name: network.Name,
-			Type: api.NetworkType(network.Type),
+			Name:     network.Name,
+			Type:     api.NetworkType(network.Type),
+			VmsCount: util.IntPtr(vmsPerNetwork[networkNameToID[network.Name]]),
 		}
 
 		if network.Dvswitch != nil && *network.Dvswitch != "" {

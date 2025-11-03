@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	. "github.com/onsi/ginkgo/v2"
@@ -726,7 +728,7 @@ invalid syntax here`
 			It("should return empty slice when no network data available", func() {
 				emptyDvswitchRows := [][]string{}
 				emptyDvportRows := [][]string{}
-				result := rvtools.ExtractNetworks(emptyDvswitchRows, emptyDvportRows)
+				result := rvtools.ExtractNetworks(emptyDvswitchRows, emptyDvportRows, []vsphere.VM{})
 				Expect(result).To(BeEmpty())
 			})
 		})
@@ -740,7 +742,7 @@ invalid syntax here`
 				}
 				emptyDvportRows := [][]string{}
 
-				result := rvtools.ExtractNetworks(dvswitchRows, emptyDvportRows)
+				result := rvtools.ExtractNetworks(dvswitchRows, emptyDvportRows, []vsphere.VM{})
 
 				Expect(result).ToNot(BeNil())
 				Expect(len(result)).To(BeNumerically(">=", 2))
@@ -763,9 +765,55 @@ invalid syntax here`
 					{"pg3", "dvSwitch2", ""},
 				}
 
-				result := rvtools.ExtractNetworks(emptyDvswitchRows, dvportRows)
+				result := rvtools.ExtractNetworks(emptyDvswitchRows, dvportRows, []vsphere.VM{})
 
 				Expect(result).ToNot(BeNil())
+			})
+
+			It("should count VMs per network", func() {
+				emptyDvswitchRows := [][]string{}
+				dvportRows := [][]string{
+					{"Port", "Switch", "VLAN", "Object ID"},
+					{"pg1", "dvSwitch1", "100", "dvportgroup-1"},
+					{"pg2", "dvSwitch1", "200", "dvportgroup-2"},
+					{"pg3", "dvSwitch2", "", "dvportgroup-3"},
+				}
+
+				vms := []vsphere.VM{
+					{
+						Networks: []vsphere.Ref{
+							{
+								Kind: "Network",
+								ID:   "dvportgroup-1",
+							},
+						},
+					},
+					{
+						Networks: []vsphere.Ref{
+							{
+								Kind: "Network",
+								ID:   "dvportgroup-1",
+							},
+						},
+					},
+					{
+						Networks: []vsphere.Ref{
+							{
+								Kind: "Network",
+								ID:   "dvportgroup-1",
+							},
+						},
+					},
+				}
+
+				result := rvtools.ExtractNetworks(emptyDvswitchRows, dvportRows, vms)
+				Expect(result).ToNot(BeNil())
+
+				for _, network := range result {
+					if network.Name == "pg1" {
+						Expect(*network.VmsCount).To(BeNumerically("==", 3))
+					}
+				}
 			})
 
 			It("should handle mixed dvSwitch and dvPort data", func() {
@@ -781,7 +829,7 @@ invalid syntax here`
 					{"pg3", "dvSwitch3", "300"}, // Switch not in dvswitchRows
 				}
 
-				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows)
+				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows, []vsphere.VM{})
 
 				Expect(result).ToNot(BeNil())
 				Expect(len(result)).To(BeNumerically(">", 0))
@@ -797,7 +845,7 @@ invalid syntax here`
 					{"pg1", "dvSwitch1", "100"},
 				}
 
-				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows)
+				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows, []vsphere.VM{})
 
 				Expect(result).ToNot(BeNil())
 				if len(result) > 0 {
@@ -820,7 +868,7 @@ invalid syntax here`
 				}
 
 				// Should not panic with malformed data
-				result := rvtools.ExtractNetworks(malformedDvswitchRows, malformedDvportRows)
+				result := rvtools.ExtractNetworks(malformedDvswitchRows, malformedDvportRows, []vsphere.VM{})
 				Expect(result).ToNot(BeNil())
 			})
 
@@ -835,7 +883,7 @@ invalid syntax here`
 					{"pg1", "dvSwitch1", "100"},
 				}
 
-				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows)
+				result := rvtools.ExtractNetworks(dvswitchRows, dvportRows, []vsphere.VM{})
 				Expect(result).ToNot(BeNil())
 			})
 		})

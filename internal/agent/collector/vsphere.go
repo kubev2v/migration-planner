@@ -163,7 +163,7 @@ func (c *Collector) run(ctx context.Context) {
 
 	infraData := service.InfrastructureData{
 		Datastores:            getDatastores(hosts, collector),
-		Networks:              getNetworks(collector, countVmsByNetwork(*vms)),
+		Networks:              getNetworks(collector, CountVmsByNetwork(*vms)),
 		HostPowerStates:       getHostPowerStates(*hosts),
 		Hosts:                 getHosts(hosts),
 		HostsPerCluster:       getHostsPerCluster(*clusters),
@@ -429,7 +429,7 @@ func getSecret(creds config.Credentials) *core.Secret {
 	}
 }
 
-func countVmsByNetwork(vms []vspheremodel.VM) map[string]int {
+func CountVmsByNetwork(vms []vspheremodel.VM) map[string]int {
 	vmsPerNetwork := make(map[string]int)
 	for _, vm := range vms {
 		for _, network := range vm.Networks {
