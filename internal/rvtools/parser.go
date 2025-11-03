@@ -110,7 +110,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	dvswitchRows := readSheet(excelFile, sheets, "dvSwitch")
 	dvportRows := readSheet(excelFile, sheets, "dvPort")
 
-	networks := ExtractNetworks(dvswitchRows, dvportRows)
+	networks := ExtractNetworks(dvswitchRows, dvportRows, vms)
 
 	zap.S().Named("rvtools").Infof("Create Basic Inventory")
 	infraData := service.InfrastructureData{
@@ -286,7 +286,7 @@ func ExtractVmsPerCluster(rows [][]string) []int {
 	return calculateVMsPerCluster(clusterToVMs)
 }
 
-func ExtractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
+func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []api.Network {
 	networks := []api.Network{}
 
 	if len(dvswitchRows) == 0 && len(dvportRows) == 0 {
@@ -295,7 +295,7 @@ func ExtractNetworks(dvswitchRows, dvportRows [][]string) []api.Network {
 	}
 
 	tempInventory := &api.Inventory{Infra: api.Infra{}}
-	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory); err == nil {
+	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory, vms); err == nil {
 		networks = tempInventory.Infra.Networks
 	}
 
