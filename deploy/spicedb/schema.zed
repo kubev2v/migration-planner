@@ -1,0 +1,95 @@
+/**
+ * User Definition
+ * 
+ * Represents any authenticated user in the system.
+ * This is the base type for all user-related relationships.
+ */
+definition user {}
+
+/**
+ * Platform Definition
+ * 
+ * Represents the top-level tenant in the multi-tenant architecture.
+ * Platforms have administrative controls that cascade down to assessments.
+ * 
+ * Relations:
+ * - admin: Users with full administrative privileges across the platform
+ * - viewer: Users with read-only access across all platform resources
+ * - editor: Users with edit access across all platform resources
+ * 
+ * Permissions:
+ * - super_admin: Full control over all platform resources
+ * - view: Read access to platform resources
+ * - edit: Modify access to platform resources
+ */
+definition platform {
+	relation admin: user
+	relation viewer: user
+	relation editor: user
+	permission super_admin = admin
+	permission view = viewer
+	permission edit = editor
+}
+
+/**
+ * Organization Definition
+ * 
+ * Represents a group or team of users within the platform.
+ * Organizations provide a way to group users and share resources among them.
+ * 
+ * Relations:
+ * - member: Users who belong to this organization
+ * 
+ * Permissions:
+ * - org_member: Derived permission for organization membership
+ */
+definition org {
+	relation member: user
+	permission org_member = member
+}
+
+/**
+ * Assessment Definition
+ * 
+ * Represents a migration assessment resource - the core entity in the system.
+ * Assessments are scoped to both a platform and an organization, with flexible
+ * permission controls based on ownership, organization membership, and platform roles.
+ * 
+ * Relations:
+ * - parent: The platform this assessment belongs to
+ * - org: The organization this assessment is associated with
+ * - owner: The user who created or owns this assessment
+ * - editor: Users explicitly granted edit access to this assessment
+ * - viewer: Users explicitly granted read-only access to this assessment
+ * 
+ * Permissions:
+ * - read: Can view the assessment. Granted to:
+ * * Users explicitly added as readers
+ * * All members of the associated organization
+ * * Platform super admins, viewers, and editors
+ * 
+ * - edit: Can modify the assessment. Granted to:
+ * * The assessment owner
+ * * All members of the associated organization
+ * * Platform super admins and editors
+ * 
+ * - share: Can grant access to other users. Granted to:
+ * * The assessment owner
+ * * All members of the associated organization
+ * * Platform super admins
+ * 
+ * - delete: Can delete the assessment. Granted to:
+ * * The assessment owner
+ * * Platform super admins
+ */
+definition assessment {
+	relation parent: platform
+	relation org: org
+	relation owner: user
+	relation editor: user
+	relation viewer: user
+	permission read = owner + viewer + editor + org->org_member + parent->super_admin + parent->view + parent->edit
+	permission edit = owner + org->org_member + parent->super_admin + parent->edit + editor
+	permission share = owner + org->org_member + parent->super_admin
+	permission delete = owner + parent->super_admin
+}
