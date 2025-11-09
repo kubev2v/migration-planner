@@ -431,6 +431,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         "500":
           description: Internal error
           content:
@@ -584,6 +590,41 @@ paths:
                 $ref: '#/components/schemas/Error'
         "404":
           description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assessments/{id}/job:
+    delete:
+      tags:
+        - assessment
+      description: Cancel the processing job for an assessment
+      operationId: cancelAssessmentJob
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Job cancelled successfully
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Conflict - job cannot be cancelled
           content:
             application/json:
               schema:
@@ -1187,14 +1228,21 @@ components:
     Snapshot:
       type: object
       properties:
-        inventory:
-          $ref: '#/components/schemas/Inventory'
         createdAt:
           type: string
           format: date-time
+        status:
+          type: string
+          enum: [pending, parsing, validating, ready, failed]
+          description: Status of the snapshot processing
+        error:
+          type: string
+          description: Error message if snapshot processing failed
+        inventory:
+          $ref: '#/components/schemas/Inventory'
       required:
-        - inventory
         - createdAt
+        - status
 
     Assessment:
       type: object

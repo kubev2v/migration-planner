@@ -1,6 +1,8 @@
 package service
 
 import (
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 )
@@ -32,4 +34,5 @@ type assessmentApi interface {
 	GetAssessments() (*v1alpha1.AssessmentList, error)
 	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)
 	RemoveAssessment(uuid.UUID) error
+	WaitForAssessmentProcessing(id uuid.UUID, timeout time.Duration, pollInterval time.Duration) (*v1alpha1.Assessment, error)
 }
