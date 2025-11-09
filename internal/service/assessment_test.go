@@ -21,7 +21,7 @@ import (
 const (
 	insertSourceStm     = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
 	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertSnapshotStm   = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
+	insertSnapshotStm   = "INSERT INTO snapshots (assessment_id, inventory, status) VALUES ('%s', '%s', 'ready');"
 )
 
 var _ = Describe("assessment service", Ordered, func() {
@@ -39,7 +39,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAssessmentService(s, nil)
+		svc = service.NewAssessmentService(s, nil, nil)
 	})
 
 	AfterAll(func() {

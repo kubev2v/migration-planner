@@ -75,7 +75,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
@@ -100,7 +101,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
@@ -132,7 +134,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				},
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 				JSONBody: &v1alpha1.AssessmentForm{
 					Name:       "test-assessment",
@@ -172,7 +175,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				},
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 
 			// Note: AssessmentForm schema deliberately excludes owner fields
 			// This prevents users from spoofing owner information via API requests
@@ -214,7 +218,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 				JSONBody: &v1alpha1.AssessmentForm{
 					Name:       "agent-assessment",
@@ -239,7 +244,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateAssessment400JSONResponse{}).String()))
@@ -261,7 +267,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 				JSONBody: &v1alpha1.AssessmentForm{
 					Name:       "forbidden-assessment",
@@ -286,7 +293,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 				JSONBody: &v1alpha1.AssessmentForm{
 					Name:       "no-inventory-assessment",
@@ -317,7 +325,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				EmailDomain:  "admin.example.com",
 			}
 			ctx = auth.NewTokenContext(context.TODO(), user)
-			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil))
 		})
 
 		Context("name validation", func() {
@@ -630,7 +638,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment200JSONResponse{}).String()))
@@ -651,7 +660,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: nonExistentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment404JSONResponse{}).String()))
@@ -673,7 +683,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment403JSONResponse{}).String()))
@@ -702,7 +713,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			updatedName := "updated-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -727,7 +739,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id:   assessmentID,
 				Body: nil,
@@ -749,7 +762,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			newName := "new-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: nonExistentID,
@@ -777,7 +791,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			hackedName := "hacked-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -805,7 +820,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			updatedName := "updated-inventory-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -841,7 +857,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			updatedName := "updated-rvtools-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -886,7 +903,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			updatedName := "updated-agent-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -927,7 +945,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment200JSONResponse{}).String()))
@@ -954,7 +973,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: nonExistentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment404JSONResponse{}).String()))
@@ -976,7 +996,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			assessmentSrv := service.NewAssessmentService(s, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), assessmentSrv)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment403JSONResponse{}).String()))

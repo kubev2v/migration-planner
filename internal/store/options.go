@@ -128,6 +128,14 @@ func (f *AssessmentQueryFilter) WithSourceID(sourceID string) *AssessmentQueryFi
 	return f
 }
 
+// Filter by exact name match
+func (f *AssessmentQueryFilter) WithName(name string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("name = ?", name)
+	})
+	return f
+}
+
 // Filter by name pattern
 func (f *AssessmentQueryFilter) WithNameLike(pattern string) *AssessmentQueryFilter {
 	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
@@ -158,4 +166,36 @@ func (o *AssessmentQueryOptions) WithOrder(order string) *AssessmentQueryOptions
 		return tx.Order(order)
 	})
 	return o
+}
+
+type SnapshotQueryFilter struct {
+	QueryFn []func(*gorm.DB) *gorm.DB
+}
+
+func NewSnapshotQueryFilter() *SnapshotQueryFilter {
+	return &SnapshotQueryFilter{}
+}
+
+// Filter by assessment ID
+func (f *SnapshotQueryFilter) WithAssessmentID(assessmentID string) *SnapshotQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("assessment_id = ?", assessmentID)
+	})
+	return f
+}
+
+// Filter by single status
+func (f *SnapshotQueryFilter) WithStatus(status string) *SnapshotQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("status = ?", status)
+	})
+	return f
+}
+
+// Filter by multiple statuses
+func (f *SnapshotQueryFilter) WithStatuses(statuses []string) *SnapshotQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("status IN ?", statuses)
+	})
+	return f
 }
