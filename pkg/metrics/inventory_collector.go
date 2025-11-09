@@ -10,14 +10,14 @@ import (
 )
 
 type inventoryStatsCollector struct {
-	store                  store.Store
-	totalVm                *prometheus.Desc
-	totalCustomers         *prometheus.Desc
-	totalInventories       *prometheus.Desc
-	totalAssessments       *prometheus.Desc
-	totalVmByOs            *prometheus.Desc
-	totalVmByCustomer      *prometheus.Desc // WARN: possible high cadinality
-	totalStorageByCustomer *prometheus.Desc // WARN: possible high cadinality
+	store                      store.Store
+	totalVm                    *prometheus.Desc
+	totalCustomers             *prometheus.Desc
+	totalInventories           *prometheus.Desc
+	totalAssessmentsByCustomer *prometheus.Desc // WARN: possible high cadinality
+	totalVmByOs                *prometheus.Desc
+	totalVmByCustomer          *prometheus.Desc // WARN: possible high cadinality
+	totalStorageByCustomer     *prometheus.Desc // WARN: possible high cadinality
 }
 
 func newInventoryStatsCollector(s store.Store) prometheus.Collector {
@@ -45,10 +45,10 @@ func newInventoryStatsCollector(s store.Store) prometheus.Collector {
 			nil,
 			prometheus.Labels{},
 		),
-		totalAssessments: prometheus.NewDesc(
-			fqName("assessments_total"),
-			"Total number of assessments",
-			nil,
+		totalAssessmentsByCustomer: prometheus.NewDesc(
+			fqName("assessments_by_customer_total"),
+			"Total number of assessments by customer",
+			[]string{"org_id"},
 			prometheus.Labels{},
 		),
 		totalVmByOs: prometheus.NewDesc(
@@ -76,7 +76,7 @@ func (c *inventoryStatsCollector) Describe(ch chan<- *prometheus.Desc) {
 	ch <- c.totalVm
 	ch <- c.totalCustomers
 	ch <- c.totalInventories
-	ch <- c.totalAssessments
+	ch <- c.totalAssessmentsByCustomer
 	ch <- c.totalVmByOs
 	ch <- c.totalVmByCustomer
 	ch <- c.totalStorageByCustomer
@@ -91,8 +91,11 @@ func (c *inventoryStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	}
 	ch <- prometheus.MustNewConstMetric(c.totalVm, prometheus.GaugeValue, float64(stats.Vms.Total))
 	ch <- prometheus.MustNewConstMetric(c.totalInventories, prometheus.GaugeValue, float64(stats.TotalInventories))
-	ch <- prometheus.MustNewConstMetric(c.totalAssessments, prometheus.GaugeValue, float64(stats.TotalAssessments))
 	ch <- prometheus.MustNewConstMetric(c.totalCustomers, prometheus.GaugeValue, float64(stats.TotalCustomers))
+
+	for domain, totalAssessments := range stats.TotalAssessmentsByCustomer {
+		ch <- prometheus.MustNewConstMetric(c.totalAssessmentsByCustomer, prometheus.GaugeValue, float64(totalAssessments), domain)
+	}
 
 	for osType, total := range stats.Vms.TotalByOS {
 		ch <- prometheus.MustNewConstMetric(c.totalVmByOs, prometheus.GaugeValue, float64(total), osType)
