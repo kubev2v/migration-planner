@@ -127,9 +127,15 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 	for i, snapshot := range a.Snapshots {
 		assessment.Snapshots[i] = api.Snapshot{
 			CreatedAt: snapshot.CreatedAt,
+			Status:    api.SnapshotStatus(snapshot.Status),
 		}
+		// Add error if present
+		if snapshot.Error != nil {
+			assessment.Snapshots[i].Error = snapshot.Error
+		}
+		// Only include inventory if it exists (when status is ready)
 		if snapshot.Inventory != nil {
-			assessment.Snapshots[i].Inventory = snapshot.Inventory.Data
+			assessment.Snapshots[i].Inventory = &snapshot.Inventory.Data
 		}
 	}
 

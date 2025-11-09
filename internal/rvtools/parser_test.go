@@ -272,7 +272,7 @@ var _ = Describe("Parser", func() {
 		Context("with invalid Excel data", func() {
 			It("should return error for invalid Excel content", func() {
 				invalidContent := []byte("not an excel file")
-				inventory, err := rvtools.ParseRVTools(context.Background(), invalidContent, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), invalidContent, nil, nil, 0)
 				Expect(err).To(HaveOccurred())
 				Expect(inventory).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("error opening Excel file"))
@@ -282,7 +282,7 @@ var _ = Describe("Parser", func() {
 		Context("with empty Excel data", func() {
 			It("should return error for empty content", func() {
 				emptyContent := []byte{}
-				inventory, err := rvtools.ParseRVTools(context.Background(), emptyContent, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), emptyContent, nil, nil, 0)
 				Expect(err).To(HaveOccurred())
 				Expect(inventory).To(BeNil())
 			})
@@ -292,7 +292,7 @@ var _ = Describe("Parser", func() {
 			It("should handle Excel with empty RVTools sheets", func() {
 				minimalExcel := createMinimalTestExcel()
 
-				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -319,7 +319,7 @@ var _ = Describe("Parser", func() {
 			})
 
 			It("should successfully parse Excel data with sample content", func() {
-				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -341,7 +341,7 @@ var _ = Describe("Parser", func() {
 			})
 
 			It("should handle Excel data with various sheet types", func() {
-				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -390,7 +390,7 @@ concerns contains flag if {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(validator).ToNot(BeNil())
 
-				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, validator)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, validator, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -401,7 +401,7 @@ concerns contains flag if {
 
 			It("should handle OPA validation errors gracefully", func() {
 				// Test with nil validator first to ensure it doesn't break
-				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -420,7 +420,7 @@ invalid syntax here`
 			})
 
 			It("should correlate data between different sheets", func() {
-				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil, nil, 0)
 
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
@@ -1012,7 +1012,7 @@ invalid syntax here`
 			validator, err := opa.NewValidator(policies)
 			Expect(err).ToNot(HaveOccurred())
 
-			inventory, err := rvtools.ParseRVTools(context.Background(), excelContent, validator)
+			inventory, err := rvtools.ParseRVTools(context.Background(), excelContent, validator, nil, 0)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(inventory).ToNot(BeNil())
 

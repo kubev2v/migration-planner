@@ -2,11 +2,13 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/opa"
@@ -26,13 +28,15 @@ const (
 type AssessmentService struct {
 	store        store.Store
 	opaValidator *opa.Validator
+	riverClient  *river.Client[pgx.Tx]
 	logger       *log.StructuredLogger
 }
 
-func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *AssessmentService {
+func NewAssessmentService(store store.Store, opaValidator *opa.Validator, riverClient *river.Client[pgx.Tx]) *AssessmentService {
 	return &AssessmentService{
 		store:        store,
 		opaValidator: opaValidator,
+		riverClient:  riverClient,
 		logger:       log.NewDebugLogger("assessment_service"),
 	}
 }
@@ -91,6 +95,102 @@ func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*
 	return assessment, nil
 }
 
+// CreateRvtoolsAssessment creates an assessment with RVTools processing
+// It creates an empty assessment and snapshot, enqueues a River job, and returns immediately
+func (as *AssessmentService) CreateRvtoolsAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
+	logger := as.logger.WithContext(ctx)
+	tracer := logger.Operation("create_rvtools_assessment").
+		WithString("org_id", createForm.OrgID).
+		WithString("name", createForm.Name).
+		Build()
+
+	assessment := createForm.ToModel()
+	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
+
+	// Validate file data
+	if len(createForm.RVToolsFile) == 0 {
+		return nil, fmt.Errorf("rvtools file is empty")
+	}
+	tracer.Step("validate_file").WithInt("file_size", len(createForm.RVToolsFile)).Log()
+
+	// Encode to base64 for storage in job args
+	encodedData := base64.StdEncoding.EncodeToString(createForm.RVToolsFile)
+	tracer.Step("encoded_base64").WithInt("encoded_size", len(encodedData)).Log()
+
+	// Start transaction
+	var err error
+	ctx, err = as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	// Create assessment with pending snapshot (inventory = nil)
+	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, nil)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		if errors.Is(err, store.ErrDuplicateKey) {
+			return nil, NewErrAssessmentDuplicateName(assessment.Name)
+		}
+		return nil, fmt.Errorf("failed to create assessment: %w", err)
+	}
+
+	// Get the created snapshot from the assessment
+	createdSnapshot := &createdAssessment.Snapshots[0]
+
+	tracer.Step("assessment_and_snapshot_created").
+		WithUUID("created_assessment_id", createdAssessment.ID).
+		WithInt("snapshot_id", int(createdSnapshot.ID)).
+		WithString("snapshot_status", string(createdSnapshot.Status)).
+		Log()
+
+	// Commit transaction before enqueuing job
+	ctx, err = store.Commit(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Enqueue River job for async processing
+	if as.riverClient != nil {
+		_, err = as.riverClient.Insert(ctx, rvtools.RVToolsJobArgs{
+			SnapshotID:   createdSnapshot.ID,
+			AssessmentID: createdAssessment.ID,
+			RVToolsData:  encodedData,
+		}, &river.InsertOpts{
+			MaxAttempts: 3, // Retry up to 3 times on failure
+			UniqueOpts: river.UniqueOpts{
+				ByArgs: true, // Unique by assessment ID (from RVToolsJobArgs)
+			},
+		})
+		if err != nil {
+			tracer.Error(err).WithString("step", "enqueue_river_job").Log()
+			// Mark snapshot as failed since job couldn't be enqueued
+			// Transaction already committed, so update snapshot status to failed
+			errMsg := fmt.Sprintf("failed to enqueue RVTools processing job: %v", err)
+			if updateErr := as.store.Snapshot().UpdateStatus(ctx, createdSnapshot.ID, model.SnapshotStatusFailed, &errMsg); updateErr != nil {
+				tracer.Error(updateErr).WithString("step", "mark_snapshot_failed").Log()
+			}
+			createdSnapshot.Status = model.SnapshotStatusFailed
+			createdSnapshot.Error = &errMsg
+		} else {
+			tracer.Step("river_job_enqueued").Log()
+		}
+	}
+
+	// Load snapshots for response
+	createdAssessment.Snapshots = []model.Snapshot{*createdSnapshot}
+
+	tracer.Success().
+		WithUUID("assessment_id", createdAssessment.ID).
+		WithString("assessment_name", createdAssessment.Name).
+		WithInt("snapshot_id", int(createdSnapshot.ID)).
+		Log()
+
+	return createdAssessment, nil
+}
+
 func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("create_assessment").
@@ -103,6 +203,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
+	// Handle synchronous processing for agent and inventory sources
 	var inventory v1alpha1.Inventory
 	switch assessment.SourceType {
 	case SourceTypeAgent:
@@ -122,19 +223,6 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	case SourceTypeInventory:
 		tracer.Step("process_inventory_source").Log()
 		inventory = createForm.Inventory
-	case SourceTypeRvtools:
-		tracer.Step("process_rvtools_source").Log()
-		content, err := io.ReadAll(createForm.RVToolsFile)
-		if err != nil {
-			return nil, err
-		}
-		tracer.Step("read_rvtools_file").WithInt("file_size", len(content)).Log()
-		rvtoolInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
-		if err != nil {
-			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
-		}
-		inventory = *rvtoolInventory
-		tracer.Step("parsed_rvtools_inventory").Log()
 	}
 
 	ctx, err := as.store.NewTransactionContext(ctx)
@@ -145,7 +233,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		_, _ = store.Rollback(ctx)
 	}()
 
-	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory)
+	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, &inventory)
 	if err != nil {
 		_, _ = store.Rollback(ctx)
 
@@ -156,7 +244,14 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		return nil, fmt.Errorf("failed to create assessment: %w", err)
 	}
 
-	tracer.Step("assessment_created_in_db").WithUUID("created_assessment_id", createdAssessment.ID).Log()
+	// Get the created snapshot from the assessment
+	createdSnapshot := &createdAssessment.Snapshots[0]
+
+	tracer.Step("assessment_and_snapshot_created_in_db").
+		WithUUID("created_assessment_id", createdAssessment.ID).
+		WithInt("snapshot_id", int(createdSnapshot.ID)).
+		WithString("snapshot_status", string(createdSnapshot.Status)).
+		Log()
 
 	if _, err := store.Commit(ctx); err != nil {
 		return nil, err
@@ -197,18 +292,26 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 	tracer.Step("assessment_exists").WithString("current_name", assessment.Name).WithBool("has_source_id", assessment.SourceID != nil).Log()
 
+	// Update name if provided
+	if name != nil {
+		tracer.Step("updating_name").WithString("new_name", *name).Log()
+		if _, err := as.store.Assessment().UpdateName(ctx, id, *name); err != nil {
+			return nil, fmt.Errorf("failed to update assessment name: %w", err)
+		}
+	}
+
 	// if assessment source is inventory or rvtools don't update the inventory. update the name only
 	// per design only assessments with sourceID can have multiple snapshots
 	if assessment.SourceID != nil {
-		tracer.Step("updating_with_new_snapshot").WithUUIDPtr("source_id", assessment.SourceID).Log()
+		tracer.Step("adding_new_snapshot").WithUUIDPtr("source_id", assessment.SourceID).Log()
 		source, err := as.store.Source().Get(ctx, *assessment.SourceID)
 		if err != nil {
 			return nil, err
 		}
 		tracer.Step("source_retrieved").WithUUID("source_id", source.ID).Log()
-		// Update assessment with new snapshot
-		if _, err := as.store.Assessment().Update(ctx, id, name, &source.Inventory.Data); err != nil {
-			return nil, fmt.Errorf("failed to update assessment: %w", err)
+		// Add new snapshot with latest inventory
+		if err := as.store.Assessment().AddSnapshot(ctx, id, &source.Inventory.Data); err != nil {
+			return nil, fmt.Errorf("failed to add snapshot: %w", err)
 		}
 
 		if _, err := store.Commit(ctx); err != nil {
@@ -219,11 +322,7 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 		return as.GetAssessment(ctx, id)
 	}
 
-	tracer.Step("updating_name_only").Log()
-	// Update assessment with new snapshot
-	if _, err = as.store.Assessment().Update(ctx, id, name, nil); err != nil {
-		return nil, fmt.Errorf("failed to update assessment: %w", err)
-	}
+	tracer.Step("name_only_update_complete").Log()
 
 	if _, err := store.Commit(ctx); err != nil {
 		return nil, err
@@ -231,6 +330,126 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 	tracer.Success().WithString("update_type", "name_only").Log()
 	return as.GetAssessment(ctx, id)
+}
+
+// CancelJob cancels a processing job and deletes the snapshot
+// It finds the processing snapshot for the assessment automatically
+func (as *AssessmentService) CancelJob(ctx context.Context, assessmentID uuid.UUID, orgID string) error {
+	logger := as.logger.WithContext(ctx)
+	tracer := logger.Operation("cancel_job").
+		WithUUID("assessment_id", assessmentID).
+		WithString("org_id", orgID).
+		Build()
+
+	// Get assessment to verify ownership
+	assessment, err := as.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrAssessmentNotFound(assessmentID)
+		}
+		return err
+	}
+
+	if assessment.OrgID != orgID {
+		return NewErrAssessmentNotFound(assessmentID) // Hide existence from unauthorized users
+	}
+
+	tracer.Step("assessment_verified").Log()
+
+	// Find processing snapshot
+	filter := store.NewSnapshotQueryFilter().
+		WithAssessmentID(assessmentID.String()).
+		WithStatuses([]string{
+			string(model.SnapshotStatusPending),
+			string(model.SnapshotStatusParsing),
+			string(model.SnapshotStatusValidating),
+		})
+
+	snapshots, err := as.store.Snapshot().List(ctx, filter)
+	if err != nil {
+		return err
+	}
+
+	if len(snapshots) == 0 {
+		return NewErrResourceNotFound(assessmentID, "processing job")
+	}
+
+	snapshot := &snapshots[0]
+
+	// Only cancel if status is pending, parsing, or validating
+	if snapshot.Status != model.SnapshotStatusPending &&
+		snapshot.Status != model.SnapshotStatusParsing &&
+		snapshot.Status != model.SnapshotStatusValidating {
+		return NewErrJobCannotBeCancelled(snapshot.ID, string(snapshot.Status))
+	}
+
+	tracer.Step("snapshot_found").WithInt("snapshot_id", int(snapshot.ID)).WithString("status", string(snapshot.Status)).Log()
+
+	// Cancel the River job before deleting the snapshot
+	if as.riverClient != nil {
+		jobID, err := as.store.RiverJob().GetJobIDByAssessmentID(ctx, assessmentID)
+		if err != nil {
+			tracer.Error(err).WithString("step", "find_river_job").Log()
+			return fmt.Errorf("failed to find river job: %w", err)
+		}
+
+		if jobID != nil {
+			tracer.Step("found_river_job").WithInt("job_id", int(*jobID)).Log()
+
+			// Cancel the job
+			_, err = as.riverClient.JobCancel(ctx, *jobID)
+			if err != nil {
+				tracer.Error(err).WithString("step", "cancel_river_job").Log()
+				// Continue even if cancellation fails - the job might already be completed/cancelled
+			} else {
+				tracer.Step("river_job_cancelled").Log()
+			}
+		} else {
+			tracer.Step("no_active_river_job_found").Log()
+		}
+	}
+
+	// Start transaction
+	ctx, err = as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	// Delete the snapshot
+	if err := as.store.Snapshot().Delete(ctx, snapshot.ID); err != nil {
+		_, _ = store.Rollback(ctx)
+		return fmt.Errorf("failed to delete snapshot: %w", err)
+	}
+
+	tracer.Step("snapshot_deleted").Log()
+
+	// Check if this was the only snapshot
+	snapshotFilter := store.NewSnapshotQueryFilter().WithAssessmentID(assessmentID.String())
+	remainingSnapshots, err := as.store.Snapshot().List(ctx, snapshotFilter)
+	if err != nil {
+		_, _ = store.Rollback(ctx)
+		return err
+	}
+
+	// If no snapshots remain, delete the assessment
+	if len(remainingSnapshots) == 0 {
+		if err := as.store.Assessment().Delete(ctx, assessmentID); err != nil {
+			_, _ = store.Rollback(ctx)
+			return fmt.Errorf("failed to delete assessment: %w", err)
+		}
+		tracer.Step("assessment_deleted").Log()
+	}
+
+	// Commit transaction
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+
+	tracer.Success().Log()
+	return nil
 }
 
 func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID) error {

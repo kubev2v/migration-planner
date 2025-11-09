@@ -210,3 +210,36 @@ func AssessmentFormValidator() validator.StructLevelFunc {
 		}
 	}
 }
+
+// ValidateRVToolsFile validates that the uploaded file is a valid Excel format
+// by checking the magic bytes signature
+func ValidateRVToolsFile(fileData []byte) error {
+	if len(fileData) == 0 {
+		return &ValidationError{Field: "file", Message: "rvtools file body is empty"}
+	}
+
+	if len(fileData) < 4 {
+		return &ValidationError{Field: "file", Message: "file is too small to be a valid Excel file"}
+	}
+
+	// Excel 2007+ (.xlsx) files start with PK (ZIP signature: 0x50 0x4B)
+	// Excel 97-2003 (.xls) files start with D0 CF (OLE signature: 0xD0 0xCF)
+	isXLSX := fileData[0] == 0x50 && fileData[1] == 0x4B
+	isXLS := fileData[0] == 0xD0 && fileData[1] == 0xCF
+
+	if !isXLSX && !isXLS {
+		return &ValidationError{Field: "file", Message: "file is not a valid Excel file format"}
+	}
+
+	return nil
+}
+
+// ValidationError represents a validation error with field information
+type ValidationError struct {
+	Field   string
+	Message string
+}
+
+func (e *ValidationError) Error() string {
+	return e.Message
+}

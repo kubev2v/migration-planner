@@ -11,11 +11,13 @@ import (
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
 )
 
-func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*api.Inventory, error) {
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator, snapshotStore store.Store, snapshotID uint) (*api.Inventory, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -36,10 +38,11 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		datastoreMapping = buildDatastoreMapping(datastoreRows)
 	}
 
+	vHostRows := readSheet(excelFile, sheets, "vHost")
+
 	zap.S().Named("rvtools").Infof("Process VMs")
 	var vms []vsphere.VM
 	if slices.Contains(sheets, "vInfo") {
-		vHostRows := readSheet(excelFile, sheets, "vHost")
 		vCpuRows := readSheet(excelFile, sheets, "vCPU")
 		vMemoryRows := readSheet(excelFile, sheets, "vMemory")
 		vDiskRows := readSheet(excelFile, sheets, "vDisk")
@@ -54,6 +57,12 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 	}
 
 	if len(vms) > 0 && opaValidator != nil {
+		// Update status to validating before validation
+		if snapshotStore != nil && snapshotID > 0 {
+			if err := snapshotStore.Snapshot().UpdateStatus(ctx, snapshotID, model.SnapshotStatusValidating, nil); err != nil {
+				zap.S().Named("rvtools").Warnf("Failed to update status to validating: %v", err)
+			}
+		}
 		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
 		if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
 			zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
@@ -66,7 +75,6 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	hostPowerStates = map[string]int{"green": 0}
 
-	vHostRows := readSheet(excelFile, sheets, "vHost")
 	var clusterInfo ClusterInfo
 	if len(vHostRows) > 0 {
 		clusterInfo = ExtractClusterAndDatacenterInfo(vHostRows)
@@ -89,7 +97,6 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	if len(datastoreRows) > 0 {
 		tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
-		vHostRows := readSheet(excelFile, sheets, "vHost")
 		err := processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("Failed to process datastore info: %v", err)
