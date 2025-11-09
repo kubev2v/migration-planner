@@ -34,6 +34,15 @@ const (
 	Unsupported NetworkType = "unsupported"
 )
 
+// Defines values for SnapshotStatus.
+const (
+	Failed     SnapshotStatus = "failed"
+	Parsing    SnapshotStatus = "parsing"
+	Pending    SnapshotStatus = "pending"
+	Ready      SnapshotStatus = "ready"
+	Validating SnapshotStatus = "validating"
+)
+
 // Agent defines model for Agent.
 type Agent struct {
 	CreatedAt     time.Time          `json:"createdAt"`
@@ -222,8 +231,17 @@ type NetworkType string
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
 	CreatedAt time.Time `json:"createdAt"`
-	Inventory Inventory `json:"inventory"`
+
+	// Error Error message if snapshot processing failed
+	Error     *string    `json:"error,omitempty"`
+	Inventory *Inventory `json:"inventory,omitempty"`
+
+	// Status Status of the snapshot processing
+	Status SnapshotStatus `json:"status"`
 }
+
+// SnapshotStatus Status of the snapshot processing
+type SnapshotStatus string
 
 // Source defines model for Source.
 type Source struct {

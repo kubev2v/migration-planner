@@ -1,8 +1,6 @@
 package mappers
 
 import (
-	"io"
-
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -170,7 +168,7 @@ type AssessmentCreateForm struct {
 	Source         string
 	SourceID       *uuid.UUID
 	Inventory      []byte
-	RVToolsFile    io.Reader
+	RVToolsFile    []byte
 }
 
 func (f *AssessmentCreateForm) ToModel() model.Assessment {

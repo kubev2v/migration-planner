@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -137,4 +138,46 @@ func (s *plannerService) RemoveAssessment(id uuid.UUID) error {
 		return fmt.Errorf("failed to delete assessment. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+// WaitForAssessmentProcessing waits for the assessment's snapshot to be processed.
+// It polls the assessment until the snapshot status is "ready" or "failed", or until timeout.
+// Returns the updated assessment and any error encountered.
+func (s *plannerService) WaitForAssessmentProcessing(id uuid.UUID, timeout time.Duration, pollInterval time.Duration) (*v1alpha1.Assessment, error) {
+	zap.S().Infof("[PlannerService] Waiting for assessment processing [assessment: %s, timeout: %v]", id, timeout)
+
+	deadline := time.Now().Add(timeout)
+
+	for {
+		assessment, err := s.GetAssessment(id)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get assessment while waiting: %w", err)
+		}
+
+		for _, snapshot := range assessment.Snapshots {
+			if snapshot.Status == v1alpha1.Ready {
+				zap.S().Infof("[PlannerService] Assessment processing completed [assessment: %s]", id)
+				return assessment, nil
+			}
+			if snapshot.Status == v1alpha1.Failed {
+				errMsg := "unknown error"
+				if snapshot.Error != nil {
+					errMsg = *snapshot.Error
+				}
+				return assessment, fmt.Errorf("assessment processing failed: %s", errMsg)
+			}
+		}
+
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, fmt.Errorf("timeout waiting for assessment processing after %v", timeout)
+		}
+
+		waitTime := pollInterval
+		if remaining < waitTime {
+			waitTime = remaining
+		}
+
+		<-time.After(waitTime)
+	}
 }

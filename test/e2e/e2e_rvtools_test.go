@@ -15,6 +15,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	assessmentProcessingTimeout = 120 * time.Second
+	assessmentPollInterval      = 500 * time.Millisecond
+)
+
 var _ = Describe("e2e-rvtools", func() {
 	var (
 		svc        PlannerService
@@ -54,6 +59,11 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("assessment",
 				filepath.Join(pwd, "data/example_rvtools_files/example1.xlsx"))
 			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+
+			// Wait for async processing to complete
+			assessment, err = svc.WaitForAssessmentProcessing(assessment.Id, assessmentProcessingTimeout, assessmentPollInterval)
+			Expect(err).To(BeNil(), "Assessment processing should complete successfully")
 			Expect(assessment).NotTo(BeNil())
 
 			// Change The Assessment name
@@ -122,6 +132,9 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
 
+			// Wait for async processing (may fail for missing sheets, which is acceptable)
+			_, _ = svc.WaitForAssessmentProcessing(assessment.Id, assessmentProcessingTimeout, assessmentPollInterval)
+
 			// Clean up if successful
 			err = svc.RemoveAssessment(assessment.Id)
 			Expect(err).To(BeNil())
@@ -152,7 +165,7 @@ var _ = Describe("e2e-rvtools", func() {
 				assessment2, err := svc.CreateAssessmentFromRvtools("duplicate-name-test", tmpFile)
 				Expect(err).NotTo(BeNil())
 				Expect(assessment2).To(BeNil())
-				Expect(err).To(MatchError(ContainSubstring("status: 400")))
+				Expect(err).To(MatchError(ContainSubstring("status: 409")))
 
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
@@ -204,6 +217,11 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).NotTo(BeNil())
 
+				// Wait for async processing to complete
+				assessment, err = svc.WaitForAssessmentProcessing(assessment.Id, assessmentProcessingTimeout, assessmentPollInterval)
+				Expect(err).To(BeNil(), "Large file processing should complete successfully")
+				Expect(assessment).NotTo(BeNil())
+
 				// Clean up if successful
 				err = svc.RemoveAssessment(assessment.Id)
 				Expect(err).To(BeNil())
@@ -221,34 +239,41 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				defer os.Remove(tmpFile)
 
-				// Create multiple assessments concurrently (simulate concurrent uploads)
-				done := make(chan bool, 3)
-				var assessments []*v1alpha1.Assessment
-				var errors []error
+				// Create and process assessments concurrently
+				type result struct {
+					assessment *v1alpha1.Assessment
+					err        error
+				}
+				results := make(chan result, 3)
 
 				for i := 0; i < 3; i++ {
 					go func(index int) {
 						assessment, err := svc.CreateAssessmentFromRvtools(fmt.Sprintf("concurrent-test-%d", index), tmpFile)
-						assessments = append(assessments, assessment)
-						errors = append(errors, err)
-						done <- true
+						if err == nil && assessment != nil {
+							// Wait for processing to complete
+							_, err = svc.WaitForAssessmentProcessing(assessment.Id, assessmentProcessingTimeout, assessmentPollInterval)
+						}
+						results <- result{assessment: assessment, err: err}
 					}(i)
 				}
 
-				// Wait for all goroutines to complete
-				for i := 0; i < 3; i++ {
-					<-done
-				}
-
+				// Collect results and verify
 				successCount := 0
-				for i, err := range errors {
-					if err == nil && assessments[i] != nil {
+				var assessments []*v1alpha1.Assessment
+				for i := 0; i < 3; i++ {
+					r := <-results
+					if r.err == nil && r.assessment != nil {
 						successCount++
-
-						_ = svc.RemoveAssessment(assessments[i].Id)
+						assessments = append(assessments, r.assessment)
 					}
 				}
-				Expect(successCount).To(BeNumerically("==", 3))
+
+				Expect(successCount).To(BeNumerically("==", 3), "All assessments should be created and processed successfully")
+
+				// Clean up
+				for _, a := range assessments {
+					_ = svc.RemoveAssessment(a.Id)
+				}
 
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
