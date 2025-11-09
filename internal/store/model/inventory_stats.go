@@ -27,12 +27,12 @@ type StorageCustomerStats struct {
 }
 
 type InventoryStats struct {
-	Vms              VmStats
-	Os               OsStats
-	TotalCustomers   int
-	TotalAssessments int
-	TotalInventories int
-	Storage          []StorageCustomerStats
+	Vms                        VmStats
+	Os                         OsStats
+	TotalCustomers             int
+	TotalAssessmentsByCustomer map[string]int
+	TotalInventories           int
+	Storage                    []StorageCustomerStats
 }
 
 type domainSnapshot struct {
@@ -61,12 +61,12 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 	}
 
 	return InventoryStats{
-		Vms:              computeVmStats(domainSnapshots),
-		Os:               computeOsStats(domainSnapshots),
-		TotalInventories: len(domainSnapshots),
-		TotalAssessments: len(assessments),
-		TotalCustomers:   len(orgIDs),
-		Storage:          computeStorageStats(domainSnapshots),
+		Vms:                        computeVmStats(domainSnapshots),
+		Os:                         computeOsStats(domainSnapshots),
+		TotalInventories:           len(domainSnapshots),
+		TotalAssessmentsByCustomer: computeAssessmentsByCustomer(assessments),
+		TotalCustomers:             len(orgIDs),
+		Storage:                    computeStorageStats(domainSnapshots),
 	}
 }
 
@@ -105,6 +105,21 @@ func computeOsStats(domainSnapshots []domainSnapshot) OsStats {
 	}
 
 	return OsStats{Total: len(os)}
+}
+
+func computeAssessmentsByCustomer(assessments []Assessment) map[string]int {
+	assessmentsByCustomer := make(map[string]int)
+
+	for _, a := range assessments {
+		domain, err := getDomainNameFromAssessment(a)
+		if err != nil {
+			zap.S().Debugw("failed to get domain from username", "error", err, "username", a.Username)
+			domain = a.OrgID
+		}
+		assessmentsByCustomer[domain]++
+	}
+
+	return assessmentsByCustomer
 }
 
 func computeStorageStats(domainSnapshots []domainSnapshot) []StorageCustomerStats {
