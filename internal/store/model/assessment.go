@@ -21,11 +21,24 @@ type Assessment struct {
 	Snapshots      []Snapshot `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
 }
 
+type SnapshotStatus string
+
+const (
+	SnapshotStatusPending    SnapshotStatus = "pending"
+	SnapshotStatusParsing    SnapshotStatus = "parsing"
+	SnapshotStatusValidating SnapshotStatus = "validating"
+	SnapshotStatusReady      SnapshotStatus = "ready"
+	SnapshotStatusFailed     SnapshotStatus = "failed"
+)
+
 type Snapshot struct {
 	ID           uint      `gorm:"primaryKey;autoIncrement"`
 	CreatedAt    time.Time `gorm:"not null;default:now()"`
-	Inventory    []byte    `gorm:"type:jsonb;not null"`
-	AssessmentID uuid.UUID `gorm:"not null;type:VARCHAR(255);"`
+	UpdatedAt    *time.Time
+	Status       SnapshotStatus `gorm:"type:varchar(20);default:'pending'"`
+	Error        *string        `gorm:"type:text"`
+	Inventory    []byte         `gorm:"type:jsonb;not null"`
+	AssessmentID uuid.UUID      `gorm:"not null;type:VARCHAR(255);"`
 }
 
 type AssessmentList []Assessment
