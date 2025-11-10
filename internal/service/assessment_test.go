@@ -59,19 +59,19 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 		})
 
-		It("lists all assessments for an organization", func() {
-			filter := service.NewAssessmentFilter("org1")
+		It("lists all assessments for a user (private)", func() {
+			filter := service.NewAssessmentFilter("testuser")
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 			for _, assessment := range assessments {
-				Expect(assessment.OrgID).To(Equal("org1"))
+				Expect(assessment.Username).To(Equal("testuser"))
 			}
 		})
 
 		It("filters assessments by source", func() {
-			filter := service.NewAssessmentFilter("org1").WithSource(service.SourceTypeInventory)
+			filter := service.NewAssessmentFilter("testuser").WithSource(service.SourceTypeInventory)
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
@@ -80,7 +80,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		It("filters assessments by name pattern", func() {
-			filter := service.NewAssessmentFilter("org1").WithNameLike("Test")
+			filter := service.NewAssessmentFilter("testuser").WithNameLike("Test")
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
@@ -198,7 +198,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.OwnerLastName).To(BeNil())
 			})
 
-			It("fails to create assessment when name already exists in same org", func() {
+			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
 				inventory := v1alpha1.Inventory{
 					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
 					Vms:     v1alpha1.VMs{Total: 10},
@@ -211,11 +211,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), name, "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
-				// Second creation with same name and org should fail via service
+				// Second creation with same name should fail via service (unique constraint)
 				secondForm := mappers.AssessmentCreateForm{
 					ID:        uuid.New(),
-					Name:      name,   // duplicate name
-					OrgID:     "org1", // same org
+					Name:      name, // duplicate name
+					OrgID:     "org1",
 					Username:  "testuser",
 					Source:    service.SourceTypeInventory,
 					Inventory: inventory,
@@ -629,15 +629,15 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	Context("AssessmentFilter", func() {
-		It("creates filter with orgID and chains methods", func() {
-			filter := service.NewAssessmentFilter("org1").
+		It("creates filter with username and chains methods", func() {
+			filter := service.NewAssessmentFilter("testuser").
 				WithSource(service.SourceTypeInventory).
 				WithSourceID("source-123").
 				WithNameLike("test").
 				WithLimit(10).
 				WithOffset(5)
 
-			Expect(filter.OrgID).To(Equal("org1"))
+			Expect(filter.Username).To(Equal("testuser"))
 			Expect(filter.Source).To(Equal(service.SourceTypeInventory))
 			Expect(filter.SourceID).To(Equal("source-123"))
 			Expect(filter.NameLike).To(Equal("test"))
@@ -655,8 +655,8 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		Context("CreateAssessment failures", func() {
-			It("rolls back database when assessment creation fails with orgID mismatch", func() {
-				// Create a source in different org
+			It("rolls back database when assessment creation fails with forbidden source access", func() {
+				// Create a source owned by different user
 				sourceID := uuid.New()
 				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`
 
@@ -675,7 +675,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessmentCount).To(Equal(int64(0)))
 				Expect(snapshotCount).To(Equal(int64(0)))
 
-				// Attempt to create assessment with wrong orgID (should fail)
+				// Attempt to create assessment from source in different org (should fail - authorization check)
 				createForm := mappers.AssessmentCreateForm{
 					ID:       uuid.New(),
 					Name:     "Test Assessment",

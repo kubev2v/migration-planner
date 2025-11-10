@@ -40,7 +40,7 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *Asses
 func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("list_assessments").
-		WithString("org_id", filter.OrgID).
+		WithString("username", filter.Username).
 		WithString("source", filter.Source).
 		WithString("source_id", filter.SourceID).
 		WithString("name_like", filter.NameLike).
@@ -48,7 +48,7 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 		WithInt("offset", filter.Offset).
 		Build()
 
-	storeFilter := store.NewAssessmentQueryFilter().WithOrgID(filter.OrgID)
+	storeFilter := store.NewAssessmentQueryFilter().WithUsername(filter.Username)
 
 	if filter.Source != "" {
 		storeFilter = storeFilter.WithSourceType(filter.Source)
@@ -264,7 +264,7 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 
 // AssessmentFilter represents filtering options for listing assessments
 type AssessmentFilter struct {
-	OrgID    string
+	Username string
 	Source   string
 	SourceID string
 	NameLike string
@@ -272,9 +272,9 @@ type AssessmentFilter struct {
 	Offset   int
 }
 
-func NewAssessmentFilter(orgID string) *AssessmentFilter {
+func NewAssessmentFilter(username string) *AssessmentFilter {
 	return &AssessmentFilter{
-		OrgID: orgID,
+		Username: username,
 	}
 }
 
