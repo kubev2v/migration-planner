@@ -25,7 +25,7 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 	user := auth.MustHaveUser(ctx)
 	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
-	filter := service.NewAssessmentFilter(user.Organization)
+	filter := service.NewAssessmentFilter(user.Username, user.Organization)
 
 	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
@@ -143,9 +143,9 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 	logger.Step("assessment_retrieved").WithString("assessment_name", assessment.Name).Log()
 
 	user := auth.MustHaveUser(ctx)
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user with org_id %s", assessmentID, user.Organization)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user_org", user.Organization).WithString("assessment_org", assessment.OrgID).Log()
+	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
+		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
+		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user", user.Username).WithString("assessment_username", assessment.Username).Log()
 		return server.GetAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
@@ -188,9 +188,9 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 
 	logger.Step("assessment_retrieved_for_update").WithString("current_name", assessment.Name).Log()
 
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to update assessment %s by user with org_id %s", assessmentID, user.Organization)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user_org", user.Organization).WithString("assessment_org", assessment.OrgID).Log()
+	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
+		message := fmt.Sprintf("forbidden to update assessment %s by user %s", assessmentID, user.Username)
+		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
 		return server.UpdateAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
@@ -246,9 +246,9 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 
 	logger.Step("assessment_retrieved_for_delete").WithString("assessment_name", assessment.Name).Log()
 
-	if user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to delete assessment %s by user with org_id %s", assessmentID, user.Organization)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user_org", user.Organization).WithString("assessment_org", assessment.OrgID).Log()
+	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
+		message := fmt.Sprintf("forbidden to delete assessment %s by user with %s", assessmentID, user.Username)
+		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
 		return server.DeleteAssessment403JSONResponse{Message: message, RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 

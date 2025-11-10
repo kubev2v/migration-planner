@@ -64,7 +64,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			srv := service.NewSourceService(s, nil)
-			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("batman")))
+			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithUsername("batman"), service.WithOrgID("batman")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(1))
 		})
@@ -83,7 +83,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			srv := service.NewSourceService(s, nil)
-			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithOrgID("admin")))
+			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithUsername("admin"), service.WithOrgID("admin")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(2))
 
@@ -514,7 +514,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 
 		It("returns 403 if user not authorized", func() {
 			sourceID := uuid.NewString()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "owner-org", "owner-org"))
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "owner-user", "owner-org"))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -608,9 +608,9 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 	})
 
 	Context("source filter", func() {
-		It("filter has orgID set properlly", func() {
-			f := service.NewSourceFilter(service.WithOrgID("test"))
-			Expect(f.OrgID).To(Equal("test"))
+		It("filter has username set properlly", func() {
+			f := service.NewSourceFilter(service.WithUsername("test"))
+			Expect(f.Username).To(Equal("test"))
 		})
 		It("filter has id set properlly", func() {
 			id := uuid.New()

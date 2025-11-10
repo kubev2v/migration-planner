@@ -54,7 +54,7 @@ var _ = Describe("e2e-multiple-users", func() {
 	})
 
 	Context("Multiple Users", func() {
-		It("Users should see only organizational sources", func() {
+		It("Users should see their sources", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Verify that each user sees only the sources created by their own organization
@@ -63,7 +63,7 @@ var _ = Describe("e2e-multiple-users", func() {
 					key := fmt.Sprintf("%s|%s", org, user)
 					visibleSources, err := serviceInstances[key].GetSources()
 					Expect(err).To(BeNil())
-					Expect(*visibleSources).To(HaveLen(len(users)))
+					Expect(*visibleSources).To(HaveLen(1))
 					for _, source := range *visibleSources {
 						Expect(strings.Split(source.Name, "-")[0]).To(Equal(org))
 					}
