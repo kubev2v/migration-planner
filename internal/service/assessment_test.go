@@ -51,27 +51,27 @@ var _ = Describe("assessment service", Ordered, func() {
 			assessment1ID := uuid.New()
 			assessment2ID := uuid.New()
 			assessment3ID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", "testuser", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "testuser2", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "user12", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 		})
 
-		It("lists all assessments for an organization", func() {
-			filter := service.NewAssessmentFilter("org1")
+		It("lists all assessments for a user (private)", func() {
+			filter := service.NewAssessmentFilter("user1", "org1")
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 			for _, assessment := range assessments {
-				Expect(assessment.OrgID).To(Equal("org1"))
+				Expect(assessment.Username).To(Equal("user1"))
 			}
 		})
 
 		It("filters assessments by source", func() {
-			filter := service.NewAssessmentFilter("org1").WithSource(service.SourceTypeInventory)
+			filter := service.NewAssessmentFilter("user1", "org1").WithSource(service.SourceTypeInventory)
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
@@ -80,7 +80,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		It("filters assessments by name pattern", func() {
-			filter := service.NewAssessmentFilter("org1").WithNameLike("Test")
+			filter := service.NewAssessmentFilter("user1", "org1").WithNameLike("Test")
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
@@ -100,7 +100,7 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("GetAssessment", func() {
 		It("successfully gets an assessment", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			assessment, err := svc.GetAssessment(context.TODO(), assessmentID)
@@ -144,7 +144,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:             testAssessmentID,
 					Name:           "Test Assessment",
 					OrgID:          "org1",
-					Username:       "testuser",
+					Username:       "user1",
 					OwnerFirstName: &ownerFirstName,
 					OwnerLastName:  &ownerLastName,
 					Source:         service.SourceTypeInventory,
@@ -157,7 +157,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
 				Expect(assessment.Name).To(Equal("Test Assessment"))
-				Expect(assessment.Username).To(Equal("testuser"))
+				Expect(assessment.Username).To(Equal("user1"))
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeInventory))
 				Expect(assessment.SourceID).To(BeNil())
 				Expect(assessment.Snapshots).To(HaveLen(1))
@@ -180,7 +180,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:             testAssessmentID,
 					Name:           "Test Assessment No Owner",
 					OrgID:          "org1",
-					Username:       "testuser",
+					Username:       "user1",
 					OwnerFirstName: nil, // Test nil values
 					OwnerLastName:  nil,
 					Source:         service.SourceTypeInventory,
@@ -198,7 +198,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.OwnerLastName).To(BeNil())
 			})
 
-			It("fails to create assessment when name already exists in same org", func() {
+			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
 				inventory := v1alpha1.Inventory{
 					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
 					Vms:     v1alpha1.VMs{Total: 10},
@@ -208,15 +208,15 @@ var _ = Describe("assessment service", Ordered, func() {
 				name := "Duplicate Assessment"
 				// Insert first assessment directly via DB
 				assessmentID := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), name, "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), name, "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
-				// Second creation with same name and org should fail via service
+				// Second creation with same name should fail via service (unique constraint)
 				secondForm := mappers.AssessmentCreateForm{
 					ID:        uuid.New(),
-					Name:      name,   // duplicate name
-					OrgID:     "org1", // same org
-					Username:  "testuser",
+					Name:      name, // duplicate name
+					OrgID:     "org1",
+					Username:  "user1",
 					Source:    service.SourceTypeInventory,
 					Inventory: inventory,
 				}
@@ -243,7 +243,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       testAssessmentID,
 					Name:     "Test Assessment",
 					OrgID:    "org1",
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &sourceID,
 				}
@@ -253,7 +253,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Username).To(Equal("testuser"))
+				Expect(assessment.Username).To(Equal("user1"))
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeAgent))
 				Expect(assessment.SourceID).ToNot(BeNil())
 				Expect(assessment.SourceID.String()).To(Equal(sourceID.String()))
@@ -272,7 +272,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1", // Different org than source
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &sourceID,
 				}
@@ -295,7 +295,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1",
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &sourceID,
 				}
@@ -314,7 +314,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1",
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &nonExistentSourceID,
 				}
@@ -346,7 +346,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Create assessment with sourceID
 				assessmentID := uuid.New()
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -378,7 +378,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Create assessment with sourceID
 				assessmentID := uuid.New()
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -408,7 +408,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Create assessment with sourceID
 				assessmentID := uuid.New()
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -462,7 +462,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Create assessment with the sourceID
 				assessmentID := uuid.New()
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "testuser", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -493,7 +493,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("successfully updates assessment name only (no new snapshot)", func() {
 				// Create assessment without sourceID (inventory type)
 				assessmentID := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -518,7 +518,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("successfully updates rvtools assessment name only", func() {
 				// Create assessment without sourceID (rvtools type)
 				assessmentID := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -532,7 +532,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("maintains only one snapshot after multiple updates for non-sourceID assessments", func() {
 				// Create assessment without sourceID (inventory type)
 				assessmentID := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
@@ -598,7 +598,7 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("DeleteAssessment", func() {
 		It("successfully deletes an assessment", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
 			err := svc.DeleteAssessment(context.TODO(), assessmentID)
@@ -629,14 +629,15 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	Context("AssessmentFilter", func() {
-		It("creates filter with orgID and chains methods", func() {
-			filter := service.NewAssessmentFilter("org1").
+		It("creates filter with username and chains methods", func() {
+			filter := service.NewAssessmentFilter("user1", "org1").
 				WithSource(service.SourceTypeInventory).
 				WithSourceID("source-123").
 				WithNameLike("test").
 				WithLimit(10).
 				WithOffset(5)
 
+			Expect(filter.Username).To(Equal("user1"))
 			Expect(filter.OrgID).To(Equal("org1"))
 			Expect(filter.Source).To(Equal(service.SourceTypeInventory))
 			Expect(filter.SourceID).To(Equal("source-123"))
@@ -655,8 +656,8 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		Context("CreateAssessment failures", func() {
-			It("rolls back database when assessment creation fails with orgID mismatch", func() {
-				// Create a source in different org
+			It("rolls back database when assessment creation fails with forbidden source access", func() {
+				// Create a source owned by different user
 				sourceID := uuid.New()
 				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`
 
@@ -675,12 +676,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessmentCount).To(Equal(int64(0)))
 				Expect(snapshotCount).To(Equal(int64(0)))
 
-				// Attempt to create assessment with wrong orgID (should fail)
+				// Attempt to create assessment from source in different org (should fail - authorization check)
 				createForm := mappers.AssessmentCreateForm{
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1", // Different org than source (org2)
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &sourceID,
 				}
@@ -727,7 +728,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1",
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &sourceID,
 				}
@@ -768,7 +769,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					ID:       uuid.New(),
 					Name:     "Test Assessment",
 					OrgID:    "org1",
-					Username: "testuser",
+					Username: "user1",
 					Source:   service.SourceTypeAgent,
 					SourceID: &nonExistentSourceID,
 				}

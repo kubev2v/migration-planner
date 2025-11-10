@@ -48,7 +48,7 @@ func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) 
 }
 
 func (s *SourceService) ListSources(ctx context.Context, filter *SourceFilter) ([]model.Source, error) {
-	storeFilter := store.NewSourceQueryFilter().ByOrgID(filter.OrgID)
+	storeFilter := store.NewSourceQueryFilter().ByUsername(filter.Username).ByOrgID(filter.OrgID)
 
 	userResult, err := s.store.Source().List(ctx, storeFilter)
 	if err != nil {
@@ -220,8 +220,9 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 type SourceFilterFunc func(s *SourceFilter)
 
 type SourceFilter struct {
-	OrgID string
-	ID    uuid.UUID
+	Username string
+	OrgID    string
+	ID       uuid.UUID
 }
 
 func NewSourceFilter(filters ...SourceFilterFunc) *SourceFilter {
@@ -235,6 +236,12 @@ func NewSourceFilter(filters ...SourceFilterFunc) *SourceFilter {
 func (s *SourceFilter) WithOption(o SourceFilterFunc) *SourceFilter {
 	o(s)
 	return s
+}
+
+func WithUsername(username string) SourceFilterFunc {
+	return func(s *SourceFilter) {
+		s.Username = username
+	}
 }
 
 func WithSourceID(id uuid.UUID) SourceFilterFunc {

@@ -37,7 +37,7 @@ func validateSourceData(data interface{}) error {
 func (s *ServiceHandler) ListSources(ctx context.Context, request apiServer.ListSourcesRequestObject) (apiServer.ListSourcesResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
-	filter := service.NewSourceFilter(service.WithOrgID(user.Organization))
+	filter := service.NewSourceFilter(service.WithUsername(user.Username), service.WithOrgID(user.Organization))
 
 	sources, err := s.sourceSrv.ListSources(ctx, filter)
 	if err != nil {
@@ -94,7 +94,7 @@ func (s *ServiceHandler) DeleteSource(ctx context.Context, request apiServer.Del
 	}
 
 	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
+	if user.Username != source.Username || user.Organization != source.OrgID {
 		message := fmt.Sprintf("forbidden to delete source %s by user with org_id %s", request.Id, user.Organization)
 		return server.DeleteSource403JSONResponse{Message: message}, nil
 	}
@@ -119,8 +119,8 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request apiServer.GetSou
 	}
 
 	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
-		message := fmt.Sprintf("forbidden to access source %s by user with org_id %s", request.Id, user.Organization)
+	if user.Username != source.Username || user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to access source %s by user %s", request.Id, user.Username)
 		return server.GetSource403JSONResponse{Message: message}, nil
 	}
 
@@ -148,8 +148,8 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.Upd
 	}
 
 	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
-		message := fmt.Sprintf("forbidden to update source %s by user with org_id %s", request.Id, user.Organization)
+	if user.Username != source.Username || user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to update source %s by user %s", request.Id, user.Username)
 		return server.UpdateSource403JSONResponse{Message: message}, nil
 	}
 
@@ -186,8 +186,8 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request apiServer.
 	}
 
 	user := auth.MustHaveUser(ctx)
-	if user.Organization != source.OrgID {
-		message := fmt.Sprintf("forbidden to update inventory for source %s by user with org_id %s", request.Id, user.Organization)
+	if user.Organization != source.OrgID || user.Username != source.Username {
+		message := fmt.Sprintf("forbidden to update inventory for source %s by user %s with org_id %s", request.Id, user.Username, user.Organization)
 		return server.UpdateInventory403JSONResponse{Message: message}, nil
 	}
 
