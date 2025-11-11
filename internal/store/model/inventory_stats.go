@@ -7,6 +7,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	SourceTypeAgent   string = "agent"
+	SourceTypeRvtools string = "rvtools"
+)
+
 type VmStats struct {
 	// Total is the total number of vms
 	Total int
@@ -21,18 +26,23 @@ type OsStats struct {
 	Total int
 }
 
+type CustomerAssessments struct {
+	AgentCount  int
+	RvToolCount int
+}
+
 type StorageCustomerStats struct {
 	TotalByProvider map[string]int
 	Domain          string
 }
 
 type InventoryStats struct {
-	Vms                        VmStats
-	Os                         OsStats
-	TotalCustomers             int
-	TotalAssessmentsByCustomer map[string]int
-	TotalInventories           int
-	Storage                    []StorageCustomerStats
+	Vms                                VmStats
+	Os                                 OsStats
+	TotalCustomers                     int
+	TotalAssessmentsByCustomerBySource map[string]CustomerAssessments
+	TotalInventories                   int
+	Storage                            []StorageCustomerStats
 }
 
 type domainSnapshot struct {
@@ -61,12 +71,12 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 	}
 
 	return InventoryStats{
-		Vms:                        computeVmStats(domainSnapshots),
-		Os:                         computeOsStats(domainSnapshots),
-		TotalInventories:           len(domainSnapshots),
-		TotalAssessmentsByCustomer: computeAssessmentsByCustomer(assessments),
-		TotalCustomers:             len(orgIDs),
-		Storage:                    computeStorageStats(domainSnapshots),
+		Vms:                                computeVmStats(domainSnapshots),
+		Os:                                 computeOsStats(domainSnapshots),
+		TotalInventories:                   len(domainSnapshots),
+		TotalAssessmentsByCustomerBySource: computeAssessmentsByCustomerBySource(assessments),
+		TotalCustomers:                     len(orgIDs),
+		Storage:                            computeStorageStats(domainSnapshots),
 	}
 }
 
@@ -107,8 +117,8 @@ func computeOsStats(domainSnapshots []domainSnapshot) OsStats {
 	return OsStats{Total: len(os)}
 }
 
-func computeAssessmentsByCustomer(assessments []Assessment) map[string]int {
-	assessmentsByCustomer := make(map[string]int)
+func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]CustomerAssessments {
+	assessmentsByCustomer := make(map[string]CustomerAssessments)
 
 	for _, a := range assessments {
 		domain, err := getDomainNameFromAssessment(a)
@@ -116,7 +126,17 @@ func computeAssessmentsByCustomer(assessments []Assessment) map[string]int {
 			zap.S().Debugw("failed to get domain from username", "error", err, "username", a.Username)
 			domain = a.OrgID
 		}
-		assessmentsByCustomer[domain]++
+
+		customer := assessmentsByCustomer[domain]
+
+		switch a.SourceType {
+		case SourceTypeAgent:
+			customer.AgentCount++
+		case SourceTypeRvtools:
+			customer.RvToolCount++
+		}
+
+		assessmentsByCustomer[domain] = customer
 	}
 
 	return assessmentsByCustomer
