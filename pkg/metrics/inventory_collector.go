@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/zap"
 )
@@ -46,9 +47,9 @@ func newInventoryStatsCollector(s store.Store) prometheus.Collector {
 			prometheus.Labels{},
 		),
 		totalAssessmentsByCustomer: prometheus.NewDesc(
-			fqName("assessments_by_customer_total"),
-			"Total number of assessments by customer",
-			[]string{"org_id"},
+			fqName("total_assessments_by_customer_by_source_type"),
+			"Total number of assessments by customer by source type",
+			[]string{"org_id", "source_type"},
 			prometheus.Labels{},
 		),
 		totalVmByOs: prometheus.NewDesc(
@@ -93,8 +94,10 @@ func (c *inventoryStatsCollector) Collect(ch chan<- prometheus.Metric) {
 	ch <- prometheus.MustNewConstMetric(c.totalInventories, prometheus.GaugeValue, float64(stats.TotalInventories))
 	ch <- prometheus.MustNewConstMetric(c.totalCustomers, prometheus.GaugeValue, float64(stats.TotalCustomers))
 
-	for domain, totalAssessments := range stats.TotalAssessmentsByCustomer {
-		ch <- prometheus.MustNewConstMetric(c.totalAssessmentsByCustomer, prometheus.GaugeValue, float64(totalAssessments), domain)
+	for domain, customerAssessments := range stats.TotalAssessmentsByCustomerBySource {
+		ch <- prometheus.MustNewConstMetric(c.totalAssessmentsByCustomer, prometheus.GaugeValue, float64(customerAssessments.RvToolCount), domain, model.SourceTypeRvtools)
+		ch <- prometheus.MustNewConstMetric(c.totalAssessmentsByCustomer, prometheus.GaugeValue, float64(customerAssessments.AgentCount), domain, model.SourceTypeAgent)
+
 	}
 
 	for osType, total := range stats.Vms.TotalByOS {
