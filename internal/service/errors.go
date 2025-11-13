@@ -81,3 +81,23 @@ func NewErrDuplicateKey(resourceType, key string) *ErrDuplicateKey {
 func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
 	return NewErrDuplicateKey("assessment", fmt.Sprintf("name '%s'", name))
 }
+
+type ErrProcessingAlreadyInProgress struct {
+	error
+}
+
+func NewErrProcessingAlreadyInProgress(assessmentID uuid.UUID) *ErrProcessingAlreadyInProgress {
+	return &ErrProcessingAlreadyInProgress{
+		fmt.Errorf("assessment %s already has a processing job in progress", assessmentID),
+	}
+}
+
+type ErrJobCannotBeCancelled struct {
+	error
+}
+
+func NewErrJobCannotBeCancelled(snapshotID uint, status string) *ErrJobCannotBeCancelled {
+	return &ErrJobCannotBeCancelled{
+		fmt.Errorf("job for snapshotID %d cannot be cancelled in status %s", snapshotID, status),
+	}
+}

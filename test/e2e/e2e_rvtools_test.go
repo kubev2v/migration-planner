@@ -152,7 +152,7 @@ var _ = Describe("e2e-rvtools", func() {
 				assessment2, err := svc.CreateAssessmentFromRvtools("duplicate-name-test", tmpFile)
 				Expect(err).NotTo(BeNil())
 				Expect(assessment2).To(BeNil())
-				Expect(err).To(MatchError(ContainSubstring("status: 400")))
+				Expect(err).To(MatchError(ContainSubstring("status: 409")))
 
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
