@@ -96,6 +96,14 @@ func NewAssessmentQueryOptions() *AssessmentQueryOptions {
 	return &AssessmentQueryOptions{}
 }
 
+// Filter by username
+func (f *AssessmentQueryFilter) WithUsername(username string) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("username = ?", username)
+	})
+	return f
+}
+
 // Filter by organization ID
 func (f *AssessmentQueryFilter) WithOrgID(orgID string) *AssessmentQueryFilter {
 	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
