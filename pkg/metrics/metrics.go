@@ -68,4 +68,5 @@ func RegisterMetrics(s store.Store) {
 	prometheus.MustRegister(inventoryStatsCollector)
 	prometheus.MustRegister(ovaDownloadsTotalMetric)
 	prometheus.MustRegister(agentStatusCountMetric)
+	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)
 }

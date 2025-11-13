@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/kubev2v/migration-planner/pkg/metrics"
+
 	"github.com/MicahParks/jwkset"
 	keyfunc "github.com/MicahParks/keyfunc/v3"
 	"github.com/golang-jwt/jwt/v5"
@@ -138,6 +140,8 @@ func (rh *RHSSOAuthenticator) Authenticator(next http.Handler) http.Handler {
 			http.Error(w, "authentication failed", http.StatusUnauthorized)
 			return
 		}
+
+		metrics.UniqueVisitsPerWeek.IncreaseTotalUniqueVisit(fmt.Sprintf("%s:%s", user.Organization, user.Username))
 
 		ctx := NewTokenContext(r.Context(), user)
 		next.ServeHTTP(w, r.WithContext(ctx))
