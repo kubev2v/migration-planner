@@ -23,7 +23,7 @@ const (
 	insertSnapshotStm   = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
 )
 
-var _ = Describe("assessment service", Ordered, func() {
+var _ = Describe("Assessment Service", Ordered, func() {
 	var (
 		s      store.Store
 		gormdb *gorm.DB
@@ -46,7 +46,7 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	Context("ListAssessments", func() {
-		BeforeEach(func() {
+		It("lists all assessments", func() {
 			// Create test data
 			assessment1ID := uuid.New()
 			assessment2ID := uuid.New()
@@ -57,30 +57,49 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "testuser2", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
+
+			filter := service.NewAssessmentFilter()
+			assessments, err := svc.ListAssessments(context.TODO(), filter)
+
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(3)) // All 3 assessments
 		})
 
-		It("lists all assessments for an organization", func() {
-			filter := service.NewAssessmentFilter("org1")
+		It("filters assessments by source", func() {
+			// Create test data
+			assessment1ID := uuid.New()
+			assessment2ID := uuid.New()
+			assessment3ID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", "testuser", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "testuser2", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			filter := service.NewAssessmentFilter().WithSource(service.SourceTypeInventory)
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 			for _, assessment := range assessments {
-				Expect(assessment.OrgID).To(Equal("org1"))
+				Expect(assessment.SourceType).To(Equal(service.SourceTypeInventory))
 			}
 		})
 
-		It("filters assessments by source", func() {
-			filter := service.NewAssessmentFilter("org1").WithSource(service.SourceTypeInventory)
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
-
-			Expect(err).To(BeNil())
-			Expect(assessments).To(HaveLen(1))
-			Expect(assessments[0].SourceType).To(Equal(service.SourceTypeInventory))
-		})
-
 		It("filters assessments by name pattern", func() {
-			filter := service.NewAssessmentFilter("org1").WithNameLike("Test")
+			// Create test data
+			assessment1ID := uuid.New()
+			assessment2ID := uuid.New()
+			assessment3ID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", "testuser", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", "testuser", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "testuser2", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			filter := service.NewAssessmentFilter().WithNameLike("Test")
 			assessments, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
@@ -629,15 +648,14 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	Context("AssessmentFilter", func() {
-		It("creates filter with orgID and chains methods", func() {
-			filter := service.NewAssessmentFilter("org1").
+		It("creates filter and chains methods", func() {
+			filter := service.NewAssessmentFilter().
 				WithSource(service.SourceTypeInventory).
 				WithSourceID("source-123").
 				WithNameLike("test").
 				WithLimit(10).
 				WithOffset(5)
 
-			Expect(filter.OrgID).To(Equal("org1"))
 			Expect(filter.Source).To(Equal(service.SourceTypeInventory))
 			Expect(filter.SourceID).To(Equal("source-123"))
 			Expect(filter.NameLike).To(Equal("test"))

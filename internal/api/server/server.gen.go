@@ -36,6 +36,21 @@ type ServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (DELETE /api/v1/assessments/{id}/relationships)
+	RemoveAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/assessments/{id}/relationships)
+	ListAssessmentRelationships(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v1/assessments/{id}/relationships)
+	AddAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /api/v1/assessments/{id}/relationships/organization)
+	UnshareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v1/assessments/{id}/relationships/organization)
+	ShareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
 
@@ -96,6 +111,31 @@ func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id 
 
 // (PUT /api/v1/assessments/{id})
 func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/assessments/{id}/relationships)
+func (_ Unimplemented) RemoveAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/assessments/{id}/relationships)
+func (_ Unimplemented) ListAssessmentRelationships(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/relationships)
+func (_ Unimplemented) AddAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/assessments/{id}/relationships/organization)
+func (_ Unimplemented) UnshareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/relationships/organization)
+func (_ Unimplemented) ShareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -262,6 +302,136 @@ func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// RemoveAssessmentRelationship operation middleware
+func (siw *ServerInterfaceWrapper) RemoveAssessmentRelationship(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveAssessmentRelationship(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ListAssessmentRelationships operation middleware
+func (siw *ServerInterfaceWrapper) ListAssessmentRelationships(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAssessmentRelationships(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// AddAssessmentRelationship operation middleware
+func (siw *ServerInterfaceWrapper) AddAssessmentRelationship(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddAssessmentRelationship(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UnshareAssessmentWithOrganization operation middleware
+func (siw *ServerInterfaceWrapper) UnshareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnshareAssessmentWithOrganization(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ShareAssessmentWithOrganization operation middleware
+func (siw *ServerInterfaceWrapper) ShareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ShareAssessmentWithOrganization(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -631,6 +801,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/assessments/{id}/relationships", wrapper.RemoveAssessmentRelationship)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/assessments/{id}/relationships", wrapper.ListAssessmentRelationships)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/relationships", wrapper.AddAssessmentRelationship)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/assessments/{id}/relationships/organization", wrapper.UnshareAssessmentWithOrganization)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/relationships/organization", wrapper.ShareAssessmentWithOrganization)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
 	})
 	r.Group(func(r chi.Router) {
@@ -927,6 +1112,318 @@ func (response UpdateAssessment404JSONResponse) VisitUpdateAssessmentResponse(w 
 type UpdateAssessment500JSONResponse Error
 
 func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationshipRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *RemoveAssessmentRelationshipJSONRequestBody
+}
+
+type RemoveAssessmentRelationshipResponseObject interface {
+	VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error
+}
+
+type RemoveAssessmentRelationship200JSONResponse Status
+
+func (response RemoveAssessmentRelationship200JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationship400JSONResponse Error
+
+func (response RemoveAssessmentRelationship400JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationship401JSONResponse Error
+
+func (response RemoveAssessmentRelationship401JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationship403JSONResponse Error
+
+func (response RemoveAssessmentRelationship403JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationship404JSONResponse Error
+
+func (response RemoveAssessmentRelationship404JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveAssessmentRelationship500JSONResponse Error
+
+func (response RemoveAssessmentRelationship500JSONResponse) VisitRemoveAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationshipsRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ListAssessmentRelationshipsResponseObject interface {
+	VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error
+}
+
+type ListAssessmentRelationships200JSONResponse []AssessmentRelationship
+
+func (response ListAssessmentRelationships200JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationships400JSONResponse Error
+
+func (response ListAssessmentRelationships400JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationships401JSONResponse Error
+
+func (response ListAssessmentRelationships401JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationships403JSONResponse Error
+
+func (response ListAssessmentRelationships403JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationships404JSONResponse Error
+
+func (response ListAssessmentRelationships404JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentRelationships500JSONResponse Error
+
+func (response ListAssessmentRelationships500JSONResponse) VisitListAssessmentRelationshipsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationshipRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *AddAssessmentRelationshipJSONRequestBody
+}
+
+type AddAssessmentRelationshipResponseObject interface {
+	VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error
+}
+
+type AddAssessmentRelationship201JSONResponse Status
+
+func (response AddAssessmentRelationship201JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationship400JSONResponse Error
+
+func (response AddAssessmentRelationship400JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationship401JSONResponse Error
+
+func (response AddAssessmentRelationship401JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationship403JSONResponse Error
+
+func (response AddAssessmentRelationship403JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationship404JSONResponse Error
+
+func (response AddAssessmentRelationship404JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type AddAssessmentRelationship500JSONResponse Error
+
+func (response AddAssessmentRelationship500JSONResponse) VisitAddAssessmentRelationshipResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganizationRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type UnshareAssessmentWithOrganizationResponseObject interface {
+	VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error
+}
+
+type UnshareAssessmentWithOrganization200JSONResponse Status
+
+func (response UnshareAssessmentWithOrganization200JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganization400JSONResponse Error
+
+func (response UnshareAssessmentWithOrganization400JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganization401JSONResponse Error
+
+func (response UnshareAssessmentWithOrganization401JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganization403JSONResponse Error
+
+func (response UnshareAssessmentWithOrganization403JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganization404JSONResponse Error
+
+func (response UnshareAssessmentWithOrganization404JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UnshareAssessmentWithOrganization500JSONResponse Error
+
+func (response UnshareAssessmentWithOrganization500JSONResponse) VisitUnshareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganizationRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type ShareAssessmentWithOrganizationResponseObject interface {
+	VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error
+}
+
+type ShareAssessmentWithOrganization201JSONResponse Status
+
+func (response ShareAssessmentWithOrganization201JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganization400JSONResponse Error
+
+func (response ShareAssessmentWithOrganization400JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganization401JSONResponse Error
+
+func (response ShareAssessmentWithOrganization401JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganization403JSONResponse Error
+
+func (response ShareAssessmentWithOrganization403JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganization404JSONResponse Error
+
+func (response ShareAssessmentWithOrganization404JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ShareAssessmentWithOrganization500JSONResponse Error
+
+func (response ShareAssessmentWithOrganization500JSONResponse) VisitShareAssessmentWithOrganizationResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1453,6 +1950,21 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
 
+	// (DELETE /api/v1/assessments/{id}/relationships)
+	RemoveAssessmentRelationship(ctx context.Context, request RemoveAssessmentRelationshipRequestObject) (RemoveAssessmentRelationshipResponseObject, error)
+
+	// (GET /api/v1/assessments/{id}/relationships)
+	ListAssessmentRelationships(ctx context.Context, request ListAssessmentRelationshipsRequestObject) (ListAssessmentRelationshipsResponseObject, error)
+
+	// (POST /api/v1/assessments/{id}/relationships)
+	AddAssessmentRelationship(ctx context.Context, request AddAssessmentRelationshipRequestObject) (AddAssessmentRelationshipResponseObject, error)
+
+	// (DELETE /api/v1/assessments/{id}/relationships/organization)
+	UnshareAssessmentWithOrganization(ctx context.Context, request UnshareAssessmentWithOrganizationRequestObject) (UnshareAssessmentWithOrganizationResponseObject, error)
+
+	// (POST /api/v1/assessments/{id}/relationships/organization)
+	ShareAssessmentWithOrganization(ctx context.Context, request ShareAssessmentWithOrganizationRequestObject) (ShareAssessmentWithOrganizationResponseObject, error)
+
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
 
@@ -1660,6 +2172,150 @@ func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
 		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveAssessmentRelationship operation middleware
+func (sh *strictHandler) RemoveAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request RemoveAssessmentRelationshipRequestObject
+
+	request.Id = id
+
+	var body RemoveAssessmentRelationshipJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveAssessmentRelationship(ctx, request.(RemoveAssessmentRelationshipRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveAssessmentRelationship")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveAssessmentRelationshipResponseObject); ok {
+		if err := validResponse.VisitRemoveAssessmentRelationshipResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAssessmentRelationships operation middleware
+func (sh *strictHandler) ListAssessmentRelationships(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ListAssessmentRelationshipsRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAssessmentRelationships(ctx, request.(ListAssessmentRelationshipsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAssessmentRelationships")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAssessmentRelationshipsResponseObject); ok {
+		if err := validResponse.VisitListAssessmentRelationshipsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddAssessmentRelationship operation middleware
+func (sh *strictHandler) AddAssessmentRelationship(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request AddAssessmentRelationshipRequestObject
+
+	request.Id = id
+
+	var body AddAssessmentRelationshipJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddAssessmentRelationship(ctx, request.(AddAssessmentRelationshipRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddAssessmentRelationship")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddAssessmentRelationshipResponseObject); ok {
+		if err := validResponse.VisitAddAssessmentRelationshipResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnshareAssessmentWithOrganization operation middleware
+func (sh *strictHandler) UnshareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UnshareAssessmentWithOrganizationRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnshareAssessmentWithOrganization(ctx, request.(UnshareAssessmentWithOrganizationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnshareAssessmentWithOrganization")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnshareAssessmentWithOrganizationResponseObject); ok {
+		if err := validResponse.VisitUnshareAssessmentWithOrganizationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ShareAssessmentWithOrganization operation middleware
+func (sh *strictHandler) ShareAssessmentWithOrganization(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request ShareAssessmentWithOrganizationRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ShareAssessmentWithOrganization(ctx, request.(ShareAssessmentWithOrganizationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ShareAssessmentWithOrganization")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ShareAssessmentWithOrganizationResponseObject); ok {
+		if err := validResponse.VisitShareAssessmentWithOrganizationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

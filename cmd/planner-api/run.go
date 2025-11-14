@@ -10,20 +10,21 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/spf13/cobra"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
+
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
-	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
-	"github.com/spf13/cobra"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
 type Server interface {
@@ -60,8 +61,19 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("initializing data store", "error", err)
 		}
 
-		store := store.NewStore(db)
-		defer store.Close()
+		var st store.Store
+		if cfg.Service.Authz.AuthorizationKind == apiserver.AuthorizationKindSpiceDB {
+			spiceDBClient, err := store.InitSpiceDBClient(cfg.Service.Authz.SpiceDBURL, cfg.Service.Authz.SpiceDBToken)
+			if err != nil {
+				zap.S().Fatalw("initializing SpiceDB client", "error", err)
+			}
+			defer spiceDBClient.Close()
+
+			st = store.NewStoreWithAuthz(db, spiceDBClient)
+		} else {
+			st = store.NewStore(db)
+		}
+		defer st.Close()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
 			zap.S().Fatalw("running initial migration", "error", err)
@@ -82,19 +94,20 @@ var runCmd = &cobra.Command{
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
+
 		// register metrics
-		metrics.RegisterMetrics(store)
+		metrics.RegisterMetrics(st)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator)
+			return apiserver.New(cfg, st, l, opaValidator)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
-			return agentserver.New(cfg, store, l)
+			return agentserver.New(cfg, st, l)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.ImageEndpointAddress, "image_server", func(l net.Listener) Server {
-			return imageserver.New(cfg, store, l)
+			return imageserver.New(cfg, st, l)
 		})
 
 		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
@@ -129,8 +142,8 @@ func ensureIsoExist(path string) error {
 }
 
 func runServer(ctx context.Context, wg *sync.WaitGroup, cancel context.CancelFunc,
-	address string, loggerName string, serverFactory func(net.Listener) Server) {
-
+	address string, loggerName string, serverFactory func(net.Listener) Server,
+) {
 	wg.Add(1)
 
 	go func() {

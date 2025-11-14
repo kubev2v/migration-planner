@@ -19,11 +19,25 @@ const (
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
 )
 
+// Defines values for AssessmentPermissions.
+const (
+	Delete AssessmentPermissions = "delete"
+	Edit   AssessmentPermissions = "edit"
+	Read   AssessmentPermissions = "read"
+	Share  AssessmentPermissions = "share"
+)
+
 // Defines values for AssessmentSourceType.
 const (
 	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
 	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
+)
+
+// Defines values for AssessmentRelationshipRelationship.
+const (
+	Editor AssessmentRelationshipRelationship = "editor"
+	Viewer AssessmentRelationshipRelationship = "viewer"
 )
 
 // Defines values for NetworkType.
@@ -65,11 +79,15 @@ type Assessment struct {
 	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
 
 	// OwnerLastName Owner's last name
-	OwnerLastName *string              `json:"ownerLastName,omitempty"`
-	Snapshots     []Snapshot           `json:"snapshots"`
-	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
-	SourceType    AssessmentSourceType `json:"sourceType"`
+	OwnerLastName *string                 `json:"ownerLastName,omitempty"`
+	Permissions   []AssessmentPermissions `json:"permissions"`
+	Snapshots     []Snapshot              `json:"snapshots"`
+	SourceId      *openapi_types.UUID     `json:"sourceId,omitempty"`
+	SourceType    AssessmentSourceType    `json:"sourceType"`
 }
+
+// AssessmentPermissions defines model for Assessment.Permissions.
+type AssessmentPermissions string
 
 // AssessmentSourceType defines model for Assessment.SourceType.
 type AssessmentSourceType string
@@ -88,6 +106,20 @@ type AssessmentForm struct {
 
 // AssessmentList defines model for AssessmentList.
 type AssessmentList = []Assessment
+
+// AssessmentRelationship defines model for AssessmentRelationship.
+type AssessmentRelationship struct {
+	Relationship AssessmentRelationshipRelationship `json:"relationship"`
+	UserId       string                             `json:"userId" validate:"required,min=1"`
+}
+
+// AssessmentRelationshipRelationship defines model for AssessmentRelationship.Relationship.
+type AssessmentRelationshipRelationship string
+
+// AssessmentRelationshipRequest defines model for AssessmentRelationshipRequest.
+type AssessmentRelationshipRequest struct {
+	Relationships []AssessmentRelationship `json:"relationships"`
+}
 
 // AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
 type AssessmentRvtoolsForm struct {
@@ -365,6 +397,12 @@ type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
+
+// RemoveAssessmentRelationshipJSONRequestBody defines body for RemoveAssessmentRelationship for application/json ContentType.
+type RemoveAssessmentRelationshipJSONRequestBody = AssessmentRelationshipRequest
+
+// AddAssessmentRelationshipJSONRequestBody defines body for AddAssessmentRelationship for application/json ContentType.
+type AddAssessmentRelationshipJSONRequestBody = AssessmentRelationshipRequest
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate

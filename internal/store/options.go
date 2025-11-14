@@ -28,9 +28,11 @@ func NewAgentQueryOptions() *AgentQueryOptions {
 }
 
 func (qf *AgentQueryFilter) ByID(ids []string) *AgentQueryFilter {
-	qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
-		return tx.Where("id IN ?", ids)
-	})
+	if len(ids) != 0 {
+		qf.QueryFn = append(qf.QueryFn, func(tx *gorm.DB) *gorm.DB {
+			return tx.Where("id IN ?", ids)
+		})
+	}
 	return qf
 }
 
@@ -126,6 +128,17 @@ func (f *AssessmentQueryFilter) WithNameLike(pattern string) *AssessmentQueryFil
 		return tx.Where("name ILIKE ?", "%"+pattern+"%")
 	})
 	return f
+}
+
+func (o *AssessmentQueryFilter) WithIDIn(ids []string) *AssessmentQueryFilter {
+	// When ids is empty do not return anything.
+	if len(ids) == 0 {
+		return o
+	}
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id IN ?", ids)
+	})
+	return o
 }
 
 // Limit results

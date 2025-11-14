@@ -1,0 +1,61 @@
+---
+# Kubernetes manifest for SpiceDB only - compatible with podman play kube
+# This runs SpiceDB with migration init container, connecting to external PostgreSQL
+#
+# SpiceDB settings:
+#   pre-shared key: foobar
+#   metrics address: http://localhost:9090
+#   grpc address: localhost:50051
+#
+# Prerequisites:
+#   - PostgreSQL database must be running (use postgres-only-kube.yml)
+#   - Database connection: postgres-database:5432
+#
+# example call with zed:
+#   zed schema read --endpoint=localhost:50051 --insecure=true
+#
+# To run:
+#   1. First start PostgreSQL: podman play kube postgres-only-kube.yml
+#   2. Then start SpiceDB: podman play kube spicedb-only-kube.yml
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: spicedb-service
+  labels:
+    app: spicedb-service
+spec:
+  # Setup containers that run before main containers
+  initContainers:
+  # Run SpiceDB migrations
+  - name: migrate
+    image: docker.io/authzed/spicedb
+    command: ["spicedb", "migrate", "head"]
+    env:
+    - name: SPICEDB_DATASTORE_ENGINE
+      value: "postgres"
+    - name: SPICEDB_DATASTORE_CONN_URI
+      value: "postgres://admin:adminpass@planner-db:5432/spicedb?sslmode=disable"
+
+  # Main containers
+  containers:
+  # SpiceDB main service
+  - name: spicedb
+    image: docker.io/authzed/spicedb
+    command: 
+      - spicedb
+    args:
+      - serve
+      - --grpc-preshared-key
+      - foobar
+      - --datastore-engine
+      - postgres
+      - --datastore-conn-uri
+      - postgres://admin:adminpass@planner-db:5432/spicedb?sslmode=disable
+      - --telemetry-endpoint=""
+    ports:
+    - containerPort: 50051
+      hostPort: 50051
+    - containerPort: 9090
+      hostPort: 7070
+  restartPolicy: Always
