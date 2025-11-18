@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -104,7 +103,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
-	var inventory v1alpha1.Inventory
+	var inventory []byte
 	switch assessment.SourceType {
 	case SourceTypeAgent:
 		tracer.Step("process_agent_source").Log()
@@ -119,7 +118,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		if source.Inventory == nil {
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
-		inventory = source.Inventory.Data
+		inventory = source.Inventory
 	case SourceTypeInventory:
 		tracer.Step("process_inventory_source").Log()
 		inventory = createForm.Inventory
@@ -135,7 +134,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
 		}
 
-		inventory = *clusteredInventory.VCenter
+		inventory = clusteredInventory
 		tracer.Step("parsed_rvtools_inventory").Log()
 	}
 
@@ -209,7 +208,7 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 		}
 		tracer.Step("source_retrieved").WithUUID("source_id", source.ID).Log()
 		// Update assessment with new snapshot
-		if _, err := as.store.Assessment().Update(ctx, id, name, &source.Inventory.Data); err != nil {
+		if _, err := as.store.Assessment().Update(ctx, id, name, source.Inventory); err != nil {
 			return nil, fmt.Errorf("failed to update assessment: %w", err)
 		}
 

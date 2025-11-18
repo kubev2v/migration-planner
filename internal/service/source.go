@@ -183,7 +183,7 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 	// create the agent if missing
 	var agent *model.Agent
 	for _, a := range source.Agents {
-		if a.ID == form.AgentId {
+		if a.ID == form.AgentID {
 			agent = &a
 			break
 		}
@@ -196,14 +196,14 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 		}
 	}
 
-	if source.VCenterID != "" && source.VCenterID != form.Inventory.Vcenter.Id {
+	if source.VCenterID != "" && source.VCenterID != form.VCenterID {
 		_, _ = store.Rollback(ctx)
-		return model.Source{}, NewErrInvalidVCenterID(form.SourceID, form.Inventory.Vcenter.Id)
+		return model.Source{}, NewErrInvalidVCenterID(form.SourceID, form.VCenterID)
 	}
 
 	source.OnPremises = true
-	source.VCenterID = form.Inventory.Vcenter.Id
-	source.Inventory = model.MakeJSONField(form.Inventory)
+	source.VCenterID = form.VCenterID
+	source.Inventory = form.Inventory
 
 	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)

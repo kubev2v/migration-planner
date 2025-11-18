@@ -45,26 +45,26 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 		return nil, fmt.Errorf("failed to fetch source: %s", err)
 	}
 
-	agent, err := as.store.Agent().Get(ctx, updateForm.AgentId)
+	agent, err := as.store.Agent().Get(ctx, updateForm.AgentID)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return nil, NewErrAgentNotFound(updateForm.AgentId)
+		return nil, NewErrAgentNotFound(updateForm.AgentID)
 	}
 
 	if agent == nil {
-		return nil, NewErrAgentNotFound(updateForm.AgentId)
+		return nil, NewErrAgentNotFound(updateForm.AgentID)
 	}
 
 	// don't allow updates of sources not associated with this agent
 	if updateForm.SourceID != agent.SourceID {
-		return nil, NewErrAgentUpdateForbidden(updateForm.SourceID, updateForm.AgentId)
+		return nil, NewErrAgentUpdateForbidden(updateForm.SourceID, updateForm.AgentID)
 	}
 
 	// if source has already a vCenter check if it's the same
-	if source.VCenterID != "" && source.VCenterID != updateForm.Inventory.Vcenter.Id {
-		return nil, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.Inventory.Vcenter.Id)
+	if source.VCenterID != "" && source.VCenterID != updateForm.VCenterID {
+		return nil, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.VCenterID)
 	}
 
-	source = mappers.UpdateSourceFromApi(source, updateForm.Inventory)
+	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
 	updatedSource, err := as.store.Source().Update(ctx, *source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update source: %s", err)

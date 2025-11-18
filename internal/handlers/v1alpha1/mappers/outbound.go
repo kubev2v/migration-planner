@@ -1,8 +1,10 @@
 package mappers
 
 import (
+	"encoding/json"
 	"slices"
 
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
@@ -17,8 +19,10 @@ func SourceToApi(s model.Source) api.Source {
 		Name:       s.Name,
 	}
 
-	if s.Inventory != nil {
-		source.Inventory = &s.Inventory.Data
+	if len(s.Inventory) > 0 {
+		i := v1alpha1.Inventory{}
+		_ = json.Unmarshal(s.Inventory, &i)
+		source.Inventory = &i
 	}
 
 	if len(s.Labels) > 0 {
@@ -113,7 +117,7 @@ func AgentToApi(a model.Agent) api.Agent {
 	}
 }
 
-func AssessmentToApi(a model.Assessment) api.Assessment {
+func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 	assessment := api.Assessment{
 		Id:             a.ID,
 		Name:           a.Name,
@@ -128,8 +132,12 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 		assessment.Snapshots[i] = api.Snapshot{
 			CreatedAt: snapshot.CreatedAt,
 		}
-		if snapshot.Inventory != nil {
-			assessment.Snapshots[i].Inventory = snapshot.Inventory.Data
+		if len(snapshot.Inventory) > 0 {
+			inventory := v1alpha1.Inventory{}
+			if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
+				return api.Assessment{}, err
+			}
+			assessment.Snapshots[i].Inventory = inventory
 		}
 	}
 
@@ -138,13 +146,17 @@ func AssessmentToApi(a model.Assessment) api.Assessment {
 	assessment.SourceType = sourceType
 	assessment.SourceId = a.SourceID
 
-	return assessment
+	return assessment, nil
 }
 
-func AssessmentListToApi(assessments []model.Assessment) api.AssessmentList {
+func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, error) {
 	assessmentList := make([]api.Assessment, len(assessments))
 	for i, assessment := range assessments {
-		assessmentList[i] = AssessmentToApi(assessment)
+		a, err := AssessmentToApi(assessment)
+		if err != nil {
+			return api.AssessmentList{}, err
+		}
+		assessmentList[i] = a
 	}
-	return assessmentList
+	return assessmentList, nil
 }

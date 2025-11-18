@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
 type Assessment struct {
@@ -24,10 +22,10 @@ type Assessment struct {
 }
 
 type Snapshot struct {
-	ID           uint                      `gorm:"primaryKey;autoIncrement"`
-	CreatedAt    time.Time                 `gorm:"not null;default:now()"`
-	Inventory    *JSONField[api.Inventory] `gorm:"type:jsonb;not null"`
-	AssessmentID uuid.UUID                 `gorm:"not null;type:VARCHAR(255);"`
+	ID           uint      `gorm:"primaryKey;autoIncrement"`
+	CreatedAt    time.Time `gorm:"not null;default:now()"`
+	Inventory    []byte    `gorm:"type:jsonb;not null"`
+	AssessmentID uuid.UUID `gorm:"not null;type:VARCHAR(255);"`
 }
 
 type AssessmentList []Assessment

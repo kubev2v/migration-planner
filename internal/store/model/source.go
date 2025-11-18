@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"gorm.io/gorm"
 )
 
@@ -20,8 +19,8 @@ type Source struct {
 	Name        string    `gorm:"uniqueIndex:name_org_id;not null"`
 	VCenterID   string
 	Username    string
-	OrgID       string                    `gorm:"uniqueIndex:name_org_id;not null"`
-	Inventory   *JSONField[api.Inventory] `gorm:"type:jsonb"`
+	OrgID       string `gorm:"uniqueIndex:name_org_id;not null"`
+	Inventory   []byte `gorm:"type:jsonb"`
 	OnPremises  bool
 	Agents      []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
 	ImageInfra  ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`

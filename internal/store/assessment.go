@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -15,8 +14,8 @@ import (
 type Assessment interface {
 	List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error)
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
-	Create(ctx context.Context, assessment model.Assessment, inventory api.Inventory) (*model.Assessment, error)
-	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory *api.Inventory) (*model.Assessment, error)
+	Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error)
+	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -65,7 +64,7 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 	return &assessment, nil
 }
 
-func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory api.Inventory) (*model.Assessment, error) {
+func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {
 	// Create the assessment first
 	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
 	if result.Error != nil {
@@ -78,7 +77,7 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 	// Create the initial snapshot with the inventory
 	snapshot := model.Snapshot{
 		AssessmentID: assessment.ID,
-		Inventory:    model.MakeJSONField(inventory),
+		Inventory:    inventory,
 	}
 
 	if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
@@ -89,7 +88,7 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 	return a.Get(ctx, assessment.ID)
 }
 
-func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory *api.Inventory) (*model.Assessment, error) {
+func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error) {
 	// Check if assessment exists
 	var assessment model.Assessment
 	if err := a.getDB(ctx).First(&assessment, "id = ?", assessmentID).Error; err != nil {
@@ -108,7 +107,7 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		// Create a new snapshot
 		snapshot := model.Snapshot{
 			AssessmentID: assessmentID,
-			Inventory:    model.MakeJSONField(*inventory),
+			Inventory:    inventory,
 		}
 
 		if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {

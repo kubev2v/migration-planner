@@ -2,6 +2,7 @@ package service_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -131,11 +132,11 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("CreateAssessment", func() {
 		Context("with inventory source", func() {
 			It("successfully creates assessment with inventory", func() {
-				inventory := v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
 					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
 					Vms:     v1alpha1.VMs{Total: 10},
 					Infra:   v1alpha1.Infra{TotalHosts: 5},
-				}
+				})
 
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
@@ -148,7 +149,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: &ownerFirstName,
 					OwnerLastName:  &ownerLastName,
 					Source:         service.SourceTypeInventory,
-					Inventory:      inventory,
+					Inventory:      inventoryJSON,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -169,11 +170,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("successfully creates assessment without owner fields (nil values)", func() {
-				inventory := v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
 					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
 					Vms:     v1alpha1.VMs{Total: 10},
 					Infra:   v1alpha1.Infra{TotalHosts: 5},
-				}
+				})
 
 				testAssessmentID := uuid.New()
 				createForm := mappers.AssessmentCreateForm{
@@ -184,7 +185,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: nil, // Test nil values
 					OwnerLastName:  nil,
 					Source:         service.SourceTypeInventory,
-					Inventory:      inventory,
+					Inventory:      inventoryJSON,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -199,11 +200,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
-				inventory := v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
 					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
 					Vms:     v1alpha1.VMs{Total: 10},
 					Infra:   v1alpha1.Infra{TotalHosts: 5},
-				}
+				})
 
 				name := "Duplicate Assessment"
 				// Insert first assessment directly via DB
@@ -218,7 +219,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OrgID:     "org1",
 					Username:  "user1",
 					Source:    service.SourceTypeInventory,
-					Inventory: inventory,
+					Inventory: inventoryJSON,
 				}
 
 				secondAssessment, secondErr := svc.CreateAssessment(context.TODO(), secondForm)

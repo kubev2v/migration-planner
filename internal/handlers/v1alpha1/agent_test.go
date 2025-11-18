@@ -2,6 +2,7 @@ package v1alpha1_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -232,7 +233,11 @@ var _ = Describe("agent service", Ordered, func() {
 			// the source should have the agent associated
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
-			Expect(source.Inventory.Data.Vcenter.Id).To(Equal("vcenter"))
+
+			var inventory v1alpha1.Inventory
+			err = json.Unmarshal(source.Inventory, &inventory)
+			Expect(err).To(BeNil())
+			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
 		})
 
 		It("successfully updates the source - two agents", func() {
@@ -273,7 +278,11 @@ var _ = Describe("agent service", Ordered, func() {
 			// the source should have the agent associated
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
-			Expect(source.Inventory.Data.Vcenter.Id).To(Equal("vcenter"))
+
+			var inventory v1alpha1.Inventory
+			err = json.Unmarshal(source.Inventory, &inventory)
+			Expect(err).To(BeNil())
+			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
 
 			// second agent request
 			resp, err = srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{

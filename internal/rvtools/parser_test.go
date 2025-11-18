@@ -3,15 +3,18 @@ package rvtools_test
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 
-	"github.com/kubev2v/migration-planner/internal/opa"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"github.com/xuri/excelize/v2"
+
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/internal/rvtools"
 )
 
 // Helper functions for Excel operations
@@ -272,9 +275,9 @@ var _ = Describe("Parser", func() {
 		Context("with invalid Excel data", func() {
 			It("should return error for invalid Excel content", func() {
 				invalidContent := []byte("not an excel file")
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), invalidContent, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), invalidContent, nil)
 				Expect(err).To(HaveOccurred())
-				Expect(clusteredInv).To(BeNil())
+				Expect(inventory).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("error opening Excel file"))
 			})
 		})
@@ -282,9 +285,9 @@ var _ = Describe("Parser", func() {
 		Context("with empty Excel data", func() {
 			It("should return error for empty content", func() {
 				emptyContent := []byte{}
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), emptyContent, nil)
+				inventory, err := rvtools.ParseRVTools(context.Background(), emptyContent, nil)
 				Expect(err).To(HaveOccurred())
-				Expect(clusteredInv).To(BeNil())
+				Expect(inventory).To(BeNil())
 			})
 		})
 
@@ -292,25 +295,24 @@ var _ = Describe("Parser", func() {
 			It("should handle Excel with empty RVTools sheets", func() {
 				minimalExcel := createMinimalTestExcel()
 
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil)
-
+				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
-				Expect(clusteredInv.VCenter).ToNot(BeNil())
 
-				// Extract VCenter inventory for easier testing
-				inventory := clusteredInv.VCenter
-				Expect(inventory.Infra).ToNot(BeNil())
+				apiInventory := v1alpha1.Inventory{}
+				jerr := json.Unmarshal(inventory, &apiInventory)
+				Expect(jerr).ToNot(HaveOccurred())
+
+				Expect(apiInventory.Infra).ToNot(BeNil())
 
 				By("verifying empty data is handled gracefully")
-				Expect(inventory.Vms.Total).To(Equal(0))
-				Expect(inventory.Infra.TotalHosts).To(Equal(0))
-				Expect(inventory.Infra.TotalClusters).To(Equal(0))
+				Expect(apiInventory.Vms.Total).To(Equal(0))
+				Expect(apiInventory.Infra.TotalHosts).To(Equal(0))
+				Expect(apiInventory.Infra.TotalClusters).To(Equal(0))
 
 				By("verifying empty collections are initialized")
-				Expect(inventory.Infra.Datastores).To(BeEmpty())
-				Expect(inventory.Infra.Networks).To(BeEmpty())
-				Expect(inventory.Infra.HostsPerCluster).To(BeEmpty())
+				Expect(apiInventory.Infra.Datastores).To(BeEmpty())
+				Expect(apiInventory.Infra.Networks).To(BeEmpty())
+				Expect(apiInventory.Infra.HostsPerCluster).To(BeEmpty())
 			})
 		})
 
@@ -323,58 +325,57 @@ var _ = Describe("Parser", func() {
 			})
 
 			It("should successfully parse Excel data with sample content", func() {
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
-
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
-				Expect(clusteredInv.VCenter).ToNot(BeNil())
 
-				// Extract VCenter inventory for easier testing
-				inventory := clusteredInv.VCenter
-				Expect(inventory.Infra).ToNot(BeNil())
+				apiInventory := v1alpha1.Inventory{}
+				jerr := json.Unmarshal(inventory, &apiInventory)
+				Expect(jerr).ToNot(HaveOccurred())
+
+				Expect(apiInventory.Infra).ToNot(BeNil())
 
 				By("checking that inventory has basic structure")
-				Expect(inventory.Vcenter).ToNot(BeNil())
+				Expect(apiInventory.Vcenter).ToNot(BeNil())
 
 				By("verifying that some infrastructure data was parsed")
 				hostsLen := 0
-				if inventory.Infra.Hosts != nil {
-					hostsLen = len(*inventory.Infra.Hosts)
+				if apiInventory.Infra.Hosts != nil {
+					hostsLen = len(*apiInventory.Infra.Hosts)
 				}
-				hasData := inventory.Vms.Total > 0 ||
+				hasData := apiInventory.Vms.Total > 0 ||
 					hostsLen > 0 ||
-					len(inventory.Infra.Datastores) > 0 ||
-					len(inventory.Infra.Networks) > 0
+					len(apiInventory.Infra.Datastores) > 0 ||
+					len(apiInventory.Infra.Networks) > 0
 				Expect(hasData).To(BeTrue(), "Expected at least some infrastructure data to be parsed")
 			})
 
 			It("should handle Excel data with various sheet types", func() {
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
-
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
+				Expect(inventory).ToNot(BeNil())
 
-				// Extract VCenter inventory for easier testing
-				inventory := clusteredInv.VCenter
+				apiInventory := v1alpha1.Inventory{}
+				jerr := json.Unmarshal(inventory, &apiInventory)
+				Expect(jerr).ToNot(HaveOccurred())
 
 				By("verifying VMs were processed")
-				if inventory.Vms.Total > 0 {
-					Expect(inventory.Vms.PowerStates).ToNot(BeNil())
-					Expect(inventory.Vms.Os).ToNot(BeNil())
+				if apiInventory.Vms.Total > 0 {
+					Expect(apiInventory.Vms.PowerStates).ToNot(BeNil())
+					Expect(apiInventory.Vms.Os).ToNot(BeNil())
 				}
 
 				By("verifying hosts were processed")
-				if inventory.Infra.Hosts != nil && len(*inventory.Infra.Hosts) > 0 {
-					host := (*inventory.Infra.Hosts)[0]
+				if apiInventory.Infra.Hosts != nil && len(*apiInventory.Infra.Hosts) > 0 {
+					host := (*apiInventory.Infra.Hosts)[0]
 					Expect(host.Vendor).ToNot(BeEmpty())
 					Expect(host.Model).ToNot(BeEmpty())
 				}
 
 				By("verifying infrastructure stats were calculated")
-				Expect(inventory.Infra.TotalHosts).To(BeNumerically(">=", 0))
-				Expect(inventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
-				if inventory.Infra.TotalDatacenters != nil {
-					Expect(*inventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
+				Expect(apiInventory.Infra.TotalHosts).To(BeNumerically(">=", 0))
+				Expect(apiInventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
+				if apiInventory.Infra.TotalDatacenters != nil {
+					Expect(*apiInventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 				}
 			})
 
@@ -401,10 +402,10 @@ concerns contains flag if {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(validator).ToNot(BeNil())
 
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), testExcelFile, validator)
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, validator)
 
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
+				Expect(inventory).ToNot(BeNil())
 
 				// The validator should have been called but won't find any VMs matching our test policy
 				// The important thing is that it doesn't crash and completes successfully
@@ -412,10 +413,9 @@ concerns contains flag if {
 
 			It("should handle OPA validation errors gracefully", func() {
 				// Test with nil validator first to ensure it doesn't break
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
-
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
+				Expect(inventory).ToNot(BeNil())
 
 				// Additional test: Create a validator with invalid policy to test error handling
 				invalidPolicy := `package io.konveyor.forklift.vmware
@@ -431,27 +431,27 @@ invalid syntax here`
 			})
 
 			It("should correlate data between different sheets", func() {
-				clusteredInv, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
-
+				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
 				Expect(err).ToNot(HaveOccurred())
-				Expect(clusteredInv).ToNot(BeNil())
+				Expect(inventory).ToNot(BeNil())
 
-				// Extract VCenter inventory for easier testing
-				inventory := clusteredInv.VCenter
+				apiInventory := v1alpha1.Inventory{}
+				jerr := json.Unmarshal(inventory, &apiInventory)
+				Expect(jerr).ToNot(HaveOccurred())
 
 				By("checking for data correlation signs")
 				// Check that VM totals and infrastructure data make sense together
-				if inventory.Vms.Total > 0 && len(inventory.Infra.Datastores) > 0 {
+				if apiInventory.Vms.Total > 0 && len(apiInventory.Infra.Datastores) > 0 {
 					// If we have VMs and datastores, the parsing likely worked
-					Expect(inventory.Vms.Total).To(BeNumerically(">", 0))
-					Expect(len(inventory.Infra.Datastores)).To(BeNumerically(">", 0))
+					Expect(apiInventory.Vms.Total).To(BeNumerically(">", 0))
+					Expect(len(apiInventory.Infra.Datastores)).To(BeNumerically(">", 0))
 				}
 
 				By("verifying infrastructure consistency")
-				if inventory.Infra.TotalHosts > 0 {
-					Expect(inventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
-					if inventory.Infra.TotalDatacenters != nil {
-						Expect(*inventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
+				if apiInventory.Infra.TotalHosts > 0 {
+					Expect(apiInventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
+					if apiInventory.Infra.TotalDatacenters != nil {
+						Expect(*apiInventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 					}
 				}
 			})
@@ -997,7 +997,6 @@ invalid syntax here`
 				Expect(rvtools.IsExcelFile(invalidContent)).To(BeFalse())
 			})
 		})
-
 	})
 
 	Describe("NewControllerTracker", func() {
@@ -1026,22 +1025,22 @@ invalid syntax here`
 			validator, err := opa.NewValidator(policies)
 			Expect(err).ToNot(HaveOccurred())
 
-			clusteredInv, err := rvtools.ParseRVTools(context.Background(), excelContent, validator)
+			inventory, err := rvtools.ParseRVTools(context.Background(), excelContent, validator)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(clusteredInv).ToNot(BeNil())
+			Expect(inventory).ToNot(BeNil())
 
-			// Extract VCenter inventory for easier testing
-			inventory := clusteredInv.VCenter
+			apiInventory := v1alpha1.Inventory{}
+			jerr := json.Unmarshal(inventory, &apiInventory)
+			Expect(jerr).ToNot(HaveOccurred())
 
-			Expect(inventory.Vms.Total).To(Equal(1))
-			Expect(inventory.Vms.PowerStates).To(HaveKeyWithValue("poweredOn", 1))
+			Expect(apiInventory.Vms.Total).To(Equal(1))
+			Expect(apiInventory.Vms.PowerStates).To(HaveKeyWithValue("poweredOn", 1))
 
-			Expect(inventory.Vms.DiskGB.Total).To(BeNumerically(">", 0))
-			Expect(inventory.Vms.DiskCount.Total).To(BeNumerically(">", 0))
+			Expect(apiInventory.Vms.DiskGB.Total).To(BeNumerically(">", 0))
+			Expect(apiInventory.Vms.DiskCount.Total).To(BeNumerically(">", 0))
 
-			Expect(inventory.Vms.CpuCores.Total).To(Equal(4)) // VM has 4 CPUs
-			Expect(inventory.Vms.RamGB.Total).To(BeNumerically(">", 0))
+			Expect(apiInventory.Vms.CpuCores.Total).To(Equal(4)) // VM has 4 CPUs
+			Expect(apiInventory.Vms.RamGB.Total).To(BeNumerically(">", 0))
 		})
 	})
-
 })

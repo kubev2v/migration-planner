@@ -2,11 +2,13 @@ package mappers
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
 
 	"github.com/google/uuid"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -143,7 +145,8 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 
 	// Set inventory if provided
 	if resource.Inventory != nil {
-		form.Inventory = *resource.Inventory
+		data, _ := json.Marshal(resource.Inventory) // cannot fail. it has been already validated
+		form.Inventory = data
 	}
 
 	return form
@@ -207,7 +210,7 @@ func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, user aut
 
 	// For RVTools, we'll set an empty inventory initially
 	// The service layer should process the RVToolsFile to populate inventory
-	form.Inventory = v1alpha1.Inventory{}
+	form.Inventory = []byte{}
 
 	return form, nil
 }
