@@ -20,7 +20,7 @@ import (
 
 const (
 	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, username, org_id, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertSnapshotStm   = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s', '%s');"
+	insertSnapshotStm   = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s'::jsonb, '%s');"
 )
 
 var _ = Describe("assessment handler", Ordered, func() {
@@ -58,12 +58,12 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			// Create snapshots for assessments
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID1.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID1.String()))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID2.String()))
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID2.String()))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID3.String()))
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID3.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -203,8 +203,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			// Add inventory to the source
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventory, sourceID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -478,8 +478,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
 				Expect(tx.Error).To(BeNil())
 
-				inventory := `{"vcenter": {"id": "test-vcenter"}}`
-				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventory, sourceID.String()))
+				inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 				Expect(tx.Error).To(BeNil())
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -590,8 +590,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
 				Expect(tx.Error).To(BeNil())
 
-				inventory := `{"vcenter": {"id": "test-vcenter"}}`
-				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventory, sourceID.String()))
+				inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 				Expect(tx.Error).To(BeNil())
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -619,8 +619,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -662,8 +662,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -691,8 +691,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "original-name", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -766,8 +766,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -794,8 +794,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "inventory-assessment", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -830,8 +830,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "rvtools-assessment", "admin", "admin", "John", "Doe", service.SourceTypeRvtools, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -865,8 +865,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			// Add inventory to the source
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventory, sourceID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			// Create assessment with agent sourceType
@@ -876,7 +876,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			// Create initial snapshot
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -916,8 +916,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "test-assessment", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -965,8 +965,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventory, assessmentID.String()))
+			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{

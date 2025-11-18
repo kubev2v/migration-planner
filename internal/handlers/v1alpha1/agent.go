@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
@@ -29,10 +30,16 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		return agentServer.UpdateSourceInventory400JSONResponse{Message: "empty body"}, nil
 	}
 
+	data, err := json.Marshal(request.Body.Inventory)
+	if err != nil {
+		return agentServer.UpdateSourceInventory500JSONResponse{Message: err.Error()}, nil
+	}
+
 	updatedSource, err := h.srv.UpdateSourceInventory(ctx, mappers.InventoryUpdateForm{
 		SourceID:  request.Id,
-		AgentId:   request.Body.AgentId,
-		Inventory: request.Body.Inventory,
+		AgentID:   request.Body.AgentId,
+		Inventory: data,
+		VCenterID: request.Body.Inventory.Vcenter.Id,
 	})
 	if err != nil {
 		switch err.(type) {

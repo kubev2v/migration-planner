@@ -3,19 +3,21 @@ package rvtools
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/xuri/excelize/v2"
+	"go.uber.org/zap"
+
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/opa"
-	"github.com/xuri/excelize/v2"
-	"go.uber.org/zap"
 )
 
-func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*service.ClusteredInventoryResponse, error) {
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) ([]byte, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -171,7 +173,12 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			VCenter:   vcenterInventory,
 		}
 
-		return response, nil
+		data, err := json.Marshal(response.VCenter)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		return data, nil
 	}
 
 	// If vInfo doesn't exist, fail with error

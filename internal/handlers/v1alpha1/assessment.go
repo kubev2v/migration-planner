@@ -34,7 +34,13 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 	}
 
 	logger.Success().WithInt("count", len(assessments)).Log()
-	return server.ListAssessments200JSONResponse(mappers.AssessmentListToApi(assessments)), nil
+
+	apiAssessments, err := mappers.AssessmentListToApi(assessments)
+	if err != nil {
+		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	return server.ListAssessments200JSONResponse(apiAssessments), nil
 }
 
 // (POST /api/v1/assessments)
@@ -115,7 +121,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		WithString("assessment_name", assessment.Name).
 		WithString("source_type", assessment.SourceType).
 		Log()
-	return server.CreateAssessment201JSONResponse(mappers.AssessmentToApi(*assessment)), nil
+
+	apiAssessment, err := mappers.AssessmentToApi(*assessment)
+	if err != nil {
+		return server.CreateAssessment500JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	return server.CreateAssessment201JSONResponse(apiAssessment), nil
 }
 
 // (GET /api/v1/assessments/{id})
@@ -151,7 +163,13 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 
 	logger.Step("authorization_check_passed").Log()
 	logger.Success().WithString("source_type", assessment.SourceType).Log()
-	return server.GetAssessment200JSONResponse(mappers.AssessmentToApi(*assessment)), nil
+
+	apiAssessment, err := mappers.AssessmentToApi(*assessment)
+	if err != nil {
+		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	return server.GetAssessment200JSONResponse(apiAssessment), nil
 }
 
 // (PUT /api/v1/assessments/{id})
@@ -215,7 +233,13 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		WithString("updated_name", updatedAssessment.Name).
 		WithString("source_type", updatedAssessment.SourceType).
 		Log()
-	return server.UpdateAssessment200JSONResponse(mappers.AssessmentToApi(*updatedAssessment)), nil
+
+	apiAssessment, err := mappers.AssessmentToApi(*updatedAssessment)
+	if err != nil {
+		return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	return server.UpdateAssessment200JSONResponse(apiAssessment), nil
 }
 
 // (DELETE /api/v1/assessments/{id})

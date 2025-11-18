@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -192,11 +191,7 @@ var _ = Describe("assessment store", Ordered, func() {
 	Context("create", func() {
 		It("successfully creates an assessment with inventory", func() {
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -205,7 +200,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -225,11 +220,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 		It("successfully creates an assessment with owner fields", func() {
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			ownerFirstName := "Alice"
 			ownerLastName := "Johnson"
@@ -243,7 +234,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType:     "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -271,11 +262,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -285,7 +272,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -296,11 +283,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		It("fails to create assessment with non-existent source_id", func() {
 			nonExistentSourceID := uuid.New()
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -310,7 +293,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &nonExistentSourceID,
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("foreign key constraint"))
 		})
@@ -318,11 +301,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		It("fails to create assessment with duplicate name in same org", func() {
 			assessmentID1 := uuid.New()
 			assessmentID2 := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment1 := model.Assessment{
 				ID:         assessmentID1,
@@ -331,7 +310,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventory)
+			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON)
 			Expect(err).To(BeNil())
 
 			// Try to create another assessment with same name in same org
@@ -342,18 +321,14 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventory)
+			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON)
 			Expect(err).ToNot(BeNil())
 		})
 
 		It("successfully creates assessments with same name in different orgs", func() {
 			assessmentID1 := uuid.New()
 			assessmentID2 := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment1 := model.Assessment{
 				ID:         assessmentID1,
@@ -362,7 +337,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventory)
+			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON)
 			Expect(err).To(BeNil())
 
 			// Create assessment with same name but different org
@@ -373,7 +348,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventory)
+			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON)
 			Expect(err).To(BeNil())
 
 			var count int
@@ -398,11 +373,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 			// Create an assessment with this source_id
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -412,7 +383,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
@@ -437,11 +408,7 @@ var _ = Describe("assessment store", Ordered, func() {
 	Context("update", func() {
 		It("successfully updates assessment name", func() {
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -450,7 +417,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 
 			newName := "updated-name"
@@ -463,11 +430,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 		It("successfully adds new snapshot to assessment", func() {
 			assessmentID := uuid.New()
-			inventory1 := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter-1"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventory1JSON := []byte(`{"vcenter":{"id":"test-vcenter-1"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -476,18 +439,14 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON)
 			Expect(err).To(BeNil())
 			Expect(created.Snapshots).To(HaveLen(1))
 
 			// Add new snapshot
-			inventory2 := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter-2"},
-				Vms:     api.VMs{Total: 15},
-				Infra:   api.Infra{TotalHosts: 7},
-			}
+			inventory2JSON := []byte(`{"vcenter":{"id":"test-vcenter-2"},"vms":{"total":15},"infra":{"totalHosts":7}}`)
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, &inventory2)
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, inventory2JSON)
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 
@@ -500,11 +459,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 		It("successfully updates both name and adds snapshot", func() {
 			assessmentID := uuid.New()
-			inventory1 := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter-1"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventory1JSON := []byte(`{"vcenter":{"id":"test-vcenter-1"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -513,18 +468,14 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON)
 			Expect(err).To(BeNil())
 
 			// Update both name and add snapshot
 			newName := "updated-name"
-			inventory2 := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter-2"},
-				Vms:     api.VMs{Total: 15},
-				Infra:   api.Infra{TotalHosts: 7},
-			}
+			inventory2JSON := []byte(`{"vcenter":{"id":"test-vcenter-2"},"vms":{"total":15},"infra":{"totalHosts":7}}`)
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, &inventory2)
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, inventory2JSON)
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 			Expect(updated.Name).To(Equal("updated-name"))
@@ -556,11 +507,7 @@ var _ = Describe("assessment store", Ordered, func() {
 	Context("delete", func() {
 		It("successfully deletes an assessment", func() {
 			assessmentID := uuid.New()
-			inventory := api.Inventory{
-				Vcenter: api.VCenter{Id: "test-vcenter"},
-				Vms:     api.VMs{Total: 10},
-				Infra:   api.Infra{TotalHosts: 5},
-			}
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
 			assessment := model.Assessment{
 				ID:         assessmentID,
@@ -569,7 +516,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
 			Expect(err).To(BeNil())
 
 			// Verify assessment and snapshot exist

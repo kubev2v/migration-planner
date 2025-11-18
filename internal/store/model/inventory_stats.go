@@ -1,10 +1,13 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"go.uber.org/zap"
+
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
 const (
@@ -45,13 +48,13 @@ type InventoryStats struct {
 	Storage                            []StorageCustomerStats
 }
 
-type domainSnapshot struct {
-	Snapshot Snapshot
-	OrgID    string
+type domainInventory struct {
+	Inventory api.Inventory
+	OrgID     string
 }
 
 func NewInventoryStats(assessments []Assessment) InventoryStats {
-	domainSnapshots := make([]domainSnapshot, 0, len(assessments))
+	domainInventories := make([]domainInventory, 0, len(assessments))
 	orgIDs := make(map[string]struct{})
 
 	for _, a := range assessments {
@@ -63,31 +66,38 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 			domain = a.OrgID
 		}
 
-		domainSnapshots = append(domainSnapshots, domainSnapshot{
-			Snapshot: latesSnapshot,
-			OrgID:    domain,
+		inventory := &api.Inventory{}
+
+		if err := json.Unmarshal(latesSnapshot.Inventory, &inventory); err != nil {
+			zap.S().Warnw("failed to unmarshal inventory", "error", err)
+			continue
+		}
+
+		domainInventories = append(domainInventories, domainInventory{
+			Inventory: *inventory,
+			OrgID:     domain,
 		})
 		orgIDs[a.OrgID] = struct{}{}
 	}
 
 	return InventoryStats{
-		Vms:                                computeVmStats(domainSnapshots),
-		Os:                                 computeOsStats(domainSnapshots),
-		TotalInventories:                   len(domainSnapshots),
+		Vms:                                computeVmStats(domainInventories),
+		Os:                                 computeOsStats(domainInventories),
+		TotalInventories:                   len(domainInventories),
 		TotalAssessmentsByCustomerBySource: computeAssessmentsByCustomerBySource(assessments),
 		TotalCustomers:                     len(orgIDs),
-		Storage:                            computeStorageStats(domainSnapshots),
+		Storage:                            computeStorageStats(domainInventories),
 	}
 }
 
-func computeVmStats(domainSnapshots []domainSnapshot) VmStats {
+func computeVmStats(domainInventories []domainInventory) VmStats {
 	total := 0
 	os := make(map[string]int)
 	orgTotal := make(map[string]int)
 
-	for _, ds := range domainSnapshots {
-		total += ds.Snapshot.Inventory.Data.Vms.Total
-		for k, v := range ds.Snapshot.Inventory.Data.Vms.Os {
+	for _, ds := range domainInventories {
+		total += ds.Inventory.Vms.Total
+		for k, v := range ds.Inventory.Vms.Os {
 			if oldValue, found := os[k]; found {
 				oldValue += v
 				os[k] = oldValue
@@ -95,7 +105,7 @@ func computeVmStats(domainSnapshots []domainSnapshot) VmStats {
 				os[k] = v
 			}
 		}
-		orgTotal[ds.OrgID] = ds.Snapshot.Inventory.Data.Vms.Total
+		orgTotal[ds.OrgID] = ds.Inventory.Vms.Total
 	}
 
 	return VmStats{
@@ -105,11 +115,11 @@ func computeVmStats(domainSnapshots []domainSnapshot) VmStats {
 	}
 }
 
-func computeOsStats(domainSnapshots []domainSnapshot) OsStats {
+func computeOsStats(domainSnapshots []domainInventory) OsStats {
 	os := make(map[string]struct{})
 
 	for _, ds := range domainSnapshots {
-		for k := range ds.Snapshot.Inventory.Data.Vms.Os {
+		for k := range ds.Inventory.Vms.Os {
 			os[k] = struct{}{}
 		}
 	}
@@ -142,12 +152,12 @@ func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]C
 	return assessmentsByCustomer
 }
 
-func computeStorageStats(domainSnapshots []domainSnapshot) []StorageCustomerStats {
-	stats := make([]StorageCustomerStats, 0, len(domainSnapshots))
+func computeStorageStats(domainInventories []domainInventory) []StorageCustomerStats {
+	stats := make([]StorageCustomerStats, 0, len(domainInventories))
 	statsPerCustomer := make(map[string]StorageCustomerStats)
 
-	for _, ds := range domainSnapshots {
-		storageSnapshotStats := computeSnapshotStorageStats(&ds.Snapshot)
+	for _, ds := range domainInventories {
+		storageSnapshotStats := computeInventoryStorageStats(ds.Inventory)
 		val, found := statsPerCustomer[ds.OrgID]
 		if found {
 			statsPerCustomer[ds.OrgID] = StorageCustomerStats{
@@ -166,10 +176,10 @@ func computeStorageStats(domainSnapshots []domainSnapshot) []StorageCustomerStat
 	return stats
 }
 
-func computeSnapshotStorageStats(snapshot *Snapshot) map[string]int {
+func computeInventoryStorageStats(inventory api.Inventory) map[string]int {
 	totalByProvider := make(map[string]int)
 
-	for _, storage := range snapshot.Inventory.Data.Infra.Datastores {
+	for _, storage := range inventory.Infra.Datastores {
 		if val, found := totalByProvider[storage.Type]; found {
 			val += storage.TotalCapacityGB
 			totalByProvider[storage.Type] = val

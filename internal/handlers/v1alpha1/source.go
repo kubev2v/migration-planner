@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -191,10 +192,16 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request apiServer.
 		return server.UpdateInventory403JSONResponse{Message: message}, nil
 	}
 
+	data, err := json.Marshal(request.Body.Inventory)
+	if err != nil {
+		return apiServer.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
+	}
+
 	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, srvMappers.InventoryUpdateForm{
-		AgentId:   request.Body.AgentId,
+		AgentID:   request.Body.AgentId,
 		SourceID:  request.Id,
-		Inventory: request.Body.Inventory,
+		Inventory: data,
+		VCenterID: request.Body.Inventory.Vcenter.Id,
 	})
 	if err != nil {
 		switch err.(type) {

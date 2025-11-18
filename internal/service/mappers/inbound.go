@@ -5,7 +5,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -70,8 +69,9 @@ func (s SourceCreateForm) ToSource() model.Source {
 
 type InventoryUpdateForm struct {
 	SourceID  uuid.UUID
-	AgentId   uuid.UUID
-	Inventory v1alpha1.Inventory // TODO: think about versioning. This is bound to v1alpha1 currently.
+	AgentID   uuid.UUID
+	VCenterID string
+	Inventory []byte
 }
 
 type AgentUpdateForm struct {
@@ -94,9 +94,9 @@ func (f *AgentUpdateForm) ToModel() model.Agent {
 	}
 }
 
-func UpdateSourceFromApi(m *model.Source, inventory api.Inventory) *model.Source {
-	m.Inventory = model.MakeJSONField(inventory)
-	m.VCenterID = inventory.Vcenter.Id
+func UpdateSourceFromApi(m *model.Source, vCenterID string, inventory []byte) *model.Source {
+	m.Inventory = inventory
+	m.VCenterID = vCenterID
 	return m
 }
 
@@ -169,7 +169,7 @@ type AssessmentCreateForm struct {
 	OwnerLastName  *string
 	Source         string
 	SourceID       *uuid.UUID
-	Inventory      v1alpha1.Inventory
+	Inventory      []byte
 	RVToolsFile    io.Reader
 }
 
@@ -194,5 +194,5 @@ type AssessmentUpdateForm struct {
 	Name           *string
 	OwnerFirstName *string
 	OwnerLastName  *string
-	Inventory      v1alpha1.Inventory
+	Inventory      []byte
 }
