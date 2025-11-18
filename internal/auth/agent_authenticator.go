@@ -88,17 +88,12 @@ func (aa *AgentAuthenticator) Authenticate(token string) (AgentJWT, error) {
 			return nil, errors.New("kid not found")
 		}
 
-		publicKeys, err := aa.store.PrivateKey().GetPublicKeys(context.Background())
+		publicKey, err := aa.store.PrivateKey().GetPublicKey(context.Background(), kid)
 		if err != nil {
-			return nil, err
-		}
-
-		pb, found := publicKeys[kid]
-		if !found {
 			return nil, fmt.Errorf("public key not found with id: %s", kid)
 		}
 
-		rsaPublicKey := pb.(rsa.PublicKey)
+		rsaPublicKey := publicKey.(rsa.PublicKey)
 		return &rsaPublicKey, nil
 	})
 	if err != nil {
