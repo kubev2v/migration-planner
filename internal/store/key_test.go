@@ -143,7 +143,7 @@ var _ = Describe("key store", Ordered, func() {
 	})
 
 	Context("public keys", func() {
-		It("successfully gets a list of public keys", func() {
+		It("successfully retrieves the public key", func() {
 			privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 			Expect(err).To(BeNil())
 
@@ -157,11 +157,10 @@ var _ = Describe("key store", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertPrivateKeyStm, "id", "org_id", string(pemdata)))
 			Expect(tx.Error).To(BeNil())
 
-			pb, err := s.PrivateKey().GetPublicKeys(context.TODO())
+			pb, err := s.PrivateKey().GetPublicKey(context.TODO(), "id")
 			Expect(err).To(BeNil())
 
-			Expect(pb).To(HaveLen(1))
-			Expect(pb["id"]).To(Not(BeNil()))
+			Expect(pb).NotTo(BeNil())
 		})
 
 		AfterEach(func() {

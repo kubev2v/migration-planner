@@ -15,7 +15,7 @@ type PrivateKey interface {
 	Create(ctx context.Context, privateKey model.Key) (*model.Key, error)
 	Get(ctx context.Context, orgID string) (*model.Key, error)
 	Delete(ctx context.Context, orgID string) error
-	GetPublicKeys(ctx context.Context) (map[string]crypto.PublicKey, error)
+	GetPublicKey(ctx context.Context, id string) (crypto.PublicKey, error)
 }
 
 type PrivateKeyStore struct {
@@ -56,18 +56,13 @@ func (p *PrivateKeyStore) Delete(ctx context.Context, orgID string) error {
 	return nil
 }
 
-func (p *PrivateKeyStore) GetPublicKeys(ctx context.Context) (map[string]crypto.PublicKey, error) {
-	privateKeys := []model.Key{}
-	if err := p.getDB(ctx).Find(&privateKeys).Error; err != nil {
-		return make(map[string]crypto.PublicKey), err
+func (p *PrivateKeyStore) GetPublicKey(ctx context.Context, kid string) (crypto.PublicKey, error) {
+	key := model.Key{}
+	if err := p.getDB(ctx).Where("id = ?", kid).First(&key).Error; err != nil {
+		return nil, err
 	}
 
-	publicKeys := make(map[string]crypto.PublicKey)
-	for _, pk := range privateKeys {
-		publicKeys[pk.ID] = pk.PrivateKey.PublicKey
-	}
-
-	return publicKeys, nil
+	return key.PrivateKey.PublicKey, nil
 }
 
 func (p *PrivateKeyStore) getDB(ctx context.Context) *gorm.DB {
