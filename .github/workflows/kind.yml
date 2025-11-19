@@ -19,6 +19,12 @@ jobs:
       - name: Checkout the code
         uses: actions/checkout@v2
 
+      - name: Disable firewall
+        run: |
+          sudo ufw disable || true
+          sudo systemctl stop ufw || true
+          sudo systemctl disable ufw || true
+
       - name: Set env variables
         run: |
           export "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')"
