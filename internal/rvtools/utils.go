@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -107,52 +106,6 @@ func ensureMapExists[K comparable, V any](m map[K]map[K]V, key K) {
 	}
 }
 
-func calculateHostsPerCluster(clusterToHosts map[string]map[string]struct{}) []int {
-	if len(clusterToHosts) == 0 {
-		return []int{}
-	}
-
-	// Sort cluster names for consistent ordering
-	clusterNames := make([]string, 0, len(clusterToHosts))
-	for cluster := range clusterToHosts {
-		clusterNames = append(clusterNames, cluster)
-	}
-	sort.Strings(clusterNames)
-
-	hostsPerCluster := make([]int, 0, len(clusterNames))
-	for _, cluster := range clusterNames {
-		hostsPerCluster = append(hostsPerCluster, len(clusterToHosts[cluster]))
-	}
-
-	return hostsPerCluster
-}
-
-func calculateVMsPerCluster(clusterToVMs map[string]map[string]struct{}) []int {
-	if len(clusterToVMs) == 0 {
-		return []int{}
-	}
-
-	vmsPerCluster := make([]int, 0, len(clusterToVMs))
-	for _, vms := range clusterToVMs {
-		vmsPerCluster = append(vmsPerCluster, len(vms))
-	}
-
-	return vmsPerCluster
-}
-
-func calculateClustersPerDatacenter(datacenterToClusters map[string]map[string]struct{}) []int {
-	if len(datacenterToClusters) == 0 {
-		return []int{}
-	}
-
-	clustersPerDatacenter := make([]int, 0, len(datacenterToClusters))
-	for _, clusters := range datacenterToClusters {
-		clustersPerDatacenter = append(clustersPerDatacenter, len(clusters))
-	}
-
-	return clustersPerDatacenter
-}
-
 func groupRowsByVM(rows [][]string, colMap map[string]int) map[string][][]string {
 	vmData := make(map[string][][]string)
 
@@ -190,19 +143,13 @@ func buildDatastoreMapping(datastoreRows [][]string) map[string]string {
 		return datastoreNameToID
 	}
 
-	headers := datastoreRows[0]
-	colMap := make(map[string]int)
-	for i, header := range headers {
-		key := strings.ToLower(strings.TrimSpace(header))
-		colMap[key] = i
-	}
+	colMap := buildColumnMap(datastoreRows[0])
 
 	for _, row := range datastoreRows[1:] {
 		if len(row) == 0 {
 			continue
 		}
 
-		// Extract datastore name and object ID
 		datastoreName := getColumnValue(row, colMap, "name")
 		objectID := getColumnValue(row, colMap, "object id")
 
@@ -228,11 +175,20 @@ func readSheet(excelFile *excelize.File, sheets []string, sheetName string) [][]
 	return rows
 }
 
-func createNetworkNameToIDMap(dvPortRows [][]string) map[string]string {
-	networkMap := make(map[string]string)
+// NetworkMappings contains bidirectional network mappings
+type NetworkMappings struct {
+	NameToID map[string]string // Network name -> Object ID
+	IDToName map[string]string // Object ID -> Network name
+}
+
+func createNetworkMappings(dvPortRows [][]string) NetworkMappings {
+	mappings := NetworkMappings{
+		NameToID: make(map[string]string),
+		IDToName: make(map[string]string),
+	}
 
 	if len(dvPortRows) <= 1 {
-		return networkMap // Return empty map if no dvPort data
+		return mappings
 	}
 
 	dvPortColMap := buildColumnMap(dvPortRows[0])
@@ -246,11 +202,12 @@ func createNetworkNameToIDMap(dvPortRows [][]string) map[string]string {
 		objectID := getColumnValue(row, dvPortColMap, "object id")
 
 		if networkName != "" && objectID != "" {
-			networkMap[networkName] = objectID
+			mappings.NameToID[networkName] = objectID
+			mappings.IDToName[objectID] = networkName
 		}
 	}
 
-	return networkMap
+	return mappings
 }
 
 func IsExcelFile(content []byte) bool {

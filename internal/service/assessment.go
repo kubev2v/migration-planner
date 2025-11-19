@@ -129,11 +129,12 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, err
 		}
 		tracer.Step("read_rvtools_file").WithInt("file_size", len(content)).Log()
-		rvtoolInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
+		clusteredInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
 		if err != nil {
 			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
 		}
-		inventory = *rvtoolInventory
+
+		inventory = *clusteredInventory.VCenter
 		tracer.Step("parsed_rvtools_inventory").Log()
 	}
 

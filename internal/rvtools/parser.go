@@ -15,7 +15,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*api.Inventory, error) {
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*service.ClusteredInventoryResponse, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -30,109 +30,152 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		vcenterUUID, _ = ExtractVCenterUUID(vInfoRows)
 	}
 
-	datastoreRows := readSheet(excelFile, sheets, "vDatastore")
-	datastoreMapping := make(map[string]string)
-	if len(datastoreRows) > 0 {
-		datastoreMapping = buildDatastoreMapping(datastoreRows)
-	}
-
-	zap.S().Named("rvtools").Infof("Process VMs")
-	var vms []vsphere.VM
 	if slices.Contains(sheets, "vInfo") {
+		zap.S().Named("rvtools").Infof("Process VMs")
+
+		// Read all VM-related sheets once
+		datastoreRows := readSheet(excelFile, sheets, "vDatastore")
+		datastoreMapping := make(map[string]string)
+		if len(datastoreRows) > 0 {
+			datastoreMapping = buildDatastoreMapping(datastoreRows)
+		}
+
 		vHostRows := readSheet(excelFile, sheets, "vHost")
 		vCpuRows := readSheet(excelFile, sheets, "vCPU")
 		vMemoryRows := readSheet(excelFile, sheets, "vMemory")
 		vDiskRows := readSheet(excelFile, sheets, "vDisk")
 		vNetworkRows := readSheet(excelFile, sheets, "vNetwork")
 		dvPortRows := readSheet(excelFile, sheets, "dvPort")
+		vClusterRows := readSheet(excelFile, sheets, "vCluster")
+		dvswitchRows := readSheet(excelFile, sheets, "dvSwitch")
 
-		vms, err = processVMInfo(vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows, datastoreMapping)
+		vms, err := processVMInfo(vInfoRows, vCpuRows, vMemoryRows, vDiskRows, vNetworkRows, vHostRows, dvPortRows, datastoreMapping)
 		if err != nil {
 			zap.S().Named("rvtools").Warnf("VM processing failed: %v", err)
 			vms = []vsphere.VM{}
 		}
-	}
 
-	if len(vms) > 0 && opaValidator != nil {
-		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
-		if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
-			zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
+		if len(vms) > 0 && opaValidator != nil {
+			zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
+			if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
+				zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
+			}
 		}
-	}
 
-	zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
-	var hostPowerStates map[string]int
-	var hosts []api.Host
+		zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
+		var hostPowerStates map[string]int
+		var hosts []api.Host
 
-	hostPowerStates = map[string]int{"green": 0}
+		hostPowerStates = map[string]int{"green": 0}
 
-	vHostRows := readSheet(excelFile, sheets, "vHost")
-	var clusterInfo ClusterInfo
-	if len(vHostRows) > 0 {
-		clusterInfo = ExtractClusterAndDatacenterInfo(vHostRows)
-		hostPowerStates = ExtractHostPowerStates(vHostRows)
+		var clusterInfo ClusterInfo
+		var hostIDToPowerState map[string]string
+		if len(vHostRows) > 0 {
+			clusterInfo = ExtractClusterAndDatacenterInfo(vHostRows)
+			hostPowerStates = ExtractHostPowerStates(vHostRows)
+			hostIDToPowerState = ExtractHostIDToPowerStateMap(vHostRows)
 
-		var err error
-		hosts, err = ExtractHostsInfo(vHostRows)
-		if err != nil {
-			zap.S().Named("rvtools").Warnf("Failed to extract host info: %v", err)
-			hosts = []api.Host{}
-		}
-	} else {
-		zap.S().Named("rvtools").Infof("vHost sheet not found, using default values")
-		clusterInfo = ClusterInfo{}
-		hosts = []api.Host{}
-	}
-
-	zap.S().Named("rvtools").Infof("Process Datastores")
-	var datastores []api.Datastore
-
-	if len(datastoreRows) > 0 {
-		tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
-		vHostRows := readSheet(excelFile, sheets, "vHost")
-		err := processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
-		if err != nil {
-			zap.S().Named("rvtools").Warnf("Failed to process datastore info: %v", err)
-			datastores = []api.Datastore{}
+			var err error
+			hosts, err = ExtractHostsInfo(vHostRows)
+			if err != nil {
+				zap.S().Named("rvtools").Warnf("Failed to extract host info: %v", err)
+				hosts = []api.Host{}
+			}
 		} else {
-			multipathRows := readSheet(excelFile, sheets, "vMultiPath")
-			hbaRows := readSheet(excelFile, sheets, "vHBA")
-
-			correlateDatastoreInfo(multipathRows, hbaRows, tempInventory)
-			datastores = tempInventory.Infra.Datastores
+			zap.S().Named("rvtools").Infof("vHost sheet not found, using default values")
+			clusterInfo = ClusterInfo{}
+			hosts = []api.Host{}
+			hostIDToPowerState = make(map[string]string)
 		}
-	} else {
-		datastores = []api.Datastore{}
+
+		zap.S().Named("rvtools").Infof("Process Datastores")
+		var datastores []api.Datastore
+		var datastoreIndexToName map[int]string
+
+		if len(datastoreRows) > 0 {
+			tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
+			var err error
+			datastoreIndexToName, err = processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
+			if err != nil {
+				zap.S().Named("rvtools").Warnf("Failed to process datastore info: %v", err)
+				datastores = []api.Datastore{}
+				datastoreIndexToName = make(map[int]string)
+			} else {
+				multipathRows := readSheet(excelFile, sheets, "vMultiPath")
+				hbaRows := readSheet(excelFile, sheets, "vHBA")
+
+				correlateDatastoreInfo(multipathRows, hbaRows, tempInventory)
+				datastores = tempInventory.Infra.Datastores
+			}
+		} else {
+			datastores = []api.Datastore{}
+			datastoreIndexToName = make(map[int]string)
+		}
+
+		zap.S().Named("rvtools").Infof("Process Networks")
+		networks := ExtractNetworks(dvswitchRows, dvPortRows, vms)
+
+		// Create vcenter-level aggregated inventory
+		zap.S().Named("rvtools").Infof("Create Basic Inventory (VCenter Level)")
+		infraData := service.InfrastructureData{
+			Datastores:            datastores,
+			Networks:              networks,
+			HostPowerStates:       hostPowerStates,
+			Hosts:                 &hosts,
+			HostsPerCluster:       clusterInfo.HostsPerCluster,
+			ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
+			TotalHosts:            clusterInfo.TotalHosts,
+			TotalClusters:         clusterInfo.TotalClusters,
+			TotalDatacenters:      clusterInfo.TotalDatacenters,
+			VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
+		}
+		vcenterInventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
+
+		zap.S().Named("rvtools").Infof("Fill VCenter Inventory with VM Data")
+		if len(vms) > 0 {
+			collector.FillInventoryObjectWithMoreData(&vms, vcenterInventory)
+		}
+
+		// Extract cluster ID mappings
+		zap.S().Named("rvtools").Infof("Extract Cluster ID Mappings")
+		clusterMapping := ExtractClusterIDMapping(vInfoRows, vHostRows, vClusterRows, vcenterUUID)
+		zap.S().Named("rvtools").Infof("Found %d unique clusters", len(clusterMapping.ClusterIDs))
+
+		// Build network ID to name mapping for filtering
+		networkMapping := createNetworkMappings(dvPortRows).IDToName
+
+		// Create per-cluster inventories
+		zap.S().Named("rvtools").Infof("Create Per-Cluster Inventories")
+		clusterInventories := make(map[string]*api.Inventory)
+
+		for _, clusterID := range clusterMapping.ClusterIDs {
+			zap.S().Named("rvtools").Infof("Processing cluster: %s", clusterID)
+
+			clusterVMs := service.FilterVMsByClusterID(vms, clusterID, clusterMapping.VMToClusterID)
+			zap.S().Named("rvtools").Infof("  - %d VMs in cluster %s", len(clusterVMs), clusterID)
+
+			clusterInfraData := service.FilterInfraDataByClusterID(infraData, clusterID, clusterMapping.HostToClusterID, clusterVMs, datastoreMapping, datastoreIndexToName, networkMapping, hostIDToPowerState)
+
+			clusterInv := service.CreateBasicInventory(vcenterUUID, &clusterVMs, clusterInfraData)
+
+			if len(clusterVMs) > 0 {
+				collector.FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
+			}
+
+			clusterInventories[clusterID] = clusterInv
+		}
+
+		response := &service.ClusteredInventoryResponse{
+			VCenterID: vcenterUUID,
+			Clusters:  clusterInventories,
+			VCenter:   vcenterInventory,
+		}
+
+		return response, nil
 	}
 
-	zap.S().Named("rvtools").Infof("Process Networks")
-
-	dvswitchRows := readSheet(excelFile, sheets, "dvSwitch")
-	dvportRows := readSheet(excelFile, sheets, "dvPort")
-
-	networks := ExtractNetworks(dvswitchRows, dvportRows, vms)
-
-	zap.S().Named("rvtools").Infof("Create Basic Inventory")
-	infraData := service.InfrastructureData{
-		Datastores:            datastores,
-		Networks:              networks,
-		HostPowerStates:       hostPowerStates,
-		Hosts:                 &hosts,
-		HostsPerCluster:       clusterInfo.HostsPerCluster,
-		ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
-		TotalHosts:            clusterInfo.TotalHosts,
-		TotalClusters:         clusterInfo.TotalClusters,
-		TotalDatacenters:      clusterInfo.TotalDatacenters,
-		VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
-	}
-	inventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
-
-	zap.S().Named("rvtools").Infof("Fill Inventory with VM Data")
-	if len(vms) > 0 {
-		collector.FillInventoryObjectWithMoreData(&vms, inventory)
-	}
-
-	return inventory, nil
+	// If vInfo doesn't exist, fail with error
+	return nil, fmt.Errorf("vInfo sheet not found in RVTools export - cannot process inventory without VM data")
 }
 
 type ClusterInfo struct {
@@ -188,8 +231,8 @@ func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	}
 
 	return ClusterInfo{
-		HostsPerCluster:       calculateHostsPerCluster(clusterToHosts),
-		ClustersPerDatacenter: calculateClustersPerDatacenter(datacenterToClusters),
+		HostsPerCluster:       service.CalculateHostsPerCluster(clusterToHosts),
+		ClustersPerDatacenter: service.CalculateClustersPerDatacenter(datacenterToClusters),
 		TotalHosts:            len(hosts),
 		TotalClusters:         len(clusters),
 		TotalDatacenters:      len(datacenters),
@@ -265,6 +308,38 @@ func ExtractHostPowerStates(rows [][]string) map[string]int {
 	return hostPowerStates
 }
 
+func ExtractHostIDToPowerStateMap(rows [][]string) map[string]string {
+	if len(rows) <= 1 {
+		return map[string]string{}
+	}
+
+	colMap := buildColumnMap(rows[0])
+	hostIDToPowerState := make(map[string]string)
+
+	for _, row := range rows[1:] {
+		if len(row) == 0 {
+			continue
+		}
+
+		hostID := getColumnValue(row, colMap, "object id")
+		status := getColumnValue(row, colMap, "config status")
+
+		if hostID == "" {
+			continue
+		}
+
+		// Normalize status to valid values
+		switch status {
+		case "red", "yellow", "green", "gray":
+			hostIDToPowerState[hostID] = status
+		default:
+			hostIDToPowerState[hostID] = "green"
+		}
+	}
+
+	return hostIDToPowerState
+}
+
 func ExtractVmsPerCluster(rows [][]string) []int {
 	if len(rows) <= 1 {
 		return []int{}
@@ -283,7 +358,7 @@ func ExtractVmsPerCluster(rows [][]string) []int {
 		}
 	}
 
-	return calculateVMsPerCluster(clusterToVMs)
+	return service.CalculateVMsPerCluster(clusterToVMs)
 }
 
 func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []api.Network {
@@ -295,10 +370,12 @@ func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []ap
 	}
 
 	tempInventory := &api.Inventory{Infra: api.Infra{}}
-	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory, vms); err == nil {
-		networks = tempInventory.Infra.Networks
+	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory, vms); err != nil {
+		zap.S().Named("rvtools").Warnf("Failed to process network info: %v", err)
+		return networks
 	}
 
+	networks = tempInventory.Infra.Networks
 	return networks
 }
 
