@@ -9,9 +9,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.Inventory) error {
+func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.Inventory) (map[int]string, error) {
+	datastoreIndexToName := make(map[int]string)
+
 	if len(rows) <= 1 {
-		return nil
+		return datastoreIndexToName, nil
 	}
 
 	headers := rows[0]
@@ -82,11 +84,15 @@ func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.
 			}
 		}
 
+		// Store the original name before it gets replaced by NAA/path
+		datastoreIndex := len(inventory.Infra.Datastores)
+		datastoreIndexToName[datastoreIndex] = name
+
 		inventory.Infra.Datastores = append(inventory.Infra.Datastores, datastore)
 	}
 
 	zap.S().Named("rvtools").Infof("Processed %d datastores", len(inventory.Infra.Datastores))
-	return nil
+	return datastoreIndexToName, nil
 }
 
 func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.Inventory) {

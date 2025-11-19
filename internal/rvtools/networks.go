@@ -44,7 +44,7 @@ func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventor
 	}
 
 	vmsPerNetwork := collector.CountVmsByNetwork(vms)
-	networkNameToID := createNetworkNameToIDMap(dvportRows)
+	networkNameToID := createNetworkMappings(dvportRows).NameToID
 
 	for _, network := range networksMap {
 		netEntry := api.Network{

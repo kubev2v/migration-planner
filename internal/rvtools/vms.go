@@ -28,7 +28,7 @@ func processVMInfo(
 	vNetworkColMap := buildColumnMap(vNetworkHeader)
 
 	hostIPToObjectID := createHostIPToObjectIDMap(vHostRows)
-	networkNameToID := createNetworkNameToIDMap(dvPortRows)
+	networkNameToID := createNetworkMappings(dvPortRows).NameToID
 
 	vmCpuData := groupRowsByVM(vCpuData, vCpuColMap)
 	vmMemoryData := groupRowsByVM(vMemoryData, vMemoryColMap)
