@@ -111,7 +111,7 @@ export default class LoginForm {
                         <div class="pf-v6-c-form__group-control">
                             <div class="pf-v6-c-check ${disabled.elem}">
                                 <input id="checkbox-form-control" class="pf-v6-c-check__input"
-                                    name="isDataSharingAllowed" type="checkbox" aria-invalid="false" data"
+                                    name="isDataSharingAllowed" type="checkbox" aria-invalid="false"
                                     ${disabled.elem}
                                     ${self.props.dataSharingEnabled ? "checked" : ""}>
                                 <label class="pf-v6-c-check__label" for="checkbox-form-control">
@@ -133,8 +133,8 @@ export default class LoginForm {
 
 
         let dataSharingElement = formElement.querySelector("#checkbox-form-control");
-        dataSharingElement.addEventListener("click", () => {
-            self.props.enableDataSharingCallback(dataSharingElement);
+        dataSharingElement.addEventListener("change", (event) => {
+            self.props.enableDataSharingCallback(event.target);
         });
 
         return formElement;
