@@ -52,9 +52,14 @@ export default class FormView extends Observable {
             dataSharingEnabled: self.store.state.dataSharingAccepted,
             disabled: self.store.state.requestPending || self.store.state.formState == FormStates.CredentialsAccepted || self.store.state.formState == FormStates.GatheringInventory,
             enableDataSharingCallback: (elem) => {
-                self.store.dispatch("enableDataSharing", {
-                    enabled: elem.checked
-                });
+                // preserve current form values before state-triggered re-render
+                const credentials = {
+                    url: form.elements['url'].value,
+                    username: form.elements['username'].value,
+                    password: form.elements['password'].value,
+                };
+                self.store.dispatch('formCredentials', credentials);
+                self.store.dispatch("enableDataSharing", { enabled: elem.checked });
             },
             credentials: self.store.state.creds,
             state: self.store.state.formState,
