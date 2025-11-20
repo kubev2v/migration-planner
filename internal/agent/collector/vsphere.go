@@ -159,11 +159,31 @@ func (c *Collector) run(ctx context.Context) {
 		return
 	}
 
-	zap.S().Named("collector").Infof("Create inventory")
+	zap.S().Named("collector").Infof("List Datastores")
+	datastores, err := listDatastoresFromCollector(collector)
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to list datastores: %v", err)
+		return
+	}
+
+	zap.S().Named("collector").Infof("List Networks")
+	networks, err := listNetworksFromCollector(collector)
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to list networks: %v", err)
+		return
+	}
+
+	zap.S().Named("collector").Infof("Extract cluster mapping and build helper maps")
+	clusterMapping, hostIDToPowerState, vmsByCluster := ExtractVSphereClusterIDMapping(*vms, *hosts, *clusters)
+
+	zap.S().Named("collector").Infof("Create vCenter-level inventory")
+
+	apiDatastores, datastoreIndexToName, datastoreMapping := getDatastores(hosts, datastores)
+	apiNetworks, networkMapping := getNetworks(networks, collector, CountVmsByNetwork(*vms))
 
 	infraData := service.InfrastructureData{
-		Datastores:            getDatastores(hosts, collector),
-		Networks:              getNetworks(collector, CountVmsByNetwork(*vms)),
+		Datastores:            apiDatastores,
+		Networks:              apiNetworks,
 		HostPowerStates:       getHostPowerStates(*hosts),
 		Hosts:                 getHosts(hosts),
 		HostsPerCluster:       getHostsPerCluster(*clusters),
@@ -173,30 +193,72 @@ func (c *Collector) run(ctx context.Context) {
 		TotalDatacenters:      len(*datacenters),
 		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
 	}
-	invData := service.CreateBasicInventory(vms, infraData)
+	vcenterInv := service.CreateBasicInventory(vms, infraData)
 
-	zap.S().Named("collector").Infof("Run the validation of VMs")
+	zap.S().Named("collector").Infof("Run the validation of VMs for vCenter-level")
 	if err := c.validateVMs(ctx, vms); err != nil {
 		zap.S().Named("collector").Warnf("At least one error during VMs validation: %v", err)
 	}
 
-	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, invData)
+	zap.S().Named("collector").Infof("Fill the vCenter-level inventory object with more data")
+	FillInventoryObjectWithMoreData(vms, vcenterInv)
 
-	// FIX: do not release into prod without https://github.com/kubev2v/migration-planner/pull/744
-	inv := &apiplanner.Inventory{
-		VcenterId: about.InstanceUuid,
-		Clusters: map[string]apiplanner.InventoryData{
-			"cluster1": *invData,
-		},
-		Vcenter: invData,
+	zap.S().Named("collector").Infof("Create per-cluster inventories")
+	perClusterInventories := make(map[string]*apiplanner.InventoryData)
+	for _, clusterID := range clusterMapping.ClusterIDs {
+		zap.S().Named("collector").Debugf("Processing cluster: %s", clusterID)
+
+		clusterVMs := vmsByCluster[clusterID]
+
+		// Filter infrastructure data for this cluster
+		clusterInfraData := service.FilterInfraDataByClusterID(
+			infraData,
+			clusterID,
+			clusterMapping.HostToClusterID,
+			clusterVMs,
+			datastoreMapping,
+			datastoreIndexToName,
+			networkMapping,
+			hostIDToPowerState,
+		)
+
+		// Create cluster inventory
+		clusterInv := service.CreateBasicInventory(&clusterVMs, clusterInfraData)
+
+		if len(clusterVMs) > 0 {
+			// Validate cluster VMs
+			if err := c.validateVMs(ctx, &clusterVMs); err != nil {
+				zap.S().Named("collector").Warnf("Cluster %s: validation errors: %v", clusterID, err)
+			}
+
+			// Fill cluster inventory with more data
+			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
+		}
+
+		perClusterInventories[clusterID] = clusterInv
 	}
 
+	// Create the full V2 Inventory structure
+	zap.S().Named("collector").Infof("Create clustered inventory response")
+	inventoryV2 := &apiplanner.Inventory{
+		VcenterId: about.InstanceUuid,
+		Clusters:  make(map[string]apiplanner.InventoryData),
+		Vcenter:   vcenterInv,
+	}
+
+	// Convert per-cluster inventories to the map format
+	for clusterID, clusterInv := range perClusterInventories {
+		inventoryV2.Clusters[clusterID] = *clusterInv
+	}
+
+	// Write the V2 inventory to output file
 	zap.S().Named("collector").Infof("Write the inventory to output file")
-	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
-		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
+	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inventoryV2); err != nil {
+		zap.S().Named("collector").Errorf("Failed to write inventory: %v", err)
 		return
 	}
+
+	zap.S().Named("collector").Infof("Successfully created inventory with %d clusters", len(perClusterInventories))
 }
 
 func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
@@ -527,22 +589,37 @@ func Histogram(d []int) apiplanner.Histogram {
 	}
 }
 
-func getNetworks(collector *vsphere.Collector, vmsPerNetwork map[string]int) []apiplanner.Network {
-	r := []apiplanner.Network{}
+func listNetworksFromCollector(collector *vsphere.Collector) (*[]vspheremodel.Network, error) {
 	networks := &[]vspheremodel.Network{}
 	err := collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		return nil
+		return nil, err
 	}
+	return networks, nil
+}
 
+func getNetworks(networks *[]vspheremodel.Network, collector *vsphere.Collector, vmsPerNetwork map[string]int) (
+	apiNetworks []apiplanner.Network,
+	networkMapping map[string]string,
+) {
+	apiNetworks = []apiplanner.Network{}
+	networkMapping = make(map[string]string, len(*networks))
+
+	// Single iteration to build API networks and mapping
 	for _, n := range *networks {
+		// Build mapping
+		if n.ID != "" && n.Name != "" {
+			networkMapping[n.ID] = n.Name
+		}
+
+		// Build API network
 		vlanId := n.VlanId
 		dvNet := &vspheremodel.Network{}
 		if n.Variant == vspheremodel.NetDvPortGroup {
 			dvNet.WithRef(n.DVSwitch)
 			_ = collector.DB().Get(dvNet)
 		}
-		r = append(r, apiplanner.Network{
+		apiNetworks = append(apiNetworks, apiplanner.Network{
 			Name:     n.Name,
 			Type:     apiplanner.NetworkType(getNetworkType(&n)),
 			VlanId:   &vlanId,
@@ -551,19 +628,20 @@ func getNetworks(collector *vsphere.Collector, vmsPerNetwork map[string]int) []a
 		})
 	}
 
-	return r
+	return apiNetworks, networkMapping
 }
 
 func getNetworkType(n *vspheremodel.Network) string {
-	if n.Variant == vspheremodel.NetDvPortGroup {
+	switch n.Variant {
+	case vspheremodel.NetDvPortGroup:
 		return string(apiplanner.Distributed)
-	} else if n.Variant == vspheremodel.NetStandard {
+	case vspheremodel.NetStandard:
 		return string(apiplanner.Standard)
-	} else if n.Variant == vspheremodel.NetDvSwitch {
+	case vspheremodel.NetDvSwitch:
 		return string(apiplanner.Dvswitch)
+	default:
+		return string(apiplanner.Unsupported)
 	}
-
-	return string(apiplanner.Unsupported)
 }
 
 func getHostsPerCluster(clusters []vspheremodel.Cluster) []int {
@@ -699,13 +777,20 @@ func TransformVendorName(vendor string) string {
 	return raw // Return original case for unmapped
 }
 
-func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []apiplanner.Datastore {
+func listDatastoresFromCollector(collector *vsphere.Collector) (*[]vspheremodel.Datastore, error) {
 	datastores := &[]vspheremodel.Datastore{}
 	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
 	if err != nil {
-		return nil
+		return nil, err
 	}
+	return datastores, nil
+}
 
+func getDatastores(hosts *[]vspheremodel.Host, datastores *[]vspheremodel.Datastore) (
+	apiDatastores []apiplanner.Datastore,
+	indexToName map[int]string,
+	nameToID map[string]string,
+) {
 	// Create datastore-to-hostIDs mapping once for better performance
 	datastoreToHostIDs := make(map[string][]string)
 	for _, host := range *hosts {
@@ -714,8 +799,20 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 		}
 	}
 
-	res := []apiplanner.Datastore{}
-	for _, ds := range *datastores {
+	// Initialize return values
+	apiDatastores = []apiplanner.Datastore{}
+	indexToName = make(map[int]string, len(*datastores))
+	nameToID = make(map[string]string, len(*datastores))
+
+	// Single iteration to build API datastores and mappings
+	for i, ds := range *datastores {
+		// Build mappings
+		indexToName[i] = ds.Name
+		if ds.Name != "" && ds.ID != "" {
+			nameToID[ds.Name] = ds.ID
+		}
+
+		// Build API datastore
 		dsVendor, dsModel, dsProtocol := findDataStoreInfo(*hosts, ds.BackingDevicesNames)
 		hostIDs := datastoreToHostIDs[ds.ID]
 		var hostIDPtr *string
@@ -724,7 +821,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 			hostIDPtr = &joined
 		}
 
-		res = append(res, apiplanner.Datastore{
+		apiDatastores = append(apiDatastores, apiplanner.Datastore{
 			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
 			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
@@ -737,7 +834,7 @@ func getDatastores(hosts *[]vspheremodel.Host, collector *vsphere.Collector) []a
 		})
 	}
 
-	return res
+	return apiDatastores, indexToName, nameToID
 }
 
 func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
@@ -802,7 +899,7 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	// Ensure the file is closed properly
 	defer file.Close()
 
-	// Write the string to the file
+	// Write the inventory to the file  // Note: service.InventoryData wraps the Inventory with error handling
 	jsonData, err := json.Marshal(&service.InventoryData{Inventory: *inv})
 	if err != nil {
 		return err
