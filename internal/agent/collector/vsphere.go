@@ -159,7 +159,28 @@ func (c *Collector) run(ctx context.Context) {
 		return
 	}
 
-	zap.S().Named("collector").Infof("Create inventory")
+	zap.S().Named("collector").Infof("List Datastores")
+	datastores := &[]vspheremodel.Datastore{}
+	err = collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to list datastores: %v", err)
+		return
+	}
+
+	zap.S().Named("collector").Infof("List Networks")
+	networks := &[]vspheremodel.Network{}
+	err = collector.DB().List(networks, libmodel.FilterOptions{Detail: 1})
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to list networks: %v", err)
+		return
+	}
+
+	zap.S().Named("collector").Infof("Extract cluster mapping and build helper maps")
+	clusterMapping, hostIDToPowerState, vmsByCluster := ExtractVSphereClusterIDMapping(*vms, *hosts, *clusters)
+	datastoreIndexToName, datastoreMapping := buildDatastoreMappings(*datastores)
+	networkMapping := buildNetworkMappingFromVSphere(*networks)
+
+	zap.S().Named("collector").Infof("Create vCenter-level inventory")
 
 	infraData := service.InfrastructureData{
 		Datastores:            getDatastores(hosts, collector),
@@ -173,21 +194,67 @@ func (c *Collector) run(ctx context.Context) {
 		TotalDatacenters:      len(*datacenters),
 		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
 	}
-	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
+	vcenterInv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
 
-	zap.S().Named("collector").Infof("Run the validation of VMs")
+	zap.S().Named("collector").Infof("Run the validation of VMs for vCenter-level")
 	if err := c.validateVMs(ctx, vms); err != nil {
 		zap.S().Named("collector").Warnf("At least one error during VMs validation: %v", err)
 	}
 
-	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, inv)
+	zap.S().Named("collector").Infof("Fill the vCenter-level inventory object with more data")
+	FillInventoryObjectWithMoreData(vms, vcenterInv)
 
+	zap.S().Named("collector").Infof("Create per-cluster inventories")
+	perClusterInventories := make(map[string]*apiplanner.Inventory)
+	for _, clusterID := range clusterMapping.ClusterIDs {
+		zap.S().Named("collector").Debugf("Processing cluster: %s", clusterID)
+
+		clusterVMs := vmsByCluster[clusterID]
+
+		// Filter infrastructure data for this cluster
+		clusterInfraData := service.FilterInfraDataByClusterID(
+			infraData,
+			clusterID,
+			clusterMapping.HostToClusterID,
+			clusterVMs,
+			datastoreMapping,
+			datastoreIndexToName,
+			networkMapping,
+			hostIDToPowerState,
+		)
+
+		// Create cluster inventory
+		clusterInv := service.CreateBasicInventory(about.InstanceUuid, &clusterVMs, clusterInfraData)
+
+		if len(clusterVMs) > 0 {
+			// Validate cluster VMs
+			if err := c.validateVMs(ctx, &clusterVMs); err != nil {
+				zap.S().Named("collector").Warnf("Cluster %s: validation errors: %v", clusterID, err)
+			}
+
+			// Fill cluster inventory with more data
+			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
+		}
+
+		perClusterInventories[clusterID] = clusterInv
+	}
+
+	zap.S().Named("collector").Infof("Create clustered inventory response")
+	clusteredInventory := &service.ClusteredInventoryResponse{
+		VCenterID: about.InstanceUuid,
+		VCenter:   vcenterInv,
+		Clusters:  perClusterInventories,
+	}
+
+	// For now, write only the vCenter-level inventory to maintain compatibility
+	// Future: expose per-cluster data via API
 	zap.S().Named("collector").Infof("Write the inventory to output file")
-	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
-		zap.S().Named("collector").Errorf("Fill the inventory object with more data: %v", err)
+	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), clusteredInventory.VCenter); err != nil {
+		zap.S().Named("collector").Errorf("Failed to write inventory: %v", err)
 		return
 	}
+
+	zap.S().Named("collector").Infof("Successfully created inventory with %d clusters", len(perClusterInventories))
 }
 
 func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
