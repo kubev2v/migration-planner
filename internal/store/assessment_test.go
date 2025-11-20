@@ -205,12 +205,22 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
+			Expect(err).To(BeNil())
+
+			// Get the created assessment with snapshots
+			created, err := s.Assessment().Get(context.TODO(), assessmentID)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
 			Expect(created.Name).To(Equal("test-assessment"))
 			Expect(created.Snapshots).To(HaveLen(1))
+			Expect(created.Snapshots[0].Status).To(Equal(model.SnapshotStatusReady))
 
 			// Verify in database
 			var count int
@@ -243,7 +253,15 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType:     "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
+			Expect(err).To(BeNil())
+
+			created, err := s.Assessment().Get(context.TODO(), assessmentID)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -285,7 +303,15 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
+			Expect(err).To(BeNil())
+
+			created, err := s.Assessment().Get(context.TODO(), assessmentID)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -310,7 +336,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &nonExistentSourceID,
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("foreign key constraint"))
 		})
@@ -331,7 +362,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventory)
+			snapshot1 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment1, &snapshot1)
 			Expect(err).To(BeNil())
 
 			// Try to create another assessment with same name in same org
@@ -342,7 +378,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventory)
+			snapshot2 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err = s.Assessment().Create(context.TODO(), &assessment2, &snapshot2)
 			Expect(err).ToNot(BeNil())
 		})
 
@@ -362,7 +403,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventory)
+			snapshot1 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment1, &snapshot1)
 			Expect(err).To(BeNil())
 
 			// Create assessment with same name but different org
@@ -373,7 +419,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventory)
+			snapshot2 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err = s.Assessment().Create(context.TODO(), &assessment2, &snapshot2)
 			Expect(err).To(BeNil())
 
 			var count int
@@ -412,7 +463,15 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
+			Expect(err).To(BeNil())
+
+			created, err := s.Assessment().Get(context.TODO(), assessmentID)
 			Expect(err).To(BeNil())
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
@@ -450,11 +509,16 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
 			Expect(err).To(BeNil())
 
 			newName := "updated-name"
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, nil)
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &model.Assessment{Name: newName}, nil)
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 			Expect(updated.Name).To(Equal("updated-name"))
@@ -476,9 +540,13 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1)
+			snapshot1 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory1),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot1)
 			Expect(err).To(BeNil())
-			Expect(created.Snapshots).To(HaveLen(1))
 
 			// Add new snapshot
 			inventory2 := api.Inventory{
@@ -487,9 +555,13 @@ var _ = Describe("assessment store", Ordered, func() {
 				Infra:   api.Infra{TotalHosts: 7},
 			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, &inventory2)
+			snapshot2 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory2),
+			}
+
+			_, err = s.Assessment().Update(context.TODO(), assessmentID, &model.Assessment{}, &snapshot2)
 			Expect(err).To(BeNil())
-			Expect(updated).ToNot(BeNil())
 
 			// Verify new snapshot was added
 			var count int
@@ -513,7 +585,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1)
+			snapshot1 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory1),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot1)
 			Expect(err).To(BeNil())
 
 			// Update both name and add snapshot
@@ -524,7 +601,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Infra:   api.Infra{TotalHosts: 7},
 			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, &inventory2)
+			snapshot2 := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory2),
+			}
+
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &model.Assessment{Name: newName}, &snapshot2)
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 			Expect(updated.Name).To(Equal("updated-name"))
@@ -541,7 +623,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			nonExistentID := uuid.New()
 			newName := "updated-name"
 
-			_, err := s.Assessment().Update(context.TODO(), nonExistentID, &newName, nil)
+			_, err := s.Assessment().Update(context.TODO(), nonExistentID, &model.Assessment{Name: newName}, nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err).To(Equal(store.ErrRecordNotFound))
 		})
@@ -569,7 +651,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory)
+			snapshot := model.Snapshot{
+				Status:    model.SnapshotStatusReady,
+				Inventory: model.MakeJSONField(inventory),
+			}
+
+			err := s.Assessment().Create(context.TODO(), &assessment, &snapshot)
 			Expect(err).To(BeNil())
 
 			// Verify assessment and snapshot exist
