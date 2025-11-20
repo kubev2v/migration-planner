@@ -329,7 +329,7 @@ test: $(GINKGO)
 	@echo "✅ All Unit tests passed successfully."
 
 # Full unit test cycle: build, prepare DB, run tests, and clean up
-unit-test: build kill-db deploy-db migrate test kill-db
+unit-test: build deploy-db deploy-spicedb migrate test kill-spicedb kill-db
 
 # Run integration tests using ginkgo
 integration-test: $(GINKGO) build
