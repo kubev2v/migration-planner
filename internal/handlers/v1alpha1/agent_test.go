@@ -221,9 +221,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: agentID,
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -237,7 +235,7 @@ var _ = Describe("agent service", Ordered, func() {
 			var inventory v1alpha1.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
-			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
+			Expect(inventory.VcenterId).To(Equal("vcenter"))
 		})
 
 		It("successfully updates the source - two agents", func() {
@@ -266,9 +264,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: agentID,
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -282,7 +278,7 @@ var _ = Describe("agent service", Ordered, func() {
 			var inventory v1alpha1.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
-			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
+			Expect(inventory.VcenterId).To(Equal("vcenter"))
 
 			// second agent request
 			resp, err = srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
@@ -290,9 +286,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: secondAgentID,
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -352,9 +346,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: firstAgentID,
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -366,9 +358,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: firstAgentID,
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "anotherVCenterID",
-						},
+						VcenterId: "anotherVCenterID",
 					},
 				},
 			})

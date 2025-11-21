@@ -17,7 +17,7 @@ const (
 	NetDvPortGroup = "distributed"
 )
 
-func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.Inventory, vms []vsphere.VM) error {
+func processNetworkInfo(dvswitchRows [][]string, dvportRows [][]string, inventory *api.InventoryData, vms []vsphere.VM) error {
 	dvswitchMap := make(map[string]bool)
 
 	networksMap := make(map[string]api.Network)

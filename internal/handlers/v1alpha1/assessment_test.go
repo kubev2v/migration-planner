@@ -129,9 +129,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			inventory := v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "test-vcenter",
-				},
+				VcenterId: "test-vcenter",
 			}
 
 			assessmentSrv := service.NewAssessmentService(s, nil, nil)
@@ -170,9 +168,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			inventory := v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "test-vcenter",
-				},
+				VcenterId: "test-vcenter",
 			}
 
 			assessmentSrv := service.NewAssessmentService(s, nil, nil)
@@ -331,9 +327,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		Context("name validation", func() {
 			It("fails with empty name", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -349,9 +343,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails with name containing spaces", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -367,9 +359,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails with name containing special characters", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -385,9 +375,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails with name too long (over 100 characters)", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				longName := "a"
@@ -408,9 +396,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("succeeds with valid name containing allowed characters", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -428,9 +414,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		Context("sourceType validation", func() {
 			It("fails with empty sourceType", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -446,9 +430,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails with invalid sourceType", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -464,9 +446,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("succeeds with valid sourceType 'inventory'", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -520,9 +500,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails when sourceType is 'inventory' but inventory has no vCenter ID", func() {
 				emptyInventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "", // Empty vCenter ID
-					},
+					VcenterId: "", // Empty vCenter ID
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -542,7 +520,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			It("fails when sourceType is 'inventory' but inventory has empty vCenter", func() {
 				// Inventory with empty vcenter (no meaningful data)
 				emptyVCenterInventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{}, // No ID provided
+					VcenterId: "", // No ID provided
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -576,9 +554,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("succeeds when sourceType is 'inventory' and inventory is provided", func() {
 				inventory := v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{
-						Id: "test-vcenter",
-					},
+					VcenterId: "test-vcenter",
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
