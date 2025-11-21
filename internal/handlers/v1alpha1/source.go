@@ -201,7 +201,7 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request apiServer.
 		AgentID:   request.Body.AgentId,
 		SourceID:  request.Id,
 		Inventory: data,
-		VCenterID: request.Body.Inventory.Vcenter.Id,
+		VCenterID: request.Body.Inventory.VcenterId,
 	})
 	if err != nil {
 		switch err.(type) {

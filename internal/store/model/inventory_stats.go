@@ -49,7 +49,7 @@ type InventoryStats struct {
 }
 
 type domainInventory struct {
-	Inventory api.Inventory
+	Inventory api.InventoryData
 	OrgID     string
 }
 
@@ -74,7 +74,7 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 		}
 
 		domainInventories = append(domainInventories, domainInventory{
-			Inventory: *inventory,
+			Inventory: *inventory.Vcenter,
 			OrgID:     domain,
 		})
 		orgIDs[a.OrgID] = struct{}{}
@@ -176,7 +176,7 @@ func computeStorageStats(domainInventories []domainInventory) []StorageCustomerS
 	return stats
 }
 
-func computeInventoryStorageStats(inventory api.Inventory) map[string]int {
+func computeInventoryStorageStats(inventory api.InventoryData) map[string]int {
 	totalByProvider := make(map[string]int)
 
 	for _, storage := range inventory.Infra.Datastores {

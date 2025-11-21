@@ -310,9 +310,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			srv := service.NewSourceService(s, nil)
@@ -347,9 +345,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			srv := service.NewSourceService(s, nil)
@@ -386,9 +382,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			inventory1JSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			srv := service.NewSourceService(s, nil)
@@ -401,9 +395,7 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			inventory2JSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "another-vcenter-id",
-				},
+				VcenterId: "another-vcenter-id",
 			})
 
 			// Now try to update with a different vCenter ID

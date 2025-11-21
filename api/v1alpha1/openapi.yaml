@@ -821,11 +821,30 @@ components:
     Inventory:
       type: object
       required:
-        - vcenter
+        - vcenter_id
+        - clusters
+      properties:
+        vcenter_id:
+          type: string
+          description: ID of the vCenter
+        clusters:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/InventoryData'
+          description: Map of cluster names to their inventory data
+        vcenter:
+          $ref: '#/components/schemas/InventoryData'
+          description: vCenter-level inventory data
+
+    InventoryData:
+      type: object
+      required:
         - vms
         - infra
       properties:
         vcenter:
+          deprecated: true
+          nullable: true
           $ref: '#/components/schemas/VCenter'
         vms:
           $ref: '#/components/schemas/VMs'

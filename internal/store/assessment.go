@@ -78,6 +78,7 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 	snapshot := model.Snapshot{
 		AssessmentID: assessment.ID,
 		Inventory:    inventory,
+		Version:      model.SnapshotVersionV2,
 	}
 
 	if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
@@ -108,6 +109,7 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		snapshot := model.Snapshot{
 			AssessmentID: assessmentID,
 			Inventory:    inventory,
+			Version:      model.SnapshotVersionV2,
 		}
 
 		if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {

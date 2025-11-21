@@ -95,7 +95,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		var datastoreIndexToName map[int]string
 
 		if len(datastoreRows) > 0 {
-			tempInventory := &api.Inventory{Infra: api.Infra{Datastores: []api.Datastore{}}}
+			tempInventory := &api.InventoryData{Infra: api.Infra{Datastores: []api.Datastore{}}}
 			var err error
 			datastoreIndexToName, err = processDatastoreInfo(datastoreRows, vHostRows, tempInventory)
 			if err != nil {
@@ -131,7 +131,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			TotalDatacenters:      clusterInfo.TotalDatacenters,
 			VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
 		}
-		vcenterInventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
+		vcenterInventory := service.CreateBasicInventory(&vms, infraData)
 
 		zap.S().Named("rvtools").Infof("Fill VCenter Inventory with VM Data")
 		if len(vms) > 0 {
@@ -148,7 +148,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 		// Create per-cluster inventories
 		zap.S().Named("rvtools").Infof("Create Per-Cluster Inventories")
-		clusterInventories := make(map[string]*api.Inventory)
+		clusterInventories := make(map[string]api.InventoryData)
 
 		for _, clusterID := range clusterMapping.ClusterIDs {
 			zap.S().Named("rvtools").Infof("Processing cluster: %s", clusterID)
@@ -158,22 +158,22 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 			clusterInfraData := service.FilterInfraDataByClusterID(infraData, clusterID, clusterMapping.HostToClusterID, clusterVMs, datastoreMapping, datastoreIndexToName, networkMapping, hostIDToPowerState)
 
-			clusterInv := service.CreateBasicInventory(vcenterUUID, &clusterVMs, clusterInfraData)
+			clusterInv := service.CreateBasicInventory(&clusterVMs, clusterInfraData)
 
 			if len(clusterVMs) > 0 {
 				collector.FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
 			}
 
-			clusterInventories[clusterID] = clusterInv
+			clusterInventories[clusterID] = *clusterInv
 		}
 
-		response := &service.ClusteredInventoryResponse{
-			VCenterID: vcenterUUID,
+		inv := api.Inventory{
+			VcenterId: vcenterUUID,
+			Vcenter:   vcenterInventory,
 			Clusters:  clusterInventories,
-			VCenter:   vcenterInventory,
 		}
 
-		data, err := json.Marshal(response.VCenter)
+		data, err := json.Marshal(inv)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -376,7 +376,7 @@ func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []ap
 		return networks
 	}
 
-	tempInventory := &api.Inventory{Infra: api.Infra{}}
+	tempInventory := &api.InventoryData{Infra: api.Infra{}}
 	if err := processNetworkInfo(dvswitchRows, dvportRows, tempInventory, vms); err != nil {
 		zap.S().Named("rvtools").Warnf("Failed to process network info: %v", err)
 		return networks

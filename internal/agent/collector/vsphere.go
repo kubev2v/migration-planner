@@ -173,7 +173,7 @@ func (c *Collector) run(ctx context.Context) {
 		TotalDatacenters:      len(*datacenters),
 		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
 	}
-	inv := service.CreateBasicInventory(about.InstanceUuid, vms, infraData)
+	invData := service.CreateBasicInventory(vms, infraData)
 
 	zap.S().Named("collector").Infof("Run the validation of VMs")
 	if err := c.validateVMs(ctx, vms); err != nil {
@@ -181,7 +181,16 @@ func (c *Collector) run(ctx context.Context) {
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, inv)
+	FillInventoryObjectWithMoreData(vms, invData)
+
+	// FIX: do not release into prod without https://github.com/kubev2v/migration-planner/pull/744
+	inv := &apiplanner.Inventory{
+		VcenterId: about.InstanceUuid,
+		Clusters: map[string]apiplanner.InventoryData{
+			"cluster1": *invData,
+		},
+		Vcenter: invData,
+	}
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
@@ -191,7 +200,6 @@ func (c *Collector) run(ctx context.Context) {
 }
 
 func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
-
 	opaValidator, err := opa.NewValidatorFromDir(c.opaPoliciesDir)
 	if err != nil {
 		return fmt.Errorf("failed to initialize OPA validator from %s: %w", c.opaPoliciesDir, err)
@@ -237,7 +245,7 @@ func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
 	return container, nil
 }
 
-func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
+func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.InventoryData) {
 	cpuSet := []int{}
 	memorySet := []int{}
 	diskGBSet := []int{}
@@ -287,7 +295,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 				inv.Vms.CpuCores.TotalForMigratableWithWarnings += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
-				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) //Migratable
+				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) // Migratable
 				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
 				// Migratable without any warnings
@@ -328,7 +336,7 @@ func vmGuestName(vm vspheremodel.VM) string {
 	return vm.GuestName
 }
 
-func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.Inventory) {
+func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.InventoryData) {
 	diskSizeTier := *(inv.Vms.DiskSizeTier)
 
 	for _, diskGB := range diskGBSet {
@@ -356,7 +364,6 @@ func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.Inventory) {
 		v.TotalSizeTB = math.Round(v.TotalSizeTB*100) / 100
 		diskSizeTier[k] = v
 	}
-
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
@@ -808,7 +815,7 @@ func createOuput(outputFile string, inv *apiplanner.Inventory) error {
 	return nil
 }
 
-func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.Inventory) (bool, bool) {
+func migrationReport(concern []vspheremodel.Concern, inv *apiplanner.InventoryData) (bool, bool) {
 	migratable := true
 	hasWarning := false
 	for _, result := range concern {

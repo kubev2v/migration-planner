@@ -133,9 +133,11 @@ var _ = Describe("assessment service", Ordered, func() {
 		Context("with inventory source", func() {
 			It("successfully creates assessment with inventory", func() {
 				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
-					Vms:     v1alpha1.VMs{Total: 10},
-					Infra:   v1alpha1.Infra{TotalHosts: 5},
+					VcenterId: "test-vcenter",
+					Vcenter: &v1alpha1.InventoryData{
+						Vms:   v1alpha1.VMs{Total: 10},
+						Infra: v1alpha1.Infra{TotalHosts: 5},
+					},
 				})
 
 				testAssessmentID := uuid.New()
@@ -171,9 +173,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			It("successfully creates assessment without owner fields (nil values)", func() {
 				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
-					Vms:     v1alpha1.VMs{Total: 10},
-					Infra:   v1alpha1.Infra{TotalHosts: 5},
+					VcenterId: "test-vcenter",
+					Vcenter: &v1alpha1.InventoryData{
+						Vms:   v1alpha1.VMs{Total: 10},
+						Infra: v1alpha1.Infra{TotalHosts: 5},
+					},
 				})
 
 				testAssessmentID := uuid.New()
@@ -201,9 +205,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
 				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-					Vcenter: v1alpha1.VCenter{Id: "test-vcenter"},
-					Vms:     v1alpha1.VMs{Total: 10},
-					Infra:   v1alpha1.Infra{TotalHosts: 5},
+					VcenterId: "test-vcenter",
+					Vcenter: &v1alpha1.InventoryData{
+						Vms:   v1alpha1.VMs{Total: 10},
+						Infra: v1alpha1.Infra{TotalHosts: 5},
+					},
 				})
 
 				name := "Duplicate Assessment"
@@ -234,7 +240,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("successfully creates assessment with valid source", func() {
 				// Create a source with inventory first
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -264,7 +270,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("fails when user orgID is different than source orgID", func() {
 				// Create a source in different org
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org2", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -340,7 +346,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("successfully updates assessment name and adds new snapshot", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":15},"infra":{"totalHosts":7}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -351,7 +357,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"old-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -372,7 +378,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("only updates name when name is provided without creating new snapshot", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":15},"infra":{"totalHosts":7}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -383,7 +389,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"old-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -402,7 +408,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("creates a new snapshot on every PUT operation for sourceID-based assessments", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":15},"infra":{"totalHosts":7}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -413,7 +419,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"old-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 1 snapshot
@@ -456,7 +462,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("successfully updates when source is deleted (source_id becomes NULL)", func() {
 				// Create a source first
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":15},"infra":{"totalHosts":7}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
@@ -467,7 +473,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"old-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Delete the source (this will set source_id to NULL due to ON DELETE SET NULL)
@@ -498,7 +504,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -537,7 +543,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 1 snapshot
@@ -660,7 +666,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			It("rolls back database when assessment creation fails with forbidden source access", func() {
 				// Create a source owned by different user
 				sourceID := uuid.New()
-				inventoryJSON := `{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`
 
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org2", inventoryJSON))
 				Expect(tx.Error).To(BeNil())
