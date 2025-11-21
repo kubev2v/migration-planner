@@ -12,9 +12,9 @@ type ClusterIDMapping struct {
 }
 
 type ClusteredInventoryResponse struct {
-	VCenterID string                    `json:"vcenter_id"`
-	Clusters  map[string]*api.Inventory `json:"clusters"` // Keys are cluster IDs
-	VCenter   *api.Inventory            `json:"vcenter"`  // Aggregated vcenter inventory
+	VCenterID string                        `json:"vcenter_id"`
+	Clusters  map[string]*api.InventoryData `json:"clusters"` // Keys are cluster IDs
+	VCenter   *api.InventoryData            `json:"vcenter"`  // Aggregated vcenter inventory
 }
 
 func FilterVMsByClusterID(vms []vsphere.VM, clusterID string, vmToClusterID map[string]string) []vsphere.VM {

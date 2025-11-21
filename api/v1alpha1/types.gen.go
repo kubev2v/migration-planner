@@ -177,9 +177,19 @@ type Infra struct {
 
 // Inventory defines model for Inventory.
 type Inventory struct {
-	Infra   Infra   `json:"infra"`
-	Vcenter VCenter `json:"vcenter"`
-	Vms     VMs     `json:"vms"`
+	// Clusters Map of cluster names to their inventory data
+	Clusters map[string]InventoryData `json:"clusters"`
+	Vcenter  *InventoryData           `json:"vcenter,omitempty"`
+
+	// VcenterId ID of the vCenter
+	VcenterId string `json:"vcenter_id"`
+}
+
+// InventoryData defines model for InventoryData.
+type InventoryData struct {
+	Infra   Infra    `json:"infra"`
+	Vcenter *VCenter `json:"vcenter,omitempty"`
+	Vms     VMs      `json:"vms"`
 }
 
 // Ipv4Config defines model for Ipv4Config.

@@ -298,21 +298,25 @@ var _ = Describe("Parser", func() {
 				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil)
 				Expect(err).ToNot(HaveOccurred())
 
-				apiInventory := v1alpha1.Inventory{}
-				jerr := json.Unmarshal(inventory, &apiInventory)
+				var response struct {
+					VCenterID string                            `json:"vcenter_id"`
+					Clusters  map[string]v1alpha1.InventoryData `json:"clusters"`
+					VCenter   v1alpha1.InventoryData            `json:"vcenter"`
+				}
+				jerr := json.Unmarshal(inventory, &response)
 				Expect(jerr).ToNot(HaveOccurred())
 
-				Expect(apiInventory.Infra).ToNot(BeNil())
+				Expect(response.VCenter.Infra).ToNot(BeNil())
 
 				By("verifying empty data is handled gracefully")
-				Expect(apiInventory.Vms.Total).To(Equal(0))
-				Expect(apiInventory.Infra.TotalHosts).To(Equal(0))
-				Expect(apiInventory.Infra.TotalClusters).To(Equal(0))
+				Expect(response.VCenter.Vms.Total).To(Equal(0))
+				Expect(response.VCenter.Infra.TotalHosts).To(Equal(0))
+				Expect(response.VCenter.Infra.TotalClusters).To(Equal(0))
 
 				By("verifying empty collections are initialized")
-				Expect(apiInventory.Infra.Datastores).To(BeEmpty())
-				Expect(apiInventory.Infra.Networks).To(BeEmpty())
-				Expect(apiInventory.Infra.HostsPerCluster).To(BeEmpty())
+				Expect(response.VCenter.Infra.Datastores).To(BeEmpty())
+				Expect(response.VCenter.Infra.Networks).To(BeEmpty())
+				Expect(response.VCenter.Infra.HostsPerCluster).To(BeEmpty())
 			})
 		})
 
@@ -328,24 +332,28 @@ var _ = Describe("Parser", func() {
 				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil)
 				Expect(err).ToNot(HaveOccurred())
 
-				apiInventory := v1alpha1.Inventory{}
-				jerr := json.Unmarshal(inventory, &apiInventory)
+				var response struct {
+					VCenterID string                            `json:"vcenter_id"`
+					Clusters  map[string]v1alpha1.InventoryData `json:"clusters"`
+					VCenter   v1alpha1.InventoryData            `json:"vcenter"`
+				}
+				jerr := json.Unmarshal(inventory, &response)
 				Expect(jerr).ToNot(HaveOccurred())
 
-				Expect(apiInventory.Infra).ToNot(BeNil())
+				Expect(response.VCenter.Infra).ToNot(BeNil())
 
 				By("checking that inventory has basic structure")
-				Expect(apiInventory.Vcenter).ToNot(BeNil())
+				Expect(response.VCenterID).ToNot(BeEmpty())
 
 				By("verifying that some infrastructure data was parsed")
 				hostsLen := 0
-				if apiInventory.Infra.Hosts != nil {
-					hostsLen = len(*apiInventory.Infra.Hosts)
+				if response.VCenter.Infra.Hosts != nil {
+					hostsLen = len(*response.VCenter.Infra.Hosts)
 				}
-				hasData := apiInventory.Vms.Total > 0 ||
+				hasData := response.VCenter.Vms.Total > 0 ||
 					hostsLen > 0 ||
-					len(apiInventory.Infra.Datastores) > 0 ||
-					len(apiInventory.Infra.Networks) > 0
+					len(response.VCenter.Infra.Datastores) > 0 ||
+					len(response.VCenter.Infra.Networks) > 0
 				Expect(hasData).To(BeTrue(), "Expected at least some infrastructure data to be parsed")
 			})
 
@@ -354,28 +362,32 @@ var _ = Describe("Parser", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
 
-				apiInventory := v1alpha1.Inventory{}
-				jerr := json.Unmarshal(inventory, &apiInventory)
+				var response struct {
+					VCenterID string                            `json:"vcenter_id"`
+					Clusters  map[string]v1alpha1.InventoryData `json:"clusters"`
+					VCenter   v1alpha1.InventoryData            `json:"vcenter"`
+				}
+				jerr := json.Unmarshal(inventory, &response)
 				Expect(jerr).ToNot(HaveOccurred())
 
 				By("verifying VMs were processed")
-				if apiInventory.Vms.Total > 0 {
-					Expect(apiInventory.Vms.PowerStates).ToNot(BeNil())
-					Expect(apiInventory.Vms.Os).ToNot(BeNil())
+				if response.VCenter.Vms.Total > 0 {
+					Expect(response.VCenter.Vms.PowerStates).ToNot(BeNil())
+					Expect(response.VCenter.Vms.Os).ToNot(BeNil())
 				}
 
 				By("verifying hosts were processed")
-				if apiInventory.Infra.Hosts != nil && len(*apiInventory.Infra.Hosts) > 0 {
-					host := (*apiInventory.Infra.Hosts)[0]
+				if response.VCenter.Infra.Hosts != nil && len(*response.VCenter.Infra.Hosts) > 0 {
+					host := (*response.VCenter.Infra.Hosts)[0]
 					Expect(host.Vendor).ToNot(BeEmpty())
 					Expect(host.Model).ToNot(BeEmpty())
 				}
 
 				By("verifying infrastructure stats were calculated")
-				Expect(apiInventory.Infra.TotalHosts).To(BeNumerically(">=", 0))
-				Expect(apiInventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
-				if apiInventory.Infra.TotalDatacenters != nil {
-					Expect(*apiInventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
+				Expect(response.VCenter.Infra.TotalHosts).To(BeNumerically(">=", 0))
+				Expect(response.VCenter.Infra.TotalClusters).To(BeNumerically(">=", 0))
+				if response.VCenter.Infra.TotalDatacenters != nil {
+					Expect(*response.VCenter.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 				}
 			})
 
@@ -435,23 +447,27 @@ invalid syntax here`
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
 
-				apiInventory := v1alpha1.Inventory{}
-				jerr := json.Unmarshal(inventory, &apiInventory)
+				var response struct {
+					VCenterID string                            `json:"vcenter_id"`
+					Clusters  map[string]v1alpha1.InventoryData `json:"clusters"`
+					VCenter   v1alpha1.InventoryData            `json:"vcenter"`
+				}
+				jerr := json.Unmarshal(inventory, &response)
 				Expect(jerr).ToNot(HaveOccurred())
 
 				By("checking for data correlation signs")
 				// Check that VM totals and infrastructure data make sense together
-				if apiInventory.Vms.Total > 0 && len(apiInventory.Infra.Datastores) > 0 {
+				if response.VCenter.Vms.Total > 0 && len(response.VCenter.Infra.Datastores) > 0 {
 					// If we have VMs and datastores, the parsing likely worked
-					Expect(apiInventory.Vms.Total).To(BeNumerically(">", 0))
-					Expect(len(apiInventory.Infra.Datastores)).To(BeNumerically(">", 0))
+					Expect(response.VCenter.Vms.Total).To(BeNumerically(">", 0))
+					Expect(len(response.VCenter.Infra.Datastores)).To(BeNumerically(">", 0))
 				}
 
 				By("verifying infrastructure consistency")
-				if apiInventory.Infra.TotalHosts > 0 {
-					Expect(apiInventory.Infra.TotalClusters).To(BeNumerically(">=", 0))
-					if apiInventory.Infra.TotalDatacenters != nil {
-						Expect(*apiInventory.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
+				if response.VCenter.Infra.TotalHosts > 0 {
+					Expect(response.VCenter.Infra.TotalClusters).To(BeNumerically(">=", 0))
+					if response.VCenter.Infra.TotalDatacenters != nil {
+						Expect(*response.VCenter.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 					}
 				}
 			})
@@ -1011,7 +1027,7 @@ invalid syntax here`
 			excelContent := createComprehensiveVMDataExcel()
 
 			testPolicy := `package io.konveyor.forklift.vmware
-			
+
 			import rego.v1
 
 			concerns contains flag if {
@@ -1029,18 +1045,22 @@ invalid syntax here`
 			Expect(err).ToNot(HaveOccurred())
 			Expect(inventory).ToNot(BeNil())
 
-			apiInventory := v1alpha1.Inventory{}
-			jerr := json.Unmarshal(inventory, &apiInventory)
+			var response struct {
+				VCenterID string                            `json:"vcenter_id"`
+				Clusters  map[string]v1alpha1.InventoryData `json:"clusters"`
+				VCenter   v1alpha1.InventoryData            `json:"vcenter"`
+			}
+			jerr := json.Unmarshal(inventory, &response)
 			Expect(jerr).ToNot(HaveOccurred())
 
-			Expect(apiInventory.Vms.Total).To(Equal(1))
-			Expect(apiInventory.Vms.PowerStates).To(HaveKeyWithValue("poweredOn", 1))
+			Expect(response.VCenter.Vms.Total).To(Equal(1))
+			Expect(response.VCenter.Vms.PowerStates).To(HaveKeyWithValue("poweredOn", 1))
 
-			Expect(apiInventory.Vms.DiskGB.Total).To(BeNumerically(">", 0))
-			Expect(apiInventory.Vms.DiskCount.Total).To(BeNumerically(">", 0))
+			Expect(response.VCenter.Vms.DiskGB.Total).To(BeNumerically(">", 0))
+			Expect(response.VCenter.Vms.DiskCount.Total).To(BeNumerically(">", 0))
 
-			Expect(apiInventory.Vms.CpuCores.Total).To(Equal(4)) // VM has 4 CPUs
-			Expect(apiInventory.Vms.RamGB.Total).To(BeNumerically(">", 0))
+			Expect(response.VCenter.Vms.CpuCores.Total).To(Equal(4)) // VM has 4 CPUs
+			Expect(response.VCenter.Vms.RamGB.Total).To(BeNumerically(">", 0))
 		})
 	})
 })

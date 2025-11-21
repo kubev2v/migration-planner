@@ -692,9 +692,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -736,9 +734,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -760,9 +756,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -788,9 +782,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "vcenter",
-						},
+						VcenterId: "vcenter",
 					},
 				},
 			})
@@ -812,9 +804,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
-						Vcenter: v1alpha1.VCenter{
-							Id: "another-vcenter-id",
-						},
+						VcenterId: "another-vcenter-id",
 					},
 				},
 			})

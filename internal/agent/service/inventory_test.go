@@ -30,13 +30,14 @@ var _ = Describe("Inventory", func() {
 					Expect(params.AgentId).To(Equal(agentID))
 					Expect(params.Inventory).ToNot(BeNil())
 					return nil
-
 				},
 			}
 
 			inventory := &api.Inventory{
-				Vms:     api.VMs{Total: 2},
-				Vcenter: api.VCenter{Id: sourceID.String()},
+				Vcenter: &api.InventoryData{
+					Vms: api.VMs{Total: 2},
+				},
+				VcenterId: sourceID.String(),
 			}
 			inventoryUpdater := service.NewInventoryUpdater(sourceID, agentID, &client)
 			inventoryUpdater.UpdateServiceWithInventory(context.TODO(), inventory)

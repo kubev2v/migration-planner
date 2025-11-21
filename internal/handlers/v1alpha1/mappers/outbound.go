@@ -2,6 +2,7 @@ package mappers
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -134,8 +135,20 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 		}
 		if len(snapshot.Inventory) > 0 {
 			inventory := v1alpha1.Inventory{}
-			if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
-				return api.Assessment{}, err
+			switch snapshot.Version {
+			case 1:
+				invV1 := v1alpha1.InventoryData{}
+				if err := json.Unmarshal(snapshot.Inventory, &invV1); err != nil {
+					return api.Assessment{}, err
+				}
+				inventory.Vcenter = &invV1
+				inventory.VcenterId = invV1.Vcenter.Id
+			case 2:
+				if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
+					return api.Assessment{}, err
+				}
+			default:
+				return api.Assessment{}, fmt.Errorf("unsupported snapshot version: %d", snapshot.Version)
 			}
 			assessment.Snapshots[i].Inventory = inventory
 		}

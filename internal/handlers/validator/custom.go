@@ -199,7 +199,7 @@ func AssessmentFormValidator() validator.StructLevelFunc {
 			}
 
 			// Check if inventory has a vCenter
-			if val.Inventory.Vcenter.Id == "" {
+			if val.Inventory.VcenterId == "" {
 				sl.ReportError("inventory", "inventory", "inventory", "inventory has no vCenterID", "")
 			}
 		}

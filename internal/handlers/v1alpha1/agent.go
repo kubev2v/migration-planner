@@ -39,7 +39,7 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		SourceID:  request.Id,
 		AgentID:   request.Body.AgentId,
 		Inventory: data,
-		VCenterID: request.Body.Inventory.Vcenter.Id,
+		VCenterID: request.Body.Inventory.VcenterId,
 	})
 	if err != nil {
 		switch err.(type) {
