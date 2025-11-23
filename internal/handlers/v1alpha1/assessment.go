@@ -11,7 +11,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
@@ -86,13 +85,6 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 			return server.CreateAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
 		}
 		logger.Step("mapped_multipart_form").WithString("source_type", createForm.Source).Log()
-
-		// Validate RVTools file format
-		if err := validator.ValidateRVToolsFile(createForm.RVToolsFile); err != nil {
-			logger.Error(err).WithString("step", "validate_rvtools_file").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-		logger.Step("validated_rvtools_file").Log()
 	}
 
 	logger.Step("create_assessment").
@@ -103,15 +95,7 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		WithUUIDPtr("source_id", createForm.SourceID).
 		Log()
 
-	var assessment *model.Assessment
-	var err error
-
-	// Route to appropriate create method based on source type
-	if createForm.Source == service.SourceTypeRvtools {
-		assessment, err = h.assessmentSrv.CreateRvtoolsAssessment(ctx, createForm)
-	} else {
-		assessment, err = h.assessmentSrv.CreateAssessment(ctx, createForm)
-	}
+	assessment, err := h.assessmentSrv.CreateAssessment(ctx, createForm)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrAssessmentCreationForbidden:
@@ -122,7 +106,7 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 		case *service.ErrDuplicateKey:
 			logger.Error(err).WithString("step", "validate_input").Log()
-			return server.CreateAssessment409JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 		case *service.ErrFileCorrupted:
 			logger.Error(err).WithString("step", "file_validation").Log()
 			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
@@ -301,36 +285,6 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 
 	logger.Success().WithString("deleted_assessment_name", assessment.Name).Log()
 	return server.DeleteAssessment200JSONResponse{}, nil
-}
-
-// (DELETE /api/v1/assessments/{id}/job)
-func (h *ServiceHandler) CancelAssessmentJob(ctx context.Context, request server.CancelAssessmentJobRequestObject) (server.CancelAssessmentJobResponseObject, error) {
-	logger := log.NewDebugLogger("assessment_handler").
-		WithContext(ctx).
-		Operation("cancel_assessment_job").
-		WithUUID("assessment_id", request.Id).
-		Build()
-
-	user := auth.MustHaveUser(ctx)
-
-	// Cancel the job and delete snapshot
-	err := h.assessmentSrv.CancelJob(ctx, request.Id, user.Organization)
-	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound, *service.ErrNoProcessingJob:
-			logger.Error(err).Log()
-			return server.CancelAssessmentJob404JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
-		case *service.ErrJobCannotBeCancelled:
-			logger.Error(err).Log()
-			return server.CancelAssessmentJob409JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
-		default:
-			logger.Error(err).Log()
-			return server.CancelAssessmentJob500JSONResponse{Message: fmt.Sprintf("failed to cancel job: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-	}
-
-	logger.Success().Log()
-	return server.CancelAssessmentJob200Response{}, nil
 }
 
 func validateAssessmentData(data interface{}) error {
