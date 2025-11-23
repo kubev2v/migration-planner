@@ -7,6 +7,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
+	apiServer "github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
@@ -34,7 +35,7 @@ func validateSourceData(data interface{}) error {
 }
 
 // (GET /api/v1/sources)
-func (s *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
+func (s *ServiceHandler) ListSources(ctx context.Context, request apiServer.ListSourcesRequestObject) (apiServer.ListSourcesResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
 	filter := service.NewSourceFilter(service.WithUsername(user.Username), service.WithOrgID(user.Organization))
@@ -48,14 +49,14 @@ func (s *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 }
 
 // (POST /api/v1/sources)
-func (s *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
+func (s *ServiceHandler) CreateSource(ctx context.Context, request apiServer.CreateSourceRequestObject) (apiServer.CreateSourceResponseObject, error) {
 	if request.Body == nil {
 		return server.CreateSource400JSONResponse{Message: "empty body"}, nil
 	}
 
 	form := v1alpha1.SourceCreate(*request.Body)
 	if err := validateSourceData(form); err != nil {
-		return server.CreateSource400JSONResponse{Message: err.Error()}, nil
+		return apiServer.CreateSource400JSONResponse{Message: err.Error()}, nil
 	}
 
 	user := auth.MustHaveUser(ctx)
@@ -66,23 +67,23 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 
 	source, err := s.sourceSrv.CreateSource(ctx, sourceCreateForm)
 	if err != nil {
-		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
+		return apiServer.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
 	}
 
-	return server.CreateSource201JSONResponse(mappers.SourceToApi(source)), nil
+	return apiServer.CreateSource201JSONResponse(mappers.SourceToApi(source)), nil
 }
 
 // (DELETE /api/v1/sources)
-func (s *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
+func (s *ServiceHandler) DeleteSources(ctx context.Context, request apiServer.DeleteSourcesRequestObject) (apiServer.DeleteSourcesResponseObject, error) {
 	err := s.sourceSrv.DeleteSources(ctx)
 	if err != nil {
 		return server.DeleteSources500JSONResponse{}, nil
 	}
-	return server.DeleteSources200JSONResponse{}, nil
+	return apiServer.DeleteSources200JSONResponse{}, nil
 }
 
 // (DELETE /api/v1/sources/{id})
-func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
+func (s *ServiceHandler) DeleteSource(ctx context.Context, request apiServer.DeleteSourceRequestObject) (apiServer.DeleteSourceResponseObject, error) {
 	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
@@ -107,7 +108,7 @@ func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 }
 
 // (GET /api/v1/sources/{id})
-func (s *ServiceHandler) GetSource(ctx context.Context, request server.GetSourceRequestObject) (server.GetSourceResponseObject, error) {
+func (s *ServiceHandler) GetSource(ctx context.Context, request apiServer.GetSourceRequestObject) (apiServer.GetSourceResponseObject, error) {
 	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
@@ -128,7 +129,7 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request server.GetSource
 }
 
 // (PUT /api/v1/sources/{id})
-func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
+func (s *ServiceHandler) UpdateSource(ctx context.Context, request apiServer.UpdateSourceRequestObject) (apiServer.UpdateSourceResponseObject, error) {
 	if request.Body == nil {
 		return server.UpdateSource400JSONResponse{Message: "There is nothing to update"}, nil
 	}
@@ -162,15 +163,15 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 		case *service.ErrResourceNotFound:
 			return server.UpdateSource404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to update source %s: %v", request.Id, err)}, nil
+			return apiServer.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to update source %s: %v", request.Id, err)}, nil
 		}
 	}
 
-	return server.UpdateSource200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
+	return apiServer.UpdateSource200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
 }
 
 // (PUT /api/v1/sources/{id}/inventory)
-func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.UpdateInventoryRequestObject) (server.UpdateInventoryResponseObject, error) {
+func (s *ServiceHandler) UpdateInventory(ctx context.Context, request apiServer.UpdateInventoryRequestObject) (apiServer.UpdateInventoryResponseObject, error) {
 	if request.Body == nil {
 		return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
 	}
@@ -193,7 +194,7 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 
 	data, err := json.Marshal(request.Body.Inventory)
 	if err != nil {
-		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
+		return apiServer.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
 	}
 
 	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, srvMappers.InventoryUpdateForm{
@@ -207,33 +208,33 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 		case *service.ErrInvalidVCenterID:
 			return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
+			return apiServer.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
 		}
 	}
 
-	return server.UpdateInventory200JSONResponse(mappers.SourceToApi(updatedSource)), nil
+	return apiServer.UpdateInventory200JSONResponse(mappers.SourceToApi(updatedSource)), nil
 }
 
 // (HEAD /api/v1/sources/{id}/image)
-func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
+func (s *ServiceHandler) HeadImage(ctx context.Context, request apiServer.HeadImageRequestObject) (apiServer.HeadImageResponseObject, error) {
 	return nil, nil
 }
 
 // (GET /api/v1/sources/{id}/image-url)
-func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
+func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request apiServer.GetSourceDownloadURLRequestObject) (apiServer.GetSourceDownloadURLResponseObject, error) {
 	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
-			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
+			return apiServer.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
+			return apiServer.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
 		}
 	}
-	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
+	return apiServer.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
 }
 
 // (GET /health)
-func (s *ServiceHandler) Health(ctx context.Context, request server.HealthRequestObject) (server.HealthResponseObject, error) {
-	return server.Health200Response{}, nil
+func (s *ServiceHandler) Health(ctx context.Context, request apiServer.HealthRequestObject) (apiServer.HealthResponseObject, error) {
+	return apiServer.Health200Response{}, nil
 }

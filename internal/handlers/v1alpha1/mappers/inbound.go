@@ -1,7 +1,9 @@
 package mappers
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"mime/multipart"
 
@@ -190,11 +192,16 @@ func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, user aut
 			}
 			form.Name = string(nameBytes)
 		case "file":
-			fileData, err := io.ReadAll(part)
+			buff := bytes.NewBuffer([]byte{})
+			n, err := io.Copy(buff, part)
 			if err != nil {
 				return form, err
 			}
-			form.RVToolsFile = fileData
+			if n == 0 {
+				return form, fmt.Errorf("rvtools file body is empty")
+			}
+			// Store the entire part as RVToolsFile for processing
+			form.RVToolsFile = buff
 		case "labels":
 			// Handle labels if provided in multipart form
 			// This is optional based on the API spec

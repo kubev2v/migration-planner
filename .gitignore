@@ -24,7 +24,3 @@ private-key.txt
 
 # Exceptions
 !hack/staging-debug-tool/.env-debug.example
-
-# Test artifacts
-*.test
-*.out
