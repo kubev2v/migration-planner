@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,7 +15,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
-	"github.com/riverqueue/river/rivermigrate"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -116,87 +114,69 @@ func (s *Server) Run(ctx context.Context) error {
 
 	// Initialize pgx pool for River
 	var riverClient *river.Client[pgx.Tx]
-	if s.cfg.Database.Type == "pgsql" {
-		// Parse config to safely handle special characters in credentials
-		cfg, err := pgxpool.ParseConfig("")
-		if err != nil {
-			return fmt.Errorf("failed to parse pgx config: %w", err)
-		}
+	// Parse config to safely handle special characters in credentials
+	dsn := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s",
+		s.cfg.Database.Hostname,
+		s.cfg.Database.User,
+		s.cfg.Database.Password,
+		s.cfg.Database.Port,
+		s.cfg.Database.Name,
+	)
 
-		// Parse port number
-		port, err := strconv.ParseUint(s.cfg.Database.Port, 10, 16)
-		if err != nil {
-			return fmt.Errorf("invalid database port: %w", err)
-		}
-
-		cfg.ConnConfig.Host = s.cfg.Database.Hostname
-		cfg.ConnConfig.User = s.cfg.Database.User
-		cfg.ConnConfig.Password = s.cfg.Database.Password
-		cfg.ConnConfig.Port = uint16(port)
-		cfg.ConnConfig.Database = s.cfg.Database.Name
-
-		// Configure connection pool for River's needs (including LISTEN/NOTIFY)
-		cfg.MaxConns = 20 // Maximum connections for job processing + LISTEN
-		cfg.MinConns = 5  // Keep connections warm for immediate job pickup
-		cfg.MaxConnLifetime = time.Hour
-		cfg.MaxConnIdleTime = 30 * time.Minute
-
-		dbPool, err := pgxpool.NewWithConfig(ctx, cfg)
-		if err != nil {
-			return fmt.Errorf("failed to create pgx pool: %w", err)
-		}
-		defer dbPool.Close()
-
-		// Run River migrations to create necessary tables
-		zap.S().Named("api_server").Info("Running River migrations...")
-		migrator, err := rivermigrate.New(riverpgxv5.New(dbPool), nil)
-		if err != nil {
-			return fmt.Errorf("failed to create river migrator: %w", err)
-		}
-		_, err = migrator.Migrate(ctx, rivermigrate.DirectionUp, &rivermigrate.MigrateOpts{})
-		if err != nil {
-			return fmt.Errorf("failed to run river migrations: %w", err)
-		}
-		zap.S().Named("api_server").Info("River migrations completed")
-
-		// Initialize River workers
-		workers := river.NewWorkers()
-		river.AddWorker(workers, rvtools.NewRVToolsWorker(s.store, s.opaValidator))
-
-		// Create River client with job retention policies
-		riverClient, err = river.NewClient(riverpgxv5.New(dbPool), &river.Config{
-			Queues: map[string]river.QueueConfig{
-				river.QueueDefault: {MaxWorkers: 4}, // Limit concurrent RVTools processing
-			},
-			Workers: workers,
-
-			// Ultra-fast polling for immediate job pickup
-			FetchCooldown:     50 * time.Millisecond,  // Check every 50ms when actively processing
-			FetchPollInterval: 100 * time.Millisecond, // Check every 100ms when idle
-
-			// Job retention policies to prevent database bloat
-			CancelledJobRetentionPeriod: 24 * time.Hour,     // Keep cancelled jobs for 1 day
-			CompletedJobRetentionPeriod: 24 * time.Hour,     // Keep completed jobs for 1 day
-			DiscardedJobRetentionPeriod: 7 * 24 * time.Hour, // Keep failed jobs for 7 days (debugging)
-		})
-		if err != nil {
-			return fmt.Errorf("failed to create river client: %w", err)
-		}
-
-		// Start River
-		if err := riverClient.Start(ctx); err != nil {
-			return fmt.Errorf("failed to start river: %w", err)
-		}
-		defer func() {
-			stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-			defer cancel()
-			if err := riverClient.Stop(stopCtx); err != nil {
-				zap.S().Named("api_server").Warnw("failed to stop river client", "error", err)
-			}
-		}()
-
-		zap.S().Named("api_server").Info("River job queue initialized")
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		return fmt.Errorf("failed to parse pgx config: %w", err)
 	}
+
+	// Configure connection pool for River's needs (including LISTEN/NOTIFY)
+	cfg.MaxConns = 20 // Maximum connections for job processing + LISTEN
+	cfg.MinConns = 5  // Keep connections warm for immediate job pickup
+	cfg.MaxConnLifetime = time.Hour
+	cfg.MaxConnIdleTime = 30 * time.Minute
+
+	dbPool, err := pgxpool.NewWithConfig(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to create pgx pool: %w", err)
+	}
+	defer dbPool.Close()
+
+	// Initialize River workers
+	workers := river.NewWorkers()
+	river.AddWorker(workers, rvtools.NewRVToolsWorker(s.store, s.opaValidator))
+
+	// Create River client with job retention policies
+	riverClient, err = river.NewClient(riverpgxv5.New(dbPool), &river.Config{
+		Queues: map[string]river.QueueConfig{
+			river.QueueDefault: {MaxWorkers: 4}, // Limit concurrent RVTools processing
+		},
+		Workers: workers,
+
+		// Ultra-fast polling for immediate job pickup
+		FetchCooldown:     50 * time.Millisecond,  // Check every 50ms when actively processing
+		FetchPollInterval: 100 * time.Millisecond, // Check every 100ms when idle
+
+		// Job retention policies to prevent database bloat
+		CancelledJobRetentionPeriod: 24 * time.Hour,     // Keep cancelled jobs for 1 day
+		CompletedJobRetentionPeriod: 24 * time.Hour,     // Keep completed jobs for 1 day
+		DiscardedJobRetentionPeriod: 7 * 24 * time.Hour, // Keep failed jobs for 7 days (debugging)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create river client: %w", err)
+	}
+
+	// Start River
+	if err := riverClient.Start(ctx); err != nil {
+		return fmt.Errorf("failed to start river: %w", err)
+	}
+	defer func() {
+		stopCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if err := riverClient.Stop(stopCtx); err != nil {
+			zap.S().Named("api_server").Warnw("failed to stop river client", "error", err)
+		}
+	}()
+
+	zap.S().Named("api_server").Info("River job queue initialized")
 
 	assessmentService := service.NewAssessmentService(s.store, s.opaValidator, riverClient)
 
