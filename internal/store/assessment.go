@@ -79,8 +79,8 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment *model.Assessme
 	// Set the assessment ID on the snapshot
 	snapshot.AssessmentID = assessment.ID
 
-	// Create the snapshot
-	if err := a.getDB(ctx).Create(snapshot).Error; err != nil {
+	// Create the snapshot using the snapshot store
+	if err := NewSnapshotStore(a.db).Create(ctx, snapshot); err != nil {
 		return err
 	}
 
@@ -108,7 +108,7 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, up
 	// Create new snapshot if provided
 	if newSnapshot != nil {
 		newSnapshot.AssessmentID = assessmentID
-		if err := a.getDB(ctx).Create(newSnapshot).Error; err != nil {
+		if err := NewSnapshotStore(a.db).Create(ctx, newSnapshot); err != nil {
 			return nil, err
 		}
 	}
