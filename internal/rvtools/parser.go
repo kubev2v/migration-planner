@@ -143,9 +143,12 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		}
 		vcenterInventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
+		zap.S().Named("rvtools").Infof("Build datastore ID to type mapping")
+		datastoreIDToType := buildDatastoreIDToTypeMapFromRVTools(datastoreRows)
+
 		zap.S().Named("rvtools").Infof("Fill VCenter Inventory with VM Data")
 		if len(vms) > 0 {
-			collector.FillInventoryObjectWithMoreData(&vms, vcenterInventory)
+			collector.FillInventoryObjectWithMoreData(&vms, vcenterInventory, datastoreIDToType)
 		}
 
 		// Extract cluster ID mappings
@@ -171,7 +174,8 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			clusterInv := service.CreateBasicInventory(vcenterUUID, &clusterVMs, clusterInfraData)
 
 			if len(clusterVMs) > 0 {
-				collector.FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
+				// Use the same datastore mapping for cluster inventories
+				collector.FillInventoryObjectWithMoreData(&clusterVMs, clusterInv, datastoreIDToType)
 			}
 
 			clusterInventories[clusterID] = clusterInv
@@ -187,6 +191,31 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 
 	// If vInfo doesn't exist, fail with error
 	return nil, fmt.Errorf("vInfo sheet not found in RVTools export - cannot process inventory without VM data")
+}
+
+func buildDatastoreIDToTypeMapFromRVTools(datastoreRows [][]string) map[string]string {
+	datastoreIDToType := make(map[string]string)
+
+	if len(datastoreRows) <= 1 {
+		return datastoreIDToType
+	}
+
+	colMap := buildColumnMap(datastoreRows[0])
+
+	for _, row := range datastoreRows[1:] {
+		if len(row) == 0 {
+			continue
+		}
+
+		objectID := getColumnValue(row, colMap, "object id")
+		dsType := getColumnValue(row, colMap, "type")
+
+		if objectID != "" && dsType != "" {
+			datastoreIDToType[objectID] = dsType
+		}
+	}
+
+	return datastoreIDToType
 }
 
 type ClusterInfo struct {
