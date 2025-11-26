@@ -180,8 +180,11 @@ func (c *Collector) run(ctx context.Context) {
 		zap.S().Named("collector").Warnf("At least one error during VMs validation: %v", err)
 	}
 
+	zap.S().Named("collector").Infof("Build datastore ID to type mapping")
+	datastoreIDToType := buildDatastoreIDToTypeMap(collector)
+
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, inv)
+	FillInventoryObjectWithMoreData(vms, inv, datastoreIDToType)
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
@@ -237,23 +240,45 @@ func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
 	return container, nil
 }
 
-func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
+type diskTypeData struct {
+	vmSet       map[int]struct{} // Track unique VMs with this disk type
+	totalSizeTB float64          // Track total size in TB (same as diskSizeTier)
+}
+
+func buildDatastoreIDToTypeMap(collector *vsphere.Collector) map[string]string {
+	datastoreIDToType := make(map[string]string)
+	datastores := &[]vspheremodel.Datastore{}
+	err := collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
+	if err != nil {
+		zap.S().Named("collector").Warnf("Failed to list datastores for type mapping: %v", err)
+		return datastoreIDToType
+	}
+
+	for _, ds := range *datastores {
+		datastoreIDToType[ds.ID] = ds.Type
+	}
+
+	return datastoreIDToType
+}
+
+func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory, datastoreIDToType map[string]string) {
 	cpuSet := []int{}
 	memorySet := []int{}
-	diskGBSet := []int{}
+	diskTBSet := []float64{}
 	diskCountSet := []int{}
 	nicCountSet := []int{}
 
+	diskTypeMap := make(map[string]*diskTypeData)
+
 	for _, vm := range *vms {
 		nicCount := len(vm.NICs)
-		// histogram collection
 		cpuSet = append(cpuSet, int(vm.CpuCount))
 		memorySet = append(memorySet, int(vm.MemoryMB/1024))
-		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
+		vmDiskTB := totalCapacityTB(vm.Disks)
+		diskTBSet = append(diskTBSet, vmDiskTB)
 		diskCountSet = append(diskCountSet, len(vm.Disks))
 		nicCountSet = append(nicCountSet, nicCount)
 
-		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
 
 		guestName := vmGuestName(vm)
@@ -267,49 +292,125 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 		inv.Vms.PowerStates[vm.PowerState]++
 
-		// Update total values
+		vmDiskTypes := make(map[string]bool)
+
+		for _, disk := range vm.Disks {
+			var diskType string
+
+			if disk.RDM {
+				diskType = "RDM"
+			} else if disk.Datastore.ID != "" {
+				if dsType, exists := datastoreIDToType[disk.Datastore.ID]; exists {
+					diskType = normalizeDiskType(dsType)
+				} else {
+					continue
+				}
+			} else {
+				continue
+			}
+
+			if diskTypeMap[diskType] == nil {
+				diskTypeMap[diskType] = &diskTypeData{
+					vmSet:       make(map[int]struct{}),
+					totalSizeTB: 0,
+				}
+			}
+
+			diskTB := diskCapacityTB(disk.Capacity)
+			diskTypeMap[diskType].totalSizeTB += diskTB
+			vmDiskTypes[diskType] = true
+		}
+
+		vmIndex := len(cpuSet)
+		for diskType := range vmDiskTypes {
+			if diskTypeMap[diskType] != nil {
+				diskTypeMap[diskType].vmSet[vmIndex] = struct{}{}
+			}
+		}
+
+		vmDiskGB := int(vmDiskTB * 1024.0)
 		inv.Vms.CpuCores.Total += int(vm.CpuCount)
 		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
 		inv.Vms.DiskCount.Total += len(vm.Disks)
-		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
+		inv.Vms.DiskGB.Total += vmDiskGB
 		inv.Vms.NicCount.Total += len(vm.NICs)
 
-		// Not Migratable
 		if !migratable {
 			inv.Vms.CpuCores.TotalForNotMigratable += int(vm.CpuCount)
 			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
 			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
-			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
+			inv.Vms.DiskGB.TotalForNotMigratable += vmDiskGB
 			inv.Vms.NicCount.TotalForNotMigratable += len(vm.NICs)
 		} else {
-			// Migratable with warning(s)
 			if hasWarning {
 				inv.Vms.CpuCores.TotalForMigratableWithWarnings += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
-				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) //Migratable
+				inv.Vms.DiskGB.TotalForMigratableWithWarnings += vmDiskGB
 				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
-				// Migratable without any warnings
 				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
 				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
-				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
+				inv.Vms.DiskGB.TotalForMigratable += vmDiskGB
 				inv.Vms.NicCount.TotalForMigratable += len(vm.NICs)
 			}
 		}
 
 	}
 
-	// Histogram
 	inv.Vms.CpuCores.Histogram = Histogram(cpuSet)
 	inv.Vms.RamGB.Histogram = Histogram(memorySet)
 	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
+	diskGBSet := make([]int, len(diskTBSet))
+	for i, tb := range diskTBSet {
+		diskGBSet[i] = int(tb * 1024.0)
+	}
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
 	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
 
-	// Update the disk size tier
-	updateDiskSizeTier(diskGBSet, inv)
+	updateDiskSizeTier(diskTBSet, inv)
+	updateDiskTypes(diskTypeMap, inv)
+}
+
+func normalizeDiskType(dsType string) string {
+	upperType := strings.ToUpper(dsType)
+	switch upperType {
+	case "VMFS":
+		return "VMFS"
+	case "NFS":
+		return "NFS"
+	case "VSAN":
+		return "vSAN"
+	case "RDM":
+		return "RDM"
+	case "VVOLS":
+		return "vVols"
+	default:
+		// Return original if not recognized, but uppercase it for consistency
+		return upperType
+	}
+}
+
+func updateDiskTypes(diskTypeMap map[string]*diskTypeData, inv *apiplanner.Inventory) {
+	if inv.Vms.DiskTypes == nil {
+		diskTypes := make(map[string]apiplanner.DiskTypeSummary)
+		inv.Vms.DiskTypes = &diskTypes
+	}
+
+	diskTypes := *(inv.Vms.DiskTypes)
+
+	for diskType, data := range diskTypeMap {
+		diskTB := math.Round(data.totalSizeTB*100) / 100
+
+		diskTypes[diskType] = apiplanner.DiskTypeSummary{
+			DiskTypeName: diskType,
+			VmCount:      len(data.vmSet),
+			TotalSizeTB:  diskTB,
+		}
+	}
+
+	inv.Vms.DiskTypes = &diskTypes
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {
@@ -328,11 +429,10 @@ func vmGuestName(vm vspheremodel.VM) string {
 	return vm.GuestName
 }
 
-func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.Inventory) {
+func updateDiskSizeTier(diskTBSet []float64, inv *apiplanner.Inventory) {
 	diskSizeTier := *(inv.Vms.DiskSizeTier)
 
-	for _, diskGB := range diskGBSet {
-		diskTB := float64(diskGB) / 1024.0
+	for _, diskTB := range diskTBSet {
 		var tierKey string
 
 		switch {
@@ -758,12 +858,18 @@ func getHosts(hosts *[]vspheremodel.Host) *[]apiplanner.Host {
 	return &l
 }
 
-func totalCapacity(disks []vspheremodel.Disk) int {
-	total := 0
+// totalCapacityTB converts disk capacities from bytes to TB using floating point for maximum accuracy
+func totalCapacityTB(disks []vspheremodel.Disk) float64 {
+	var totalTB float64
 	for _, d := range disks {
-		total += int(d.Capacity)
+		totalTB += diskCapacityTB(d.Capacity)
 	}
-	return total / 1024 / 1024 / 1024
+	return totalTB
+}
+
+// diskCapacityTB converts a single disk capacity from bytes to TB using floating point
+func diskCapacityTB(capacity int64) float64 {
+	return float64(capacity) / 1024.0 / 1024.0 / 1024.0 / 1024.0
 }
 
 func hasID(reasons apiplanner.MigrationIssues, id string) int {
