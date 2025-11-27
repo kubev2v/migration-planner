@@ -12,7 +12,8 @@ import (
 	. "github.com/onsi/gomega"
 	"github.com/xuri/excelize/v2"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/agent/service"
 	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 )
@@ -298,7 +299,7 @@ var _ = Describe("Parser", func() {
 				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil, nil, 0)
 				Expect(err).ToNot(HaveOccurred())
 
-				apiInventory := v1alpha1.Inventory{}
+				apiInventory := api.Inventory{}
 				jerr := json.Unmarshal(inventory, &apiInventory)
 				Expect(jerr).ToNot(HaveOccurred())
 
@@ -328,7 +329,7 @@ var _ = Describe("Parser", func() {
 				inventory, err := rvtools.ParseRVTools(context.Background(), testExcelFile, nil, nil, 0)
 				Expect(err).ToNot(HaveOccurred())
 
-				apiInventory := v1alpha1.Inventory{}
+				apiInventory := api.Inventory{}
 				jerr := json.Unmarshal(inventory, &apiInventory)
 				Expect(jerr).ToNot(HaveOccurred())
 
@@ -354,7 +355,7 @@ var _ = Describe("Parser", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
 
-				apiInventory := v1alpha1.Inventory{}
+				apiInventory := api.Inventory{}
 				jerr := json.Unmarshal(inventory, &apiInventory)
 				Expect(jerr).ToNot(HaveOccurred())
 
@@ -435,7 +436,7 @@ invalid syntax here`
 				Expect(err).ToNot(HaveOccurred())
 				Expect(inventory).ToNot(BeNil())
 
-				apiInventory := v1alpha1.Inventory{}
+				apiInventory := api.Inventory{}
 				jerr := json.Unmarshal(inventory, &apiInventory)
 				Expect(jerr).ToNot(HaveOccurred())
 
@@ -1029,7 +1030,7 @@ invalid syntax here`
 			Expect(err).ToNot(HaveOccurred())
 			Expect(inventory).ToNot(BeNil())
 
-			apiInventory := v1alpha1.Inventory{}
+			apiInventory := api.Inventory{}
 			jerr := json.Unmarshal(inventory, &apiInventory)
 			Expect(jerr).ToNot(HaveOccurred())
 
@@ -1041,6 +1042,136 @@ invalid syntax here`
 
 			Expect(apiInventory.Vms.CpuCores.Total).To(Equal(4)) // VM has 4 CPUs
 			Expect(apiInventory.Vms.RamGB.Total).To(BeNumerically(">", 0))
+		})
+	})
+
+	Describe("CalculateCpuOverCommitmentFromParsedData", func() {
+		Context("with empty data", func() {
+			It("should return empty slice for empty cluster mapping", func() {
+				hosts := []api.Host{}
+				vms := []vsphere.VM{}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{},
+					HostToClusterID: map[string]string{},
+					ClusterIDs:      []string{},
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(BeEmpty())
+			})
+		})
+
+		Context("with valid data", func() {
+			It("should calculate overcommitment for single cluster", func() {
+				hostID1 := "host-1"
+				hostID2 := "host-2"
+				cores32 := 32
+				hosts := []api.Host{
+					{Id: &hostID1, CpuCores: &cores32},
+					{Id: &hostID2, CpuCores: &cores32},
+				}
+				vms := []vsphere.VM{
+					{Base: vsphere.Base{Name: "vm1"}, CpuCount: 4, PowerState: "poweredOn"},
+					{Base: vsphere.Base{Name: "vm2"}, CpuCount: 8, PowerState: "poweredOn"},
+					{Base: vsphere.Base{Name: "vm3"}, CpuCount: 2, PowerState: "poweredOff"}, // excluded
+				}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{"vm1": "cluster-a", "vm2": "cluster-a", "vm3": "cluster-a"},
+					HostToClusterID: map[string]string{"host-1": "cluster-a", "host-2": "cluster-a"},
+					ClusterIDs:      []string{"cluster-a"},
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].AllocatedVCpus).To(Equal(12)) // 4 + 8 (powered-on only)
+				Expect(result[0].PhysicalCores).To(Equal(64))  // 32 + 32
+			})
+
+			It("should calculate overcommitment for multiple clusters in sorted order", func() {
+				hostID1 := "host-1"
+				hostID2 := "host-2"
+				hostID3 := "host-3"
+				cores16 := 16
+				cores24 := 24
+				cores32 := 32
+				hosts := []api.Host{
+					{Id: &hostID1, CpuCores: &cores16},
+					{Id: &hostID2, CpuCores: &cores32},
+					{Id: &hostID3, CpuCores: &cores24},
+				}
+				vms := []vsphere.VM{
+					{Base: vsphere.Base{Name: "vm1"}, CpuCount: 8, PowerState: "poweredOn"},
+					{Base: vsphere.Base{Name: "vm2"}, CpuCount: 4, PowerState: "poweredOn"},
+					{Base: vsphere.Base{Name: "vm3"}, CpuCount: 6, PowerState: "poweredOn"},
+				}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{"vm1": "zebra-cluster", "vm2": "alpha-cluster", "vm3": "beta-cluster"},
+					HostToClusterID: map[string]string{"host-1": "zebra-cluster", "host-2": "alpha-cluster", "host-3": "beta-cluster"},
+					ClusterIDs:      []string{"alpha-cluster", "beta-cluster", "zebra-cluster"}, // pre-sorted
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(HaveLen(3))
+				// Order matches ClusterIDs order
+				Expect(result[0].AllocatedVCpus).To(Equal(4)) // alpha-cluster
+				Expect(result[0].PhysicalCores).To(Equal(32))
+				Expect(result[1].AllocatedVCpus).To(Equal(6)) // beta-cluster
+				Expect(result[1].PhysicalCores).To(Equal(24))
+				Expect(result[2].AllocatedVCpus).To(Equal(8)) // zebra-cluster
+				Expect(result[2].PhysicalCores).To(Equal(16))
+			})
+
+			It("should handle cluster with hosts but no VMs", func() {
+				hostID := "host-1"
+				cores64 := 64
+				hosts := []api.Host{{Id: &hostID, CpuCores: &cores64}}
+				vms := []vsphere.VM{}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{},
+					HostToClusterID: map[string]string{"host-1": "empty-cluster"},
+					ClusterIDs:      []string{"empty-cluster"},
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].AllocatedVCpus).To(Equal(0))
+				Expect(result[0].PhysicalCores).To(Equal(64))
+			})
+
+			It("should handle cluster with VMs but no hosts", func() {
+				hosts := []api.Host{}
+				vms := []vsphere.VM{
+					{Base: vsphere.Base{Name: "vm1"}, CpuCount: 8, PowerState: "poweredOn"},
+				}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{"vm1": "orphan-cluster"},
+					HostToClusterID: map[string]string{},
+					ClusterIDs:      []string{"orphan-cluster"},
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].AllocatedVCpus).To(Equal(8))
+				Expect(result[0].PhysicalCores).To(Equal(0))
+			})
+
+			It("should handle missing CpuCores gracefully", func() {
+				hostID1 := "host-1"
+				hostID2 := "host-2"
+				cores32 := 32
+				hosts := []api.Host{
+					{Id: &hostID1, CpuCores: nil}, // nil cores
+					{Id: &hostID2, CpuCores: &cores32},
+				}
+				vms := []vsphere.VM{
+					{Base: vsphere.Base{Name: "vm1"}, CpuCount: 0, PowerState: "poweredOn"}, // zero CPU
+					{Base: vsphere.Base{Name: "vm2"}, CpuCount: 4, PowerState: "poweredOn"},
+				}
+				clusterMapping := service.ClusterIDMapping{
+					VMToClusterID:   map[string]string{"vm1": "cluster-a", "vm2": "cluster-a"},
+					HostToClusterID: map[string]string{"host-1": "cluster-a", "host-2": "cluster-a"},
+					ClusterIDs:      []string{"cluster-a"},
+				}
+				result := rvtools.CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+				Expect(result).To(HaveLen(1))
+				Expect(result[0].AllocatedVCpus).To(Equal(4)) // 0 + 4
+				Expect(result[0].PhysicalCores).To(Equal(32)) // only host2
+			})
 		})
 	})
 })

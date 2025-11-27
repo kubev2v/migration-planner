@@ -27,16 +27,17 @@ type InventoryData struct {
 
 // InfrastructureData contains all the infrastructure-related data needed to create an inventory
 type InfrastructureData struct {
-	Datastores            []api.Datastore
-	Networks              []api.Network
-	HostPowerStates       map[string]int
-	Hosts                 *[]api.Host
-	HostsPerCluster       []int
-	ClustersPerDatacenter []int
-	TotalHosts            int
-	TotalClusters         int
-	TotalDatacenters      int
-	VmsPerCluster         []int
+	Datastores                  []api.Datastore
+	Networks                    []api.Network
+	HostPowerStates             map[string]int
+	Hosts                       *[]api.Host
+	HostsPerCluster             []int
+	ClustersPerDatacenter       []int
+	TotalHosts                  int
+	TotalClusters               int
+	TotalDatacenters            int
+	VmsPerCluster               []int
+	CpuOverCommitmentPerCluster []api.ClusterCpuOverCommitment
 }
 
 // CreateBasicInventory creates a basic inventory object with the provided data
@@ -67,16 +68,17 @@ func CreateBasicInventory(
 			NicCount:  &api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
 		},
 		Infra: api.Infra{
-			ClustersPerDatacenter: &infraData.ClustersPerDatacenter,
-			Datastores:            infraData.Datastores,
-			HostPowerStates:       infraData.HostPowerStates,
-			Hosts:                 infraData.Hosts,
-			TotalHosts:            infraData.TotalHosts,
-			TotalClusters:         infraData.TotalClusters,
-			TotalDatacenters:      &infraData.TotalDatacenters,
-			HostsPerCluster:       infraData.HostsPerCluster,
-			Networks:              infraData.Networks,
-			VmsPerCluster:         &infraData.VmsPerCluster,
+			ClustersPerDatacenter:       &infraData.ClustersPerDatacenter,
+			Datastores:                  infraData.Datastores,
+			HostPowerStates:             infraData.HostPowerStates,
+			Hosts:                       infraData.Hosts,
+			TotalHosts:                  infraData.TotalHosts,
+			TotalClusters:               infraData.TotalClusters,
+			TotalDatacenters:            &infraData.TotalDatacenters,
+			HostsPerCluster:             infraData.HostsPerCluster,
+			Networks:                    infraData.Networks,
+			VmsPerCluster:               &infraData.VmsPerCluster,
+			CpuOverCommitmentPerCluster: &infraData.CpuOverCommitmentPerCluster,
 		},
 	}
 }

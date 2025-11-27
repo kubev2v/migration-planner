@@ -731,6 +731,111 @@ func TestCalculateHostPowerStatesForCluster(t *testing.T) {
 	}
 }
 
+func TestCalculateCpuOverCommitmentForCluster(t *testing.T) {
+	tests := []struct {
+		name                   string
+		hosts                  []api.Host
+		vms                    []vsphere.VM
+		expectedAllocatedVCpus int
+		expectedPhysicalCores  int
+		description            string
+	}{
+		{
+			name: "standard cluster with powered-on VMs",
+			hosts: []api.Host{
+				{Id: stringPtr("host-1"), CpuCores: intPtr(32)},
+				{Id: stringPtr("host-2"), CpuCores: intPtr(32)},
+			},
+			vms: []vsphere.VM{
+				{PowerState: "poweredOn", CpuCount: 4},
+				{PowerState: "poweredOn", CpuCount: 8},
+				{PowerState: "poweredOff", CpuCount: 2}, // should be excluded
+			},
+			expectedAllocatedVCpus: 12, // 4 + 8
+			expectedPhysicalCores:  64, // 32 + 32
+			description:            "Should sum vCPUs from powered-on VMs only",
+		},
+		{
+			name: "cluster with all VMs powered off",
+			hosts: []api.Host{
+				{Id: stringPtr("host-1"), CpuCores: intPtr(16)},
+			},
+			vms: []vsphere.VM{
+				{PowerState: "poweredOff", CpuCount: 4},
+				{PowerState: "suspended", CpuCount: 8},
+			},
+			expectedAllocatedVCpus: 0,
+			expectedPhysicalCores:  16,
+			description:            "Should have zero allocated vCPUs when all VMs are off",
+		},
+		{
+			name: "cluster with hosts missing CPU cores data",
+			hosts: []api.Host{
+				{Id: stringPtr("host-1"), CpuCores: intPtr(32)},
+				{Id: stringPtr("host-2"), CpuCores: nil}, // missing CPU data
+				{Id: stringPtr("host-3"), CpuCores: intPtr(16)},
+			},
+			vms: []vsphere.VM{
+				{PowerState: "poweredOn", CpuCount: 4},
+			},
+			expectedAllocatedVCpus: 4,
+			expectedPhysicalCores:  48, // 32 + 0 + 16
+			description:            "Should handle hosts with nil CpuCores gracefully",
+		},
+		{
+			name:                   "empty cluster - no hosts or VMs",
+			hosts:                  []api.Host{},
+			vms:                    []vsphere.VM{},
+			expectedAllocatedVCpus: 0,
+			expectedPhysicalCores:  0,
+			description:            "Should return zeros for empty cluster",
+		},
+		{
+			name: "hosts only - no VMs",
+			hosts: []api.Host{
+				{Id: stringPtr("host-1"), CpuCores: intPtr(64)},
+			},
+			vms:                    []vsphere.VM{},
+			expectedAllocatedVCpus: 0,
+			expectedPhysicalCores:  64,
+			description:            "Should return zero vCPUs when no VMs exist",
+		},
+		{
+			name:  "VMs only - no hosts",
+			hosts: []api.Host{},
+			vms: []vsphere.VM{
+				{PowerState: "poweredOn", CpuCount: 8},
+			},
+			expectedAllocatedVCpus: 8,
+			expectedPhysicalCores:  0,
+			description:            "Should return zero cores when no hosts exist",
+		},
+		{
+			name: "high overcommitment ratio",
+			hosts: []api.Host{
+				{Id: stringPtr("host-1"), CpuCores: intPtr(8)},
+			},
+			vms: []vsphere.VM{
+				{PowerState: "poweredOn", CpuCount: 4},
+				{PowerState: "poweredOn", CpuCount: 4},
+				{PowerState: "poweredOn", CpuCount: 8},
+				{PowerState: "poweredOn", CpuCount: 8},
+			},
+			expectedAllocatedVCpus: 24, // 4 + 4 + 8 + 8 = 24 (3:1 ratio)
+			expectedPhysicalCores:  8,
+			description:            "Should correctly calculate high overcommitment",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := CalculateCpuOverCommitmentForCluster(tt.hosts, tt.vms)
+			assert.Equal(t, tt.expectedAllocatedVCpus, result.AllocatedVCpus, tt.description+" - AllocatedVCpus")
+			assert.Equal(t, tt.expectedPhysicalCores, result.PhysicalCores, tt.description+" - PhysicalCores")
+		})
+	}
+}
+
 // Helper functions for tests
 func intPtr(i int) *int {
 	return &i

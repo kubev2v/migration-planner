@@ -996,6 +996,10 @@ components:
           type: array
           items:
             type: integer
+        cpuOverCommitmentPerCluster:
+          type: array
+          items:
+            $ref: '#/components/schemas/ClusterCpuOverCommitment'
         hostPowerStates:
           type: object
           additionalProperties:
@@ -1035,6 +1039,19 @@ components:
           format: int64
           description: Host memory in MB
           nullable: true
+
+    ClusterCpuOverCommitment:
+      type: object
+      required:
+        - allocatedVCpus
+        - physicalCores
+      properties:
+        allocatedVCpus:
+          type: integer
+          description: Sum of vCPUs allocated to powered-on VMs in this cluster
+        physicalCores:
+          type: integer
+          description: Sum of physical CPU cores from all hosts in this cluster
 
     Network:
       type: object

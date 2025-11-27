@@ -113,6 +113,15 @@ type AssessmentUpdate struct {
 	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
 }
 
+// ClusterCpuOverCommitment defines model for ClusterCpuOverCommitment.
+type ClusterCpuOverCommitment struct {
+	// AllocatedVCpus Sum of vCPUs allocated to powered-on VMs in this cluster
+	AllocatedVCpus int `json:"allocatedVCpus"`
+
+	// PhysicalCores Sum of physical CPU cores from all hosts in this cluster
+	PhysicalCores int `json:"physicalCores"`
+}
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`
@@ -172,16 +181,17 @@ type Info struct {
 
 // Infra defines model for Infra.
 type Infra struct {
-	ClustersPerDatacenter *[]int         `json:"clustersPerDatacenter,omitempty"`
-	Datastores            []Datastore    `json:"datastores"`
-	HostPowerStates       map[string]int `json:"hostPowerStates"`
-	Hosts                 *[]Host        `json:"hosts,omitempty"`
-	HostsPerCluster       []int          `json:"hostsPerCluster"`
-	Networks              []Network      `json:"networks"`
-	TotalClusters         int            `json:"totalClusters"`
-	TotalDatacenters      *int           `json:"totalDatacenters,omitempty"`
-	TotalHosts            int            `json:"totalHosts"`
-	VmsPerCluster         *[]int         `json:"vmsPerCluster,omitempty"`
+	ClustersPerDatacenter       *[]int                      `json:"clustersPerDatacenter,omitempty"`
+	CpuOverCommitmentPerCluster *[]ClusterCpuOverCommitment `json:"cpuOverCommitmentPerCluster,omitempty"`
+	Datastores                  []Datastore                 `json:"datastores"`
+	HostPowerStates             map[string]int              `json:"hostPowerStates"`
+	Hosts                       *[]Host                     `json:"hosts,omitempty"`
+	HostsPerCluster             []int                       `json:"hostsPerCluster"`
+	Networks                    []Network                   `json:"networks"`
+	TotalClusters               int                         `json:"totalClusters"`
+	TotalDatacenters            *int                        `json:"totalDatacenters,omitempty"`
+	TotalHosts                  int                         `json:"totalHosts"`
+	VmsPerCluster               *[]int                      `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.
