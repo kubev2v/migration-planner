@@ -127,19 +127,26 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		zap.S().Named("rvtools").Infof("Process Networks")
 		networks := ExtractNetworks(dvswitchRows, dvPortRows, vms)
 
+		zap.S().Named("rvtools").Infof("Extract Cluster ID Mappings")
+		clusterMapping := ExtractClusterIDMapping(vInfoRows, vHostRows, vClusterRows, vcenterUUID)
+		zap.S().Named("rvtools").Infof("Found %d unique clusters", len(clusterMapping.ClusterIDs))
+
+		cpuOverCommitment := CalculateCpuOverCommitmentFromParsedData(hosts, vms, clusterMapping)
+
 		// Create vcenter-level aggregated inventory
 		zap.S().Named("rvtools").Infof("Create Basic Inventory (VCenter Level)")
 		infraData := service.InfrastructureData{
-			Datastores:            datastores,
-			Networks:              networks,
-			HostPowerStates:       hostPowerStates,
-			Hosts:                 &hosts,
-			HostsPerCluster:       clusterInfo.HostsPerCluster,
-			ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
-			TotalHosts:            clusterInfo.TotalHosts,
-			TotalClusters:         clusterInfo.TotalClusters,
-			TotalDatacenters:      clusterInfo.TotalDatacenters,
-			VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
+			Datastores:                  datastores,
+			Networks:                    networks,
+			HostPowerStates:             hostPowerStates,
+			Hosts:                       &hosts,
+			HostsPerCluster:             clusterInfo.HostsPerCluster,
+			ClustersPerDatacenter:       clusterInfo.ClustersPerDatacenter,
+			TotalHosts:                  clusterInfo.TotalHosts,
+			TotalClusters:               clusterInfo.TotalClusters,
+			TotalDatacenters:            clusterInfo.TotalDatacenters,
+			VmsPerCluster:               ExtractVmsPerCluster(vInfoRows),
+			CpuOverCommitmentPerCluster: cpuOverCommitment,
 		}
 		vcenterInventory := service.CreateBasicInventory(vcenterUUID, &vms, infraData)
 
@@ -147,11 +154,6 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		if len(vms) > 0 {
 			collector.FillInventoryObjectWithMoreData(&vms, vcenterInventory)
 		}
-
-		// Extract cluster ID mappings
-		zap.S().Named("rvtools").Infof("Extract Cluster ID Mappings")
-		clusterMapping := ExtractClusterIDMapping(vInfoRows, vHostRows, vClusterRows, vcenterUUID)
-		zap.S().Named("rvtools").Infof("Found %d unique clusters", len(clusterMapping.ClusterIDs))
 
 		// Build network ID to name mapping for filtering
 		networkMapping := createNetworkMappings(dvPortRows).IDToName
@@ -370,6 +372,43 @@ func ExtractVmsPerCluster(rows [][]string) []int {
 	}
 
 	return service.CalculateVMsPerCluster(clusterToVMs)
+}
+
+func CalculateCpuOverCommitmentFromParsedData(hosts []api.Host, vms []vsphere.VM, clusterMapping service.ClusterIDMapping) []api.ClusterCpuOverCommitment {
+	if len(clusterMapping.ClusterIDs) == 0 {
+		return []api.ClusterCpuOverCommitment{}
+	}
+
+	result := make([]api.ClusterCpuOverCommitment, len(clusterMapping.ClusterIDs))
+
+	clusterIndex := make(map[string]int, len(clusterMapping.ClusterIDs))
+	for i, clusterID := range clusterMapping.ClusterIDs {
+		clusterIndex[clusterID] = i
+	}
+
+	for _, host := range hosts {
+		if host.Id == nil {
+			continue
+		}
+		if clusterID, ok := clusterMapping.HostToClusterID[*host.Id]; ok {
+			if idx, ok := clusterIndex[clusterID]; ok && host.CpuCores != nil {
+				result[idx].PhysicalCores += *host.CpuCores
+			}
+		}
+	}
+
+	for _, vm := range vms {
+		if vm.PowerState != "poweredOn" {
+			continue
+		}
+		if clusterID, ok := clusterMapping.VMToClusterID[vm.Name]; ok {
+			if idx, ok := clusterIndex[clusterID]; ok {
+				result[idx].AllocatedVCpus += int(vm.CpuCount)
+			}
+		}
+	}
+
+	return result
 }
 
 func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []api.Network {

@@ -1,6 +1,8 @@
 package service
 
-import "sort"
+import (
+	"sort"
+)
 
 func CalculateHostsPerCluster(clusterToHosts map[string]map[string]struct{}) []int {
 	if len(clusterToHosts) == 0 {

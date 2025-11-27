@@ -84,17 +84,41 @@ func FilterInfraDataByClusterID(
 
 	clusterNetworks := FilterNetworksByVMs(infraData.Networks, clusterVMs, networkMapping)
 
+	cpuOverCommitment := CalculateCpuOverCommitmentForCluster(clusterHosts, clusterVMs)
+
 	return InfrastructureData{
-		Datastores:            clusterDatastores,
-		Networks:              clusterNetworks,
-		HostPowerStates:       clusterHostPowerStates,
-		Hosts:                 &clusterHosts,
-		HostsPerCluster:       []int{len(clusterHosts)},
-		ClustersPerDatacenter: []int{1}, // Single cluster
-		TotalHosts:            len(clusterHosts),
-		TotalClusters:         1,
-		TotalDatacenters:      1,
-		VmsPerCluster:         []int{len(clusterVMs)},
+		Datastores:                  clusterDatastores,
+		Networks:                    clusterNetworks,
+		HostPowerStates:             clusterHostPowerStates,
+		Hosts:                       &clusterHosts,
+		HostsPerCluster:             []int{len(clusterHosts)},
+		ClustersPerDatacenter:       []int{1}, // Single cluster
+		TotalHosts:                  len(clusterHosts),
+		TotalClusters:               1,
+		TotalDatacenters:            1,
+		VmsPerCluster:               []int{len(clusterVMs)},
+		CpuOverCommitmentPerCluster: []api.ClusterCpuOverCommitment{cpuOverCommitment},
+	}
+}
+
+func CalculateCpuOverCommitmentForCluster(hosts []api.Host, vms []vsphere.VM) api.ClusterCpuOverCommitment {
+	var physicalCores int
+	for _, host := range hosts {
+		if host.CpuCores != nil {
+			physicalCores += *host.CpuCores
+		}
+	}
+
+	var allocatedVCpus int
+	for _, vm := range vms {
+		if vm.PowerState == "poweredOn" {
+			allocatedVCpus += int(vm.CpuCount)
+		}
+	}
+
+	return api.ClusterCpuOverCommitment{
+		AllocatedVCpus: allocatedVCpus,
+		PhysicalCores:  physicalCores,
 	}
 }
 
