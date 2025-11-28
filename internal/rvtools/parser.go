@@ -3,7 +3,6 @@ package rvtools
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"slices"
 
@@ -17,7 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/opa"
 )
 
-func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) ([]byte, error) {
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) (*api.Inventory, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -167,18 +166,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			clusterInventories[clusterID] = clusterInv
 		}
 
-		response := &service.ClusteredInventoryResponse{
-			VCenterID: vcenterUUID,
-			Clusters:  clusterInventories,
-			VCenter:   vcenterInventory,
-		}
-
-		data, err := json.Marshal(response.VCenter)
-		if err != nil {
-			return []byte{}, err
-		}
-
-		return data, nil
+		return vcenterInventory, nil
 	}
 
 	// If vInfo doesn't exist, fail with error

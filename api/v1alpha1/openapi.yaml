@@ -408,9 +408,6 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/AssessmentForm'
-          multipart/form-data:
-            schema:
-              $ref: '#/components/schemas/AssessmentRvtoolsForm'
         required: true
       responses:
         "201":
@@ -584,6 +581,150 @@ paths:
                 $ref: '#/components/schemas/Error'
         "404":
           description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assessments/jobs:
+    post:
+      tags:
+        - job
+      description: Create a job for async RVTools processing
+      operationId: createRVToolsJob
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RVToolsJobForm'
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /api/v1/assessments/jobs/{id}:
+    get:
+      tags:
+        - job
+      description: Get the specified job
+      operationId: getJob
+      parameters:
+        - name: id
+          in: path
+          description: ID of the job
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      tags:
+        - job
+      description: Cancel a running job
+      operationId: cancelJob
+      parameters:
+        - name: id
+          in: path
+          description: ID of the job
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Conflict - Job already completed or cancelled
           content:
             application/json:
               schema:
@@ -1212,7 +1353,7 @@ components:
           description: Owner's last name
         sourceType:
           type: string
-          enum: [inventory, rvtools, source]
+          enum: [inventory, rvtools, agent]
         sourceId:
           type: string
           format: uuid
@@ -1240,36 +1381,52 @@ components:
         sourceType:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "required,oneof=inventory agent"
+            validate: "required,oneof=inventory agent rvtools"
           description: >
             Source of the assessment data:
              * `inventory` - Manual inventory upload via JSON
              * `agent` - Collected by migration planner agent
+             * `rvtools` - Parsed from RVTools file via async job
         sourceId:
           type: string
           format: uuid
+          description: Source ID for agent source type
+        jobId:
+          type: integer
+          format: int64
+          description: Job ID for rvtools source type (from completed job)
         inventory:
           $ref: '#/components/schemas/Inventory'
       required:
         - name
         - sourceType
 
-    AssessmentRvtoolsForm:
+    Job:
       type: object
       properties:
-        name:
+        id:
+          type: integer
+          format: int64
+        status:
           type: string
-          description: Name of the assessment
-          x-oapi-codegen-extra-tags:
-            validate: "required,assessment_name,min=1,max=100"
+          enum: [pending, scheduled, available, running, completed, cancelled, discarded, retryable]
+        error:
+          type: string
+          description: Error message if the job failed
+      required:
+        - id
+        - status
+
+    RVToolsJobForm:
+      type: object
+      properties:
         file:
           type: string
           format: binary
-          description: File upload for assessment data
+          description: RVTools Excel file to process
           x-oapi-codegen-extra-tags:
             validate: "required"
       required:
-        - name
         - file
 
     AssessmentUpdate:

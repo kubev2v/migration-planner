@@ -35,6 +35,7 @@ type Server struct {
 	store        store.Store
 	listener     net.Listener
 	opaValidator *opa.Validator
+	jobService   *service.JobService
 }
 
 // New returns a new instance of a migration-planner server.
@@ -43,12 +44,14 @@ func New(
 	store store.Store,
 	listener net.Listener,
 	opaValidator *opa.Validator,
+	jobService *service.JobService,
 ) *Server {
 	return &Server{
 		cfg:          cfg,
 		store:        store,
 		listener:     listener,
 		opaValidator: opaValidator,
+		jobService:   jobService,
 	}
 }
 
@@ -108,7 +111,8 @@ func (s *Server) Run(ctx context.Context) error {
 
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
-		service.NewAssessmentService(s.store, s.opaValidator),
+		service.NewAssessmentService(s.store, s.opaValidator, s.jobService),
+		s.jobService,
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}

@@ -21,9 +21,21 @@ const (
 
 // Defines values for AssessmentSourceType.
 const (
+	AssessmentSourceTypeAgent     AssessmentSourceType = "agent"
 	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
 	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
-	AssessmentSourceTypeSource    AssessmentSourceType = "source"
+)
+
+// Defines values for JobStatus.
+const (
+	Available JobStatus = "available"
+	Cancelled JobStatus = "cancelled"
+	Completed JobStatus = "completed"
+	Discarded JobStatus = "discarded"
+	Pending   JobStatus = "pending"
+	Retryable JobStatus = "retryable"
+	Running   JobStatus = "running"
+	Scheduled JobStatus = "scheduled"
 )
 
 // Defines values for NetworkType.
@@ -76,27 +88,24 @@ type AssessmentSourceType string
 
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
-	Inventory *Inventory          `json:"inventory,omitempty"`
-	Name      string              `json:"name" validate:"required,assessment_name,min=1,max=100"`
-	SourceId  *openapi_types.UUID `json:"sourceId,omitempty"`
+	Inventory *Inventory `json:"inventory,omitempty"`
+
+	// JobId Job ID for rvtools source type (from completed job)
+	JobId *int64 `json:"jobId,omitempty"`
+	Name  string `json:"name" validate:"required,assessment_name,min=1,max=100"`
+
+	// SourceId Source ID for agent source type
+	SourceId *openapi_types.UUID `json:"sourceId,omitempty"`
 
 	// SourceType Source of the assessment data:
 	//  * `inventory` - Manual inventory upload via JSON
 	//  * `agent` - Collected by migration planner agent
-	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent"`
+	//  * `rvtools` - Parsed from RVTools file via async job
+	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent rvtools"`
 }
 
 // AssessmentList defines model for AssessmentList.
 type AssessmentList = []Assessment
-
-// AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
-type AssessmentRvtoolsForm struct {
-	// File File upload for assessment data
-	File openapi_types.File `json:"file" validate:"required"`
-
-	// Name Name of the assessment
-	Name string `json:"name" validate:"required,assessment_name,min=1,max=100"`
-}
 
 // AssessmentUpdate Update form of the assessment.
 type AssessmentUpdate struct {
@@ -190,6 +199,17 @@ type Ipv4Config struct {
 	SubnetMask     string `json:"subnetMask" validate:"required,subnet_mask,max=2"`
 }
 
+// Job defines model for Job.
+type Job struct {
+	// Error Error message if the job failed
+	Error  *string   `json:"error,omitempty"`
+	Id     int64     `json:"id"`
+	Status JobStatus `json:"status"`
+}
+
+// JobStatus defines model for Job.Status.
+type JobStatus string
+
 // Label defines model for Label.
 type Label struct {
 	Key   string `json:"key" validate:"required,label"`
@@ -218,6 +238,12 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// RVToolsJobForm defines model for RVToolsJobForm.
+type RVToolsJobForm struct {
+	// File RVTools Excel file to process
+	File openapi_types.File `json:"file" validate:"required"`
+}
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
@@ -360,8 +386,8 @@ type PresignedUrl struct {
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
-// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
-type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
+// CreateRVToolsJobMultipartRequestBody defines body for CreateRVToolsJob for multipart/form-data ContentType.
+type CreateRVToolsJobMultipartRequestBody = RVToolsJobForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate

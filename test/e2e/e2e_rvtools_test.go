@@ -83,10 +83,12 @@ var _ = Describe("e2e-rvtools", func() {
 			defer os.Remove(tmpFile)
 
 			// Attempt to create assessment from corrupted file
+			// With async job flow, the job creation succeeds but the job fails during processing
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			// Job fails with discarded status due to invalid Excel content
+			Expect(err).To(MatchError(ContainSubstring("job failed")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

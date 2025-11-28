@@ -9,9 +9,13 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
+	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
@@ -63,30 +67,76 @@ var runCmd = &cobra.Command{
 		store := store.NewStore(db)
 		defer store.Close()
 
-		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
-			zap.S().Fatalw("running initial migration", "error", err)
+		pgxDSN := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s",
+			cfg.Database.Hostname,
+			cfg.Database.User,
+			cfg.Database.Password,
+			cfg.Database.Port,
+			cfg.Database.Name,
+		)
+		pgxCfg, err := pgxpool.ParseConfig(pgxDSN)
+		if err != nil {
+			zap.S().Fatalw("parsing pgx config", "error", err)
 		}
 
-		// The migration planner API expects the RHCOS ISO to be on disk
+		// Configure pool for River's LISTEN/NOTIFY (instant job notifications)
+		pgxCfg.MaxConns = 20
+		pgxCfg.MinConns = 2
+		pgxCfg.MaxConnLifetime = time.Hour
+		pgxCfg.MaxConnIdleTime = 30 * time.Minute
+
+		pgxPool, err := pgxpool.NewWithConfig(context.Background(), pgxCfg)
+		if err != nil {
+			zap.S().Fatalw("creating pgx pool", "error", err)
+		}
+		defer pgxPool.Close()
+
+		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder, pgxPool); err != nil {
+			zap.S().Fatalw("running migrations", "error", err)
+		}
+
 		if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
 			zap.S().Fatalw("validate iso", "error", err)
 			return err
 		}
 
-		// Initialize OPA validator for policy validation
-		zap.S().Info("initializing OPA validator...")
+		zap.S().Info("Initializing OPA validator...")
 		opaValidator, err := opa.NewValidatorFromDir(cfg.Service.OpaPoliciesFolder)
 		if err != nil {
 			zap.S().Warnf("Failed to initialize OPA validator: %v - validation will be disabled", err)
 		}
 
+		zap.S().Info("Initializing River Queue...")
+		jobClient, err := jobs.NewClient(context.Background(), pgxPool, opaValidator)
+		if err != nil {
+			zap.S().Fatalw("creating River client", "error", err)
+		}
+		jobService := service.NewJobService(jobClient)
+
+		// Start River workers (non-blocking in v0.28+)
+		if err := jobClient.Start(context.Background()); err != nil {
+			zap.S().Fatalw("starting River client", "error", err)
+		}
+		zap.S().Info("River Queue started")
+
+		// Ensure graceful shutdown of River
+		defer func() {
+			zap.S().Info("Stopping River Queue...")
+			stopCtx, stopCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer stopCancel()
+			if err := jobClient.Stop(stopCtx); err != nil {
+				zap.S().Warnw("failed to stop River client gracefully", "error", err)
+			}
+			zap.S().Info("River Queue stopped")
+		}()
+
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
-		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
-		// register metrics
+		var wg sync.WaitGroup
+
 		metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator)
+			return apiserver.New(cfg, store, l, opaValidator, jobService)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {

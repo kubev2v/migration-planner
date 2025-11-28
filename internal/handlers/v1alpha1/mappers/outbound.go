@@ -160,3 +160,14 @@ func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, er
 	}
 	return assessmentList, nil
 }
+
+func JobInfoToApi(id int64, status string, errMsg string) api.Job {
+	job := api.Job{
+		Id:     id,
+		Status: api.JobStatus(status),
+	}
+	if errMsg != "" {
+		job.Error = &errMsg
+	}
+	return job
+}

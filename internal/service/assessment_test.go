@@ -39,7 +39,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAssessmentService(s, nil)
+		svc = service.NewAssessmentService(s, nil, nil)
 	})
 
 	AfterAll(func() {
