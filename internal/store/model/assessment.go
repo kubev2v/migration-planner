@@ -7,6 +7,11 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	SnapshotVersionV1 = 1 + iota
+	SnapshotVersionV2
+)
+
 type Assessment struct {
 	ID             uuid.UUID `gorm:"primaryKey;column:id;type:VARCHAR(255);"`
 	CreatedAt      time.Time `gorm:"not null;default:now()"`
@@ -37,8 +42,9 @@ type Snapshot struct {
 	UpdatedAt    *time.Time
 	Status       SnapshotStatus `gorm:"type:varchar(20);default:'pending'"`
 	Error        *string        `gorm:"type:text"`
-	Inventory    []byte         `gorm:"type:jsonb;not null"`
 	AssessmentID uuid.UUID      `gorm:"not null;type:VARCHAR(255);"`
+	Inventory    []byte         `gorm:"type:jsonb;not null"`
+	Version      uint           `gorm:"type:smallint;not null;default:1"`
 }
 
 type AssessmentList []Assessment

@@ -172,9 +172,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			srv := service.NewAgentService(s)
@@ -193,7 +191,7 @@ var _ = Describe("agent service", Ordered, func() {
 			var inventory v1alpha1.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
-			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
+			Expect(inventory.VcenterId).To(Equal("vcenter"))
 		})
 
 		It("successfully updates the source - two agents", func() {
@@ -210,9 +208,7 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			// first agent request
@@ -232,7 +228,7 @@ var _ = Describe("agent service", Ordered, func() {
 			var inventory v1alpha1.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
-			Expect(inventory.Vcenter.Id).To(Equal("vcenter"))
+			Expect(inventory.VcenterId).To(Equal("vcenter"))
 
 			// second agent request
 			_, err = srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -280,9 +276,7 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			inventory1JSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "vcenter",
-				},
+				VcenterId: "vcenter",
 			})
 
 			srv := service.NewAgentService(s)
@@ -295,9 +289,7 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			inventory2JSON, _ := json.Marshal(v1alpha1.Inventory{
-				Vcenter: v1alpha1.VCenter{
-					Id: "anotherVCenterID",
-				},
+				VcenterId: "anotherVCenterID",
 			})
 
 			_, err = srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{

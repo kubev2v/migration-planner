@@ -43,14 +43,10 @@ type InfrastructureData struct {
 // This function consolidates the duplicated createBasicInventoryObj functions from
 // vsphere.go and parser.go to ensure consistency and reduce duplication.
 func CreateBasicInventory(
-	vCenterID string,
 	vms *[]vsphere.VM,
 	infraData InfrastructureData,
-) *api.Inventory {
-	return &api.Inventory{
-		Vcenter: api.VCenter{
-			Id: vCenterID,
-		},
+) *api.InventoryData {
+	return &api.InventoryData{
 		Vms: api.VMs{
 			Total:                len(*vms),
 			PowerStates:          map[string]int{},

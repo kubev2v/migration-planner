@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.Inventory) (map[int]string, error) {
+func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.InventoryData) (map[int]string, error) {
 	datastoreIndexToName := make(map[int]string)
 
 	if len(rows) <= 1 {
@@ -95,7 +95,7 @@ func processDatastoreInfo(rows [][]string, vHostRows [][]string, inventory *api.
 	return datastoreIndexToName, nil
 }
 
-func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.Inventory) {
+func correlateDatastoreInfo(multipathRows, hbaRows [][]string, inventory *api.InventoryData) {
 	if len(inventory.Infra.Datastores) == 0 {
 		return
 	}
