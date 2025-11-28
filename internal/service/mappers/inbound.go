@@ -171,6 +171,7 @@ type AssessmentCreateForm struct {
 	SourceID       *uuid.UUID
 	Inventory      []byte
 	RVToolsFile    io.Reader
+	JobID          *int64 // For rvtools source type from async job
 }
 
 func (f *AssessmentCreateForm) ToModel() model.Assessment {

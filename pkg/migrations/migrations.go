@@ -1,15 +1,19 @@
 package migrations
 
 import (
+	"context"
 	"fmt"
 	"os"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pressly/goose/v3"
+	"github.com/riverqueue/river/riverdriver/riverpgxv5"
+	"github.com/riverqueue/river/rivermigrate"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
 
-func MigrateStore(db *gorm.DB, migrationFolder string) error {
+func MigrateStore(db *gorm.DB, migrationFolder string, pgxPool *pgxpool.Pool) error {
 	goose.SetLogger(&logger{})
 
 	fi, err := os.Stat(migrationFolder)
@@ -36,7 +40,20 @@ func MigrateStore(db *gorm.DB, migrationFolder string) error {
 		return err
 	}
 
+	if err := migrateRiver(pgxPool); err != nil {
+		return fmt.Errorf("river migrations: %w", err)
+	}
+
 	return nil
+}
+
+func migrateRiver(pool *pgxpool.Pool) error {
+	migrator, err := rivermigrate.New(riverpgxv5.New(pool), nil)
+	if err != nil {
+		return err
+	}
+	_, err = migrator.Migrate(context.Background(), rivermigrate.DirectionUp, nil)
+	return err
 }
 
 /*

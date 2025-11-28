@@ -10,7 +10,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
-	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
@@ -48,44 +47,25 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	logger := log.NewDebugLogger("assessment_handler").
 		WithContext(ctx).
 		Operation("create_assessment").
-		WithRequestBody("request_body", request.JSONBody).
+		WithRequestBody("request_body", request.Body).
 		Build()
 
 	user := auth.MustHaveUser(ctx)
 	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
-	if request.JSONBody == nil && request.MultipartBody == nil {
+	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).Log()
 		return server.CreateAssessment400JSONResponse{Message: "empty body", RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	var createForm srvMappers.AssessmentCreateForm
-	createForm.OrgID = user.Organization
-
-	// Handle JSON content type
-	if request.JSONBody != nil {
-		logger.Step("process_json_body").Log()
-		form := v1alpha1.AssessmentForm(*request.JSONBody)
-		if err := validateAssessmentData(form); err != nil {
-			logger.Error(err).WithString("step", "validation").Log()
-			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-
-		createForm = mappers.AssessmentFormToCreateForm(form, user)
-		logger.Step("mapped_json_form").WithString("source_type", createForm.Source).Log()
+	form := v1alpha1.AssessmentForm(*request.Body)
+	if err := validateAssessmentData(form); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	// Handle multipart content type (RVTools upload)
-	if request.MultipartBody != nil {
-		logger.Step("process_multipart_body").Log()
-		var err error
-		createForm, err = mappers.AssessmentCreateFormFromMultipart(request.MultipartBody, user)
-		if err != nil {
-			logger.Error(err).WithString("step", "parse_multipart").Log()
-			return server.CreateAssessment400JSONResponse{Message: fmt.Sprintf("failed to parse multipart form: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
-		}
-		logger.Step("mapped_multipart_form").WithString("source_type", createForm.Source).Log()
-	}
+	createForm := mappers.AssessmentFormToCreateForm(form, user)
+	logger.Step("mapped_form").WithString("source_type", createForm.Source).Log()
 
 	logger.Step("create_assessment").
 		WithUUID("id", createForm.ID).

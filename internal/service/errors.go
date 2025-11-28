@@ -81,3 +81,35 @@ func NewErrDuplicateKey(resourceType, key string) *ErrDuplicateKey {
 func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
 	return NewErrDuplicateKey("assessment", fmt.Sprintf("name '%s'", name))
 }
+
+type ErrJobNotFound struct {
+	error
+}
+
+func NewErrJobNotFound(id int64) *ErrJobNotFound {
+	return &ErrJobNotFound{fmt.Errorf("job %d not found", id)}
+}
+
+type ErrJobAccessForbidden struct {
+	error
+}
+
+func NewErrJobAccessForbidden(id int64) *ErrJobAccessForbidden {
+	return &ErrJobAccessForbidden{fmt.Errorf("forbidden to access job %d", id)}
+}
+
+type ErrJobAlreadyCompleted struct {
+	error
+}
+
+func NewErrJobAlreadyCompleted(id int64) *ErrJobAlreadyCompleted {
+	return &ErrJobAlreadyCompleted{fmt.Errorf("job %d is already completed or cancelled", id)}
+}
+
+type ErrJobNotCompleted struct {
+	error
+}
+
+func NewErrJobNotCompleted(id int64) *ErrJobNotCompleted {
+	return &ErrJobNotCompleted{fmt.Errorf("job %d is not completed", id)}
+}
