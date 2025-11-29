@@ -36,10 +36,7 @@ var _ = Describe("migrations", Ordered, func() {
 
 	Context("store migrations", Ordered, func() {
 		It("fails to migration the db -- migration folder does not exists", func() {
-			cfg, err := config.New()
-			Expect(err).To(BeNil())
-			cfg.Service.MigrationFolder = "some folder"
-			err = migrations.MigrateStore(gormdb, cfg)
+			err := migrations.MigrateStore(gormdb, "some folder")
 			Expect(err).NotTo(BeNil())
 
 		})
@@ -47,11 +44,8 @@ var _ = Describe("migrations", Ordered, func() {
 		It("sucessfully migrate the db", func() {
 			currentFolder, err := os.Getwd()
 			Expect(err).To(BeNil())
-			cfg, err := config.New()
-			Expect(err).To(BeNil())
-			cfg.Service.MigrationFolder = path.Join(currentFolder, "sql")
 
-			err = migrations.MigrateStore(gormdb, cfg)
+			err = migrations.MigrateStore(gormdb, path.Join(currentFolder, "sql"))
 			Expect(err).To(BeNil())
 
 			tableExists := func(name string) bool {

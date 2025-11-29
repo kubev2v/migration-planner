@@ -14,8 +14,8 @@ import (
 type Assessment interface {
 	List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error)
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
-	Create(ctx context.Context, assessment *model.Assessment, snapshot *model.Snapshot) error
-	Update(ctx context.Context, assessmentID uuid.UUID, updates *model.Assessment, newSnapshot *model.Snapshot) (*model.Assessment, error)
+	Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error)
+	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -64,30 +64,31 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 	return &assessment, nil
 }
 
-// Create creates an assessment with its associated snapshot
-// Both are created in the same database operation (should be within a transaction)
-func (a *AssessmentStore) Create(ctx context.Context, assessment *model.Assessment, snapshot *model.Snapshot) error {
+func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {
 	// Create the assessment first
-	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(assessment)
+	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
-			return ErrDuplicateKey
+			return nil, ErrDuplicateKey
 		}
-		return result.Error
+		return nil, result.Error
 	}
 
-	// Set the assessment ID on the snapshot
-	snapshot.AssessmentID = assessment.ID
-
-	// Create the snapshot using the snapshot store
-	if err := NewSnapshotStore(a.db).Create(ctx, snapshot); err != nil {
-		return err
+	// Create the initial snapshot with the inventory
+	snapshot := model.Snapshot{
+		AssessmentID: assessment.ID,
+		Inventory:    inventory,
 	}
 
-	return nil
+	if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
+		return nil, err
+	}
+
+	// Return the assessment with snapshots loaded
+	return a.Get(ctx, assessment.ID)
 }
 
-func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, updates *model.Assessment, newSnapshot *model.Snapshot) (*model.Assessment, error) {
+func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error) {
 	// Check if assessment exists
 	var assessment model.Assessment
 	if err := a.getDB(ctx).First(&assessment, "id = ?", assessmentID).Error; err != nil {
@@ -97,27 +98,30 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, up
 		return nil, err
 	}
 
-	// Always set UpdatedAt when updating
-	now := time.Now()
-	updates.UpdatedAt = &now
-
-	if err := a.getDB(ctx).Model(&assessment).Updates(updates).Error; err != nil {
-		return nil, err
+	// Update assessment name if provided
+	if name != nil {
+		assessment.Name = *name
 	}
 
-	// Create new snapshot if provided
-	if newSnapshot != nil {
-		newSnapshot.AssessmentID = assessmentID
-		if err := NewSnapshotStore(a.db).Create(ctx, newSnapshot); err != nil {
+	if inventory != nil {
+		// Create a new snapshot
+		snapshot := model.Snapshot{
+			AssessmentID: assessmentID,
+			Inventory:    inventory,
+		}
+
+		if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
 			return nil, err
 		}
 	}
 
-	// Reload to get all fields
-	if err := a.getDB(ctx).First(&assessment, "id = ?", assessmentID).Error; err != nil {
+	now := time.Now()
+	assessment.UpdatedAt = &now
+	if err := a.getDB(ctx).Model(&assessment).Updates(&assessment).Error; err != nil {
 		return nil, err
 	}
 
+	// Return the updated assessment with snapshots
 	return &assessment, nil
 }
 
