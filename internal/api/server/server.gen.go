@@ -36,9 +36,6 @@ type ServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (DELETE /api/v1/assessments/{id}/job)
-	CancelAssessmentJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
-
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
 
@@ -99,11 +96,6 @@ func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id 
 
 // (PUT /api/v1/assessments/{id})
 func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (DELETE /api/v1/assessments/{id}/job)
-func (_ Unimplemented) CancelAssessmentJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -270,32 +262,6 @@ func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAssessment(w, r, id)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
-// CancelAssessmentJob operation middleware
-func (siw *ServerInterfaceWrapper) CancelAssessmentJob(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	var err error
-
-	// ------------- Path parameter "id" -------------
-	var id openapi_types.UUID
-
-	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
-		return
-	}
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.CancelAssessmentJob(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -665,9 +631,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
 	})
 	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/assessments/{id}/job", wrapper.CancelAssessmentJob)
-	})
-	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
 	})
 	r.Group(func(r chi.Router) {
@@ -770,15 +733,6 @@ type CreateAssessment401JSONResponse Error
 func (response CreateAssessment401JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CreateAssessment409JSONResponse Error
-
-func (response CreateAssessment409JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -973,49 +927,6 @@ func (response UpdateAssessment404JSONResponse) VisitUpdateAssessmentResponse(w 
 type UpdateAssessment500JSONResponse Error
 
 func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CancelAssessmentJobRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
-}
-
-type CancelAssessmentJobResponseObject interface {
-	VisitCancelAssessmentJobResponse(w http.ResponseWriter) error
-}
-
-type CancelAssessmentJob200Response struct {
-}
-
-func (response CancelAssessmentJob200Response) VisitCancelAssessmentJobResponse(w http.ResponseWriter) error {
-	w.WriteHeader(200)
-	return nil
-}
-
-type CancelAssessmentJob404JSONResponse Error
-
-func (response CancelAssessmentJob404JSONResponse) VisitCancelAssessmentJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CancelAssessmentJob409JSONResponse Error
-
-func (response CancelAssessmentJob409JSONResponse) VisitCancelAssessmentJobResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(409)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type CancelAssessmentJob500JSONResponse Error
-
-func (response CancelAssessmentJob500JSONResponse) VisitCancelAssessmentJobResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1542,9 +1453,6 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
 
-	// (DELETE /api/v1/assessments/{id}/job)
-	CancelAssessmentJob(ctx context.Context, request CancelAssessmentJobRequestObject) (CancelAssessmentJobResponseObject, error)
-
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
 
@@ -1752,32 +1660,6 @@ func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
 		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// CancelAssessmentJob operation middleware
-func (sh *strictHandler) CancelAssessmentJob(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request CancelAssessmentJobRequestObject
-
-	request.Id = id
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.CancelAssessmentJob(ctx, request.(CancelAssessmentJobRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "CancelAssessmentJob")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(CancelAssessmentJobResponseObject); ok {
-		if err := validResponse.VisitCancelAssessmentJobResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

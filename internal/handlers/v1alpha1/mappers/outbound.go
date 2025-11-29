@@ -131,18 +131,13 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 	for i, snapshot := range a.Snapshots {
 		assessment.Snapshots[i] = api.Snapshot{
 			CreatedAt: snapshot.CreatedAt,
-			Status:    api.SnapshotStatus(snapshot.Status),
-		}
-		// Add error if present
-		if snapshot.Error != nil {
-			assessment.Snapshots[i].Error = snapshot.Error
 		}
 		if len(snapshot.Inventory) > 0 {
 			inventory := v1alpha1.Inventory{}
 			if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
 				return api.Assessment{}, err
 			}
-			assessment.Snapshots[i].Inventory = &inventory
+			assessment.Snapshots[i].Inventory = inventory
 		}
 	}
 
