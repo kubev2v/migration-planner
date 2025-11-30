@@ -17,6 +17,15 @@ jobs:
       PODMAN: "docker"
 
     steps:
+
+      - name: Check disk space
+        run: df -h
+        
+      - name: Clean up Docker before build
+        run: |
+          docker system prune -af || true
+          docker builder prune -af || true
+          
       - name: Checkout the code
         uses: actions/checkout@v2
 
@@ -33,6 +42,9 @@ jobs:
       - name: Run test
         run: |
           sudo make integration-test PLANNER_IP=${REGISTRY_IP}
+
+      - name: Check disk space
+        run: df -h
           
       - name: Collect logs
         if: always()
