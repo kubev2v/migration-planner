@@ -9,7 +9,7 @@ parameters:
     value: ""
   - name: MIGRATION_PLANNER_IMAGE
     required: true
-  - name: MIGRATION_PLANNER_API_IMAGE_PULL_POLICY
+  - name: MIGRATION_PLANNER_IMAGE_PULL_POLICY
     value: Always
   - name: IMAGE_TAG
     value: latest
@@ -414,6 +414,7 @@ objects:
           initContainers:
             - name: pull-iso
               image: ${MIGRATION_PLANNER_ISO_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: ${MIGRATION_PLANNER_IMAGE_PULL_POLICY}
               command: ["/bin/bash", "-c"]
               args:
                 - |
@@ -485,7 +486,7 @@ objects:
                   cpu: ${MIGRATION_PLANNER_CPU_LIMIT}
                   memory: ${MIGRATION_PLANNER_MEMORY_LIMIT}
               image: ${MIGRATION_PLANNER_IMAGE}:${IMAGE_TAG}
-              imagePullPolicy: ${MIGRATION_PLANNER_API_IMAGE_PULL_POLICY}
+              imagePullPolicy: ${MIGRATION_PLANNER_IMAGE_PULL_POLICY}
               ports:
                 - containerPort: 8080
                   name: backend-metrics

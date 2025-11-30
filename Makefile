@@ -13,7 +13,7 @@ MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),
 MIGRATION_PLANNER_AGENT_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= $(REGISTRY)/$(REGISTRY_ORG)/migration-planner-api
 MIGRATION_PLANNER_ISO_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso
-MIGRATION_PLANNER_API_IMAGE_PULL_POLICY ?= Always
+MIGRATION_PLANNER_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
 MIGRATION_PLANNER_AUTH ?= local
@@ -124,6 +124,23 @@ bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_F
 migration-planner-api-container: bin/.migration-planner-api-container
 migration-planner-agent-container: bin/.migration-planner-agent-container
 
+bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
+	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	ISO_CHECKSUM=$$(grep '^ISO_CHECKSUM=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	TLS_VERIFY=$${TLS_VERIFY:-true}; \
+	$(PODMAN) build . \
+		--network=host \
+		--build-arg AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) \
+		--build-arg ISO_URL=$$ISO_URL \
+		--build-arg ISO_CHECKSUM=$$ISO_CHECKSUM \
+		--build-arg FINAL_ISO_PATH=/rhcos.iso \
+		--build-arg TLS_VERIFY=$$TLS_VERIFY \
+		-f build/migration-planner-iso/Containerfile \
+		$(if $(LABEL),--label "$(LABEL)") \
+		-t $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+
+migration-planner-iso-container: bin/.migration-planner-iso-container
+
 build-containers: migration-planner-api-container migration-planner-agent-container
 
 .PHONY: build-containers
@@ -203,7 +220,7 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443/api/migration-assessment \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
-	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
+	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
@@ -220,7 +237,7 @@ delete-from-kind: oc
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
-	   -p MIGRATION_PLANNER_API_IMAGE_PULL_POLICY=Never \
+	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
 	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \

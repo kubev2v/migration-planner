@@ -16,6 +16,9 @@ export ORG=""
 export AGENT_IMAGE_NAME=""
 export DRY_RUN=false
 
+: "${TLS_VERIFY:=true}"
+export TLS_VERIFY
+
 # Colors for output
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -90,6 +93,18 @@ parse_arguments() {
                 AGENT_IMAGE="$2"
                 shift 2
                 ;;
+            --tls-verify)
+                if [[ "$2" == "true" ]]; then
+                    TLS_VERIFY=true
+                    shift 2
+                elif [[ "$2" == "false" ]]; then
+                    TLS_VERIFY=false
+                    shift 2
+                else
+                    log_error "--tls-verify requires 'true' or 'false' value"
+                    exit 1
+                fi
+                ;;
             --dry-run)
                 DRY_RUN=true
                 shift
@@ -124,6 +139,7 @@ OPTIONS:
     --dir PATH              Working directory path (default: $DEFAULT_WORK_DIR)
     --output-file PATH      Full path to the output ISO file (required)
     --agent-image NAME      Agent image pull spec with tag (required)
+    --tls-verify VALUE      Enable/disable TLS verification (true/false, default: true)
     --dry-run               Show what would be done without executing
     -h, --help              Show this help message
 
@@ -257,8 +273,13 @@ function wait_for_image_availability() {
     log_info "Waiting for image to be available: ${pull_spec}"
     log_info "Timeout: ${timeout}s (30 minutes), checking every ${check_interval}s"
 
+    local skopeo_args=()
+    if [[ "$TLS_VERIFY" == "false" ]]; then
+        skopeo_args+=(--tls-verify=false)
+    fi
+
     while [[ $elapsed -lt $timeout ]]; do
-        if $SUDO skopeo inspect docker://"${pull_spec}" >/dev/null 2>&1; then
+        if $SUDO skopeo inspect "${skopeo_args[@]}" docker://"${pull_spec}" >/dev/null 2>&1; then
             log_success "Image is available: ${pull_spec}"
             return 0
         fi
@@ -291,7 +312,11 @@ function setup_agent_artifacts() {
         wait_for_image_availability "${pull_spec}"
 
         log_info "Pulling agent image: ${pull_spec}"
-        if ! $SUDO skopeo copy -q docker://"${pull_spec}" oci-archive:"${image_tar}"; then
+        local skopeo_args=(-q)
+        if [[ "$TLS_VERIFY" == "false" ]]; then
+            skopeo_args+=(--tls-verify=false)
+        fi
+        if ! $SUDO skopeo copy "${skopeo_args[@]}" docker://"${pull_spec}" oci-archive:"${image_tar}"; then
             log_error "Failed to pull agent image: ${pull_spec}"
             exit 1
         fi

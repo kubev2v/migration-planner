@@ -25,6 +25,7 @@ type E2ETestOptions struct {
 	pkgManager                string
 	insecureRegistryAddr      string
 	agentImage                string
+	isoImage                  string
 	registryIP                net.IP
 	keepEnvironment           bool
 	iface                     string
@@ -36,6 +37,7 @@ const (
 	defaultPullPolicy       = "Never"
 	defaultContainerRuntime = "docker"
 	defaultRegistryPort     = "5000"
+	defaultIsoImage         = "custom/migration-planner-iso"
 )
 
 func DefaultE2EOptions() *E2ETestOptions {
@@ -50,6 +52,7 @@ func DefaultE2EOptions() *E2ETestOptions {
 		localRegistryPort:         defaultRegistryPort,
 		insecureRegistryAddr:      defaultInsecureRegistry,
 		agentImage:                fmt.Sprintf("%s/agent", defaultInsecureRegistry),
+		isoImage:                  defaultIsoImage,
 		pkgManager:                getPackageManager(),
 		registryIP:                defaultRegistryIP,
 		iface:                     getInterfaceName(defaultRegistryIP),
@@ -150,14 +153,15 @@ func runCommand(cmdStr string) error {
 // configureEnvironment sets up and exports environment variables needed for running the tests
 func (o *E2ETestOptions) configureEnvironment() (map[string]string, error) {
 	envVars := map[string]string{
-		"REGISTRY_IP":                             o.registryIP.String(),
-		"INSECURE_REGISTRY":                       o.insecureRegistryAddr,
-		"MIGRATION_PLANNER_AGENT_IMAGE":           o.agentImage,
-		"MIGRATION_PLANNER_API_IMAGE":             o.plannerAPIImage,
-		"MIGRATION_PLANNER_API_IMAGE_PULL_POLICY": o.plannerAPIImagePullPolicy,
-		"PODMAN":      o.containerRuntime,
-		"PKG_MANAGER": o.pkgManager,
-		"IFACE":       o.iface,
+		"REGISTRY_IP":                         o.registryIP.String(),
+		"INSECURE_REGISTRY":                   o.insecureRegistryAddr,
+		"MIGRATION_PLANNER_AGENT_IMAGE":       o.agentImage,
+		"MIGRATION_PLANNER_API_IMAGE":         o.plannerAPIImage,
+		"MIGRATION_PLANNER_IMAGE_PULL_POLICY": o.plannerAPIImagePullPolicy,
+		"MIGRATION_PLANNER_ISO_IMAGE":         o.isoImage,
+		"PODMAN":                              o.containerRuntime,
+		"PKG_MANAGER":                         o.pkgManager,
+		"IFACE":                               o.iface,
 	}
 
 	for key, value := range envVars {
