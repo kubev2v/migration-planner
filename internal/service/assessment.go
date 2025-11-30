@@ -4,12 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/google/uuid"
 
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/opa"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -25,13 +24,15 @@ const (
 type AssessmentService struct {
 	store        store.Store
 	opaValidator *opa.Validator
+	jobService   *JobService
 	logger       *log.StructuredLogger
 }
 
-func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *AssessmentService {
+func NewAssessmentService(store store.Store, opaValidator *opa.Validator, jobService *JobService) *AssessmentService {
 	return &AssessmentService{
 		store:        store,
 		opaValidator: opaValidator,
+		jobService:   jobService,
 		logger:       log.NewDebugLogger("assessment_service"),
 	}
 }
@@ -124,18 +125,22 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		inventory = createForm.Inventory
 	case SourceTypeRvtools:
 		tracer.Step("process_rvtools_source").Log()
-		content, err := io.ReadAll(createForm.RVToolsFile)
-		if err != nil {
-			return nil, err
+		if createForm.JobID == nil {
+			return nil, fmt.Errorf("jobId is required for rvtools source type")
 		}
-		tracer.Step("read_rvtools_file").WithInt("file_size", len(content)).Log()
-		clusteredInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
+		tracer.Step("get_job_inventory").WithParam("job_id", *createForm.JobID).Log()
+
+		// Get inventory from completed job
+		jobInventory, err := as.jobService.GetJobInventory(ctx, *createForm.JobID, &auth.User{
+			Username:     createForm.Username,
+			Organization: createForm.OrgID,
+		})
 		if err != nil {
-			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
+			return nil, fmt.Errorf("failed to get inventory from job: %w", err)
 		}
 
-		inventory = clusteredInventory
-		tracer.Step("parsed_rvtools_inventory").Log()
+		inventory = jobInventory
+		tracer.Step("retrieved_job_inventory").WithInt("inventory_size", len(inventory)).Log()
 	}
 
 	ctx, err := as.store.NewTransactionContext(ctx)

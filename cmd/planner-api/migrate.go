@@ -1,6 +1,10 @@
 package main
 
 import (
+	"context"
+	"fmt"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -34,10 +38,24 @@ var migrateCmd = &cobra.Command{
 		store := store.NewStore(db)
 		defer store.Close()
 
-		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
-			zap.S().Fatalw("running initial migration", "error", err)
+		pgxDSN := fmt.Sprintf("host=%s user=%s password=%s port=%s dbname=%s",
+			cfg.Database.Hostname,
+			cfg.Database.User,
+			cfg.Database.Password,
+			cfg.Database.Port,
+			cfg.Database.Name,
+		)
+		pgxPool, err := pgxpool.New(context.Background(), pgxDSN)
+		if err != nil {
+			zap.S().Fatalw("creating pgx pool", "error", err)
+		}
+		defer pgxPool.Close()
+
+		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder, pgxPool); err != nil {
+			zap.S().Fatalw("running migrations", "error", err)
 		}
 
+		zap.S().Info("Migrations completed successfully")
 		return nil
 	},
 }

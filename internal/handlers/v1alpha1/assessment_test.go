@@ -75,7 +75,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
@@ -100,7 +100,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
@@ -132,9 +132,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 				},
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-				JSONBody: &v1alpha1.AssessmentForm{
+				Body: &v1alpha1.AssessmentForm{
 					Name:       "test-assessment",
 					SourceType: service.SourceTypeInventory,
 					Inventory:  &inventory,
@@ -172,12 +172,12 @@ var _ = Describe("assessment handler", Ordered, func() {
 				},
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 
 			// Note: AssessmentForm schema deliberately excludes owner fields
 			// This prevents users from spoofing owner information via API requests
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-				JSONBody: &v1alpha1.AssessmentForm{
+				Body: &v1alpha1.AssessmentForm{
 					Name:       "security-test-assessment",
 					SourceType: service.SourceTypeInventory,
 					Inventory:  &inventory,
@@ -214,9 +214,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-				JSONBody: &v1alpha1.AssessmentForm{
+				Body: &v1alpha1.AssessmentForm{
 					Name:       "agent-assessment",
 					SourceType: service.SourceTypeAgent,
 					SourceId:   &sourceID,
@@ -239,7 +239,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateAssessment400JSONResponse{}).String()))
@@ -261,9 +261,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-				JSONBody: &v1alpha1.AssessmentForm{
+				Body: &v1alpha1.AssessmentForm{
 					Name:       "forbidden-assessment",
 					SourceType: service.SourceTypeAgent,
 					SourceId:   &sourceID,
@@ -286,9 +286,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-				JSONBody: &v1alpha1.AssessmentForm{
+				Body: &v1alpha1.AssessmentForm{
 					Name:       "no-inventory-assessment",
 					SourceType: service.SourceTypeAgent,
 					SourceId:   &sourceID,
@@ -317,7 +317,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				EmailDomain:  "admin.example.com",
 			}
 			ctx = auth.NewTokenContext(context.TODO(), user)
-			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 		})
 
 		Context("name validation", func() {
@@ -329,7 +329,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -347,7 +347,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "invalid name with spaces",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -365,7 +365,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "invalid@name#with$special%chars",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -388,7 +388,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       longName,
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -406,7 +406,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "valid-name_123+test.assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -426,7 +426,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: "",
 						Inventory:  &inventory,
@@ -444,7 +444,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: "invalid-source-type",
 						Inventory:  &inventory,
@@ -462,7 +462,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -483,7 +483,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeAgent,
 						SourceId:   &sourceID,
@@ -497,7 +497,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		Context("conditional field validation", func() {
 			It("fails when sourceType is 'inventory' but no inventory is provided", func() {
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeInventory,
 						// No inventory provided (nil)
@@ -518,7 +518,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &emptyInventory,
@@ -538,7 +538,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &emptyVCenterInventory,
@@ -553,7 +553,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails when sourceType is 'agent' but no sourceId is provided", func() {
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeAgent,
 						// No sourceId provided
@@ -574,7 +574,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				}
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
@@ -595,7 +595,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
-					JSONBody: &v1alpha1.AssessmentForm{
+					Body: &v1alpha1.AssessmentForm{
 						Name:       "test-assessment",
 						SourceType: service.SourceTypeAgent,
 						SourceId:   &sourceID,
@@ -630,7 +630,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment200JSONResponse{}).String()))
@@ -651,7 +651,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: nonExistentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment404JSONResponse{}).String()))
@@ -673,7 +673,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment403JSONResponse{}).String()))
@@ -702,7 +702,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			updatedName := "updated-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -727,7 +727,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id:   assessmentID,
 				Body: nil,
@@ -749,7 +749,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			newName := "new-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: nonExistentID,
@@ -777,7 +777,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			hackedName := "hacked-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -805,7 +805,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			updatedName := "updated-inventory-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -841,7 +841,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			updatedName := "updated-rvtools-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -886,7 +886,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			updatedName := "updated-agent-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -927,7 +927,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment200JSONResponse{}).String()))
@@ -954,7 +954,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: nonExistentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment404JSONResponse{}).String()))
@@ -976,7 +976,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment403JSONResponse{}).String()))

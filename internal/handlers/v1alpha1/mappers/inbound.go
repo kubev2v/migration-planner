@@ -138,12 +138,17 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 		form.OwnerLastName = &user.LastName
 	}
 
-	// Set source ID if provided
+	// Set source ID if provided (for agent source type)
 	if resource.SourceId != nil {
 		form.SourceID = resource.SourceId
 	}
 
-	// Set inventory if provided
+	// Set job ID if provided (for rvtools source type)
+	if resource.JobId != nil {
+		form.JobID = resource.JobId
+	}
+
+	// Set inventory if provided (for inventory source type)
 	if resource.Inventory != nil {
 		data, _ := json.Marshal(resource.Inventory) // cannot fail. it has been already validated
 		form.Inventory = data
