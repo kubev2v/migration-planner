@@ -12,7 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
-      MIGRATION_PLANNER_API_IMAGE_PULL_POLICY: "Never"
+      MIGRATION_PLANNER_ISO_IMAGE: "custom/migration-planner-iso"
+      MIGRATION_PLANNER_IMAGE_PULL_POLICY: "Never"
       PODMAN: "docker"
 
     steps:
