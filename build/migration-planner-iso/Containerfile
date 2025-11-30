@@ -1,6 +1,6 @@
 FROM --platform=linux/amd64 quay.io/centos/centos:stream9 AS builder
 
-ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE
+ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE TLS_VERIFY=true
 
 USER root
 
@@ -37,6 +37,7 @@ RUN /tmp/build-ove-image.sh \
     --dir / \
     --output-file /output/final.iso \
     --agent-image ${AGENT_IMAGE} \
+    --tls-verify ${TLS_VERIFY} \
     && rm /initial-rhcos.iso && rm -rf /isomnt
 
 # Final stage with minimal image
