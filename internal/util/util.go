@@ -106,3 +106,8 @@ func ToStrPtr(s string) *string {
 func IntPtr(i int) *int {
 	return &i
 }
+
+// FloatPtr returns a pointer to the given float
+func FloatPtr(i float64) *float64 {
+	return &i
+}

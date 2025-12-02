@@ -163,16 +163,19 @@ type Info struct {
 
 // Infra defines model for Infra.
 type Infra struct {
-	ClustersPerDatacenter *[]int         `json:"clustersPerDatacenter,omitempty"`
-	Datastores            []Datastore    `json:"datastores"`
-	HostPowerStates       map[string]int `json:"hostPowerStates"`
-	Hosts                 *[]Host        `json:"hosts,omitempty"`
-	HostsPerCluster       []int          `json:"hostsPerCluster"`
-	Networks              []Network      `json:"networks"`
-	TotalClusters         int            `json:"totalClusters"`
-	TotalDatacenters      *int           `json:"totalDatacenters,omitempty"`
-	TotalHosts            int            `json:"totalHosts"`
-	VmsPerCluster         *[]int         `json:"vmsPerCluster,omitempty"`
+	ClustersPerDatacenter *[]int `json:"clustersPerDatacenter,omitempty"`
+
+	// CpuOverCommitment CPU Overcommitment Ratio. Calculated as total Allocated vCPUs / Total Physical Cores
+	CpuOverCommitment *float64       `json:"cpuOverCommitment,omitempty"`
+	Datastores        []Datastore    `json:"datastores"`
+	HostPowerStates   map[string]int `json:"hostPowerStates"`
+	Hosts             *[]Host        `json:"hosts,omitempty"`
+	HostsPerCluster   []int          `json:"hostsPerCluster"`
+	Networks          []Network      `json:"networks"`
+	TotalClusters     int            `json:"totalClusters"`
+	TotalDatacenters  *int           `json:"totalDatacenters,omitempty"`
+	TotalHosts        int            `json:"totalHosts"`
+	VmsPerCluster     *[]int         `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.
