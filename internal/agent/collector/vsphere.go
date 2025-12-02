@@ -201,7 +201,8 @@ func (c *Collector) run(ctx context.Context) {
 	}
 
 	zap.S().Named("collector").Infof("Fill the vCenter-level inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, vcenterInv)
+	datastoreIDToType := buildDatastoreIDToTypeMap(datastores)
+	FillInventoryObjectWithMoreData(vms, vcenterInv, datastoreIDToType)
 
 	zap.S().Named("collector").Infof("Create per-cluster inventories")
 	perClusterInventories := make(map[string]*apiplanner.InventoryData)
@@ -232,7 +233,7 @@ func (c *Collector) run(ctx context.Context) {
 			}
 
 			// Fill cluster inventory with more data
-			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv)
+			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv, datastoreIDToType)
 		}
 
 		perClusterInventories[clusterID] = clusterInv
@@ -307,7 +308,17 @@ func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
 	return container, nil
 }
 
-func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.InventoryData) {
+func buildDatastoreIDToTypeMap(datastores *[]vspheremodel.Datastore) map[string]string {
+	datastoreIDToType := make(map[string]string)
+
+	for _, ds := range *datastores {
+		datastoreIDToType[ds.ID] = ds.Type
+	}
+
+	return datastoreIDToType
+}
+
+func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.InventoryData, datastoreIDToType map[string]string) {
 	cpuSet := []int{}
 	memorySet := []int{}
 	diskGBSet := []int{}
@@ -320,7 +331,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		nicCount := len(vm.NICs)
 		// histogram collection
 		cpuSet = append(cpuSet, int(vm.CpuCount))
-		memorySet = append(memorySet, int(vm.MemoryMB/1024))
+		memorySet = append(memorySet, util.MBToGB(vm.MemoryMB))
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 		diskCountSet = append(diskCountSet, len(vm.Disks))
 		nicCountSet = append(nicCountSet, nicCount)
@@ -333,13 +344,13 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
 
-		updateOsInfoForVM(&vm, inv)
+		inv.Vms.OsInfo = updateOsInfo(&vm, *inv.Vms.OsInfo)
 
 		inv.Vms.PowerStates[vm.PowerState]++
 
 		// Update total values
 		inv.Vms.CpuCores.Total += int(vm.CpuCount)
-		inv.Vms.RamGB.Total += int(vm.MemoryMB / 1024)
+		inv.Vms.RamGB.Total += util.MBToGB(vm.MemoryMB)
 		inv.Vms.DiskCount.Total += len(vm.Disks)
 		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
 		inv.Vms.NicCount.Total += len(vm.NICs)
@@ -347,7 +358,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		// Not Migratable
 		if !migratable {
 			inv.Vms.CpuCores.TotalForNotMigratable += int(vm.CpuCount)
-			inv.Vms.RamGB.TotalForNotMigratable += int(vm.MemoryMB / 1024)
+			inv.Vms.RamGB.TotalForNotMigratable += util.MBToGB(vm.MemoryMB)
 			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
 			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
 			inv.Vms.NicCount.TotalForNotMigratable += len(vm.NICs)
@@ -355,20 +366,21 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 			// Migratable with warning(s)
 			if hasWarning {
 				inv.Vms.CpuCores.TotalForMigratableWithWarnings += int(vm.CpuCount)
-				inv.Vms.RamGB.TotalForMigratableWithWarnings += int(vm.MemoryMB / 1024)
+				inv.Vms.RamGB.TotalForMigratableWithWarnings += util.MBToGB(vm.MemoryMB)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) // Migratable
 				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
 				// Migratable without any warnings
 				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
-				inv.Vms.RamGB.TotalForMigratable += int(vm.MemoryMB / 1024)
+				inv.Vms.RamGB.TotalForMigratable += util.MBToGB(vm.MemoryMB)
 				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
 				inv.Vms.NicCount.TotalForMigratable += len(vm.NICs)
 			}
 		}
 
+		inv.Vms.DiskTypes = updateDiskTypeSummary(&vm, *inv.Vms.DiskTypes, datastoreIDToType)
 	}
 
 	// Histogram
@@ -379,13 +391,13 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
 
 	// Update the disk size tier
-	updateDiskSizeTier(diskGBSet, inv)
+	inv.Vms.DiskSizeTier = diskSizeTier(diskGBSet)
 
 	// calculate the cpu overcommitment ratio
 	totalCpus := sumHostsCpu(inv.Infra.Hosts)
 	if totalCpus > 0 {
 		overcommitmentRatio := float64(totalAllocatedVCpus) / float64(totalCpus)
-		roundedRatio := math.Round(overcommitmentRatio*100) / 100
+		roundedRatio := util.Round(overcommitmentRatio)
 		inv.Infra.CpuOverCommitment = util.FloatPtr(roundedRatio)
 	}
 }
@@ -402,11 +414,51 @@ func sumHostsCpu(hosts *[]apiplanner.Host) int {
 	return total
 }
 
-func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.InventoryData) {
-	diskSizeTier := *(inv.Vms.DiskSizeTier)
+// updateDiskTypeSummary calculates and updates a summary of disk usage by type for a given VM.
+// It takes:
+//   - vm: the VM whose disks are being analyzed,
+//   - summary: a map of existing DiskTypeSummary values keyed by disk type,
+//   - datastoreIDToType: a mapping from datastore IDs to their corresponding disk type names.
+//
+// For each disk in the VM, it:
+//   - identifies the disk type,
+//   - increments the VM count for that type (counting each VM only once per type),
+//   - adds the disk's size to the total size for that type (in TB),
+//   - rounds the total size to two decimal places.
+//
+// Returns a pointer to the updated map of DiskTypeSummary.
+func updateDiskTypeSummary(vm *vspheremodel.VM, summary map[string]apiplanner.DiskTypeSummary, datastoreIDToType map[string]string) *map[string]apiplanner.DiskTypeSummary {
+	seenTypes := make(map[string]bool)
+
+	for _, disk := range vm.Disks {
+		diskTypeName := datastoreIDToType[disk.Datastore.ID]
+
+		if diskTypeName == "" {
+			continue
+		}
+
+		diskTypeSummary := summary[diskTypeName]
+		if !seenTypes[diskTypeName] {
+			diskTypeSummary.VmCount++
+			seenTypes[diskTypeName] = true
+		}
+		diskTypeSummary.TotalSizeTB += util.BytesToTB(disk.Capacity)
+		summary[diskTypeName] = diskTypeSummary
+	}
+
+	for k, v := range summary {
+		v.TotalSizeTB = util.Round(v.TotalSizeTB)
+		summary[k] = v
+	}
+
+	return &summary
+}
+
+func diskSizeTier(diskGBSet []int) *map[string]apiplanner.DiskSizeTierSummary {
+	result := make(map[string]apiplanner.DiskSizeTierSummary)
 
 	for _, diskGB := range diskGBSet {
-		diskTB := float64(diskGB) / 1024.0
+		diskTB := util.GBToTB(diskGB)
 		var tierKey string
 
 		switch {
@@ -420,16 +472,18 @@ func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.InventoryData) {
 			tierKey = "White Glove (>50TB)"
 		}
 
-		tier := diskSizeTier[tierKey]
+		tier := result[tierKey]
 		tier.TotalSizeTB += diskTB
 		tier.VmCount++
-		diskSizeTier[tierKey] = tier
+		result[tierKey] = tier
 	}
 
-	for k, v := range diskSizeTier {
-		v.TotalSizeTB = math.Round(v.TotalSizeTB*100) / 100
-		diskSizeTier[k] = v
+	for k, v := range result {
+		v.TotalSizeTB = util.Round(v.TotalSizeTB)
+		result[k] = v
 	}
+
+	return &result
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
@@ -826,8 +880,8 @@ func getDatastores(hosts *[]vspheremodel.Host, datastores *[]vspheremodel.Datast
 		}
 
 		apiDatastores = append(apiDatastores, apiplanner.Datastore{
-			TotalCapacityGB:         int(ds.Capacity / 1024 / 1024 / 1024),
-			FreeCapacityGB:          int(ds.Free / 1024 / 1024 / 1024),
+			TotalCapacityGB:         util.BytesToGB(ds.Capacity),
+			FreeCapacityGB:          util.BytesToGB(ds.Free),
 			HardwareAcceleratedMove: isHardwareAcceleratedMove(*hosts, ds.BackingDevicesNames),
 			Type:                    ds.Type,
 			Vendor:                  TransformVendorName(dsVendor),
@@ -871,7 +925,7 @@ func totalCapacity(disks []vspheremodel.Disk) int {
 	for _, d := range disks {
 		total += int(d.Capacity)
 	}
-	return total / 1024 / 1024 / 1024
+	return util.BytesToGB(total)
 }
 
 func hasID(reasons apiplanner.MigrationIssues, id string) int {
