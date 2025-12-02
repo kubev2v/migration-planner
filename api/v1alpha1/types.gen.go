@@ -316,6 +316,7 @@ type VMs struct {
 	DiskCount            VMResourceBreakdown             `json:"diskCount"`
 	DiskGB               VMResourceBreakdown             `json:"diskGB"`
 	DiskSizeTier         *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	DiskTypes            *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 	MigrationWarnings    []MigrationIssue                `json:"migrationWarnings"`
 	NicCount             *VMResourceBreakdown            `json:"nicCount,omitempty"`
 	NotMigratableReasons []MigrationIssue                `json:"notMigratableReasons"`
@@ -352,6 +353,15 @@ type DiskSizeTierSummary struct {
 	TotalSizeTB float64 `json:"totalSizeTB"`
 
 	// VmCount Number of VMs in this tier
+	VmCount int `json:"vmCount"`
+}
+
+// DiskTypeSummary defines model for diskTypeSummary.
+type DiskTypeSummary struct {
+	// TotalSizeTB Total disk size in TB for this disk type
+	TotalSizeTB float64 `json:"totalSizeTB"`
+
+	// VmCount Number of VMs that have at least one disk of this type
 	VmCount int `json:"vmCount"`
 }
 

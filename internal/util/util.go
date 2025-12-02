@@ -3,6 +3,7 @@ package util
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"time"
@@ -110,4 +111,33 @@ func IntPtr(i int) *int {
 // FloatPtr returns a pointer to the given float
 func FloatPtr(i float64) *float64 {
 	return &i
+}
+
+// Round Method to round to 2 decimals
+func Round(f float64) float64 {
+	return math.Round(f*100) / 100
+}
+
+// BytesToTB converts a value in bytes to terabytes (TB).
+// Accepts int, int64, or float64.
+func BytesToTB[T ~int | ~int64 | ~float64](bytes T) float64 {
+	return float64(bytes) / 1024.0 / 1024.0 / 1024.0 / 1024.0
+}
+
+// BytesToGB converts a value in bytes to gigabytes (GB).
+// Accepts int, int64, or float64.
+func BytesToGB[T ~int | ~int64 | ~float64](bytes T) int {
+	return int(math.Round(float64(bytes) / 1024.0 / 1024.0 / 1024.0))
+}
+
+// GBToTB converts a value in gigabytes (GB) to terabytes (TB).
+// Accepts int, int64, or float64.
+func GBToTB[T ~int | ~int64 | ~float64](gb T) float64 {
+	return float64(gb) / 1024.0
+}
+
+// MBToGB converts a value in MB to GB.
+// Accepts int, int32, or float64.
+func MBToGB[T ~int | ~int32 | ~float64](mb T) int {
+	return int(math.Round(float64(mb) / 1024.0))
 }

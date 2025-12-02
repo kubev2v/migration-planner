@@ -6,9 +6,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/opa"
 )
 
-func updateOsInfoForVM(vm *vspheremodel.VM, inv *apiplanner.InventoryData) {
+func updateOsInfo(vm *vspheremodel.VM, osInfoMap map[string]apiplanner.OsInfo) *map[string]apiplanner.OsInfo {
 	guestName := vmGuestName(*vm)
-	osInfoMap := *inv.Vms.OsInfo
 	osInfo, found := osInfoMap[guestName]
 
 	if !found || osInfo.Supported {
@@ -22,6 +21,8 @@ func updateOsInfoForVM(vm *vspheremodel.VM, inv *apiplanner.InventoryData) {
 	}
 
 	osInfoMap[guestName] = osInfo
+
+	return &osInfoMap
 }
 
 func addUpgradeRecommendationIfExist(concerns []vspheremodel.Concern) *string {
