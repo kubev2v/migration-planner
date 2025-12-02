@@ -143,6 +143,14 @@ func (c *Collector) run(ctx context.Context) {
 		return
 	}
 
+	zap.S().Named("collector").Infof("List Datastores")
+	datastores := &[]vspheremodel.Datastore{}
+	err = collector.DB().List(datastores, libmodel.FilterOptions{Detail: 1})
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to list database: %v", err)
+		return
+	}
+
 	zap.S().Named("collector").Infof("List Clusters")
 	clusters := &[]vspheremodel.Cluster{}
 	err = collector.DB().List(clusters, libmodel.FilterOptions{Detail: 1})
@@ -181,7 +189,8 @@ func (c *Collector) run(ctx context.Context) {
 	}
 
 	zap.S().Named("collector").Infof("Fill the inventory object with more data")
-	FillInventoryObjectWithMoreData(vms, inv)
+	datastoreIDToType := buildDatastoreIDToTypeMap(datastores)
+	FillInventoryObjectWithMoreData(vms, inv, datastoreIDToType)
 
 	zap.S().Named("collector").Infof("Write the inventory to output file")
 	if err := createOuput(filepath.Join(c.dataDir, config.InventoryFile), inv); err != nil {
@@ -237,7 +246,17 @@ func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {
 	return container, nil
 }
 
-func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory) {
+func buildDatastoreIDToTypeMap(datastores *[]vspheremodel.Datastore) map[string]string {
+	datastoreIDToType := make(map[string]string)
+
+	for _, ds := range *datastores {
+		datastoreIDToType[ds.ID] = ds.Type
+	}
+
+	return datastoreIDToType
+}
+
+func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inventory, datastoreIDToType map[string]string) {
 	cpuSet := []int{}
 	memorySet := []int{}
 	diskGBSet := []int{}
@@ -299,17 +318,28 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 			}
 		}
 
+		updateDiskTypes(&vm, inv, datastoreIDToType)
 	}
 
-	// Histogram
 	inv.Vms.CpuCores.Histogram = Histogram(cpuSet)
 	inv.Vms.RamGB.Histogram = Histogram(memorySet)
 	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
 	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
 	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
 
-	// Update the disk size tier
 	updateDiskSizeTier(diskGBSet, inv)
+}
+
+func updateDiskTypes(vm *vspheremodel.VM, inv *apiplanner.Inventory, datastoreIDToType map[string]string) {
+	diskTypes := *(inv.Vms.DiskTypes)
+
+	for _, disk := range vm.Disks {
+		diskType := diskTypes[datastoreIDToType[disk.Datastore.ID]]
+		diskType.VmCount++
+		diskType.TotalSizeTB += float64(disk.Capacity) / 1024.0 / 1024.0 / 1024.0 / 1024.0
+		diskType.TotalSizeTB = math.Round(diskType.TotalSizeTB*100) / 100
+		diskTypes[datastoreIDToType[disk.Datastore.ID]] = diskType
+	}
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {

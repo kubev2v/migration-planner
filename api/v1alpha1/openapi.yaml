@@ -906,6 +906,10 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/diskSizeTierSummary'
+        diskTypes:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/diskTypeSummary'
         ramGB:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
@@ -952,6 +956,20 @@ components:
         vmCount:
           type: integer
           description: Number of VMs in this tier
+
+    diskTypeSummary:
+      type: object
+      required:
+        - vmCount
+        - totalSizeTB
+      properties:
+        vmCount:
+          type: integer
+          description: Number of VMs that have at least one disk of this type
+        totalSizeTB:
+          type: number
+          format: double
+          description: Total disk size in TB for this disk type
 
     osInfo:
       type: object
