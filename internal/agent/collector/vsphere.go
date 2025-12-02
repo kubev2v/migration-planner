@@ -333,14 +333,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
 
-		guestName := vmGuestName(vm)
-		osInfoMap := *inv.Vms.OsInfo
-		osInfo, found := osInfoMap[guestName]
-		if !found || osInfo.Supported {
-			osInfo.Supported = isOsSupported(vm.Concerns)
-		}
-		osInfo.Count++
-		osInfoMap[guestName] = osInfo
+		updateOsInfoForVM(&vm, inv)
 
 		inv.Vms.PowerStates[vm.PowerState]++
 
@@ -407,22 +400,6 @@ func sumHostsCpu(hosts *[]apiplanner.Host) int {
 	}
 
 	return total
-}
-
-func isOsSupported(concerns []vspheremodel.Concern) bool {
-	for _, concern := range concerns {
-		if concern.Id == "vmware.os.unsupported" {
-			return false
-		}
-	}
-	return true
-}
-
-func vmGuestName(vm vspheremodel.VM) string {
-	if vm.GuestNameFromVmwareTools != "" {
-		return vm.GuestNameFromVmwareTools
-	}
-	return vm.GuestName
 }
 
 func updateDiskSizeTier(diskGBSet []int, inv *apiplanner.InventoryData) {

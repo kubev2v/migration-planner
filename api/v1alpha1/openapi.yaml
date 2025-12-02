@@ -941,6 +941,9 @@ components:
           type: integer
         supported:
           type: boolean
+        upgradeRecommendation:
+          type: string
+          description: Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
 
     Infra:
       type: object
