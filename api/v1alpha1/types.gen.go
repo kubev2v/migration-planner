@@ -359,6 +359,9 @@ type DiskSizeTierSummary struct {
 type OsInfo struct {
 	Count     int  `json:"count"`
 	Supported bool `json:"supported"`
+
+	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
+	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
 
 // PresignedUrl defines model for presigned-url.
