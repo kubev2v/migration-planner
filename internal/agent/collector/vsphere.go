@@ -314,6 +314,8 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	diskCountSet := []int{}
 	nicCountSet := []int{}
 
+	totalAllocatedVCpus := 0 // For poweredOn VMs
+
 	for _, vm := range *vms {
 		nicCount := len(vm.NICs)
 		// histogram collection
@@ -322,6 +324,11 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 		diskCountSet = append(diskCountSet, len(vm.Disks))
 		nicCountSet = append(nicCountSet, nicCount)
+
+		// allocated VCpu for powered On VMs
+		if vm.PowerState == "poweredOn" {
+			totalAllocatedVCpus += int(vm.CpuCount)
+		}
 
 		// inventory
 		migratable, hasWarning := migrationReport(vm.Concerns, inv)
@@ -380,6 +387,26 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 	// Update the disk size tier
 	updateDiskSizeTier(diskGBSet, inv)
+
+	// calculate the cpu overcommitment ratio
+	totalCpus := sumHostsCpu(inv.Infra.Hosts)
+	if totalCpus > 0 {
+		overcommitmentRatio := float64(totalAllocatedVCpus) / float64(totalCpus)
+		roundedRatio := math.Round(overcommitmentRatio*100) / 100
+		inv.Infra.CpuOverCommitment = util.FloatPtr(roundedRatio)
+	}
+}
+
+func sumHostsCpu(hosts *[]apiplanner.Host) int {
+	total := 0
+	for _, h := range *hosts {
+		if h.CpuCores == nil {
+			continue
+		}
+		total += *h.CpuCores
+	}
+
+	return total
 }
 
 func isOsSupported(concerns []vspheremodel.Concern) bool {
