@@ -339,6 +339,7 @@ $(GINKGO):
 	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 	@echo "✅ 'ginkgo' installed successfully."
 
+.PHONY: test
 # Run unit tests using ginkgo
 test: $(GINKGO)
 	@echo "🧪 Running Unit tests..."

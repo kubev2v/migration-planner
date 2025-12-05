@@ -81,3 +81,29 @@ func NewErrDuplicateKey(resourceType, key string) *ErrDuplicateKey {
 func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
 	return NewErrDuplicateKey("assessment", fmt.Sprintf("name '%s'", name))
 }
+
+// Job-related errors
+
+type ErrJobNotFound struct {
+	JobID int64
+}
+
+func (e *ErrJobNotFound) Error() string {
+	return fmt.Sprintf("job %d not found", e.JobID)
+}
+
+func NewErrJobNotFound(jobID int64) *ErrJobNotFound {
+	return &ErrJobNotFound{JobID: jobID}
+}
+
+type ErrJobForbidden struct {
+	JobID int64
+}
+
+func (e *ErrJobForbidden) Error() string {
+	return fmt.Sprintf("access to job %d forbidden", e.JobID)
+}
+
+func NewErrJobForbidden(jobID int64) *ErrJobForbidden {
+	return &ErrJobForbidden{JobID: jobID}
+}

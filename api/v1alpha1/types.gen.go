@@ -26,6 +26,16 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
+// Defines values for JobStatus.
+const (
+	Cancelled  JobStatus = "cancelled"
+	Completed  JobStatus = "completed"
+	Failed     JobStatus = "failed"
+	Parsing    JobStatus = "parsing"
+	Pending    JobStatus = "pending"
+	Validating JobStatus = "validating"
+)
+
 // Defines values for NetworkType.
 const (
 	Distributed NetworkType = "distributed"
@@ -205,6 +215,36 @@ type Ipv4Config struct {
 	IpAddress      string `json:"ipAddress" validate:"required,ip4_addr,max=15"`
 	SubnetMask     string `json:"subnetMask" validate:"required,subnet_mask,max=2"`
 }
+
+// Job Background job for async assessment creation
+type Job struct {
+	// AssessmentId Assessment ID when job completed successfully
+	AssessmentId *openapi_types.UUID `json:"assessmentId,omitempty"`
+
+	// Error Error message if job failed
+	Error *string `json:"error,omitempty"`
+
+	// Id Job ID
+	Id int64 `json:"id"`
+
+	// Status Job status:
+	//  * `pending` - Job is queued
+	//  * `parsing` - Parsing RVTools Excel file
+	//  * `validating` - Running OPA VM validations
+	//  * `completed` - Assessment created successfully
+	//  * `failed` - Job failed with error
+	//  * `cancelled` - Job was cancelled
+	Status JobStatus `json:"status"`
+}
+
+// JobStatus Job status:
+//   - `pending` - Job is queued
+//   - `parsing` - Parsing RVTools Excel file
+//   - `validating` - Running OPA VM validations
+//   - `completed` - Assessment created successfully
+//   - `failed` - Job failed with error
+//   - `cancelled` - Job was cancelled
+type JobStatus string
 
 // Label defines model for Label.
 type Label struct {
@@ -389,8 +429,8 @@ type PresignedUrl struct {
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
-// CreateAssessmentMultipartRequestBody defines body for CreateAssessment for multipart/form-data ContentType.
-type CreateAssessmentMultipartRequestBody = AssessmentRvtoolsForm
+// CreateRVToolsAssessmentMultipartRequestBody defines body for CreateRVToolsAssessment for multipart/form-data ContentType.
+type CreateRVToolsAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
