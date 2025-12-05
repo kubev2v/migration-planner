@@ -9,8 +9,10 @@ import (
 )
 
 const (
-	apiV1SourcesPath     = "/api/v1/sources"
-	apiV1AssessmentsPath = "/api/v1/assessments"
+	apiV1SourcesPath            = "/api/v1/sources"
+	apiV1AssessmentsPath        = "/api/v1/assessments"
+	apiV1AssessmentsRVToolsPath = "/api/v1/assessments/rvtools"
+	apiV1AssessmentsJobsPath    = "/api/v1/assessments/jobs"
 )
 
 // plannerService is the concrete implementation of PlannerService

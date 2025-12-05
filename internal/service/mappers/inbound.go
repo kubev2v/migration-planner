@@ -1,11 +1,10 @@
 package mappers
 
 import (
-	"io"
-
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/riverqueue/river/rivertype"
 )
 
 // Label represents a simple key-value pair for form data
@@ -170,7 +169,6 @@ type AssessmentCreateForm struct {
 	Source         string
 	SourceID       *uuid.UUID
 	Inventory      []byte
-	RVToolsFile    io.Reader
 }
 
 func (f *AssessmentCreateForm) ToModel() model.Assessment {
@@ -195,4 +193,68 @@ type AssessmentUpdateForm struct {
 	OwnerFirstName *string
 	OwnerLastName  *string
 	Inventory      []byte
+}
+
+// Job-related mappers
+
+// JobForm wraps data needed to create an API Job
+type JobForm struct {
+	ID       int64
+	State    rivertype.JobState
+	Metadata model.RVToolsJobMetadata
+}
+
+// ToAPIJob converts JobForm to API Job
+func (f *JobForm) ToAPIJob() *v1alpha1.Job {
+	status := mapRiverStateToStatus(f.State, f.Metadata)
+
+	job := &v1alpha1.Job{
+		Id:     f.ID,
+		Status: status,
+	}
+
+	if f.Metadata.Error != "" {
+		job.Error = &f.Metadata.Error
+	}
+
+	if f.Metadata.AssessmentID != nil {
+		job.AssessmentId = f.Metadata.AssessmentID
+	}
+
+	return job
+}
+
+func mapRiverStateToStatus(state rivertype.JobState, metadata model.RVToolsJobMetadata) v1alpha1.JobStatus {
+	switch state {
+	case rivertype.JobStateRunning:
+		switch metadata.Status {
+		case model.JobStatusValidating:
+			return v1alpha1.Validating
+		case model.JobStatusCompleted:
+			return v1alpha1.Completed
+		case model.JobStatusFailed:
+			return v1alpha1.Failed
+		case model.JobStatusCancelled:
+			return v1alpha1.Cancelled
+		case model.JobStatusParsing:
+			return v1alpha1.Parsing
+		default:
+			return v1alpha1.Parsing
+		}
+
+	case rivertype.JobStateCompleted:
+		return v1alpha1.Completed
+
+	case rivertype.JobStateCancelled:
+		return v1alpha1.Cancelled
+
+	case rivertype.JobStateDiscarded, rivertype.JobStateRetryable:
+		return v1alpha1.Failed
+
+	case rivertype.JobStateAvailable, rivertype.JobStateScheduled, rivertype.JobStatePending:
+		return v1alpha1.Pending
+
+	default:
+		return v1alpha1.Pending
+	}
 }

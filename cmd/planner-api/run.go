@@ -12,6 +12,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
+	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
@@ -82,11 +83,23 @@ var runCmd = &cobra.Command{
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
+
+		// Initialize River jobs client (required for RVTools processing)
+		zap.S().Info("Initializing River jobs client...")
+		jobsClient, err := jobs.NewClient(ctx, cfg, store, opaValidator)
+		if err != nil {
+			zap.S().Fatalw("initializing River jobs client", "error", err)
+		}
+		if err := jobsClient.RiverClient.Start(context.Background()); err != nil {
+			zap.S().Fatalw("starting River jobs client", "error", err)
+		}
+		zap.S().Info("River jobs client started")
+
 		// register metrics
 		metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator)
+			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
@@ -103,6 +116,13 @@ var runCmd = &cobra.Command{
 
 		<-ctx.Done()
 		wg.Wait()
+
+		// Stop River jobs client (has built-in graceful shutdown)
+		zap.S().Info("Stopping River jobs client...")
+		if err := jobsClient.Stop(context.Background()); err != nil {
+			zap.S().Warnf("Error stopping River jobs client: %v", err)
+		}
+
 		zap.S().Info("Service stopped gracefully")
 
 		return nil

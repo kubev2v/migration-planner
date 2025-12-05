@@ -34,6 +34,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.22.0
+	github.com/riverqueue/river v0.28.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.28.0
+	github.com/riverqueue/river/rivertype v0.28.0
 	github.com/sirupsen/logrus v1.9.4-0.20251023124752-b61f268f75b6
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.10
@@ -161,9 +164,15 @@ require (
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/richardlehane/mscfb v1.0.4 // indirect
 	github.com/richardlehane/msoleps v1.0.4 // indirect
+	github.com/riverqueue/river/riverdriver v0.28.0 // indirect
+	github.com/riverqueue/river/rivershared v0.28.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
+	github.com/tidwall/gjson v1.18.0 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.1 // indirect
+	github.com/tidwall/sjson v1.2.5 // indirect
 	github.com/tiendc/go-deepcopy v1.7.1 // indirect
 	github.com/tinylib/msgp v1.5.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
@@ -184,12 +193,13 @@ require (
 	go.opentelemetry.io/otel/metric v1.38.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.38.0 // indirect
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
+	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/arch v0.22.0 // indirect
-	golang.org/x/crypto v0.44.0 // indirect
+	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/exp v0.0.0-20251125195548-87e1e737ad39 // indirect
 	golang.org/x/mod v0.30.0 // indirect
 	golang.org/x/net v0.47.0 // indirect

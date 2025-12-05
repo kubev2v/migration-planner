@@ -18,6 +18,7 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -35,6 +36,7 @@ type Server struct {
 	store        store.Store
 	listener     net.Listener
 	opaValidator *opa.Validator
+	jobsClient   *jobs.Client
 }
 
 // New returns a new instance of a migration-planner server.
@@ -43,12 +45,14 @@ func New(
 	store store.Store,
 	listener net.Listener,
 	opaValidator *opa.Validator,
+	jobsClient *jobs.Client,
 ) *Server {
 	return &Server{
 		cfg:          cfg,
 		store:        store,
 		listener:     listener,
 		opaValidator: opaValidator,
+		jobsClient:   jobsClient,
 	}
 }
 
@@ -109,6 +113,7 @@ func (s *Server) Run(ctx context.Context) error {
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		service.NewAssessmentService(s.store, s.opaValidator),
+		service.NewJobService(s.store, s.jobsClient.RiverClient),
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
