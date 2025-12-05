@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -26,6 +25,15 @@ type ServerInterface interface {
 
 	// (POST /api/v1/assessments)
 	CreateAssessment(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/v1/assessments/jobs/{id})
+	CancelJob(w http.ResponseWriter, r *http.Request, id int64)
+
+	// (GET /api/v1/assessments/jobs/{id})
+	GetJob(w http.ResponseWriter, r *http.Request, id int64)
+
+	// (POST /api/v1/assessments/rvtools)
+	CreateRVToolsAssessment(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /api/v1/assessments/{id})
 	DeleteAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -81,6 +89,21 @@ func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request) {
 
 // (POST /api/v1/assessments)
 func (_ Unimplemented) CreateAssessment(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/assessments/jobs/{id})
+func (_ Unimplemented) CancelJob(w http.ResponseWriter, r *http.Request, id int64) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/assessments/jobs/{id})
+func (_ Unimplemented) GetJob(w http.ResponseWriter, r *http.Request, id int64) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/rvtools)
+func (_ Unimplemented) CreateRVToolsAssessment(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -184,6 +207,73 @@ func (siw *ServerInterfaceWrapper) CreateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateAssessment(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CancelJob operation middleware
+func (siw *ServerInterfaceWrapper) CancelJob(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelJob(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetJob operation middleware
+func (siw *ServerInterfaceWrapper) GetJob(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetJob(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateRVToolsAssessment operation middleware
+func (siw *ServerInterfaceWrapper) CreateRVToolsAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRVToolsAssessment(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -622,6 +712,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/assessments", wrapper.CreateAssessment)
 	})
 	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/assessments/jobs/{id}", wrapper.CancelJob)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/assessments/jobs/{id}", wrapper.GetJob)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/rvtools", wrapper.CreateRVToolsAssessment)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/assessments/{id}", wrapper.DeleteAssessment)
 	})
 	r.Group(func(r chi.Router) {
@@ -702,8 +801,7 @@ func (response ListAssessments500JSONResponse) VisitListAssessmentsResponse(w ht
 }
 
 type CreateAssessmentRequestObject struct {
-	JSONBody      *CreateAssessmentJSONRequestBody
-	MultipartBody *multipart.Reader
+	Body *CreateAssessmentJSONRequestBody
 }
 
 type CreateAssessmentResponseObject interface {
@@ -740,6 +838,183 @@ func (response CreateAssessment401JSONResponse) VisitCreateAssessmentResponse(w 
 type CreateAssessment500JSONResponse Error
 
 func (response CreateAssessment500JSONResponse) VisitCreateAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJobRequestObject struct {
+	Id int64 `json:"id"`
+}
+
+type CancelJobResponseObject interface {
+	VisitCancelJobResponse(w http.ResponseWriter) error
+}
+
+type CancelJob200JSONResponse Job
+
+func (response CancelJob200JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob400JSONResponse Error
+
+func (response CancelJob400JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob401JSONResponse Error
+
+func (response CancelJob401JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob403JSONResponse Error
+
+func (response CancelJob403JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob404JSONResponse Error
+
+func (response CancelJob404JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob409JSONResponse Error
+
+func (response CancelJob409JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelJob500JSONResponse Error
+
+func (response CancelJob500JSONResponse) VisitCancelJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJobRequestObject struct {
+	Id int64 `json:"id"`
+}
+
+type GetJobResponseObject interface {
+	VisitGetJobResponse(w http.ResponseWriter) error
+}
+
+type GetJob200JSONResponse Job
+
+func (response GetJob200JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJob400JSONResponse Error
+
+func (response GetJob400JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJob401JSONResponse Error
+
+func (response GetJob401JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJob403JSONResponse Error
+
+func (response GetJob403JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJob404JSONResponse Error
+
+func (response GetJob404JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetJob500JSONResponse Error
+
+func (response GetJob500JSONResponse) VisitGetJobResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentRequestObject struct {
+	Body *multipart.Reader
+}
+
+type CreateRVToolsAssessmentResponseObject interface {
+	VisitCreateRVToolsAssessmentResponse(w http.ResponseWriter) error
+}
+
+type CreateRVToolsAssessment202JSONResponse Job
+
+func (response CreateRVToolsAssessment202JSONResponse) VisitCreateRVToolsAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessment400JSONResponse Error
+
+func (response CreateRVToolsAssessment400JSONResponse) VisitCreateRVToolsAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessment401JSONResponse Error
+
+func (response CreateRVToolsAssessment401JSONResponse) VisitCreateRVToolsAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessment500JSONResponse Error
+
+func (response CreateRVToolsAssessment500JSONResponse) VisitCreateRVToolsAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -1444,6 +1719,15 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments)
 	CreateAssessment(ctx context.Context, request CreateAssessmentRequestObject) (CreateAssessmentResponseObject, error)
 
+	// (DELETE /api/v1/assessments/jobs/{id})
+	CancelJob(ctx context.Context, request CancelJobRequestObject) (CancelJobResponseObject, error)
+
+	// (GET /api/v1/assessments/jobs/{id})
+	GetJob(ctx context.Context, request GetJobRequestObject) (GetJobResponseObject, error)
+
+	// (POST /api/v1/assessments/rvtools)
+	CreateRVToolsAssessment(ctx context.Context, request CreateRVToolsAssessmentRequestObject) (CreateRVToolsAssessmentResponseObject, error)
+
 	// (DELETE /api/v1/assessments/{id})
 	DeleteAssessment(ctx context.Context, request DeleteAssessmentRequestObject) (DeleteAssessmentResponseObject, error)
 
@@ -1544,23 +1828,12 @@ func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request)
 func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request) {
 	var request CreateAssessmentRequestObject
 
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
-
-		var body CreateAssessmentJSONRequestBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-			return
-		}
-		request.JSONBody = &body
+	var body CreateAssessmentJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
 	}
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if reader, err := r.MultipartReader(); err != nil {
-			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
-			return
-		} else {
-			request.MultipartBody = reader
-		}
-	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.CreateAssessment(ctx, request.(CreateAssessmentRequestObject))
@@ -1575,6 +1848,89 @@ func (sh *strictHandler) CreateAssessment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateAssessmentResponseObject); ok {
 		if err := validResponse.VisitCreateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelJob operation middleware
+func (sh *strictHandler) CancelJob(w http.ResponseWriter, r *http.Request, id int64) {
+	var request CancelJobRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelJob(ctx, request.(CancelJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelJobResponseObject); ok {
+		if err := validResponse.VisitCancelJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetJob operation middleware
+func (sh *strictHandler) GetJob(w http.ResponseWriter, r *http.Request, id int64) {
+	var request GetJobRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetJob(ctx, request.(GetJobRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetJob")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetJobResponseObject); ok {
+		if err := validResponse.VisitGetJobResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRVToolsAssessment operation middleware
+func (sh *strictHandler) CreateRVToolsAssessment(w http.ResponseWriter, r *http.Request) {
+	var request CreateRVToolsAssessmentRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRVToolsAssessment(ctx, request.(CreateRVToolsAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRVToolsAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRVToolsAssessmentResponseObject); ok {
+		if err := validResponse.VisitCreateRVToolsAssessmentResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

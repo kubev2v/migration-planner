@@ -86,7 +86,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			Expect(err).To(MatchError(ContainSubstring("job failed")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -100,9 +100,11 @@ var _ = Describe("e2e-rvtools", func() {
 			defer os.Remove(tmpFile)
 
 			// Attempt to create assessment from empty file
+			// Empty files are validated immediately at handler level before job creation
 			assessment, err = svc.CreateAssessmentFromRvtools("empty-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
+			Expect(err).To(MatchError(ContainSubstring("status: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -152,7 +154,7 @@ var _ = Describe("e2e-rvtools", func() {
 				assessment2, err := svc.CreateAssessmentFromRvtools("duplicate-name-test", tmpFile)
 				Expect(err).NotTo(BeNil())
 				Expect(assessment2).To(BeNil())
-				Expect(err).To(MatchError(ContainSubstring("status: 400")))
+				Expect(err).To(MatchError(ContainSubstring("job failed")))
 
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
@@ -167,24 +169,28 @@ var _ = Describe("e2e-rvtools", func() {
 			//	Expect(err).To(BeNil())
 			//	defer os.Remove(tmpFile)
 			//
-			//	// Test empty name
+			//	// Test empty name - validated immediately at handler level
 			//	assessment, err = svc.CreateAssessmentFromRvtools("", tmpFile)
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
 			//	Expect(err.Error()).To(ContainSubstring("status: 400"))
 			//
-			//	// Test very long name
+			//	// Test very long name - if validation added, would be immediate (400)
+			//	// Currently no length validation, so job would be created and might succeed or fail
 			//	longName := strings.Repeat("a", 1000)
 			//	assessment, err = svc.CreateAssessmentFromRvtools(longName, tmpFile)
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
-			//	Expect(err.Error()).To(ContainSubstring("status: 400"))
+			//	// Update this assertion based on actual validation implementation
+			//	Expect(err.Error()).To(Or(ContainSubstring("status: 400"), ContainSubstring("job failed")))
 			//
-			//	// Test name with special characters
+			//	// Test name with special characters - if validation added, would be immediate (400)
+			//	// Currently no format validation, so job would be created and might succeed or fail
 			//	assessment, err = svc.CreateAssessmentFromRvtools("test@#$%^&*()", tmpFile)
 			//	Expect(err).NotTo(BeNil())
 			//	Expect(assessment).To(BeNil())
-			//	Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			//	// Update this assertion based on actual validation implementation
+			//	Expect(err).To(Or(MatchError(ContainSubstring("status: 400")), MatchError(ContainSubstring("job failed"))))
 			//
 			//	zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			//})

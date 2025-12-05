@@ -17,7 +17,12 @@ import (
 	"github.com/kubev2v/migration-planner/internal/opa"
 )
 
-func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator) ([]byte, error) {
+// StatusCallback is called when the parsing status changes
+type StatusCallback func(status string) error
+
+// ParseRVTools parses an RVTools Excel export and returns inventory JSON.
+// The optional statusCallback is called when transitioning to validation phase.
+func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator, statusCallback StatusCallback) ([]byte, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
@@ -58,6 +63,12 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		}
 
 		if len(vms) > 0 && opaValidator != nil {
+			// Notify callback that we're transitioning to validation phase
+			if statusCallback != nil {
+				if err := statusCallback(string(api.Validating)); err != nil {
+					zap.S().Named("rvtools").Warnf("Failed to update status to validating: %v", err)
+				}
+			}
 			zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
 			if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
 				zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)

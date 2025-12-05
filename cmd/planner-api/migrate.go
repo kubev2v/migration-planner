@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -34,8 +36,14 @@ var migrateCmd = &cobra.Command{
 		store := store.NewStore(db)
 		defer store.Close()
 
+		zap.S().Info("Running database migrations")
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
-			zap.S().Fatalw("running initial migration", "error", err)
+			zap.S().Fatalw("running database migration", "error", err)
+		}
+
+		zap.S().Info("Running River migrations")
+		if err := migrations.MigrateRiver(context.Background(), cfg); err != nil {
+			zap.S().Fatalw("running River migration", "error", err)
 		}
 
 		return nil
