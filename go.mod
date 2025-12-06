@@ -143,8 +143,8 @@ require (
 	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037 // indirect
 	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
-	github.com/openshift/api v0.0.0-20251127005036-0e3c378fdedc // indirect
-	github.com/openshift/client-go v0.0.0-20251125141819-b6281947c285 // indirect
+	github.com/openshift/api v0.0.0-20251204164930-cd2e40c5883a // indirect
+	github.com/openshift/client-go v0.0.0-20251205093018-96a6cbc1420c // indirect
 	github.com/openshift/custom-resource-status v1.1.2 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/perimeterx/marshmallow v1.1.5 // indirect
