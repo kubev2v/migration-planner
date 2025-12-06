@@ -4,12 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/internal/opa"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -122,20 +120,6 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	case SourceTypeInventory:
 		tracer.Step("process_inventory_source").Log()
 		inventory = createForm.Inventory
-	case SourceTypeRvtools:
-		tracer.Step("process_rvtools_source").Log()
-		content, err := io.ReadAll(createForm.RVToolsFile)
-		if err != nil {
-			return nil, err
-		}
-		tracer.Step("read_rvtools_file").WithInt("file_size", len(content)).Log()
-		clusteredInventory, err := rvtools.ParseRVTools(ctx, content, as.opaValidator)
-		if err != nil {
-			return nil, NewErrRVToolsFileCorrupted(fmt.Sprintf("error parsing RVTools file: %v", err))
-		}
-
-		inventory = clusteredInventory
-		tracer.Step("parsed_rvtools_inventory").Log()
 	}
 
 	ctx, err := as.store.NewTransactionContext(ctx)

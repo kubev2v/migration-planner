@@ -1,17 +1,12 @@
 package mappers
 
 import (
-	"bytes"
 	"encoding/json"
-	"fmt"
-	"io"
-	"mime/multipart"
 
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
-	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
@@ -156,61 +151,4 @@ func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
 	return mappers.InventoryForm{
 		Data: inventory,
 	}
-}
-
-func AssessmentCreateFormFromMultipart(multipartBody *multipart.Reader, user auth.User) (mappers.AssessmentCreateForm, error) {
-	form := mappers.AssessmentCreateForm{
-		ID:       uuid.New(),
-		OrgID:    user.Organization,
-		Username: user.Username,
-		Source:   service.SourceTypeRvtools,
-	}
-
-	// Set owner fields from user context (like username)
-	if user.FirstName != "" {
-		form.OwnerFirstName = &user.FirstName
-	}
-	if user.LastName != "" {
-		form.OwnerLastName = &user.LastName
-	}
-
-	for {
-		part, err := multipartBody.NextPart()
-		if err != nil {
-			if err.Error() == "EOF" {
-				break
-			}
-			return form, err
-		}
-		defer part.Close()
-
-		switch part.FormName() {
-		case "name":
-			nameBytes, err := io.ReadAll(part)
-			if err != nil {
-				return form, err
-			}
-			form.Name = string(nameBytes)
-		case "file":
-			buff := bytes.NewBuffer([]byte{})
-			n, err := io.Copy(buff, part)
-			if err != nil {
-				return form, err
-			}
-			if n == 0 {
-				return form, fmt.Errorf("rvtools file body is empty")
-			}
-			// Store the entire part as RVToolsFile for processing
-			form.RVToolsFile = buff
-		case "labels":
-			// Handle labels if provided in multipart form
-			// This is optional based on the API spec
-		}
-	}
-
-	// For RVTools, we'll set an empty inventory initially
-	// The service layer should process the RVToolsFile to populate inventory
-	form.Inventory = []byte{}
-
-	return form, nil
 }

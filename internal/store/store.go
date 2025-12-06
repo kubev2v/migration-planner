@@ -15,6 +15,7 @@ type Store interface {
 	PrivateKey() PrivateKey
 	Label() Label
 	Assessment() Assessment
+	Job() Job
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
 }
@@ -27,6 +28,7 @@ type DataStore struct {
 	privateKey PrivateKey
 	label      Label
 	assessment Assessment
+	job        Job
 }
 
 func NewStore(db *gorm.DB) Store {
@@ -37,6 +39,7 @@ func NewStore(db *gorm.DB) Store {
 		privateKey: NewCacheKeyStore(NewPrivateKey(db)),
 		label:      NewLabelStore(db),
 		assessment: NewAssessmentStore(db),
+		job:        NewJobStore(db),
 		db:         db,
 	}
 }
@@ -67,6 +70,10 @@ func (s *DataStore) Label() Label {
 
 func (s *DataStore) Assessment() Assessment {
 	return s.assessment
+}
+
+func (s *DataStore) Job() Job {
+	return s.job
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {

@@ -10,6 +10,7 @@ type PlannerService interface {
 	sourceApi
 	imageApi
 	assessmentApi
+	jobApi
 }
 
 type sourceApi interface {
@@ -32,4 +33,10 @@ type assessmentApi interface {
 	GetAssessments() (*v1alpha1.AssessmentList, error)
 	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)
 	RemoveAssessment(uuid.UUID) error
+}
+
+type jobApi interface {
+	CreateRVToolsJob(name, filepath string) (*v1alpha1.Job, error)
+	GetJob(id int64) (*v1alpha1.Job, error)
+	CancelJob(id int64) (*v1alpha1.Job, error)
 }
