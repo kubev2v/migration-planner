@@ -311,12 +311,10 @@ var _ = Describe("Parser", func() {
 				By("verifying empty data is handled gracefully")
 				Expect(response.VCenter.Vms.Total).To(Equal(0))
 				Expect(response.VCenter.Infra.TotalHosts).To(Equal(0))
-				Expect(response.VCenter.Infra.TotalClusters).To(Equal(0))
 
 				By("verifying empty collections are initialized")
 				Expect(response.VCenter.Infra.Datastores).To(BeEmpty())
 				Expect(response.VCenter.Infra.Networks).To(BeEmpty())
-				Expect(response.VCenter.Infra.HostsPerCluster).To(BeEmpty())
 			})
 		})
 
@@ -373,7 +371,6 @@ var _ = Describe("Parser", func() {
 				By("verifying VMs were processed")
 				if response.VCenter.Vms.Total > 0 {
 					Expect(response.VCenter.Vms.PowerStates).ToNot(BeNil())
-					Expect(response.VCenter.Vms.Os).ToNot(BeNil())
 				}
 
 				By("verifying hosts were processed")
@@ -385,7 +382,6 @@ var _ = Describe("Parser", func() {
 
 				By("verifying infrastructure stats were calculated")
 				Expect(response.VCenter.Infra.TotalHosts).To(BeNumerically(">=", 0))
-				Expect(response.VCenter.Infra.TotalClusters).To(BeNumerically(">=", 0))
 				if response.VCenter.Infra.TotalDatacenters != nil {
 					Expect(*response.VCenter.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 				}
@@ -465,7 +461,6 @@ invalid syntax here`
 
 				By("verifying infrastructure consistency")
 				if response.VCenter.Infra.TotalHosts > 0 {
-					Expect(response.VCenter.Infra.TotalClusters).To(BeNumerically(">=", 0))
 					if response.VCenter.Infra.TotalDatacenters != nil {
 						Expect(*response.VCenter.Infra.TotalDatacenters).To(BeNumerically(">=", 0))
 					}
@@ -480,9 +475,7 @@ invalid syntax here`
 				emptyRows := [][]string{}
 				result := rvtools.ExtractClusterAndDatacenterInfo(emptyRows)
 				Expect(result.TotalHosts).To(Equal(0))
-				Expect(result.TotalClusters).To(Equal(0))
 				Expect(result.TotalDatacenters).To(Equal(0))
-				Expect(result.HostsPerCluster).To(BeEmpty())
 				Expect(result.ClustersPerDatacenter).To(BeEmpty())
 			})
 
@@ -490,7 +483,6 @@ invalid syntax here`
 				headerOnly := [][]string{{"host", "datacenter", "cluster"}}
 				result := rvtools.ExtractClusterAndDatacenterInfo(headerOnly)
 				Expect(result.TotalHosts).To(Equal(0))
-				Expect(result.TotalClusters).To(Equal(0))
 				Expect(result.TotalDatacenters).To(Equal(0))
 			})
 		})
@@ -506,9 +498,7 @@ invalid syntax here`
 				}
 				result := rvtools.ExtractClusterAndDatacenterInfo(rows)
 				Expect(result.TotalHosts).To(Equal(4))
-				Expect(result.TotalClusters).To(Equal(3))
 				Expect(result.TotalDatacenters).To(Equal(2))
-				Expect(result.HostsPerCluster).To(ContainElements(2, 1, 1))
 				Expect(result.ClustersPerDatacenter).To(ContainElements(2, 1))
 			})
 
@@ -520,7 +510,6 @@ invalid syntax here`
 				}
 				result := rvtools.ExtractClusterAndDatacenterInfo(rows)
 				Expect(result.TotalHosts).To(Equal(2))
-				Expect(result.TotalClusters).To(Equal(1))
 				Expect(result.TotalDatacenters).To(Equal(1))
 			})
 
@@ -532,7 +521,6 @@ invalid syntax here`
 				}
 				result := rvtools.ExtractClusterAndDatacenterInfo(rows)
 				Expect(result.TotalHosts).To(Equal(2))
-				Expect(result.TotalClusters).To(Equal(1))
 				Expect(result.TotalDatacenters).To(Equal(1))
 			})
 		})
@@ -694,61 +682,6 @@ invalid syntax here`
 				}
 				result := rvtools.ExtractHostPowerStates(rows)
 				Expect(result["green"]).To(Equal(3))
-			})
-		})
-	})
-
-	Describe("ExtractVmsPerCluster", func() {
-		Context("with empty data", func() {
-			It("should return empty slice for empty rows", func() {
-				emptyRows := [][]string{}
-				result := rvtools.ExtractVmsPerCluster(emptyRows)
-				Expect(result).To(BeEmpty())
-			})
-
-			It("should return empty slice for header-only rows", func() {
-				headerOnly := [][]string{{"cluster", "vm"}}
-				result := rvtools.ExtractVmsPerCluster(headerOnly)
-				Expect(result).To(BeEmpty())
-			})
-		})
-
-		Context("with valid data", func() {
-			It("should count VMs per cluster correctly", func() {
-				rows := [][]string{
-					{"cluster", "vm"},
-					{"cluster1", "vm1"},
-					{"cluster1", "vm2"},
-					{"cluster1", "vm3"},
-					{"cluster2", "vm4"},
-					{"cluster2", "vm5"},
-					{"cluster3", "vm6"},
-				}
-				result := rvtools.ExtractVmsPerCluster(rows)
-				Expect(result).To(ContainElements(3, 2, 1))
-			})
-
-			It("should handle missing cluster or VM data", func() {
-				rows := [][]string{
-					{"cluster", "vm"},
-					{"cluster1", "vm1"},
-					{"", "vm2"},
-					{"cluster1", ""},
-					{"cluster2", "vm3"},
-				}
-				result := rvtools.ExtractVmsPerCluster(rows)
-				Expect(result).To(ContainElements(1, 1))
-			})
-
-			It("should handle duplicate VMs in same cluster", func() {
-				rows := [][]string{
-					{"cluster", "vm"},
-					{"cluster1", "vm1"},
-					{"cluster1", "vm1"},
-					{"cluster1", "vm2"},
-				}
-				result := rvtools.ExtractVmsPerCluster(rows)
-				Expect(result).To(ContainElement(2))
 			})
 		})
 	})
