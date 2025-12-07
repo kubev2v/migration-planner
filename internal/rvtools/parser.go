@@ -124,12 +124,9 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			Networks:              networks,
 			HostPowerStates:       hostPowerStates,
 			Hosts:                 &hosts,
-			HostsPerCluster:       clusterInfo.HostsPerCluster,
 			ClustersPerDatacenter: clusterInfo.ClustersPerDatacenter,
 			TotalHosts:            clusterInfo.TotalHosts,
-			TotalClusters:         clusterInfo.TotalClusters,
 			TotalDatacenters:      clusterInfo.TotalDatacenters,
-			VmsPerCluster:         ExtractVmsPerCluster(vInfoRows),
 		}
 		vcenterInventory := service.CreateBasicInventory(&vms, infraData)
 		datastoreIDToType := buildDatastoreIDToTypeMapFromRVTools(datastoreRows)
@@ -212,10 +209,8 @@ func buildDatastoreIDToTypeMapFromRVTools(datastoreRows [][]string) map[string]s
 }
 
 type ClusterInfo struct {
-	HostsPerCluster       []int
 	ClustersPerDatacenter []int
 	TotalHosts            int
-	TotalClusters         int
 	TotalDatacenters      int
 }
 
@@ -227,7 +222,6 @@ func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	colMap := buildColumnMap(vHostRows[0])
 
 	hosts := make(map[string]struct{})
-	clusters := make(map[string]struct{})
 	datacenters := make(map[string]struct{})
 
 	datacenterToClusters := make(map[string]map[string]struct{})
@@ -254,7 +248,6 @@ func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 		}
 
 		if hasValue(datacenter) && hasValue(cluster) {
-			clusters[cluster] = struct{}{}
 			datacenterToClusters[datacenter][cluster] = struct{}{}
 
 			ensureMapExists(clusterToHosts, cluster)
@@ -264,10 +257,8 @@ func ExtractClusterAndDatacenterInfo(vHostRows [][]string) ClusterInfo {
 	}
 
 	return ClusterInfo{
-		HostsPerCluster:       service.CalculateHostsPerCluster(clusterToHosts),
 		ClustersPerDatacenter: service.CalculateClustersPerDatacenter(datacenterToClusters),
 		TotalHosts:            len(hosts),
-		TotalClusters:         len(clusters),
 		TotalDatacenters:      len(datacenters),
 	}
 }
@@ -371,27 +362,6 @@ func ExtractHostIDToPowerStateMap(rows [][]string) map[string]string {
 	}
 
 	return hostIDToPowerState
-}
-
-func ExtractVmsPerCluster(rows [][]string) []int {
-	if len(rows) <= 1 {
-		return []int{}
-	}
-
-	colMap := buildColumnMap(rows[0])
-	clusterToVMs := make(map[string]map[string]struct{})
-
-	for _, row := range rows[1:] {
-		cluster := getColumnValue(row, colMap, "cluster")
-		vm := getColumnValue(row, colMap, "vm")
-
-		if hasValue(cluster) && hasValue(vm) {
-			ensureMapExists(clusterToVMs, cluster)
-			clusterToVMs[cluster][vm] = struct{}{}
-		}
-	}
-
-	return service.CalculateVMsPerCluster(clusterToVMs)
 }
 
 func ExtractNetworks(dvswitchRows, dvportRows [][]string, vms []vsphere.VM) []api.Network {

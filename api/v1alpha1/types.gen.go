@@ -170,12 +170,15 @@ type Infra struct {
 	Datastores        []Datastore    `json:"datastores"`
 	HostPowerStates   map[string]int `json:"hostPowerStates"`
 	Hosts             *[]Host        `json:"hosts,omitempty"`
-	HostsPerCluster   []int          `json:"hostsPerCluster"`
-	Networks          []Network      `json:"networks"`
-	TotalClusters     int            `json:"totalClusters"`
-	TotalDatacenters  *int           `json:"totalDatacenters,omitempty"`
-	TotalHosts        int            `json:"totalHosts"`
-	VmsPerCluster     *[]int         `json:"vmsPerCluster,omitempty"`
+	// Deprecated:
+	HostsPerCluster *[]int    `json:"hostsPerCluster,omitempty"`
+	Networks        []Network `json:"networks"`
+	// Deprecated:
+	TotalClusters    *int `json:"totalClusters,omitempty"`
+	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
+	TotalHosts       int  `json:"totalHosts"`
+	// Deprecated:
+	VmsPerCluster *[]int `json:"vmsPerCluster,omitempty"`
 }
 
 // Inventory defines model for Inventory.
@@ -321,7 +324,7 @@ type VMs struct {
 	NicCount             *VMResourceBreakdown            `json:"nicCount,omitempty"`
 	NotMigratableReasons []MigrationIssue                `json:"notMigratableReasons"`
 	// Deprecated:
-	Os                          map[string]int      `json:"os"`
+	Os                          *map[string]int     `json:"os,omitempty"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
 	PowerStates                 map[string]int      `json:"powerStates"`
 	RamGB                       VMResourceBreakdown `json:"ramGB"`

@@ -186,12 +186,9 @@ func (c *Collector) run(ctx context.Context) {
 		Networks:              apiNetworks,
 		HostPowerStates:       getHostPowerStates(*hosts),
 		Hosts:                 getHosts(hosts),
-		HostsPerCluster:       getHostsPerCluster(*clusters),
 		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, collector),
 		TotalHosts:            len(*hosts),
-		TotalClusters:         len(*clusters),
 		TotalDatacenters:      len(*datacenters),
-		VmsPerCluster:         getVMsPerCluster(*vms, *hosts, *clusters),
 	}
 	vcenterInv := service.CreateBasicInventory(vms, infraData)
 
@@ -700,36 +697,6 @@ func getNetworkType(n *vspheremodel.Network) string {
 	default:
 		return string(apiplanner.Unsupported)
 	}
-}
-
-func getHostsPerCluster(clusters []vspheremodel.Cluster) []int {
-	res := []int{}
-	for _, c := range clusters {
-		res = append(res, len(c.Hosts))
-	}
-	return res
-}
-
-func getVMsPerCluster(vms []vspheremodel.VM, hosts []vspheremodel.Host, clusters []vspheremodel.Cluster) []int {
-	clusterIndex := make(map[string]int, len(clusters))
-	for i, c := range clusters {
-		clusterIndex[c.ID] = i
-	}
-
-	hostToClusterIdx := make(map[string]int, len(hosts))
-	for _, h := range hosts {
-		if idx, ok := clusterIndex[h.Cluster]; ok {
-			hostToClusterIdx[h.ID] = idx
-		}
-	}
-
-	counts := make([]int, len(clusters))
-	for _, vm := range vms {
-		if idx, ok := hostToClusterIdx[vm.Host]; ok {
-			counts[idx]++
-		}
-	}
-	return counts
 }
 
 func getHostPowerStates(hosts []vspheremodel.Host) map[string]int {

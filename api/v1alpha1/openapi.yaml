@@ -867,7 +867,6 @@ components:
         - ramGB
         - diskGB
         - diskCount
-        - os
         - powerStates
         - notMigratableReasons
         - migrationWarnings
@@ -967,8 +966,6 @@ components:
       type: object
       required:
         - totalHosts
-        - totalClusters
-        - hostsPerCluster
         - hostPowerStates
         - networks
         - datastores
@@ -979,6 +976,7 @@ components:
           type: integer
         totalClusters:
           type: integer
+          deprecated: true
         clustersPerDatacenter:
           type: array
           items:
@@ -995,10 +993,12 @@ components:
           type: array
           items:
             type: integer
+          deprecated: true
         vmsPerCluster:
           type: array
           items:
             type: integer
+          deprecated: true
         hostPowerStates:
           type: object
           additionalProperties:

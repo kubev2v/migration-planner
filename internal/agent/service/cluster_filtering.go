@@ -89,12 +89,9 @@ func FilterInfraDataByClusterID(
 		Networks:              clusterNetworks,
 		HostPowerStates:       clusterHostPowerStates,
 		Hosts:                 &clusterHosts,
-		HostsPerCluster:       []int{len(clusterHosts)},
 		ClustersPerDatacenter: []int{1}, // Single cluster
 		TotalHosts:            len(clusterHosts),
-		TotalClusters:         1,
 		TotalDatacenters:      1,
-		VmsPerCluster:         []int{len(clusterVMs)},
 	}
 }
 

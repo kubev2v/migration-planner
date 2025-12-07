@@ -31,12 +31,9 @@ type InfrastructureData struct {
 	Networks              []api.Network
 	HostPowerStates       map[string]int
 	Hosts                 *[]api.Host
-	HostsPerCluster       []int
 	ClustersPerDatacenter []int
 	TotalHosts            int
-	TotalClusters         int
 	TotalDatacenters      int
-	VmsPerCluster         []int
 }
 
 // CreateBasicInventory creates a basic inventory object with the provided data
@@ -50,7 +47,6 @@ func CreateBasicInventory(
 		Vms: api.VMs{
 			Total:                len(*vms),
 			PowerStates:          map[string]int{},
-			Os:                   map[string]int{},
 			OsInfo:               &map[string]api.OsInfo{},
 			DiskSizeTier:         &map[string]api.DiskSizeTierSummary{},
 			DiskTypes:            &map[string]api.DiskTypeSummary{},
@@ -69,11 +65,8 @@ func CreateBasicInventory(
 			HostPowerStates:       infraData.HostPowerStates,
 			Hosts:                 infraData.Hosts,
 			TotalHosts:            infraData.TotalHosts,
-			TotalClusters:         infraData.TotalClusters,
 			TotalDatacenters:      &infraData.TotalDatacenters,
-			HostsPerCluster:       infraData.HostsPerCluster,
 			Networks:              infraData.Networks,
-			VmsPerCluster:         &infraData.VmsPerCluster,
 		},
 	}
 }

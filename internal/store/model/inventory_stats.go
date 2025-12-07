@@ -97,12 +97,9 @@ func computeVmStats(domainInventories []domainInventory) VmStats {
 
 	for _, ds := range domainInventories {
 		total += ds.Inventory.Vms.Total
-		for k, v := range ds.Inventory.Vms.Os {
-			if oldValue, found := os[k]; found {
-				oldValue += v
-				os[k] = oldValue
-			} else {
-				os[k] = v
+		if ds.Inventory.Vms.OsInfo != nil {
+			for k, v := range *ds.Inventory.Vms.OsInfo {
+				os[k] += v.Count
 			}
 		}
 		orgTotal[ds.OrgID] = ds.Inventory.Vms.Total
@@ -119,8 +116,10 @@ func computeOsStats(domainSnapshots []domainInventory) OsStats {
 	os := make(map[string]struct{})
 
 	for _, ds := range domainSnapshots {
-		for k := range ds.Inventory.Vms.Os {
-			os[k] = struct{}{}
+		if ds.Inventory.Vms.OsInfo != nil {
+			for k := range *ds.Inventory.Vms.OsInfo {
+				os[k] = struct{}{}
+			}
 		}
 	}
 

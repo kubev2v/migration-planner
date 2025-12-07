@@ -2,26 +2,6 @@ package service
 
 import "sort"
 
-func CalculateHostsPerCluster(clusterToHosts map[string]map[string]struct{}) []int {
-	if len(clusterToHosts) == 0 {
-		return []int{}
-	}
-
-	// Sort cluster names for consistent ordering
-	clusterNames := make([]string, 0, len(clusterToHosts))
-	for cluster := range clusterToHosts {
-		clusterNames = append(clusterNames, cluster)
-	}
-	sort.Strings(clusterNames)
-
-	hostsPerCluster := make([]int, 0, len(clusterNames))
-	for _, cluster := range clusterNames {
-		hostsPerCluster = append(hostsPerCluster, len(clusterToHosts[cluster]))
-	}
-
-	return hostsPerCluster
-}
-
 func CalculateVMsPerCluster(clusterToVMs map[string]map[string]struct{}) []int {
 	if len(clusterToVMs) == 0 {
 		return []int{}
