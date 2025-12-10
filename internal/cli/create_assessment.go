@@ -1,15 +1,15 @@
 package cli
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
+	"path/filepath"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -70,37 +70,46 @@ func (o *CreateAssessmentOptions) Run(ctx context.Context, args []string) error 
 	}
 	defer file.Close()
 
-	data, err := io.ReadAll(file)
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+
+	if err := writer.WriteField("name", args[0]); err != nil {
+		return fmt.Errorf("writing name field: %w", err)
+	}
+
+	part, err := writer.CreateFormFile("file", filepath.Base(o.excelFile))
 	if err != nil {
-		return fmt.Errorf("reading file: %w", err)
+		return fmt.Errorf("creating form file: %w", err)
 	}
 
-	inventoryData, err := rvtools.ParseRVTools(ctx, data, nil)
-	if err != nil {
-		return fmt.Errorf("parsing inventory file: %w", err)
+	if _, err := io.Copy(part, file); err != nil {
+		return fmt.Errorf("copying file content: %w", err)
 	}
 
-	inv := &v1alpha1.Inventory{}
-	if err := json.Unmarshal(inventoryData, inv); err != nil {
-		return fmt.Errorf("unmarshal inventory: %w", err)
+	if err := writer.Close(); err != nil {
+		return fmt.Errorf("closing multipart writer: %w", err)
 	}
 
-	params := v1alpha1.AssessmentForm{
-		Name:       args[0],
-		Inventory:  inv,
-		SourceType: "rvtools",
-	}
-
-	response, err := c.CreateAssessmentWithResponse(ctx, params)
+	response, err := c.CreateRVToolsAssessmentWithBodyWithResponse(ctx, writer.FormDataContentType(), body)
 	if err != nil {
 		return fmt.Errorf("failed to create assessment: %w", err)
 	}
 
-	if response.StatusCode() != http.StatusCreated {
+	if response.StatusCode() != http.StatusAccepted {
+		if response.JSON400 != nil {
+			return fmt.Errorf("failed to create assessment: %s", response.JSON400.Message)
+		}
+		if response.JSON500 != nil {
+			return fmt.Errorf("failed to create assessment: %s", response.JSON500.Message)
+		}
 		return fmt.Errorf("failed to create assessment: %s", response.Status())
 	}
 
-	fmt.Println(response.JSON201.Id)
+	if response.JSON202 == nil {
+		return fmt.Errorf("failed to create assessment: received 202 response but body is empty or malformed")
+	}
+
+	fmt.Printf("RVTools processing job started (ID: %d). The assessment will be created upon completion.\n", response.JSON202.Id)
 
 	return nil
 }
