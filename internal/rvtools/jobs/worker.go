@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
@@ -29,6 +30,10 @@ func NewRVToolsWorker(opaValidator *opa.Validator, store store.Store) *RVToolsWo
 		opaValidator: opaValidator,
 		store:        store,
 	}
+}
+
+func (w *RVToolsWorker) Timeout(_ *river.Job[RVToolsJobArgs]) time.Duration {
+	return 10 * time.Minute
 }
 
 // Work processes an RVTools assessment job.
