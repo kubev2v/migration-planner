@@ -1,8 +1,6 @@
 module github.com/kubev2v/migration-planner
 
-go 1.24.0
-
-toolchain go1.24.6
+go 1.24.9
 
 require (
 	github.com/MicahParks/jwkset v0.11.0
@@ -116,7 +114,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/pprof v0.0.0-20251114195745-4902fdda35c8 // indirect
+	github.com/google/pprof v0.0.0-20251208000136-3d256cb9ff16 // indirect
 	github.com/gorilla/mux v1.8.1 // indirect
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674 // indirect
 	github.com/hashicorp/go-version v1.7.0 // indirect
