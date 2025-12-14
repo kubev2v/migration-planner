@@ -53,11 +53,11 @@ func CreateBasicInventory(
 			MigrationWarnings:    api.MigrationIssues{},
 			NotMigratableReasons: api.MigrationIssues{},
 			// TODO: refactor, hot fix for https://issues.redhat.com/browse/ECOPROJECT-3423
-			CpuCores:  api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
-			RamGB:     api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
-			DiskCount: api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
-			DiskGB:    api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
-			NicCount:  &api.VMResourceBreakdown{Histogram: api.Histogram{Data: []int{}}},
+			CpuCores:  api.VMResourceBreakdown{},
+			RamGB:     api.VMResourceBreakdown{},
+			DiskCount: api.VMResourceBreakdown{},
+			DiskGB:    api.VMResourceBreakdown{},
+			NicCount:  &api.VMResourceBreakdown{},
 		},
 		Infra: api.Infra{
 			ClustersPerDatacenter: &infraData.ClustersPerDatacenter,
