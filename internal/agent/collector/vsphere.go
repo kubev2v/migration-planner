@@ -321,6 +321,9 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	for _, vm := range *vms {
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 
+		// Update the VM count per CPU tier
+		(*inv.Vms.DistributionByCpuTier)[cpuTierKey(int(vm.CpuCount))]++
+
 		// allocated VCpu for powered On VMs
 		if vm.PowerState == "poweredOn" {
 			totalAllocatedVCpus += int(vm.CpuCount)
@@ -462,6 +465,25 @@ func diskSizeTier(diskGBSet []int) *map[string]apiplanner.DiskSizeTierSummary {
 	}
 
 	return &result
+}
+
+func cpuTierKey(i int) string {
+	var tierKey string
+
+	switch {
+	case i <= 4:
+		tierKey = "0-4"
+	case i <= 8:
+		tierKey = "5-8"
+	case i <= 16:
+		tierKey = "9-16"
+	case i <= 32:
+		tierKey = "17-32"
+	default:
+		tierKey = "32+"
+	}
+
+	return tierKey
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
