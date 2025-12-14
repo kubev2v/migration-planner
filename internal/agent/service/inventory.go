@@ -45,13 +45,14 @@ func CreateBasicInventory(
 ) *api.InventoryData {
 	return &api.InventoryData{
 		Vms: api.VMs{
-			Total:                len(*vms),
-			PowerStates:          map[string]int{},
-			OsInfo:               &map[string]api.OsInfo{},
-			DiskSizeTier:         &map[string]api.DiskSizeTierSummary{},
-			DiskTypes:            &map[string]api.DiskTypeSummary{},
-			MigrationWarnings:    api.MigrationIssues{},
-			NotMigratableReasons: api.MigrationIssues{},
+			Total:                 len(*vms),
+			PowerStates:           map[string]int{},
+			OsInfo:                &map[string]api.OsInfo{},
+			DiskSizeTier:          &map[string]api.DiskSizeTierSummary{},
+			DiskTypes:             &map[string]api.DiskTypeSummary{},
+			DistributionByCpuTier: &map[string]int{},
+			MigrationWarnings:     api.MigrationIssues{},
+			NotMigratableReasons:  api.MigrationIssues{},
 			// TODO: refactor, hot fix for https://issues.redhat.com/browse/ECOPROJECT-3423
 			CpuCores:  api.VMResourceBreakdown{},
 			RamGB:     api.VMResourceBreakdown{},

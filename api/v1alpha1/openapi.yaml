@@ -1028,6 +1028,11 @@ components:
           type: object
           additionalProperties:
             $ref: '#/components/schemas/diskTypeSummary'
+        distributionByCpuTier:
+          type: object
+          description: Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
+          additionalProperties:
+            type: integer
         ramGB:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:

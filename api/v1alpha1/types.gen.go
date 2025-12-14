@@ -356,14 +356,17 @@ type VMResourceBreakdown struct {
 
 // VMs defines model for VMs.
 type VMs struct {
-	CpuCores             VMResourceBreakdown             `json:"cpuCores"`
-	DiskCount            VMResourceBreakdown             `json:"diskCount"`
-	DiskGB               VMResourceBreakdown             `json:"diskGB"`
-	DiskSizeTier         *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
-	DiskTypes            *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
-	MigrationWarnings    []MigrationIssue                `json:"migrationWarnings"`
-	NicCount             *VMResourceBreakdown            `json:"nicCount,omitempty"`
-	NotMigratableReasons []MigrationIssue                `json:"notMigratableReasons"`
+	CpuCores     VMResourceBreakdown             `json:"cpuCores"`
+	DiskCount    VMResourceBreakdown             `json:"diskCount"`
+	DiskGB       VMResourceBreakdown             `json:"diskGB"`
+	DiskSizeTier *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	DiskTypes    *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
+
+	// DistributionByCpuTier Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
+	DistributionByCpuTier *map[string]int      `json:"distributionByCpuTier,omitempty"`
+	MigrationWarnings     []MigrationIssue     `json:"migrationWarnings"`
+	NicCount              *VMResourceBreakdown `json:"nicCount,omitempty"`
+	NotMigratableReasons  []MigrationIssue     `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          *map[string]int     `json:"os,omitempty"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
