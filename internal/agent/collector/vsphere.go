@@ -5,11 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math"
 	"net/http"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -316,22 +314,12 @@ func buildDatastoreIDToTypeMap(datastores *[]vspheremodel.Datastore) map[string]
 }
 
 func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.InventoryData, datastoreIDToType map[string]string) {
-	cpuSet := []int{}
-	memorySet := []int{}
 	diskGBSet := []int{}
-	diskCountSet := []int{}
-	nicCountSet := []int{}
 
 	totalAllocatedVCpus := 0 // For poweredOn VMs
 
 	for _, vm := range *vms {
-		nicCount := len(vm.NICs)
-		// histogram collection
-		cpuSet = append(cpuSet, int(vm.CpuCount))
-		memorySet = append(memorySet, util.MBToGB(vm.MemoryMB))
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
-		diskCountSet = append(diskCountSet, len(vm.Disks))
-		nicCountSet = append(nicCountSet, nicCount)
 
 		// allocated VCpu for powered On VMs
 		if vm.PowerState == "poweredOn" {
@@ -379,13 +367,6 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 		inv.Vms.DiskTypes = updateDiskTypeSummary(&vm, *inv.Vms.DiskTypes, datastoreIDToType)
 	}
-
-	// Histogram
-	inv.Vms.CpuCores.Histogram = Histogram(cpuSet)
-	inv.Vms.RamGB.Histogram = Histogram(memorySet)
-	inv.Vms.DiskCount.Histogram = Histogram(diskCountSet)
-	inv.Vms.DiskGB.Histogram = Histogram(diskGBSet)
-	inv.Vms.NicCount.Histogram = Histogram(nicCountSet)
 
 	// Update the disk size tier
 	inv.Vms.DiskSizeTier = diskSizeTier(diskGBSet)
@@ -561,87 +542,6 @@ func CountVmsByNetwork(vms []vspheremodel.VM) map[string]int {
 		}
 	}
 	return vmsPerNetwork
-}
-
-func calculateBinIndex(data, minVal int, binSize float64, rangeValues, numberOfBins int) int {
-	if rangeValues == 0 {
-		// All values are identical - put everything in bin 0
-		return 0
-	}
-
-	var binIndex int
-	if binSize == 1.0 {
-		binIndex = data - minVal
-	} else {
-		// Division-based mapping for larger ranges
-		binIndex = int(float64(data-minVal) / binSize)
-	}
-
-	// Ensure bin index is within bounds
-	if binIndex >= numberOfBins {
-		return numberOfBins - 1
-	}
-	if binIndex < 0 {
-		return 0
-	}
-
-	return binIndex
-}
-
-func Histogram(d []int) apiplanner.Histogram {
-	// Handle empty data
-	if len(d) == 0 {
-		return apiplanner.Histogram{
-			Data:     []int{},
-			Step:     0,
-			MinValue: 0,
-		}
-	}
-
-	minVal := slices.Min(d)
-	maxVal := slices.Max(d)
-	rangeValues := maxVal - minVal
-	numberOfDataPoints := len(d)
-	numberOfBins := int(math.Sqrt(float64(numberOfDataPoints)))
-
-	// Handle corner case where numberOfBins is 0
-	if numberOfBins == 0 {
-		numberOfBins = 1
-	}
-
-	// For small ranges (like NIC counts), use 1 bin per value for more intuitive results
-	var binSize float64
-	if maxVal <= 10 {
-		numberOfBins = maxVal - minVal + 1
-		binSize = 1.0
-	} else {
-		// For larger ranges, use the original algorithm
-		if rangeValues == 0 {
-			binSize = 1.0
-		} else {
-			binSize = float64(rangeValues) / float64(numberOfBins)
-		}
-	}
-
-	// Initialize the bins with 0s
-	bins := make([]int, numberOfBins)
-
-	// Fill the bins based on data points
-	for _, data := range d {
-		binIndex := calculateBinIndex(data, minVal, binSize, rangeValues, numberOfBins)
-		bins[binIndex]++
-	}
-
-	step := int(math.Round(binSize))
-	if step == 0 && len(d) > 0 {
-		step = 1
-	}
-
-	return apiplanner.Histogram{
-		Data:     bins,
-		Step:     step,
-		MinValue: minVal,
-	}
 }
 
 func listNetworksFromCollector(collector *vsphere.Collector) (*[]vspheremodel.Network, error) {

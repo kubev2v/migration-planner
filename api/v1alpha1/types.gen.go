@@ -346,11 +346,12 @@ type VCenter struct {
 
 // VMResourceBreakdown defines model for VMResourceBreakdown.
 type VMResourceBreakdown struct {
-	Histogram                      Histogram `json:"histogram"`
-	Total                          int       `json:"total"`
-	TotalForMigratable             int       `json:"totalForMigratable"`
-	TotalForMigratableWithWarnings int       `json:"totalForMigratableWithWarnings"`
-	TotalForNotMigratable          int       `json:"totalForNotMigratable"`
+	// Deprecated:
+	Histogram                      *Histogram `json:"histogram,omitempty"`
+	Total                          int        `json:"total"`
+	TotalForMigratable             int        `json:"totalForMigratable"`
+	TotalForMigratableWithWarnings int        `json:"totalForMigratableWithWarnings"`
+	TotalForNotMigratable          int        `json:"totalForNotMigratable"`
 }
 
 // VMs defines model for VMs.

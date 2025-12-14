@@ -1234,7 +1234,6 @@ components:
     VMResourceBreakdown:
       type: object
       required:
-        - histogram
         - total
         - totalForMigratable
         - totalForMigratableWithWarnings
@@ -1248,11 +1247,12 @@ components:
           type: integer
         totalForNotMigratable:
           type: integer
-        histogram:
+        histogram: # deprecated
           $ref: '#/components/schemas/Histogram'
 
     Histogram:
       type: object
+      deprecated: true
       required:
         - minValue
         - step
