@@ -181,8 +181,11 @@ type Infra struct {
 	HostPowerStates   map[string]int `json:"hostPowerStates"`
 	Hosts             *[]Host        `json:"hosts,omitempty"`
 	// Deprecated:
-	HostsPerCluster *[]int    `json:"hostsPerCluster,omitempty"`
-	Networks        []Network `json:"networks"`
+	HostsPerCluster *[]int `json:"hostsPerCluster,omitempty"`
+
+	// MemoryOverCommitment RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
+	MemoryOverCommitment *float64  `json:"memoryOverCommitment,omitempty"`
+	Networks             []Network `json:"networks"`
 	// Deprecated:
 	TotalClusters    *int `json:"totalClusters,omitempty"`
 	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
