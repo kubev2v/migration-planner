@@ -310,7 +310,8 @@ func buildDatastoreIDToTypeMap(datastores *[]vspheremodel.Datastore) map[string]
 func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.InventoryData, datastoreIDToType map[string]string) {
 	diskGBSet := []int{}
 
-	totalAllocatedVCpus := 0 // For poweredOn VMs
+	totalAllocatedVCpus := 0  // For poweredOn VMs
+	totalAllocatedMemory := 0 // For poweredOn VMs
 
 	for _, vm := range *vms {
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
@@ -322,6 +323,7 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		// allocated VCpu for powered On VMs
 		if vm.PowerState == "poweredOn" {
 			totalAllocatedVCpus += int(vm.CpuCount)
+			totalAllocatedMemory += int(vm.MemoryMB)
 		}
 
 		// inventory
@@ -369,13 +371,16 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	// Update the disk size tier
 	inv.Vms.DiskSizeTier = diskSizeTier(diskGBSet)
 
-	// calculate the cpu overcommitment ratio
-	totalCpus := sumHostsCpu(inv.Infra.Hosts)
-	if totalCpus > 0 {
-		overcommitmentRatio := float64(totalAllocatedVCpus) / float64(totalCpus)
-		roundedRatio := util.Round(overcommitmentRatio)
-		inv.Infra.CpuOverCommitment = util.FloatPtr(roundedRatio)
+	// calculate the cpu and memory overcommitment ratio
+	inv.Infra.CpuOverCommitment = util.FloatPtr(calcOverCommitmentRatio(totalAllocatedVCpus, sumHostsCpu(inv.Infra.Hosts)))
+	inv.Infra.MemoryOverCommitment = util.FloatPtr(calcOverCommitmentRatio(totalAllocatedMemory, sumHostsMemory(inv.Infra.Hosts)))
+}
+
+func calcOverCommitmentRatio(totalAllocated, totalAvailable int) float64 {
+	if totalAvailable == 0 {
+		return 0.0
 	}
+	return util.Round(float64(totalAllocated) / float64(totalAvailable))
 }
 
 func sumHostsCpu(hosts *[]apiplanner.Host) int {
@@ -385,6 +390,18 @@ func sumHostsCpu(hosts *[]apiplanner.Host) int {
 			continue
 		}
 		total += *h.CpuCores
+	}
+
+	return total
+}
+
+func sumHostsMemory(hosts *[]apiplanner.Host) int {
+	total := 0
+	for _, h := range *hosts {
+		if h.MemoryMB == nil {
+			continue
+		}
+		total += int(*h.MemoryMB)
 	}
 
 	return total

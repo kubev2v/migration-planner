@@ -1136,6 +1136,10 @@ components:
           type: number
           format: double
           description: CPU Overcommitment Ratio. Calculated as total Allocated vCPUs / Total Physical Cores
+        memoryOverCommitment:
+          type: number
+          format: double
+          description: RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
         hosts:
           type: array
           items:
