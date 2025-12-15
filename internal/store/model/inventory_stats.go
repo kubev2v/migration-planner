@@ -69,7 +69,6 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 		inventory := &api.Inventory{}
 
 		if err := json.Unmarshal(latesSnapshot.Inventory, &inventory); err != nil {
-			zap.S().Warnw("failed to unmarshal inventory", "error", err)
 			continue
 		}
 
