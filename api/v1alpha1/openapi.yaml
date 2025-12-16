@@ -1033,6 +1033,11 @@ components:
           description: Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
           additionalProperties:
             type: integer
+        distributionByMemoryTier:
+          type: object
+          description: Distribution of VMs across Memory tier buckets (e.g., "0-4", "5-16", "17-32", "33-64", "65-128", "129-256", "256+")
+          additionalProperties:
+            type: integer
         ramGB:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
