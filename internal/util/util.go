@@ -7,6 +7,9 @@ import (
 	"os"
 	"strconv"
 	"time"
+
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 type StringerWithError func() (string, error)
@@ -140,4 +143,16 @@ func GBToTB[T ~int | ~int64 | ~float64](gb T) float64 {
 // Accepts int, int32, or float64.
 func MBToGB[T ~int | ~int32 | ~float64](mb T) int {
 	return int(math.Round(float64(mb) / 1024.0))
+}
+
+// Unmarshal does not return error when v1 inventory is unmarshal into a v2 struct.
+// The only way to differentiate the version is to check the internal structure.
+func GetInventoryVersion(inventory []byte) int {
+	i := v1alpha1.Inventory{}
+	_ = json.Unmarshal(inventory, &i)
+
+	if i.VcenterId == "" {
+		return model.SnapshotVersionV1
+	}
+	return model.SnapshotVersionV2
 }

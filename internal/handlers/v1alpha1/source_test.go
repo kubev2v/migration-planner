@@ -524,6 +524,84 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
 		})
 
+		It("successfully converts V1 inventory to V2 format", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+
+			// V1 inventory format: InventoryData without vcenter_id at root level
+			v1InventoryJSON := `{"vms":{"total":100,"totalMigratable":80},"infra":{"totalHosts":10,"totalClusters":2},"vcenter":{"id":"vcenter-123","name":"test-vcenter"}}`
+
+			insertSourceWithInventoryStm := "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', 'source_name', '%s', '%s', '%s');"
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithInventoryStm, sourceID, "admin", "admin", v1InventoryJSON))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Inventory).ToNot(BeNil())
+			// V2 format should have vcenter_id at root level
+			Expect(source.Inventory.VcenterId).To(Equal("vcenter-123"))
+			// V2 format should have vcenter data in Vcenter field
+			Expect(source.Inventory.Vcenter).ToNot(BeNil())
+			Expect(source.Inventory.Vcenter.Vms.Total).To(Equal(100))
+			Expect(source.Inventory.Vcenter.Vms.TotalMigratable).To(Equal(80))
+			Expect(source.Inventory.Vcenter.Infra.TotalHosts).To(Equal(10))
+			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil())
+			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(2))
+			// V2 format should have empty clusters map
+			Expect(source.Inventory.Clusters).To(BeEmpty())
+		})
+
+		It("successfully returns V2 inventory as-is", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+
+			// V2 inventory format: has vcenter_id at root level
+			v2InventoryJSON := `{"vcenter_id":"vcenter-456","vcenter":{"vms":{"total":200,"totalMigratable":150},"infra":{"totalHosts":20,"totalClusters":5}},"clusters":{"cluster-1":{"vms":{"total":50},"infra":{}}}}`
+
+			insertSourceWithInventoryStm := "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', 'source_name', '%s', '%s', '%s');"
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithInventoryStm, sourceID, "admin", "admin", v2InventoryJSON))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Inventory).ToNot(BeNil())
+			Expect(source.Inventory.VcenterId).To(Equal("vcenter-456"))
+			Expect(source.Inventory.Vcenter).ToNot(BeNil())
+			Expect(source.Inventory.Vcenter.Vms.Total).To(Equal(200))
+			Expect(source.Inventory.Vcenter.Vms.TotalMigratable).To(Equal(150))
+			Expect(source.Inventory.Vcenter.Infra.TotalHosts).To(Equal(20))
+			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil())
+			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(5))
+			Expect(source.Inventory.Clusters).To(HaveLen(1))
+			Expect(source.Inventory.Clusters["cluster-1"].Vms.Total).To(Equal(50))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE from labels;")
 			gormdb.Exec("DELETE FROM agents;")
@@ -555,7 +633,6 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Raw("SELECT COUNT(*) FROM SOURCES;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(0))
-
 		})
 
 		It("successfully deletes a source", func() {

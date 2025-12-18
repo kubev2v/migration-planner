@@ -332,6 +332,70 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("record not found"))
 			})
+
+			It("successfully creates assessment from source with V1 inventory and stores correct version", func() {
+				// Create a source with V1 inventory (no vcenter_id at root level)
+				sourceID := uuid.New()
+				v1InventoryJSON := `{"vms":{"total":100,"totalMigratable":80},"infra":{"totalHosts":10,"totalClusters":2},"vcenter":{"id":"vcenter-123","name":"test-vcenter"}}`
+
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", v1InventoryJSON))
+				Expect(tx.Error).To(BeNil())
+
+				testAssessmentID := uuid.New()
+				createForm := mappers.AssessmentCreateForm{
+					ID:       testAssessmentID,
+					Name:     "V1 Assessment",
+					OrgID:    "org1",
+					Username: "user1",
+					Source:   service.SourceTypeAgent,
+					SourceID: &sourceID,
+				}
+
+				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
+
+				Expect(err).To(BeNil())
+				Expect(assessment).ToNot(BeNil())
+				Expect(assessment.ID).To(Equal(testAssessmentID))
+				Expect(assessment.Snapshots).To(HaveLen(1))
+
+				// Verify the snapshot was stored with V1 version
+				var snapshotVersion int
+				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
+				Expect(tx.Error).To(BeNil())
+				Expect(snapshotVersion).To(Equal(1)) // V1
+			})
+
+			It("successfully creates assessment from source with V2 inventory and stores correct version", func() {
+				// Create a source with V2 inventory (has vcenter_id at root level)
+				sourceID := uuid.New()
+				v2InventoryJSON := `{"vcenter_id":"vcenter-456","vcenter":{"vms":{"total":200,"totalMigratable":150},"infra":{"totalHosts":20,"totalClusters":5}},"clusters":{}}`
+
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, sourceID, "test-source", "user1", "org1", v2InventoryJSON))
+				Expect(tx.Error).To(BeNil())
+
+				testAssessmentID := uuid.New()
+				createForm := mappers.AssessmentCreateForm{
+					ID:       testAssessmentID,
+					Name:     "V2 Assessment",
+					OrgID:    "org1",
+					Username: "user1",
+					Source:   service.SourceTypeAgent,
+					SourceID: &sourceID,
+				}
+
+				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
+
+				Expect(err).To(BeNil())
+				Expect(assessment).ToNot(BeNil())
+				Expect(assessment.ID).To(Equal(testAssessmentID))
+				Expect(assessment.Snapshots).To(HaveLen(1))
+
+				// Verify the snapshot was stored with V2 version
+				var snapshotVersion int
+				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
+				Expect(tx.Error).To(BeNil())
+				Expect(snapshotVersion).To(Equal(2)) // V2
+			})
 		})
 
 		AfterEach(func() {
