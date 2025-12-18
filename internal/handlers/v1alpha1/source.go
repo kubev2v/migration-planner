@@ -71,7 +71,12 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
 	}
 
-	return server.CreateSource201JSONResponse(mappers.SourceToApi(source)), nil
+	response, err := mappers.SourceToApi(source)
+	if err != nil {
+		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+	}
+
+	return server.CreateSource201JSONResponse(response), nil
 }
 
 // (DELETE /api/v1/sources)
@@ -126,7 +131,12 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request server.GetSource
 		return server.GetSource403JSONResponse{Message: message}, nil
 	}
 
-	return server.GetSource200JSONResponse(mappers.SourceToApi(*source)), nil
+	response, err := mappers.SourceToApi(*source)
+	if err != nil {
+		return server.GetSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+	}
+
+	return server.GetSource200JSONResponse(response), nil
 }
 
 // (PUT /api/v1/sources/{id})
@@ -168,7 +178,12 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 		}
 	}
 
-	return server.UpdateSource200JSONResponse(mappers.SourceToApi(*updatedSource)), nil
+	response, err := mappers.SourceToApi(*updatedSource)
+	if err != nil {
+		return server.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+	}
+
+	return server.UpdateSource200JSONResponse(response), nil
 }
 
 // (PUT /api/v1/sources/{id}/inventory)
@@ -213,7 +228,12 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 		}
 	}
 
-	return server.UpdateInventory200JSONResponse(mappers.SourceToApi(updatedSource)), nil
+	response, err := mappers.SourceToApi(updatedSource)
+	if err != nil {
+		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+	}
+
+	return server.UpdateInventory200JSONResponse(response), nil
 }
 
 // (HEAD /api/v1/sources/{id}/image)

@@ -8,9 +8,10 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 )
 
-func SourceToApi(s model.Source) api.Source {
+func SourceToApi(s model.Source) (api.Source, error) {
 	source := api.Source{
 		Id:         s.ID,
 		Inventory:  nil,
@@ -21,9 +22,28 @@ func SourceToApi(s model.Source) api.Source {
 	}
 
 	if len(s.Inventory) > 0 {
-		i := v1alpha1.Inventory{}
-		_ = json.Unmarshal(s.Inventory, &i)
-		source.Inventory = &i
+		v := util.GetInventoryVersion(s.Inventory)
+		switch v {
+		case model.SnapshotVersionV1:
+			i := v1alpha1.InventoryData{}
+			if err := json.Unmarshal(s.Inventory, &i); err != nil {
+				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
+			}
+			if i.Vcenter == nil {
+				return api.Source{}, fmt.Errorf("v1 inventory missing vcenter data")
+			}
+			source.Inventory = &v1alpha1.Inventory{
+				Vcenter:   &i,
+				VcenterId: i.Vcenter.Id,
+				Clusters:  map[string]api.InventoryData{},
+			}
+		default:
+			v2 := v1alpha1.Inventory{}
+			if err := json.Unmarshal(s.Inventory, &v2); err != nil {
+				return api.Source{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
+			}
+			source.Inventory = &v2
+		}
 	}
 
 	if len(s.Labels) > 0 {
@@ -78,7 +98,7 @@ func SourceToApi(s model.Source) api.Source {
 	// while other agents in up-to-date states exists.
 	// Which one should be presented in the API response?
 	if len(s.Agents) == 0 {
-		return source
+		return source, nil
 	}
 
 	slices.SortFunc(s.Agents, func(a model.Agent, b model.Agent) int {
@@ -93,14 +113,18 @@ func SourceToApi(s model.Source) api.Source {
 	agent := AgentToApi(s.Agents[0])
 	source.Agent = &agent
 
-	return source
+	return source, nil
 }
 
 func SourceListToApi(sources ...model.SourceList) api.SourceList {
 	sourceList := []api.Source{}
 	for _, source := range sources {
 		for _, s := range source {
-			sourceList = append(sourceList, SourceToApi(s))
+			apiSource, err := SourceToApi(s)
+			if err != nil {
+				continue
+			}
+			sourceList = append(sourceList, apiSource)
 		}
 	}
 	return sourceList
