@@ -6,9 +6,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+
+	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 )
 
 type Assessment interface {
@@ -78,7 +80,7 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 	snapshot := model.Snapshot{
 		AssessmentID: assessment.ID,
 		Inventory:    inventory,
-		Version:      model.SnapshotVersionV2,
+		Version:      uint(util.GetInventoryVersion(inventory)),
 	}
 
 	if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
@@ -105,11 +107,10 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 	}
 
 	if inventory != nil {
-		// Create a new snapshot
 		snapshot := model.Snapshot{
 			AssessmentID: assessmentID,
 			Inventory:    inventory,
-			Version:      model.SnapshotVersionV2,
+			Version:      uint(util.GetInventoryVersion(inventory)),
 		}
 
 		if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
