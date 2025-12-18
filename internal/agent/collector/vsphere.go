@@ -171,9 +171,6 @@ func (c *Collector) run(ctx context.Context) {
 		return
 	}
 
-	zap.S().Named("collector").Infof("Extract cluster mapping and build helper maps")
-	clusterMapping, hostIDToPowerState, vmsByCluster := ExtractVSphereClusterIDMapping(*vms, *hosts, *clusters)
-
 	zap.S().Named("collector").Infof("Create vCenter-level inventory")
 
 	apiDatastores, datastoreIndexToName, datastoreMapping := getDatastores(hosts, datastores)
@@ -199,6 +196,9 @@ func (c *Collector) run(ctx context.Context) {
 	datastoreIDToType := buildDatastoreIDToTypeMap(datastores)
 	FillInventoryObjectWithMoreData(vms, vcenterInv, datastoreIDToType)
 
+	zap.S().Named("collector").Infof("Extract cluster mapping and build helper maps")
+	clusterMapping, hostIDToPowerState, vmsByCluster := ExtractVSphereClusterIDMapping(*vms, *hosts, *clusters)
+
 	zap.S().Named("collector").Infof("Create per-cluster inventories")
 	perClusterInventories := make(map[string]*apiplanner.InventoryData)
 	for _, clusterID := range clusterMapping.ClusterIDs {
@@ -222,13 +222,7 @@ func (c *Collector) run(ctx context.Context) {
 		clusterInv := service.CreateBasicInventory(&clusterVMs, clusterInfraData)
 
 		if len(clusterVMs) > 0 {
-			// Validate cluster VMs
-			if err := c.validateVMs(ctx, &clusterVMs); err != nil {
-				zap.S().Named("collector").Warnf("Cluster %s: validation errors: %v", clusterID, err)
-			}
-
-			// Fill cluster inventory with more data
-			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv, datastoreIDToType)
+			FillInventoryObjectWithMoreData(&clusterVMs, clusterInv, datastoreIDToType) // Fill cluster inventory with more data
 		}
 
 		perClusterInventories[clusterID] = clusterInv
