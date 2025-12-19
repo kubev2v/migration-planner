@@ -332,6 +332,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 			assessment1 := model.Assessment{
 				ID:         assessmentID1,
+				Username:   "user2",
 				Name:       "test-assessment",
 				OrgID:      "org1",
 				SourceType: "inventory",
@@ -344,7 +345,8 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessment2 := model.Assessment{
 				ID:         assessmentID2,
 				Name:       "test-assessment", // Same name
-				OrgID:      "org2",            // Different org
+				Username:   "user1",
+				OrgID:      "org2", // Different org
 				SourceType: "rvtools",
 			}
 
