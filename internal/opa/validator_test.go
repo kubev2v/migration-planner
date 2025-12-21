@@ -173,8 +173,12 @@ func TestValidator_ValidateVMS(t *testing.T) {
 		GuestID: "rhel6guest",
 	})
 
-	if err := validator.ValidateVMs(context.Background(), &vms); err != nil {
-		t.Fatalf("concerns() failed: %v", err)
+	for i := range vms {
+		concerns, err := validator.ValidateVM(context.Background(), vms[i])
+		if err != nil {
+			t.Fatalf("ValidateVM() failed: %v", err)
+		}
+		vms[i].Concerns = concerns
 	}
 
 	if len(vms) != 1 {
