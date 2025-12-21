@@ -108,8 +108,9 @@ query_and_convert() {
             local col_name="${HEADER_ARR[$j]}"
 
             # Skip zero-UUID records to prevent FK integrity issues
+            # Only skip if zero-UUID appears in key FK/PK columns, not in JSON data
             if [ "$value" = "00000000-0000-0000-0000-000000000000" ]; then
-                if [ "$col_name" = "id" ] || [ "$col_name" = "source_id" ]; then
+                if [ "$col_name" = "id" ] || [ "$col_name" = "source_id" ] || [ "$col_name" = "assessment_id" ]; then
                     skip_row=true
                     break
                 fi
@@ -121,6 +122,15 @@ query_and_convert() {
                 # Normalize org_id to 'internal' for single-tenant (auth=none) mode
                 if [ "$col_name" = "org_id" ] && [ "${PRESERVE_ORGS:-}" != "true" ]; then
                     values="${values}'internal'"
+                # Normalize username based on auth mode for privacy filtering compatibility
+                elif [ "$col_name" = "username" ]; then
+                    if [ "${PRESERVE_ORGS:-}" = "true" ]; then
+                        # auth=local mode: use 'testuser' (matches JWT token username)
+                        values="${values}'testuser'"
+                    else
+                        # auth=none mode: use 'admin' (matches hardcoded username)
+                        values="${values}'admin'"
+                    fi
                 else
                     local escaped_value
                     escaped_value=$(escape_sql "$value")
@@ -179,6 +189,50 @@ query_and_convert() {
             done < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
         fi
     fi
+    
+    # Post-process snapshots table for data quality
+    if [ "$table" = "snapshots" ]; then
+        echo "🔧 Cleaning snapshots data..."
+        
+        # Remove snapshots with NULL inventory entirely (they cause UI crashes)
+        # These snapshots have no real data and should not be loaded
+        grep -v "', NULL, '" "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+        
+        # Build list of valid assessment IDs from assessments.sql
+        if [ -f "$OUTPUT_DIR/assessments.sql" ]; then
+            # Extract assessment IDs from assessments.sql
+            grep "^INSERT INTO assessments" "$OUTPUT_DIR/assessments.sql" | \
+                sed -E "s/.*VALUES \('([^']+)'.*/\1/" | sort -u > "${file}.assessment_ids"
+            
+            # Remove snapshots that reference non-existent assessments
+            local original_count
+            original_count=$(grep -c "^INSERT INTO snapshots" "$file" || echo "0")
+            while IFS= read -r line; do
+                if [[ $line == INSERT\ INTO\ snapshots* ]]; then
+                    # Extract assessment_id (4th column in VALUES clause)
+                    local assessment_id
+                    assessment_id=$(echo "$line" | sed -E "s/.*', '([^']+)', '[0-9]+'\);/\1/")
+                    # Only include if assessment exists
+                    if grep -q "^${assessment_id}$" "${file}.assessment_ids"; then
+                        echo "$line"
+                    fi
+                else
+                    echo "$line"
+                fi
+            done < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+            
+            local final_count
+            final_count=$(grep -c "^INSERT INTO snapshots" "$file" || echo "0")
+            local removed=$((original_count - final_count))
+            if [ $removed -gt 0 ]; then
+                echo "  ⚠️  Removed $removed orphaned snapshots (assessment no longer exists)"
+            fi
+            
+            rm -f "${file}.assessment_ids"
+        fi
+        
+        echo "✅ Snapshots cleaned: $(grep -c '^INSERT INTO snapshots' "$file" || echo 0) valid records"
+    fi
 
 }
 
@@ -187,13 +241,15 @@ echo ""
 echo "🗃️  Extracting all staging database tables..."
 
 # Core application tables
-# Export sources with explicit column list for schema compatibility
+# Export with explicit column lists for schema compatibility between staging and local
 query_and_convert "sources" "SELECT id, created_at, updated_at, deleted_at, name, v_center_id, username, org_id, inventory FROM sources;"
 query_and_convert "assessments" "SELECT * FROM assessments;"
 query_and_convert "agents" "SELECT * FROM agents;"
 query_and_convert "keys" "SELECT * FROM keys;"
 query_and_convert "labels" "SELECT * FROM labels;"
-query_and_convert "snapshots" "SELECT * FROM snapshots;"
+# Snapshots: only export columns that exist in local schema (id, created_at, inventory, assessment_id, version)
+# GABI versions are correct as-is - no swap needed
+query_and_convert "snapshots" "SELECT id, created_at, inventory, assessment_id, version FROM snapshots;"
 query_and_convert "image_infras" "SELECT * FROM image_infras;"
 
 # Skip goose_db_version (just migration tracking)
