@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -13,7 +15,6 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 )
 

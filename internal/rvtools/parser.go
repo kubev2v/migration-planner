@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	vsphere "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	"github.com/xuri/excelize/v2"
 	"go.uber.org/zap"
@@ -14,7 +16,6 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	collector "github.com/kubev2v/migration-planner/internal/agent/collector"
 	"github.com/kubev2v/migration-planner/internal/agent/service"
-	"github.com/kubev2v/migration-planner/internal/opa"
 )
 
 // StatusCallback is called when the parsing status changes
@@ -62,7 +63,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			vms = []vsphere.VM{}
 		}
 
-		if len(vms) > 0 && opaValidator != nil {
+		if len(vms) > 0 {
 			// Notify callback that we're transitioning to validation phase
 			if statusCallback != nil {
 				if err := statusCallback(string(api.Validating)); err != nil {
@@ -70,7 +71,7 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 				}
 			}
 			zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
-			if err := opaValidator.ValidateVMs(ctx, &vms); err != nil {
+			if err := collector.ValidateVMs(ctx, opaValidator, vms); err != nil {
 				zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
 			}
 		}
