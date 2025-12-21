@@ -24,12 +24,28 @@ cp -r /staging-data /tmp/staging-data
 cd /tmp/staging-data
 
 # Sanitize known bad zero-UUID records that can break FK/transactions
-for f in sources.sql assessments.sql snapshots.sql; do
-  if [ -f "$f" ]; then
-    # Remove any INSERT lines referencing the all-zero UUID
-    sed -i "/00000000-0000-0000-0000-000000000000/d" "$f"
-  fi
-done
+# Only remove rows where zero-UUID appears in key columns (id, source_id, assessment_id)
+# Don't remove rows where zero-UUID only appears in JSON inventory data
+
+if [ -f "sources.sql" ]; then
+  # Remove sources with zero-UUID as id (first column after VALUES)
+  # Pattern matches: VALUES ('00000000...', ensuring it's the first value
+  sed -i "/^INSERT INTO sources.*VALUES ('00000000-0000-0000-0000-000000000000',/d" "sources.sql"
+fi
+
+if [ -f "assessments.sql" ]; then
+  # Remove assessments with zero-UUID as id (first column after VALUES)
+  # Pattern matches: VALUES ('00000000...', ensuring it's the first value
+  sed -i "/^INSERT INTO assessments.*VALUES ('00000000-0000-0000-0000-000000000000',/d" "assessments.sql"
+fi
+
+if [ -f "snapshots.sql" ]; then
+  # For snapshots, only remove if assessment_id (4th column) is zero-UUID
+  # Pattern: VALUES (id, created_at, inventory, '00000000-0000-0000-0000-000000000000'
+  # We need to match the 4th value being the zero-UUID
+  # This is complex, so we'll use a more targeted approach in the cleanup SQL below
+  echo "Snapshots will be cleaned up via SQL after load..."
+fi
 
 # Load in FK-safe order so parent tables exist before children
 files=(
