@@ -10,6 +10,8 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
@@ -17,7 +19,6 @@ import (
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"

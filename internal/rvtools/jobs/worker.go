@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	"github.com/google/uuid"
 	"github.com/riverqueue/river"
 
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"

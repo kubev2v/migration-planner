@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -12,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	api "github.com/kubev2v/forklift/pkg/apis/forklift/v1beta1"
 	"github.com/kubev2v/forklift/pkg/controller/provider/container/vsphere"
@@ -187,8 +188,14 @@ func (c *Collector) run(ctx context.Context) {
 	}
 	vcenterInv := service.CreateBasicInventory(vms, infraData)
 
+	zap.S().Named("collector").Infof("initialize OPA validator from %s.", c.opaPoliciesDir)
+	opaValidator, err := opa.NewValidatorFromDir(c.opaPoliciesDir)
+	if err != nil {
+		zap.S().Named("collector").Errorf("failed to initialize OPA validator from %s: %v", c.opaPoliciesDir, err)
+	}
+
 	zap.S().Named("collector").Infof("Run the validation of VMs for vCenter-level")
-	if err := c.validateVMs(ctx, vms); err != nil {
+	if err := ValidateVMs(ctx, opaValidator, *vms); err != nil {
 		zap.S().Named("collector").Warnf("At least one error during VMs validation: %v", err)
 	}
 
@@ -251,13 +258,26 @@ func (c *Collector) run(ctx context.Context) {
 	zap.S().Named("collector").Infof("Successfully created inventory with %d clusters", len(perClusterInventories))
 }
 
-func (c *Collector) validateVMs(ctx context.Context, vms *[]vspheremodel.VM) error {
-	opaValidator, err := opa.NewValidatorFromDir(c.opaPoliciesDir)
-	if err != nil {
-		return fmt.Errorf("failed to initialize OPA validator from %s: %w", c.opaPoliciesDir, err)
+func ValidateVMs(ctx context.Context, opaValidator *opa.Validator, vms []vspheremodel.VM) error {
+	if opaValidator == nil {
+		return fmt.Errorf("received opa validator is nil")
 	}
 
-	return opaValidator.ValidateVMs(ctx, vms)
+	var validationErrors []error
+
+	for i := range vms {
+		concerns, err := opaValidator.ValidateVM(ctx, vms[i])
+		if err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+		vms[i].Concerns = concerns
+	}
+
+	if len(validationErrors) > 0 {
+		return fmt.Errorf("validation completed with %d error(s): %w", len(validationErrors), errors.Join(validationErrors...))
+	}
+
+	return nil
 }
 
 func startWeb(collector *vsphere.Collector) (*libcontainer.Container, error) {

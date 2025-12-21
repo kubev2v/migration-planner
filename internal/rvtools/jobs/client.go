@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/store"
 )
 

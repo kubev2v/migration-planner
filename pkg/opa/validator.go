@@ -2,7 +2,7 @@ package opa
 
 import (
 	"context"
-	"errors"
+	"encoding/json"
 	"fmt"
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
@@ -83,7 +83,7 @@ func (v *Validator) compilePolicies(policies map[string]string) error {
 }
 
 // concerns Validate the provided input against compiled policies
-func (v *Validator) concerns(ctx context.Context, input interface{}) ([]interface{}, error) {
+func (v *Validator) concerns(ctx context.Context, input interface{}) ([]vsphere.Concern, error) {
 	resultSet, err := v.preparedQuery.Eval(ctx, rego.EvalInput(input))
 	if err != nil {
 		return nil, fmt.Errorf("policy evaluation failed: %w", err)
@@ -91,73 +91,47 @@ func (v *Validator) concerns(ctx context.Context, input interface{}) ([]interfac
 
 	if len(resultSet) == 0 || len(resultSet[0].Expressions) == 0 {
 		zap.S().Named("opa").Debug("No policy results returned")
-		return []interface{}{}, nil
+		return []vsphere.Concern{}, nil
 	}
 
-	result, ok := resultSet[0].Expressions[0].Value.([]interface{})
+	raw, ok := resultSet[0].Expressions[0].Value.([]interface{})
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type from policy evaluation")
 	}
 
-	return result, nil
+	// convert results to concern model
+	var concerns []vsphere.Concern
+	for _, r := range raw {
+		m, ok := r.(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected item type in result set")
+		}
+
+		b, err := json.Marshal(m)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal concern data: %w", err)
+		}
+
+		var c vsphere.Concern
+		if err := json.Unmarshal(b, &c); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal concern: %w", err)
+		}
+
+		concerns = append(concerns, c)
+	}
+
+	return concerns, nil
 }
 
-func (v *Validator) ValidateVMs(ctx context.Context, vms *[]vsphere.VM) error {
-	if vms == nil || len(*vms) == 0 {
-		return nil
+func (v *Validator) ValidateVM(ctx context.Context, vm vsphere.VM) ([]vsphere.Concern, error) {
+	// Prepare the JSON data in MTV OPA server format
+	workload := web.Workload{}
+	workload.With(&vm)
+
+	concerns, err := v.concerns(ctx, workload)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate VM %q: %w", vm.Name, err)
 	}
 
-	var validationErrors []error
-
-	for i := range *vms {
-		vm := &(*vms)[i] // take a pointer to the real element
-
-		// Prepare the JSON data in MTV OPA server format
-		workload := web.Workload{}
-		workload.With(vm)
-
-		concerns, err := v.concerns(ctx, workload)
-		if err != nil {
-			validationErrors = append(validationErrors,
-				fmt.Errorf("failed to validate VM %q: %w", vm.Name, err))
-			continue
-		}
-
-		// Convert concerns to vsphere.Concern format
-		for _, c := range concerns {
-			concernMap, ok := c.(map[string]interface{})
-			if !ok {
-				return fmt.Errorf(
-					"unexpected concern data type for VM %q: got %T, expected map[string]interface{}",
-					vm.Name,
-					c,
-				)
-			}
-
-			concern := vsphere.Concern{}
-			if id, ok := concernMap["id"].(string); ok {
-				concern.Id = id
-			}
-
-			if label, ok := concernMap["label"].(string); ok {
-				concern.Label = label
-			}
-
-			if assessment, ok := concernMap["assessment"].(string); ok {
-				concern.Assessment = assessment
-			}
-
-			if category, ok := concernMap["category"].(string); ok {
-				concern.Category = category
-			}
-
-			vm.Concerns = append(vm.Concerns, concern)
-		}
-	}
-
-	if len(validationErrors) > 0 {
-		return fmt.Errorf("validation completed with %d error(s): %w", len(validationErrors), errors.Join(validationErrors...))
-	}
-
-	return nil
+	return concerns, nil
 }

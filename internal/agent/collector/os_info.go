@@ -3,7 +3,7 @@ package collector
 import (
 	vspheremodel "github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	apiplanner "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/opa"
+	"github.com/kubev2v/migration-planner/pkg/opa"
 )
 
 func updateOsInfo(vm *vspheremodel.VM, osInfoMap map[string]apiplanner.OsInfo) *map[string]apiplanner.OsInfo {

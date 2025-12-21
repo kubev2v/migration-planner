@@ -5,9 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/opa"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/image"
-	"github.com/kubev2v/migration-planner/internal/opa"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
