@@ -3,9 +3,11 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
+	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	apiMappers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -54,7 +56,12 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		}
 	}
 
-	return agentServer.UpdateSourceInventory200JSONResponse(apiMappers.SourceToApi(*updatedSource)), nil
+	response, err := apiMappers.SourceToApi(*updatedSource)
+	if err != nil {
+		return server.UpdateSourceInventory500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+	}
+
+	return agentServer.UpdateSourceInventory200JSONResponse(response), nil
 }
 
 // UpdateAgentStatus updates or creates a new agent resource
