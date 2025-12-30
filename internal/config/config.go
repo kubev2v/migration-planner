@@ -33,6 +33,7 @@ type svcConfig struct {
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	S3                   S3
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
+	Sizer                Sizer
 }
 
 type Auth struct {
@@ -49,6 +50,11 @@ type S3 struct {
 	SecretKey   string `envconfig:"MIGRATION_PLANNER_S3_SECRET_KEY" default:""`
 	IsoFileName string `envconfig:"MIGRATION_PLANNER_S3_ISO_FILENAME" default:""`
 	IsoSha256   string `envconfig:"MIGRATION_PLANNER_S3_ISO_SHA256" default:""`
+}
+
+type Sizer struct {
+	ServiceURL string `envconfig:"SIZER_SERVICE_URL" default:"http://migration-planner-sizer:9200"`
+	Timeout    string `envconfig:"SIZER_SERVICE_TIMEOUT" default:"60s"`
 }
 
 func New() (*Config, error) {

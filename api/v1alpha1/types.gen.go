@@ -26,6 +26,14 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
+// Defines values for ClusterRequirementsRequestOverCommitRatio.
+const (
+	OneToFour ClusterRequirementsRequestOverCommitRatio = "1:4"
+	OneToOne  ClusterRequirementsRequestOverCommitRatio = "1:1"
+	OneToSix  ClusterRequirementsRequestOverCommitRatio = "1:6"
+	OneToTwo  ClusterRequirementsRequestOverCommitRatio = "1:2"
+)
+
 // Defines values for JobStatus.
 const (
 	Cancelled  JobStatus = "cancelled"
@@ -112,6 +120,57 @@ type AssessmentRvtoolsForm struct {
 type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
+}
+
+// ClusterRequirementsRequest Request payload for calculating cluster requirements
+type ClusterRequirementsRequest struct {
+	// ClusterId ID of the cluster to calculate requirements for
+	ClusterId string `json:"clusterId" validate:"required"`
+
+	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
+	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
+
+	// OverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	OverCommitRatio ClusterRequirementsRequestOverCommitRatio `json:"overCommitRatio" validate:"required"`
+
+	// WorkerNodeCPU CPU cores per worker node
+	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
+
+	// WorkerNodeMemory Memory (GB) per worker node
+	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
+}
+
+// ClusterRequirementsRequestOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+type ClusterRequirementsRequestOverCommitRatio string
+
+// ClusterRequirementsResponse Cluster requirements calculation results
+type ClusterRequirementsResponse struct {
+	// ClusterSizing Overall cluster sizing summary
+	ClusterSizing ClusterSizing `json:"clusterSizing"`
+
+	// InventoryTotals Inventory totals for the cluster
+	InventoryTotals InventoryTotals `json:"inventoryTotals"`
+
+	// ResourceConsumption Resource consumption across the cluster
+	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
+}
+
+// ClusterSizing Overall cluster sizing summary
+type ClusterSizing struct {
+	// ControlPlaneNodes Number of control plane nodes
+	ControlPlaneNodes int `json:"controlPlaneNodes"`
+
+	// TotalCPU Total CPU cores across all nodes
+	TotalCPU int `json:"totalCPU"`
+
+	// TotalMemory Total memory (GB) across all nodes
+	TotalMemory int `json:"totalMemory"`
+
+	// TotalNodes Total number of nodes (worker + control plane)
+	TotalNodes int `json:"totalNodes"`
+
+	// WorkerNodes Number of worker nodes
+	WorkerNodes int `json:"workerNodes"`
 }
 
 // Datastore defines model for Datastore.
@@ -211,6 +270,18 @@ type InventoryData struct {
 	Vms     VMs      `json:"vms"`
 }
 
+// InventoryTotals Inventory totals for the cluster
+type InventoryTotals struct {
+	// TotalCPU Total CPU cores across all VMs in the cluster
+	TotalCPU int `json:"totalCPU"`
+
+	// TotalMemory Total memory (GB) across all VMs in the cluster
+	TotalMemory int `json:"totalMemory"`
+
+	// TotalVMs Total number of VMs in the cluster
+	TotalVMs int `json:"totalVMs"`
+}
+
 // Ipv4Config defines model for Ipv4Config.
 type Ipv4Config struct {
 	DefaultGateway string `json:"defaultGateway" validate:"required,ip4_addr,max=15"`
@@ -277,6 +348,39 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// SizingOverCommitRatio Over-commit ratios
+type SizingOverCommitRatio struct {
+	// Cpu CPU over-commit ratio
+	Cpu float64 `json:"cpu"`
+
+	// Memory Memory over-commit ratio
+	Memory float64 `json:"memory"`
+}
+
+// SizingResourceConsumption Resource consumption across the cluster
+type SizingResourceConsumption struct {
+	// Cpu Total CPU requested
+	Cpu float64 `json:"cpu"`
+
+	// Limits Resource limits
+	Limits *SizingResourceLimits `json:"limits,omitempty"`
+
+	// Memory Total memory (GB) requested
+	Memory float64 `json:"memory"`
+
+	// OverCommitRatio Over-commit ratios
+	OverCommitRatio *SizingOverCommitRatio `json:"overCommitRatio,omitempty"`
+}
+
+// SizingResourceLimits Resource limits
+type SizingResourceLimits struct {
+	// Cpu Total CPU limits
+	Cpu float64 `json:"cpu"`
+
+	// Memory Total memory (GB) limits
+	Memory float64 `json:"memory"`
+}
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
@@ -447,6 +551,9 @@ type CreateRVToolsAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
+
+// CalculateAssessmentClusterRequirementsJSONRequestBody defines body for CalculateAssessmentClusterRequirements for application/json ContentType.
+type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate

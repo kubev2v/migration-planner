@@ -44,6 +44,9 @@ type ServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (POST /api/v1/assessments/{id}/cluster-requirements)
+	CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
 
@@ -119,6 +122,11 @@ func (_ Unimplemented) GetAssessment(w http.ResponseWriter, r *http.Request, id 
 
 // (PUT /api/v1/assessments/{id})
 func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/cluster-requirements)
+func (_ Unimplemented) CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -352,6 +360,32 @@ func (siw *ServerInterfaceWrapper) UpdateAssessment(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CalculateAssessmentClusterRequirements operation middleware
+func (siw *ServerInterfaceWrapper) CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CalculateAssessmentClusterRequirements(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -728,6 +762,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/assessments/{id}", wrapper.UpdateAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/cluster-requirements", wrapper.CalculateAssessmentClusterRequirements)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
@@ -1204,6 +1241,78 @@ type UpdateAssessment500JSONResponse Error
 func (response UpdateAssessment500JSONResponse) VisitUpdateAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirementsRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CalculateAssessmentClusterRequirementsJSONRequestBody
+}
+
+type CalculateAssessmentClusterRequirementsResponseObject interface {
+	VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error
+}
+
+type CalculateAssessmentClusterRequirements200JSONResponse ClusterRequirementsResponse
+
+func (response CalculateAssessmentClusterRequirements200JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements400JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements400JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements401JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements401JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements403JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements403JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements404JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements404JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements500JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements500JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateAssessmentClusterRequirements503JSONResponse Error
+
+func (response CalculateAssessmentClusterRequirements503JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1737,6 +1846,9 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/assessments/{id})
 	UpdateAssessment(ctx context.Context, request UpdateAssessmentRequestObject) (UpdateAssessmentResponseObject, error)
 
+	// (POST /api/v1/assessments/{id}/cluster-requirements)
+	CalculateAssessmentClusterRequirements(ctx context.Context, request CalculateAssessmentClusterRequirementsRequestObject) (CalculateAssessmentClusterRequirementsResponseObject, error)
+
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
 
@@ -2016,6 +2128,39 @@ func (sh *strictHandler) UpdateAssessment(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateAssessmentResponseObject); ok {
 		if err := validResponse.VisitUpdateAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CalculateAssessmentClusterRequirements operation middleware
+func (sh *strictHandler) CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CalculateAssessmentClusterRequirementsRequestObject
+
+	request.Id = id
+
+	var body CalculateAssessmentClusterRequirementsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CalculateAssessmentClusterRequirements(ctx, request.(CalculateAssessmentClusterRequirementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CalculateAssessmentClusterRequirements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CalculateAssessmentClusterRequirementsResponseObject); ok {
+		if err := validResponse.VisitCalculateAssessmentClusterRequirementsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
