@@ -47,6 +47,9 @@ type ServerInterface interface {
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
 
+	// (POST /api/v1/sizing)
+	CalculateSizing(w http.ResponseWriter, r *http.Request)
+
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
 
@@ -124,6 +127,11 @@ func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, 
 
 // (GET /api/v1/info)
 func (_ Unimplemented) GetInfo(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/sizing)
+func (_ Unimplemented) CalculateSizing(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -367,6 +375,21 @@ func (siw *ServerInterfaceWrapper) GetInfo(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetInfo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CalculateSizing operation middleware
+func (siw *ServerInterfaceWrapper) CalculateSizing(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CalculateSizing(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -731,6 +754,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/sizing", wrapper.CalculateSizing)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
@@ -1229,6 +1255,77 @@ type GetInfo500JSONResponse Error
 func (response GetInfo500JSONResponse) VisitGetInfoResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizingRequestObject struct {
+	Body *CalculateSizingJSONRequestBody
+}
+
+type CalculateSizingResponseObject interface {
+	VisitCalculateSizingResponse(w http.ResponseWriter) error
+}
+
+type CalculateSizing200JSONResponse SizingResponse
+
+func (response CalculateSizing200JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing400JSONResponse Error
+
+func (response CalculateSizing400JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing401JSONResponse Error
+
+func (response CalculateSizing401JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing403JSONResponse Error
+
+func (response CalculateSizing403JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing404JSONResponse Error
+
+func (response CalculateSizing404JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing500JSONResponse Error
+
+func (response CalculateSizing500JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateSizing503JSONResponse Error
+
+func (response CalculateSizing503JSONResponse) VisitCalculateSizingResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1740,6 +1837,9 @@ type StrictServerInterface interface {
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
 
+	// (POST /api/v1/sizing)
+	CalculateSizing(ctx context.Context, request CalculateSizingRequestObject) (CalculateSizingResponseObject, error)
+
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
 
@@ -2040,6 +2140,37 @@ func (sh *strictHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetInfoResponseObject); ok {
 		if err := validResponse.VisitGetInfoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CalculateSizing operation middleware
+func (sh *strictHandler) CalculateSizing(w http.ResponseWriter, r *http.Request) {
+	var request CalculateSizingRequestObject
+
+	var body CalculateSizingJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CalculateSizing(ctx, request.(CalculateSizingRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CalculateSizing")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CalculateSizingResponseObject); ok {
+		if err := validResponse.VisitCalculateSizingResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

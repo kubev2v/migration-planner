@@ -591,6 +591,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+  /api/v1/sizing:
+    post:
+      tags:
+        - sizing
+      description: Calculate sizing requirements
+      operationId: calculateSizing
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SizingRequest'
+        required: true
+      responses:
+        "200":
+          description: Sizing calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SizingResponse'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "503":
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
   /api/v1/assessments/rvtools:
     post:
       tags:
@@ -1485,6 +1540,128 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Assessment'
+
+    SizingRequest:
+      type: object
+      description: Request payload for calculating cluster sizing
+      properties:
+        overCommitRatio:
+          type: string
+          enum: ["1:1", "1:2", "1:4", "1:6"]
+          default: "1:4"
+          description: CPU over-commit ratio (e.g., "1:4")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        workerNodeCPU:
+          type: integer
+          description: CPU cores per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=2,max=200"
+        workerNodeMemory:
+          type: integer
+          description: Memory (GB) per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=4,max=512"
+        inventoryTotalCPU:
+          type: integer
+          description: Total CPU from inventory
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=0"
+        inventoryTotalMemory:
+          type: integer
+          description: Total memory (GB) from inventory
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=0"
+      required:
+        - overCommitRatio
+        - workerNodeCPU
+        - workerNodeMemory
+        - inventoryTotalCPU
+        - inventoryTotalMemory
+
+    SizingResponse:
+      type: object
+      description: Sizing calculation results
+      properties:
+        clusterSizing:
+          $ref: '#/components/schemas/ClusterSizing'
+        resourceConsumption:
+          $ref: '#/components/schemas/SizingResourceConsumption'
+      required:
+        - clusterSizing
+        - resourceConsumption
+
+    ClusterSizing:
+      type: object
+      description: Overall cluster sizing summary
+      properties:
+        nodeCount:
+          type: integer
+          description: Total number of nodes (worker + control plane)
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all nodes
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all nodes
+      required:
+        - nodeCount
+        - totalCPU
+        - totalMemory
+
+    SizingResourceConsumption:
+      type: object
+      description: Resource consumption across the cluster
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU requested
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) requested
+        limits:
+          $ref: '#/components/schemas/SizingResourceLimits'
+        overCommitRatio:
+          $ref: '#/components/schemas/SizingOverCommitRatio'
+      required:
+        - cpu
+        - memory
+        - limits
+        - overCommitRatio
+
+    SizingResourceLimits:
+      type: object
+      description: Resource limits
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU limits
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) limits
+      required:
+        - cpu
+        - memory
+
+    SizingOverCommitRatio:
+      type: object
+      description: Over-commit ratios
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: CPU over-commit ratio
+        memory:
+          type: number
+          format: double
+          description: Memory over-commit ratio
+      required:
+        - cpu
+        - memory
 
     Job:
       type: object

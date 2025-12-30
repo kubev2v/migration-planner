@@ -44,6 +44,14 @@ const (
 	Unsupported NetworkType = "unsupported"
 )
 
+// Defines values for SizingRequestOverCommitRatio.
+const (
+	N11 SizingRequestOverCommitRatio = "1:1"
+	N12 SizingRequestOverCommitRatio = "1:2"
+	N14 SizingRequestOverCommitRatio = "1:4"
+	N16 SizingRequestOverCommitRatio = "1:6"
+)
+
 // Agent defines model for Agent.
 type Agent struct {
 	CreatedAt     time.Time          `json:"createdAt"`
@@ -112,6 +120,18 @@ type AssessmentRvtoolsForm struct {
 type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
+}
+
+// ClusterSizing Overall cluster sizing summary
+type ClusterSizing struct {
+	// NodeCount Total number of nodes (worker + control plane)
+	NodeCount int `json:"nodeCount"`
+
+	// TotalCPU Total CPU cores across all nodes
+	TotalCPU int `json:"totalCPU"`
+
+	// TotalMemory Total memory (GB) across all nodes
+	TotalMemory int `json:"totalMemory"`
 }
 
 // Datastore defines model for Datastore.
@@ -277,6 +297,69 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// SizingOverCommitRatio Over-commit ratios
+type SizingOverCommitRatio struct {
+	// Cpu CPU over-commit ratio
+	Cpu float64 `json:"cpu"`
+
+	// Memory Memory over-commit ratio
+	Memory float64 `json:"memory"`
+}
+
+// SizingRequest Request payload for calculating cluster sizing
+type SizingRequest struct {
+	// InventoryTotalCPU Total CPU from inventory
+	InventoryTotalCPU int `json:"inventoryTotalCPU" validate:"required,min=0"`
+
+	// InventoryTotalMemory Total memory (GB) from inventory
+	InventoryTotalMemory int `json:"inventoryTotalMemory" validate:"required,min=0"`
+
+	// OverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	OverCommitRatio SizingRequestOverCommitRatio `json:"overCommitRatio" validate:"required"`
+
+	// WorkerNodeCPU CPU cores per worker node
+	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
+
+	// WorkerNodeMemory Memory (GB) per worker node
+	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
+}
+
+// SizingRequestOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+type SizingRequestOverCommitRatio string
+
+// SizingResourceConsumption Resource consumption across the cluster
+type SizingResourceConsumption struct {
+	// Cpu Total CPU requested
+	Cpu float64 `json:"cpu"`
+
+	// Limits Resource limits
+	Limits SizingResourceLimits `json:"limits"`
+
+	// Memory Total memory (GB) requested
+	Memory float64 `json:"memory"`
+
+	// OverCommitRatio Over-commit ratios
+	OverCommitRatio SizingOverCommitRatio `json:"overCommitRatio"`
+}
+
+// SizingResourceLimits Resource limits
+type SizingResourceLimits struct {
+	// Cpu Total CPU limits
+	Cpu float64 `json:"cpu"`
+
+	// Memory Total memory (GB) limits
+	Memory float64 `json:"memory"`
+}
+
+// SizingResponse Sizing calculation results
+type SizingResponse struct {
+	// ClusterSizing Overall cluster sizing summary
+	ClusterSizing ClusterSizing `json:"clusterSizing"`
+
+	// ResourceConsumption Resource consumption across the cluster
+	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
+}
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
@@ -444,6 +527,9 @@ type CreateRVToolsAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate
+
+// CalculateSizingJSONRequestBody defines body for CalculateSizing for application/json ContentType.
+type CalculateSizingJSONRequestBody = SizingRequest
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
