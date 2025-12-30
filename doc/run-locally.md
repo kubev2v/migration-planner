@@ -94,31 +94,37 @@ You can use the CLI from terminal to complete several actions.
 For example:
 
 #### a. Create source:
+
 ```bash
 bin/planner create <source-name>
 ```
 
 #### b. List all sources:
+
 ```bash
 bin/planner get sources
 ```
 
 #### c. Get source details:
+
 ```bash
 bin/planner get sources/<source-id>
 ```
 
 #### d. Delete a source:
+
 ```bash
 bin/planner delete sources/<source-id>
 ```
 
 #### e. Help for more planner CLI options
+
 ```bash
 bin/planner --help
 ```
 
 #### f. Get info
+
 ```bash
 bin/planner info
 ```
@@ -129,11 +135,13 @@ You can use curl to perform API calls directly.
 For example:
 
 #### a. List all sources:
+
 ```bash
 curl http://localhost:3443/api/v1/sources
 ```
 
 #### b. Create a new source:
+
 ```bash
 curl -i -X POST 'http://localhost:3443/api/v1/sources' \
   -H "Content-type: application/json" \
@@ -143,31 +151,37 @@ curl -i -X POST 'http://localhost:3443/api/v1/sources' \
 ```
 
 #### c. Get a specific source:
+
 ```bash
 curl http://localhost:3443/api/v1/sources/{source-id}
 ```
 
 #### d. Get source download URL:
+
 ```bash
 curl http://localhost:3443/api/v1/sources/{source-id}/image-url
 ```
 
 #### e. Delete a source:
+
 ```bash
 curl -X DELETE http://localhost:3443/api/v1/sources/{source-id}
 ```
 
 #### f. Get info:
+
 ```bash
 curl http://localhost:3443/api/v1/info
 ```
 
 #### g. List all assessments:
+
 ```bash
 curl http://localhost:3443/api/v1/assessments
 ```
 
 #### h. Create new assessment of type agent:
+
 ```bash
 curl -X POST "http://localhost:3443/api/v1/assessments" \
   -H "Content-Type: application/json" \
@@ -177,6 +191,83 @@ curl -X POST "http://localhost:3443/api/v1/assessments" \
     "sourceId": "{source-id}"
   }'
 curl http://localhost:3443/api/v1/assessments
+```
+
+## Run the Sizer Service locally
+
+The sizer service is used for cluster sizing calculations. It runs as a separate containerized service.
+
+### 1. Start the Sizer Service
+
+Run the sizer service container:
+
+```bash
+make run-sizer
+```
+
+This will:
+
+- Pull the latest sizer image from Quay
+- Start the container on port 9200
+- Display helpful URLs and commands
+
+### 2. Verify Sizer is Running
+
+Test the health endpoint:
+
+```bash
+curl http://localhost:9200/health
+```
+
+Expected response:
+
+```json
+{
+  "status": "ok",
+  "service": "sizer-library",
+  "version": "1.0.0"
+}
+```
+
+### 3. Test the Sizing API
+
+Example request to the sizing API:
+
+```bash
+curl -X POST http://localhost:9200/api/v1/size/custom \
+  -H "Content-Type: application/json" \
+  -d '{
+    "platform": "BareMetal",
+    "detailed": true,
+    "machineSets": [
+      {
+        "name": "worker",
+        "cpu": 64,
+        "memory": 256,
+        "instanceName": "worker-large",
+        "numberOfDisks": 24,
+        "onlyFor": [],
+        "label": "Worker"
+      }
+    ],
+    "workloads": [
+      {
+        "name": "test-workload",
+        "count": 1,
+        "usesMachines": [],
+        "services": [
+          {
+            "name": "test-service",
+            "requiredCPU": 10,
+            "requiredMemory": 20,
+            "zones": 1,
+            "runsWith": [],
+            "avoid": []
+          }
+        ]
+      }
+    ]
+  }' | jq .
 ```
 
 ## Run the Migration Planner Agent locally

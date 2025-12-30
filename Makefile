@@ -27,6 +27,8 @@ PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
+SIZER_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+SIZER_PORT ?= 9200
 
 # OPA Configuration for eval mode
 MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
@@ -92,6 +94,18 @@ run: image
 run-agent:
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	./bin/planner-agent
+
+run-sizer:
+	@echo "🚀 Starting sizer service container on port $(SIZER_PORT)..."
+	@$(PODMAN) rm -f migration-planner-sizer-local 2>/dev/null || true
+	@$(PODMAN) run -d --name migration-planner-sizer-local \
+		-p $(SIZER_PORT):$(SIZER_PORT) \
+		-e PORT=$(SIZER_PORT) \
+		$(SIZER_IMAGE):latest
+	@echo "✅ Sizer service running at http://localhost:$(SIZER_PORT)"
+	@echo "   Health: http://localhost:$(SIZER_PORT)/health"
+	@echo "   API:    http://localhost:$(SIZER_PORT)/api/v1/size/custom"
+
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -199,6 +213,8 @@ delete-from-openshift: oc
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
+       -p SIZER_IMAGE=$(SIZER_IMAGE) \
+       -p SIZER_PORT=$(SIZER_PORT) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
@@ -385,6 +401,8 @@ setup-opa-policies:
 clean-opa-policies:
 	@echo "Cleaning OPA policies..."
 	@rm -rf $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
+
+.PHONY: run-sizer
 
 # include the deployment targets
 include deploy/deploy.mk
