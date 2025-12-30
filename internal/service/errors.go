@@ -1,6 +1,7 @@
 package service
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -106,4 +107,22 @@ func (e *ErrJobForbidden) Error() string {
 
 func NewErrJobForbidden(jobID int64) *ErrJobForbidden {
 	return &ErrJobForbidden{JobID: jobID}
+}
+
+// Sizer-related errors
+
+type ErrInvalidClusterInventory struct {
+	error
+}
+
+func NewErrInvalidClusterInventory(clusterID string, reason string) *ErrInvalidClusterInventory {
+	return &ErrInvalidClusterInventory{fmt.Errorf("cluster %s has invalid inventory: %s", clusterID, reason)}
+}
+
+type ErrInvalidRequest struct {
+	error
+}
+
+func NewErrInvalidRequest(message string) *ErrInvalidRequest {
+	return &ErrInvalidRequest{errors.New(message)}
 }

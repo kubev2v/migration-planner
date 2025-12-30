@@ -16,6 +16,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/image"
@@ -111,10 +112,19 @@ func (s *Server) Run(ctx context.Context) error {
 		WithResponseWriter,
 	)
 
+	// Initialize sizer client
+	sizerTimeout, err := time.ParseDuration(s.cfg.Service.Sizer.Timeout)
+	if err != nil {
+		zap.S().Named("api_server").Warnf("Invalid sizer timeout, using default 60s: %v", err)
+		sizerTimeout = 60 * time.Second
+	}
+	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		service.NewAssessmentService(s.store, s.opaValidator),
 		service.NewJobService(s.store, s.jobsClient.RiverClient),
+		service.NewSizerService(sizerClient, s.store),
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}

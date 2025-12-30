@@ -116,6 +116,20 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 
 // Assessment-related mappers
 
+func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest) mappers.ClusterRequirementsRequestForm {
+	form := mappers.ClusterRequirementsRequestForm{
+		ClusterID:               apiReq.ClusterId,
+		OverCommitRatio:         string(apiReq.OverCommitRatio),
+		WorkerNodeCPU:           apiReq.WorkerNodeCPU,
+		WorkerNodeMemory:        apiReq.WorkerNodeMemory,
+		ControlPlaneSchedulable: false,
+	}
+	if apiReq.ControlPlaneSchedulable != nil {
+		form.ControlPlaneSchedulable = *apiReq.ControlPlaneSchedulable
+	}
+	return form
+}
+
 func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User) mappers.AssessmentCreateForm {
 	form := mappers.AssessmentCreateForm{
 		ID:       uuid.New(),

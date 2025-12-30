@@ -224,6 +224,51 @@ func (f *JobForm) ToAPIJob() *v1alpha1.Job {
 	return job
 }
 
+type ClusterRequirementsRequestForm struct {
+	ClusterID               string
+	OverCommitRatio         string
+	WorkerNodeCPU           int
+	WorkerNodeMemory        int
+	ControlPlaneSchedulable bool
+}
+
+type ClusterRequirementsResponseForm struct {
+	ClusterSizing       ClusterSizingForm
+	ResourceConsumption ResourceConsumptionForm
+	InventoryTotals     InventoryTotalsForm
+}
+
+type ClusterSizingForm struct {
+	TotalNodes        int
+	ControlPlaneNodes int
+	WorkerNodes       int
+	TotalCPU          int
+	TotalMemory       int
+}
+
+type ResourceConsumptionForm struct {
+	CPU             float64
+	Memory          float64
+	Limits          ResourceLimitsForm
+	OverCommitRatio OverCommitRatioForm
+}
+
+type ResourceLimitsForm struct {
+	CPU    float64
+	Memory float64
+}
+
+type OverCommitRatioForm struct {
+	CPU    float64
+	Memory float64
+}
+
+type InventoryTotalsForm struct {
+	TotalVMs    int
+	TotalCPU    int
+	TotalMemory int
+}
+
 func mapRiverStateToStatus(state rivertype.JobState, metadata model.RVToolsJobMetadata) v1alpha1.JobStatus {
 	switch state {
 	case rivertype.JobStateRunning:

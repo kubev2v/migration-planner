@@ -7,6 +7,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
@@ -196,4 +197,41 @@ func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, er
 		assessmentList[i] = a
 	}
 	return assessmentList, nil
+}
+
+func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsResponseForm) v1alpha1.ClusterRequirementsResponse {
+	resourceConsumption := v1alpha1.SizingResourceConsumption{
+		Cpu:    form.ResourceConsumption.CPU,
+		Memory: form.ResourceConsumption.Memory,
+	}
+
+	if form.ResourceConsumption.Limits.CPU != 0.0 || form.ResourceConsumption.Limits.Memory != 0.0 {
+		resourceConsumption.Limits = &v1alpha1.SizingResourceLimits{
+			Cpu:    form.ResourceConsumption.Limits.CPU,
+			Memory: form.ResourceConsumption.Limits.Memory,
+		}
+	}
+
+	if form.ResourceConsumption.OverCommitRatio.CPU != 0.0 || form.ResourceConsumption.OverCommitRatio.Memory != 0.0 {
+		resourceConsumption.OverCommitRatio = &v1alpha1.SizingOverCommitRatio{
+			Cpu:    form.ResourceConsumption.OverCommitRatio.CPU,
+			Memory: form.ResourceConsumption.OverCommitRatio.Memory,
+		}
+	}
+
+	return v1alpha1.ClusterRequirementsResponse{
+		ClusterSizing: v1alpha1.ClusterSizing{
+			TotalNodes:        form.ClusterSizing.TotalNodes,
+			ControlPlaneNodes: form.ClusterSizing.ControlPlaneNodes,
+			WorkerNodes:       form.ClusterSizing.WorkerNodes,
+			TotalCPU:          form.ClusterSizing.TotalCPU,
+			TotalMemory:       form.ClusterSizing.TotalMemory,
+		},
+		ResourceConsumption: resourceConsumption,
+		InventoryTotals: v1alpha1.InventoryTotals{
+			TotalVMs:    form.InventoryTotals.TotalVMs,
+			TotalCPU:    form.InventoryTotals.TotalCPU,
+			TotalMemory: form.InventoryTotals.TotalMemory,
+		},
+	}
 }

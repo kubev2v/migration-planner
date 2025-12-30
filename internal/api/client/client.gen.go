@@ -119,6 +119,11 @@ type ClientInterface interface {
 
 	UpdateAssessment(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CalculateAssessmentClusterRequirementsWithBody request with any body
+	CalculateAssessmentClusterRequirementsWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CalculateAssessmentClusterRequirements(ctx context.Context, id openapi_types.UUID, body CalculateAssessmentClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetInfo request
 	GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -269,6 +274,30 @@ func (c *Client) UpdateAssessmentWithBody(ctx context.Context, id openapi_types.
 
 func (c *Client) UpdateAssessment(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateAssessmentRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateAssessmentClusterRequirementsWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateAssessmentClusterRequirementsRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateAssessmentClusterRequirements(ctx context.Context, id openapi_types.UUID, body CalculateAssessmentClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateAssessmentClusterRequirementsRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -717,6 +746,53 @@ func NewUpdateAssessmentRequestWithBody(server string, id openapi_types.UUID, co
 	}
 
 	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCalculateAssessmentClusterRequirementsRequest calls the generic CalculateAssessmentClusterRequirements builder with application/json body
+func NewCalculateAssessmentClusterRequirementsRequest(server string, id openapi_types.UUID, body CalculateAssessmentClusterRequirementsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCalculateAssessmentClusterRequirementsRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewCalculateAssessmentClusterRequirementsRequestWithBody generates requests for CalculateAssessmentClusterRequirements with any type of body
+func NewCalculateAssessmentClusterRequirementsRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/%s/cluster-requirements", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
 	if err != nil {
 		return nil, err
 	}
@@ -1175,6 +1251,11 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error)
 
+	// CalculateAssessmentClusterRequirementsWithBodyWithResponse request with any body
+	CalculateAssessmentClusterRequirementsWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateAssessmentClusterRequirementsResponse, error)
+
+	CalculateAssessmentClusterRequirementsWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateAssessmentClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateAssessmentClusterRequirementsResponse, error)
+
 	// GetInfoWithResponse request
 	GetInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInfoResponse, error)
 
@@ -1419,6 +1500,34 @@ func (r UpdateAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateAssessmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CalculateAssessmentClusterRequirementsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *ClusterRequirementsResponse
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+	JSON503      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CalculateAssessmentClusterRequirementsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CalculateAssessmentClusterRequirementsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -1782,6 +1891,23 @@ func (c *ClientWithResponses) UpdateAssessmentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseUpdateAssessmentResponse(rsp)
+}
+
+// CalculateAssessmentClusterRequirementsWithBodyWithResponse request with arbitrary body returning *CalculateAssessmentClusterRequirementsResponse
+func (c *ClientWithResponses) CalculateAssessmentClusterRequirementsWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateAssessmentClusterRequirementsResponse, error) {
+	rsp, err := c.CalculateAssessmentClusterRequirementsWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateAssessmentClusterRequirementsResponse(rsp)
+}
+
+func (c *ClientWithResponses) CalculateAssessmentClusterRequirementsWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateAssessmentClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateAssessmentClusterRequirementsResponse, error) {
+	rsp, err := c.CalculateAssessmentClusterRequirements(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateAssessmentClusterRequirementsResponse(rsp)
 }
 
 // GetInfoWithResponse request returning *GetInfoResponse
@@ -2347,6 +2473,74 @@ func ParseUpdateAssessmentResponse(rsp *http.Response) (*UpdateAssessmentRespons
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCalculateAssessmentClusterRequirementsResponse parses an HTTP response from a CalculateAssessmentClusterRequirementsWithResponse call
+func ParseCalculateAssessmentClusterRequirementsResponse(rsp *http.Response) (*CalculateAssessmentClusterRequirementsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CalculateAssessmentClusterRequirementsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest ClusterRequirementsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

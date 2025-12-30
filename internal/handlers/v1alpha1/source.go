@@ -18,13 +18,20 @@ type ServiceHandler struct {
 	sourceSrv     *service.SourceService
 	assessmentSrv *service.AssessmentService
 	jobSrv        *service.JobService
+	sizerSrv      *service.SizerService
 }
 
-func NewServiceHandler(sourceService *service.SourceService, a *service.AssessmentService, j *service.JobService) *ServiceHandler {
+func NewServiceHandler(
+	sourceService *service.SourceService,
+	a *service.AssessmentService,
+	j *service.JobService,
+	sizer *service.SizerService,
+) *ServiceHandler {
 	return &ServiceHandler{
 		sourceSrv:     sourceService,
 		assessmentSrv: a,
 		jobSrv:        j,
+		sizerSrv:      sizer,
 	}
 }
 

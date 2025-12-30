@@ -20,19 +20,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SourceList'
+                $ref: "#/components/schemas/SourceList"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     post:
       tags:
         - source
@@ -42,7 +42,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourceCreate'
+              $ref: "#/components/schemas/SourceCreate"
         required: true
       responses:
         "201":
@@ -50,25 +50,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Source'
+                $ref: "#/components/schemas/Source"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     delete:
       tags:
         - source
@@ -80,19 +80,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Status'
+                $ref: "#/components/schemas/Status"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/sources/{id}:
     get:
       tags:
@@ -113,37 +113,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Source'
+                $ref: "#/components/schemas/Source"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     put:
       tags:
         - source
@@ -161,7 +161,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/SourceUpdate'
+              $ref: "#/components/schemas/SourceUpdate"
         required: true
       responses:
         "200":
@@ -169,37 +169,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Source'
+                $ref: "#/components/schemas/Source"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     delete:
       tags:
         - source
@@ -219,37 +219,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Source'
+                $ref: "#/components/schemas/Source"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/sources/{id}/inventory:
     put:
       tags:
@@ -269,44 +269,44 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateInventory'
+              $ref: "#/components/schemas/UpdateInventory"
       responses:
         "200":
           description: Updated source inventory
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Source'
+                $ref: "#/components/schemas/Source"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/sources/{id}/image-url:
     get:
       tags:
@@ -327,25 +327,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/presigned-url'
+                $ref: "#/components/schemas/presigned-url"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/sources/{id}/image:
     head:
       tags:
@@ -385,19 +385,19 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AssessmentList'
+                $ref: "#/components/schemas/AssessmentList"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     post:
       tags:
         - assessment
@@ -407,7 +407,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AssessmentForm'
+              $ref: "#/components/schemas/AssessmentForm"
         required: true
       responses:
         "201":
@@ -415,25 +415,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Assessment'
+                $ref: "#/components/schemas/Assessment"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/{id}:
     get:
       tags:
@@ -454,37 +454,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Assessment'
+                $ref: "#/components/schemas/Assessment"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     put:
       tags:
         - assessment
@@ -502,7 +502,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AssessmentUpdate'
+              $ref: "#/components/schemas/AssessmentUpdate"
         required: true
       responses:
         "200":
@@ -510,37 +510,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Assessment'
+                $ref: "#/components/schemas/Assessment"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal Server Error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     delete:
       tags:
         - assessment
@@ -560,37 +560,100 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Assessment'
+                $ref: "#/components/schemas/Assessment"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
+  /api/v1/assessments/{id}/cluster-requirements:
+    post:
+      tags:
+        - assessment
+      description: Calculate cluster requirements for an assessment
+      operationId: calculateAssessmentClusterRequirements
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClusterRequirementsRequest"
+        required: true
+      responses:
+        "200":
+          description: Cluster requirements calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterRequirementsResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/rvtools:
     post:
       tags:
@@ -601,7 +664,7 @@ paths:
         content:
           multipart/form-data:
             schema:
-              $ref: '#/components/schemas/AssessmentRvtoolsForm'
+              $ref: "#/components/schemas/AssessmentRvtoolsForm"
         required: true
       responses:
         "202":
@@ -609,25 +672,25 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Job'
+                $ref: "#/components/schemas/Job"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/jobs/{id}:
     get:
       tags:
@@ -648,37 +711,37 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Job'
+                $ref: "#/components/schemas/Job"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
     delete:
       tags:
         - job
@@ -698,43 +761,43 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Job'
+                $ref: "#/components/schemas/Job"
         "400":
           description: Bad Request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "403":
           description: Forbidden
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "404":
           description: NotFound
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "409":
           description: Conflict
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /api/v1/info:
     get:
       tags:
@@ -747,13 +810,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Info'
+                $ref: "#/components/schemas/Info"
         "500":
           description: Internal error
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                $ref: "#/components/schemas/Error"
   /health:
     get:
       tags:
@@ -766,7 +829,6 @@ paths:
 
 components:
   schemas:
-
     # Reusable validation components
     ValidatedSourceName:
       type: string
@@ -814,7 +876,7 @@ components:
         name:
           type: string
         inventory:
-          $ref: '#/components/schemas/Inventory'
+          $ref: "#/components/schemas/Inventory"
         createdAt:
           type: string
           format: date-time
@@ -824,20 +886,20 @@ components:
         onPremises:
           type: boolean
         agent:
-          $ref: '#/components/schemas/Agent'
+          $ref: "#/components/schemas/Agent"
         labels:
           type: array
           items:
-            $ref: '#/components/schemas/Label'
+            $ref: "#/components/schemas/Label"
         infra:
           type: object
           properties:
             proxy:
-              $ref: '#/components/schemas/AgentProxy'
+              $ref: "#/components/schemas/AgentProxy"
             sshPublicKey:
-              $ref: '#/components/schemas/ValidatedSSHPublicKey'
+              $ref: "#/components/schemas/ValidatedSSHPublicKey"
             vmNetwork:
-              $ref: '#/components/schemas/VmNetwork'
+              $ref: "#/components/schemas/VmNetwork"
       required:
         - id
         - name
@@ -871,23 +933,23 @@ components:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/ValidatedSourceName'
+          $ref: "#/components/schemas/ValidatedSourceName"
         sshPublicKey:
-          $ref: '#/components/schemas/ValidatedSSHPublicKey'
+          $ref: "#/components/schemas/ValidatedSSHPublicKey"
         proxy:
-          $ref: '#/components/schemas/AgentProxy'
+          $ref: "#/components/schemas/AgentProxy"
           x-oapi-codegen-extra-tags:
             validate: "omitnil"
         certificateChain:
-          $ref: '#/components/schemas/ValidatedCertificateChain'
+          $ref: "#/components/schemas/ValidatedCertificateChain"
         network:
-          $ref: '#/components/schemas/VmNetwork'
+          $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"
         labels:
           type: array
           items:
-            $ref: '#/components/schemas/Label'
+            $ref: "#/components/schemas/Label"
             x-oapi-codegen-extra-tags:
               validate: "required,label"
           x-oapi-codegen-extra-tags:
@@ -927,13 +989,13 @@ components:
       type: object
       properties:
         ipv4:
-          $ref: '#/components/schemas/Ipv4Config'
+          $ref: "#/components/schemas/Ipv4Config"
 
     SourceList:
       type: array
       items:
-        $ref: '#/components/schemas/Source'
-    
+        $ref: "#/components/schemas/Source"
+
     Error:
       properties:
         message:
@@ -971,10 +1033,10 @@ components:
         clusters:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/InventoryData'
+            $ref: "#/components/schemas/InventoryData"
           description: Map of cluster names to their inventory data
         vcenter:
-          $ref: '#/components/schemas/InventoryData'
+          $ref: "#/components/schemas/InventoryData"
           description: vCenter-level inventory data
 
     InventoryData:
@@ -986,11 +1048,11 @@ components:
         vcenter:
           deprecated: true
           nullable: true
-          $ref: '#/components/schemas/VCenter'
+          $ref: "#/components/schemas/VCenter"
         vms:
-          $ref: '#/components/schemas/VMs'
+          $ref: "#/components/schemas/VMs"
         infra:
-          $ref: '#/components/schemas/Infra'
+          $ref: "#/components/schemas/Infra"
 
     VCenter:
       type: object
@@ -1019,15 +1081,15 @@ components:
         totalMigratableWithWarnings:
           type: integer
         cpuCores:
-          $ref: '#/components/schemas/VMResourceBreakdown'
+          $ref: "#/components/schemas/VMResourceBreakdown"
         diskSizeTier:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/diskSizeTierSummary'
+            $ref: "#/components/schemas/diskSizeTierSummary"
         diskTypes:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/diskTypeSummary'
+            $ref: "#/components/schemas/diskTypeSummary"
         distributionByCpuTier:
           type: object
           description: Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
@@ -1044,13 +1106,13 @@ components:
           additionalProperties:
             type: integer
         ramGB:
-          $ref: '#/components/schemas/VMResourceBreakdown'
+          $ref: "#/components/schemas/VMResourceBreakdown"
         diskGB:
-          $ref: '#/components/schemas/VMResourceBreakdown'
+          $ref: "#/components/schemas/VMResourceBreakdown"
         diskCount:
-          $ref: '#/components/schemas/VMResourceBreakdown'
+          $ref: "#/components/schemas/VMResourceBreakdown"
         nicCount:
-          $ref: '#/components/schemas/VMResourceBreakdown'
+          $ref: "#/components/schemas/VMResourceBreakdown"
           deprecated: true
           nullable: false
           x-oapi-codegen-extra-tags:
@@ -1067,15 +1129,15 @@ components:
         osInfo:
           type: object
           additionalProperties:
-            $ref: '#/components/schemas/osInfo'
+            $ref: "#/components/schemas/osInfo"
         notMigratableReasons:
           type: array
           items:
-            $ref: '#/components/schemas/MigrationIssue'
+            $ref: "#/components/schemas/MigrationIssue"
         migrationWarnings:
           type: array
           items:
-            $ref: '#/components/schemas/MigrationIssue'
+            $ref: "#/components/schemas/MigrationIssue"
 
     diskSizeTierSummary:
       type: object
@@ -1149,7 +1211,7 @@ components:
         hosts:
           type: array
           items:
-            $ref: '#/components/schemas/Host'
+            $ref: "#/components/schemas/Host"
         hostsPerCluster:
           type: array
           items:
@@ -1167,11 +1229,11 @@ components:
         networks:
           type: array
           items:
-            $ref: '#/components/schemas/Network'
+            $ref: "#/components/schemas/Network"
         datastores:
           type: array
           items:
-            $ref: '#/components/schemas/Datastore'
+            $ref: "#/components/schemas/Datastore"
 
     Host:
       type: object
@@ -1208,7 +1270,7 @@ components:
       properties:
         type:
           type: string
-          enum: [ standard, distributed, dvswitch, unsupported ]
+          enum: [standard, distributed, dvswitch, unsupported]
         name:
           type: string
         vlanId:
@@ -1268,7 +1330,7 @@ components:
         totalForNotMigratable:
           type: integer
         histogram: # deprecated
-          $ref: '#/components/schemas/Histogram'
+          $ref: "#/components/schemas/Histogram"
 
     Histogram:
       type: object
@@ -1290,7 +1352,7 @@ components:
     MigrationIssues:
       type: array
       items:
-        $ref: '#/components/schemas/MigrationIssue'
+        $ref: "#/components/schemas/MigrationIssue"
 
     MigrationIssue:
       type: object
@@ -1316,7 +1378,15 @@ components:
           format: uuid
         status:
           type: string
-          enum: [ not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone ]
+          enum:
+            [
+              not-connected,
+              waiting-for-credentials,
+              error,
+              gathering-initial-inventory,
+              up-to-date,
+              source-gone,
+            ]
         statusInfo:
           type: string
         credentialUrl:
@@ -1342,23 +1412,23 @@ components:
       type: object
       properties:
         name:
-          $ref: '#/components/schemas/ValidatedOptionalSourceName'
+          $ref: "#/components/schemas/ValidatedOptionalSourceName"
         labels:
           type: array
           items:
-            $ref: '#/components/schemas/Label'
+            $ref: "#/components/schemas/Label"
             x-oapi-codegen-extra-tags:
               validate: "required,label"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive,required"
         sshPublicKey:
-          $ref: '#/components/schemas/ValidatedSSHPublicKey'
+          $ref: "#/components/schemas/ValidatedSSHPublicKey"
         certificateChain:
-          $ref: '#/components/schemas/ValidatedCertificateChain'
+          $ref: "#/components/schemas/ValidatedCertificateChain"
         proxy:
-          $ref: '#/components/schemas/AgentProxy'
+          $ref: "#/components/schemas/AgentProxy"
         network:
-          $ref: '#/components/schemas/VmNetwork'
+          $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"
 
@@ -1369,7 +1439,7 @@ components:
           type: string
           format: uuid
         inventory:
-          $ref: '#/components/schemas/Inventory'
+          $ref: "#/components/schemas/Inventory"
       required:
         - inventory
         - agentId
@@ -1393,7 +1463,7 @@ components:
       type: object
       properties:
         inventory:
-          $ref: '#/components/schemas/Inventory'
+          $ref: "#/components/schemas/Inventory"
         createdAt:
           type: string
           format: date-time
@@ -1427,7 +1497,7 @@ components:
         snapshots:
           type: array
           items:
-            $ref: '#/components/schemas/Snapshot'
+            $ref: "#/components/schemas/Snapshot"
       required:
         - id
         - name
@@ -1454,7 +1524,7 @@ components:
           type: string
           format: uuid
         inventory:
-          $ref: '#/components/schemas/Inventory'
+          $ref: "#/components/schemas/Inventory"
       required:
         - name
         - sourceType
@@ -1490,7 +1560,155 @@ components:
     AssessmentList:
       type: array
       items:
-        $ref: '#/components/schemas/Assessment'
+        $ref: "#/components/schemas/Assessment"
+
+    ClusterRequirementsRequest:
+      type: object
+      description: Request payload for calculating cluster requirements
+      properties:
+        clusterId:
+          type: string
+          description: ID of the cluster to calculate requirements for
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        overCommitRatio:
+          type: string
+          enum: ["1:1", "1:2", "1:4", "1:6"]
+          x-enum-varnames: ["OneToOne", "OneToTwo", "OneToFour", "OneToSix"]
+          default: "1:4"
+          description: CPU over-commit ratio (e.g., "1:4")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        workerNodeCPU:
+          type: integer
+          description: CPU cores per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=2,max=200"
+        workerNodeMemory:
+          type: integer
+          description: Memory (GB) per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=4,max=512"
+        controlPlaneSchedulable:
+          type: boolean
+          default: false
+          description: Allow workload scheduling on control plane nodes
+      required:
+        - clusterId
+        - overCommitRatio
+        - workerNodeCPU
+        - workerNodeMemory
+
+    ClusterRequirementsResponse:
+      type: object
+      description: Cluster requirements calculation results
+      properties:
+        clusterSizing:
+          $ref: "#/components/schemas/ClusterSizing"
+        resourceConsumption:
+          $ref: "#/components/schemas/SizingResourceConsumption"
+        inventoryTotals:
+          $ref: "#/components/schemas/InventoryTotals"
+      required:
+        - clusterSizing
+        - resourceConsumption
+        - inventoryTotals
+
+    InventoryTotals:
+      type: object
+      description: Inventory totals for the cluster
+      properties:
+        totalVMs:
+          type: integer
+          description: Total number of VMs in the cluster
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all VMs in the cluster
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all VMs in the cluster
+      required:
+        - totalVMs
+        - totalCPU
+        - totalMemory
+
+    ClusterSizing:
+      type: object
+      description: Overall cluster sizing summary
+      properties:
+        totalNodes:
+          type: integer
+          description: Total number of nodes (worker + control plane)
+        workerNodes:
+          type: integer
+          description: Number of worker nodes
+        controlPlaneNodes:
+          type: integer
+          description: Number of control plane nodes
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all nodes
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all nodes
+      required:
+        - totalNodes
+        - workerNodes
+        - controlPlaneNodes
+        - totalCPU
+        - totalMemory
+
+    SizingResourceConsumption:
+      type: object
+      description: Resource consumption across the cluster
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU requested
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) requested
+        limits:
+          $ref: "#/components/schemas/SizingResourceLimits"
+        overCommitRatio:
+          $ref: "#/components/schemas/SizingOverCommitRatio"
+      required:
+        - cpu
+        - memory
+
+    SizingResourceLimits:
+      type: object
+      description: Resource limits
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: Total CPU limits
+        memory:
+          type: number
+          format: double
+          description: Total memory (GB) limits
+      required:
+        - cpu
+        - memory
+
+    SizingOverCommitRatio:
+      type: object
+      description: Over-commit ratios
+      properties:
+        cpu:
+          type: number
+          format: double
+          description: CPU over-commit ratio
+        memory:
+          type: number
+          format: double
+          description: Memory over-commit ratio
+      required:
+        - cpu
+        - memory
 
     Job:
       type: object
@@ -1501,7 +1719,7 @@ components:
           format: int64
           description: Job ID
         status:
-          $ref: '#/components/schemas/JobStatus'
+          $ref: "#/components/schemas/JobStatus"
         error:
           type: string
           description: Error message if job failed
