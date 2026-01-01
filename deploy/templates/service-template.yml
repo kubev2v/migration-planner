@@ -100,6 +100,34 @@ parameters:
     value: docker.io/envoyproxy/envoy:v1.33.2
   - name: RHCOS_PASSWORD
     description: "Password to be set for the default RHCOS user"
+  # Sizer Service Config values
+  - name: SIZER_IMAGE
+    description: Sizer service container image
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+  - name: SIZER_REPLICAS
+    description: Number of replicas of the sizer service to run
+    value: "2"
+  - name: SIZER_MEMORY_REQUEST
+    description: Memory request for the sizer pods
+    value: "256Mi"
+  - name: SIZER_MEMORY_LIMIT
+    description: Memory limit for the sizer pods
+    value: "512Mi"
+  - name: SIZER_CPU_REQUEST
+    description: CPU request for the sizer pods
+    value: "100m"
+  - name: SIZER_CPU_LIMIT
+    description: CPU limit for the sizer pods
+    value: "500m"
+  - name: SIZER_PORT
+    description: Port for the sizer service
+    value: "9200"
+  - name: SIZER_LOG_LEVEL
+    description: Log level for the sizer service
+    value: "info"
+  - name: SIZER_IMAGE_PULL_POLICY
+    description: Image pull policy for the sizer service
+    value: Always
 
 objects:
   - kind: ServiceAccount
@@ -168,6 +196,22 @@ objects:
           port: 9000
           protocol: TCP
           targetPort: 9000
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner-sizer
+      annotations:
+        description: Sizer service for cluster sizing calculations
+      name: migration-planner-sizer
+    spec:
+      selector:
+        app: migration-planner-sizer
+      ports:
+        - name: http
+          port: ${{SIZER_PORT}}
+          protocol: TCP
+          targetPort: ${{SIZER_PORT}}
   - apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -183,11 +227,11 @@ objects:
           address:
             pipe:
               path: /sockets/admin.socket
-  
+
         static_resources:
-    
+
           clusters:
-  
+
           # This backend is used to send metrics and probes requests to the
           # administration endpoint.
           - name: admin
@@ -202,7 +246,7 @@ objects:
                     address:
                       pipe:
                         path: /sockets/admin.socket
-    
+
           # This cluster is used to send requests to the backend-api.
           - name: backend-api
             connect_timeout: 1s
@@ -247,9 +291,9 @@ objects:
                       socket_address:
                         address: 127.0.0.1
                         port_value: 21443
-    
+
           listeners:
-    
+
           # This listener is used to accept /metrics and /ready requests.
           # Everything else will be rejected.
           - name: admin
@@ -285,7 +329,7 @@ objects:
                   - name: envoy.filters.http.router
                     typed_config:
                       "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  
+
           - name: ingress-api
             address:
               socket_address:
@@ -513,7 +557,7 @@ objects:
                   value: ${DEBUG_MODE}
                 - name: PERSISTENT_DISK_DEVICE
                   value: ${PERSISTENT_DISK_DEVICE}
-                - name:  INSECURE_REGISTRY
+                - name: INSECURE_REGISTRY
                   value: ${INSECURE_REGISTRY}
                 - name: MIGRATION_PLANNER_ISO_PATH
                   value: ${MIGRATION_PLANNER_ISO_PATH}
@@ -593,3 +637,57 @@ objects:
             - name: envoy-unix-sockets
               emptyDir:
                 medium: Memory
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: migration-planner-sizer
+      labels:
+        app: migration-planner-sizer
+    spec:
+      selector:
+        matchLabels:
+          app: migration-planner-sizer
+      replicas: ${{SIZER_REPLICAS}}
+      template:
+        metadata:
+          labels:
+            app: migration-planner-sizer
+        spec:
+          containers:
+            - name: sizer
+              image: ${SIZER_IMAGE}:${IMAGE_TAG}
+              imagePullPolicy: ${SIZER_IMAGE_PULL_POLICY}
+              ports:
+                - containerPort: ${{SIZER_PORT}}
+                  name: http
+              env:
+                - name: PORT
+                  value: "${SIZER_PORT}"
+                - name: LOG_LEVEL
+                  value: ${SIZER_LOG_LEVEL}
+              livenessProbe:
+                httpGet:
+                  path: /health
+                  port: ${{SIZER_PORT}}
+                initialDelaySeconds: 10
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /health
+                  port: ${{SIZER_PORT}}
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              resources:
+                requests:
+                  cpu: ${SIZER_CPU_REQUEST}
+                  memory: ${SIZER_MEMORY_REQUEST}
+                limits:
+                  cpu: ${SIZER_CPU_LIMIT}
+                  memory: ${SIZER_MEMORY_LIMIT}
+          serviceAccountName: migration-planner
