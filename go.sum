@@ -90,6 +90,8 @@ github.com/emicklei/go-restful/v3 v3.13.0 h1:C4Bl2xDndpU6nJ4bc1jXd+uTmYPVUwkD6bF
 github.com/emicklei/go-restful/v3 v3.13.0/go.mod h1:6n3XBCmQQb25CM2LCACGz8ukIrRry+4bhvbpWn3mrbc=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
+github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453 h1:PCt3HPQM9lr9QRaDF9Sg+cH8HGlpBabVmrlYWHEGAmI=
+github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453/go.mod h1:XkSeN9MHszGd4+3gcEjadJLYHCQpWzJ7/8yznzMuzJs=
 github.com/evanphx/json-patch v4.12.0+incompatible/go.mod h1:50XU6AFN0ol/bzJsmQLiYLvXMP4fmwYFNcr97nuDLSk=
 github.com/evanphx/json-patch/v5 v5.9.11 h1:/8HVnzMq13/3x9TPvjG08wUGqBTmZBsCWzjTM0wiaDU=
 github.com/evanphx/json-patch/v5 v5.9.11/go.mod h1:3j+LviiESTElxA4p3EMKAB9HXj3/XEtnUf6OZxqIQTM=
@@ -400,8 +402,8 @@ github.com/open-policy-agent/opa v1.6.0 h1:/S/cnNQJ2MUMNzizHPbisTWBHowmLkPrugY5j
 github.com/open-policy-agent/opa v1.6.0/go.mod h1:zFmw4P+W62+CWGYRDDswfVYSCnPo6oYaktQnfIaRFC4=
 github.com/openshift/api v0.0.0-20260107103503-6d35063ca179 h1:5gMFMmuVLAcEnBAjNFql/8L2ZRPBDOxl7nmbjO5klvk=
 github.com/openshift/api v0.0.0-20260107103503-6d35063ca179/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
-github.com/openshift/assisted-image-service v0.0.0-20251124072317-6438e736a0d8 h1:6T5/4RMwNjO3QmppoKcI4I0+0SCee8w3ALmllacgbTs=
-github.com/openshift/assisted-image-service v0.0.0-20251124072317-6438e736a0d8/go.mod h1:WGdSeSnK0voEWWwA4ar5eApNjGBLmGTpFurEKw/FXJc=
+github.com/openshift/assisted-image-service v0.0.0-20251229102121-b396d331f931 h1:rrXMH8XYN1jWhlAI9uVrrZp8JDC415VPlWsTuMC+b3I=
+github.com/openshift/assisted-image-service v0.0.0-20251229102121-b396d331f931/go.mod h1:cTr8yj5dj0arTFluNIJ+8E6fKGzwB6jeW0ogI2Gl0B0=
 github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 h1:6rd4zSo2UaWQcAPZfHK9yzKVqH0BnMv1hqMzqXZyTds=
 github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13/go.mod h1:YvOmPmV7wcJxpfhTDuFqqs2Xpb3M3ovsM6Qs/i2ptq4=
 github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=

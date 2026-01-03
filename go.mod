@@ -29,7 +29,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
 	github.com/open-policy-agent/opa v1.6.0
-	github.com/openshift/assisted-image-service v0.0.0-20251124072317-6438e736a0d8
+	github.com/openshift/assisted-image-service v0.0.0-20251229102121-b396d331f931
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.22.0
@@ -77,6 +77,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20251209210403-59ed57bd7b86 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
+	github.com/erofs/go-erofs v0.0.0-20250726210804-e84d089fc453 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.11 // indirect
