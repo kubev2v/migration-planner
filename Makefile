@@ -28,6 +28,7 @@ DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
 SIZER_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+SIZER_IMAGE_TAG ?= latest
 SIZER_PORT ?= 9200
 
 SOURCE_GIT_TAG ?=$(shell git describe --always --long --tags --abbrev=7 --match 'v[0-9]*' || echo 'v0.0.0-unknown-$(SOURCE_GIT_COMMIT)')
@@ -114,7 +115,7 @@ run-sizer:
 	@$(PODMAN) run -d --name migration-planner-sizer-local \
 		-p $(SIZER_PORT):$(SIZER_PORT) \
 		-e PORT=$(SIZER_PORT) \
-		$(SIZER_IMAGE):latest
+		$(SIZER_IMAGE):$(SIZER_IMAGE_TAG)
 	@echo "✅ Sizer service running at http://localhost:$(SIZER_PORT)"
 	@echo "   Health: http://localhost:$(SIZER_PORT)/health"
 	@echo "   API:    http://localhost:$(SIZER_PORT)/api/v1/size/custom"
