@@ -1038,6 +1038,11 @@ components:
           description: Distribution of VMs across Memory tier buckets (e.g., "0-4", "5-16", "17-32", "33-64", "65-128", "129-256", "256+")
           additionalProperties:
             type: integer
+        distributionByNicCount:
+          type: object
+          description: Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
+          additionalProperties:
+            type: integer
         ramGB:
           $ref: '#/components/schemas/VMResourceBreakdown'
         diskGB:
@@ -1046,6 +1051,7 @@ components:
           $ref: '#/components/schemas/VMResourceBreakdown'
         nicCount:
           $ref: '#/components/schemas/VMResourceBreakdown'
+          deprecated: true
           nullable: false
           x-oapi-codegen-extra-tags:
             json: "nicCount,omitempty"
