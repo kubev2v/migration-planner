@@ -52,6 +52,7 @@ func CreateBasicInventory(
 			DiskTypes:                &map[string]api.DiskTypeSummary{},
 			DistributionByCpuTier:    &map[string]int{},
 			DistributionByMemoryTier: &map[string]int{},
+			DistributionByNicCount:   &map[string]int{},
 			MigrationWarnings:        api.MigrationIssues{},
 			NotMigratableReasons:     api.MigrationIssues{},
 			// TODO: refactor, hot fix for https://issues.redhat.com/browse/ECOPROJECT-3423

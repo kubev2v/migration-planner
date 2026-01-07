@@ -369,10 +369,13 @@ type VMs struct {
 	DistributionByCpuTier *map[string]int `json:"distributionByCpuTier,omitempty"`
 
 	// DistributionByMemoryTier Distribution of VMs across Memory tier buckets (e.g., "0-4", "5-16", "17-32", "33-64", "65-128", "129-256", "256+")
-	DistributionByMemoryTier *map[string]int      `json:"distributionByMemoryTier,omitempty"`
-	MigrationWarnings        []MigrationIssue     `json:"migrationWarnings"`
-	NicCount                 *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons     []MigrationIssue     `json:"notMigratableReasons"`
+	DistributionByMemoryTier *map[string]int `json:"distributionByMemoryTier,omitempty"`
+
+	// DistributionByNicCount Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
+	DistributionByNicCount *map[string]int      `json:"distributionByNicCount,omitempty"`
+	MigrationWarnings      []MigrationIssue     `json:"migrationWarnings"`
+	NicCount               *VMResourceBreakdown `json:"nicCount,omitempty"`
+	NotMigratableReasons   []MigrationIssue     `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          *map[string]int     `json:"os,omitempty"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`

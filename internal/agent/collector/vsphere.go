@@ -336,9 +336,10 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 	for _, vm := range *vms {
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
 
-		// Update the VM count per CPU & Memory tier
+		// Update the VM count per CPU, Memory & NIC tier
 		(*inv.Vms.DistributionByCpuTier)[cpuTierKey(int(vm.CpuCount))]++
 		(*inv.Vms.DistributionByMemoryTier)[memoryTierKey(util.MBToGB(vm.MemoryMB))]++
+		(*inv.Vms.DistributionByNicCount)[nicCountKey(len(vm.NICs))]++
 
 		// allocated VCpu for powered On VMs
 		if vm.PowerState == "poweredOn" {
@@ -358,7 +359,6 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		inv.Vms.RamGB.Total += util.MBToGB(vm.MemoryMB)
 		inv.Vms.DiskCount.Total += len(vm.Disks)
 		inv.Vms.DiskGB.Total += totalCapacity(vm.Disks)
-		inv.Vms.NicCount.Total += len(vm.NICs)
 
 		// Not Migratable
 		if !migratable {
@@ -366,7 +366,6 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 			inv.Vms.RamGB.TotalForNotMigratable += util.MBToGB(vm.MemoryMB)
 			inv.Vms.DiskCount.TotalForNotMigratable += len(vm.Disks)
 			inv.Vms.DiskGB.TotalForNotMigratable += totalCapacity(vm.Disks)
-			inv.Vms.NicCount.TotalForNotMigratable += len(vm.NICs)
 		} else {
 			// Migratable with warning(s)
 			if hasWarning {
@@ -374,14 +373,12 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 				inv.Vms.RamGB.TotalForMigratableWithWarnings += util.MBToGB(vm.MemoryMB)
 				inv.Vms.DiskCount.TotalForMigratableWithWarnings += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratableWithWarnings += totalCapacity(vm.Disks) // Migratable
-				inv.Vms.NicCount.TotalForMigratableWithWarnings += len(vm.NICs)
 			} else {
 				// Migratable without any warnings
 				inv.Vms.CpuCores.TotalForMigratable += int(vm.CpuCount)
 				inv.Vms.RamGB.TotalForMigratable += util.MBToGB(vm.MemoryMB)
 				inv.Vms.DiskCount.TotalForMigratable += len(vm.Disks)
 				inv.Vms.DiskGB.TotalForMigratable += totalCapacity(vm.Disks)
-				inv.Vms.NicCount.TotalForMigratable += len(vm.NICs)
 			}
 		}
 
@@ -539,6 +536,21 @@ func cpuTierKey(i int) string {
 	}
 
 	return tierKey
+}
+
+func nicCountKey(i int) string {
+	switch {
+	case i <= 0:
+		return "0"
+	case i == 1:
+		return "1"
+	case i == 2:
+		return "2"
+	case i == 3:
+		return "3"
+	default:
+		return "4+"
+	}
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {
