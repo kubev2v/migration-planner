@@ -4,7 +4,7 @@ RUN dnf install -y npm wget
 
 WORKDIR /app
 COPY . .
-RUN mkdir /app/www && cp -r ./agent-ui/* /app/www
+RUN mkdir /app/www && cp -r ./agent-ui/legacy/* /app/www
 RUN wget -P /app/www/js https://unpkg.com/axios/dist/axios.min.js
 
 WORKDIR /app/www
