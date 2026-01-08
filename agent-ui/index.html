@@ -1,57 +1,13 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-    <meta charset="UTF-8">
-    <link rel="shortcut icon" href="/redhat.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
-    <link href="/css/patternfly.css" rel="stylesheet">
-    <link href="/css/main.css" rel="stylesheet">
-</head>
-
-<body>
-    <div class="container">
-        <div class="pf-v6-c-card">
-            <div class="title pf-v6-c-card__header">
-                <div class="pf-v6-c-card__header-main">
-                    <div class="pf-v6-c-content">
-                        <h2 class="pf-v6-c-card__title-text">Migration Discovery VM</h2>
-                        <p class="description">
-                            The migration discovery VM requires access to your VMware
-                            environment to execute a discovery process that gathers essential
-                            data, including network topology, storage configuration, and VM
-                            inventory. The process leverages this information to provide
-                            recommendations for a seamless migration to OpenShift
-                            Virtualization.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <hr class="pf-v5-c-divider divider" />
-            <div class="pf-v6-c-card__body card-body">
-                <div class="pf-v6-c-content ">
-                    <svg class="pf-v6-svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true" role="img"
-                        width="1em" height="1em" color="#007bff">
-                        <path
-                            d="M256 8C119.043 8 8 119.083 8 256c0 136.997 111.043 248 248 248s248-111.003 248-248C504 119.083 392.957 8 256 8zm0 110c23.196 0 42 18.804 42 42s-18.804 42-42 42-42-18.804-42-42 18.804-42 42-42zm56 254c0 6.627-5.373 12-12 12h-88c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h12v-64h-12c-6.627 0-12-5.373-12-12v-24c0-6.627 5.373-12 12-12h64c6.627 0 12 5.373 12 12v100h12c6.627 0 12 5.373 12 12v24z">
-                        </path>
-                    </svg>
-                    <p>Access control</p>
-                </div>
-                <div class="description">
-                    A VMware user account with read-only permissions is sufficient for secure access during the
-                    discovery
-                    process.
-                </div>
-            </div>
-            <hr class="pf-v5-c-divider divider" />
-            <div id="form-container" class="pf-v6-c-card__body card-description">
-            </div>
-            <div id="btn-container" class="pf-v6-c-card__footer">
-            </div>
-        </div>
-    </div>
-    <script src="/js/axios.min.js"></script>
-    <script type="module" src="/js/main.js"></script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>agent-ui-react</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
