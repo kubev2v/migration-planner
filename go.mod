@@ -18,7 +18,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kubev2v/forklift v0.0.0-20251204092501-13418ce68fe3
+	github.com/kubev2v/forklift v0.0.0-20260109132042-6ac29b3130c3
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/minio/minio-go/v7 v7.0.95
