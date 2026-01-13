@@ -1,0 +1,24 @@
+{{- /*
+Host Query Template - Generates DuckDB SQL to extract ESXi host information.
+
+This query extracts host details from the vHost sheet including CPU, memory,
+and vendor/model information.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+  - Limit: max results (0 = unlimited)
+  - Offset: skip first N results
+*/ -}}
+SELECT
+    "Cluster" as "cluster",
+    "# Cores"::integer as "cpuCores",
+    "# CPU"::integer as "cpuSockets",
+    "Object ID" as "id",
+    "# Memory"::integer as "memoryMB",
+    COALESCE("Model", 'N/A') as "model",
+    COALESCE("Vendor", 'N/A') as "vendor"
+FROM vhost
+WHERE "Cluster" IS NOT NULL
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
+{{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

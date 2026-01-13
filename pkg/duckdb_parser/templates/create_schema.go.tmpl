@@ -1,0 +1,154 @@
+{{- /*
+Create Schema Template - Creates all RVTools tables with the required columns.
+
+This template creates empty tables with the schema expected by the parser.
+Column types are based on how they are used in the query templates:
+  - VARCHAR: string columns
+  - INTEGER: numeric columns cast with TRY_CAST or ::integer (default 0)
+  - BOOLEAN: columns compared with LOWER(...) IN ('true', '1', 'yes') (default false)
+  - DOUBLE: columns used in calculations with ::double (default 0.0)
+
+No template parameters required.
+*/ -}}
+CREATE TABLE IF NOT EXISTS vinfo (
+    "VM ID" VARCHAR,
+    "VM" VARCHAR,
+    "Folder ID" VARCHAR,
+    "Folder" VARCHAR,
+    "Host" VARCHAR,
+    "SMBIOS UUID" VARCHAR,
+    "VM UUID" VARCHAR,
+    "Firmware" VARCHAR,
+    "Powerstate" VARCHAR,
+    "Connection state" VARCHAR,
+    "FT State" VARCHAR,
+    "CPUs" INTEGER DEFAULT 0,
+    "Memory" INTEGER DEFAULT 0,
+    "OS according to the configuration file" VARCHAR,
+    "OS according to the VMware Tools" VARCHAR,
+    "DNS Name" VARCHAR,
+    "Primary IP Address" VARCHAR,
+    "In Use MiB" INTEGER DEFAULT 0,
+    "Template" BOOLEAN DEFAULT false,
+    "CBT" BOOLEAN DEFAULT false,
+    "EnableUUID" BOOLEAN DEFAULT false,
+    "Datacenter" VARCHAR,
+    "Cluster" VARCHAR,
+    "HW version" VARCHAR,
+    "Total disk capacity MiB" INTEGER DEFAULT 0,
+    "Provisioned MiB" INTEGER DEFAULT 0,
+    "Resource pool" VARCHAR,
+    "VI SDK UUID" VARCHAR,
+    "Network #1" VARCHAR,
+    "Network #2" VARCHAR,
+    "Network #3" VARCHAR,
+    "Network #4" VARCHAR,
+    "Network #5" VARCHAR,
+    "Network #6" VARCHAR,
+    "Network #7" VARCHAR,
+    "Network #8" VARCHAR,
+    "Network #9" VARCHAR,
+    "Network #10" VARCHAR,
+    "Network #11" VARCHAR,
+    "Network #12" VARCHAR,
+    "Network #13" VARCHAR,
+    "Network #14" VARCHAR,
+    "Network #15" VARCHAR,
+    "Network #16" VARCHAR,
+    "Network #17" VARCHAR,
+    "Network #18" VARCHAR,
+    "Network #19" VARCHAR,
+    "Network #20" VARCHAR,
+    "Network #21" VARCHAR,
+    "Network #22" VARCHAR,
+    "Network #23" VARCHAR,
+    "Network #24" VARCHAR,
+    "Network #25" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vcpu (
+    "VM ID" VARCHAR,
+    "Hot Add" BOOLEAN DEFAULT false,
+    "Hot Remove" BOOLEAN DEFAULT false,
+    "Sockets" INTEGER DEFAULT 0,
+    "Cores p/s" INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS vmemory (
+    "VM ID" VARCHAR,
+    "Hot Add" BOOLEAN DEFAULT false,
+    "Ballooned" INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS vdisk (
+    "VM ID" VARCHAR,
+    "Disk Key" VARCHAR,
+    "Unit #" VARCHAR,
+    "Path" VARCHAR,
+    "Disk Path" VARCHAR,
+    "Capacity MiB" BIGINT DEFAULT 0,
+    "Sharing mode" BOOLEAN DEFAULT false,
+    "Raw" BOOLEAN DEFAULT false,
+    "Shared Bus" VARCHAR,
+    "Disk Mode" VARCHAR,
+    "Disk UUID" VARCHAR,
+    "Thin" BOOLEAN DEFAULT false,
+    "Controller" VARCHAR,
+    "Label" VARCHAR,
+    "SCSI Unit #" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vnetwork (
+    "VM ID" VARCHAR,
+    "Network" VARCHAR,
+    "Mac Address" VARCHAR,
+    "NIC label" VARCHAR,
+    "Adapter" VARCHAR,
+    "Switch" VARCHAR,
+    "Connected" BOOLEAN DEFAULT false,
+    "Starts Connected" BOOLEAN DEFAULT false,
+    "Type" VARCHAR,
+    "IPv4 Address" VARCHAR,
+    "IPv6 Address" VARCHAR,
+    "Cluster" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vhost (
+    "Cluster" VARCHAR,
+    "# Cores" INTEGER DEFAULT 0,
+    "# CPU" INTEGER DEFAULT 0,
+    "Object ID" VARCHAR,
+    "# Memory" INTEGER DEFAULT 0,
+    "Model" VARCHAR,
+    "Vendor" VARCHAR,
+    "Host" VARCHAR,
+    "Config status" VARCHAR DEFAULT 'green'
+);
+
+CREATE TABLE IF NOT EXISTS vdatastore (
+    "Hosts" VARCHAR,
+    "Address" VARCHAR,
+    "Name" VARCHAR,
+    "Free MiB" DOUBLE DEFAULT 0.0,
+    "MHA" BOOLEAN DEFAULT false,
+    "Capacity MiB" DOUBLE DEFAULT 0.0,
+    "Type" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vhba (
+    "Device" VARCHAR,
+    "Type" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS dvport (
+    "Port" VARCHAR,
+    "VLAN" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS concerns (
+    "VM_ID" VARCHAR,
+    "Concern_ID" VARCHAR,
+    "Label" VARCHAR,
+    "Category" VARCHAR,
+    "Assessment" VARCHAR
+);

@@ -1,0 +1,10 @@
+{{- /*
+VCenter Query Template - Extracts the vCenter UUID from vInfo.
+
+The VI SDK UUID column contains the vCenter identifier.
+We take the first non-null value since it's the same for all VMs.
+*/ -}}
+SELECT DISTINCT "VI SDK UUID" as "vcenter_id"
+FROM vinfo
+WHERE "VI SDK UUID" IS NOT NULL
+LIMIT 1;

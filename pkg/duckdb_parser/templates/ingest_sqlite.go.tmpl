@@ -1,0 +1,208 @@
+{{- /*
+Ingest SQLite Template - Inserts data from forklift SQLite database into pre-created schema tables.
+
+Strategy:
+  - Tables must be created first using create_schema.go.tmpl
+  - Uses INSERT INTO ... SELECT to map SQLite columns to schema columns
+  - Transforms the normalized forklift/vsphere model into flat RVTools-style tables
+
+Key transformations:
+  - VM → vinfo: Direct 1:1 field mapping with derived Cluster and Datacenter
+  - VM.NICs (JSON array) → vnetwork rows via LATERAL unnest
+  - VM.Disks (JSON array) → vdisk rows via LATERAL unnest
+  - Host → vhost with memory converted from bytes to MiB
+  - Datastore → vdatastore with capacity/free converted from bytes to MiB
+  - Network → dvport for distributed virtual switches
+*/ -}}
+
+INSTALL sqlite;
+LOAD sqlite;
+ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
+
+INSERT INTO vinfo (
+    "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
+    "Firmware", "Powerstate", "Connection state", "FT State",
+    "CPUs", "Memory",
+    "OS according to the configuration file", "OS according to the VMware Tools",
+    "DNS Name", "Primary IP Address", "In Use MiB",
+    "Template", "CBT", "EnableUUID",
+    "Datacenter", "Cluster", "HW version",
+    "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID"
+)
+SELECT
+    v.ID,
+    v.Name,
+    v.Folder,
+    v.Folder,
+    v.Host,
+    v.UUID,
+    v.UUID,
+    v.Firmware,
+    v.PowerState,
+    v.ConnectionState,
+    CASE WHEN v.FaultToleranceEnabled = 1 THEN 'Protected' ELSE 'Not protected' END,
+    v.CpuCount,
+    v.MemoryMB,
+    v.GuestName,
+    v.GuestNameFromVmwareTools,
+    v.HostName,
+    v.IpAddress,
+    v.StorageUsed / 1048576,
+    v.IsTemplate = 1,
+    v.ChangeTrackingEnabled = 1,
+    v.DiskEnableUuid = 1,
+    d.Name,
+    c.Name,
+    '',
+    0,
+    0,
+    '',
+    about.InstanceUuid
+FROM src.VM v
+LEFT JOIN src.Host h ON v.Host = h.ID
+LEFT JOIN src.Cluster c ON h.Cluster = c.ID
+LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
+LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID
+CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about;
+
+INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
+SELECT
+    v.ID,
+    v.CpuHotAddEnabled = 1,
+    v.CpuHotRemoveEnabled = 1,
+    v.CpuCount / NULLIF(v.CoresPerSocket, 0),
+    v.CoresPerSocket
+FROM src.VM v;
+
+INSERT INTO vmemory ("VM ID", "Hot Add", "Ballooned")
+SELECT
+    v.ID,
+    v.MemoryHotAddEnabled = 1,
+    v.BalloonedMemory
+FROM src.VM v;
+
+INSERT INTO vdisk (
+    "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+    "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+    "Thin", "Controller", "Label", "SCSI Unit #"
+)
+SELECT
+    v.ID,
+    disk->>'key',
+    disk->>'unitNumber',
+    disk->>'file',
+    disk->>'file',
+    (disk->>'capacity')::bigint / 1048576,
+    disk->>'shared' = 'true',
+    disk->>'rdm' = 'true',
+    disk->>'bus',
+    disk->>'mode',
+    disk->>'serial',
+    false,
+    disk->>'bus',
+    '',
+    disk->>'unitNumber'
+FROM src.VM v,
+LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR"}]')) AS t(disk)
+WHERE v.Disks != '[]';
+
+INSERT INTO vnetwork (
+    "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
+    "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"
+)
+SELECT
+    v.ID,
+    n.Name,
+    nic->>'mac',
+    '',
+    '',
+    COALESCE(n.DVSwitch->>'id', ''),
+    true,
+    true,
+    CASE WHEN n.DVSwitch->>'id' IS NOT NULL THEN 'distributed' ELSE 'standard' END,
+    v.IpAddress,
+    '',
+    c.Name
+FROM src.VM v
+LEFT JOIN src.Host h ON v.Host = h.ID
+LEFT JOIN src.Cluster c ON h.Cluster = c.ID,
+LATERAL unnest(from_json(v.NICs, '[{"network":{"kind":"VARCHAR","id":"VARCHAR"},"mac":"VARCHAR","order":"INTEGER","deviceKey":"INTEGER"}]')) AS t(nic)
+LEFT JOIN src.Network n ON nic->'network'->>'id' = n.ID
+WHERE v.NICs != '[]';
+
+INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
+SELECT
+    c.Name,
+    h.CpuCores,
+    h.CpuSockets,
+    h.ID,
+    h.MemoryBytes / 1048576,
+    h.Model,
+    h.Vendor,
+    h.ID,
+    'green'
+FROM src.Host h
+LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
+
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Free MiB", "MHA", "Capacity MiB", "Type")
+SELECT
+    string_agg(DISTINCT h.ID, ','),
+    ds.Name,
+    ds.Name,
+    ds.Free / 1048576,
+    ds.MaintenanceMode = 'True',
+    ds.Capacity / 1048576,
+    ds.Type
+FROM src.Datastore ds
+LEFT JOIN (
+    SELECT h.ID, h.Cluster, dsref->>'id' AS datastore_id
+    FROM src.Host h,
+    LATERAL unnest(from_json(h.Datastores, '[{"kind":"VARCHAR","id":"VARCHAR"}]')) AS t(dsref)
+) h ON h.datastore_id = ds.ID
+GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type;
+
+INSERT INTO dvport ("Port", "VLAN")
+SELECT
+    n.Name,
+    n.VlanId
+FROM src.Network n
+WHERE COALESCE(n.DVSwitch->>'id', '') != '';
+
+DETACH src;
+
+-- Populate Network # columns in vinfo from vnetwork table
+WITH network_arrays AS (
+    SELECT
+        "VM ID",
+        list("Network") AS networks
+    FROM vnetwork
+    GROUP BY "VM ID"
+)
+UPDATE vinfo SET
+    "Network #1" = networks[1],
+    "Network #2" = networks[2],
+    "Network #3" = networks[3],
+    "Network #4" = networks[4],
+    "Network #5" = networks[5],
+    "Network #6" = networks[6],
+    "Network #7" = networks[7],
+    "Network #8" = networks[8],
+    "Network #9" = networks[9],
+    "Network #10" = networks[10],
+    "Network #11" = networks[11],
+    "Network #12" = networks[12],
+    "Network #13" = networks[13],
+    "Network #14" = networks[14],
+    "Network #15" = networks[15],
+    "Network #16" = networks[16],
+    "Network #17" = networks[17],
+    "Network #18" = networks[18],
+    "Network #19" = networks[19],
+    "Network #20" = networks[20],
+    "Network #21" = networks[21],
+    "Network #22" = networks[22],
+    "Network #23" = networks[23],
+    "Network #24" = networks[24],
+    "Network #25" = networks[25]
+FROM network_arrays
+WHERE vinfo."VM ID" = network_arrays."VM ID";

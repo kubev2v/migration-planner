@@ -1,0 +1,18 @@
+{{- /*
+Migration Issues Query Template - Returns aggregated migration issues by category.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+  - Category: concern category (e.g., "Critical", "Warning")
+*/ -}}
+SELECT
+    c."Concern_ID" AS id,
+    c."Label" AS label,
+    c."Category" AS category,
+    c."Assessment" AS assessment,
+    COUNT(*) AS count
+FROM concerns c
+JOIN vinfo i ON c."VM_ID" = i."VM ID"
+WHERE c."Category" = '{{.Category}}'
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY c."Concern_ID", c."Label", c."Category", c."Assessment";

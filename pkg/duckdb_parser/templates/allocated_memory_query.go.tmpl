@@ -1,0 +1,11 @@
+{{- /*
+Allocated Memory Query Template - Returns sum of memory (MB) for powered-on VMs.
+Used for memory overcommitment calculation.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT COALESCE(SUM("Memory"), 0)
+FROM vinfo
+WHERE "Powerstate" = 'poweredOn'
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};

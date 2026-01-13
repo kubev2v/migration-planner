@@ -1,0 +1,11 @@
+{{- /*
+Allocated VCPUs Query Template - Returns sum of vCPUs for powered-on VMs.
+Used for CPU overcommitment calculation.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT COALESCE(SUM("CPUs"), 0)
+FROM vinfo
+WHERE "Powerstate" = 'poweredOn'
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};

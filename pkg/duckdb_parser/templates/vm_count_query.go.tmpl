@@ -1,0 +1,11 @@
+{{- /*
+VM Count Query Template - Returns count of VMs with optional filters.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+  - PowerStateFilter: filter by power state
+*/ -}}
+SELECT COUNT(*) FROM vinfo
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .PowerStateFilter }} AND "Powerstate" = '{{.PowerStateFilter}}'{{end}};

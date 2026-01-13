@@ -1,0 +1,6 @@
+{{- /*
+Datacenter Count Query Template - Returns count of unique datacenters.
+*/ -}}
+SELECT COUNT(DISTINCT "Datacenter")
+FROM vinfo
+WHERE "Datacenter" IS NOT NULL AND "Datacenter" != '';

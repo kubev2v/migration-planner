@@ -1,0 +1,10 @@
+{{- /*
+Total Host CPUs Query Template - Returns sum of physical CPU cores across hosts.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT COALESCE(SUM("# Cores"), 0)
+FROM vhost
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};

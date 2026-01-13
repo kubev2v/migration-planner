@@ -1,0 +1,19 @@
+{{- /*
+CPU Tier Query Template - Returns VM distribution by CPU tier.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT
+    CASE
+        WHEN "CPUs" <= 4 THEN '0-4'
+        WHEN "CPUs" <= 8 THEN '5-8'
+        WHEN "CPUs" <= 16 THEN '9-16'
+        WHEN "CPUs" <= 32 THEN '17-32'
+        ELSE '32+'
+    END AS tier,
+    COUNT(*) AS count
+FROM vinfo
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY tier;

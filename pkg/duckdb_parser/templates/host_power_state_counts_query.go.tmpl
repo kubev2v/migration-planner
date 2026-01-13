@@ -1,0 +1,12 @@
+{{- /*
+Host Power State Counts Query Template - Returns host status distribution.
+Note: Defaults to 'green' if status is empty/null.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT COALESCE(NULLIF("Config status", ''), 'green') AS state, COUNT(*) AS count
+FROM vhost
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY state;
