@@ -1,0 +1,23 @@
+{{- /*
+Disk Type Summary Query Template - Returns disk usage aggregated by datastore type.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+WITH vm_disk_types AS (
+    SELECT
+        d."VM ID",
+        ds."Type" AS disk_type,
+        d."Capacity MiB"
+    FROM vdisk d
+    JOIN vdatastore ds ON ds."Name" = REGEXP_EXTRACT(d."Path", '\[([^\]]+)\]', 1)
+    JOIN vinfo i ON d."VM ID" = i."VM ID"
+    WHERE ds."Type" IS NOT NULL AND ds."Type" != ''
+    {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+)
+SELECT
+    disk_type AS type,
+    COUNT(DISTINCT "VM ID") AS vm_count,
+    ROUND(SUM("Capacity MiB") / 1048576.0, 2) AS total_size_tb
+FROM vm_disk_types
+GROUP BY disk_type;

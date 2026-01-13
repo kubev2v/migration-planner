@@ -1,0 +1,21 @@
+{{- /*
+Memory Tier Query Template - Returns VM distribution by memory tier (in GB).
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT
+    CASE
+        WHEN "Memory" / 1024 <= 4 THEN '0-4'
+        WHEN "Memory" / 1024 <= 16 THEN '5-16'
+        WHEN "Memory" / 1024 <= 32 THEN '17-32'
+        WHEN "Memory" / 1024 <= 64 THEN '33-64'
+        WHEN "Memory" / 1024 <= 128 THEN '65-128'
+        WHEN "Memory" / 1024 <= 256 THEN '129-256'
+        ELSE '256+'
+    END AS tier,
+    COUNT(*) AS count
+FROM vinfo
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY tier;

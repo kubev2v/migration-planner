@@ -6,6 +6,7 @@ require (
 	github.com/MicahParks/jwkset v0.11.0
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/coreos/butane v0.25.1
+	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.2.3

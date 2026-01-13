@@ -1,0 +1,48 @@
+{{- /*
+OS Query Template - Generates DuckDB SQL to aggregate OS distribution.
+
+This query groups VMs by their OS (with fallback from VMware Tools to config file) and counts them.
+Used to generate OS distribution summary for the inventory.
+
+The query also determines if each OS is supported by checking for "vmware.os.unsupported" concerns.
+An OS is considered supported if no VM with that OS has an unsupported OS concern.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+WITH os_data AS (
+    SELECT
+        v."VM ID",
+        COALESCE(
+            NULLIF(v."OS according to the VMware Tools", ''),
+            NULLIF(v."OS according to the configuration file", ''),
+            'Unknown OS'
+        ) AS os_name
+    FROM vinfo v
+    WHERE (
+        (v."OS according to the VMware Tools" IS NOT NULL AND v."OS according to the VMware Tools" != '')
+        OR
+        (v."OS according to the configuration file" IS NOT NULL AND v."OS according to the configuration file" != '')
+    )
+    {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+),
+unsupported_os AS (
+    SELECT DISTINCT
+        COALESCE(
+            NULLIF(v."OS according to the VMware Tools", ''),
+            NULLIF(v."OS according to the configuration file", ''),
+            'Unknown OS'
+        ) AS os_name
+    FROM vinfo v
+    JOIN concerns c ON v."VM ID" = c."VM_ID"
+    WHERE c."Concern_ID" = 'vmware.os.unsupported'
+    {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+)
+SELECT
+    od.os_name AS "name",
+    COUNT(*) AS "count",
+    CASE WHEN uo.os_name IS NULL THEN TRUE ELSE FALSE END AS "supported"
+FROM os_data od
+LEFT JOIN unsupported_os uo ON od.os_name = uo.os_name
+GROUP BY od.os_name, uo.os_name
+ORDER BY od.os_name;

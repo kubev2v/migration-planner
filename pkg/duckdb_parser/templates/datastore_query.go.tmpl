@@ -1,0 +1,71 @@
+{{- /*
+Datastore Query Template - Extracts datastore data from the fixed schema.
+
+The schema always has vdatastore, vhost, and vhba tables. LEFT JOIN handles
+cases where vhba is empty.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+  - Limit: max results (0 = unlimited)
+  - Offset: skip first N results
+*/ -}}
+WITH expanded AS (
+    SELECT
+        d.*,
+        trim(unnest(string_split(d.Hosts, ','))) AS ip,
+        regexp_extract(d."Address", 'vmhba[0-9]+') as hba_device
+    FROM vdatastore d
+    WHERE d."Hosts" IS NOT NULL
+),
+with_host AS (
+    SELECT DISTINCT
+        vh."Cluster",
+        e."Address",
+        e."Name",
+        e."Free MiB",
+        e."MHA",
+        e."Capacity MiB",
+        e."Type",
+        e.ip,
+        vh."Object ID",
+        e.hba_device
+    FROM expanded e
+    JOIN vhost vh ON vh.Host = e.ip
+),
+with_hba AS (
+    SELECT DISTINCT
+        w."Cluster",
+        w."Address",
+        w."Name",
+        w."Free MiB",
+        w."MHA",
+        w."Capacity MiB",
+        w."Type",
+        w.ip,
+        w."Object ID",
+        FIRST(hba."Type") OVER (PARTITION BY w."Name") as hba_type
+    FROM with_host w
+    LEFT JOIN vhba hba ON hba."Device" = w.hba_device
+)
+SELECT
+    w."Cluster" as "cluster",
+    COALESCE(w."Address", w."Name") as "diskId",
+    (w."Free MiB"::double / 1024)::integer as "freeCapacityGB",
+    COALESCE(w."MHA", false) as "hardwareAcceleratedMove",
+    COALESCE(string_agg(DISTINCT w."Object ID", ', '), 'N/A') AS "hostId",
+    'N/A' as "model",
+    CASE
+        WHEN w."Type" = 'NFS' THEN 'N/A'
+        WHEN w."Address" LIKE 'naa.%' THEN 'iSCSI'
+        WHEN w.hba_type IS NOT NULL THEN w.hba_type
+        ELSE 'N/A'
+    END as "protocolType",
+    (w."Capacity MiB"::double / 1024)::integer as "totalCapacityGB",
+    COALESCE(w."Type", 'N/A') as "type",
+    'N/A' as "vendor"
+FROM with_hba w
+WHERE w."Cluster" IS NOT NULL
+{{- if .ClusterFilter }} AND w."Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY w."Cluster", w."Address", w."Name", w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w.hba_type
+{{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
+{{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

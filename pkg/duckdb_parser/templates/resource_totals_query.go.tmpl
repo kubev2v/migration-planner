@@ -1,0 +1,25 @@
+{{- /*
+Resource Totals Query Template - Returns aggregated resource totals.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT
+    COALESCE(SUM(i."CPUs"), 0)::integer AS total_cpu_cores,
+    COALESCE(SUM(i."Memory") / 1024, 0)::integer AS total_ram_gb,
+    COALESCE(SUM(d.disk_count), 0)::integer AS total_disk_count,
+    COALESCE(SUM(d.disk_gb), 0)::integer AS total_disk_gb,
+    COALESCE(SUM(n.nic_count), 0)::integer AS total_nic_count
+FROM vinfo i
+LEFT JOIN (
+    SELECT "VM ID", COUNT(*) AS disk_count, SUM("Capacity MiB") / 1024 AS disk_gb
+    FROM vdisk
+    GROUP BY "VM ID"
+) d ON i."VM ID" = d."VM ID"
+LEFT JOIN (
+    SELECT "VM ID", COUNT(*) AS nic_count
+    FROM vnetwork
+    GROUP BY "VM ID"
+) n ON i."VM ID" = n."VM ID"
+WHERE 1=1
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}};

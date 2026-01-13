@@ -1,0 +1,8 @@
+{{- /*
+Clusters Per Datacenter Query Template - Returns cluster count per datacenter.
+*/ -}}
+SELECT "Datacenter", COUNT(DISTINCT "Cluster") AS cluster_count
+FROM vinfo
+WHERE "Datacenter" IS NOT NULL AND "Datacenter" != ''
+GROUP BY "Datacenter"
+ORDER BY "Datacenter";

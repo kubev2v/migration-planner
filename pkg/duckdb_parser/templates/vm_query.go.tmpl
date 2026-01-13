@@ -1,0 +1,117 @@
+{{- /*
+VM Query Template - Queries the fixed schema to extract VM data.
+
+The schema is fixed (created by create_schema.go.tmpl) with all tables and columns
+always present. Missing data from Excel sheets results in empty tables, which
+LEFT JOINs handle gracefully.
+
+Template Parameters:
+  - NetworkColumns: Comma-separated list of network columns (e.g., i."Network #1", i."Network #2", ...)
+  - ClusterFilter: filter by cluster name
+  - OSFilter: filter by OS name
+  - PowerStateFilter: filter by power state
+  - Limit: max results (0 = unlimited)
+  - Offset: skip first N results
+*/ -}}
+WITH disks AS (
+    SELECT
+        "VM ID",
+        LIST({
+            'Key': "Disk Key",
+            'UnitNumber': "Unit #",
+            'File': COALESCE("Path", "Disk Path"),
+            'Capacity': "Capacity MiB",
+            'Shared': "Sharing mode",
+            'RDM': "Raw",
+            'Bus': "Shared Bus",
+            'Mode': "Disk Mode",
+            'Serial': "Disk UUID",
+            'Thin': "Thin",
+            'Controller': "Controller",
+            'Label': "Label",
+            'SCSIUnit': "SCSI Unit #"
+        }) AS disks
+    FROM vdisk
+    GROUP BY "VM ID"
+),
+nics AS (
+    SELECT
+        "VM ID",
+        LIST({
+            'Network': "Network",
+            'MAC': "Mac Address",
+            'Label': "NIC label",
+            'Adapter': "Adapter",
+            'Switch': "Switch",
+            'Connected': "Connected",
+            'StartsConnected': "Starts Connected",
+            'Type': "Type",
+            'IPv4Address': CASE WHEN "IPv4 Address" = 'VM' OR "IPv4 Address" IS NULL THEN '' ELSE "IPv4 Address" END,
+            'IPv6Address': CASE WHEN "IPv6 Address" = 'VM' OR "IPv6 Address" IS NULL THEN '' ELSE "IPv6 Address" END
+        }) AS nics
+    FROM vnetwork
+    GROUP BY "VM ID"
+),
+concerns_agg AS (
+    SELECT
+        "VM_ID",
+        LIST({
+            'Id': "Concern_ID",
+            'Label': "Label",
+            'Category': "Category",
+            'Assessment': "Assessment"
+        }) AS concerns
+    FROM concerns
+    GROUP BY "VM_ID"
+)
+SELECT
+    COALESCE(i."VM ID", '') AS "ID",
+    COALESCE(i."VM", '') AS "Name",
+    COALESCE(i."Folder ID", i."Folder", '') AS "Folder",
+    COALESCE(i."Host", '') AS "Host",
+    COALESCE(i."SMBIOS UUID", i."VM UUID", '') AS "UUID",
+    COALESCE(i."Firmware", '') AS "Firmware",
+    COALESCE(i."Powerstate", '') AS "PowerState",
+    COALESCE(i."Connection state", '') AS "ConnectionState",
+    (i."FT State" IS NOT NULL AND i."FT State" != '' AND i."FT State" != 'notConfigured') AS "FaultToleranceEnabled",
+    COALESCE(i."CPUs", 0) AS "CpuCount",
+    COALESCE(i."Memory", 0) AS "MemoryMB",
+    COALESCE(i."OS according to the configuration file", '') AS "GuestName",
+    COALESCE(i."OS according to the VMware Tools", '') AS "GuestNameFromVmwareTools",
+    COALESCE(i."DNS Name", '') AS "HostName",
+    COALESCE(i."Primary IP Address", '') AS "IpAddress",
+    COALESCE(i."In Use MiB", 0) AS "StorageUsed",
+    COALESCE(i."Template", false) AS "IsTemplate",
+    COALESCE(i."CBT", false) AS "ChangeTrackingEnabled",
+    COALESCE(i."EnableUUID", false) AS "DiskEnableUuid",
+    COALESCE(i."Datacenter", '') AS "Datacenter",
+    COALESCE(i."Cluster", '') AS "Cluster",
+    COALESCE(i."HW version", '') AS "HWVersion",
+    COALESCE(i."Total disk capacity MiB", 0) AS "TotalDiskCapacityMiB",
+    COALESCE(i."Provisioned MiB", 0) AS "ProvisionedMiB",
+    COALESCE(i."Resource pool", '') AS "ResourcePool",
+    COALESCE(c."Hot Add", false) AS "CpuHotAddEnabled",
+    COALESCE(c."Hot Remove", false) AS "CpuHotRemoveEnabled",
+    COALESCE(c."Sockets", 0) AS "CpuSockets",
+    COALESCE(c."Cores p/s", 0) AS "CoresPerSocket",
+    COALESCE(m."Hot Add", false) AS "MemoryHotAddEnabled",
+    COALESCE(m."Ballooned", 0) AS "BalloonedMemory",
+    COALESCE(d.disks, []) AS "Disks",
+    COALESCE(n.nics, []) AS "NICs",
+    LIST_FILTER(
+        LIST_VALUE({{ .NetworkColumns }}),
+        x -> x IS NOT NULL AND x != '' AND x != 'VM'
+    ) AS "Networks",
+    COALESCE(con.concerns, []) AS "Concerns"
+FROM vinfo i
+LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
+LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
+LEFT JOIN disks d ON i."VM ID" = d."VM ID"
+LEFT JOIN nics n ON i."VM ID" = n."VM ID"
+LEFT JOIN concerns_agg con ON i."VM ID" = con."VM_ID"
+WHERE 1=1
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .OSFilter }} AND i."OS according to the configuration file" LIKE '%{{.OSFilter}}%'{{end}}
+{{- if .PowerStateFilter }} AND i."Powerstate" = '{{.PowerStateFilter}}'{{end}}
+{{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
+{{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

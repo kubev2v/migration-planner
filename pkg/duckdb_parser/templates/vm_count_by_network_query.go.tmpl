@@ -1,0 +1,13 @@
+{{- /*
+VM Count By Network Query Template - Returns VM count per network.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT "Network" AS network, COUNT(DISTINCT "VM ID") AS count
+FROM vnetwork n
+{{- if .ClusterFilter }}
+JOIN vinfo i ON n."VM ID" = i."VM ID"
+WHERE i."Cluster" = '{{.ClusterFilter}}'
+{{- end}}
+GROUP BY "Network";

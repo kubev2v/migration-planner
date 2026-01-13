@@ -1,0 +1,27 @@
+{{- /*
+Disk Size Tier Query Template - Returns VM distribution by total disk size tier.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+WITH vm_disk_totals AS (
+    SELECT
+        d."VM ID",
+        SUM(d."Capacity MiB") / 1048576.0 AS total_disk_tb
+    FROM vdisk d
+    JOIN vinfo i ON d."VM ID" = i."VM ID"
+    WHERE 1=1
+    {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    GROUP BY d."VM ID"
+)
+SELECT
+    CASE
+        WHEN total_disk_tb < 10 THEN 'Easy (0-10TB)'
+        WHEN total_disk_tb < 20 THEN 'Medium (10-20TB)'
+        WHEN total_disk_tb < 50 THEN 'Hard (20-50TB)'
+        ELSE 'White Glove (>50TB)'
+    END AS tier,
+    COUNT(*) AS vm_count,
+    ROUND(SUM(total_disk_tb), 2) AS total_size_tb
+FROM vm_disk_totals
+GROUP BY tier;
