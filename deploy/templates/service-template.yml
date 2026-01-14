@@ -104,6 +104,9 @@ parameters:
   - name: SIZER_IMAGE
     description: Sizer service container image
     value: quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+  - name: SIZER_IMAGE_TAG
+    description: Sizer service container image Tag
+    value: 8932a5061e96f53e81817d916c0efcf2d25e9c51
   - name: SIZER_REPLICAS
     description: Number of replicas of the sizer service to run
     value: "2"
@@ -655,7 +658,7 @@ objects:
         spec:
           containers:
             - name: sizer
-              image: ${SIZER_IMAGE}:${IMAGE_TAG}
+              image: ${SIZER_IMAGE}:${SIZER_IMAGE_TAG}
               imagePullPolicy: ${SIZER_IMAGE_PULL_POLICY}
               ports:
                 - containerPort: ${{SIZER_PORT}}
