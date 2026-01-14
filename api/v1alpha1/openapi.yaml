@@ -970,6 +970,7 @@ components:
           description: ID of the vCenter
         clusters:
           type: object
+          nullable: true
           additionalProperties:
             $ref: '#/components/schemas/InventoryData'
           description: Map of cluster names to their inventory data
@@ -1070,10 +1071,12 @@ components:
             $ref: '#/components/schemas/osInfo'
         notMigratableReasons:
           type: array
+          nullable: true
           items:
             $ref: '#/components/schemas/MigrationIssue'
         migrationWarnings:
           type: array
+          nullable: true
           items:
             $ref: '#/components/schemas/MigrationIssue'
 
@@ -1162,14 +1165,17 @@ components:
           deprecated: true
         hostPowerStates:
           type: object
+          nullable: true
           additionalProperties:
             type: integer
         networks:
           type: array
+          nullable: true
           items:
             $ref: '#/components/schemas/Network'
         datastores:
-          type: array
+          type: array 
+          nullable: true
           items:
             $ref: '#/components/schemas/Datastore'
 
@@ -1426,6 +1432,7 @@ components:
           format: date-time
         snapshots:
           type: array
+          nullable: true
           items:
             $ref: '#/components/schemas/Snapshot'
       required:

@@ -76,7 +76,7 @@ type Assessment struct {
 
 	// OwnerLastName Owner's last name
 	OwnerLastName *string              `json:"ownerLastName,omitempty"`
-	Snapshots     []Snapshot           `json:"snapshots"`
+	Snapshots     *[]Snapshot          `json:"snapshots"`
 	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
 	SourceType    AssessmentSourceType `json:"sourceType"`
 }
@@ -176,16 +176,16 @@ type Infra struct {
 	ClustersPerDatacenter *[]int `json:"clustersPerDatacenter,omitempty"`
 
 	// CpuOverCommitment CPU Overcommitment Ratio. Calculated as total Allocated vCPUs / Total Physical Cores
-	CpuOverCommitment *float64       `json:"cpuOverCommitment,omitempty"`
-	Datastores        []Datastore    `json:"datastores"`
-	HostPowerStates   map[string]int `json:"hostPowerStates"`
-	Hosts             *[]Host        `json:"hosts,omitempty"`
+	CpuOverCommitment *float64        `json:"cpuOverCommitment,omitempty"`
+	Datastores        *[]Datastore    `json:"datastores"`
+	HostPowerStates   *map[string]int `json:"hostPowerStates"`
+	Hosts             *[]Host         `json:"hosts,omitempty"`
 	// Deprecated:
 	HostsPerCluster *[]int `json:"hostsPerCluster,omitempty"`
 
 	// MemoryOverCommitment RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
-	MemoryOverCommitment *float64  `json:"memoryOverCommitment,omitempty"`
-	Networks             []Network `json:"networks"`
+	MemoryOverCommitment *float64   `json:"memoryOverCommitment,omitempty"`
+	Networks             *[]Network `json:"networks"`
 	// Deprecated:
 	TotalClusters    *int `json:"totalClusters,omitempty"`
 	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
@@ -197,8 +197,8 @@ type Infra struct {
 // Inventory defines model for Inventory.
 type Inventory struct {
 	// Clusters Map of cluster names to their inventory data
-	Clusters map[string]InventoryData `json:"clusters"`
-	Vcenter  *InventoryData           `json:"vcenter,omitempty"`
+	Clusters *map[string]InventoryData `json:"clusters"`
+	Vcenter  *InventoryData            `json:"vcenter,omitempty"`
 
 	// VcenterId ID of the vCenter
 	VcenterId string `json:"vcenter_id"`
@@ -373,9 +373,9 @@ type VMs struct {
 
 	// DistributionByNicCount Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
 	DistributionByNicCount *map[string]int      `json:"distributionByNicCount,omitempty"`
-	MigrationWarnings      []MigrationIssue     `json:"migrationWarnings"`
+	MigrationWarnings      *[]MigrationIssue    `json:"migrationWarnings"`
 	NicCount               *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons   []MigrationIssue     `json:"notMigratableReasons"`
+	NotMigratableReasons   *[]MigrationIssue    `json:"notMigratableReasons"`
 	// Deprecated:
 	Os                          *map[string]int     `json:"os,omitempty"`
 	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
