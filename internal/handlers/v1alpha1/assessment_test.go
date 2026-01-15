@@ -393,7 +393,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
-						Name:       "valid-name_123+test.assessment",
+						Name:       "valid-name_123_test.assessment",
 						SourceType: service.SourceTypeInventory,
 						Inventory:  &inventory,
 					},

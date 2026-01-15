@@ -95,7 +95,7 @@ type AssessmentSourceType string
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
 	Inventory *Inventory          `json:"inventory,omitempty"`
-	Name      string              `json:"name" validate:"required,assessment_name,min=1,max=100"`
+	Name      string              `json:"name" validate:"required,assessment_name"`
 	SourceId  *openapi_types.UUID `json:"sourceId,omitempty"`
 
 	// SourceType Source of the assessment data:
@@ -113,13 +113,13 @@ type AssessmentRvtoolsForm struct {
 	File openapi_types.File `json:"file" validate:"required"`
 
 	// Name Name of the assessment
-	Name string `json:"name" validate:"required,assessment_name,min=1,max=100"`
+	Name string `json:"name" validate:"required,assessment_name"`
 }
 
 // AssessmentUpdate Update form of the assessment.
 type AssessmentUpdate struct {
 	// Name Name of the assessment
-	Name *string `json:"name,omitempty" validate:"required,assessment_name,min=1,max=100"`
+	Name *string `json:"name,omitempty" validate:"required,assessment_name"`
 }
 
 // ClusterRequirementsRequest Request payload for calculating cluster requirements
@@ -409,7 +409,7 @@ type Source struct {
 type SourceCreate struct {
 	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
 	Labels           *[]Label                   `json:"labels,omitempty" validate:"omitempty,dive,required"`
-	Name             ValidatedSourceName        `json:"name" validate:"required,source_name,min=1,max=100"`
+	Name             ValidatedSourceName        `json:"name" validate:"required,source_name"`
 	Network          *VmNetwork                 `json:"network,omitempty"`
 	Proxy            *AgentProxy                `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
@@ -422,7 +422,7 @@ type SourceList = []Source
 type SourceUpdate struct {
 	CertificateChain *ValidatedCertificateChain   `json:"certificateChain" validate:"omitnil,certs"`
 	Labels           *[]Label                     `json:"labels,omitempty" validate:"omitempty,dive,required"`
-	Name             *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name,min=1,max=100"`
+	Name             *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name"`
 	Network          *VmNetwork                   `json:"network,omitempty"`
 	Proxy            *AgentProxy                  `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey       `json:"sshPublicKey" validate:"omitnil,ssh_key"`
