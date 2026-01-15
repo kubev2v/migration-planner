@@ -9,6 +9,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -79,6 +80,10 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 	if name == "" {
 		logger.Error(fmt.Errorf("name is required")).Log()
 		return server.CreateRVToolsAssessment400JSONResponse{Message: "name is required", RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+	if err := validateRVToolsData(rvToolsNameForm{Name: name}); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 	if len(fileContent) == 0 {
 		logger.Error(fmt.Errorf("file is required")).Log()
@@ -169,4 +174,14 @@ func (h *ServiceHandler) CancelJob(ctx context.Context, request server.CancelJob
 	logger.Success().Log()
 
 	return server.CancelJob200JSONResponse(*job), nil
+}
+
+type rvToolsNameForm struct {
+	Name string `validate:"required,assessment_name,min=1,max=100"`
+}
+
+func validateRVToolsData(data interface{}) error {
+	v := validator.NewValidator()
+	v.Register(validator.NewJobValidationRules()...)
+	return v.Struct(data)
 }

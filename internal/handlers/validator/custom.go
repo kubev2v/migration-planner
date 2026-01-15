@@ -21,8 +21,8 @@ var (
 		regexp.MustCompile(`^ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT[0-9A-Za-z+/]+[=]{0,3}(\\s.*)?$`),
 	}
 
-	sourceNameValidRegex = regexp.MustCompile("^[a-zA-Z0-9+-_.]+$")
-	labelRegex           = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
+	nameValidRegex = regexp.MustCompile(`^[a-zA-Z0-9+-_.]+$`)
+	labelRegex     = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
 )
 
 func nameValidator(fl validator.FieldLevel) bool {
@@ -31,7 +31,7 @@ func nameValidator(fl validator.FieldLevel) bool {
 		return false
 	}
 
-	return sourceNameValidRegex.MatchString(val)
+	return nameValidRegex.MatchString(val)
 }
 
 func sshKeyValidator(fl validator.FieldLevel) bool {
