@@ -1,10 +1,14 @@
 package v1alpha1_test
 
 import (
+	"bytes"
 	"context"
+	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -78,6 +82,127 @@ var _ = Describe("job handler", Ordered, func() {
 			resp, err := srv.CancelJob(ctx, server.CancelJobRequestObject{Id: 123})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CancelJob404JSONResponse{}).String()))
+		})
+	})
+
+	Context("CreateRVToolsAssessment - name validation", func() {
+		var user auth.User
+		var ctx context.Context
+		var srv *handlers.ServiceHandler
+
+		// Helper function to create a multipart reader for testing
+		createMultipartReader := func(name string, fileContent string) *multipart.Reader {
+			var b bytes.Buffer
+			w := multipart.NewWriter(&b)
+
+			// Add name field
+			namePart, _ := w.CreateFormField("name")
+			_, _ = io.WriteString(namePart, name)
+
+			// Add file field
+			filePart, _ := w.CreateFormFile("file", "test.xlsx")
+			_, _ = io.WriteString(filePart, fileContent)
+
+			_ = w.Close()
+
+			return multipart.NewReader(&b, w.Boundary())
+		}
+
+		BeforeEach(func() {
+			user = auth.User{
+				Username:     "test-user",
+				Organization: "test-org",
+				FirstName:    "Test",
+				LastName:     "User",
+			}
+			ctx = auth.NewTokenContext(context.TODO(), user)
+			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s))
+		})
+
+		It("returns 400 when name is empty", func() {
+			reader := createMultipartReader("", "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
+		})
+
+		It("returns 400 when name contains spaces", func() {
+			reader := createMultipartReader("invalid name with spaces", "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
+		})
+
+		It("returns 400 when name contains special characters", func() {
+			reader := createMultipartReader("invalid@name#with$special%chars", "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
+		})
+
+		It("returns 400 when name exceeds 100 characters", func() {
+			// Create a name with 101 characters
+			longName := strings.Repeat("a", 101)
+			reader := createMultipartReader(longName, "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
+		})
+
+		It("returns 400 when name contains slash", func() {
+			reader := createMultipartReader("invalid/name", "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
+		})
+
+		It("returns 400 when name contains backslash", func() {
+			reader := createMultipartReader("invalid\\name", "file content")
+
+			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+				Body: reader,
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+
+			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
+			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
 	})
 })

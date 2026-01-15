@@ -833,12 +833,12 @@ components:
     ValidatedSourceName:
       type: string
       x-oapi-codegen-extra-tags:
-        validate: "required,source_name,min=1,max=100"
+        validate: "required,source_name"
 
     ValidatedOptionalSourceName:
       type: string
       x-oapi-codegen-extra-tags:
-        validate: "omitempty,source_name,min=1,max=100"
+        validate: "omitempty,source_name"
 
     ValidatedSSHPublicKey:
       type: string
@@ -1511,7 +1511,7 @@ components:
         name:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "required,assessment_name,min=1,max=100"
+            validate: "required,assessment_name"
         sourceType:
           type: string
           x-oapi-codegen-extra-tags:
@@ -1536,7 +1536,7 @@ components:
           type: string
           description: Name of the assessment
           x-oapi-codegen-extra-tags:
-            validate: "required,assessment_name,min=1,max=100"
+            validate: "required,assessment_name"
         file:
           type: string
           format: binary
@@ -1555,7 +1555,7 @@ components:
           type: string
           description: Name of the assessment
           x-oapi-codegen-extra-tags:
-            validate: "required,assessment_name,min=1,max=100"
+            validate: "required,assessment_name"
 
     AssessmentList:
       type: array
