@@ -55,3 +55,11 @@ func NewAssessmentValidationRules() []ValidationRule {
 		},
 	}
 }
+
+func NewJobValidationRules() []ValidationRule {
+	return []ValidationRule{
+		{
+			Rule: registerFn("assessment_name", nameValidator),
+		},
+	}
+}
