@@ -175,7 +175,7 @@ require (
 	github.com/tiendc/go-deepcopy v1.7.1 // indirect
 	github.com/tinylib/msgp v1.5.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
-	github.com/ugorji/go/codec v1.3.0 // indirect
+	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.31 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
