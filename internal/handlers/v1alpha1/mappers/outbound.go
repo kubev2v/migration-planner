@@ -12,6 +12,54 @@ import (
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
+// normalizeInventoryData ensures all nil maps and slices are initialized to empty ones
+// This prevents null values in JSON that can cause UI crashes when reading data from database
+func normalizeInventoryData(data *api.InventoryData) {
+	if data == nil {
+		return
+	}
+
+	// Normalize Infra fields
+	if data.Infra.Datastores == nil {
+		data.Infra.Datastores = []api.Datastore{}
+	}
+	if data.Infra.Networks == nil {
+		data.Infra.Networks = []api.Network{}
+	}
+	if data.Infra.HostPowerStates == nil {
+		data.Infra.HostPowerStates = map[string]int{}
+	}
+
+	// Normalize VMs fields
+	if data.Vms.PowerStates == nil {
+		data.Vms.PowerStates = map[string]int{}
+	}
+	if data.Vms.MigrationWarnings == nil {
+		data.Vms.MigrationWarnings = api.MigrationIssues{}
+	}
+	if data.Vms.NotMigratableReasons == nil {
+		data.Vms.NotMigratableReasons = api.MigrationIssues{}
+	}
+	if data.Vms.OsInfo == nil {
+		data.Vms.OsInfo = &map[string]api.OsInfo{}
+	}
+	if data.Vms.DiskSizeTier == nil {
+		data.Vms.DiskSizeTier = &map[string]api.DiskSizeTierSummary{}
+	}
+	if data.Vms.DiskTypes == nil {
+		data.Vms.DiskTypes = &map[string]api.DiskTypeSummary{}
+	}
+	if data.Vms.DistributionByCpuTier == nil {
+		data.Vms.DistributionByCpuTier = &map[string]int{}
+	}
+	if data.Vms.DistributionByMemoryTier == nil {
+		data.Vms.DistributionByMemoryTier = &map[string]int{}
+	}
+	if data.Vms.DistributionByNicCount == nil {
+		data.Vms.DistributionByNicCount = &map[string]int{}
+	}
+}
+
 func SourceToApi(s model.Source) (api.Source, error) {
 	source := api.Source{
 		Id:         s.ID,
@@ -33,6 +81,8 @@ func SourceToApi(s model.Source) (api.Source, error) {
 			if i.Vcenter == nil {
 				return api.Source{}, fmt.Errorf("v1 inventory missing vcenter data")
 			}
+			// Normalize to prevent null values from database
+			normalizeInventoryData(&i)
 			source.Inventory = &v1alpha1.Inventory{
 				Vcenter:   &i,
 				VcenterId: i.Vcenter.Id,
@@ -42,6 +92,18 @@ func SourceToApi(s model.Source) (api.Source, error) {
 			v2 := v1alpha1.Inventory{}
 			if err := json.Unmarshal(s.Inventory, &v2); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
+			}
+			// Ensure clusters map is never nil (fix for null values from database)
+			if v2.Clusters == nil {
+				v2.Clusters = make(map[string]api.InventoryData)
+			}
+			// Normalize vcenter and all cluster inventories to prevent null values
+			if v2.Vcenter != nil {
+				normalizeInventoryData(v2.Vcenter)
+			}
+			for clusterID, clusterData := range v2.Clusters {
+				normalizeInventoryData(&clusterData)
+				v2.Clusters[clusterID] = clusterData
 			}
 			source.Inventory = &v2
 		}
@@ -166,11 +228,29 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 				if err := json.Unmarshal(snapshot.Inventory, &invV1); err != nil {
 					return api.Assessment{}, err
 				}
+				// Normalize to prevent null values from database
+				normalizeInventoryData(&invV1)
 				inventory.Vcenter = &invV1
 				inventory.VcenterId = invV1.Vcenter.Id
+				// Ensure clusters is initialized
+				if inventory.Clusters == nil {
+					inventory.Clusters = make(map[string]api.InventoryData)
+				}
 			case 2:
 				if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
 					return api.Assessment{}, err
+				}
+				// Ensure clusters map is never nil (fix for null values from database)
+				if inventory.Clusters == nil {
+					inventory.Clusters = make(map[string]api.InventoryData)
+				}
+				// Normalize vcenter and all cluster inventories to prevent null values
+				if inventory.Vcenter != nil {
+					normalizeInventoryData(inventory.Vcenter)
+				}
+				for clusterID, clusterData := range inventory.Clusters {
+					normalizeInventoryData(&clusterData)
+					inventory.Clusters[clusterID] = clusterData
 				}
 			default:
 				return api.Assessment{}, fmt.Errorf("unsupported snapshot version: %d", snapshot.Version)

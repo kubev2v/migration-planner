@@ -84,6 +84,9 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		case *service.ErrSourceHasNoInventory:
 			logger.Error(err).WithString("step", "inventory_check").Log()
 			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+		case *service.ErrInventoryHasNoVMs:
+			logger.Error(err).WithString("step", "inventory_validation").Log()
+			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
 		case *service.ErrDuplicateKey:
 			logger.Error(err).WithString("step", "validate_input").Log()
 			return server.CreateAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil

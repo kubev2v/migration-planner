@@ -63,17 +63,28 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 			vms = []vsphere.VM{}
 		}
 
-		if len(vms) > 0 {
-			// Notify callback that we're transitioning to validation phase
-			if statusCallback != nil {
-				if err := statusCallback(string(api.Validating)); err != nil {
-					zap.S().Named("rvtools").Warnf("Failed to update status to validating: %v", err)
-				}
+		// Validate that at least one VM was found
+		if len(vms) == 0 {
+			if len(vInfoRows) <= 1 {
+				return nil, fmt.Errorf("no VMs found: vInfo sheet has no data rows (only header or empty)")
 			}
-			zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
-			if err := collector.ValidateVMs(ctx, opaValidator, vms); err != nil {
-				zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
+			vInfoColMap := buildColumnMap(vInfoRows[0])
+			if _, exists := vInfoColMap["vm"]; !exists {
+				return nil, fmt.Errorf("no VMs found: vInfo sheet is missing required 'VM' column")
 			}
+			return nil, fmt.Errorf("no VMs found: vInfo sheet has data rows but no valid VM data could be extracted")
+		}
+
+		// Run OPA validation (data quality validation, not business rule)
+		// Notify callback that we're transitioning to validation phase
+		if statusCallback != nil {
+			if err := statusCallback(string(api.Validating)); err != nil {
+				zap.S().Named("rvtools").Warnf("Failed to update status to validating: %v", err)
+			}
+		}
+		zap.S().Named("rvtools").Infof("Validating %d VMs using OPA validator", len(vms))
+		if err := collector.ValidateVMs(ctx, opaValidator, vms); err != nil {
+			zap.S().Named("rvtools").Warnf("At least one error during VMs validation: %v", err)
 		}
 
 		zap.S().Named("rvtools").Infof("Process Hosts and Clusters")
@@ -152,6 +163,26 @@ func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.
 		zap.S().Named("rvtools").Infof("Extract Cluster ID Mappings")
 		clusterMapping := ExtractClusterIDMapping(vInfoRows, vHostRows, vClusterRows, vcenterUUID)
 		zap.S().Named("rvtools").Infof("Found %d unique clusters", len(clusterMapping.ClusterIDs))
+
+		// Validate that at least one cluster was found
+		if len(clusterMapping.ClusterIDs) == 0 {
+			if len(vInfoRows) == 0 {
+				return nil, fmt.Errorf("no clusters found: vInfo sheet is empty - cannot determine clusters")
+			}
+			hasVClusterSheet := slices.Contains(sheets, "vCluster")
+			vInfoColMap := buildColumnMap(vInfoRows[0])
+			_, hasClusterColumn := vInfoColMap["cluster"]
+
+			vClusterStatus := "has no valid data"
+			if !hasVClusterSheet {
+				vClusterStatus = "is missing"
+			}
+			vInfoStatus := "has no valid data"
+			if !hasClusterColumn {
+				vInfoStatus = "is missing"
+			}
+			return nil, fmt.Errorf("no clusters found: vCluster sheet %s and vInfo 'cluster' column %s", vClusterStatus, vInfoStatus)
+		}
 
 		// Build network ID to name mapping for filtering
 		networkMapping := createNetworkMappings(dvPortRows).IDToName

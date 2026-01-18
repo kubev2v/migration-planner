@@ -73,6 +73,59 @@ func createMinimalTestExcel() []byte {
 			setCellValue(f, sheetName, cellRef, header)
 		}
 
+		// Set data rows
+		for rowIndex, row := range config.Rows {
+			for colIndex, value := range row {
+				cellRef := columnToLetter(colIndex) + fmt.Sprintf("%d", rowIndex+2)
+				setCellValue(f, sheetName, cellRef, value)
+			}
+		}
+	}
+
+	f.SetActiveSheet(vInfoIndex)
+
+	var buf bytes.Buffer
+	writeBuffer(f, &buf)
+	return buf.Bytes()
+}
+
+func createMinimalTestExcelWithVM() []byte {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	type SheetConfig struct {
+		Headers []string
+		Rows    [][]string
+	}
+
+	sheetConfigs := map[string]SheetConfig{
+		"vInfo": {
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster"},
+			Rows: [][]string{
+				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "cluster1"},
+			},
+		},
+		"vHost": {
+			Headers: []string{"Host", "Vendor", "Model", "Object ID", "Datacenter", "Cluster"},
+			Rows: [][]string{
+				{"esxi-host-1", "VMware", "ESXi", "host-001", "datacenter1", "cluster1"},
+			},
+		},
+	}
+
+	var vInfoIndex int
+	for sheetName, config := range sheetConfigs {
+		sheetIndex := newSheet(f, sheetName)
+		if sheetName == "vInfo" {
+			vInfoIndex = sheetIndex
+		}
+
+		// Set headers
+		for colIndex, header := range config.Headers {
+			cellRef := columnToLetter(colIndex) + "1"
+			setCellValue(f, sheetName, cellRef, header)
+		}
+
 		// Set data rows (empty in this case)
 		for rowIndex, row := range config.Rows {
 			for colIndex, value := range row {
@@ -100,10 +153,10 @@ func createSampleDataExcel() []byte {
 
 	sheetConfigs := map[string]SheetConfig{
 		"vInfo": {
-			Headers: []string{"VM", "VM ID", "VI SDK UUID", "CPUs", "Memory", "PowerState", "Cluster"},
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "PowerState", "Cluster"},
 			Rows: [][]string{
-				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "4", "8192", "poweredOn", "cluster1"},
-				{"test-vm-2", "vm-002", "87654321-4321-4321-4321-210987654321", "2", "4096", "poweredOff", "cluster1"},
+				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
+				{"test-vm-2", "vm-002", "87654321-4321-4321-4321-210987654321", "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
 			},
 		},
 		"vHost": {
@@ -187,9 +240,9 @@ func createComprehensiveVMDataExcel() []byte {
 
 	sheetConfigs := map[string]SheetConfig{
 		"vInfo": {
-			Headers: []string{"VM", "VM ID", "VI SDK UUID", "CPUs", "Memory", "PowerState", "Cluster"},
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "PowerState", "Cluster"},
 			Rows: [][]string{
-				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "4", "8192", "poweredOn", "cluster1"},
+				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
 			},
 		},
 		"vHost": {
@@ -293,8 +346,8 @@ var _ = Describe("Parser", func() {
 		})
 
 		Context("with minimal valid Excel data", func() {
-			It("should handle Excel with empty RVTools sheets", func() {
-				minimalExcel := createMinimalTestExcel()
+			It("should handle Excel with empty RVTools sheets (but with at least one VM)", func() {
+				minimalExcel := createMinimalTestExcelWithVM()
 
 				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil, nil)
 				Expect(err).ToNot(HaveOccurred())
@@ -310,12 +363,23 @@ var _ = Describe("Parser", func() {
 				Expect(response.VCenter.Infra).ToNot(BeNil())
 
 				By("verifying empty data is handled gracefully")
-				Expect(response.VCenter.Vms.Total).To(Equal(0))
-				Expect(response.VCenter.Infra.TotalHosts).To(Equal(0))
+				Expect(response.VCenter.Vms.Total).To(Equal(1))
+				Expect(response.VCenter.Infra.TotalHosts).To(Equal(1))
 
 				By("verifying empty collections are initialized")
 				Expect(response.VCenter.Infra.Datastores).To(BeEmpty())
 				Expect(response.VCenter.Infra.Networks).To(BeEmpty())
+			})
+
+			It("should reject Excel with no VMs", func() {
+				minimalExcel := createMinimalTestExcel()
+
+				inventory, err := rvtools.ParseRVTools(context.Background(), minimalExcel, nil, nil)
+				Expect(err).To(HaveOccurred())
+				Expect(inventory).To(BeNil())
+
+				By("verifying error message indicates no VMs found")
+				Expect(err.Error()).To(ContainSubstring("no VMs found"))
 			})
 		})
 

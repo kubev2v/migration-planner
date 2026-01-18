@@ -26,11 +26,40 @@ func CreateExcelOnlyWithVInfo() ([]byte, error) {
 	f.SetActiveSheet(sheetIndex)
 	_ = f.DeleteSheet("Sheet1")
 
-	// Set headers for vInfo
-	headers := []string{"VM", "VM ID", "VI SDK UUID"}
+	// Set headers for vInfo - include Host column for cluster extraction
+	headers := []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster"}
 	for colIndex, header := range headers {
 		cellRef := ColumnToLetter(colIndex) + "1"
 		if err := f.SetCellValue("vInfo", cellRef, header); err != nil {
+			return nil, err
+		}
+	}
+
+	// Add at least one VM data row to pass validation
+	vmRow := []string{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "cluster1"}
+	for colIndex, value := range vmRow {
+		cellRef := ColumnToLetter(colIndex) + "2"
+		if err := f.SetCellValue("vInfo", cellRef, value); err != nil {
+			return nil, err
+		}
+	}
+
+	// Add minimal vHost sheet with cluster info for cluster extraction
+	_, err = f.NewSheet("vHost")
+	if err != nil {
+		return nil, err
+	}
+	vHostHeaders := []string{"Host", "Vendor", "Model", "Object ID", "Datacenter", "Cluster"}
+	for colIndex, header := range vHostHeaders {
+		cellRef := ColumnToLetter(colIndex) + "1"
+		if err := f.SetCellValue("vHost", cellRef, header); err != nil {
+			return nil, err
+		}
+	}
+	vHostRow := []string{"esxi-host-1", "VMware", "ESXi", "host-001", "datacenter1", "cluster1"}
+	for colIndex, value := range vHostRow {
+		cellRef := ColumnToLetter(colIndex) + "2"
+		if err := f.SetCellValue("vHost", cellRef, value); err != nil {
 			return nil, err
 		}
 	}
@@ -59,6 +88,7 @@ func CreateLargeExcel() ([]byte, error) {
 			fmt.Sprintf("test-vm-%d", i),
 			fmt.Sprintf("vm-%03d", i),
 			fmt.Sprintf("12345678-1234-1234-1234-%012d", i),
+			"esxi-host-1",
 			"4",
 			"8192",
 			"poweredOn",
@@ -68,13 +98,13 @@ func CreateLargeExcel() ([]byte, error) {
 
 	sheetConfigs := map[string]SheetConfig{
 		"vInfo": {
-			Headers: []string{"VM", "VM ID", "VI SDK UUID", "CPUs", "Memory", "PowerState", "Cluster"},
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "PowerState", "Cluster"},
 			Rows:    vmRows,
 		},
 		"vHost": {
-			Headers: []string{"Host", "Vendor", "Model", "Object ID"},
+			Headers: []string{"Host", "Vendor", "Model", "Object ID", "Datacenter", "Cluster"},
 			Rows: [][]string{
-				{"esxi-host-1", "VMware", "ESXi", "host-001"},
+				{"esxi-host-1", "VMware", "ESXi", "host-001", "datacenter1", "cluster1"},
 			},
 		},
 	}
@@ -130,10 +160,10 @@ func CreateValidTestExcel() ([]byte, error) {
 
 	sheetConfigs := map[string]SheetConfig{
 		"vInfo": {
-			Headers: []string{"VM", "VM ID", "VI SDK UUID", "CPUs", "Memory", "PowerState", "Cluster"},
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "PowerState", "Cluster"},
 			Rows: [][]string{
-				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "4", "8192", "poweredOn", "cluster1"},
-				{"test-vm-2", "vm-002", "87654321-4321-4321-4321-210987654321", "2", "4096", "poweredOff", "cluster1"},
+				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
+				{"test-vm-2", "vm-002", "87654321-4321-4321-4321-210987654321", "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
 			},
 		},
 		"vHost": {
@@ -181,6 +211,91 @@ func CreateValidTestExcel() ([]byte, error) {
 	}
 
 	f.SetActiveSheet(vInfoIndex)
+
+	var buf bytes.Buffer
+	if _, err := f.WriteTo(&buf); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// CreateExample1Excel creates a valid example Excel file matching the format expected by e2e tests
+// This replaces the static example1.xlsx file with a dynamically generated one that meets validation requirements
+func CreateExample1Excel() ([]byte, error) {
+	f := excelize.NewFile()
+	defer f.Close()
+
+	type SheetConfig struct {
+		Headers []string
+		Rows    [][]string
+	}
+
+	sheetConfigs := map[string]SheetConfig{
+		"vInfo": {
+			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "PowerState", "Cluster"},
+			Rows: [][]string{
+				{"example-vm-1", "vm-example-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
+				{"example-vm-2", "vm-example-002", "87654321-4321-4321-4321-210987654321", "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
+			},
+		},
+		"vHost": {
+			Headers: []string{"Host", "Vendor", "Model", "Object ID", "Datacenter", "Cluster"},
+			Rows: [][]string{
+				{"esxi-host-1", "VMware", "ESXi", "host-001", "datacenter1", "cluster1"},
+				{"esxi-host-2", "VMware", "ESXi", "host-002", "datacenter1", "cluster1"},
+			},
+		},
+		"vDatastore": {
+			Headers: []string{"Name", "Type", "Capacity MiB", "Free MiB", "Object ID"},
+			Rows: [][]string{
+				{"datastore1", "VMFS", "1048576", "524288", "datastore-001"},
+			},
+		},
+		"dvSwitch": {
+			Headers: []string{"Switch", "Datacenter"},
+			Rows: [][]string{
+				{"dvSwitch1", "datacenter1"},
+			},
+		},
+		"dvPort": {
+			Headers: []string{"Port", "Switch", "VLAN"},
+			Rows: [][]string{
+				{"VM Network", "dvSwitch1", "100"},
+			},
+		},
+	}
+
+	var vInfoIndex int
+	for sheetName, config := range sheetConfigs {
+		sheetIndex, err := f.NewSheet(sheetName)
+		if err != nil {
+			return nil, err
+		}
+		if sheetName == "vInfo" {
+			vInfoIndex = sheetIndex
+		}
+
+		// Set headers
+		for colIndex, header := range config.Headers {
+			cellRef := ColumnToLetter(colIndex) + "1"
+			if err := f.SetCellValue(sheetName, cellRef, header); err != nil {
+				return nil, err
+			}
+		}
+
+		// Set data rows
+		for rowIndex, row := range config.Rows {
+			for colIndex, value := range row {
+				cellRef := ColumnToLetter(colIndex) + fmt.Sprintf("%d", rowIndex+2)
+				if err := f.SetCellValue(sheetName, cellRef, value); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
+
+	f.SetActiveSheet(vInfoIndex)
+	_ = f.DeleteSheet("Sheet1")
 
 	var buf bytes.Buffer
 	if _, err := f.WriteTo(&buf); err != nil {

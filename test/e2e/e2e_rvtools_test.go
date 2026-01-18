@@ -3,7 +3,6 @@ package e2e_test
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -47,12 +46,15 @@ var _ = Describe("e2e-rvtools", func() {
 		It("Create an assessment from a rvtools file", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			pwd, err := os.Getwd()
-			Expect(err).To(BeNil(), "Failed to get current directory")
+			// Generate a valid example Excel file that meets validation requirements
+			exampleContent, err := CreateExample1Excel()
+			Expect(err).To(BeNil(), "Failed to generate example Excel file")
+			tmpFile, err := CreateTempExcelFile(exampleContent)
+			Expect(err).To(BeNil(), "Failed to create temporary Excel file")
+			defer os.Remove(tmpFile)
 
 			// Create Assessment
-			assessment, err = svc.CreateAssessmentFromRvtools("assessment",
-				filepath.Join(pwd, "data/example_rvtools_files/example1.xlsx"))
+			assessment, err = svc.CreateAssessmentFromRvtools("assessment", tmpFile)
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
 

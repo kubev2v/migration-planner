@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/rvtools"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -70,6 +71,17 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 			logger.Error(updateErr).WithString("step", "update_failed_status").Log()
 		}
 		return err
+	}
+
+	// Parser validates both VMs and clusters, so this is a redundant safety check
+	// Kept as defense-in-depth since worker bypasses service layer
+	if err := util.ValidateInventoryHasVMs(inventory); err != nil {
+		errMsg := fmt.Sprintf("parsed inventory validation failed: %v", err)
+		logger.Error(err).WithString("step", "validate_inventory").Log()
+		if updateErr := w.updateJobStatus(ctx, job.ID, model.JobStatusFailed, errMsg, nil); updateErr != nil {
+			logger.Error(updateErr).WithString("step", "update_failed_status").Log()
+		}
+		return fmt.Errorf("parsed inventory validation failed: %w", err)
 	}
 
 	// Check for cancellation before creating assessment

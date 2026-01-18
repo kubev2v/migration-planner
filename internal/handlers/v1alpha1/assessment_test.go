@@ -23,6 +23,25 @@ const (
 	insertSnapshotStm   = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s'::jsonb, '%s');"
 )
 
+// createMinimalInventory returns a minimal valid inventory for testing
+// with a single VM to satisfy validation requirements
+func createMinimalInventory() v1alpha1.Inventory {
+	return v1alpha1.Inventory{
+		VcenterId: "test-vcenter",
+		Vcenter: &v1alpha1.InventoryData{
+			Vms: v1alpha1.VMs{
+				Total: 1,
+			},
+		},
+	}
+}
+
+// createMinimalInventoryJSON returns a minimal valid inventory JSON string for testing
+// with a single VM to satisfy validation requirements
+func createMinimalInventoryJSON() string {
+	return `{"vcenter": {"id": "test-vcenter"}, "vms": {"total": 1}}`
+}
+
 var _ = Describe("assessment handler", Ordered, func() {
 	var (
 		s      store.Store
@@ -126,9 +145,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			inventory := v1alpha1.Inventory{
-				VcenterId: "test-vcenter",
-			}
+			inventory := createMinimalInventory()
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s))
 			resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
@@ -164,9 +181,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			inventory := v1alpha1.Inventory{
-				VcenterId: "test-vcenter",
-			}
+			inventory := createMinimalInventory()
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s))
 
@@ -199,7 +214,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			// Add inventory to the source
-			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+			inventoryJSON := createMinimalInventoryJSON()
 			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 			Expect(tx.Error).To(BeNil())
 
@@ -318,9 +333,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		Context("name validation", func() {
 			It("fails with empty name", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -334,9 +347,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("fails with name containing spaces", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -350,9 +361,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("fails with name containing special characters", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -366,9 +375,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("fails with name too long (over 100 characters)", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				longName := "a"
 				for i := 0; i < 101; i++ {
@@ -387,9 +394,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("succeeds with valid name containing allowed characters", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -405,9 +410,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		Context("sourceType validation", func() {
 			It("fails with empty sourceType", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -421,9 +424,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("fails with invalid sourceType", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -437,9 +438,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("succeeds with valid sourceType 'inventory'", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -458,7 +457,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
 				Expect(tx.Error).To(BeNil())
 
-				inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+				inventoryJSON := createMinimalInventoryJSON()
 				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 				Expect(tx.Error).To(BeNil())
 
@@ -529,6 +528,55 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Expect(errorResp.Message).To(ContainSubstring("inventory has no vCenterID"))
 			})
 
+			It("fails when sourceType is 'inventory' but inventory has no VMs", func() {
+				// Inventory with vcenter but no VMs
+				inventoryNoVMs := v1alpha1.Inventory{
+					VcenterId: "test-vcenter",
+					Vcenter: &v1alpha1.InventoryData{
+						Vms: v1alpha1.VMs{
+							Total: 0, // No VMs
+						},
+					},
+				}
+
+				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
+					Body: &v1alpha1.AssessmentForm{
+						Name:       "test-assessment",
+						SourceType: service.SourceTypeInventory,
+						Inventory:  &inventoryNoVMs,
+					},
+				})
+				Expect(err).To(BeNil())
+				Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateAssessment400JSONResponse{}).String()))
+
+				errorResp := resp.(server.CreateAssessment400JSONResponse)
+				Expect(errorResp.Message).To(ContainSubstring("no VMs found in inventory"))
+			})
+
+			It("fails when sourceType is 'agent' but source inventory has no VMs", func() {
+				// Create a source with inventory that has no VMs
+				sourceID := uuid.New()
+				tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
+				Expect(tx.Error).To(BeNil())
+
+				inventoryJSON := `{"vcenter": {"id": "test-vcenter"}, "vms": {"total": 0}}`
+				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
+				Expect(tx.Error).To(BeNil())
+
+				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
+					Body: &v1alpha1.AssessmentForm{
+						Name:       "test-assessment",
+						SourceType: service.SourceTypeAgent,
+						SourceId:   &sourceID,
+					},
+				})
+				Expect(err).To(BeNil())
+				Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateAssessment400JSONResponse{}).String()))
+
+				errorResp := resp.(server.CreateAssessment400JSONResponse)
+				Expect(errorResp.Message).To(ContainSubstring("no VMs found in inventory"))
+			})
+
 			It("fails when sourceType is 'agent' but no sourceId is provided", func() {
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -545,9 +593,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("succeeds when sourceType is 'inventory' and inventory is provided", func() {
-				inventory := v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-				}
+				inventory := createMinimalInventory()
 
 				resp, err := srv.CreateAssessment(ctx, server.CreateAssessmentRequestObject{
 					Body: &v1alpha1.AssessmentForm{
@@ -566,7 +612,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 				tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
 				Expect(tx.Error).To(BeNil())
 
-				inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
+				inventoryJSON := createMinimalInventoryJSON()
 				tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s';", inventoryJSON, sourceID.String()))
 				Expect(tx.Error).To(BeNil())
 
