@@ -8,10 +8,10 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/google/uuid"
-
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -118,9 +118,35 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
 		inventory = source.Inventory
+		// Validate inventory has VMs before creating assessment
+		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
+			switch err.(type) {
+			case *util.ErrNoVMsInInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			case *util.ErrInventoryUnmarshalError:
+				return nil, fmt.Errorf("inventory data corruption: %w", err)
+			case *util.ErrEmptyInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			default:
+				return nil, fmt.Errorf("inventory validation failed: %w", err)
+			}
+		}
 	case SourceTypeInventory:
 		tracer.Step("process_inventory_source").Log()
 		inventory = createForm.Inventory
+		// Validate inventory has VMs before creating assessment
+		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
+			switch err.(type) {
+			case *util.ErrNoVMsInInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			case *util.ErrInventoryUnmarshalError:
+				return nil, fmt.Errorf("inventory data corruption: %w", err)
+			case *util.ErrEmptyInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			default:
+				return nil, fmt.Errorf("inventory validation failed: %w", err)
+			}
+		}
 	}
 
 	ctx, err := as.store.NewTransactionContext(ctx)

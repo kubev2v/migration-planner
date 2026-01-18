@@ -176,11 +176,12 @@ func (c *Collector) run(ctx context.Context) {
 
 	apiDatastores, datastoreIndexToName, datastoreMapping := getDatastores(hosts, datastores)
 	apiNetworks, networkMapping := getNetworks(networks, collector, CountVmsByNetwork(*vms))
+	hostPowerStates := getHostPowerStates(*hosts)
 
 	infraData := service.InfrastructureData{
 		Datastores:            apiDatastores,
 		Networks:              apiNetworks,
-		HostPowerStates:       getHostPowerStates(*hosts),
+		HostPowerStates:       hostPowerStates,
 		Hosts:                 getHosts(hosts),
 		ClustersPerDatacenter: *clustersPerDatacenter(datacenters, collector),
 		TotalHosts:            len(*hosts),

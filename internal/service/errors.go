@@ -71,6 +71,14 @@ func NewErrSourceHasNoInventory(sourceID uuid.UUID) *ErrSourceHasNoInventory {
 	return &ErrSourceHasNoInventory{fmt.Errorf("source has no inventory: %s", sourceID)}
 }
 
+type ErrInventoryHasNoVMs struct {
+	error
+}
+
+func NewErrInventoryHasNoVMs() *ErrInventoryHasNoVMs {
+	return &ErrInventoryHasNoVMs{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
+}
+
 type ErrDuplicateKey struct {
 	error
 }
