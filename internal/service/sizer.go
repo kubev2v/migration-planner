@@ -429,13 +429,14 @@ func (s *SizerService) calculateMinimumNodeSize(inventoryCPU, inventoryMemory in
 
 // formatNodeSizeError creates a standardized error message for node size validation failures
 func (s *SizerService) formatNodeSizeError(workerCPU, workerMemory, inventoryCPU, inventoryMemory, minCPU, minMemory int) error {
-	return fmt.Errorf(
+	message := fmt.Sprintf(
 		"worker node size (%d CPU / %d GB) is too small for this inventory (%d CPU / %d GB). "+
 			"Please use larger worker nodes (recommended: at least %d CPU / %d GB)",
 		workerCPU, workerMemory,
 		inventoryCPU, inventoryMemory,
 		minCPU, minMemory,
 	)
+	return NewErrInvalidRequest(message)
 }
 
 // buildSizerPayload transforms batched services into sizer API format
