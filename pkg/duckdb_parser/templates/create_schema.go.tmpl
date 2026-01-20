@@ -11,7 +11,7 @@ Column types are based on how they are used in the query templates:
 No template parameters required.
 */ -}}
 CREATE TABLE IF NOT EXISTS vinfo (
-    "VM ID" VARCHAR,
+    "VM ID" VARCHAR PRIMARY KEY,
     "VM" VARCHAR,
     "Folder ID" VARCHAR,
     "Folder" VARCHAR,
@@ -71,13 +71,15 @@ CREATE TABLE IF NOT EXISTS vcpu (
     "Hot Add" BOOLEAN DEFAULT false,
     "Hot Remove" BOOLEAN DEFAULT false,
     "Sockets" INTEGER DEFAULT 0,
-    "Cores p/s" INTEGER DEFAULT 0
+    "Cores p/s" INTEGER DEFAULT 0,
+    FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
 CREATE TABLE IF NOT EXISTS vmemory (
     "VM ID" VARCHAR,
     "Hot Add" BOOLEAN DEFAULT false,
-    "Ballooned" INTEGER DEFAULT 0
+    "Ballooned" INTEGER DEFAULT 0,
+    FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
 CREATE TABLE IF NOT EXISTS vdisk (
@@ -95,7 +97,8 @@ CREATE TABLE IF NOT EXISTS vdisk (
     "Thin" BOOLEAN DEFAULT false,
     "Controller" VARCHAR,
     "Label" VARCHAR,
-    "SCSI Unit #" VARCHAR
+    "SCSI Unit #" VARCHAR,
+    FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
 CREATE TABLE IF NOT EXISTS vnetwork (
@@ -110,7 +113,8 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     "Type" VARCHAR,
     "IPv4 Address" VARCHAR,
     "IPv6 Address" VARCHAR,
-    "Cluster" VARCHAR
+    "Cluster" VARCHAR,
+    FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
 CREATE TABLE IF NOT EXISTS vhost (
@@ -150,5 +154,6 @@ CREATE TABLE IF NOT EXISTS concerns (
     "Concern_ID" VARCHAR,
     "Label" VARCHAR,
     "Category" VARCHAR,
-    "Assessment" VARCHAR
+    "Assessment" VARCHAR,
+    FOREIGN KEY ("VM_ID") REFERENCES vinfo("VM ID")
 );

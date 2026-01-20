@@ -62,6 +62,7 @@ type queryParams struct {
 	ClusterFilter    string
 	OSFilter         string
 	PowerStateFilter string
+	VmIDFilter       string
 	Category         string
 	Limit            int
 	Offset           int
@@ -81,6 +82,7 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 		ClusterFilter:    filters.Cluster,
 		OSFilter:         filters.OS,
 		PowerStateFilter: filters.PowerState,
+		VmIDFilter:       filters.VmId,
 		Limit:            options.Limit,
 		Offset:           options.Offset,
 	}

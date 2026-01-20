@@ -112,6 +112,7 @@ LEFT JOIN concerns_agg con ON i."VM ID" = con."VM_ID"
 WHERE 1=1
 {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
 {{- if .OSFilter }} AND i."OS according to the configuration file" LIKE '%{{.OSFilter}}%'{{end}}
+{{- if .VmIDFilter }} AND i."VM ID" = '{{.VmIDFilter}}'{{end}}
 {{- if .PowerStateFilter }} AND i."Powerstate" = '{{.PowerStateFilter}}'{{end}}
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

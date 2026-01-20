@@ -3,6 +3,7 @@ package duckdb_parser
 // Filters for querying data.
 type Filters struct {
 	Cluster    string // filter by cluster name
+	VmId       string // filter by vm ID
 	OS         string // filter by OS name (for VMs)
 	PowerState string // filter by power state (for VMs)
 }
