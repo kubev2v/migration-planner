@@ -1,18 +1,22 @@
 {{- /*
 Disk Size Tier Query Template - Returns VM distribution by total disk size tier.
 
+This query counts ALL VMs from vinfo, including those with 0 disks.
+VMs with no disk entries are counted with 0 TB capacity and fall into "Easy (0-10TB)".
+This matches the old implementation behavior.
+
 Template Parameters:
   - ClusterFilter: filter by cluster name
 */ -}}
 WITH vm_disk_totals AS (
     SELECT
-        d."VM ID",
-        SUM(d."Capacity MiB") / 1048576.0 AS total_disk_tb
-    FROM vdisk d
-    JOIN vinfo i ON d."VM ID" = i."VM ID"
+        i."VM ID",
+        COALESCE(SUM(d."Capacity MiB"), 0) / 1048576.0 AS total_disk_tb
+    FROM vinfo i
+    LEFT JOIN vdisk d ON i."VM ID" = d."VM ID"
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
-    GROUP BY d."VM ID"
+    GROUP BY i."VM ID"
 )
 SELECT
     CASE

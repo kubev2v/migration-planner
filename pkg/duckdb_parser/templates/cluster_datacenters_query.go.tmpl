@@ -1,0 +1,9 @@
+{{- /*
+Cluster Datacenters Query Template - Returns cluster to datacenter mapping.
+Used for generating anonymous cluster IDs.
+*/ -}}
+SELECT DISTINCT "Cluster", "Datacenter"
+FROM vinfo
+WHERE "Cluster" IS NOT NULL AND "Cluster" != ''
+  AND "Datacenter" IS NOT NULL AND "Datacenter" != ''
+ORDER BY "Cluster";

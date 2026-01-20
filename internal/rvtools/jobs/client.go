@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
-
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -13,6 +11,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/opa"
 )
 
 // Client wraps the River client and provides job management functionality.
@@ -29,8 +28,9 @@ func NewClient(ctx context.Context, cfg *config.Config, s store.Store, opaValida
 		return nil, fmt.Errorf("creating pgx pool: %w", err)
 	}
 
-	// Create worker with store
-	worker := NewRVToolsWorker(opaValidator, s)
+	// Create worker with store and OPA validator (each job creates its own DuckDB instance)
+	// opa.Validator now directly implements duckdb_parser.Validator
+	worker := NewRVToolsWorker(s, opaValidator)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)

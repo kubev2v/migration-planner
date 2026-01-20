@@ -3,9 +3,12 @@ Resource Breakdowns Query Template - Calculates resource totals split by migrabi
 
 Returns CPU cores, RAM GB, Disk count, Disk GB, and NIC count, each split by:
 - Total
-- Migratable (no Critical concerns)
+- Migratable (no Critical concerns AND no Warning concerns - clean VMs)
 - MigratableWithWarnings (has Warning but no Critical)
 - NotMigratable (has Critical concerns)
+
+This matches the old implementation behavior where TotalForMigratable only counts
+resources for VMs that are fully migratable without any warnings.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
@@ -17,7 +20,7 @@ WITH vm_concerns AS (
         MAX(CASE WHEN c."Category" = 'Warning' THEN 1 ELSE 0 END) as has_warning
     FROM vinfo i
     LEFT JOIN concerns c ON i."VM ID" = c."VM_ID"
-    WHERE i."Cluster" IS NOT NULL
+    WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
     GROUP BY i."VM ID"
 ),
@@ -30,7 +33,7 @@ vm_resources AS (
         COALESCE(vc.has_warning, 0) as has_warning
     FROM vinfo i
     LEFT JOIN vm_concerns vc ON i."VM ID" = vc.vm_id
-    WHERE i."Cluster" IS NOT NULL
+    WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
 ),
 disk_resources AS (
@@ -40,7 +43,7 @@ disk_resources AS (
         COALESCE(SUM(d."Capacity MiB"), 0) as disk_mib
     FROM vdisk d
     JOIN vinfo i ON d."VM ID" = i."VM ID"
-    WHERE i."Cluster" IS NOT NULL
+    WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
     GROUP BY d."VM ID"
 ),
@@ -50,7 +53,7 @@ nic_resources AS (
         COUNT(*) as nic_count
     FROM vnetwork n
     JOIN vinfo i ON n."VM ID" = i."VM ID"
-    WHERE i."Cluster" IS NOT NULL
+    WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
     GROUP BY n."VM ID"
 ),
@@ -71,27 +74,27 @@ combined AS (
 SELECT
     -- CPU Cores
     COALESCE(SUM(cpu_cores), 0)::integer as cpu_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 THEN cpu_cores ELSE 0 END), 0)::integer as cpu_migratable,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN cpu_cores ELSE 0 END), 0)::integer as cpu_migratable,
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN cpu_cores ELSE 0 END), 0)::integer as cpu_migratable_warnings,
     COALESCE(SUM(CASE WHEN has_critical = 1 THEN cpu_cores ELSE 0 END), 0)::integer as cpu_not_migratable,
-    -- RAM GB
-    COALESCE(SUM(memory_mb / 1024), 0)::integer as ram_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 THEN memory_mb / 1024 ELSE 0 END), 0)::integer as ram_migratable,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN memory_mb / 1024 ELSE 0 END), 0)::integer as ram_migratable_warnings,
-    COALESCE(SUM(CASE WHEN has_critical = 1 THEN memory_mb / 1024 ELSE 0 END), 0)::integer as ram_not_migratable,
+    -- RAM GB (round per-VM before summing to match old implementation)
+    COALESCE(SUM(ROUND(memory_mb / 1024.0)), 0)::integer as ram_total,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN ROUND(memory_mb / 1024.0) ELSE 0 END), 0)::integer as ram_migratable,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN ROUND(memory_mb / 1024.0) ELSE 0 END), 0)::integer as ram_migratable_warnings,
+    COALESCE(SUM(CASE WHEN has_critical = 1 THEN ROUND(memory_mb / 1024.0) ELSE 0 END), 0)::integer as ram_not_migratable,
     -- Disk Count
     COALESCE(SUM(disk_count), 0)::integer as disk_count_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 THEN disk_count ELSE 0 END), 0)::integer as disk_count_migratable,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN disk_count ELSE 0 END), 0)::integer as disk_count_migratable,
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN disk_count ELSE 0 END), 0)::integer as disk_count_migratable_warnings,
     COALESCE(SUM(CASE WHEN has_critical = 1 THEN disk_count ELSE 0 END), 0)::integer as disk_count_not_migratable,
-    -- Disk GB
-    COALESCE(SUM(disk_mib / 1024), 0)::integer as disk_gb_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 THEN disk_mib / 1024 ELSE 0 END), 0)::integer as disk_gb_migratable,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN disk_mib / 1024 ELSE 0 END), 0)::integer as disk_gb_migratable_warnings,
-    COALESCE(SUM(CASE WHEN has_critical = 1 THEN disk_mib / 1024 ELSE 0 END), 0)::integer as disk_gb_not_migratable,
+    -- Disk GB (round per-VM before summing to match old implementation)
+    COALESCE(SUM(ROUND(disk_mib / 1024.0)), 0)::integer as disk_gb_total,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_migratable,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_migratable_warnings,
+    COALESCE(SUM(CASE WHEN has_critical = 1 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_not_migratable,
     -- NIC Count
     COALESCE(SUM(nic_count), 0)::integer as nic_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable,
+    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable,
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable_warnings,
     COALESCE(SUM(CASE WHEN has_critical = 1 THEN nic_count ELSE 0 END), 0)::integer as nic_not_migratable
 FROM combined;

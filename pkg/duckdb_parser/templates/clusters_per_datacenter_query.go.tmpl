@@ -1,8 +1,11 @@
 {{- /*
 Clusters Per Datacenter Query Template - Returns cluster count per datacenter.
+
+Uses vhost table to match old implementation behavior which extracted
+cluster and datacenter info from the vHost sheet.
 */ -}}
 SELECT "Datacenter", COUNT(DISTINCT "Cluster") AS cluster_count
-FROM vinfo
+FROM vhost
 WHERE "Datacenter" IS NOT NULL AND "Datacenter" != ''
 GROUP BY "Datacenter"
 ORDER BY "Datacenter";

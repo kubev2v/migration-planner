@@ -1,5 +1,7 @@
 package duckdb_parser
 
+import "github.com/kubev2v/migration-planner/pkg/inventory"
+
 // Filters for querying data.
 type Filters struct {
 	Cluster    string // filter by cluster name
@@ -23,41 +25,12 @@ type ResourceTotals struct {
 	TotalNICCount  int
 }
 
-// DiskTypeSummary contains disk usage aggregated by datastore type.
-type DiskTypeSummary struct {
-	Type        string
-	VMCount     int
-	TotalSizeTB float64
-}
-
-// DiskSizeTierSummary contains VM count and total size for a disk size tier.
-type DiskSizeTierSummary struct {
-	VMCount     int
-	TotalSizeTB float64
-}
-
-// MigrationIssue represents an aggregated migration issue.
-type MigrationIssue struct {
-	ID         string
-	Label      string
-	Category   string
-	Assessment string
-	Count      int
-}
-
-// VMResourceBreakdown contains resource totals split by migrability status.
-type VMResourceBreakdown struct {
-	Total                          int
-	TotalForMigratable             int
-	TotalForMigratableWithWarnings int
-	TotalForNotMigratable          int
-}
-
 // AllResourceBreakdowns holds all resource breakdowns by migrability.
+// Uses inventory.ResourceBreakdown to avoid type duplication.
 type AllResourceBreakdowns struct {
-	CpuCores  VMResourceBreakdown
-	RamGB     VMResourceBreakdown
-	DiskCount VMResourceBreakdown
-	DiskGB    VMResourceBreakdown
-	NicCount  VMResourceBreakdown
+	CpuCores  inventory.ResourceBreakdown
+	RamGB     inventory.ResourceBreakdown
+	DiskCount inventory.ResourceBreakdown
+	DiskGB    inventory.ResourceBreakdown
+	NicCount  inventory.ResourceBreakdown
 }

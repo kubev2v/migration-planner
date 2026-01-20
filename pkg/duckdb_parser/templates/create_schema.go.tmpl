@@ -46,24 +46,7 @@ CREATE TABLE IF NOT EXISTS vinfo (
     "Network #5" VARCHAR,
     "Network #6" VARCHAR,
     "Network #7" VARCHAR,
-    "Network #8" VARCHAR,
-    "Network #9" VARCHAR,
-    "Network #10" VARCHAR,
-    "Network #11" VARCHAR,
-    "Network #12" VARCHAR,
-    "Network #13" VARCHAR,
-    "Network #14" VARCHAR,
-    "Network #15" VARCHAR,
-    "Network #16" VARCHAR,
-    "Network #17" VARCHAR,
-    "Network #18" VARCHAR,
-    "Network #19" VARCHAR,
-    "Network #20" VARCHAR,
-    "Network #21" VARCHAR,
-    "Network #22" VARCHAR,
-    "Network #23" VARCHAR,
-    "Network #24" VARCHAR,
-    "Network #25" VARCHAR
+    "Network #8" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS vcpu (
@@ -118,6 +101,7 @@ CREATE TABLE IF NOT EXISTS vnetwork (
 );
 
 CREATE TABLE IF NOT EXISTS vhost (
+    "Datacenter" VARCHAR,
     "Cluster" VARCHAR,
     "# Cores" INTEGER DEFAULT 0,
     "# CPU" INTEGER DEFAULT 0,
@@ -133,6 +117,7 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "Hosts" VARCHAR,
     "Address" VARCHAR,
     "Name" VARCHAR,
+    "Object ID" VARCHAR,
     "Free MiB" DOUBLE DEFAULT 0.0,
     "MHA" BOOLEAN DEFAULT false,
     "Capacity MiB" DOUBLE DEFAULT 0.0,
@@ -146,7 +131,12 @@ CREATE TABLE IF NOT EXISTS vhba (
 
 CREATE TABLE IF NOT EXISTS dvport (
     "Port" VARCHAR,
-    "VLAN" VARCHAR
+    "VLAN" VARCHAR,
+    "Switch" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS dvswitch (
+    "Name" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS concerns (
@@ -156,4 +146,9 @@ CREATE TABLE IF NOT EXISTS concerns (
     "Category" VARCHAR,
     "Assessment" VARCHAR,
     FOREIGN KEY ("VM_ID") REFERENCES vinfo("VM ID")
+);
+
+CREATE TABLE IF NOT EXISTS vcluster (
+    "Name" VARCHAR,
+    "Object ID" VARCHAR
 );
