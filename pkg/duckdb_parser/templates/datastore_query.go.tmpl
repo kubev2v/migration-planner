@@ -4,11 +4,16 @@ Datastore Query Template - Extracts datastore data from the fixed schema.
 The schema always has vdatastore, vhost, and vhba tables. LEFT JOIN handles
 cases where vhba is empty.
 
+For vcenter-level queries (no ClusterFilter), return ALL datastores.
+For cluster-level queries, filter to datastores used by hosts in that cluster.
+
 Template Parameters:
   - ClusterFilter: filter by cluster name
   - Limit: max results (0 = unlimited)
   - Offset: skip first N results
 */ -}}
+{{- if .ClusterFilter }}
+-- Cluster-level: filter to datastores used by hosts in the cluster
 WITH expanded AS (
     SELECT
         d.*,
@@ -31,6 +36,7 @@ with_host AS (
         e.hba_device
     FROM expanded e
     JOIN vhost vh ON vh.Host = e.ip
+    WHERE vh."Cluster" = '{{.ClusterFilter}}'
 ),
 with_hba AS (
     SELECT DISTINCT
@@ -50,7 +56,7 @@ with_hba AS (
 SELECT
     w."Cluster" as "cluster",
     COALESCE(w."Address", w."Name") as "diskId",
-    (w."Free MiB"::double / 1024)::integer as "freeCapacityGB",
+    ROUND(w."Free MiB"::double / 1024)::integer as "freeCapacityGB",
     COALESCE(w."MHA", false) as "hardwareAcceleratedMove",
     COALESCE(string_agg(DISTINCT w."Object ID", ', '), 'N/A') AS "hostId",
     'N/A' as "model",
@@ -60,12 +66,46 @@ SELECT
         WHEN w.hba_type IS NOT NULL THEN w.hba_type
         ELSE 'N/A'
     END as "protocolType",
-    (w."Capacity MiB"::double / 1024)::integer as "totalCapacityGB",
+    ROUND(w."Capacity MiB"::double / 1024)::integer as "totalCapacityGB",
     COALESCE(w."Type", 'N/A') as "type",
     'N/A' as "vendor"
 FROM with_hba w
-WHERE w."Cluster" IS NOT NULL
-{{- if .ClusterFilter }} AND w."Cluster" = '{{.ClusterFilter}}'{{end}}
 GROUP BY w."Cluster", w."Address", w."Name", w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w.hba_type
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
+{{- else }}
+-- vCenter-level: return ALL datastores (matching old implementation)
+WITH expanded_hosts AS (
+    SELECT
+        d."Name" as ds_name,
+        trim(unnest(string_split(d."Hosts", ','))) AS ip
+    FROM vdatastore d
+    WHERE d."Hosts" IS NOT NULL AND d."Hosts" != ''
+),
+host_ids AS (
+    SELECT
+        e.ds_name,
+        string_agg(DISTINCT vh."Object ID", ', ') as host_ids
+    FROM expanded_hosts e
+    LEFT JOIN vhost vh ON vh."Host" = e.ip
+    GROUP BY e.ds_name
+)
+SELECT
+    '' as "cluster",
+    COALESCE(d."Name", 'N/A') as "diskId",
+    COALESCE(ROUND(d."Free MiB"::double / 1024)::integer, 0) as "freeCapacityGB",
+    false as "hardwareAcceleratedMove",
+    COALESCE(h.host_ids, 'N/A') AS "hostId",
+    'N/A' as "model",
+    CASE
+        WHEN d."Type" = 'NFS' THEN 'N/A'
+        ELSE 'N/A'
+    END as "protocolType",
+    COALESCE(ROUND(d."Capacity MiB"::double / 1024)::integer, 0) as "totalCapacityGB",
+    COALESCE(d."Type", 'N/A') as "type",
+    'N/A' as "vendor"
+FROM vdatastore d
+LEFT JOIN host_ids h ON h.ds_name = d."Name"
+{{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
+{{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
+{{- end }}

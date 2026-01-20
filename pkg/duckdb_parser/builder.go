@@ -56,6 +56,11 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"), ingestParams{FilePath: filePath})
 }
 
+// ClearDataQuery returns a query that deletes all data from tables without dropping the schema.
+func (b *QueryBuilder) ClearDataQuery() (string, error) {
+	return b.buildQuery("clear_data", mustGetTemplate("clear_data"), nil)
+}
+
 // queryParams holds all template parameters for queries.
 type queryParams struct {
 	NetworkColumns   string
@@ -70,7 +75,7 @@ type queryParams struct {
 
 // VMQuery builds the VM query with filters and pagination.
 func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error) {
-	const maxNetworkNumbers = 25
+	const maxNetworkNumbers = 8 // RVTools vInfo has Network #1 through Network #8
 	quoted := make([]string, 0, maxNetworkNumbers)
 	for i := 1; i <= maxNetworkNumbers; i++ {
 		quoted = append(quoted, fmt.Sprintf(`i."Network #%d"`, i))
@@ -132,6 +137,16 @@ func (b *QueryBuilder) ClustersQuery() (string, error) {
 	return b.buildQuery("clusters_query", mustGetTemplate("clusters_query"), nil)
 }
 
+// ClusterDatacentersQuery builds the cluster to datacenter mapping query.
+func (b *QueryBuilder) ClusterDatacentersQuery() (string, error) {
+	return b.buildQuery("cluster_datacenters_query", mustGetTemplate("cluster_datacenters_query"), nil)
+}
+
+// ClusterObjectIDsQuery builds the cluster name to Object ID mapping query.
+func (b *QueryBuilder) ClusterObjectIDsQuery() (string, error) {
+	return b.buildQuery("cluster_object_ids_query", mustGetTemplate("cluster_object_ids_query"), nil)
+}
+
 // VMCountQuery builds the VM count query with filters.
 func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 	params := queryParams{
@@ -171,6 +186,14 @@ func (b *QueryBuilder) MemoryTierQuery(filters Filters) (string, error) {
 		ClusterFilter: filters.Cluster,
 	}
 	return b.buildQuery("memory_tier_query", mustGetTemplate("memory_tier_query"), params)
+}
+
+// NicTierQuery builds the NIC count tier distribution query.
+func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: filters.Cluster,
+	}
+	return b.buildQuery("nic_tier_query", mustGetTemplate("nic_tier_query"), params)
 }
 
 // DiskSizeTierQuery builds the disk size tier distribution query.

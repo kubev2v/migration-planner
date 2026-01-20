@@ -9,8 +9,37 @@ Strategy:
   - TRY_CAST is used to convert VARCHAR to proper types (INTEGER, BOOLEAN, DOUBLE)
   - TRY_CAST returns NULL if conversion fails (e.g., "VM" placeholder)
 */ -}}
+INSTALL excel;
+LOAD excel; 
 CREATE TABLE vinfo_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', all_varchar=true);
+
+-- Add potentially missing columns with NULL defaults for minimal schema support
+-- Only VM ID and VM are required; all other columns are optional
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder ID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VM UUID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Firmware" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Powerstate" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Connection state" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "FT State" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "CPUs" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Memory" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "OS according to the configuration file" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "OS according to the VMware Tools" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "DNS Name" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Primary IP Address" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "In Use MiB" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Template" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "CBT" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "EnableUUID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Datacenter" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Cluster" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "HW version" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Provisioned MiB" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Resource pool" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
 
 INSERT INTO vinfo (
     "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
@@ -25,7 +54,7 @@ INSERT INTO vinfo (
 SELECT
     "VM ID",
     "VM",
-    NULL,
+    "Folder ID",
     "Folder",
     "Host",
     COALESCE("VM UUID", NULL),
@@ -36,9 +65,9 @@ SELECT
     "FT State",
     TRY_CAST("CPUs" AS INTEGER),
     TRY_CAST("Memory" AS INTEGER),
-    "OS according to the configuration file",
-    "OS according to the VMware Tools",
-    "DNS Name",
+    NULLIF("OS according to the configuration file", 'VM'),
+    NULLIF("OS according to the VMware Tools", 'VM'),
+    NULLIF("DNS Name", 'VM'),
     "Primary IP Address",
     TRY_CAST("In Use MiB" AS INTEGER),
     CASE WHEN LOWER("Template") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Template") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
@@ -51,7 +80,10 @@ SELECT
     TRY_CAST("Provisioned MiB" AS INTEGER),
     "Resource pool",
     "VI SDK UUID"
-FROM vinfo_raw;
+FROM vinfo_raw
+WHERE "VM" IS NOT NULL AND "VM" != ''
+  AND "VM ID" IS NOT NULL AND TRIM("VM ID") != ''
+ON CONFLICT DO NOTHING;
 
 WITH cleaned_networks AS (
     SELECT
@@ -65,31 +97,14 @@ WITH cleaned_networks AS (
 )
 UPDATE vinfo
 SET
-    "Network #1"  = net_array[1],
-    "Network #2"  = net_array[2],
-    "Network #3"  = net_array[3],
-    "Network #4"  = net_array[4],
-    "Network #5"  = net_array[5],
-    "Network #6"  = net_array[6],
-    "Network #7"  = net_array[7],
-    "Network #8"  = net_array[8],
-    "Network #9"  = net_array[9],
-    "Network #10" = net_array[10],
-    "Network #11" = net_array[11],
-    "Network #12" = net_array[12],
-    "Network #13" = net_array[13],
-    "Network #14" = net_array[14],
-    "Network #15" = net_array[15],
-    "Network #16" = net_array[16],
-    "Network #17" = net_array[17],
-    "Network #18" = net_array[18],
-    "Network #19" = net_array[19],
-    "Network #20" = net_array[20],
-    "Network #21" = net_array[21],
-    "Network #22" = net_array[22],
-    "Network #23" = net_array[23],
-    "Network #24" = net_array[24],
-    "Network #25" = net_array[25]
+    "Network #1" = net_array[1],
+    "Network #2" = net_array[2],
+    "Network #3" = net_array[3],
+    "Network #4" = net_array[4],
+    "Network #5" = net_array[5],
+    "Network #6" = net_array[6],
+    "Network #7" = net_array[7],
+    "Network #8" = net_array[8]
 FROM cleaned_networks
 WHERE vinfo."VM ID" = cleaned_networks."VM ID";
 
@@ -97,19 +112,21 @@ DROP TABLE vinfo_raw;
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
 SELECT
-    "VM ID",
-    CASE WHEN LOWER("Hot Add") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Hot Add") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    CASE WHEN LOWER("Hot Remove") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Hot Remove") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    TRY_CAST("Sockets" AS INTEGER),
-    TRY_CAST("Cores p/s" AS INTEGER)
-FROM read_xlsx('{{.FilePath}}', sheet='vCPU', all_varchar=true);
+    c."VM ID",
+    CASE WHEN LOWER(c."Hot Add") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(c."Hot Add") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    CASE WHEN LOWER(c."Hot Remove") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(c."Hot Remove") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    TRY_CAST(c."Sockets" AS INTEGER),
+    TRY_CAST(c."Cores p/s" AS INTEGER)
+FROM read_xlsx('{{.FilePath}}', sheet='vCPU', all_varchar=true) c
+WHERE c."VM ID" IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vmemory ("VM ID", "Hot Add", "Ballooned")
 SELECT
-    "VM ID",
-    CASE WHEN LOWER("Hot Add") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Hot Add") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    TRY_CAST("Ballooned" AS INTEGER)
-FROM read_xlsx('{{.FilePath}}', sheet='vMemory', all_varchar=true);
+    m."VM ID",
+    CASE WHEN LOWER(m."Hot Add") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(m."Hot Add") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    TRY_CAST(m."Ballooned" AS INTEGER)
+FROM read_xlsx('{{.FilePath}}', sheet='vMemory', all_varchar=true) m
+WHERE m."VM ID" IN (SELECT "VM ID" FROM vinfo);
 
 CREATE TABLE vdisk_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vDisk', all_varchar=true);
@@ -124,38 +141,41 @@ INSERT INTO vdisk (
     "Thin", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
-    "VM ID",
-    "Disk Key",
-    "Unit #",
-    "Path",
-    "Disk Path",
-    TRY_CAST("Capacity MiB" AS BIGINT),
-    CASE WHEN LOWER("Sharing mode") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Sharing mode") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    CASE WHEN LOWER("Raw") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Raw") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    "Shared Bus",
-    "Disk Mode",
-    "Disk UUID",
-    CASE WHEN LOWER("Thin") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Thin") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    "Controller",
-    "Label",
-    "SCSI Unit #"
-FROM vdisk_raw;
+    d."VM ID",
+    d."Disk Key",
+    d."Unit #",
+    d."Path",
+    d."Disk Path",
+    TRY_CAST(d."Capacity MiB" AS BIGINT),
+    CASE WHEN LOWER(d."Sharing mode") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Sharing mode") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    CASE WHEN LOWER(d."Raw") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Raw") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    d."Shared Bus",
+    d."Disk Mode",
+    d."Disk UUID",
+    CASE WHEN LOWER(d."Thin") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Thin") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    d."Controller",
+    d."Label",
+    d."SCSI Unit #"
+FROM vdisk_raw d
+WHERE d."VM ID" IN (SELECT "VM ID" FROM vinfo);
 
 DROP TABLE vdisk_raw;
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Free MiB", "MHA", "Capacity MiB", "Type")
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
 SELECT
     "Hosts",
     "Address",
     "Name",
+    "Object ID",
     TRY_CAST("Free MiB" AS DOUBLE),
     CASE WHEN LOWER("MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     TRY_CAST("Capacity MiB" AS DOUBLE),
     "Type"
 FROM read_xlsx('{{.FilePath}}', sheet='vDatastore', all_varchar=true);
 
-INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
 SELECT
+    "Datacenter",
     "Cluster",
     TRY_CAST("# Cores" AS INTEGER),
     TRY_CAST("# CPU" AS INTEGER),
@@ -176,20 +196,29 @@ INSERT INTO vnetwork (
     "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"
 )
 SELECT
-    "VM ID",
-    "Network",
-    "Mac Address",
-    "NIC label",
-    "Adapter",
-    "Switch",
-    CASE WHEN LOWER("Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    CASE WHEN LOWER("Starts Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("Starts Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    "Type",
-    "IPv4 Address",
-    "IPv6 Address",
-    "Cluster"
-FROM read_xlsx('{{.FilePath}}', sheet='vNetwork', all_varchar=true);
+    n."VM ID",
+    n."Network",
+    n."Mac Address",
+    n."NIC label",
+    n."Adapter",
+    n."Switch",
+    CASE WHEN LOWER(n."Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    CASE WHEN LOWER(n."Starts Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Starts Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    n."Type",
+    n."IPv4 Address",
+    n."IPv6 Address",
+    n."Cluster"
+FROM read_xlsx('{{.FilePath}}', sheet='vNetwork', all_varchar=true) n
+WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
 
-INSERT INTO dvport ("Port", "VLAN")
-SELECT "Port", "VLAN"
+INSERT INTO dvport ("Port", "VLAN", "Switch")
+SELECT "Port", "VLAN", "Switch"
 FROM read_xlsx('{{.FilePath}}', sheet='dvPort', all_varchar=true);
+
+INSERT INTO dvswitch ("Name")
+SELECT DISTINCT "Name"
+FROM read_xlsx('{{.FilePath}}', sheet='dvSwitch', all_varchar=true);
+
+INSERT INTO vcluster ("Name", "Object ID")
+SELECT "Name", "Object ID"
+FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);

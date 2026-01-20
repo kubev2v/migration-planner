@@ -9,7 +9,39 @@ import (
 	"go.uber.org/zap"
 )
 
-var stmtRegex = regexp.MustCompile(`(?s)(CREATE|INSERT|UPDATE|DROP|ALTER|WITH|INSTALL|LOAD|ATTACH|DETACH).*?;`)
+var stmtRegex = regexp.MustCompile(`(?s)(CREATE|INSERT|UPDATE|DROP|ALTER|WITH|INSTALL|LOAD|ATTACH|DETACH|DELETE).*?;`)
+
+// criticalStmtPatterns defines patterns for statements that must succeed.
+// If any of these fail, the ingestion should fail immediately.
+var criticalStmtPatterns = []string{
+	"INSTALL ",           // Extension installation must succeed
+	"LOAD ",              // Extension loading must succeed
+	"CREATE TABLE vinfo", // Main VM data table creation must succeed
+}
+
+// isCriticalStatement checks if a statement matches any critical pattern.
+func isCriticalStatement(stmt string) bool {
+	upperStmt := strings.ToUpper(stmt)
+	for _, pattern := range criticalStmtPatterns {
+		if strings.Contains(upperStmt, strings.ToUpper(pattern)) {
+			return true
+		}
+	}
+	return false
+}
+
+// ClearData removes all data from tables without dropping the schema.
+// This allows re-ingestion of new RVTools data into the same database instance.
+func (p *Parser) ClearData() error {
+	query, err := p.builder.ClearDataQuery()
+	if err != nil {
+		return fmt.Errorf("building clear data query: %w", err)
+	}
+	if err := p.executeStatements(query); err != nil {
+		return fmt.Errorf("clearing data: %w", err)
+	}
+	return nil
+}
 
 // IngestRvTools ingests data from an RVTools Excel file, runs VM validation if a validator
 // is configured, and validates the schema for required tables/columns.
@@ -64,7 +96,8 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 }
 
 // executeStatements executes a multi-statement SQL string.
-// Errors are logged but not returned since missing sheets are expected in RVTools exports.
+// Critical statements (INSTALL, LOAD, CREATE TABLE vinfo) must succeed or an error is returned.
+// Non-critical statements (INSERT for optional sheets, ALTER for optional columns) are logged but don't fail.
 func (p *Parser) executeStatements(query string) error {
 	stmts := stmtRegex.FindAllString(query, -1)
 	for _, stmt := range stmts {
@@ -73,7 +106,16 @@ func (p *Parser) executeStatements(query string) error {
 			continue
 		}
 		if _, err := p.db.Exec(stmt); err != nil {
-			zap.S().Debugw("statement failed", "error", err)
+			if isCriticalStatement(stmt) {
+				// Truncate statement for cleaner error messages
+				stmtPreview := stmt
+				if len(stmtPreview) > 100 {
+					stmtPreview = stmtPreview[:100] + "..."
+				}
+				return fmt.Errorf("critical statement failed: %s: %w", stmtPreview, err)
+			}
+			// Non-critical failures are logged but don't stop execution
+			zap.S().Debugw("non-critical statement failed", "error", err)
 		}
 	}
 	return nil

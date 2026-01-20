@@ -1,18 +1,21 @@
 {{- /*
 Migration Issues Query Template - Returns aggregated migration issues by category.
 
+Aggregation is by Concern_ID only to match old stable behavior.
+This means multiple disk-level warnings (e.g., scsi0:0, scsi0:1) are counted together.
+
 Template Parameters:
   - ClusterFilter: filter by cluster name
   - Category: concern category (e.g., "Critical", "Warning")
 */ -}}
 SELECT
     c."Concern_ID" AS id,
-    c."Label" AS label,
-    c."Category" AS category,
-    c."Assessment" AS assessment,
+    FIRST(c."Label") AS label,
+    FIRST(c."Category") AS category,
+    FIRST(c."Assessment") AS assessment,
     COUNT(*) AS count
 FROM concerns c
 JOIN vinfo i ON c."VM_ID" = i."VM ID"
 WHERE c."Category" = '{{.Category}}'
 {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
-GROUP BY c."Concern_ID", c."Label", c."Category", c."Assessment";
+GROUP BY c."Concern_ID";
