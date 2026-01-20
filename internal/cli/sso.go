@@ -29,12 +29,18 @@ type tokenOptions struct {
 	PrivateKey   string
 	Username     string
 	Organization string
+	Agent        bool
+	SourceID     string
+	Kid          string
 }
 
 func (o *tokenOptions) Bind(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.PrivateKey, "private-key", "", "", "private key used to sign the token")
 	fs.StringVarP(&o.Organization, "org", "", "", "organization name")
 	fs.StringVarP(&o.Username, "username", "", "", "username")
+	fs.BoolVarP(&o.Agent, "agent", "", false, "generate an agent token instead of a user token")
+	fs.StringVarP(&o.SourceID, "source-id", "", "", "source-id (required when --agent is set)")
+	fs.StringVarP(&o.Kid, "kid", "", "", "kid (required when --agent is set)")
 }
 
 func newTokenCmd() *cobra.Command {
@@ -48,7 +54,23 @@ func newTokenCmd() *cobra.Command {
 				return err
 			}
 
-			token, err := GenerateToken(o.Username, o.Organization, privateKey)
+			var token string
+			if o.Agent {
+				if o.SourceID == "" || o.Kid == "" {
+					return fmt.Errorf("--source-id and --kid are required when --agent is set")
+				}
+				token, err = GenerateAgentToken(o.SourceID, o.Kid, privateKey)
+				if err != nil {
+					return err
+				}
+				fmt.Println(token)
+				return nil
+			}
+
+			if o.Username == "" || o.Organization == "" {
+				return fmt.Errorf("--username and --org are required for user tokens")
+			}
+			token, err = GenerateToken(o.Username, o.Organization, privateKey)
 			if err != nil {
 				return err
 			}
@@ -60,8 +82,6 @@ func newTokenCmd() *cobra.Command {
 
 	o.Bind(cmd.Flags())
 	_ = cmd.MarkFlagRequired("private-key")
-	_ = cmd.MarkFlagRequired("username")
-	_ = cmd.MarkFlagRequired("org")
 
 	return cmd
 }
@@ -120,4 +140,34 @@ func GenerateToken(username, organization string, privateKey *rsa.PrivateKey) (s
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	return token.SignedString(privateKey)
+}
+
+func GenerateAgentToken(sourceID, kid string, privateKey *rsa.PrivateKey) (string, error) {
+	type AgentTokenClaims struct {
+		SourceID string `json:"source_id"`
+		jwt.RegisteredClaims
+	}
+
+	// Create claims with multiple fields populated
+	claims := AgentTokenClaims{
+		sourceID,
+		jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
+			Issuer:    "assisted-migrations",
+			Subject:   sourceID,
+			ID:        "1",
+			Audience:  []string{"assisted-migrations"},
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = kid
+	signedToken, err := token.SignedString(privateKey)
+	if err != nil {
+		return "", fmt.Errorf("failed to sign agent token: %s", err)
+	}
+
+	return signedToken, nil
 }
