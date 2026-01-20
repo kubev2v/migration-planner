@@ -7,6 +7,7 @@ import (
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
 	web "github.com/kubev2v/forklift/pkg/controller/provider/web/vsphere"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 
 	"github.com/open-policy-agent/opa/v1/ast"
 	"github.com/open-policy-agent/opa/v1/rego"
@@ -131,6 +132,52 @@ func (v *Validator) ValidateVM(ctx context.Context, vm vsphere.VM) ([]vsphere.Co
 	concerns, err := v.concerns(ctx, workload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to validate VM %q: %w", vm.Name, err)
+	}
+
+	return concerns, nil
+}
+
+// Validate implements duckdb_parser.Validator for models.VM.
+// This allows OPA validation to work directly with duckdb_parser models.
+func (v *Validator) Validate(ctx context.Context, vm models.VM) ([]models.Concern, error) {
+	// models.VM is already JSON-compatible with the OPA input format,
+	// so we can pass it directly for evaluation
+	resultSet, err := v.preparedQuery.Eval(ctx, rego.EvalInput(vm))
+	if err != nil {
+		return nil, fmt.Errorf("policy evaluation failed for VM %q: %w", vm.Name, err)
+	}
+
+	var concerns []models.Concern
+
+	if len(resultSet) > 0 && len(resultSet[0].Expressions) > 0 {
+		raw, ok := resultSet[0].Expressions[0].Value.([]interface{})
+		if !ok {
+			return nil, fmt.Errorf("unexpected result type from policy evaluation")
+		}
+
+		for _, r := range raw {
+			m, ok := r.(map[string]interface{})
+			if !ok {
+				return nil, fmt.Errorf("unexpected item type in result set")
+			}
+
+			b, err := json.Marshal(m)
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal concern data: %w", err)
+			}
+
+			var c models.Concern
+			if err := json.Unmarshal(b, &c); err != nil {
+				return nil, fmt.Errorf("failed to unmarshal concern: %w", err)
+			}
+
+			concerns = append(concerns, c)
+		}
+	}
+
+	// Add OS upgrade recommendation for upgradable OSes
+	if upgradeConcern := GetOSUpgradeConcern(vm.EffectiveGuestName()); upgradeConcern != nil {
+		concerns = append(concerns, *upgradeConcern)
 	}
 
 	return concerns, nil

@@ -15,24 +15,26 @@ Template Parameters:
 */ -}}
 WITH disks AS (
     SELECT
-        "VM ID",
+        dk."VM ID",
         LIST({
-            'Key': "Disk Key",
-            'UnitNumber': "Unit #",
-            'File': COALESCE("Path", "Disk Path"),
-            'Capacity': "Capacity MiB",
-            'Shared': "Sharing mode",
-            'RDM': "Raw",
-            'Bus': "Shared Bus",
-            'Mode': "Disk Mode",
-            'Serial': "Disk UUID",
-            'Thin': "Thin",
-            'Controller': "Controller",
-            'Label': "Label",
-            'SCSIUnit': "SCSI Unit #"
+            'Key': dk."Disk Key",
+            'UnitNumber': dk."Unit #",
+            'File': COALESCE(dk."Path", dk."Disk Path"),
+            'Capacity': CAST(COALESCE(dk."Capacity MiB", 0) AS BIGINT) * 1024 * 1024,
+            'Shared': dk."Sharing mode",
+            'RDM': dk."Raw",
+            'Bus': dk."Shared Bus",
+            'Mode': dk."Disk Mode",
+            'Serial': dk."Disk UUID",
+            'Thin': dk."Thin",
+            'Controller': dk."Controller",
+            'Label': dk."Label",
+            'SCSIUnit': dk."SCSI Unit #",
+            'Datastore': COALESCE(ds."Object ID", '')
         }) AS disks
-    FROM vdisk
-    GROUP BY "VM ID"
+    FROM vdisk dk
+    LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+    GROUP BY dk."VM ID"
 ),
 nics AS (
     SELECT
@@ -80,7 +82,7 @@ SELECT
     COALESCE(i."OS according to the VMware Tools", '') AS "GuestNameFromVmwareTools",
     COALESCE(i."DNS Name", '') AS "HostName",
     COALESCE(i."Primary IP Address", '') AS "IpAddress",
-    COALESCE(i."In Use MiB", 0) AS "StorageUsed",
+    CAST(COALESCE(i."In Use MiB", 0) AS BIGINT) * 1024 * 1024 AS "StorageUsed",
     COALESCE(i."Template", false) AS "IsTemplate",
     COALESCE(i."CBT", false) AS "ChangeTrackingEnabled",
     COALESCE(i."EnableUUID", false) AS "DiskEnableUuid",

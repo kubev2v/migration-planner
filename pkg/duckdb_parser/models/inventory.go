@@ -16,9 +16,10 @@ type Datastore struct {
 
 // Os represents an operating system summary.
 type Os struct {
-	Name      string `db:"name" json:"name"`
-	Count     int    `db:"count" json:"count"`
-	Supported bool   `db:"supported" json:"supported"`
+	Name                  string  `db:"name" json:"name"`
+	Count                 int     `db:"count" json:"count"`
+	Supported             bool    `db:"supported" json:"supported"`
+	UpgradeRecommendation *string `db:"upgrade_recommendation" json:"upgradeRecommendation,omitempty"`
 }
 
 // Host represents a VMware ESXi host.

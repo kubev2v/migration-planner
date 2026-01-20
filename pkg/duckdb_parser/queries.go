@@ -7,6 +7,7 @@ import (
 	"github.com/georgysavva/scany/v2/sqlscan"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // VMs returns VMs with optional filters and pagination.
@@ -92,6 +93,50 @@ func (p *Parser) Clusters(ctx context.Context) ([]string, error) {
 	return clusters, rows.Err()
 }
 
+// ClusterDatacenters returns a mapping of cluster name to datacenter name.
+func (p *Parser) ClusterDatacenters(ctx context.Context) (map[string]string, error) {
+	q, err := p.builder.ClusterDatacentersQuery()
+	if err != nil {
+		return nil, fmt.Errorf("building cluster datacenters query: %w", err)
+	}
+	result := make(map[string]string)
+	rows, err := p.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("querying cluster datacenters: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cluster, datacenter string
+		if err := rows.Scan(&cluster, &datacenter); err != nil {
+			return nil, fmt.Errorf("scanning cluster datacenter: %w", err)
+		}
+		result[cluster] = datacenter
+	}
+	return result, rows.Err()
+}
+
+// ClusterObjectIDs returns a mapping of cluster name to Object ID from vCluster sheet.
+func (p *Parser) ClusterObjectIDs(ctx context.Context) (map[string]string, error) {
+	q, err := p.builder.ClusterObjectIDsQuery()
+	if err != nil {
+		return nil, fmt.Errorf("building cluster object ids query: %w", err)
+	}
+	result := make(map[string]string)
+	rows, err := p.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("querying cluster object ids: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name, objectID string
+		if err := rows.Scan(&name, &objectID); err != nil {
+			return nil, fmt.Errorf("scanning cluster object id: %w", err)
+		}
+		result[name] = objectID
+	}
+	return result, rows.Err()
+}
+
 // OsSummary returns OS distribution with optional filters.
 func (p *Parser) OsSummary(ctx context.Context, filters Filters) ([]models.Os, error) {
 	q, err := p.builder.OsQuery(filters)
@@ -150,13 +195,22 @@ func (p *Parser) MemoryTierDistribution(ctx context.Context, filters Filters) (m
 	return p.readStringIntMap(ctx, q)
 }
 
+// NicTierDistribution returns VM distribution by NIC count tier.
+func (p *Parser) NicTierDistribution(ctx context.Context, filters Filters) (map[string]int, error) {
+	q, err := p.builder.NicTierQuery(filters)
+	if err != nil {
+		return nil, fmt.Errorf("building nic tier query: %w", err)
+	}
+	return p.readStringIntMap(ctx, q)
+}
+
 // DiskSizeTierDistribution returns VM distribution by disk size tier.
-func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) (map[string]DiskSizeTierSummary, error) {
+func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) (map[string]inventory.DiskSizeTierSummary, error) {
 	q, err := p.builder.DiskSizeTierQuery(filters)
 	if err != nil {
 		return nil, fmt.Errorf("building disk size tier query: %w", err)
 	}
-	result := make(map[string]DiskSizeTierSummary)
+	result := make(map[string]inventory.DiskSizeTierSummary)
 	rows, err := p.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("querying disk size tier: %w", err)
@@ -164,7 +218,7 @@ func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) 
 	defer rows.Close()
 	for rows.Next() {
 		var tier string
-		var summary DiskSizeTierSummary
+		var summary inventory.DiskSizeTierSummary
 		if err := rows.Scan(&tier, &summary.VMCount, &summary.TotalSizeTB); err != nil {
 			return nil, fmt.Errorf("scanning disk size tier: %w", err)
 		}
@@ -174,19 +228,19 @@ func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) 
 }
 
 // DiskTypeSummary returns disk usage aggregated by datastore type.
-func (p *Parser) DiskTypeSummary(ctx context.Context, filters Filters) ([]DiskTypeSummary, error) {
+func (p *Parser) DiskTypeSummary(ctx context.Context, filters Filters) ([]inventory.DiskTypeSummary, error) {
 	q, err := p.builder.DiskTypeSummaryQuery(filters)
 	if err != nil {
 		return nil, fmt.Errorf("building disk type summary query: %w", err)
 	}
-	var results []DiskTypeSummary
+	var results []inventory.DiskTypeSummary
 	rows, err := p.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("querying disk type summary: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var s DiskTypeSummary
+		var s inventory.DiskTypeSummary
 		if err := rows.Scan(&s.Type, &s.VMCount, &s.TotalSizeTB); err != nil {
 			return nil, fmt.Errorf("scanning disk type summary: %w", err)
 		}
@@ -302,19 +356,19 @@ func (p *Parser) NotMigratableVMCount(ctx context.Context, filters Filters) (int
 }
 
 // MigrationIssues returns aggregated migration issues by category.
-func (p *Parser) MigrationIssues(ctx context.Context, filters Filters, category string) ([]MigrationIssue, error) {
+func (p *Parser) MigrationIssues(ctx context.Context, filters Filters, category string) ([]inventory.MigrationIssue, error) {
 	q, err := p.builder.MigrationIssuesQuery(filters, category)
 	if err != nil {
 		return nil, fmt.Errorf("building migration issues query: %w", err)
 	}
-	var results []MigrationIssue
+	var results []inventory.MigrationIssue
 	rows, err := p.db.QueryContext(ctx, q)
 	if err != nil {
 		return nil, fmt.Errorf("querying migration issues: %w", err)
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var m MigrationIssue
+		var m inventory.MigrationIssue
 		if err := rows.Scan(&m.ID, &m.Label, &m.Category, &m.Assessment, &m.Count); err != nil {
 			return nil, fmt.Errorf("scanning migration issue: %w", err)
 		}
@@ -478,6 +532,12 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 		); err != nil {
 			return nil, fmt.Errorf("scanning VM row: %w", err)
 		}
+
+		// Propagate VM's CBT setting to each disk for OPA per-disk CBT validation
+		for i := range vm.Disks {
+			vm.Disks[i].ChangeTrackingEnabled = vm.ChangeTrackingEnabled
+		}
+
 		vms = append(vms, vm)
 	}
 	if err := rows.Err(); err != nil {

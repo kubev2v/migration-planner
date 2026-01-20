@@ -51,10 +51,9 @@ func (v ValidationResult) Error() error {
 
 // Validation codes for errors
 const (
-	CodeNoVMs             = "NO_VMS"
-	CodeMissingVMID       = "MISSING_VM_ID"
-	CodeMissingVMName     = "MISSING_VM_NAME"
-	CodeMissingPowerstate = "MISSING_POWERSTATE"
+	CodeNoVMs         = "NO_VMS"
+	CodeMissingVMID   = "MISSING_VM_ID"
+	CodeMissingVMName = "MISSING_VM_NAME"
 )
 
 // Validation codes for warnings

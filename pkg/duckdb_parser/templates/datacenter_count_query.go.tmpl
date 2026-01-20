@@ -1,6 +1,9 @@
 {{- /*
 Datacenter Count Query Template - Returns count of unique datacenters.
+
+Uses vhost table to match old implementation behavior which extracted
+datacenter info from the vHost sheet.
 */ -}}
 SELECT COUNT(DISTINCT "Datacenter")
-FROM vinfo
+FROM vhost
 WHERE "Datacenter" IS NOT NULL AND "Datacenter" != '';

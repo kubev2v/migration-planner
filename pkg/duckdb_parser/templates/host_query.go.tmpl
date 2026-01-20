@@ -10,15 +10,15 @@ Template Parameters:
   - Offset: skip first N results
 */ -}}
 SELECT
-    "Cluster" as "cluster",
-    "# Cores"::integer as "cpuCores",
-    "# CPU"::integer as "cpuSockets",
-    "Object ID" as "id",
-    "# Memory"::integer as "memoryMB",
+    COALESCE("Cluster", '') as "cluster",
+    COALESCE("# Cores", 0)::integer as "cpuCores",
+    COALESCE("# CPU", 0)::integer as "cpuSockets",
+    COALESCE("Object ID", '') as "id",
+    COALESCE("# Memory", 0)::integer as "memoryMB",
     COALESCE("Model", 'N/A') as "model",
     COALESCE("Vendor", 'N/A') as "vendor"
 FROM vhost
-WHERE "Cluster" IS NOT NULL
+WHERE 1=1
 {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
