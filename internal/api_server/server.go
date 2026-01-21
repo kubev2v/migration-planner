@@ -1,11 +1,15 @@
 package apiserver
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
@@ -58,8 +62,54 @@ func New(
 	}
 }
 
+const oldSchemaErrorMessage = "The uploaded file is using an old schema version and cannot be parsed. Generate a new OVA file, import to your vSphere environment and then try to upload it again."
+
 func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
+}
+
+// detectOldSchemaMiddleware checks for old inventory schema format before OpenAPI validation.
+// Old schema: inventory.{infra, vcenter, vms} - VMs at top level
+// New schema: inventory.{clusters, vcenter, vcenter_id} - VMs inside clusters/vcenter
+func detectOldSchemaMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimSuffix(r.URL.Path, "/")
+		if r.Method != http.MethodPut || !strings.HasSuffix(path, "/inventory") {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		r.Body.Close()
+		if err != nil {
+			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
+			return
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+
+		var payload map[string]any
+		if json.Unmarshal(body, &payload) == nil {
+			if inv, ok := payload["inventory"].(map[string]any); ok {
+				_, hasVms := inv["vms"]
+				clusters := inv["clusters"]
+				zap.S().Named("api_server").Debugw("detectOldSchemaMiddleware: checking schema",
+					"hasVms", hasVms,
+					"clusters", clusters,
+					"clustersIsNil", clusters == nil,
+				)
+				if hasVms || clusters == nil {
+					zap.S().Named("api_server").Infow("Rejected inventory upload with old schema format",
+						"path", r.URL.Path,
+						"method", r.Method,
+					)
+					http.Error(w, oldSchemaErrorMessage, http.StatusBadRequest)
+					return
+				}
+			}
+		}
+
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Middleware to inject ResponseWriter into context
@@ -108,6 +158,7 @@ func (s *Server) Run(ctx context.Context) error {
 		middleware.RequestID,
 		middleware.Logger(),
 		chiMiddleware.Recoverer,
+		detectOldSchemaMiddleware,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,
 	)
