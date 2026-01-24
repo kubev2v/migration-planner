@@ -402,8 +402,8 @@ github.com/open-policy-agent/opa v1.6.0 h1:/S/cnNQJ2MUMNzizHPbisTWBHowmLkPrugY5j
 github.com/open-policy-agent/opa v1.6.0/go.mod h1:zFmw4P+W62+CWGYRDDswfVYSCnPo6oYaktQnfIaRFC4=
 github.com/openshift/api v0.0.0-20260107103503-6d35063ca179 h1:5gMFMmuVLAcEnBAjNFql/8L2ZRPBDOxl7nmbjO5klvk=
 github.com/openshift/api v0.0.0-20260107103503-6d35063ca179/go.mod h1:d5uzF0YN2nQQFA0jIEWzzOZ+edmo6wzlGLvx5Fhz4uY=
-github.com/openshift/assisted-image-service v0.0.0-20251229102121-b396d331f931 h1:rrXMH8XYN1jWhlAI9uVrrZp8JDC415VPlWsTuMC+b3I=
-github.com/openshift/assisted-image-service v0.0.0-20251229102121-b396d331f931/go.mod h1:cTr8yj5dj0arTFluNIJ+8E6fKGzwB6jeW0ogI2Gl0B0=
+github.com/openshift/assisted-image-service v0.0.0-20260122105115-bc2f950d9b36 h1:/4VE/OqIoWsSJFJDKtz4w37Meh6PGVEom9E98fAXkmc=
+github.com/openshift/assisted-image-service v0.0.0-20260122105115-bc2f950d9b36/go.mod h1:Kkp7gNJvrPsfKZ/GiSiKoqRKHqrurftcrkC5gM/2Rxo=
 github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13 h1:6rd4zSo2UaWQcAPZfHK9yzKVqH0BnMv1hqMzqXZyTds=
 github.com/openshift/client-go v0.0.0-20260108185524-48f4ccfc4e13/go.mod h1:YvOmPmV7wcJxpfhTDuFqqs2Xpb3M3ovsM6Qs/i2ptq4=
 github.com/openshift/custom-resource-status v1.1.2 h1:C3DL44LEbvlbItfd8mT5jWrqPfHnSOQoQf/sypqA6A4=
