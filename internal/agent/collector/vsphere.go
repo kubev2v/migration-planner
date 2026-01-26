@@ -333,9 +333,15 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 
 	totalAllocatedVCpus := 0  // For poweredOn VMs
 	totalAllocatedMemory := 0 // For poweredOn VMs
+	totalWithSharedDisk := 0
 
 	for _, vm := range *vms {
 		diskGBSet = append(diskGBSet, totalCapacity(vm.Disks))
+
+		// Check if VM has at least one shared disk
+		if hasSharedDisk(vm) {
+			totalWithSharedDisk++
+		}
 
 		// Update the VM count per CPU, Memory & NIC tier
 		(*inv.Vms.DistributionByCpuTier)[cpuTierKey(int(vm.CpuCount))]++
@@ -384,6 +390,10 @@ func FillInventoryObjectWithMoreData(vms *[]vspheremodel.VM, inv *apiplanner.Inv
 		}
 
 		inv.Vms.DiskTypes = updateDiskTypeSummary(&vm, *inv.Vms.DiskTypes, datastoreIDToType)
+	}
+
+	if totalWithSharedDisk > 0 {
+		inv.Vms.TotalWithSharedDisks = &totalWithSharedDisk
 	}
 
 	// Update the disk size tier
@@ -552,6 +562,15 @@ func nicCountKey(i int) string {
 	default:
 		return "4+"
 	}
+}
+
+func hasSharedDisk(vm vspheremodel.VM) bool {
+	for _, disk := range vm.Disks {
+		if disk.Shared {
+			return true
+		}
+	}
+	return false
 }
 
 func clustersPerDatacenter(datacenters *[]vspheremodel.Datacenter, collector *vsphere.Collector) *[]int {

@@ -1,0 +1,12 @@
+{{- /*
+VMs With Shared Disks Count Query Template - Returns count of VMs that have at least one shared disk.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT COUNT(DISTINCT d."VM ID")
+FROM vdisk d
+JOIN vinfo i ON d."VM ID" = i."VM ID"
+WHERE d."Sharing mode" = true
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}};
+
