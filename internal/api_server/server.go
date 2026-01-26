@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
@@ -59,6 +60,29 @@ func New(
 }
 
 func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
+	// Check if this is an old schema validation error
+	// Only catch known old schema issues, not all UpdateInventory validation errors
+	message = strings.TrimSpace(message)
+	lower := strings.ToLower(message)
+
+	// Check for UpdateInventory schema errors related to old schema format
+	hasUpdateInventory := strings.Contains(lower, "updateinventory") ||
+		strings.Contains(lower, "#/components/schemas/updateinventory")
+
+	// Only treat as old schema if it's a known old schema issue:
+	// - Missing vms property: Error at "/inventory/vcenter/vms": property "vms" is missing
+	// - Clusters nullable issue: Error at "/inventory/clusters": Value is not nullable
+	// - Other inventory structure mismatches
+	isOldSchema := hasUpdateInventory &&
+		(strings.Contains(lower, `"/inventory/vcenter/vms"`) ||
+			strings.Contains(lower, `property "vms" is missing`) ||
+			strings.Contains(lower, `"/inventory/clusters"`) ||
+			strings.Contains(lower, `value is not nullable`))
+
+	if isOldSchema {
+		http.Error(w, "The uploaded file is using an old schema version and cannot be parsed. Generate a new OVA file, import to your vSphere environment and then try to upload it again.", statusCode)
+		return
+	}
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
