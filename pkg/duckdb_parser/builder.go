@@ -293,6 +293,14 @@ func (b *QueryBuilder) VCenterQuery() (string, error) {
 	return b.buildQuery("vcenter_query", mustGetTemplate("vcenter_query"), nil)
 }
 
+// VMsWithSharedDisksCountQuery builds the VMs with shared disks count query.
+func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: filters.Cluster,
+	}
+	return b.buildQuery("vms_with_shared_disks_count_query", mustGetTemplate("vms_with_shared_disks_count_query"), params)
+}
+
 func (b *QueryBuilder) buildQuery(name, tmplContent string, params any) (string, error) {
 	tmpl, err := template.New(name).Parse(tmplContent)
 	if err != nil {

@@ -488,6 +488,9 @@ type VMs struct {
 	Total                       int                 `json:"total"`
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
+
+	// TotalWithSharedDisks Number of VMs that have at least one shared disk
+	TotalWithSharedDisks *int `json:"totalWithSharedDisks,omitempty"`
 }
 
 // ValidatedCertificateChain defines model for ValidatedCertificateChain.

@@ -1080,6 +1080,9 @@ components:
           type: integer
         totalMigratableWithWarnings:
           type: integer
+        totalWithSharedDisks:
+          type: integer
+          description: Number of VMs that have at least one shared disk
         cpuCores:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskSizeTier:
