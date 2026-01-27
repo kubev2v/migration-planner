@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	// TargetCapacityPercent leaves 30% headroom for over-commitment
-	TargetCapacityPercent = 70.0
+	// TargetCapacityPercent leaves 20% headroom for over-commitment
+	TargetCapacityPercent = 80.0
 	// CapacityMultiplier is the decimal representation of TargetCapacityPercent
 	CapacityMultiplier = TargetCapacityPercent / 100.0
 
@@ -38,6 +38,9 @@ const (
 
 	// MaxNodeCount - if exceeded, recommend larger nodes
 	MaxNodeCount = 100
+
+	// MaxVMsPerWorkerNode - maximum VMs allowed per worker node
+	MaxVMsPerWorkerNode = 200
 
 	// MachineSetNumberOfDisks is the number of disks for both worker and control plane machine sets
 	MachineSetNumberOfDisks = 24
@@ -89,6 +92,7 @@ type BatchedService struct {
 	RequiredMemory float64
 	LimitCPU       float64
 	LimitMemory    float64
+	VMCount        int // Number of VMs in this batch
 }
 
 // TransformedSizerResponse represents the transformed response from the sizer service
@@ -234,6 +238,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	services, err := s.aggregateVMsIntoServices(
 		float64(totalCPU),
 		float64(totalMemory),
+		totalVMs,
 		effectiveCPU,
 		req.WorkerNodeMemory,
 		req.CpuOverCommitRatio,
@@ -284,12 +289,59 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("sizer service returned empty response")
 	}
 
+	// Create service-to-VM-count mapping for tracking VMs per node
+	serviceToVMCount := make(map[string]int)
+	for _, svc := range services {
+		serviceToVMCount[svc.Name] = svc.VMCount
+	}
+
 	transformed := s.transformSizerResponse(sizerResponse, effectiveCPNodeCount)
 
 	if singleNode && sizerResponse.Data.NodeCount > 1 {
 		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
 	}
 
+	// Calculate max VMs per node from sizer response for validation. We only validate when
+	// Advanced is present; the sizer is called with Detailed: true and is expected to return
+	// a complete placement there. Multi-node: worker nodes only. Single-node: control plane
+	// hosts workloads, so include control plane nodes in the scan.
+	maxVMsPerNode := 0
+	if len(sizerResponse.Data.Advanced) > 0 {
+		for _, zone := range sizerResponse.Data.Advanced {
+			for _, node := range zone.Nodes {
+				if node.IsControlPlane && !singleNode {
+					continue
+				}
+				vmsOnNode := 0
+				for _, serviceName := range node.Services {
+					if vmCount, exists := serviceToVMCount[serviceName]; exists {
+						vmsOnNode += vmCount
+					}
+				}
+				if vmsOnNode > maxVMsPerNode {
+					maxVMsPerNode = vmsOnNode
+				}
+			}
+		}
+	}
+
+	if maxVMsPerNode > MaxVMsPerWorkerNode {
+		err := NewErrInvalidRequest(fmt.Sprintf("VM distribution constraint violated: found %d VMs on a node, exceeds limit of %d per node",
+			maxVMsPerNode, MaxVMsPerWorkerNode))
+		s.logger.Operation("vm_limit_exceeded").
+			WithInt("max_vms_per_node", maxVMsPerNode).
+			WithInt("limit", MaxVMsPerWorkerNode).
+			Build().
+			Error(err).
+			Log()
+		return nil, err
+	}
+
+	tracer.Step("sizer_results").
+		WithInt("max_vms_per_node", maxVMsPerNode).
+		WithInt("total_nodes", transformed.ClusterSizing.TotalNodes).
+		WithInt("num_services", len(services)).
+		Log()
 	if transformed.ClusterSizing.TotalNodes > MaxNodeCount {
 		minNodeCPU, minNodeMemory := s.calculateMinimumNodeSize(
 			totalCPU,
@@ -335,7 +387,7 @@ func (s *SizerService) Health(ctx context.Context) error {
 // (CPU and memory) from a cluster into multiple service batches for the sizer API.
 //
 // The algorithm:
-//  1. Calculates the number of batches needed based on worker node capacity (using 70% capacity multiplier)
+//  1. Calculates the number of batches needed based on worker node capacity (using 80% capacity multiplier)
 //  2. Distributes total CPU and memory evenly across all batches
 //  3. Enforces minimum batch sizes (MinBatchCPU, MinBatchMemory) to prevent tiny batches
 //  4. Applies the over-commit ratio to both CPU and memory to calculate required resources (requests) vs limit resources
@@ -346,11 +398,12 @@ func (s *SizerService) Health(ctx context.Context) error {
 // Parameters:
 //   - totalCPU: Total CPU cores from all VMs in the cluster
 //   - totalMemory: Total memory (GB) from all VMs in the cluster
+//   - totalVMs: Total number of VMs in the cluster
 //   - effectiveWorkerNodeCPU: Effective CPU cores per worker node (SMT-adjusted)
 //   - workerNodeMemory: Memory (GB) per worker node
 //   - cpuOverCommitRatio: CPU over-commit ratio (e.g., "1:4")
 //   - memoryOverCommitRatio: Memory over-commit ratio (e.g., "1:2")
-//   - capacityMultiplier: Multiplier for target capacity (0.7 for 70% utilization)
+//   - capacityMultiplier: Multiplier for target capacity (0.8 for 80% utilization)
 //
 // Returns:
 //   - []BatchedService: Array of batched services, one per batch
@@ -358,6 +411,7 @@ func (s *SizerService) Health(ctx context.Context) error {
 func (s *SizerService) aggregateVMsIntoServices(
 	totalCPU float64,
 	totalMemory float64,
+	totalVMs int,
 	effectiveWorkerNodeCPU float64,
 	workerNodeMemory int,
 	cpuOverCommitRatio string,
@@ -369,28 +423,51 @@ func (s *SizerService) aggregateVMsIntoServices(
 		return nil, fmt.Errorf("worker node size must be greater than zero: CPU=%.2f, Memory=%d", effectiveWorkerNodeCPU, workerNodeMemory)
 	}
 
-	// Calculate target batch size (70% of node capacity)
+	if totalVMs == 0 {
+		return []BatchedService{}, nil
+	}
+
+	// Calculate target batch size (80% of node capacity)
 	targetCPU := effectiveWorkerNodeCPU * capacityMultiplier
 	targetMemory := float64(workerNodeMemory) * capacityMultiplier
 
-	// Calculate number of batches
+	// Calculate number of batches based on resources
 	batchesCPU := int(math.Ceil(totalCPU / targetCPU))
 	batchesMemory := int(math.Ceil(totalMemory / targetMemory))
-	numBatches := max(batchesCPU, batchesMemory)
+
+	// Ensure each batch has at most MaxVMsPerWorkerNode VMs
+	minBatchesFromVMLimit := 1
+	if totalVMs > 0 && MaxVMsPerWorkerNode > 0 {
+		minBatchesFromVMLimit = int(math.Ceil(float64(totalVMs) / float64(MaxVMsPerWorkerNode)))
+	}
+
+	numBatches := max(batchesCPU, batchesMemory, minBatchesFromVMLimit)
 
 	if numBatches < 1 {
 		numBatches = 1
+	}
+
+	// Cap batches to totalVMs (prevent empty batches)
+	if totalVMs > 0 && numBatches > totalVMs {
+		numBatches = totalVMs
+	}
+
+	// Check if VM limit forces too many batches (larger nodes won't help)
+	if numBatches > MaxBatches {
+		return nil, fmt.Errorf("cluster has too many VMs (%d) to size within constraints (max %d VMs per node, max %d batches). "+
+			"This inventory exceeds the sizing limits",
+			totalVMs, MaxVMsPerWorkerNode, MaxBatches)
 	}
 
 	// Distribute resources evenly across batches
 	cpuPerBatch := totalCPU / float64(numBatches)
 	memoryPerBatch := totalMemory / float64(numBatches)
 
-	// Enforce minimum batch size
+	// Enforce minimum batch size (preserve VM limit)
 	if cpuPerBatch < MinBatchCPU || memoryPerBatch < MinBatchMemory {
 		batchesFromMinCPU := int(math.Ceil(totalCPU / MinBatchCPU))
 		batchesFromMinMemory := int(math.Ceil(totalMemory / MinBatchMemory))
-		numBatches = max(batchesFromMinCPU, batchesFromMinMemory)
+		numBatches = max(batchesFromMinCPU, batchesFromMinMemory, minBatchesFromVMLimit)
 
 		if numBatches < 1 {
 			numBatches = 1
@@ -400,7 +477,6 @@ func (s *SizerService) aggregateVMsIntoServices(
 		memoryPerBatch = totalMemory / float64(numBatches)
 	}
 
-	// Calculate requests and limits
 	limitCPU := cpuPerBatch
 	limitMemory := memoryPerBatch
 
@@ -415,14 +491,25 @@ func (s *SizerService) aggregateVMsIntoServices(
 	requiredCPU := limitCPU / cpuOverCommitMultiplier
 	requiredMemory := limitMemory / memoryOverCommitMultiplier
 
+	// Calculate VMs per batch (distribute evenly)
+	vmsPerBatch := totalVMs / numBatches
+	remainingVMs := totalVMs % numBatches
+
 	services := make([]BatchedService, numBatches)
 	for i := 0; i < numBatches; i++ {
+		// Distribute remaining VMs to first batches
+		vmCount := vmsPerBatch
+		if i < remainingVMs {
+			vmCount++
+		}
+
 		services[i] = BatchedService{
 			Name:           fmt.Sprintf("vms-batch-%d-services", i+1),
 			RequiredCPU:    requiredCPU,
 			RequiredMemory: requiredMemory,
 			LimitCPU:       limitCPU,
 			LimitMemory:    limitMemory,
+			VMCount:        vmCount,
 		}
 	}
 
@@ -533,7 +620,64 @@ func effectiveControlPlaneNodeCount(req *mappers.ClusterRequirementsRequestForm)
 	return req.ControlPlaneNodeCount
 }
 
+// BuildServiceAvoidLists enforces MaxVMsPerWorkerNode via avoid lists.
+//
+// Assumption: when limiting how many batches may share a node, we use
+// maxVMsPerBatch = max(VMCount per batch)—i.e. we assume each batch on that node
+// could be as large as the worst batch. Then maxServicesPerNode =
+// MaxVMsPerWorkerNode/maxVMsPerBatch is a safe cap on batch count per node. That
+// stays correct when VMCount differs across batches.
+func BuildServiceAvoidLists(services []BatchedService) [][]string {
+	numServices := len(services)
+	if numServices == 0 {
+		return [][]string{}
+	}
+
+	// Find max VMs in any batch
+	maxVMsPerBatch := 0
+	for _, svc := range services {
+		if svc.VMCount > maxVMsPerBatch {
+			maxVMsPerBatch = svc.VMCount
+		}
+	}
+
+	if maxVMsPerBatch == 0 {
+		// One avoid list per service; buildSizerPayload indexes by service index (not an empty slice).
+		return make([][]string, numServices)
+	}
+
+	// Max services per node within VM limit
+	maxServicesPerNode := MaxVMsPerWorkerNode / maxVMsPerBatch
+	if maxServicesPerNode < 1 {
+		maxServicesPerNode = 1
+	}
+	if maxServicesPerNode > numServices {
+		maxServicesPerNode = numServices
+	}
+
+	// Different groups avoid each other
+	serviceAvoids := make([][]string, numServices)
+	for i := range numServices {
+		currentGroup := i / maxServicesPerNode
+		avoidList := []string{}
+
+		for j := range numServices {
+			if i == j {
+				continue
+			}
+			otherGroup := j / maxServicesPerNode
+			if otherGroup != currentGroup {
+				avoidList = append(avoidList, services[j].Name)
+			}
+		}
+		serviceAvoids[i] = avoidList
+	}
+
+	return serviceAvoids
+}
+
 // buildSizerPayload transforms batched services into sizer API format
+// It uses avoid relationships to limit the number of services (and thus VMs) per node
 func (s *SizerService) buildSizerPayload(
 	services []BatchedService,
 	platform string,
@@ -623,6 +767,18 @@ func (s *SizerService) buildSizerPayload(
 		workloads[vmWorkloadIndex].UsesMachines = []string{"worker", "controlPlane"}
 	}
 
+	// Build avoid relationships to enforce VM limit per node
+	serviceAvoids := BuildServiceAvoidLists(services)
+	if len(services) == 0 {
+		return &client.SizerRequest{
+			Platform:    platform,
+			MachineSets: machineSets,
+			Workloads:   workloads,
+			Detailed:    true,
+		}
+	}
+
+	// Build service descriptors with avoid relationships
 	for i, svc := range services {
 		workloads[vmWorkloadIndex].Services[i] = client.ServiceDescriptor{
 			Name:           svc.Name,
@@ -632,7 +788,7 @@ func (s *SizerService) buildSizerPayload(
 			LimitMemory:    svc.LimitMemory,
 			Zones:          1,
 			RunsWith:       []string{},
-			Avoid:          []string{},
+			Avoid:          serviceAvoids[i],
 		}
 	}
 
@@ -724,9 +880,10 @@ func (s *SizerService) buildSingleNodeSizerPayload(
 	}
 }
 
-// transformSizerResponse maps sizer service response to API response
+// transformSizerResponse maps sizer service response to API response.
 func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerResponse, controlPlaneNodeCount int) TransformedSizerResponse {
-	var workerNodes, controlPlaneNodes int
+	workerNodes := 0
+	controlPlaneNodes := 0
 
 	if len(sizerResponse.Data.Advanced) > 0 {
 		// Count nodes from Advanced field
