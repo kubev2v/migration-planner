@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
@@ -26,6 +27,10 @@ type StatusCallback func(status string) error
 func ParseRVTools(ctx context.Context, rvtoolsContent []byte, opaValidator *opa.Validator, statusCallback StatusCallback) ([]byte, error) {
 	excelFile, err := excelize.OpenReader(bytes.NewReader(rvtoolsContent))
 	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(strings.ToLower(errMsg), "zip") {
+			return nil, fmt.Errorf("error opening Excel file: the selected .xlsx file is corrupted or does not contain valid RVTools data")
+		}
 		return nil, fmt.Errorf("error opening Excel file: %v", err)
 	}
 	defer excelFile.Close()
