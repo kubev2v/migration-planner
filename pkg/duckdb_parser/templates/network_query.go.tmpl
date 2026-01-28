@@ -1,25 +1,33 @@
 {{- /*
-Network Query Template - Extracts network data from the fixed schema.
+Network Query Template - Extracts network data from dvSwitch and dvPort tables.
 
-The schema always has vnetwork and dvport tables. LEFT JOIN handles cases
-where dvport is empty.
+Matches old implementation which adds:
+1. All switches from dvSwitch sheet (type "dvswitch")
+2. All ports from dvPort sheet (type "distributed")
+
+VM counts are populated separately by inventory_builder using VMCountByNetwork.
 
 Template Parameters:
-  - ClusterFilter: filter by cluster name
+  - ClusterFilter: filter by cluster name (not used - networks are global)
   - Limit: max results (0 = unlimited)
   - Offset: skip first N results
 */ -}}
 SELECT
-    n."Cluster" as "cluster",
-    COALESCE(n."Switch", '') as "dvswitch",
-    n."Network" as "name",
+    '' as "cluster",
+    '' as "dvswitch",
+    "Name" as "name",
+    'dvswitch' as "type",
+    '' as "vlanId"
+FROM dvswitch
+WHERE "Name" IS NOT NULL AND "Name" != ''
+UNION ALL
+SELECT
+    '' as "cluster",
+    COALESCE("Switch", '') as "dvswitch",
+    "Port" as "name",
     'distributed' as "type",
-    COALESCE(p."VLAN", '') as "vlanId",
-    COUNT(*)::integer as "vmsCount"
-FROM vnetwork n
-LEFT JOIN dvport p ON n."Network" = p."Port"
-WHERE n."Cluster" IS NOT NULL
-{{- if .ClusterFilter }} AND n."Cluster" = '{{.ClusterFilter}}'{{end}}
-GROUP BY n."Cluster", n."Switch", n."Network", p."VLAN"
+    COALESCE("VLAN", '') as "vlanId"
+FROM dvport
+WHERE "Port" IS NOT NULL AND "Port" != ''
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

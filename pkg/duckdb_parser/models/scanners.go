@@ -18,25 +18,32 @@ func (d *Disks) Scan(value interface{}) error {
 		return fmt.Errorf("Disks.Scan: expected []interface{}, got %T", value)
 	}
 	result := make([]Disk, 0, len(slice))
+	tracker := NewControllerTracker()
+
 	for _, item := range slice {
 		m, ok := item.(map[string]interface{})
 		if !ok {
 			continue
 		}
+		controller := toString(m["Controller"])
+		controllerKey, bus := tracker.GetKeyAndBus(controller)
+
 		disk := Disk{
-			Key:        toString(m["Key"]),
-			UnitNumber: toString(m["UnitNumber"]),
-			File:       toString(m["File"]),
-			Capacity:   toInt64(m["Capacity"]),
-			Shared:     toBool(m["Shared"]),
-			RDM:        toBool(m["RDM"]),
-			Bus:        toString(m["Bus"]),
-			Mode:       toString(m["Mode"]),
-			Serial:     toString(m["Serial"]),
-			Thin:       toString(m["Thin"]),
-			Controller: toString(m["Controller"]),
-			Label:      toString(m["Label"]),
-			SCSIUnit:   toString(m["SCSIUnit"]),
+			Key:           toString(m["Key"]),
+			UnitNumber:    toInt32(m["UnitNumber"]),
+			ControllerKey: controllerKey,
+			File:          toString(m["File"]),
+			Capacity:      toInt64(m["Capacity"]),
+			Shared:        toBool(m["Shared"]),
+			RDM:           toBool(m["RDM"]),
+			Bus:           bus,
+			Mode:          toString(m["Mode"]),
+			Serial:        toString(m["Serial"]),
+			Thin:          toString(m["Thin"]),
+			Controller:    controller,
+			Label:         toString(m["Label"]),
+			SCSIUnit:      toString(m["SCSIUnit"]),
+			Datastore:     Ref{ID: toString(m["Datastore"])},
 		}
 		result = append(result, disk)
 	}
@@ -67,7 +74,7 @@ func (n *NICs) Scan(value interface{}) error {
 			continue
 		}
 		nic := NIC{
-			Network:         toString(m["Network"]),
+			Network:         Ref{ID: toString(m["Network"])},
 			MAC:             toString(m["MAC"]),
 			Label:           toString(m["Label"]),
 			Adapter:         toString(m["Adapter"]),
@@ -175,6 +182,27 @@ func toInt64(v interface{}) int64 {
 		return int64(val)
 	case string:
 		var i int64
+		_, _ = fmt.Sscanf(val, "%d", &i)
+		return i
+	}
+	return 0
+}
+
+func toInt32(v interface{}) int32 {
+	if v == nil {
+		return 0
+	}
+	switch val := v.(type) {
+	case int32:
+		return val
+	case int64:
+		return int32(val)
+	case int:
+		return int32(val)
+	case float64:
+		return int32(val)
+	case string:
+		var i int32
 		_, _ = fmt.Sscanf(val, "%d", &i)
 		return i
 	}

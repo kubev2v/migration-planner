@@ -1,12 +1,14 @@
 {{- /*
-Migratable With Warnings Count Query Template - Returns count of VMs with Warning but no Critical concerns.
+Migratable With Warnings Count Query Template - Returns count of VMs with ANY Warning concern.
+
+This matches the old implementation behavior where TotalMigratableWithWarnings counts
+any VM that has a warning, regardless of whether it also has critical concerns.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
 */ -}}
 SELECT COUNT(DISTINCT i."VM ID")
 FROM vinfo i
-LEFT JOIN concerns crit ON i."VM ID" = crit."VM_ID" AND crit."Category" = 'Critical'
 JOIN concerns warn ON i."VM ID" = warn."VM_ID" AND warn."Category" = 'Warning'
-WHERE crit."VM_ID" IS NULL
+WHERE 1=1
 {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}};

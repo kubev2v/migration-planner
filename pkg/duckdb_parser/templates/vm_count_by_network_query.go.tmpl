@@ -1,10 +1,13 @@
 {{- /*
 VM Count By Network Query Template - Returns VM count per network.
 
+Counts each NIC row (not distinct VMs) to match old implementation behavior.
+A VM with 2 NICs on the same network is counted twice.
+
 Template Parameters:
   - ClusterFilter: filter by cluster name
 */ -}}
-SELECT "Network" AS network, COUNT(DISTINCT "VM ID") AS count
+SELECT "Network" AS network, COUNT(*) AS count
 FROM vnetwork n
 {{- if .ClusterFilter }}
 JOIN vinfo i ON n."VM ID" = i."VM ID"

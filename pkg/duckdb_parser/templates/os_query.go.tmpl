@@ -7,10 +7,16 @@ Used to generate OS distribution summary for the inventory.
 The query also determines if each OS is supported by checking for "vmware.os.unsupported" concerns.
 An OS is considered supported if no VM with that OS has an unsupported OS concern.
 
+For unsupported OSes ONLY, the query also extracts upgrade recommendations from
+"vmware.os.upgrade.recommendation" concerns, which provide migration paths
+for OSes like RHEL 6. This matches the old implementation behavior where
+upgrade recommendations are only shown for OSes that are also marked unsupported.
+
 Template Parameters:
   - ClusterFilter: filter by cluster name
 */ -}}
 WITH os_data AS (
+    -- "VM" placeholder is filtered during ingestion (NULLIF in ingest_rvtools.go.tmpl)
     SELECT
         v."VM ID",
         COALESCE(
@@ -37,12 +43,31 @@ unsupported_os AS (
     JOIN concerns c ON v."VM ID" = c."VM_ID"
     WHERE c."Concern_ID" = 'vmware.os.unsupported'
     {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+),
+upgrade_recommendations AS (
+    -- Only get upgrade recommendations for OSes that are also unsupported
+    -- This matches the old implementation behavior
+    SELECT DISTINCT
+        COALESCE(
+            NULLIF(v."OS according to the VMware Tools", ''),
+            NULLIF(v."OS according to the configuration file", ''),
+            'Unknown OS'
+        ) AS os_name,
+        FIRST(c."Assessment") AS upgrade_recommendation
+    FROM vinfo v
+    JOIN concerns c ON v."VM ID" = c."VM_ID"
+    WHERE c."Concern_ID" = 'vmware.os.upgrade.recommendation'
+    {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+    GROUP BY 1
 )
 SELECT
     od.os_name AS "name",
     COUNT(*) AS "count",
-    CASE WHEN uo.os_name IS NULL THEN TRUE ELSE FALSE END AS "supported"
+    CASE WHEN uo.os_name IS NULL THEN TRUE ELSE FALSE END AS "supported",
+    -- Only include upgrade recommendation if OS is also unsupported
+    CASE WHEN uo.os_name IS NOT NULL THEN ur.upgrade_recommendation ELSE NULL END AS upgrade_recommendation
 FROM os_data od
 LEFT JOIN unsupported_os uo ON od.os_name = uo.os_name
-GROUP BY od.os_name, uo.os_name
+LEFT JOIN upgrade_recommendations ur ON od.os_name = ur.os_name
+GROUP BY od.os_name, uo.os_name, ur.upgrade_recommendation
 ORDER BY od.os_name;

@@ -262,4 +262,194 @@ var _ = Describe("e2e-rvtools", func() {
 			})
 		})
 	})
+
+	Context("inventory verification", func() {
+		It("should build inventory with correct VM counts", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateValidTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("inventory-vm-counts-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify inventory (accessed via Snapshots)
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			Expect(inventory.Vcenter).NotTo(BeNil())
+			Expect(inventory.Vcenter.Vms.Total).To(Equal(2))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("should have correct power state distribution", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateValidTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("inventory-power-states-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify power states (1 poweredOn, 1 poweredOff from CreateValidTestExcel)
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			powerStates := inventory.Vcenter.Vms.PowerStates
+			Expect(powerStates).NotTo(BeNil())
+			Expect(powerStates["poweredOn"]).To(Equal(1))
+			Expect(powerStates["poweredOff"]).To(Equal(1))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("should populate infrastructure data", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateValidTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("inventory-infra-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify infrastructure data
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			infra := inventory.Vcenter.Infra
+			Expect(infra.TotalHosts).To(Equal(2))
+			Expect(infra.Hosts).NotTo(BeNil())
+			Expect(*infra.Hosts).To(HaveLen(2))
+			Expect(infra.Datastores).NotTo(BeEmpty())
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("should have resource breakdowns that sum correctly", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateValidTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("inventory-resources-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify resource breakdowns (4 + 2 = 6 CPUs from CreateValidTestExcel)
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			vms := inventory.Vcenter.Vms
+			Expect(vms.CpuCores.Total).To(Equal(6))
+			// RAM: 8192 + 4096 = 12288 MB = 12 GB
+			Expect(vms.RamGB.Total).To(Equal(12))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
+
+	Context("multi-cluster inventory", func() {
+		It("should handle multiple clusters correctly", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateMultiClusterTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("multi-cluster-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify vCenter total matches sum of cluster VMs
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			Expect(inventory.Vcenter.Vms.Total).To(Equal(4))
+
+			// Verify clusters are populated
+			Expect(inventory.Clusters).To(HaveLen(2))
+
+			// Sum of cluster VMs should equal vCenter total
+			var clusterVMTotal int
+			for _, cluster := range inventory.Clusters {
+				clusterVMTotal += cluster.Vms.Total
+			}
+			Expect(clusterVMTotal).To(Equal(4))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("should have consistent cluster totals", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateMultiClusterTestExcel()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("cluster-totals-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Each cluster should have 2 VMs
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			for clusterID, cluster := range inventory.Clusters {
+				Expect(cluster.Vms.Total).To(Equal(2), fmt.Sprintf("Cluster %s should have 2 VMs", clusterID))
+			}
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
+
+	Context("migration concerns", func() {
+		It("should populate migration concerns in inventory", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			excelContent, err := CreateExcelWithConcerns()
+			Expect(err).To(BeNil())
+			tmpFile, err := CreateTempExcelFile(excelContent)
+			Expect(err).To(BeNil())
+			defer os.Remove(tmpFile)
+
+			assessment, err = svc.CreateAssessmentFromRvtools("concerns-test", tmpFile)
+			Expect(err).To(BeNil())
+			Expect(assessment).NotTo(BeNil())
+			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
+
+			// Verify total VMs
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			inventory := assessment.Snapshots[0].Inventory
+			Expect(inventory.Vcenter.Vms.Total).To(Equal(3))
+
+			// Verify that migratable count and total are not equal when concerns exist
+			// At least one VM should not be fully migratable due to template/CBT concerns
+			vms := inventory.Vcenter.Vms
+			// Template VM should be not migratable (Critical)
+			// CBT disabled VM should have warning
+			Expect(vms.TotalMigratable).To(BeNumerically("<", vms.Total))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
 })

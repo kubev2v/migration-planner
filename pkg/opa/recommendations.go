@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 )
 
 // OSUpgradeMap maps unsupported operating systems to their recommended upgrade targets
@@ -51,5 +52,31 @@ func AddOSUpgradeConcernToVM(vm *vsphere.VM, osName string) {
 	concern := getOSUpgradeConcern(osName)
 	if concern != nil {
 		vm.Concerns = append(vm.Concerns, *concern)
+	}
+}
+
+// GetOSUpgradeConcern returns an OS upgrade recommendation concern for models.VM if applicable.
+// Returns nil if the OS is not in the upgrade map.
+func GetOSUpgradeConcern(osName string) *models.Concern {
+	osNameLower := strings.ToLower(strings.TrimSpace(osName))
+	upgradeTarget, found := OSUpgradeMap[osNameLower]
+	if !found {
+		for k, v := range OSUpgradeMap {
+			if strings.HasPrefix(osNameLower, k) {
+				upgradeTarget = v
+				break
+			}
+		}
+	}
+
+	if upgradeTarget == "" {
+		return nil
+	}
+
+	return &models.Concern{
+		Id:         "vmware.os.upgrade.recommendation",
+		Category:   "Information",
+		Label:      "OS Upgrade Recommendation",
+		Assessment: fmt.Sprintf("The guest operating system: %s is not currently supported. The operating system can be upgraded to %s", osName, upgradeTarget),
 	}
 }
