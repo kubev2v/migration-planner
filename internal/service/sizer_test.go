@@ -261,9 +261,12 @@ var _ = Describe("sizer service", func() {
 				Expect(result.InventoryTotals.TotalVMs).To(Equal(10))
 				Expect(result.InventoryTotals.TotalCPU).To(Equal(40))
 				Expect(result.InventoryTotals.TotalMemory).To(Equal(80))
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(5))
-				Expect(result.ClusterSizing.WorkerNodes).To(Equal(2))
+				// Base: 2 workers + 3 control plane = 5 total
+				// Failover: max(2, ceil(2*0.10)) = 2 nodes added
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(7))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
 				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
 				Expect(result.ResourceConsumption.CPU).To(Equal(100.0))
 				Expect(result.ResourceConsumption.Memory).To(Equal(200.0))
 			})
@@ -423,9 +426,12 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(5))
+				// Base: 2 workers + 3 control plane = 5 total
+				// Failover: max(2, ceil(2*0.10)) = 2 nodes added
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(7))
 				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
-				Expect(result.ClusterSizing.WorkerNodes).To(Equal(2))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
 			})
 
 			It("successfully handles fallback node counting when totalNodes < 3", func() {
@@ -451,9 +457,12 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(2))
+				// Base: 2 workers (no control plane since totalNodes < 3)
+				// Failover: max(2, ceil(2*0.10)) = 2 nodes added
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(4))
 				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
-				Expect(result.ClusterSizing.WorkerNodes).To(Equal(2))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
 			})
 		})
 

@@ -173,6 +173,9 @@ type ClusterSizing struct {
 	// ControlPlaneNodes Number of control plane nodes
 	ControlPlaneNodes int `json:"controlPlaneNodes"`
 
+	// FailoverNodes Number of failover nodes added for availability
+	FailoverNodes int `json:"failoverNodes"`
+
 	// TotalCPU Total CPU cores across all nodes
 	TotalCPU int `json:"totalCPU"`
 

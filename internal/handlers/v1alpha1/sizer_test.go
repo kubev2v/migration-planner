@@ -313,10 +313,13 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 
 				// Verify response contains all required fields
+				// Base: 5 total (2 workers + 3 control plane)
+				// Failover: max(2, ceil(2*0.10)) = 2 nodes added to workers
 				Expect(successResp.ClusterSizing).NotTo(BeZero())
-				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(5))
-				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(2))
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(7))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(4))
 				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(successResp.ClusterSizing.FailoverNodes).To(Equal(2))
 				Expect(successResp.ClusterSizing.TotalCPU).To(Equal(40))
 				Expect(successResp.ClusterSizing.TotalMemory).To(Equal(80))
 
