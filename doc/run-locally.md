@@ -180,7 +180,13 @@ curl http://localhost:3443/api/v1/info
 curl http://localhost:3443/api/v1/assessments
 ```
 
-#### h. Create new assessment of type agent:
+#### h. List all assessments with specific SourceID:
+
+```bash
+curl http://localhost:3443/api/v1/assessments?sourceId={source-id}
+```
+
+#### i. Create new assessment of type agent:
 
 ```bash
 curl -X POST "http://localhost:3443/api/v1/assessments" \
