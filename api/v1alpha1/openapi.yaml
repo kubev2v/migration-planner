@@ -1665,6 +1665,9 @@ components:
         controlPlaneNodes:
           type: integer
           description: Number of control plane nodes
+        failoverNodes:
+          type: integer
+          description: Number of failover nodes added for availability
         totalCPU:
           type: integer
           description: Total CPU cores across all nodes
@@ -1675,6 +1678,7 @@ components:
         - totalNodes
         - workerNodes
         - controlPlaneNodes
+        - failoverNodes
         - totalCPU
         - totalMemory
 

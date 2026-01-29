@@ -60,6 +60,11 @@ const (
 	MaxRecommendedNodeCPU = 200
 	// MaxRecommendedNodeMemory is the maximum recommended memory (GB) for nodes
 	MaxRecommendedNodeMemory = 512
+
+	// MinFailoverNodes is the minimum number of failover nodes
+	MinFailoverNodes = 2
+	// FailoverCapacityPercent is the percentage of worker nodes for failover
+	FailoverCapacityPercent = 10.0
 )
 
 // SizerService handles cluster sizing calculations
@@ -593,6 +598,11 @@ func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerRespons
 		}
 	}
 
+	// Add failover capacity: max(2 nodes, 10% of worker nodes)
+	failoverNodes := calculateFailoverNodes(workerNodes)
+	workerNodes += failoverNodes
+	totalNodes += failoverNodes
+
 	resourceConsumptionForm := mappers.ResourceConsumptionForm{
 		CPU:    sizerResponse.Data.ResourceConsumption.CPU,
 		Memory: sizerResponse.Data.ResourceConsumption.Memory,
@@ -625,9 +635,18 @@ func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerRespons
 			TotalNodes:        totalNodes,
 			WorkerNodes:       workerNodes,
 			ControlPlaneNodes: controlPlaneNodes,
+			FailoverNodes:     failoverNodes,
 			TotalCPU:          sizerResponse.Data.TotalCPU,
 			TotalMemory:       sizerResponse.Data.TotalMemory,
 		},
 		ResourceConsumption: resourceConsumptionForm,
 	}
+}
+
+func calculateFailoverNodes(workerNodes int) int {
+	if workerNodes == 0 {
+		return 0
+	}
+	percentageBased := int(math.Ceil(float64(workerNodes) * FailoverCapacityPercent / 100.0))
+	return max(MinFailoverNodes, percentageBased)
 }
