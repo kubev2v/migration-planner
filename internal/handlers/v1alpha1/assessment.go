@@ -26,6 +26,13 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 
 	filter := service.NewAssessmentFilter(user.Username, user.Organization)
 
+	// Extract sourceId from query parameter if provided
+	if request.Params.SourceId != nil {
+		sourceIdStr := request.Params.SourceId.String()
+		filter = filter.WithSourceID(sourceIdStr)
+		logger.Step("filter_by_source_id").WithString("source_id", sourceIdStr).Log()
+	}
+
 	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		logger.Error(err).Log()
