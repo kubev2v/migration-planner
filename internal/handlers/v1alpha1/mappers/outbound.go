@@ -304,6 +304,7 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 			TotalNodes:        form.ClusterSizing.TotalNodes,
 			ControlPlaneNodes: form.ClusterSizing.ControlPlaneNodes,
 			WorkerNodes:       form.ClusterSizing.WorkerNodes,
+			FailoverNodes:     form.ClusterSizing.FailoverNodes,
 			TotalCPU:          form.ClusterSizing.TotalCPU,
 			TotalMemory:       form.ClusterSizing.TotalMemory,
 		},
