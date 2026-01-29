@@ -546,6 +546,12 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
+// ListAssessmentsParams defines parameters for ListAssessments.
+type ListAssessmentsParams struct {
+	// SourceId Filter assessments by source ID
+	SourceId *openapi_types.UUID `form:"sourceId,omitempty" json:"sourceId,omitempty"`
+}
+
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 

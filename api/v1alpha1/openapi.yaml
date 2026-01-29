@@ -379,6 +379,14 @@ paths:
         - assessment
       description: List assessments
       operationId: listAssessments
+      parameters:
+        - name: sourceId
+          in: query
+          description: Filter assessments by source ID
+          required: false
+          schema:
+            type: string
+            format: uuid
       responses:
         "200":
           description: OK

@@ -91,6 +91,49 @@ var _ = Describe("assessment service", Ordered, func() {
 			}
 		})
 
+		It("filters assessments by source ID", func() {
+			// Create a source first
+			sourceID := uuid.New()
+			// Use NULL::jsonb for NULL inventory value
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', NULL);", sourceID.String(), "test-source", "user1", "org1"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create assessments - one with the sourceID, one without
+			assessment1ID := uuid.New()
+			assessment2ID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID.String(), "Assessment with Source", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID.String())))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID.String(), "Assessment without Source", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(sourceID.String())
+			assessments, err := svc.ListAssessments(context.TODO(), filter)
+
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(1))
+			Expect(assessments[0].ID).To(Equal(assessment1ID))
+			Expect(assessments[0].SourceID).ToNot(BeNil())
+			Expect(*assessments[0].SourceID).To(Equal(sourceID))
+		})
+
+		It("returns empty list when filtering by non-existent source ID", func() {
+			// Create assessments without sourceID
+			assessment1ID := uuid.New()
+			assessment2ID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID.String(), "Assessment 1", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID.String(), "Assessment 2", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			// Use a non-existent sourceID
+			nonExistentSourceID := uuid.New()
+			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(nonExistentSourceID.String())
+			assessments, err := svc.ListAssessments(context.TODO(), filter)
+
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(0))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
