@@ -3,9 +3,8 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
-
-	"go.uber.org/zap"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
@@ -14,6 +13,9 @@ const (
 	SourceTypeAgent   string = "agent"
 	SourceTypeRvtools string = "rvtools"
 )
+
+// orgIdRegex is a regex to match a non-empty string containing only digits
+var orgIdRegex = regexp.MustCompile(`^\d+$`)
 
 type VmStats struct {
 	// Total is the total number of vms
@@ -60,10 +62,9 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 	for _, a := range assessments {
 		latesSnapshot := a.Snapshots[0] // we called List which orders snapshots by created_at. So we get the latest here
 
-		domain, err := getDomainNameFromAssessment(a)
-		if err != nil {
-			zap.S().Debugw("failed to get domain from username", "error", err, "username", a.Username)
-			domain = a.OrgID
+		orgID := normalizeOrgId(a.OrgID)
+		if domain, err := getDomainName(a.Username); err == nil {
+			orgID = domain
 		}
 
 		inventory := &api.Inventory{}
@@ -74,9 +75,9 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 
 		domainInventories = append(domainInventories, domainInventory{
 			Inventory: *inventory.Vcenter,
-			OrgID:     domain,
+			OrgID:     orgID,
 		})
-		orgIDs[a.OrgID] = struct{}{}
+		orgIDs[orgID] = struct{}{}
 	}
 
 	return InventoryStats{
@@ -129,13 +130,12 @@ func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]C
 	assessmentsByCustomer := make(map[string]CustomerAssessments)
 
 	for _, a := range assessments {
-		domain, err := getDomainNameFromAssessment(a)
-		if err != nil {
-			zap.S().Debugw("failed to get domain from username", "error", err, "username", a.Username)
-			domain = a.OrgID
+		orgID := normalizeOrgId(a.OrgID)
+		if domain, err := getDomainName(a.Username); err == nil {
+			orgID = domain
 		}
 
-		customer := assessmentsByCustomer[domain]
+		customer := assessmentsByCustomer[orgID]
 
 		switch a.SourceType {
 		case SourceTypeAgent:
@@ -144,7 +144,7 @@ func computeAssessmentsByCustomerBySource(assessments []Assessment) map[string]C
 			customer.RvToolCount++
 		}
 
-		assessmentsByCustomer[domain] = customer
+		assessmentsByCustomer[orgID] = customer
 	}
 
 	return assessmentsByCustomer
@@ -212,20 +212,20 @@ func sum(m1, m2 map[string]int) map[string]int {
 	return result
 }
 
-func getDomainNameFromAssessment(a Assessment) (string, error) {
+func getDomainName(username string) (string, error) {
 	const (
 		dotChar = "."
 		atChar  = "@"
 	)
 
 	// if email domain not set, try to get the domain from username
-	if !strings.Contains(a.Username, atChar) {
-		return "", fmt.Errorf("username %q is not an email", a.Username)
+	if !strings.Contains(username, atChar) {
+		return "", fmt.Errorf("username %q is not an email", username)
 	}
 
-	domain := strings.Split(a.Username, atChar)[1]
-	if strings.TrimSpace(domain) == "" {
-		return "", fmt.Errorf("username %q is malformatted", a.Username)
+	domain := strings.TrimSpace(strings.Split(username, atChar)[1])
+	if domain == "" {
+		return "", fmt.Errorf("username %q is malformatted", username)
 	}
 
 	// split the domain name by subdomain and return only the top domain
@@ -236,4 +236,15 @@ func getDomainNameFromAssessment(a Assessment) (string, error) {
 	}
 
 	return strings.Join(parts[len(parts)-2:], dotChar), nil
+}
+
+// normalizeOrgId normalizes an organization ID string.
+// We assume that if orgId contains only digits (0-9),
+// it actually represents "redhat.com".
+func normalizeOrgId(orgId string) string {
+	if orgIdRegex.MatchString(strings.TrimSpace(orgId)) {
+		return "redhat.com"
+	}
+
+	return orgId
 }
