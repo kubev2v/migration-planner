@@ -101,7 +101,7 @@ func computeVmStats(domainInventories []domainInventory) VmStats {
 				os[k] += v.Count
 			}
 		}
-		orgTotal[ds.OrgID] = ds.Inventory.Vms.Total
+		orgTotal[ds.OrgID] += ds.Inventory.Vms.Total
 	}
 
 	return VmStats{
