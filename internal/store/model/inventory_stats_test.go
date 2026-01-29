@@ -54,13 +54,13 @@ func TestParseDomainName(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := getDomainNameFromAssessment(tt.assessment)
+			got, err := getDomainName(tt.assessment.Username)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("getDomainNameFromAssessment: error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("getDomainName: error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if got != tt.domainName {
-				t.Errorf("getDomainNameFromAssessment: got = %v, want %v", got, tt.domainName)
+				t.Errorf("getDomainName: got = %v, want %v", got, tt.domainName)
 			}
 		})
 	}
