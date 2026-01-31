@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kubev2v/forklift v0.0.0-20260109132042-6ac29b3130c3
+	github.com/kubev2v/forklift v0.0.0-20260130164321-c17a5c5a3baa
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/minio/minio-go/v7 v7.0.95
@@ -57,7 +57,9 @@ require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/ajg/form v1.5.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
-	github.com/aws/aws-sdk-go-v2 v1.39.2 // indirect
+	github.com/aws/aws-sdk-go-v2 v1.40.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ec2 v1.274.0 // indirect
+	github.com/aws/smithy-go v1.23.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.14.2 // indirect
