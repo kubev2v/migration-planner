@@ -30,6 +30,24 @@ func isCriticalStatement(stmt string) bool {
 	return false
 }
 
+// xlsxErrorMappings maps DuckDB error substrings to user-friendly messages.
+var xlsxErrorMappings = map[string]string{
+	"No xl/workbook.xml found":         "The file is corrupted or not a valid Excel file",
+	"\"vInfo\" not found in xlsx file": "File is not a valid RVTools export (missing required 'vInfo' sheet)",
+	"not found in xlsx file":           "Required worksheet not found in the Excel file",
+}
+
+// translateXLSXError converts technical DuckDB xlsx errors to user-friendly messages.
+func translateXLSXError(err error) error {
+	errStr := err.Error()
+	for pattern, message := range xlsxErrorMappings {
+		if strings.Contains(errStr, pattern) {
+			return fmt.Errorf("%s", message)
+		}
+	}
+	return err
+}
+
 // ClearData removes all data from tables without dropping the schema.
 // This allows re-ingestion of new RVTools data into the same database instance.
 func (p *Parser) ClearData() error {
@@ -107,12 +125,7 @@ func (p *Parser) executeStatements(query string) error {
 		}
 		if _, err := p.db.Exec(stmt); err != nil {
 			if isCriticalStatement(stmt) {
-				// Truncate statement for cleaner error messages
-				stmtPreview := stmt
-				if len(stmtPreview) > 100 {
-					stmtPreview = stmtPreview[:100] + "..."
-				}
-				return fmt.Errorf("critical statement failed: %s: %w", stmtPreview, err)
+				return translateXLSXError(err)
 			}
 			// Non-critical failures are logged but don't stop execution
 			zap.S().Debugw("non-critical statement failed", "error", err)

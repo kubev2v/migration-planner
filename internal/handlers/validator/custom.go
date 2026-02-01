@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"bytes"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -23,6 +24,7 @@ var (
 
 	nameValidRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,100}$`)
 	labelRegex     = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
+	xlsxMagicBytes = []byte{0x50, 0x4B, 0x03, 0x04}
 )
 
 func nameValidator(fl validator.FieldLevel) bool {
@@ -40,6 +42,15 @@ func ValidateName(name string) error {
 		return NewErrInvalidName("The provided name: %s is invalid.", name)
 	}
 
+	return nil
+}
+
+// ValidateXLSXMagicBytes checks if the file starts with ZIP magic bytes.
+// XLSX files are ZIP archives, so this is a fast preliminary check.
+func ValidateXLSXMagicBytes(data []byte) error {
+	if len(data) < 4 || !bytes.Equal(data[:4], xlsxMagicBytes) {
+		return NewErrInvalidFile("file is not a valid Excel file")
+	}
 	return nil
 }
 
