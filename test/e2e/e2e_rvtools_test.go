@@ -88,7 +88,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("job failed")))
+			Expect(err).To(MatchError(ContainSubstring("status: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

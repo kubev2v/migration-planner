@@ -84,6 +84,10 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 		logger.Error(fmt.Errorf("file is required")).Log()
 		return server.CreateRVToolsAssessment400JSONResponse{Message: "file is required", RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
+	if err := validator.ValidateXLSXMagicBytes(fileContent); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error(), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
 
 	logger.Step("file_read").WithInt("file_size", len(fileContent)).Log()
 
