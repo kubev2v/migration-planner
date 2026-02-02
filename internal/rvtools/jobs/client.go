@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
@@ -31,7 +33,11 @@ func NewClient(ctx context.Context, cfg *config.Config, s store.Store, opaValida
 
 	// Create worker with store and OPA validator (each job creates its own DuckDB instance)
 	// opa.Validator now directly implements duckdb_parser.Validator
-	worker := NewRVToolsWorker(s, opaValidator)
+	var v duckdb_parser.Validator
+	if opaValidator != nil {
+		v = opaValidator
+	}
+	worker := NewRVToolsWorker(s, v)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
