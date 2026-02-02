@@ -86,7 +86,7 @@ There are different ways to use the Migration Planner API:
 
 You can install the UI project and use it.
 Please follow the instructions in this guide:
-https://github.com/kubev2v/migration-planner-ui-app/blob/master/doc/standalone-run-locally.md
+https://github.com/kubev2v/migration-planner-ui-app/blob/master/docs/standalone-run-locally.md
 
 ### 2. Use the planner CLI
 
