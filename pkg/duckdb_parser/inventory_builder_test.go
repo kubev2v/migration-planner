@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -66,21 +67,22 @@ func setupTestParser(t *testing.T, validator Validator) (*Parser, *sql.DB, func(
 	return parser, db, cleanup
 }
 
-// createTestExcel generates a test Excel file with specified VMs.
-// Uses the exact column names expected by the ingestion template.
-func createTestExcel(t *testing.T, vms []map[string]string, hosts []map[string]string) string {
-	t.Helper()
+// ExcelSheet defines a sheet (name, headers, rows) for createTestExcel.
+// Row maps are keyed by header name; only provided keys are written.
+type ExcelSheet struct {
+	Name    string
+	Headers []string
+	Rows    []map[string]string
+}
 
-	f := excelize.NewFile()
-	defer f.Close()
+// NewExcelSheet builds a sheet value for createTestExcel.
+func NewExcelSheet(name string, headers []string, rows []map[string]string) ExcelSheet {
+	return ExcelSheet{Name: name, Headers: headers, Rows: rows}
+}
 
-	// Create vInfo sheet with exact column names from ingestion template
-	vInfoIndex, err := f.NewSheet("vInfo")
-	require.NoError(t, err)
-	f.SetActiveSheet(vInfoIndex)
-
-	// Column names must match the ingestion template exactly
-	vInfoHeaders := []string{
+// Standard sheet header sets for ingestion template compatibility.
+var (
+	vInfoHeaders = []string{
 		"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
 		"Cluster", "Datacenter", "Template", "CBT", "Firmware", "Connection state",
 		"FT State", "EnableUUID", "Folder", "DNS Name", "Primary IP Address",
@@ -88,73 +90,76 @@ func createTestExcel(t *testing.T, vms []map[string]string, hosts []map[string]s
 		"OS according to the configuration file", "OS according to the VMware Tools",
 		"VM UUID", "Total disk capacity MiB",
 	}
-	for i, h := range vInfoHeaders {
-		cellRef := fmt.Sprintf("%s1", columnLetter(i))
-		require.NoError(t, f.SetCellValue("vInfo", cellRef, h))
-	}
-	for rowIdx, vm := range vms {
-		row := rowIdx + 2
-		for colIdx, header := range vInfoHeaders {
-			cellRef := fmt.Sprintf("%s%d", columnLetter(colIdx), row)
-			if val, ok := vm[header]; ok {
-				require.NoError(t, f.SetCellValue("vInfo", cellRef, val))
-			}
-		}
-	}
+	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
+	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"}
+	vClusterHeaders   = []string{"Name", "Object ID"}
+)
 
-	// Create vHost sheet
-	_, err = f.NewSheet("vHost")
-	require.NoError(t, err)
-	vHostHeaders := []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
-	for i, h := range vHostHeaders {
-		cellRef := fmt.Sprintf("%s1", columnLetter(i))
-		require.NoError(t, f.SetCellValue("vHost", cellRef, h))
-	}
-	for rowIdx, host := range hosts {
-		row := rowIdx + 2
-		for colIdx, header := range vHostHeaders {
-			cellRef := fmt.Sprintf("%s%d", columnLetter(colIdx), row)
-			if val, ok := host[header]; ok {
-				require.NoError(t, f.SetCellValue("vHost", cellRef, val))
-			}
-		}
-	}
-
-	// Create vDatastore sheet
-	_, err = f.NewSheet("vDatastore")
-	require.NoError(t, err)
-	dsHeaders := []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"}
-	for i, h := range dsHeaders {
-		cellRef := fmt.Sprintf("%s1", columnLetter(i))
-		require.NoError(t, f.SetCellValue("vDatastore", cellRef, h))
-	}
-	dsRow := []string{"esxi-host-1", "10.0.0.1", "datastore1", "datastore-001", "524288", "false", "1048576", "VMFS"}
-	for i, val := range dsRow {
-		cellRef := fmt.Sprintf("%s2", columnLetter(i))
-		require.NoError(t, f.SetCellValue("vDatastore", cellRef, val))
-	}
-
-	// Create vCluster sheet for cluster ID resolution
-	_, err = f.NewSheet("vCluster")
-	require.NoError(t, err)
-	vClusterHeaders := []string{"Name", "Object ID"}
-	for i, h := range vClusterHeaders {
-		cellRef := fmt.Sprintf("%s1", columnLetter(i))
-		require.NoError(t, f.SetCellValue("vCluster", cellRef, h))
-	}
-	// Add cluster entries from hosts
+// defaultStandardSheets returns vInfo, vHost, default vDatastore, and vCluster from hosts for createTestExcel.
+func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 	clustersSeen := make(map[string]bool)
-	clusterRow := 2
-	for _, host := range hosts {
-		if cluster, ok := host["Cluster"]; ok && !clustersSeen[cluster] {
-			clustersSeen[cluster] = true
-			require.NoError(t, f.SetCellValue("vCluster", fmt.Sprintf("A%d", clusterRow), cluster))
-			require.NoError(t, f.SetCellValue("vCluster", fmt.Sprintf("B%d", clusterRow), fmt.Sprintf("domain-c%d", clusterRow)))
-			clusterRow++
+	var vClustersRows []map[string]string
+	for i, host := range hosts {
+		cluster, ok := host["Cluster"]
+		if !ok || clustersSeen[cluster] {
+			continue
+		}
+		clustersSeen[cluster] = true
+		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1)})
+	}
+
+	vDatastoreRows := []map[string]string{
+		{
+			"Hosts":        "esxi-host-1",
+			"Address":      "10.0.0.1",
+			"Name":         "datastore1",
+			"Object ID":    "datastore-001",
+			"Free MiB":     "524288",
+			"MHA":          "false",
+			"Capacity MiB": "1048576",
+			"Type":         "VMFS",
+		},
+	}
+
+	return []ExcelSheet{
+		NewExcelSheet("vInfo", vInfoHeaders, vms),
+		NewExcelSheet("vHost", vHostHeaders, hosts),
+		NewExcelSheet("vDatastore", vDatastoreHeaders, vDatastoreRows),
+		NewExcelSheet("vCluster", vClusterHeaders, vClustersRows),
+	}
+}
+
+// createTestExcel generates a test Excel file from variadic sheets (vInfo, vHost, vDisk, etc.).
+// Nothing is mandatory; pass only the sheets you need. Use NewExcelSheet(name, headers, rows).
+func createTestExcel(t *testing.T, sheets ...ExcelSheet) string {
+	t.Helper()
+
+	f := excelize.NewFile()
+	defer f.Close()
+
+	firstSheet := true
+	for _, sh := range sheets {
+		idx, err := f.NewSheet(sh.Name)
+		require.NoError(t, err)
+		if firstSheet {
+			f.SetActiveSheet(idx)
+			firstSheet = false
+		}
+		for i, h := range sh.Headers {
+			cellRef := fmt.Sprintf("%s1", columnLetter(i))
+			require.NoError(t, f.SetCellValue(sh.Name, cellRef, h))
+		}
+		for rowIdx, row := range sh.Rows {
+			r := rowIdx + 2
+			for colIdx, header := range sh.Headers {
+				cellRef := fmt.Sprintf("%s%d", columnLetter(colIdx), r)
+				if val, ok := row[header]; ok {
+					require.NoError(t, f.SetCellValue(sh.Name, cellRef, val))
+				}
+			}
 		}
 	}
 
-	// Delete default Sheet1
 	_ = f.DeleteSheet("Sheet1")
 
 	// Write to temp file inside t.TempDir() so cleanup is automatic
@@ -216,7 +221,7 @@ func TestBuildInventory_BasicStructure(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -243,7 +248,7 @@ func TestBuildInventory_VMCounts(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -276,7 +281,7 @@ func TestBuildInventory_PowerStates(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -303,7 +308,7 @@ func TestBuildInventory_MigrationIssues(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -330,7 +335,7 @@ func TestBuildInventory_ResourceBreakdowns(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -358,7 +363,7 @@ func TestBuildInventory_InfraData(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ProLiant", "Vendor": "HP", "Host": "esxi-host-2", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -386,7 +391,7 @@ func TestBuildInventory_ClusterInventories(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -413,7 +418,7 @@ func TestBuildInventory_EmptyData(t *testing.T) {
 	vms := []map[string]string{}
 	hosts := []map[string]string{}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	result, err := parser.IngestRvTools(ctx, tmpFile)
@@ -498,7 +503,7 @@ func TestValidation_ErrorCodes(t *testing.T) {
 			if tt.customHeaders != nil {
 				tmpFile = createTestExcelWithCustomHeaders(t, tt.customHeaders, tt.vms)
 			} else {
-				tmpFile = createTestExcel(t, tt.vms, tt.hosts)
+				tmpFile = createTestExcel(t, defaultStandardSheets(tt.vms, tt.hosts)...)
 			}
 
 			result, err := parser.IngestRvTools(context.Background(), tmpFile)
@@ -534,7 +539,7 @@ func TestBuildInventory_MultiCluster(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster2", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -669,7 +674,7 @@ func TestBuildInventory_Overcommitment(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -701,7 +706,7 @@ func TestBuildInventory_MigratableCounts(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -731,7 +736,7 @@ func TestBuildInventory_MigratableWithWarnings(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, vms, hosts)
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -770,4 +775,59 @@ func TestBuildInventory_MinimalSchema(t *testing.T) {
 	inv, err := parser.BuildInventory(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 3, inv.VCenter.VMs.Total, "Should have 3 VMs from minimal schema")
+}
+
+// TestBuildInventory_VMsWithSharedDisksCount ingests Excel with vDisk data and asserts
+// VMsWithSharedDisksCount returns the count of VMs that have at least one shared disk.
+func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-4", "VM ID": "vm-004", "VI SDK UUID": "uuid-4", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster2", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster2", "# Cores": "8", "# CPU": "2", "Object ID": "host-002", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+	}
+	// vm-001: one shared disk -> counted
+	// vm-002: only non-shared disks -> not counted
+	// vm-003: one shared, one non-shared -> counted
+	// vm-004: one shared (cluster2) -> counted; filter by cluster1 should exclude it
+	vDiskHeaders := []string{
+		"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+		"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+		"Thin", "Controller", "Label", "SCSI Unit #",
+	}
+	disks := []map[string]string{
+		{"VM ID": "vm-001", "Disk Key": "2000", "Unit #": "0", "Path": "[ds1] vm-1/disk.vmdk", "Capacity MiB": "10240", "Sharing mode": "true"},
+		{"VM ID": "vm-002", "Disk Key": "2001", "Unit #": "0", "Path": "[ds1] vm-2/disk.vmdk", "Capacity MiB": "8192", "Sharing mode": "false"},
+		{"VM ID": "vm-003", "Disk Key": "2002", "Unit #": "0", "Path": "[ds1] vm-3/disk0.vmdk", "Capacity MiB": "4096", "Sharing mode": "true"},
+		{"VM ID": "vm-003", "Disk Key": "2003", "Unit #": "1", "Path": "[ds1] vm-3/disk1.vmdk", "Capacity MiB": "2048", "Sharing mode": "false"},
+		{"VM ID": "vm-004", "Disk Key": "2004", "Unit #": "0", "Path": "[ds1] vm-4/disk.vmdk", "Capacity MiB": "4096", "Sharing mode": "true"},
+	}
+
+	tmpFile := createTestExcel(t, append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))...)
+	defer os.Remove(tmpFile)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// No filter: 3 VMs with at least one shared disk (vm-001, vm-003, vm-004)
+	count, err := parser.VMsWithSharedDisksCount(ctx, Filters{})
+	require.NoError(t, err)
+	assert.Equal(t, 3, count, "VMs with at least one shared disk (vm-001, vm-003, vm-004)")
+
+	// Filter by cluster1: 2 VMs (vm-001, vm-003); vm-004 is in cluster2
+	countCluster1, err := parser.VMsWithSharedDisksCount(ctx, Filters{Cluster: "cluster1"})
+	require.NoError(t, err)
+	assert.Equal(t, 2, countCluster1, "VMs with shared disks in cluster1 only")
+
+	countCluster2, err := parser.VMsWithSharedDisksCount(ctx, Filters{Cluster: "cluster2"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, countCluster2, "VMs with shared disks in cluster2 only")
 }

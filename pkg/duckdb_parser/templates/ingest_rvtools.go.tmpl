@@ -148,7 +148,7 @@ SELECT
     d."Path",
     d."Disk Path",
     TRY_CAST(d."Capacity MiB" AS BIGINT),
-    CASE WHEN LOWER(d."Sharing mode") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Sharing mode") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    CASE WHEN LOWER(d."Sharing mode") IN ('true', '1', 'yes', 'sharingmultiwriter') THEN TRUE WHEN LOWER(d."Sharing mode") IN ('false', '0', 'no', 'sharingnone') THEN FALSE ELSE NULL END,
     CASE WHEN LOWER(d."Raw") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Raw") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     d."Shared Bus",
     d."Disk Mode",
