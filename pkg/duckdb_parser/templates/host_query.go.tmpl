@@ -1,24 +1,46 @@
 {{- /*
-Host Query Template - Generates DuckDB SQL to extract ESXi host information.
-
-This query extracts host details from the vHost sheet including CPU, memory,
-and vendor/model information.
+Host Query - Extracts ESXi host information from vHost sheet.
+Falls back to vInfo when vHost sheet is empty/missing.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
-  - Limit: max results (0 = unlimited)
-  - Offset: skip first N results
+  - Limit/Offset: pagination
 */ -}}
-SELECT
-    COALESCE("Cluster", '') as "cluster",
-    COALESCE("# Cores", 0)::integer as "cpuCores",
-    COALESCE("# CPU", 0)::integer as "cpuSockets",
-    COALESCE("Object ID", '') as "id",
-    COALESCE("# Memory", 0)::integer as "memoryMB",
-    COALESCE("Model", 'N/A') as "model",
-    COALESCE("Vendor", 'N/A') as "vendor"
-FROM vhost
-WHERE 1=1
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+WITH vhost_global_count AS (
+    SELECT COUNT(*) as cnt FROM vhost
+),
+vhost_data AS (
+    SELECT
+        COALESCE("Cluster", '') as "cluster",
+        COALESCE("# Cores", 0)::integer as "cpuCores",
+        COALESCE("# CPU", 0)::integer as "cpuSockets",
+        COALESCE("Object ID", '') as "id",
+        COALESCE("# Memory", 0)::integer as "memoryMB",
+        COALESCE("Model", 'N/A') as "model",
+        COALESCE("Vendor", 'N/A') as "vendor"
+    FROM vhost
+    WHERE 1=1
+    {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+),
+vinfo_fallback AS (
+    SELECT DISTINCT
+        COALESCE("Cluster", '') as "cluster",
+        0 as "cpuCores",
+        0 as "cpuSockets",
+        COALESCE("Host", '') as "id",
+        0 as "memoryMB",
+        'N/A' as "model",
+        'N/A' as "vendor"
+    FROM vinfo
+    WHERE "Host" IS NOT NULL AND "Host" != ''
+    {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+)
+SELECT "cluster", "cpuCores", "cpuSockets", "id", "memoryMB", "model", "vendor"
+FROM vhost_data
+WHERE (SELECT cnt FROM vhost_global_count) > 0
+UNION ALL
+SELECT "cluster", "cpuCores", "cpuSockets", "id", "memoryMB", "model", "vendor"
+FROM vinfo_fallback
+WHERE (SELECT cnt FROM vhost_global_count) = 0
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

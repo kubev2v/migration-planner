@@ -1,12 +1,29 @@
 {{- /*
-Host Power State Counts Query Template - Returns host status distribution.
-Note: Defaults to 'green' if status is empty/null.
+Host Power State Counts - Returns host status distribution.
+Defaults to 'green' if status is empty. Falls back to vInfo with 'unknown'
+status when vHost sheet is empty/missing.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
 */ -}}
-SELECT COALESCE(NULLIF("Config status", ''), 'green') AS state, COUNT(*) AS count
-FROM vhost
-WHERE 1=1
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
-GROUP BY state;
+WITH vhost_global_count AS (
+    SELECT COUNT(*) as cnt FROM vhost
+),
+vhost_states AS (
+    SELECT COALESCE(NULLIF("Config status", ''), 'green') AS state, COUNT(*) AS count
+    FROM vhost
+    WHERE 1=1
+    {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    GROUP BY state
+),
+vinfo_fallback AS (
+    SELECT 'unknown' AS state, COUNT(DISTINCT "Host") AS count
+    FROM vinfo
+    WHERE "Host" IS NOT NULL AND "Host" != ''
+    {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+)
+SELECT state, count FROM vhost_states
+WHERE (SELECT cnt FROM vhost_global_count) > 0
+UNION ALL
+SELECT state, count FROM vinfo_fallback
+WHERE (SELECT cnt FROM vhost_global_count) = 0 AND count > 0;
