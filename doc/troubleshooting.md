@@ -45,7 +45,7 @@ Expected output should be similar to:
 ```
 | CONTAINER ID | IMAGE                                               | COMMAND               | CREATED       | STATUS        | PORTS | NAMES          |
 | cc0a71a37c1b | quay.io/kubev2v/forklift-validation:release-v2.6.4  | run --server /usr...  | 2 minutes ago | Up 31 minutes |       | opa            |
-| 70ad0a7cbdc5 | quay.io/kubev2v/migration-planner-agent:latest      | -config /agent/co...  | 2 minutes ago | Up 31 minutes |       | planner-agent  |
+| 70ad0a7cbdc5 | quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest      | -config /agent/co...  | 2 minutes ago | Up 31 minutes |       | planner-agent  |
 ```
 
 **Note:** If only the OPA is not running, you should still be able to use the agent and view the final report. However,
