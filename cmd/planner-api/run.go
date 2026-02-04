@@ -84,7 +84,7 @@ var runCmd = &cobra.Command{
 		zap.S().Info("initializing OPA validator...")
 		opaValidator, err := opa.NewValidatorFromDir(cfg.Service.OpaPoliciesFolder)
 		if err != nil {
-			zap.S().Warnf("Failed to initialize OPA validator: %v - validation will be disabled", err)
+			zap.S().Fatalw("initialize OPA validator", "error", err)
 		}
 
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
