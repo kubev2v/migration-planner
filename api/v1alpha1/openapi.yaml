@@ -1608,6 +1608,11 @@ components:
           description: Memory (GB) per worker node
           x-oapi-codegen-extra-tags:
             validate: "required,min=4,max=512"
+        workerNodeThreads:
+          type: integer
+          description: Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2"
         controlPlaneSchedulable:
           type: boolean
           default: false

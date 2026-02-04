@@ -710,4 +710,74 @@ var _ = Describe("sizer service", func() {
 	// Note: Tests for unexported methods (aggregateVMsIntoServices, getOverCommitMultiplier,
 	// calculateMinimumNodeSize, formatNodeSizeError, buildSizerPayload, transformSizerResponse)
 	// are tested indirectly through CalculateClusterRequirements above.
+
+	Describe("CalculateEffectiveCPU", func() {
+		Context("no SMT (threads == 0)", func() {
+			It("returns physical cores when threads is 0", func() {
+				result := service.CalculateEffectiveCPU(16, 0)
+				Expect(result).To(Equal(16.0))
+			})
+
+			It("returns physical cores when threads equals cores", func() {
+				result := service.CalculateEffectiveCPU(16, 16)
+				Expect(result).To(Equal(16.0))
+			})
+		})
+
+		Context("SMT enabled", func() {
+			It("calculates effective CPU for 2:1 SMT ratio (16C/32T)", func() {
+				// Formula: 16 + ((32-16) * 0.5) = 16 + 8 = 24
+				result := service.CalculateEffectiveCPU(16, 32)
+				Expect(result).To(Equal(24.0))
+			})
+
+			It("calculates effective CPU for 4:1 SMT ratio (8C/32T)", func() {
+				// Formula: 8 + ((32-8) * 0.5) = 8 + 12 = 20
+				result := service.CalculateEffectiveCPU(8, 32)
+				Expect(result).To(Equal(20.0))
+			})
+
+			It("calculates effective CPU for 2:1 SMT ratio (32C/64T)", func() {
+				// Formula: 32 + ((64-32) * 0.5) = 32 + 16 = 48
+				result := service.CalculateEffectiveCPU(32, 64)
+				Expect(result).To(Equal(48.0))
+			})
+
+			It("calculates effective CPU for odd number of cores (15C/30T)", func() {
+				// Formula: 15 + ((30-15) * 0.5) = 15 + 7.5 = 22.5
+				result := service.CalculateEffectiveCPU(15, 30)
+				Expect(result).To(Equal(22.5))
+			})
+		})
+
+		Context("edge cases", func() {
+			It("returns 0.0 when physicalCores is 0", func() {
+				result := service.CalculateEffectiveCPU(0, 16)
+				Expect(result).To(Equal(0.0))
+			})
+
+			It("returns 0.0 when physicalCores is negative", func() {
+				result := service.CalculateEffectiveCPU(-1, 16)
+				Expect(result).To(Equal(0.0))
+			})
+
+			It("returns physical cores when threads < physicalCores (invalid config)", func() {
+				// Invalid: threads (8) < cores (16)
+				result := service.CalculateEffectiveCPU(16, 8)
+				Expect(result).To(Equal(16.0))
+			})
+
+			It("handles single core with SMT (1C/2T)", func() {
+				// Formula: 1 + ((2-1) * 0.5) = 1 + 0.5 = 1.5
+				result := service.CalculateEffectiveCPU(1, 2)
+				Expect(result).To(Equal(1.5))
+			})
+
+			It("handles minimum valid cores (2C/4T)", func() {
+				// Formula: 2 + ((4-2) * 0.5) = 2 + 1 = 3
+				result := service.CalculateEffectiveCPU(2, 4)
+				Expect(result).To(Equal(3.0))
+			})
+		})
+	})
 })

@@ -122,11 +122,15 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 		CpuOverCommitRatio:      string(apiReq.CpuOverCommitRatio),
 		MemoryOverCommitRatio:   string(apiReq.MemoryOverCommitRatio),
 		WorkerNodeCPU:           apiReq.WorkerNodeCPU,
+		WorkerNodeThreads:       0,
 		WorkerNodeMemory:        apiReq.WorkerNodeMemory,
 		ControlPlaneSchedulable: false,
 	}
 	if apiReq.ControlPlaneSchedulable != nil {
 		form.ControlPlaneSchedulable = *apiReq.ControlPlaneSchedulable
+	}
+	if apiReq.WorkerNodeThreads != nil {
+		form.WorkerNodeThreads = *apiReq.WorkerNodeThreads
 	}
 	return form
 }
