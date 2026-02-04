@@ -173,6 +173,15 @@ func (s *SizerService) CalculateClusterRequirements(
 	controlPlaneCPU := ControlPlaneCPU
 	controlPlaneMemory := ControlPlaneMemory
 
+	// Calculate effective CPU with SMT adjustment
+	effectiveCPU := CalculateEffectiveCPU(req.WorkerNodeCPU, req.WorkerNodeThreads)
+
+	// Calculate SMT multiplier for minimum node size calculation
+	smtMultiplier := 1.0 // Default: no SMT
+	if req.WorkerNodeCPU > 0 && req.WorkerNodeThreads > 0 && req.WorkerNodeThreads > req.WorkerNodeCPU {
+		smtMultiplier = effectiveCPU / float64(req.WorkerNodeCPU)
+	}
+
 	tracer := logger.Operation("calculate_cluster_requirements").
 		WithUUID("assessment_id", assessmentID).
 		WithString("cluster_id", req.ClusterID).
@@ -181,11 +190,14 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithInt("inventory_total_vms", totalVMs).
 		WithString("over_commit_ratio", req.OverCommitRatio).
 		WithInt("worker_node_cpu", req.WorkerNodeCPU).
+		WithInt("worker_node_threads", req.WorkerNodeThreads).
+		WithString("worker_node_effective_cpu", fmt.Sprintf("%.2f", effectiveCPU)).
 		WithInt("worker_node_memory", req.WorkerNodeMemory).
 		WithBool("control_plane_schedulable", controlPlaneSchedulable).
 		Build()
 
-	targetCPU := float64(req.WorkerNodeCPU) * CapacityMultiplier
+	// Use effective CPU for all calculations
+	targetCPU := effectiveCPU * CapacityMultiplier
 	targetMemory := float64(req.WorkerNodeMemory) * CapacityMultiplier
 
 	minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches := s.calculateMinimumNodeSize(
@@ -193,6 +205,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		totalMemory,
 		MaxBatches,
 		CapacityMultiplier,
+		smtMultiplier,
 	)
 
 	estimatedBatchesCPU := int(math.Ceil(float64(totalCPU) / targetCPU))
@@ -210,7 +223,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	services, err := s.aggregateVMsIntoServices(
 		float64(totalCPU),
 		float64(totalMemory),
-		req.WorkerNodeCPU,
+		effectiveCPU,
 		req.WorkerNodeMemory,
 		req.OverCommitRatio,
 		CapacityMultiplier,
@@ -227,7 +240,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	sizerPayload := s.buildSizerPayload(
 		services,
 		DefaultPlatform,
-		req.WorkerNodeCPU,
+		effectiveCPU,
 		req.WorkerNodeMemory,
 		includeControlPlane,
 		controlPlaneSchedulable,
@@ -253,6 +266,7 @@ func (s *SizerService) CalculateClusterRequirements(
 			totalMemory,
 			MaxNodeCount,
 			CapacityMultiplier,
+			smtMultiplier,
 		)
 
 		return nil, s.formatNodeSizeError(
@@ -302,7 +316,7 @@ func (s *SizerService) Health(ctx context.Context) error {
 // Parameters:
 //   - totalCPU: Total CPU cores from all VMs in the cluster
 //   - totalMemory: Total memory (GB) from all VMs in the cluster
-//   - workerNodeCPU: CPU cores per worker node
+//   - effectiveWorkerNodeCPU: Effective CPU cores per worker node (SMT-adjusted)
 //   - workerNodeMemory: Memory (GB) per worker node
 //   - overCommitRatio: Over-commit ratio applied to both CPU and memory (e.g., "1:4")
 //   - capacityMultiplier: Multiplier for target capacity (0.7 for 70% utilization)
@@ -313,18 +327,18 @@ func (s *SizerService) Health(ctx context.Context) error {
 func (s *SizerService) aggregateVMsIntoServices(
 	totalCPU float64,
 	totalMemory float64,
-	workerNodeCPU int,
+	effectiveWorkerNodeCPU float64,
 	workerNodeMemory int,
 	overCommitRatio string,
 	capacityMultiplier float64,
 ) ([]BatchedService, error) {
 	// Guard against invalid worker node sizes to prevent division by zero
-	if workerNodeCPU <= 0 || workerNodeMemory <= 0 {
-		return nil, fmt.Errorf("worker node size must be greater than zero: CPU=%d, Memory=%d", workerNodeCPU, workerNodeMemory)
+	if effectiveWorkerNodeCPU <= 0 || workerNodeMemory <= 0 {
+		return nil, fmt.Errorf("worker node size must be greater than zero: CPU=%.2f, Memory=%d", effectiveWorkerNodeCPU, workerNodeMemory)
 	}
 
 	// Calculate target batch size (70% of node capacity)
-	targetCPU := float64(workerNodeCPU) * capacityMultiplier
+	targetCPU := effectiveWorkerNodeCPU * capacityMultiplier
 	targetMemory := float64(workerNodeMemory) * capacityMultiplier
 
 	// Calculate number of batches
@@ -394,15 +408,37 @@ func (s *SizerService) getOverCommitMultiplier(overCommitRatio string) (float64,
 	return multiplier, nil
 }
 
-func (s *SizerService) calculateMinimumNodeSize(inventoryCPU, inventoryMemory int, maxCount int, capacityMultiplier float64) (cpu, memory int) {
+// CalculateEffectiveCPU calculates SMT-adjusted effective CPU cores
+// Formula: effectiveCPU = physicalCores + ((threads - physicalCores) * 0.5)
+// If threads == 0 or threads == cores, returns cores (no SMT)
+func CalculateEffectiveCPU(physicalCores, threads int) float64 {
+	if physicalCores <= 0 {
+		return 0.0 // Invalid input, return 0
+	}
+	if threads == 0 || threads == physicalCores {
+		return float64(physicalCores) // No SMT or not provided
+	}
+	if threads < physicalCores {
+		// Invalid configuration, return cores as fallback
+		return float64(physicalCores)
+	}
+	smtThreads := float64(threads - physicalCores)
+	return float64(physicalCores) + (smtThreads * 0.5)
+}
+
+func (s *SizerService) calculateMinimumNodeSize(inventoryCPU, inventoryMemory int, maxCount int, capacityMultiplier float64, smtMultiplier float64) (cpu, memory int) {
 	// Validate inputs to prevent division by zero
-	if maxCount <= 0 || capacityMultiplier <= 0 {
+	if maxCount <= 0 || capacityMultiplier <= 0 || smtMultiplier <= 0 {
 		// Return minimum valid node size if inputs are invalid
 		return MinFallbackNodeCPU, MinFallbackNodeMemory
 	}
 
+	// Calculate minimum effective CPU needed per node
 	denominator := float64(maxCount) * capacityMultiplier
-	minNodeCPU := int(math.Ceil(float64(inventoryCPU) / denominator))
+	minEffectiveCPUPerNode := float64(inventoryCPU) / denominator
+
+	// Convert effective CPU back to physical cores (accounting for SMT)
+	minNodeCPU := int(math.Ceil(minEffectiveCPUPerNode / smtMultiplier))
 	minNodeMemory := int(math.Ceil(float64(inventoryMemory) / denominator))
 
 	// Round up to nearest even number for CPU, nearest multiple of 4 for memory
@@ -443,7 +479,7 @@ func (s *SizerService) formatNodeSizeError(workerCPU, workerMemory, inventoryCPU
 func (s *SizerService) buildSizerPayload(
 	services []BatchedService,
 	platform string,
-	workerNodeCPU int,
+	effectiveWorkerNodeCPU float64,
 	workerNodeMemory int,
 	includeControlPlane bool,
 	controlPlaneSchedulable bool,
@@ -453,7 +489,7 @@ func (s *SizerService) buildSizerPayload(
 	machineSets := []client.MachineSet{
 		{
 			Name:          "worker",
-			CPU:           workerNodeCPU,
+			CPU:           int(math.Round(effectiveWorkerNodeCPU)),
 			Memory:        workerNodeMemory,
 			InstanceName:  "bare-metal-worker",
 			NumberOfDisks: MachineSetNumberOfDisks,

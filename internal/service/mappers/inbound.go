@@ -228,6 +228,7 @@ type ClusterRequirementsRequestForm struct {
 	ClusterID               string
 	OverCommitRatio         string
 	WorkerNodeCPU           int
+	WorkerNodeThreads       int
 	WorkerNodeMemory        int
 	ControlPlaneSchedulable bool
 }

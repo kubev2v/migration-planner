@@ -42,6 +42,18 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
+	// Validate SMT configuration if threads provided
+	if request.Body.WorkerNodeThreads != nil {
+		threads := *request.Body.WorkerNodeThreads
+		if threads < request.Body.WorkerNodeCPU {
+			logger.Error(fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU)).Log()
+			return server.CalculateAssessmentClusterRequirements400JSONResponse{
+				Message:   fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU),
+				RequestId: requestid.FromContextPtr(ctx),
+			}, nil
+		}
+	}
+
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
