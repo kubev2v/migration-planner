@@ -332,6 +332,52 @@ var _ = Describe("sizer handler", func() {
 				Expect(successResp.ResourceConsumption.Cpu).To(Equal(100.0))
 				Expect(successResp.ResourceConsumption.Memory).To(Equal(200.0))
 			})
+
+			intPtr := func(v int) *int { return &v }
+			cases := []struct {
+				name    string
+				cpu     int
+				mem     int
+				threads *int
+			}{
+				{name: "successfully processes request with SMT enabled (16C/32T)", cpu: 16, mem: 128, threads: intPtr(32)},
+				{name: "successfully processes request without SMT (backward compatibility)", cpu: 16, mem: 128, threads: nil},
+				{name: "successfully processes request with threads equal to cores (no SMT)", cpu: 16, mem: 128, threads: intPtr(16)},
+			}
+
+			for _, tc := range cases {
+				tc := tc
+				It(tc.name, func() {
+					request := &api.ClusterRequirementsRequest{
+						ClusterId:             clusterID,
+						CpuOverCommitRatio:    api.CpuOneToFour,
+						MemoryOverCommitRatio: api.MemoryOneToTwo,
+						WorkerNodeCPU:         tc.cpu,
+						WorkerNodeThreads:     tc.threads,
+						WorkerNodeMemory:      tc.mem,
+					}
+
+					mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+					testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+					handler = handlers.NewServiceHandler(
+						nil,
+						service.NewAssessmentService(mockStore, nil),
+						nil,
+						service.NewSizerService(sizerClient, mockStore),
+					)
+
+					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+						Id:   assessmentID,
+						Body: request,
+					})
+
+					Expect(err).To(BeNil())
+					Expect(resp).NotTo(BeNil())
+					_, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+					Expect(ok).To(BeTrue())
+				})
+			}
 		})
 
 		Context("validation errors", func() {
@@ -531,6 +577,38 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("invalid memory over-commit ratio"))
 				Expect(errorResp.Message).To(ContainSubstring("1:6"))
+			})
+
+			It("returns 400 when workerNodeThreads is less than workerNodeCPU", func() {
+				threads := 8
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         16,
+					WorkerNodeThreads:     &threads,
+					WorkerNodeMemory:      128,
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("workerNodeThreads (8) must be >= workerNodeCPU (16)"))
 			})
 		})
 

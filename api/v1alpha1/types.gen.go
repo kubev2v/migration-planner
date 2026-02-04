@@ -148,6 +148,9 @@ type ClusterRequirementsRequest struct {
 
 	// WorkerNodeMemory Memory (GB) per worker node
 	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
+
+	// WorkerNodeThreads Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2"`
 }
 
 // ClusterRequirementsRequestCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
