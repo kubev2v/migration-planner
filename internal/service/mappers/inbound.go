@@ -242,6 +242,7 @@ type ClusterSizingForm struct {
 	TotalNodes        int
 	ControlPlaneNodes int
 	WorkerNodes       int
+	FailoverNodes     int
 	TotalCPU          int
 	TotalMemory       int
 }
