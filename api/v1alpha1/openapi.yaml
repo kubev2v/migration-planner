@@ -1582,12 +1582,20 @@ components:
           description: ID of the cluster to calculate requirements for
           x-oapi-codegen-extra-tags:
             validate: "required"
-        overCommitRatio:
+        cpuOverCommitRatio:
           type: string
           enum: ["1:1", "1:2", "1:4", "1:6"]
-          x-enum-varnames: ["OneToOne", "OneToTwo", "OneToFour", "OneToSix"]
+          x-enum-varnames: ["CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix"]
           default: "1:4"
           description: CPU over-commit ratio (e.g., "1:4")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        memoryOverCommitRatio:
+          type: string
+          enum: ["1:1", "1:2", "1:4"]
+          x-enum-varnames: ["MemoryOneToOne", "MemoryOneToTwo", "MemoryOneToFour"]
+          default: "1:2"
+          description: Memory over-commit ratio (e.g., "1:2")
           x-oapi-codegen-extra-tags:
             validate: "required"
         workerNodeCPU:
@@ -1606,7 +1614,8 @@ components:
           description: Allow workload scheduling on control plane nodes
       required:
         - clusterId
-        - overCommitRatio
+        - cpuOverCommitRatio
+        - memoryOverCommitRatio
         - workerNodeCPU
         - workerNodeMemory
 
