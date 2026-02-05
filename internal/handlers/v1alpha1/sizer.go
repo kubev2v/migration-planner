@@ -42,6 +42,20 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
+	// Validate CPU overcommit ratio
+	validCpuRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true, "1:6": true}
+	if !validCpuRatios[string(request.Body.CpuOverCommitRatio)] {
+		logger.Error(fmt.Errorf("invalid CPU over-commit ratio: %s", request.Body.CpuOverCommitRatio)).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6", request.Body.CpuOverCommitRatio), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
+	// Validate memory overcommit ratio
+	validMemoryRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true}
+	if !validMemoryRatios[string(request.Body.MemoryOverCommitRatio)] {
+		logger.Error(fmt.Errorf("invalid memory over-commit ratio: %s", request.Body.MemoryOverCommitRatio)).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio), RequestId: requestid.FromContextPtr(ctx)}, nil
+	}
+
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {

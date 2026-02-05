@@ -252,10 +252,11 @@ var _ = Describe("sizer handler", func() {
 		Context("successful requests", func() {
 			It("successfully returns 200 with valid request", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -282,10 +283,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns response with all required fields", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -352,10 +354,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 400 when clusterId is empty", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        "",
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             "",
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
@@ -380,10 +383,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("accepts valid clusterId format", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -408,10 +412,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 400 when worker node CPU is zero", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    0,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         0,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -437,10 +442,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 400 when worker node memory is zero", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 0,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      0,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -463,15 +469,76 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("worker node size must be greater than zero"))
 			})
+
+			It("returns 400 when CPU over-commit ratio is invalid", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.ClusterRequirementsRequestCpuOverCommitRatio("1:3"),
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+				}
+
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("invalid CPU over-commit ratio"))
+				Expect(errorResp.Message).To(ContainSubstring("1:3"))
+			})
+
+			It("returns 400 when memory over-commit ratio is invalid", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.ClusterRequirementsRequestMemoryOverCommitRatio("1:6"),
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+				}
+
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("invalid memory over-commit ratio"))
+				Expect(errorResp.Message).To(ContainSubstring("1:6"))
+			})
 		})
 
 		Context("not found errors", func() {
 			It("returns 404 when assessment not found", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				// Don't add assessment to mockStore, so it will be not found
@@ -499,10 +566,11 @@ var _ = Describe("sizer handler", func() {
 		Context("authorization errors", func() {
 			It("returns 403 when user doesn't own assessment (different username)", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, "different-user", user.Organization, clusterID)
@@ -529,10 +597,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 403 when user doesn't own assessment (different organization)", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, "different-org", clusterID)
@@ -559,10 +628,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("allows access when user owns assessment", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -589,10 +659,11 @@ var _ = Describe("sizer handler", func() {
 		Context("service errors", func() {
 			It("returns 503 when sizer service health check fails", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -620,10 +691,11 @@ var _ = Describe("sizer handler", func() {
 		Context("internal errors", func() {
 			It("returns 500 when assessment service returns non-NotFound error", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.getError = errors.New("database error")
@@ -650,10 +722,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 400 when cluster has invalid inventory", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				// Create assessment with empty cluster (0 VMs, 0 CPU, 0 Memory)
@@ -683,10 +756,11 @@ var _ = Describe("sizer handler", func() {
 
 			It("returns 500 when CalculateClusterRequirements returns error", func() {
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:        clusterID,
-					OverCommitRatio:  api.OneToFour,
-					WorkerNodeCPU:    8,
-					WorkerNodeMemory: 16,
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)

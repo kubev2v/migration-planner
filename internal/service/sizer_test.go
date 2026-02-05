@@ -238,7 +238,8 @@ var _ = Describe("sizer service", func() {
 			clusterID = "cluster-test-123"
 			request = &mappers.ClusterRequirementsRequestForm{
 				ClusterID:               clusterID,
-				OverCommitRatio:         "1:4",
+				CpuOverCommitRatio:      "1:4",
+				MemoryOverCommitRatio:   "1:2",
 				WorkerNodeCPU:           8,
 				WorkerNodeMemory:        16,
 				ControlPlaneSchedulable: false,
@@ -282,20 +283,24 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles different over-commit ratios", func() {
-				ratios := []string{"1:1", "1:2", "1:4", "1:6"}
+				cpuRatios := []string{"1:1", "1:2", "1:4", "1:6"}
+				memoryRatios := []string{"1:1", "1:2", "1:4"}
 
-				for _, ratio := range ratios {
-					request.OverCommitRatio = ratio
-					assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
-					mockStore.assessments[assessmentID] = assessment
-					testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
-					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-					sizerService = service.NewSizerService(sizerClient, mockStore)
+				for _, cpuRatio := range cpuRatios {
+					for _, memoryRatio := range memoryRatios {
+						request.CpuOverCommitRatio = cpuRatio
+						request.MemoryOverCommitRatio = memoryRatio
+						assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+						mockStore.assessments[assessmentID] = assessment
+						testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+						sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+						sizerService = service.NewSizerService(sizerClient, mockStore)
 
-					result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
-					Expect(err).To(BeNil())
-					Expect(result).NotTo(BeNil())
-					testServer.Close()
+						result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+						Expect(err).To(BeNil())
+						Expect(result).NotTo(BeNil())
+						testServer.Close()
+					}
 				}
 			})
 

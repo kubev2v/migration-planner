@@ -226,7 +226,8 @@ func (f *JobForm) ToAPIJob() *v1alpha1.Job {
 
 type ClusterRequirementsRequestForm struct {
 	ClusterID               string
-	OverCommitRatio         string
+	CpuOverCommitRatio      string
+	MemoryOverCommitRatio   string
 	WorkerNodeCPU           int
 	WorkerNodeMemory        int
 	ControlPlaneSchedulable bool

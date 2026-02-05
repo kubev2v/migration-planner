@@ -26,12 +26,19 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
-// Defines values for ClusterRequirementsRequestOverCommitRatio.
+// Defines values for ClusterRequirementsRequestCpuOverCommitRatio.
 const (
-	OneToFour ClusterRequirementsRequestOverCommitRatio = "1:4"
-	OneToOne  ClusterRequirementsRequestOverCommitRatio = "1:1"
-	OneToSix  ClusterRequirementsRequestOverCommitRatio = "1:6"
-	OneToTwo  ClusterRequirementsRequestOverCommitRatio = "1:2"
+	CpuOneToFour ClusterRequirementsRequestCpuOverCommitRatio = "1:4"
+	CpuOneToOne  ClusterRequirementsRequestCpuOverCommitRatio = "1:1"
+	CpuOneToSix  ClusterRequirementsRequestCpuOverCommitRatio = "1:6"
+	CpuOneToTwo  ClusterRequirementsRequestCpuOverCommitRatio = "1:2"
+)
+
+// Defines values for ClusterRequirementsRequestMemoryOverCommitRatio.
+const (
+	MemoryOneToFour ClusterRequirementsRequestMemoryOverCommitRatio = "1:4"
+	MemoryOneToOne  ClusterRequirementsRequestMemoryOverCommitRatio = "1:1"
+	MemoryOneToTwo  ClusterRequirementsRequestMemoryOverCommitRatio = "1:2"
 )
 
 // Defines values for JobStatus.
@@ -130,8 +137,11 @@ type ClusterRequirementsRequest struct {
 	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
 	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
 
-	// OverCommitRatio CPU over-commit ratio (e.g., "1:4")
-	OverCommitRatio ClusterRequirementsRequestOverCommitRatio `json:"overCommitRatio" validate:"required"`
+	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	CpuOverCommitRatio ClusterRequirementsRequestCpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
+
+	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+	MemoryOverCommitRatio ClusterRequirementsRequestMemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
 
 	// WorkerNodeCPU CPU cores per worker node
 	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
@@ -140,8 +150,11 @@ type ClusterRequirementsRequest struct {
 	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
 }
 
-// ClusterRequirementsRequestOverCommitRatio CPU over-commit ratio (e.g., "1:4")
-type ClusterRequirementsRequestOverCommitRatio string
+// ClusterRequirementsRequestCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+type ClusterRequirementsRequestCpuOverCommitRatio string
+
+// ClusterRequirementsRequestMemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+type ClusterRequirementsRequestMemoryOverCommitRatio string
 
 // ClusterRequirementsResponse Cluster requirements calculation results
 type ClusterRequirementsResponse struct {

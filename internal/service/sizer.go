@@ -97,11 +97,17 @@ type TransformedSizerResponse struct {
 	ResourceConsumption mappers.ResourceConsumptionForm
 }
 
-var overCommitMultipliers = map[string]float64{
+var cpuOverCommitMultipliers = map[string]float64{
 	"1:1": 1.0,
 	"1:2": 2.0,
 	"1:4": 4.0,
 	"1:6": 6.0,
+}
+
+var memoryOverCommitMultipliers = map[string]float64{
+	"1:1": 1.0,
+	"1:2": 2.0,
+	"1:4": 4.0,
 }
 
 func NewSizerService(sizerClient *client.SizerClient, store store.Store) *SizerService {
@@ -179,7 +185,8 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithInt("inventory_total_cpu", totalCPU).
 		WithInt("inventory_total_memory", totalMemory).
 		WithInt("inventory_total_vms", totalVMs).
-		WithString("over_commit_ratio", req.OverCommitRatio).
+		WithString("cpu_over_commit_ratio", req.CpuOverCommitRatio).
+		WithString("memory_over_commit_ratio", req.MemoryOverCommitRatio).
 		WithInt("worker_node_cpu", req.WorkerNodeCPU).
 		WithInt("worker_node_memory", req.WorkerNodeMemory).
 		WithBool("control_plane_schedulable", controlPlaneSchedulable).
@@ -212,7 +219,8 @@ func (s *SizerService) CalculateClusterRequirements(
 		float64(totalMemory),
 		req.WorkerNodeCPU,
 		req.WorkerNodeMemory,
-		req.OverCommitRatio,
+		req.CpuOverCommitRatio,
+		req.MemoryOverCommitRatio,
 		CapacityMultiplier,
 	)
 	if err != nil {
@@ -304,7 +312,8 @@ func (s *SizerService) Health(ctx context.Context) error {
 //   - totalMemory: Total memory (GB) from all VMs in the cluster
 //   - workerNodeCPU: CPU cores per worker node
 //   - workerNodeMemory: Memory (GB) per worker node
-//   - overCommitRatio: Over-commit ratio applied to both CPU and memory (e.g., "1:4")
+//   - cpuOverCommitRatio: CPU over-commit ratio (e.g., "1:4")
+//   - memoryOverCommitRatio: Memory over-commit ratio (e.g., "1:2")
 //   - capacityMultiplier: Multiplier for target capacity (0.7 for 70% utilization)
 //
 // Returns:
@@ -315,7 +324,8 @@ func (s *SizerService) aggregateVMsIntoServices(
 	totalMemory float64,
 	workerNodeCPU int,
 	workerNodeMemory int,
-	overCommitRatio string,
+	cpuOverCommitRatio string,
+	memoryOverCommitRatio string,
 	capacityMultiplier float64,
 ) ([]BatchedService, error) {
 	// Guard against invalid worker node sizes to prevent division by zero
@@ -358,12 +368,16 @@ func (s *SizerService) aggregateVMsIntoServices(
 	limitCPU := cpuPerBatch
 	limitMemory := memoryPerBatch
 
-	overCommitMultiplier, err := s.getOverCommitMultiplier(overCommitRatio)
+	cpuOverCommitMultiplier, err := s.getCpuOverCommitMultiplier(cpuOverCommitRatio)
 	if err != nil {
 		return nil, err
 	}
-	requiredCPU := limitCPU / overCommitMultiplier
-	requiredMemory := limitMemory / overCommitMultiplier
+	memoryOverCommitMultiplier, err := s.getMemoryOverCommitMultiplier(memoryOverCommitRatio)
+	if err != nil {
+		return nil, err
+	}
+	requiredCPU := limitCPU / cpuOverCommitMultiplier
+	requiredMemory := limitMemory / memoryOverCommitMultiplier
 
 	services := make([]BatchedService, numBatches)
 	for i := 0; i < numBatches; i++ {
@@ -379,13 +393,28 @@ func (s *SizerService) aggregateVMsIntoServices(
 	return services, nil
 }
 
-// getOverCommitMultiplier converts ratio string to multiplier.
-func (s *SizerService) getOverCommitMultiplier(overCommitRatio string) (float64, error) {
-	multiplier, ok := overCommitMultipliers[overCommitRatio]
+// getCpuOverCommitMultiplier converts CPU overcommit ratio string to multiplier.
+func (s *SizerService) getCpuOverCommitMultiplier(cpuOverCommitRatio string) (float64, error) {
+	multiplier, ok := cpuOverCommitMultipliers[cpuOverCommitRatio]
 	if !ok {
-		err := fmt.Errorf("unknown over-commit ratio %q", overCommitRatio)
-		s.logger.Operation("get_over_commit_multiplier").
-			WithString("over_commit_ratio", overCommitRatio).
+		err := fmt.Errorf("unknown CPU over-commit ratio %q", cpuOverCommitRatio)
+		s.logger.Operation("get_cpu_over_commit_multiplier").
+			WithString("cpu_over_commit_ratio", cpuOverCommitRatio).
+			Build().
+			Error(err).
+			Log()
+		return 0, err
+	}
+	return multiplier, nil
+}
+
+// getMemoryOverCommitMultiplier converts memory overcommit ratio string to multiplier.
+func (s *SizerService) getMemoryOverCommitMultiplier(memoryOverCommitRatio string) (float64, error) {
+	multiplier, ok := memoryOverCommitMultipliers[memoryOverCommitRatio]
+	if !ok {
+		err := fmt.Errorf("unknown memory over-commit ratio %q", memoryOverCommitRatio)
+		s.logger.Operation("get_memory_over_commit_multiplier").
+			WithString("memory_over_commit_ratio", memoryOverCommitRatio).
 			Build().
 			Error(err).
 			Log()

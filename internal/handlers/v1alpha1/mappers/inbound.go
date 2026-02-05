@@ -119,7 +119,8 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest) mappers.ClusterRequirementsRequestForm {
 	form := mappers.ClusterRequirementsRequestForm{
 		ClusterID:               apiReq.ClusterId,
-		OverCommitRatio:         string(apiReq.OverCommitRatio),
+		CpuOverCommitRatio:      string(apiReq.CpuOverCommitRatio),
+		MemoryOverCommitRatio:   string(apiReq.MemoryOverCommitRatio),
 		WorkerNodeCPU:           apiReq.WorkerNodeCPU,
 		WorkerNodeMemory:        apiReq.WorkerNodeMemory,
 		ControlPlaneSchedulable: false,
