@@ -96,9 +96,19 @@ run: $(AIR)
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
 
-run-agent:
-	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
-	./bin/planner-agent
+run-agent: build-agent
+	@echo "Running agent from agent-v2 submodule..."
+	$(MAKE) -C agent-v2 run
+
+# Build agent-v2 container image (includes UI)
+agent-image: submodules
+	@echo "Building agent-v2 container image..."
+	$(MAKE) -C agent-v2 image
+
+# Run agent-v2 UI dev server
+run-agent-ui: submodules
+	@echo "Starting agent-v2 UI dev server..."
+	$(MAKE) -C agent-v2 run.ui
 
 run-sizer:
 	@echo "🚀 Starting sizer service container on port $(SIZER_PORT)..."
@@ -125,16 +135,17 @@ build: bin
 build-api: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api
 
-build-agent: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-agent
+build-agent: bin submodules
+	@echo "Building agent from agent-v2 submodule..."
+	$(MAKE) -C agent-v2 build
+	@echo "Agent binary built at agent-v2/bin/agent"
 
 build-cli: bin
 	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
 
 # rebuild container only on source changes
-bin/.migration-planner-agent-container: bin Containerfile.agent go.mod go.sum $(GO_FILES)
-	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.agent $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
-	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.agent-debug -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
+bin/.migration-planner-agent-container: bin submodules agent-v2/Containerfile
+	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
@@ -280,6 +291,12 @@ undeploy-local-obs:
 bin:
 	mkdir -p bin
 
+# Initialize git submodules if needed
+submodules:
+	@if [ -f .gitmodules ]; then \
+		git submodule update --init --recursive || true; \
+	fi
+
 clean:
 	- rm -f -r bin
 
@@ -351,8 +368,10 @@ check-format: format
 
 ##################### tests support start ##########################
 GINKGO := $(GOBIN)/ginkgo
-UNIT_TEST_PACKAGES := ./...
-UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e
+# Exclude agent-v2 from parent tests (it has its own module and runs separately via test-agent-v2 target)
+# Use explicit package paths to avoid agent-v2 submodule
+UNIT_TEST_PACKAGES := ./cmd/... ./internal/... ./pkg/... ./api/...
+UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e --skip-package=agent-v2
 
 # Install ginkgo if not already available
 $(GINKGO):
@@ -360,15 +379,21 @@ $(GINKGO):
 	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 	@echo "✅ 'ginkgo' installed successfully."
 
-.PHONY: test
+.PHONY: test test-agent-v2
 # Run unit tests using ginkgo
 test: $(GINKGO)
 	@echo "🧪 Running Unit tests..."
 	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
 	@echo "✅ All Unit tests passed successfully."
 
+# Run agent-v2 tests separately in its own module context
+test-agent-v2: submodules
+	@echo "🧪 Running agent-v2 Unit tests..."
+	@cd agent-v2 && $(MAKE) test
+	@echo "✅ All agent-v2 Unit tests passed successfully."
+
 # Full unit test cycle: build, prepare DB, run tests, and clean up
-unit-test: build kill-db deploy-db migrate test kill-db
+unit-test: build kill-db deploy-db migrate test test-agent-v2 kill-db
 
 # Run integration tests using ginkgo
 integration-test: $(GINKGO) build
