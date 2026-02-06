@@ -30,6 +30,7 @@ type assessmentApi interface {
 	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
 	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error)
 	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
+	GetAssessmentJSON(uuid.UUID) ([]byte, error)
 	GetAssessments() (*v1alpha1.AssessmentList, error)
 	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)
 	RemoveAssessment(uuid.UUID) error

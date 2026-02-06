@@ -200,6 +200,27 @@ func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.
 	return parsed.JSON200, nil
 }
 
+// GetAssessmentJSON retrieves the raw JSON response for an assessment
+// This is useful for testing JSON ordering, as unmarshaling into Go structs loses map order
+func (s *plannerService) GetAssessmentJSON(id uuid.UUID) ([]byte, error) {
+	res, err := s.api.GetRequest(path.Join(apiV1AssessmentsPath, id.String()))
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get assessment. status: %d", res.StatusCode)
+	}
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read response body: %w", err)
+	}
+
+	return body, nil
+}
+
 // RemoveAssessment deletes a specific assessment by ID
 func (s *plannerService) RemoveAssessment(id uuid.UUID) error {
 	zap.S().Infof("[PlannerService] Delete assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)

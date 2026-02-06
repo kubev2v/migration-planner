@@ -1,6 +1,9 @@
 package converters
 
 import (
+	"bytes"
+	"encoding/json"
+	"sort"
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -230,4 +233,67 @@ func anonymizeNFSDatastore(ds *api.Datastore) {
 		ds.DiskId = "N/A"
 		ds.ProtocolType = "N/A"
 	}
+}
+
+// OrderedInventory wraps api.Inventory to provide custom JSON marshaling
+// that ensures clusters are ordered by VM count (descending), then alphabetically by name.
+type OrderedInventory struct {
+	*api.Inventory
+}
+
+// MarshalJSON implements json.Marshaler to ensure clusters are ordered by VM count.
+func (oi *OrderedInventory) MarshalJSON() ([]byte, error) {
+	type clusterEntry struct {
+		Name    string
+		Data    api.InventoryData
+		VMCount int
+	}
+
+	// Build sorted list of clusters
+	entries := make([]clusterEntry, 0, len(oi.Clusters))
+	for clusterName, clusterData := range oi.Clusters {
+		entries = append(entries, clusterEntry{
+			Name:    clusterName,
+			Data:    clusterData,
+			VMCount: clusterData.Vms.Total,
+		})
+	}
+
+	// Sort by VM count (descending), then by name (ascending)
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].VMCount != entries[j].VMCount {
+			return entries[i].VMCount > entries[j].VMCount
+		}
+		return entries[i].Name < entries[j].Name
+	})
+
+	// Manually construct JSON to preserve order
+	var buf bytes.Buffer
+	buf.WriteString(`{"vcenter_id":`)
+	vcenterIDBytes, _ := json.Marshal(oi.VcenterId)
+	buf.Write(vcenterIDBytes)
+	buf.WriteString(`,"clusters":{`)
+
+	// Write clusters in sorted order
+	for i, entry := range entries {
+		if i > 0 {
+			buf.WriteString(`,`)
+		}
+		keyBytes, _ := json.Marshal(entry.Name)
+		buf.Write(keyBytes)
+		buf.WriteString(`:`)
+		valueBytes, _ := json.Marshal(entry.Data)
+		buf.Write(valueBytes)
+	}
+	buf.WriteString(`}`)
+
+	// Add vcenter if present
+	if oi.Vcenter != nil {
+		buf.WriteString(`,"vcenter":`)
+		vcenterBytes, _ := json.Marshal(oi.Vcenter)
+		buf.Write(vcenterBytes)
+	}
+	buf.WriteString(`}`)
+
+	return buf.Bytes(), nil
 }
