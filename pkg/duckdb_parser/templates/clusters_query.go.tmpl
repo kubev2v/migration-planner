@@ -1,11 +1,7 @@
 {{- /*
-Clusters Query Template - Returns distinct cluster names ordered by VM count (biggest to smallest).
+Clusters Query Template - Returns distinct cluster names.
 */ -}}
-SELECT "Cluster"
-FROM (
-    SELECT "Cluster", COUNT(*) as vm_count
-    FROM vinfo
-    WHERE "Cluster" IS NOT NULL AND "Cluster" != ''
-    GROUP BY "Cluster"
-)
-ORDER BY vm_count DESC, "Cluster";
+SELECT DISTINCT "Cluster"
+FROM vinfo
+WHERE "Cluster" IS NOT NULL AND "Cluster" != ''
+ORDER BY "Cluster";

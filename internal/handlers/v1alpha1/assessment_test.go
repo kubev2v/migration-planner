@@ -98,9 +98,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s))
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			orderedResp, ok := resp.(*handlers.OrderedAssessmentListResponse)
+			Expect(ok).To(BeTrue(), "Response should be OrderedAssessmentListResponse")
+			assessmentList := orderedResp.GetAssessments()
 			Expect(assessmentList).To(HaveLen(2)) // Only admin user's assessments
 
 			// Verify owner fields are included in API responses
@@ -123,9 +124,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s))
 			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			orderedResp, ok := resp.(*handlers.OrderedAssessmentListResponse)
+			Expect(ok).To(BeTrue(), "Response should be OrderedAssessmentListResponse")
+			assessmentList := orderedResp.GetAssessments()
 			Expect(assessmentList).To(HaveLen(0))
 		})
 
@@ -176,9 +178,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Params: params,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			orderedResp, ok := resp.(*handlers.OrderedAssessmentListResponse)
+			Expect(ok).To(BeTrue(), "Response should be OrderedAssessmentListResponse")
+			assessmentList := orderedResp.GetAssessments()
 			// Should only return the assessment with the matching sourceID
 			Expect(assessmentList).To(HaveLen(1))
 			Expect(assessmentList[0].Id).To(Equal(assessmentID1))
@@ -222,9 +225,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 				Params: params,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			orderedResp, ok := resp.(*handlers.OrderedAssessmentListResponse)
+			Expect(ok).To(BeTrue(), "Response should be OrderedAssessmentListResponse")
+			assessmentList := orderedResp.GetAssessments()
 			// Should return empty list when filtering by non-existent sourceID
 			Expect(assessmentList).To(HaveLen(0))
 		})

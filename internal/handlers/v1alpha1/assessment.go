@@ -2,7 +2,12 @@ package v1alpha1
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
+
+	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -10,9 +15,68 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
+
+// OrderedAssessmentListResponse wraps AssessmentList to ensure inventories
+// are marshaled with ordered clusters
+type OrderedAssessmentListResponse struct {
+	assessments v1alpha1.AssessmentList
+}
+
+// GetAssessments returns the underlying assessments list for testing purposes
+func (r *OrderedAssessmentListResponse) GetAssessments() v1alpha1.AssessmentList {
+	return r.assessments
+}
+
+// VisitListAssessmentsResponse implements server.ListAssessmentsResponseObject
+// to ensure clusters are ordered when marshaling the response
+func (r *OrderedAssessmentListResponse) VisitListAssessmentsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	// Create a response structure with OrderedInventory for each snapshot
+	type orderedSnapshot struct {
+		CreatedAt time.Time                    `json:"createdAt"`
+		Inventory *converters.OrderedInventory `json:"inventory"`
+	}
+
+	type assessmentWithOrderedInventory struct {
+		Id             string                        `json:"id"`
+		Name           string                        `json:"name"`
+		OwnerFirstName *string                       `json:"ownerFirstName,omitempty"`
+		OwnerLastName  *string                       `json:"ownerLastName,omitempty"`
+		SourceType     v1alpha1.AssessmentSourceType `json:"sourceType"`
+		SourceId       *openapi_types.UUID           `json:"sourceId,omitempty"`
+		CreatedAt      time.Time                     `json:"createdAt"`
+		Snapshots      []orderedSnapshot             `json:"snapshots"`
+	}
+
+	orderedAssessments := make([]assessmentWithOrderedInventory, len(r.assessments))
+	for i, assessment := range r.assessments {
+		orderedAssessments[i] = assessmentWithOrderedInventory{
+			Id:             assessment.Id.String(),
+			Name:           assessment.Name,
+			OwnerFirstName: assessment.OwnerFirstName,
+			OwnerLastName:  assessment.OwnerLastName,
+			SourceType:     assessment.SourceType,
+			SourceId:       assessment.SourceId,
+			CreatedAt:      assessment.CreatedAt,
+			Snapshots:      make([]orderedSnapshot, len(assessment.Snapshots)),
+		}
+		for j, snapshot := range assessment.Snapshots {
+			inv := snapshot.Inventory
+			orderedAssessments[i].Snapshots[j] = orderedSnapshot{
+				CreatedAt: snapshot.CreatedAt,
+				Inventory: &converters.OrderedInventory{Inventory: &inv},
+			}
+		}
+	}
+
+	return json.NewEncoder(w).Encode(orderedAssessments)
+}
 
 // (GET /api/v1/assessments)
 func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.ListAssessmentsRequestObject) (server.ListAssessmentsResponseObject, error) {
@@ -46,7 +110,7 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	return server.ListAssessments200JSONResponse(apiAssessments), nil
+	return &OrderedAssessmentListResponse{assessments: apiAssessments}, nil
 }
 
 // (POST /api/v1/assessments)

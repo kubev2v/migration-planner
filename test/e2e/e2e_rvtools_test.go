@@ -1,6 +1,7 @@
 package e2e_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -425,6 +426,49 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should order clusters by VM count (biggest to smallest)", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
+			// skipJSONValue skips a JSON value (object, array, string, number, bool, null)
+			// by reading tokens recursively to handle nested structures
+			var skipJSONValue func(*json.Decoder) error
+			skipJSONValue = func(decoder *json.Decoder) error {
+				token, err := decoder.Token()
+				if err != nil {
+					return err
+				}
+
+				switch t := token.(type) {
+				case json.Delim:
+					if t == '{' {
+						// Skip object: read all key-value pairs
+						for decoder.More() {
+							// Skip key
+							_, err = decoder.Token()
+							if err != nil {
+								return err
+							}
+							// Skip value (recursive)
+							if err = skipJSONValue(decoder); err != nil {
+								return err
+							}
+						}
+						// Read closing brace
+						_, err = decoder.Token()
+						return err
+					} else if t == '[' {
+						// Skip array: read all elements
+						for decoder.More() {
+							if err = skipJSONValue(decoder); err != nil {
+								return err
+							}
+						}
+						// Read closing bracket
+						_, err = decoder.Token()
+						return err
+					}
+				}
+				// For primitive values (string, number, bool, null), we've already read the token
+				return nil
+			}
+
 			excelContent, err := CreateMultiClusterTestExcelWithDifferentVMCounts()
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
@@ -481,19 +525,94 @@ var _ = Describe("e2e-rvtools", func() {
 			}
 			Expect(clusterVMTotal).To(Equal(9), "Sum of cluster VMs should equal vCenter total")
 
-			// Validate cluster order by marshaling to JSON and checking the order
-			// Go's json.Marshal maintains a deterministic order for maps (though not guaranteed by spec)
-			// This validates that clusters appear in the correct order in the JSON response
-			inventoryJSON, err := json.Marshal(inventory)
-			Expect(err).To(BeNil(), "Should be able to marshal inventory to JSON")
+			// Validate cluster order by fetching the raw JSON response from the API
+			// This ensures we test the actual API response which uses OrderedInventory marshaler
+			// Get the raw JSON response from the API
+			assessmentJSON, err := svc.GetAssessmentJSON(assessment.Id)
+			Expect(err).To(BeNil(), "Should be able to get assessment JSON from API")
 
-			// Parse JSON to extract cluster order
-			var jsonData map[string]interface{}
-			err = json.Unmarshal(inventoryJSON, &jsonData)
-			Expect(err).To(BeNil(), "Should be able to unmarshal inventory JSON")
+			// Use json.Decoder to parse JSON and preserve the order of map keys
+			// Navigate through the JSON structure to find clusters
+			decoder := json.NewDecoder(bytes.NewReader(assessmentJSON))
 
-			clustersJSON, ok := jsonData["clusters"].(map[string]interface{})
-			Expect(ok).To(BeTrue(), "Clusters should be a map in JSON")
+			// Read the root object
+			token, err := decoder.Token()
+			Expect(err).To(BeNil(), "Should be able to read JSON token")
+			Expect(token).To(Equal(json.Delim('{')), "Root should be a JSON object")
+
+			// Skip to "snapshots" field
+			var foundSnapshots bool
+			for decoder.More() {
+				keyToken, err := decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read key token")
+				key, ok := keyToken.(string)
+				Expect(ok).To(BeTrue(), "Key should be a string")
+
+				if key == "snapshots" {
+					foundSnapshots = true
+					// Read the array start
+					arrayToken, err := decoder.Token()
+					Expect(err).To(BeNil(), "Should be able to read array token")
+					Expect(arrayToken).To(Equal(json.Delim('[')), "Snapshots should be an array")
+					break
+				} else {
+					// Skip the value
+					err = skipJSONValue(decoder)
+					Expect(err).To(BeNil(), "Should be able to skip value")
+				}
+			}
+			Expect(foundSnapshots).To(BeTrue(), "Should find snapshots field")
+
+			// Read the first snapshot object
+			snapshotToken, err := decoder.Token()
+			Expect(err).To(BeNil(), "Should be able to read snapshot token")
+			Expect(snapshotToken).To(Equal(json.Delim('{')), "Snapshot should be an object")
+
+			// Skip to "inventory" field in the snapshot
+			var foundInventory bool
+			for decoder.More() {
+				keyToken, err := decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read key token")
+				key, ok := keyToken.(string)
+				Expect(ok).To(BeTrue(), "Key should be a string")
+
+				if key == "inventory" {
+					foundInventory = true
+					// Read the inventory object start
+					invToken, err := decoder.Token()
+					Expect(err).To(BeNil(), "Should be able to read inventory token")
+					Expect(invToken).To(Equal(json.Delim('{')), "Inventory should be an object")
+					break
+				} else {
+					// Skip the value
+					err = skipJSONValue(decoder)
+					Expect(err).To(BeNil(), "Should be able to skip value")
+				}
+			}
+			Expect(foundInventory).To(BeTrue(), "Should find inventory field")
+
+			// Skip to "clusters" field in the inventory
+			var foundClusters bool
+			for decoder.More() {
+				keyToken, err := decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read key token")
+				key, ok := keyToken.(string)
+				Expect(ok).To(BeTrue(), "Key should be a string")
+
+				if key == "clusters" {
+					foundClusters = true
+					// Read the clusters object start
+					clustersToken, err := decoder.Token()
+					Expect(err).To(BeNil(), "Should be able to read clusters token")
+					Expect(clustersToken).To(Equal(json.Delim('{')), "Clusters should be an object")
+					break
+				} else {
+					// Skip the value
+					err = skipJSONValue(decoder)
+					Expect(err).To(BeNil(), "Should be able to skip value")
+				}
+			}
+			Expect(foundClusters).To(BeTrue(), "Should find clusters field")
 
 			// Extract cluster IDs and their VM counts in the order they appear in JSON
 			type clusterOrder struct {
@@ -502,19 +621,92 @@ var _ = Describe("e2e-rvtools", func() {
 			}
 			var clusterOrderList []clusterOrder
 
-			for clusterID, clusterData := range clustersJSON {
-				clusterMap, ok := clusterData.(map[string]interface{})
-				Expect(ok).To(BeTrue(), "Cluster data should be a map")
+			// Read clusters in order
+			for decoder.More() {
+				// Read cluster ID (key)
+				clusterIDToken, err := decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read cluster ID")
+				clusterID, ok := clusterIDToken.(string)
+				Expect(ok).To(BeTrue(), "Cluster ID should be a string")
 
-				vmsMap, ok := clusterMap["vms"].(map[string]interface{})
-				Expect(ok).To(BeTrue(), "VMs should be a map")
+				// Read cluster data (value) - it's an object, so read it
+				clusterObjToken, err := decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read cluster object token")
+				Expect(clusterObjToken).To(Equal(json.Delim('{')), "Cluster data should be an object")
 
-				total, ok := vmsMap["total"].(float64)
-				Expect(ok).To(BeTrue(), "Total should be a number")
+				// Navigate to "vms" field
+				var foundVms bool
+				var vmCount int
+				for decoder.More() {
+					keyToken, err := decoder.Token()
+					Expect(err).To(BeNil(), "Should be able to read key token")
+					key, ok := keyToken.(string)
+					Expect(ok).To(BeTrue(), "Key should be a string")
+
+					if key == "vms" {
+						foundVms = true
+						// Read the vms object start
+						vmsToken, err := decoder.Token()
+						Expect(err).To(BeNil(), "Should be able to read vms token")
+						Expect(vmsToken).To(Equal(json.Delim('{')), "VMs should be an object")
+
+						// Navigate to "total" field
+						for decoder.More() {
+							keyToken, err := decoder.Token()
+							Expect(err).To(BeNil(), "Should be able to read key token")
+							key, ok := keyToken.(string)
+							Expect(ok).To(BeTrue(), "Key should be a string")
+
+							if key == "total" {
+								// Read the total value
+								totalToken, err := decoder.Token()
+								Expect(err).To(BeNil(), "Should be able to read total token")
+								total, ok := totalToken.(float64)
+								Expect(ok).To(BeTrue(), "Total should be a number")
+								vmCount = int(total)
+								// Skip the rest of the vms object by reading remaining key-value pairs
+								for decoder.More() {
+									// Read the key token
+									_, err = decoder.Token()
+									Expect(err).To(BeNil(), "Should be able to read key token")
+									// Skip the value - read token and handle nested structures
+									err = skipJSONValue(decoder)
+									Expect(err).To(BeNil(), "Should be able to skip value")
+								}
+								// Read the closing brace
+								_, err = decoder.Token()
+								Expect(err).To(BeNil(), "Should be able to read closing brace")
+								break
+							} else {
+								// Skip the value
+								err = skipJSONValue(decoder)
+								Expect(err).To(BeNil(), "Should be able to skip value")
+							}
+						}
+						break
+					} else {
+						// Skip the value
+						err = skipJSONValue(decoder)
+						Expect(err).To(BeNil(), "Should be able to skip value")
+					}
+				}
+				Expect(foundVms).To(BeTrue(), "Should find vms field")
+				// Skip the rest of the cluster object
+				for decoder.More() {
+					// Read the key
+					_, err = decoder.Token()
+					Expect(err).To(BeNil(), "Should be able to read key token")
+					// Skip the value
+					err = skipJSONValue(decoder)
+					Expect(err).To(BeNil(), "Should be able to skip value")
+				}
+				// Read the closing brace
+				_, err = decoder.Token()
+				Expect(err).To(BeNil(), "Should be able to read closing brace")
 
 				clusterOrderList = append(clusterOrderList, clusterOrder{
 					ID:      clusterID,
-					VMCount: int(total),
+					VMCount: vmCount,
 				})
 			}
 
