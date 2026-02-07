@@ -108,7 +108,8 @@ SET
 FROM cleaned_networks
 WHERE vinfo."VM ID" = cleaned_networks."VM ID";
 
-DROP TABLE vinfo_raw;
+-- vinfo_raw is kept for schema validation to distinguish missing VM ID / VM name errors.
+-- It is dropped after ValidateSchema completes in IngestRvTools.
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
 SELECT

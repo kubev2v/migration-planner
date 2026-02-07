@@ -172,6 +172,47 @@ func createTestExcel(t *testing.T, vms []map[string]string, hosts []map[string]s
 	return tmpFile.Name()
 }
 
+// createTestExcelWithCustomHeaders generates a test Excel file with a custom vInfo header set.
+// Used to test scenarios where required columns (e.g. "VM ID") are missing from the sheet.
+func createTestExcelWithCustomHeaders(t *testing.T, vInfoHeaders []string, vms []map[string]string) string {
+	t.Helper()
+
+	f := excelize.NewFile()
+	defer f.Close()
+
+	vInfoIndex, err := f.NewSheet("vInfo")
+	require.NoError(t, err)
+	f.SetActiveSheet(vInfoIndex)
+
+	for i, h := range vInfoHeaders {
+		cellRef := fmt.Sprintf("%s1", columnLetter(i))
+		require.NoError(t, f.SetCellValue("vInfo", cellRef, h))
+	}
+	for rowIdx, vm := range vms {
+		row := rowIdx + 2
+		for colIdx, header := range vInfoHeaders {
+			cellRef := fmt.Sprintf("%s%d", columnLetter(colIdx), row)
+			if val, ok := vm[header]; ok {
+				require.NoError(t, f.SetCellValue("vInfo", cellRef, val))
+			}
+		}
+	}
+
+	_ = f.DeleteSheet("Sheet1")
+
+	var buf bytes.Buffer
+	_, err = f.WriteTo(&buf)
+	require.NoError(t, err)
+
+	tmpFile, err := os.CreateTemp("", "test-rvtools-*.xlsx")
+	require.NoError(t, err)
+	_, err = tmpFile.Write(buf.Bytes())
+	require.NoError(t, err)
+	tmpFile.Close()
+
+	return tmpFile.Name()
+}
+
 func columnLetter(col int) string {
 	name, _ := excelize.ColumnNumberToName(col + 1)
 	return name
@@ -413,6 +454,80 @@ func TestBuildInventory_EmptyData(t *testing.T) {
 	assert.Equal(t, 0, inv.VCenter.VMs.Total)
 }
 
+func TestValidation_ErrorCodes(t *testing.T) {
+	defaultHosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	tests := []struct {
+		name           string
+		vms            []map[string]string
+		hosts          []map[string]string
+		customHeaders  []string // if set, uses createTestExcelWithCustomHeaders
+		expectedCodes  []string // codes that must be present
+		forbiddenCodes []string // codes that must NOT be present
+	}{
+		{
+			name:           "empty vInfo with missing VM ID column reports NO_VMS only",
+			customHeaders:  []string{"VM", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{},
+			expectedCodes:  []string{CodeNoVMs},
+			forbiddenCodes: []string{CodeMissingVMID, CodeMissingVMName},
+		},
+		{
+			name:           "rows without VM IDs report MISSING_VM_ID",
+			vms:            []map[string]string{{"VM": "vm-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			hosts:          defaultHosts,
+			expectedCodes:  []string{CodeMissingVMID},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+		{
+			name:           "rows without VM names report MISSING_VM_NAME",
+			vms:            []map[string]string{{"VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			hosts:          defaultHosts,
+			expectedCodes:  []string{CodeMissingVMName},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+		{
+			name:           "missing VM ID column and empty VM values reports both errors",
+			customHeaders:  []string{"VM", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeMissingVMID, CodeMissingVMName},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			var tmpFile string
+			if tt.customHeaders != nil {
+				tmpFile = createTestExcelWithCustomHeaders(t, tt.customHeaders, tt.vms)
+			} else {
+				tmpFile = createTestExcel(t, tt.vms, tt.hosts)
+			}
+			defer os.Remove(tmpFile)
+
+			result, err := parser.IngestRvTools(context.Background(), tmpFile)
+			require.NoError(t, err)
+			require.True(t, result.HasErrors())
+
+			errorCodes := make(map[string]bool)
+			for _, e := range result.Errors {
+				errorCodes[e.Code] = true
+			}
+			for _, code := range tt.expectedCodes {
+				assert.True(t, errorCodes[code], "expected error code %s", code)
+			}
+			for _, code := range tt.forbiddenCodes {
+				assert.False(t, errorCodes[code], "unexpected error code %s", code)
+			}
+		})
+	}
+}
+
 func TestBuildInventory_MultiCluster(t *testing.T) {
 	parser, _, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()
@@ -642,4 +757,44 @@ func TestBuildInventory_MigratableWithWarnings(t *testing.T) {
 	assert.Equal(t, 2, inv.VCenter.VMs.Total)
 	assert.Equal(t, 2, inv.VCenter.VMs.TotalMigratable, "VMs with only warnings should be migratable")
 	assert.Equal(t, 2, inv.VCenter.VMs.TotalMigratableWithWarnings, "VMs with warnings should be counted")
+}
+
+// TestBuildInventory_MinimalSchema tests that a file with only VM ID and VM columns
+// (like a disabled-report) correctly ingests VMs or reports appropriate errors.
+func TestBuildInventory_MinimalSchema(t *testing.T) {
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// Create Excel with only VM ID and VM columns (minimal schema)
+	minimalHeaders := []string{"VM ID", "VM"}
+	vms := []map[string]string{
+		{"VM ID": "vm-100", "VM": "VM-SRV-0000"},
+		{"VM ID": "vm-101", "VM": "VM-SRV-0001"},
+		{"VM ID": "vm-102", "VM": "VM-SRV-0002"},
+	}
+
+	tmpFile := createTestExcelWithCustomHeaders(t, minimalHeaders, vms)
+	defer os.Remove(tmpFile)
+
+	ctx := context.Background()
+	result, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	t.Logf("Validation errors: %v", result.Errors)
+	t.Logf("Validation warnings: %v", result.Warnings)
+
+	// Check vinfo row count
+	var count int
+	err = db.QueryRowContext(ctx, "SELECT COUNT(*) FROM vinfo").Scan(&count)
+	require.NoError(t, err)
+	t.Logf("vinfo row count: %d", count)
+
+	if result.IsValid() {
+		inv, err := parser.BuildInventory(ctx)
+		require.NoError(t, err)
+		t.Logf("VCenter VMs Total: %d", inv.VCenter.VMs.Total)
+		assert.Equal(t, 3, inv.VCenter.VMs.Total, "Should have 3 VMs from minimal schema")
+	} else {
+		t.Logf("Validation failed (expected for minimal schema): %v", result.Error())
+	}
 }

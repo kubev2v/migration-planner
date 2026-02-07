@@ -77,6 +77,9 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	// Validate schema - check for required tables/columns/data
 	result := p.ValidateSchema(ctx)
 
+	// Drop vinfo_raw now that validation is complete
+	p.dropVinfoRaw()
+
 	// Only run VM validation if schema is valid (we have VMs to validate)
 	if result.IsValid() {
 		if err := p.validateVMs(ctx); err != nil {
@@ -111,6 +114,12 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	}
 
 	return result, nil
+}
+
+// dropVinfoRaw drops the temporary vinfo_raw table used during RVTools ingestion.
+// This table holds unfiltered data from the Excel file and is only needed for validation.
+func (p *Parser) dropVinfoRaw() {
+	_, _ = p.db.Exec("DROP TABLE IF EXISTS vinfo_raw")
 }
 
 // executeStatements executes a multi-statement SQL string.

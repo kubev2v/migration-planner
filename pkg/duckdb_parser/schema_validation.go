@@ -2,7 +2,6 @@ package duckdb_parser
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 )
 
@@ -16,7 +15,7 @@ type ValidationResult struct {
 
 // ValidationIssue represents a single validation problem.
 type ValidationIssue struct {
-	Code    string // Machine-readable code (e.g., "MISSING_VMS", "EMPTY_HOSTS")
+	Code    string // Machine-readable code (e.g., "NO_VMS", "EMPTY_HOSTS")
 	Table   string // Affected table name
 	Column  string // Affected column name (if applicable)
 	Message string // Human-readable description
@@ -67,149 +66,92 @@ const (
 	CodeEmptyNICs       = "EMPTY_NICS"
 )
 
-// tableCheck defines a validation check for a table.
-type tableCheck struct {
-	table       string
-	code        string
-	message     string
-	isError     bool   // true = error, false = warning
-	minRows     int    // minimum required rows (0 means just check existence)
-	columnCheck string // optional: column to check for non-null values
-}
-
-// schemaChecks defines all validation checks to perform.
-var schemaChecks = []tableCheck{
-	// Errors - these prevent inventory from being built
-	{
-		table:   "vinfo",
-		code:    CodeNoVMs,
-		message: "No VMs found in vinfo table - cannot build inventory without VM data",
-		isError: true,
-		minRows: 1,
-	},
-	{
-		table:       "vinfo",
-		code:        CodeMissingVMID,
-		message:     "VM ID column has no valid values - VMs cannot be identified",
-		isError:     true,
-		columnCheck: "VM ID",
-	},
-	{
-		table:       "vinfo",
-		code:        CodeMissingVMName,
-		message:     "VM name column has no valid values - VMs cannot be identified",
-		isError:     true,
-		columnCheck: "VM",
-	},
-
-	// Warnings - inventory can be built but with missing data
-	{
-		table:   "vhost",
-		code:    CodeEmptyHosts,
-		message: "No host data found - host information will be unavailable in inventory",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "vdatastore",
-		code:    CodeEmptyDatastores,
-		message: "No datastore data found - storage information will be unavailable in inventory",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "dvport",
-		code:    CodeEmptyNetworks,
-		message: "No network data found (dvPort) - network information will be unavailable in inventory",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "vcpu",
-		code:    CodeEmptyCPU,
-		message: "No CPU detail data found - CPU hot-add and cores-per-socket info will be unavailable",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "vmemory",
-		code:    CodeEmptyMemory,
-		message: "No memory detail data found - memory hot-add info will be unavailable",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "vdisk",
-		code:    CodeEmptyDisks,
-		message: "No disk detail data found - individual disk information will be unavailable",
-		isError: false,
-		minRows: 1,
-	},
-	{
-		table:   "vnetwork",
-		code:    CodeEmptyNICs,
-		message: "No NIC detail data found - network adapter information will be unavailable",
-		isError: false,
-		minRows: 1,
-	},
+// warningChecks defines optional table checks that produce warnings (non-fatal).
+// Each entry verifies that a table has at least one row.
+var warningChecks = []struct {
+	table   string
+	code    string
+	message string
+}{
+	{"vhost", CodeEmptyHosts, "No host data found - host information will be unavailable in inventory"},
+	{"vdatastore", CodeEmptyDatastores, "No datastore data found - storage information will be unavailable in inventory"},
+	{"dvport", CodeEmptyNetworks, "No network data found (dvPort) - network information will be unavailable in inventory"},
+	{"vcpu", CodeEmptyCPU, "No CPU detail data found - CPU hot-add and cores-per-socket info will be unavailable"},
+	{"vmemory", CodeEmptyMemory, "No memory detail data found - memory hot-add info will be unavailable"},
+	{"vdisk", CodeEmptyDisks, "No disk detail data found - individual disk information will be unavailable"},
+	{"vnetwork", CodeEmptyNICs, "No NIC detail data found - network adapter information will be unavailable"},
 }
 
 // ValidateSchema checks the ingested schema for required tables, columns, and data.
-// It returns a ValidationResult with errors (fatal) and warnings (non-fatal).
+// Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 func (p *Parser) ValidateSchema(ctx context.Context) ValidationResult {
 	result := ValidationResult{}
 
-	for _, check := range schemaChecks {
-		issue := p.runCheck(ctx, check)
-		if issue != nil {
-			if check.isError {
-				result.Errors = append(result.Errors, *issue)
-			} else {
-				result.Warnings = append(result.Warnings, *issue)
-			}
-		}
-	}
+	p.validateVinfoData(ctx, &result)
+	p.validateOptionalTables(ctx, &result)
 
 	return result
 }
 
-// runCheck executes a single validation check and returns an issue if the check fails.
-func (p *Parser) runCheck(ctx context.Context, check tableCheck) *ValidationIssue {
-	var count int
-	var err error
-
-	if check.columnCheck != "" {
-		// Check for non-null, non-empty values in a specific column
-		query := fmt.Sprintf(
-			`SELECT COUNT(*) FROM %s WHERE "%s" IS NOT NULL AND TRIM("%s") != ''`,
-			check.table, check.columnCheck, check.columnCheck,
-		)
-		err = p.db.QueryRowContext(ctx, query).Scan(&count)
-	} else {
-		// Check row count
-		query := fmt.Sprintf(`SELECT COUNT(*) FROM %s`, check.table)
-		err = p.db.QueryRowContext(ctx, query).Scan(&count)
+// validateVinfoData checks vinfo_raw for VM data quality.
+// Reports NO_VMS if sheet has no data rows, otherwise reports specific column errors.
+func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult) {
+	// First check if we have any rows at all (independent of column existence)
+	if p.countRows(ctx, `SELECT COUNT(*) FROM vinfo_raw`) == 0 {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeNoVMs,
+			Table:   "vinfo_raw",
+			Message: "No VMs found in vInfo sheet - cannot build inventory without VM data",
+		})
+		return
 	}
 
-	if err != nil {
-		// If table doesn't exist or query fails, treat as 0 rows
-		if err == sql.ErrNoRows {
-			count = 0
-		} else {
-			// Log error but continue - table might not exist
-			count = 0
+	// Rows exist — check each required column independently.
+	// hasValidColumnData returns false if column is missing OR has no valid values.
+	if !p.hasValidColumnData(ctx, "vinfo_raw", "VM ID") {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeMissingVMID,
+			Table:   "vinfo_raw",
+			Column:  "VM ID",
+			Message: "VM ID column is missing or has no valid values - VMs cannot be identified",
+		})
+	}
+
+	if !p.hasValidColumnData(ctx, "vinfo_raw", "VM") {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeMissingVMName,
+			Table:   "vinfo_raw",
+			Column:  "VM",
+			Message: "VM name column is missing or has no valid values - VMs cannot be identified",
+		})
+	}
+}
+
+// hasValidColumnData checks if a table has a column with at least one non-empty value.
+// Returns false if the column doesn't exist or has no valid values.
+func (p *Parser) hasValidColumnData(ctx context.Context, table, column string) bool {
+	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE "%s" IS NOT NULL AND TRIM("%s") != ''`, table, column, column)
+	return p.countRows(ctx, query) > 0
+}
+
+// validateOptionalTables checks that optional tables have data, producing warnings if empty.
+func (p *Parser) validateOptionalTables(ctx context.Context, result *ValidationResult) {
+	for _, check := range warningChecks {
+		if p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, check.table)) == 0 {
+			result.Warnings = append(result.Warnings, ValidationIssue{
+				Code:    check.code,
+				Table:   check.table,
+				Message: check.message,
+			})
 		}
 	}
+}
 
-	// Check if validation passes
-	if count >= check.minRows && (check.columnCheck == "" || count > 0) {
-		return nil // Check passed
+// countRows executes a COUNT query and returns the result, or 0 on any error.
+func (p *Parser) countRows(ctx context.Context, query string) int {
+	var count int
+	if err := p.db.QueryRowContext(ctx, query).Scan(&count); err != nil {
+		return 0
 	}
-
-	return &ValidationIssue{
-		Code:    check.code,
-		Table:   check.table,
-		Column:  check.columnCheck,
-		Message: check.message,
-	}
+	return count
 }
