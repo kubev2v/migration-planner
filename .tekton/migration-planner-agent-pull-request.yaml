@@ -27,9 +27,9 @@ spec:
   - name: image-expires-after
     value: 5d
   - name: dockerfile
-    value: Containerfile.agent
+    value: Containerfile
   - name: path-context
-    value: .
+    value: agent-v2
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while reducing network traffic.
