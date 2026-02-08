@@ -175,9 +175,9 @@ spec:
       - name: IMAGE
         value: $(params.agent-output-image)
       - name: DOCKERFILE
-        value: Containerfile.agent
+        value: Containerfile
       - name: CONTEXT
-        value: $(params.path-context)
+        value: agent-v2
       - name: HERMETIC
         value: $(params.hermetic)
       - name: PREFETCH_INPUT
