@@ -24,9 +24,9 @@ spec:
   - name: output-image
     value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:{{revision}}
   - name: dockerfile
-    value: Containerfile.agent
+    value: Containerfile
   - name: path-context
-    value: .
+    value: agent-v2
   pipelineSpec:
     description: |
       This pipeline is ideal for building container images from a Containerfile while reducing network traffic.
