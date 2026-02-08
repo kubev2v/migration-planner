@@ -40,7 +40,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		e2eAgent.Agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
+		e2eAgent.Agent, err = CreateAgent(source.Id, GenerateVmName(), svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")

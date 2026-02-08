@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
-	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	libvirt "github.com/libvirt/libvirt-go"
 	. "github.com/onsi/ginkgo/v2"
@@ -24,22 +22,18 @@ type PlannerAgent interface {
 
 // plannerAgentLibvirt is an implementation of the PlannerAgent interface
 type plannerAgentLibvirt struct {
-	agentEndToEndTestID string
-	con                 *libvirt.Connect
-	name                string
-	service             PlannerService
-	sourceID            uuid.UUID
+	con  *libvirt.Connect
+	name string
+	url  string // Download URL to get agent OVA
 }
 
 // NewPlannerAgent creates a new libvirt-based planner agent instance
-func NewPlannerAgent(sourceID uuid.UUID, name string, idForTest string, svc PlannerService) (*plannerAgentLibvirt, error) {
-
+func NewPlannerAgent(name, url string) (*plannerAgentLibvirt, error) {
 	conn, err := libvirt.NewConnect("qemu:///system")
 	if err != nil {
 		return nil, fmt.Errorf("failed to connect to hypervisor: %v", err)
 	}
-	return &plannerAgentLibvirt{agentEndToEndTestID: idForTest, con: conn,
-		name: name, service: svc, sourceID: sourceID}, nil
+	return &plannerAgentLibvirt{con: conn, name: name, url: url}, nil
 }
 
 // DumpLogs prints journal logs from the agent VM to the GinkgoWriter
@@ -132,7 +126,10 @@ func (p *plannerAgentLibvirt) Restart() error {
 
 // Remove gracefully deletes the virtual machine and associated resources
 func (p *plannerAgentLibvirt) Remove() error {
-	defer p.con.Close()
+	defer func() {
+		_, _ = p.con.Close()
+		_ = p.cleanupAgentFiles()
+	}()
 	domain, err := p.con.LookupDomainByName(p.name)
 	if err != nil {
 		return fmt.Errorf("failed to find domain: %v", err)
@@ -149,10 +146,6 @@ func (p *plannerAgentLibvirt) Remove() error {
 
 	if err := domain.Undefine(); err != nil {
 		return fmt.Errorf("failed to undefine domain: %v", err)
-	}
-
-	if err := p.cleanupAgentFiles(); err != nil {
-		return fmt.Errorf("failed to delete agent files: %v", err)
 	}
 
 	return nil

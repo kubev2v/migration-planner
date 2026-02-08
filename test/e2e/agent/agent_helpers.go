@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,31 +18,34 @@ import (
 // cleanupAgentFiles removes all temporary and generated files used during VM setup,
 // including the OVA, ISO, VMDK, and QCOW files.
 func (p *plannerAgentLibvirt) cleanupAgentFiles() error {
-	if err := RemoveFile(DefaultOvaPath); err != nil {
-		return fmt.Errorf("failed to remove OVA file: %w", err)
+	files := []struct {
+		path string
+		name string
+	}{
+		{p.ovaFilePath(), "OVA file"},
+		{p.isoFilePath(), "ISO file"},
+		{p.vmdkDiskFilePath(), "Vmdk file"},
+		{p.qcowDiskFilePath(), "qcow disk file"},
 	}
 
-	if err := RemoveFile(p.isoFilePath()); err != nil {
-		return fmt.Errorf("failed to remove ISO file: %w", err)
+	var errs []error
+
+	for _, f := range files {
+		if err := RemoveFile(f.path); err != nil {
+			errs = append(errs, fmt.Errorf("failed to remove %s: %w", f.name, err))
+		}
 	}
 
-	if err := RemoveFile(DefaultVmdkName); err != nil {
-		return fmt.Errorf("failed to remove Vmdk file: %w", err)
-	}
-
-	if err := RemoveFile(p.qcowDiskFilePath()); err != nil {
-		return fmt.Errorf("failed to remove qcow disk file: %w", err)
-	}
-
-	return nil
+	return errors.Join(errs...)
 }
 
 // prepareImage handles the full preparation of the agent VM image:
 // it downloads the OVA (from URL or image service), extracts the required ISO and VMDK files,
 // and converts the VMDK to QCOW format.
 func (p *plannerAgentLibvirt) prepareImage() error {
-	// Create OVA:
-	ovaFile, err := os.Create(DefaultOvaPath)
+	// Create OVA
+	ovaFilePath := p.ovaFilePath()
+	ovaFile, err := os.Create(ovaFilePath)
 	if err != nil {
 		return err
 	}
@@ -56,7 +60,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	if err := p.downloadOvaFromUrl(ovaFile); err != nil {
 		return fmt.Errorf("failed to download OVA image from url: %w", err)
 	}
-	zap.S().Infof("Successfully downloaded ova file: %s", DefaultOvaPath)
+	zap.S().Infof("Successfully downloaded ova file: %s", ovaFilePath)
 
 	if err := p.ovaValidateAndExtract(ovaFile); err != nil {
 		return err
@@ -64,7 +68,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 	zap.S().Infof("Successfully extracted the Iso and Vmdk files from the OVA.")
 
-	if err := ConvertVMDKtoQCOW2(DefaultVmdkName, p.qcowDiskFilePath()); err != nil {
+	if err := ConvertVMDKtoQCOW2(p.vmdkDiskFilePath(), p.qcowDiskFilePath()); err != nil {
 		return fmt.Errorf("failed to convert vmdk to qcow: %w", err)
 	}
 
@@ -75,12 +79,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 // downloadOvaFromUrl fetches the OVA file from a remote URL and writes it to the provided file
 func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
-	url, err := p.service.GetImageUrl(p.sourceID)
-	if err != nil {
-		return err
-	}
-
-	res, err := http.Get(url) // Download OVA from the extracted URL
+	res, err := http.Get(p.url) // Download OVA from the given URL
 
 	if err != nil {
 		return fmt.Errorf("failed to download image: %v", err)
@@ -95,13 +94,13 @@ func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
 	return nil
 }
 
-// createVm defines and starts a VM based on its XML configuration.
-// It reads the XML from a file and uses libvirt to create the domain
+// createVm defines and starts a VM by generating its XML configuration
+// and using libvirt to create the domain.
 func (p *plannerAgentLibvirt) createVm() error {
-	// Read VM XML definition from file
-	vmXMLBytes, err := os.ReadFile(p.getConfigXmlVMPath())
+	// Generate VM XML definition
+	vmXMLBytes, err := GenerateDomainXML(p.name, p.isoFilePath(), p.qcowDiskFilePath())
 	if err != nil {
-		return fmt.Errorf("failed to read VM XML file: %v", err)
+		return fmt.Errorf("failed to generate VM XML: %v", err)
 	}
 	domain, err := p.con.DomainDefineXML(string(vmXMLBytes))
 	if err != nil {
@@ -131,40 +130,31 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 	}
 
 	// Untar VMDK from OVA
-	if err := Untar(ovaFile, DefaultVmdkName, "persistence-disk.vmdk"); err != nil {
+	if err := Untar(ovaFile, p.vmdkDiskFilePath(), "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
 	return nil
 }
 
-// getConfigXmlVMPath returns the path to the VM XML configuration file,
-// which can differ based on the test ID.
-func (p *plannerAgentLibvirt) getConfigXmlVMPath() string {
-	if p.agentEndToEndTestID == DefaultAgentTestID {
-		return "data/vm.xml"
-	}
-	return fmt.Sprintf("data/vm-%s.xml", p.agentEndToEndTestID)
+// ovaFilePath returns the expected file path of the agent OVA,
+func (p *plannerAgentLibvirt) ovaFilePath() string {
+	return filepath.Join(Home, fmt.Sprintf("%s.ova", p.name))
 }
 
 // isoFilePath returns the expected file path of the agent ISO,
-// which may be test-specific or default.
 func (p *plannerAgentLibvirt) isoFilePath() string {
-	if p.agentEndToEndTestID == DefaultAgentTestID {
-		return filepath.Join(DefaultBasePath, "agent.iso")
-	}
-	fileName := fmt.Sprintf("agent-%s.iso", p.agentEndToEndTestID)
-	return filepath.Join(DefaultBasePath, fileName)
+	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.iso", p.name))
+}
+
+// vmdkDiskFilePath returns the expected path of the VMDK disk image,
+func (p *plannerAgentLibvirt) vmdkDiskFilePath() string {
+	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.vmdk", p.name))
 }
 
 // qcowDiskFilePath returns the expected path of the QCOW2 disk image,
-// varying based on the test ID.
 func (p *plannerAgentLibvirt) qcowDiskFilePath() string {
-	if p.agentEndToEndTestID == DefaultAgentTestID {
-		return filepath.Join(DefaultBasePath, "persistence-disk.qcow2")
-	}
-	fileName := fmt.Sprintf("persistence-disk-vm-%s.qcow2", p.agentEndToEndTestID)
-	return filepath.Join(DefaultBasePath, fileName)
+	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.qcow2", p.name))
 }
 
 // WaitForDomainState polls the libvirt domain state until the desired state is reached
