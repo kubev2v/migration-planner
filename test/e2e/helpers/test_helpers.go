@@ -11,14 +11,20 @@ import (
 )
 
 // CreateAgent Create VM with the UUID of the source created
-func CreateAgent(idForTest string, uuid uuid.UUID, vmName string, svc PlannerService) (PlannerAgent, error) {
+func CreateAgent(sourceId uuid.UUID, vmName string, svc PlannerService) (PlannerAgent, error) {
 	zap.S().Info("Creating agent...")
-	agent, err := NewPlannerAgent(uuid, vmName, idForTest, svc)
+	url, err := svc.GetImageUrl(sourceId)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get image url: %w", err)
+	}
+
+	agent, err := NewPlannerAgent(vmName, url)
 	if err != nil {
 		return nil, err
 	}
 	err = agent.Run()
 	if err != nil {
+		_ = agent.Remove()
 		return nil, err
 	}
 	zap.S().Info("agent created successfully")
@@ -46,4 +52,9 @@ func CredentialURL(svc PlannerService, uuid uuid.UUID) (string, error) {
 		return "", fmt.Errorf("source has no agent")
 	}
 	return s.Agent.CredentialUrl, nil
+}
+
+func GenerateVmName() string {
+	VMNamePrefix := "e2e-agent-vm"
+	return fmt.Sprintf("%s-%s", VMNamePrefix, uuid.New())
 }

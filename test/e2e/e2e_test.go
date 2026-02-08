@@ -37,7 +37,7 @@ var _ = Describe("e2e", func() {
 		Expect(err).To(BeNil())
 		Expect(source).NotTo(BeNil())
 
-		e2eAgent.Agent, err = CreateAgent(DefaultAgentTestID, source.Id, VmName, svc)
+		e2eAgent.Agent, err = CreateAgent(source.Id, GenerateVmName(), svc)
 		Expect(err).To(BeNil())
 
 		zap.S().Info("Waiting for agent IP...")
@@ -191,7 +191,7 @@ var _ = Describe("e2e", func() {
 			Expect(source2).NotTo(BeNil())
 
 			var agent2 E2EAgent
-			agent2.Agent, err = CreateAgent("2", source2.Id, VmName+"-2", svc)
+			agent2.Agent, err = CreateAgent(source2.Id, GenerateVmName(), svc)
 			Expect(err).To(BeNil())
 
 			var agentIP2 string

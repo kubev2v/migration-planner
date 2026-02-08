@@ -10,8 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	"github.com/libvirt/libvirt-go"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -108,11 +106,6 @@ func (o *E2ETestOptions) Run(ctx context.Context) error {
 	}
 
 	log.Printf("[CLI] Cluster %s exists, proceeding...", o.clusterName)
-
-	if err := validateVmsDeletion(); err != nil {
-		log.Printf("[CLI] failed to delete old test VM's: %v", err)
-		return err
-	}
 
 	o.executeTest()
 
@@ -251,50 +244,6 @@ func getInterfaceName(ip net.IP) string {
 	}
 
 	return ""
-}
-
-// validateVmsDeletion connects to libvirt and destroys and undefines any VMs created for the test
-func validateVmsDeletion() error {
-	conn, err := libvirt.NewConnect("qemu:///system")
-	if err != nil {
-		return fmt.Errorf("failed to connect to hypervisor: %v", err)
-	}
-
-	defer func() {
-		_, _ = conn.Close()
-	}()
-
-	domains, err := conn.ListAllDomains(libvirt.CONNECT_LIST_DOMAINS_ACTIVE | libvirt.CONNECT_LIST_DOMAINS_INACTIVE)
-	if err != nil {
-		return fmt.Errorf("[CLI] Failed to list domains: %v", err)
-	}
-
-	for _, domain := range domains {
-		name, err := domain.GetName()
-		if err != nil {
-			log.Printf("[CLI] Failed to get domain name: %v", err)
-			_ = domain.Free()
-			continue
-		}
-
-		if strings.HasPrefix(name, VmName) {
-			if state, _, err := domain.GetState(); err == nil && state == libvirt.DOMAIN_RUNNING {
-				if err := domain.Destroy(); err != nil {
-					_ = domain.Free()
-					return fmt.Errorf("failed to destroy domain: %v", err)
-				}
-			}
-
-			if err := domain.Undefine(); err != nil {
-				_ = domain.Free()
-				return fmt.Errorf("failed to undefine domain: %v", err)
-			}
-		}
-
-		_ = domain.Free()
-	}
-
-	return nil
 }
 
 // findProjectRoot searches for the project root by looking for a Makefile in the current or parent directory
