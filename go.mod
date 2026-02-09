@@ -11,7 +11,6 @@ require (
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/go-chi/cors v1.2.2
-	github.com/go-chi/render v1.0.3
 	github.com/go-openapi/strfmt v0.25.0
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -21,7 +20,6 @@ require (
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubev2v/forklift v0.0.0-20260205232711-33db63493541
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
-	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
@@ -37,18 +35,15 @@ require (
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
 	github.com/riverqueue/river/rivertype v0.27.0
-	github.com/sirupsen/logrus v1.9.4-0.20251023124752-b61f268f75b6
 	github.com/spf13/cobra v1.9.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
 	gorm.io/gorm v1.25.11
-	k8s.io/api v0.34.1
 	k8s.io/apimachinery v0.34.1
 	k8s.io/client-go v0.34.1
 	sigs.k8s.io/yaml v1.6.0
@@ -56,12 +51,9 @@ require (
 
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
-	github.com/ajg/form v1.5.1 // indirect
 	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.40.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ec2 v1.274.0 // indirect
-	github.com/aws/smithy-go v1.23.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
 	github.com/bytedance/sonic v1.14.2 // indirect
@@ -180,6 +172,7 @@ require (
 	github.com/riverqueue/river/rivershared v0.27.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
+	github.com/sirupsen/logrus v1.9.4-0.20251023124752-b61f268f75b6 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -192,6 +185,7 @@ require (
 	github.com/ulikunitz/xz v0.5.15 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.31 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
+	github.com/vmware/govmomi v0.50.0 // indirect
 	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
@@ -229,6 +223,7 @@ require (
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/api v0.34.1 // indirect
 	k8s.io/apiextensions-apiserver v0.34.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
