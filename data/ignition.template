@@ -64,12 +64,6 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.migration-planner/config
-      overwrite: true
-      user:
-        name: core
-      group:
-        name: core
     - path: /home/core/.migration-planner/data
       overwrite: true
       user:
@@ -141,26 +135,6 @@ storage:
               skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:localhost/migration-planner-agent:latest
           fi
 
-    - path: /home/core/.migration-planner/config/config.yaml
-      contents:
-        inline: |
-          config-dir: /agent/config
-          data-dir: /agent/data
-          persistent-data-dir: /agent/persistent-data
-          www-dir: /app/www
-          policies-dir: /app/policies
-          log-level: debug
-          update-interval: 5s
-          source-id: {{.SourceID}}
-          planner-service:
-            service:
-              server: {{.PlannerService}}
-              ui: {{.PlannerServiceUI}}
-      mode: 0644
-      user:
-        name: core
-      group:
-        name: core
     - path: /home/core/.config/containers/systemd/planner-agent.container
       mode: 0644
       contents:
@@ -172,8 +146,12 @@ storage:
           Image=localhost/migration-planner-agent:latest
           ContainerName=planner-agent
           AutoUpdate=registry
-          Exec= -config /agent/config/config.yaml
-          PublishPort=3333:3333
+          Exec= run --source-id {{.SourceID}} \
+                --agent-id ${AGENT_ID} \
+                --console-url {{.PlannerService}} \
+                --opa-policies-folder /app/policies \
+                --data-folder /var/lib/agent
+          PublishPort=8000:8000
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
@@ -195,6 +173,8 @@ storage:
           Restart=on-failure
           RestartSec=5
           ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done'
+          ExecStartPre=/bin/bash -c 'echo "AGENT_ID=$(cat /var/lib/data/agent_id)" > /run/planner-agent.env'
+          EnvironmentFile=/run/planner-agent.env
 
           [Install]
           WantedBy=multi-user.target default.target
