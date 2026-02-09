@@ -280,15 +280,7 @@ curl -X POST http://localhost:9200/api/v1/size/custom \
 
 Follow these steps to get the agent running locally:
 
-### 1. Build the Project
-
-Build the project binaries:
-
-```bash
-make build
-```
-
-### 2. Create a source and get the source ID
+### 1. Create a source and get the source ID
 
 First, create a source using the API and note the source ID:
 
@@ -301,116 +293,57 @@ SOURCE_RESPONSE=$(curl -s -X POST 'http://localhost:3443/api/v1/sources' \
 }')
 
 # Extract the source ID (you'll need jq installed, or manually copy the ID from the response)
-SOURCE_ID=$(echo $SOURCE_RESPONSE | jq -r '.id')
+export SOURCE_ID=$(echo $SOURCE_RESPONSE | jq -r '.id')
 echo "Source ID: $SOURCE_ID"
 ```
 
-### 3. Prepare configuration directories
+### 2. Create Agent ID
 
-Create the required directories for the agent:
-
-```bash
-mkdir -p ~/tools/migration-planner/config ~/tools/migration-planner/data ~/tools/migration-planner/persistent
-```
-
-### 4. Create agent configuration file
-
-Create the agent configuration file that points to the correct agent endpoint:
-
-```bash
-cat > $HOME/tools/migration-planner/config/config.yaml << EOF
-config-dir: $HOME/tools/migration-planner/config
-data-dir: $HOME/tools/migration-planner/data
-persistent-data-dir: $HOME/tools/migration-planner/persistent
-www-dir: /var/www/planner
-log-level: debug
-update-interval: 5s
-source-id: $SOURCE_ID
-planner-service:
-  service:
-    server: http://localhost:7443
-    ui: http://localhost:3000
-EOF
-```
-
-### 5. Create Agent ID
-
-Generate a unique agent ID and store it:
+Generate a unique agent ID:
 
 ```bash
 # Generate a random UUID for the agent
-AGENT_ID=$(uuidgen)
-echo $AGENT_ID > ~/tools/migration-planner/persistent/agent_id
+export AGENT_ID=$(uuidgen)
 echo "Agent ID: $AGENT_ID"
 ```
 
-### 6. Run the Application
+### 3. Build and run the Agent Application
 
-Start the Migration Planner Agent with the configuration file:
+Start the Migration Planner Agent BE:
 
 ```bash
-bin/planner-agent -config ~/tools/migration-planner/config/config.yaml
+# Build and run the agent from the agent-v2 submodule
+make run-agent-image
 ```
 
-### 7. Verify Agent Status
+### 4. Verify Agent Status
 
 Check that the agent is connecting properly:
 
 ```bash
 # Check agent status via the agent's local endpoint (using HTTPS with self-signed cert)
-curl -k https://localhost:3333/api/v1/status
+curl -k https://localhost:8000/api/v1/agent
 
 # Check if the source shows the agent as connected
 curl http://localhost:3443/api/v1/sources/$SOURCE_ID
 ```
 
-### 8. Add Credentials to the Agent
+### 5. Add Credentials to the Agent
 
 The agent needs VMware vCenter credentials to collect inventory data. You can provide credentials in the following ways:
 
-#### Option 1: Using the API directly
+#### Option 1: Using the Agent UI
 
-The web UI is not available in local development, so use the REST API to add credentials:
+Open "https://localhost:8000/" in your browser
 
-```bash
-curl -k -X PUT https://localhost:3333/api/v1/credentials \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://your-vcenter-server.com/sdk",
-    "username": "your-vcenter-username",
-    "password": "your-vcenter-password",
-    "isDataSharingAllowed": true
-  }'
-```
-
-#### Option 2: Manual credentials file
-
-For local testing, you can manually create the credentials file:
-
-```bash
-cat > $HOME/tools/migration-planner/data/credentials.json << EOF
-{
-  "url": "https://your-vcenter-server.com/sdk",
-  "username": "your-vcenter-username",
-  "password": "your-vcenter-password",
-  "isDataSharingAllowed": true
-}
-EOF
-```
-
-**Note**: The web UI at `https://localhost:3333` is not available in local development as it requires the static web files to be built and placed in the agent's www directory. For local development, use the API method above.
-
-### 9. Verify Inventory Collection
+### 6. Verify Inventory Collection
 
 After adding credentials, the agent will start collecting inventory data. You can check the progress:
 
 ```bash
 # Check agent status - should show "gathering-initial-inventory" or "up-to-date"
-curl -k https://localhost:3333/api/v1/status
-
-# Check for inventory file (created after successful collection)
-ls -la $HOME/tools/migration-planner/data/inventory.json
+curl -k https://localhost:8000/api/v1/agent
 
 # Download the inventory via the agent API
-curl -k https://localhost:3333/api/v1/inventory > local-inventory.json
+curl -k https://localhost:8000/api/v1/inventory > local-inventory.json
 ```

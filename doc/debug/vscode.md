@@ -19,7 +19,8 @@ Please create following file on `.vscode/launch.json`:
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/cmd/planner-agent/"
+            "program": "${workspaceFolder}/agent-v2/main.go",
+            "cwd": "${workspaceFolder}/agent-v2"
         },
         {
             "name": "Local planner-api debug",
@@ -63,7 +64,7 @@ Please create following file on `.vscode/launch.json`:
 
 This file contains four types run targets:
 
-1. `Local agent debug` - it will compile and run agent locally in debug mode
+1. `Local agent debug` - it will compile and run agent from agent-v2 submodule locally in debug mode
 2. `Local api debug` - it will compile and run api locally in debug mode
 3. `Remote planner-api` - it will connect to local port 40000
    Please refer to `debugdeployment.md` to setup OpenShift instance in debug mode.
