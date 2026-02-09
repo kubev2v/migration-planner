@@ -28,7 +28,7 @@ Click **Run → Edit Configurations → ➕ icon**. Then, Follow the instruction
 1. Add a new **Go Build** configuration.
 2. Give it a name
 3. For the API, Change the package path to: "`github.com/kubev2v/migration-planner/cmd/planner-api`"  
-For the Agent, Change the package path to: "`github.com/kubev2v/migration-planner/cmd/planner-agent`"
+For the Agent, the code is now in the `agent-v2` submodule. You can debug it by opening the submodule directory in GoLand or by setting the working directory to `agent-v2` and using the main package path from the submodule.
 4. Only for the API add "`run`" as Program Argument 
 5. Click apply
 

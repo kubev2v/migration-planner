@@ -5,7 +5,7 @@ The Migration Assessment VM is initialized using ignition, which configures mult
 ## Systemd services
 The following are a list of systemd services that can be found on Migration Assessment virtual machines. All of the services
 are defined as quadlets. Quadlet configuration can be found in the [ignition template file](../data/ignition.template).
-The `planner-agent` containerfile can be found [here](../Containerfile.agent).
+The `planner-agent` containerfile can be found in the [agent-v2 submodule](../agent-v2/Containerfile).
 
 ### planner-agent
 Planner-agent is a service that reports the status to the Assisted Migration service. The URL of the Assisted Migration service is configured in the file `$HOME/.migration-planner/config/config.yaml`, which is injected via ignition.

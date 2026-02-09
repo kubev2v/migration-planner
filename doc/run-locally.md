@@ -280,15 +280,7 @@ curl -X POST http://localhost:9200/api/v1/size/custom \
 
 Follow these steps to get the agent running locally:
 
-### 1. Build the Project
-
-Build the project binaries:
-
-```bash
-make build
-```
-
-### 2. Create a source and get the source ID
+### 1. Create a source and get the source ID
 
 First, create a source using the API and note the source ID:
 
@@ -301,55 +293,37 @@ SOURCE_RESPONSE=$(curl -s -X POST 'http://localhost:3443/api/v1/sources' \
 }')
 
 # Extract the source ID (you'll need jq installed, or manually copy the ID from the response)
-SOURCE_ID=$(echo $SOURCE_RESPONSE | jq -r '.id')
+export SOURCE_ID=$(echo $SOURCE_RESPONSE | jq -r '.id')
 echo "Source ID: $SOURCE_ID"
 ```
 
-### 3. Prepare configuration directories
+### 2. Create Agent ID
 
-Create the required directories for the agent:
-
-```bash
-mkdir -p ~/tools/migration-planner/config ~/tools/migration-planner/data ~/tools/migration-planner/persistent
-```
-
-### 4. Create agent configuration file
-
-Create the agent configuration file that points to the correct agent endpoint:
-
-```bash
-cat > $HOME/tools/migration-planner/config/config.yaml << EOF
-config-dir: $HOME/tools/migration-planner/config
-data-dir: $HOME/tools/migration-planner/data
-persistent-data-dir: $HOME/tools/migration-planner/persistent
-www-dir: /var/www/planner
-log-level: debug
-update-interval: 5s
-source-id: $SOURCE_ID
-planner-service:
-  service:
-    server: http://localhost:7443
-    ui: http://localhost:3000
-EOF
-```
-
-### 5. Create Agent ID
-
-Generate a unique agent ID and store it:
+Generate a unique agent ID:
 
 ```bash
 # Generate a random UUID for the agent
-AGENT_ID=$(uuidgen)
-echo $AGENT_ID > ~/tools/migration-planner/persistent/agent_id
+export AGENT_ID=$(uuidgen)
 echo "Agent ID: $AGENT_ID"
 ```
 
-### 6. Run the Application
+### 3. Run the Agent Application
 
-Start the Migration Planner Agent with the configuration file:
+Start the Migration Planner Agent BE:
 
 ```bash
-bin/planner-agent -config ~/tools/migration-planner/config/config.yaml
+# Build and run the agent from the agent-v2 submodule
+make build-agent
+agent-v2/bin/agent run --agent-id $AGENT_ID --source-id $SOURCE_ID
+```
+
+### 3. Run the Agent UI
+
+Start the Migration Planner Agent UI:
+
+```bash
+make agent-image
+make run-agent-ui
 ```
 
 ### 7. Verify Agent Status
