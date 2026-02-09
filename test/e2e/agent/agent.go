@@ -14,7 +14,6 @@ import (
 type PlannerAgent interface {
 	DumpLogs(string)
 	GetIp() (string, error)
-	IsServiceRunning(string, string) bool
 	Run() error
 	Restart() error
 	Remove() error
@@ -67,12 +66,6 @@ func (p *plannerAgentLibvirt) GetIp() (string, error) {
 		}
 	}
 	return "", fmt.Errorf("No IP found")
-}
-
-// IsServiceRunning checks whether the specified systemd service is running on the agent
-func (p *plannerAgentLibvirt) IsServiceRunning(agentIp string, service string) bool {
-	_, err := RunSSHCommand(agentIp, fmt.Sprintf("systemctl --user is-active --quiet %s", service))
-	return err == nil
 }
 
 // Run prepares and launches the planner agent VM

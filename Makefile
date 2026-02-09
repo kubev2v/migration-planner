@@ -396,7 +396,7 @@ test-agent-v2: submodules
 unit-test: build kill-db deploy-db migrate test test-agent-v2 kill-db
 
 # Run integration tests using ginkgo
-integration-test: $(GINKGO) build
+integration-test: $(GINKGO)
 	@echo "🧪 Running integration tests..."
 	$(GINKGO) -focus=$(FOCUS) run test/e2e
 	@echo "✅ All Integration tests passed successfully."

@@ -11,7 +11,6 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	"go.uber.org/zap"
 )
 
@@ -22,19 +21,6 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 
 	params := &v1alpha1.CreateSourceJSONRequestBody{Name: name}
 
-	if TestOptions.DisconnectedEnvironment { // make the service unreachable
-
-		toStrPtr := func(s string) *string {
-			return &s
-		}
-
-		params.Proxy = &api.AgentProxy{
-			HttpUrl:  toStrPtr("http://127.0.0.1"),
-			HttpsUrl: toStrPtr("https://127.0.0.1"),
-			NoProxy:  toStrPtr("vcenter.com"),
-		}
-	}
-
 	reqBody, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -44,15 +30,14 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
 	createSourceRes, err := internalclient.ParseCreateSourceResponse(res)
-	if err != nil || createSourceRes.HTTPResponse.StatusCode != http.StatusCreated {
+	if err != nil {
 		return nil, fmt.Errorf("failed to create the source: %v", err)
 	}
 
 	if createSourceRes.JSON201 == nil {
-		return nil, fmt.Errorf("failed to create the source")
+		return nil, fmt.Errorf("failed to create the source. response error: %s", string(createSourceRes.Body))
 	}
 
 	zap.S().Info("Source created successfully")
@@ -96,11 +81,14 @@ func (s *plannerService) GetSource(id uuid.UUID) (*api.Source, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
 	getSourceRes, err := internalclient.ParseGetSourceResponse(res)
-	if err != nil || getSourceRes.HTTPResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to list sources. response status code: %d", getSourceRes.HTTPResponse.StatusCode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sources: %v", err)
+	}
+
+	if getSourceRes.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get source. response code: %d. response error: %s", getSourceRes.HTTPResponse.StatusCode, string(getSourceRes.Body))
 	}
 
 	return getSourceRes.JSON200, nil
@@ -114,11 +102,14 @@ func (s *plannerService) GetSources() (*api.SourceList, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
 
 	getSourceRes, err := internalclient.ParseListSourcesResponse(res)
-	if err != nil || getSourceRes.HTTPResponse.StatusCode != 200 {
-		return nil, fmt.Errorf("failed to list sources. response status code: %d", getSourceRes.HTTPResponse.StatusCode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list sources: %v", err)
+	}
+
+	if getSourceRes.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list sources. response error: %s", string(getSourceRes.Body))
 	}
 
 	return getSourceRes.JSON200, nil
@@ -132,11 +123,15 @@ func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+
+	removeSourceRes, err := internalclient.ParseDeleteSourceResponse(res)
+	if err != nil {
+		return fmt.Errorf("failed to parse res: %v", err)
+	}
 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to delete source with uuid: %s. "+
-			"response status code: %d", uuid.String(), res.StatusCode)
+			"response status code: %d. response error: %s", uuid.String(), res.StatusCode, string(removeSourceRes.Body))
 	}
 
 	return err
@@ -150,10 +145,14 @@ func (s *plannerService) RemoveSources() error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+
+	removeSourcesRes, err := internalclient.ParseDeleteSourcesResponse(res)
+	if err != nil {
+		return fmt.Errorf("failed to parse res: %v", err)
+	}
 
 	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to delete sources. response status code: %d", res.StatusCode)
+		return fmt.Errorf("failed to delete sources. response status code: %d. response error: %s", res.StatusCode, string(removeSourcesRes.Body))
 	}
 
 	return err
@@ -170,18 +169,22 @@ func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Invent
 
 	reqBody, err := json.Marshal(update)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to marshal: %v", err)
 	}
 
 	res, err := s.api.PutRequest(path.Join(apiV1SourcesPath, uuid.String(), "inventory"), reqBody)
 	if err != nil {
-		return err
+		return fmt.Errorf("error updating inventory: %v", err)
 	}
-	defer res.Body.Close()
+
+	updateSourceRes, err := internalclient.ParseUpdateInventoryResponse(res)
+	if err != nil {
+		return fmt.Errorf("failed to parse res: %v", err)
+	}
 
 	if res.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to update source with uuid: %s. "+
-			"response status code: %d", uuid.String(), res.StatusCode)
+			"response status code: %d. response error: %s", uuid.String(), res.StatusCode, string(updateSourceRes.Body))
 	}
 
 	return err
