@@ -41,8 +41,12 @@ func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uui
 	defer res.Body.Close()
 
 	parsed, err := internalclient.ParseCreateAssessmentResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusCreated {
+	if err != nil {
 		return nil, fmt.Errorf("failed to create assessment. status: %d, err: %v", res.StatusCode, err)
+	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusCreated {
+		return nil, fmt.Errorf("failed to create assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
 	return parsed.JSON201, nil
 }
@@ -103,9 +107,14 @@ func (s *plannerService) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job,
 	defer res.Body.Close()
 
 	parsed, err := internalclient.ParseCreateRVToolsAssessmentResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusAccepted {
+	if err != nil {
 		return nil, fmt.Errorf("failed to create RVTools job. status: %d, err: %v", res.StatusCode, err)
 	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("failed to create RVTools job. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
+	}
+
 	return parsed.JSON202, nil
 }
 
@@ -118,9 +127,14 @@ func (s *plannerService) GetJob(id int64) (*v1alpha1.Job, error) {
 	defer res.Body.Close()
 
 	parsed, err := internalclient.ParseGetJobResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, fmt.Errorf("failed to get job. status: %d, err: %v", res.StatusCode, err)
 	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get job. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
+	}
+
 	return parsed.JSON200, nil
 }
 
@@ -137,6 +151,10 @@ func (s *plannerService) CancelJob(id int64) (*v1alpha1.Job, error) {
 	parsed, err := internalclient.ParseCancelJobResponse(res)
 	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to cancel job. status: %d, err: %v", res.StatusCode, err)
+	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to cancel job. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
 	return parsed.JSON200, nil
 }
@@ -155,6 +173,10 @@ func (s *plannerService) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, erro
 	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get assessment. status: %d", res.StatusCode)
 	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to get assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
+	}
 	return parsed.JSON200, nil
 }
 
@@ -169,8 +191,12 @@ func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentList, error) {
 	defer res.Body.Close()
 
 	parsed, err := internalclient.ParseListAssessmentsResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, fmt.Errorf("failed to list assessments. status: %d", res.StatusCode)
+	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to list assessments. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
 	return parsed.JSON200, nil
 }
@@ -194,8 +220,12 @@ func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.
 	defer res.Body.Close()
 
 	parsed, err := internalclient.ParseUpdateAssessmentResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
+	if err != nil {
 		return nil, fmt.Errorf("failed to update assessment. status: %d", res.StatusCode)
+	}
+
+	if parsed.HTTPResponse.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("failed to update assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
 	return parsed.JSON200, nil
 }

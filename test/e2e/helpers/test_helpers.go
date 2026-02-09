@@ -41,19 +41,6 @@ func AgentIsUpToDate(svc PlannerService, uuid uuid.UUID) (bool, error) {
 	return source.Agent.Status == v1alpha1.AgentStatusUpToDate, nil
 }
 
-// CredentialURL helper function which return credential url for an agent by source UUID
-func CredentialURL(svc PlannerService, uuid uuid.UUID) (string, error) {
-	zap.S().Info("try to retrieve valid credentials url")
-	s, err := svc.GetSource(uuid)
-	if err != nil {
-		return "", fmt.Errorf("error getting source")
-	}
-	if s.Agent == nil {
-		return "", fmt.Errorf("source has no agent")
-	}
-	return s.Agent.CredentialUrl, nil
-}
-
 func GenerateVmName() string {
 	VMNamePrefix := "e2e-agent-vm"
 	return fmt.Sprintf("%s-%s", VMNamePrefix, uuid.New())

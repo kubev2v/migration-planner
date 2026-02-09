@@ -31,7 +31,6 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DisconnectedEnvironment = true
 
 		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -58,18 +57,14 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		zap.S().Infof("agent Api base url: %s", agentApiBaseUrl)
 
 		zap.S().Info("Wait for planner-agent to be running...")
-		Eventually(func() bool {
-			return e2eAgent.Agent.IsServiceRunning(agentIP, "planner-agent")
-		}, "3m", "2s").Should(BeTrue())
-		zap.S().Info("Planner-agent is now running")
-
-		zap.S().Info("Wait for agent server to start...")
-		Eventually(func() bool {
-			if _, err := e2eAgent.Api.Status(); err != nil {
-				return false
+		Eventually(func() error {
+			_, err = e2eAgent.Api.Status()
+			if err != nil {
+				return err
 			}
-			return true
-		}, "3m", "2s").Should(BeTrue())
+			return nil
+		}, "3m", "2s").Should(BeNil())
+		zap.S().Info("Planner-agent is now running")
 
 		zap.S().Info("Setup complete for test.")
 	})
@@ -100,23 +95,29 @@ var _ = Describe("e2e-disconnected-environment", func() {
 				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", SystemIP))
 			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
 
-			// Login to Vcenter
-			Eventually(func() bool {
-				res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port),
-					"core", "123456")
-				return err == nil && res.StatusCode == http.StatusNoContent
-			}, "3m", "2s").Should(BeTrue())
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port), "core", "123456")
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
 
-			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-			Eventually(func() bool {
-				statusReply, err := e2eAgent.Api.Status()
+			zap.S().Infof("Wait for collecor status to be %s...", string(CollectorStatusCollected))
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
 				if err != nil {
-					return false
+					zap.S().Errorf("Failed to get collector status: %s", err)
+					return ""
 				}
-				Expect(statusReply.Connected).Should(Equal("false"))
-				return statusReply.Connected == "false" && statusReply.Status == string(v1alpha1.AgentStatusUpToDate)
-			}, "3m", "2s").Should(BeTrue())
+				return s.Status
+			}, "3m", "2s").Should(Equal(string(CollectorStatusCollected)))
+
+			statusReply, err := e2eAgent.Api.Status()
+			Expect(err).To(BeNil())
+			Expect(statusReply.ConsoleConnection).To(Equal("disconnected"))
+
+			// agent shouldn't be created in the api
+			so, err := svc.GetSource(source.Id)
+			Expect(err).To(BeNil())
+			Expect(so.Agent).To(BeNil())
 
 			// Get inventory
 			inventory, err := e2eAgent.Api.Inventory()

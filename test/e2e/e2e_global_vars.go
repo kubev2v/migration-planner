@@ -7,10 +7,6 @@ import (
 	"time"
 )
 
-var TestOptions = struct {
-	DisconnectedEnvironment bool
-}{}
-
 const (
 	DefaultOrganization = "admin"
 	DefaultUsername     = "admin"

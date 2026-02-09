@@ -24,7 +24,6 @@ var _ = Describe("e2e-multiple-users", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DisconnectedEnvironment = false
 
 		// Iterate over each organization and user to authenticate and create a unique source per org-user pair
 		for _, org := range organizations {

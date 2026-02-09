@@ -28,7 +28,6 @@ var _ = Describe("e2e", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -55,19 +54,39 @@ var _ = Describe("e2e", func() {
 		zap.S().Infof("agent Api base url: %s", agentApiBaseUrl)
 
 		zap.S().Info("Wait for planner-agent to be running...")
-		Eventually(func() bool {
-			return e2eAgent.Agent.IsServiceRunning(agentIP, "planner-agent")
-		}, "3m", "2s").Should(BeTrue())
+		var s *AgentStatus
+		Eventually(func() error {
+			s, err = e2eAgent.Api.Status()
+			if err != nil {
+				return err
+			}
+			return nil
+		}, "3m", "2s").Should(BeNil())
 		zap.S().Info("Planner-agent is now running")
 
+		s, err = e2eAgent.Api.SetAgentMode(string(AgentModeConnected))
+		Expect(err).To(BeNil())
+
 		Eventually(func() string {
-			credUrl, err := CredentialURL(svc, source.Id)
+			s, err = e2eAgent.Api.Status()
 			if err != nil {
-				return err.Error()
+				return ""
 			}
-			return credUrl
+			return s.ConsoleConnection
+		}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
+
+		Eventually(func() v1alpha1.AgentStatus {
+			s, err := svc.GetSource(source.Id)
+			if err != nil {
+				return ""
+			}
+			if s.Agent == nil {
+				return ""
+			}
+			return s.Agent.Status
 		}, "3m", "2s").
-			Should(Equal(fmt.Sprintf("https://%s:3333", agentIP)))
+			Should(Equal(v1alpha1.AgentStatusWaitingForCredentials))
+
 		zap.S().Info("Setup complete for test.")
 	})
 
@@ -86,40 +105,62 @@ var _ = Describe("e2e", func() {
 		e2eAgent.Agent.DumpLogs(agentIP)
 	})
 
-	Context("Check Vcenter login behavior", func() {
-		It("Succeeds login only for valid credentials", func() {
+	Context("collect from vsphere", func() {
+		It("start collecting only when credentials are valid", func() {
 
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			_, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"", "pass")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty User. Successfully returned http status: BadRequest.")
+			Expect(resCode).To(Equal(http.StatusBadRequest))
 
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			_, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"user", "")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Empty Password. Successfully returned http status: BadRequest.")
+			Expect(resCode).To(Equal(http.StatusBadRequest))
 
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			_, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"invalid", "cred")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusUnauthorized))
-			zap.S().Info("Invalid credentials. HTTP status: Unauthorized returned.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
 
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
+			var s *CollectorStatus
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusError)))
+
+			s, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
 				"user", "pass")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusBadRequest))
-			zap.S().Info("Invalid URL. Successfully returned http status: BadRequest.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusError)))
 
-			res, err = e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
+			s, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port), "core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Credentials verified successfully. HTTP status: NoContent (204) returned.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -129,11 +170,21 @@ var _ = Describe("e2e", func() {
 		It("Up to date", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-				"core", "123456")
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port), "core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
@@ -148,11 +199,23 @@ var _ = Describe("e2e", func() {
 		It("Source removal", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
@@ -173,11 +236,23 @@ var _ = Describe("e2e", func() {
 		It("Two agents, Two VSphere's", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
@@ -207,24 +282,57 @@ var _ = Describe("e2e", func() {
 			agent2.Api = DefaultAgentApi(agent2ApiBaseUrl)
 			zap.S().Infof("Agent2 Api base url: %s", agent2ApiBaseUrl)
 
-			Eventually(func() bool {
-				return agent2.Agent.IsServiceRunning(agentIP2, "planner-agent")
-			}, "3m", "2s").Should(BeTrue())
+			var agent2Status *AgentStatus
+			Eventually(func() error {
+				agent2Status, err = agent2.Api.Status()
+				if err != nil {
+					return err
+				}
+				return nil
+			}, "3m", "2s").Should(BeNil())
+			zap.S().Info("agent2 is now running")
+
+			_, err = agent2.Api.SetAgentMode(string(AgentModeConnected))
+			Expect(err).To(BeNil())
 
 			Eventually(func() string {
-				credUrl, err := CredentialURL(svc, source2.Id)
+				agent2Status, err = agent2.Api.Status()
 				if err != nil {
-					return err.Error()
+					return ""
 				}
-				return credUrl
-			}, "3m", "2s").Should(Equal(fmt.Sprintf("https://%s:3333", agentIP2)))
+				return agent2Status.ConsoleConnection
+			}, "1m", "2s").Should(Equal(string(AgentModeConnected)))
 
-			// Login to Vcsim2
-			res, err = agent2.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere2Port),
+			Eventually(func() v1alpha1.AgentStatus {
+				s, err := svc.GetSource(source2.Id)
+				if err != nil {
+					return ""
+				}
+				if s.Agent == nil {
+					return ""
+				}
+				return s.Agent.Status
+			}, "1m", "2s").
+				Should(Equal(v1alpha1.AgentStatusWaitingForCredentials))
+
+			// Start collector for Vcsim2
+			s, resCode, err = agent2.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere2Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
@@ -244,20 +352,42 @@ var _ = Describe("e2e", func() {
 		It("VM reboot", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
 			// Restarting the VM
 			err = e2eAgent.Agent.Restart()
 			Expect(err).To(BeNil())
 
-			// Check that planner-agent service is running
-			Eventually(func() bool {
-				return e2eAgent.Agent.IsServiceRunning(agentIP, "planner-agent")
-			}, "5m", "2s").Should(BeTrue())
+			// wait for the agent to be up again
+			var agentStatus *AgentStatus
+			Eventually(func() string {
+				agentStatus, err = e2eAgent.Api.Status()
+				if err != nil {
+					return ""
+				}
+				return agentStatus.ConsoleConnection
+			}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
+
+			// Restart VM should keep the inventory
+			s, err = e2eAgent.Api.GetCollectorStatus()
+			Expect(err).To(BeNil())
+			Expect(s.Status).To(Equal(string(CollectorStatusCollected)))
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
@@ -274,11 +404,23 @@ var _ = Describe("e2e", func() {
 		It("Test Assessment Endpoints With inventory", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			res, err := e2eAgent.Api.Login(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"core", "123456")
 			Expect(err).To(BeNil())
-			Expect(res.StatusCode).To(Equal(http.StatusNoContent))
-			zap.S().Info("Vcenter login completed successfully. Credentials saved.")
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
+
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
 			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
 			Eventually(func() bool {
