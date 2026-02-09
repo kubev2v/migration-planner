@@ -12,13 +12,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// StatusReply represents the status response from the agent API
-// This is a local type to avoid dependency on the removed internal/agent package
-type StatusReply struct {
-	Status    string `json:"status"`
-	Connected string `json:"connected"`
-}
-
 // AgentApi provides a client to interact with the Planner Agent API
 type AgentApi struct {
 	baseURL    string
@@ -45,15 +38,17 @@ func NewAgentApi(agentApiBaseUrl string, customHttpClient *http.Client) *AgentAp
 }
 
 // request is a helper to send an HTTP request to the agent and unmarshal the response into given struct
-func (api *AgentApi) request(method string, path string, body []byte, result any) (*http.Response, error) {
+func (a *AgentApi) request(method string, path string, body []byte, result any) (*http.Response, error) {
 	var req *http.Request
 	var err error
 
-	queryPath := api.baseURL + path
+	queryPath := a.baseURL + path
 
 	switch method {
 	case http.MethodGet:
 		req, err = http.NewRequest(http.MethodGet, queryPath, nil)
+	case http.MethodPost:
+		req, err = http.NewRequest(http.MethodPost, queryPath, bytes.NewReader(body))
 	case http.MethodPut:
 		req, err = http.NewRequest(http.MethodPut, queryPath, bytes.NewReader(body))
 	default:
@@ -67,7 +62,7 @@ func (api *AgentApi) request(method string, path string, body []byte, result any
 	req.Header.Set("Content-Type", "application/json")
 
 	zap.S().Infof("[Agent-API] %s [Method: %s]", req.URL.String(), req.Method)
-	res, err := api.httpClient.Do(req)
+	res, err := a.httpClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error getting response from local server: %v", err)
 	}
@@ -87,63 +82,91 @@ func (api *AgentApi) request(method string, path string, body []byte, result any
 	return res, nil
 }
 
-// Info retrieves the agent's version string
-func (api *AgentApi) Info() (string, error) {
-	var result struct {
-		Version string `json:"version"`
-	}
-
-	res, err := api.request(http.MethodGet, "info", nil, &result)
-	if err != nil || res.StatusCode != http.StatusOK {
-		return "", err
-	}
-	return result.Version, nil
-}
-
-// Login put the vCenter credentials
-func (api *AgentApi) Login(url string, user string, pass string) (*http.Response, error) {
-	zap.S().Infof("Attempting vCenter login with URL: %s, User: %s", url, user)
-
-	credentials := map[string]string{
-		"url":      url,
-		"username": user,
-		"password": pass,
-	}
-
-	jsonData, err := json.Marshal(credentials)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal credentials: %w", err)
-	}
-
-	res, err := api.request(http.MethodPut, "credentials", jsonData, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return res, nil
-}
-
 // Status retrieves the current status of the agent
-func (api *AgentApi) Status() (*StatusReply, error) {
-	result := &StatusReply{}
-	res, err := api.request(http.MethodGet, "status", nil, result)
-	if err != nil || res.StatusCode != http.StatusOK {
+func (a *AgentApi) Status() (*AgentStatus, error) {
+	result := &AgentStatus{}
+	res, err := a.request(http.MethodGet, "agent", nil, result)
+	if err != nil {
 		return nil, fmt.Errorf("failed to get status: %v", err)
 	}
 
-	zap.S().Infof("Agent status: %s. Connected to the Service: %s", result.Status, result.Connected)
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
+	}
+
+	zap.S().Infof("mode: %s. Console connection: %s", result.Mode, result.ConsoleConnection)
 	return result, nil
 }
 
 // Inventory retrieves the inventory data collected by the agent
-func (api *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
-	var result struct {
-		Inventory v1alpha1.Inventory `json:"inventory"`
-	}
-	res, err := api.request(http.MethodGet, "inventory", nil, &result)
-	if err != nil || res.StatusCode != http.StatusOK {
+func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
+	var inv v1alpha1.Inventory
+
+	res, err := a.request(http.MethodGet, "inventory", nil, &inv)
+	if err != nil {
 		return nil, fmt.Errorf("failed to get inventory: %v", err)
 	}
 
-	return &result.Inventory, nil
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
+	}
+
+	return &inv, nil
+}
+
+func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
+	body := AgentModeRequest{Mode: mode}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	var status AgentStatus
+
+	res, err := a.request(http.MethodPost, "agent", data, &status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to set agent mode: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
+	}
+
+	return &status, nil
+}
+
+func (a *AgentApi) StartCollector(vcenterURL, username, password string) (*CollectorStatus, int, error) {
+	body := CollectorStartRequest{
+		URL:      vcenterURL,
+		Username: username,
+		Password: password,
+	}
+	data, err := json.Marshal(body)
+	if err != nil {
+		return nil, 1, fmt.Errorf("marshaling request: %w", err)
+	}
+
+	var status CollectorStatus
+
+	res, err := a.request(http.MethodPost, "collector", data, &status)
+	if err != nil {
+		return nil, 1, fmt.Errorf("failed to start collector: %v", err)
+	}
+
+	return &status, res.StatusCode, nil
+}
+
+func (a *AgentApi) GetCollectorStatus() (*CollectorStatus, error) {
+	var status CollectorStatus
+
+	res, err := a.request(http.MethodGet, "collector", nil, &status)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collector status: %v", err)
+	}
+
+	if res.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
+	}
+
+	return &status, nil
 }

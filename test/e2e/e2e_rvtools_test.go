@@ -3,6 +3,7 @@ package e2e_test
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -24,7 +25,6 @@ var _ = Describe("e2e-rvtools", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
-		TestOptions.DisconnectedEnvironment = false
 
 		svc, err = DefaultPlannerService()
 		Expect(err).To(BeNil(), "Failed to create PlannerService")
@@ -88,7 +88,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			Expect(err).To(MatchError(ContainSubstring("status code: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -106,7 +106,7 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("empty-test", tmpFile)
 			Expect(err).NotTo(BeNil())
 			Expect(assessment).To(BeNil())
-			Expect(err).To(MatchError(ContainSubstring("status: 400")))
+			Expect(err).To(MatchError(ContainSubstring("status code: 400")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -161,41 +161,41 @@ var _ = Describe("e2e-rvtools", func() {
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
 
-			//It("should validate assessment name format", func() { // Todo: ECOPROJECT-3433
-			//	zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-			//
-			//	// Create a valid Excel file
-			//	validContent, err := CreateValidTestExcel()
-			//	Expect(err).To(BeNil())
-			//	tmpFile, err := CreateTempExcelFile(validContent)
-			//	Expect(err).To(BeNil())
-			//	defer os.Remove(tmpFile)
-			//
-			//	// Test empty name - validated immediately at handler level
-			//	assessment, err = svc.CreateAssessmentFromRvtools("", tmpFile)
-			//	Expect(err).NotTo(BeNil())
-			//	Expect(assessment).To(BeNil())
-			//	Expect(err.Error()).To(ContainSubstring("status: 400"))
-			//
-			//	// Test very long name - if validation added, would be immediate (400)
-			//	// Currently no length validation, so job would be created and might succeed or fail
-			//	longName := strings.Repeat("a", 1000)
-			//	assessment, err = svc.CreateAssessmentFromRvtools(longName, tmpFile)
-			//	Expect(err).NotTo(BeNil())
-			//	Expect(assessment).To(BeNil())
-			//	// Update this assertion based on actual validation implementation
-			//	Expect(err.Error()).To(Or(ContainSubstring("status: 400"), ContainSubstring("job failed")))
-			//
-			//	// Test name with special characters - if validation added, would be immediate (400)
-			//	// Currently no format validation, so job would be created and might succeed or fail
-			//	assessment, err = svc.CreateAssessmentFromRvtools("test@#$%^&*()", tmpFile)
-			//	Expect(err).NotTo(BeNil())
-			//	Expect(assessment).To(BeNil())
-			//	// Update this assertion based on actual validation implementation
-			//	Expect(err).To(Or(MatchError(ContainSubstring("status: 400")), MatchError(ContainSubstring("job failed"))))
-			//
-			//	zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-			//})
+			It("should validate assessment name format", func() { // Todo: ECOPROJECT-3433
+				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+				// Create a valid Excel file
+				validContent, err := CreateValidTestExcel()
+				Expect(err).To(BeNil())
+				tmpFile, err := CreateTempExcelFile(validContent)
+				Expect(err).To(BeNil())
+				defer os.Remove(tmpFile)
+
+				// Test empty name - validated immediately at handler level
+				assessment, err = svc.CreateAssessmentFromRvtools("", tmpFile)
+				Expect(err).NotTo(BeNil())
+				Expect(assessment).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("status code: 400"))
+
+				// Test very long name - if validation added, would be immediate (400)
+				// Currently no length validation, so job would be created and might succeed or fail
+				longName := strings.Repeat("a", 1000)
+				assessment, err = svc.CreateAssessmentFromRvtools(longName, tmpFile)
+				Expect(err).NotTo(BeNil())
+				Expect(assessment).To(BeNil())
+				// Update this assertion based on actual validation implementation
+				Expect(err.Error()).To(Or(ContainSubstring("status code: 400"), ContainSubstring("job failed")))
+
+				// Test name with special characters - if validation added, would be immediate (400)
+				// Currently no format validation, so job would be created and might succeed or fail
+				assessment, err = svc.CreateAssessmentFromRvtools("test@#$%^&*()", tmpFile)
+				Expect(err).NotTo(BeNil())
+				Expect(assessment).To(BeNil())
+				// Update this assertion based on actual validation implementation
+				Expect(err).To(Or(MatchError(ContainSubstring("status code: 400")), MatchError(ContainSubstring("job failed"))))
+
+				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+			})
 
 			It("should handle large file uploads", func() {
 				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
