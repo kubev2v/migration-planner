@@ -51,5 +51,4 @@ export GO_LDFLAGS="\
 -X github.com/kubev2v/migration-planner/pkg/version.versionFromGit=${SOURCE_GIT_TAG} \
 -X github.com/kubev2v/migration-planner/pkg/version.commitFromGit=${SOURCE_GIT_COMMIT} \
 -X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=${SOURCE_GIT_TREE_STATE} \
--X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP} \
--X github.com/kubev2v/migration-planner/internal/agent.version=${SOURCE_GIT_TAG}"
+-X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP}"

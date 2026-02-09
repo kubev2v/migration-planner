@@ -9,9 +9,15 @@ import (
 	"net/http"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	coreAgent "github.com/kubev2v/migration-planner/internal/agent"
 	"go.uber.org/zap"
 )
+
+// StatusReply represents the status response from the agent API
+// This is a local type to avoid dependency on the removed internal/agent package
+type StatusReply struct {
+	Status    string `json:"status"`
+	Connected string `json:"connected"`
+}
 
 // AgentApi provides a client to interact with the Planner Agent API
 type AgentApi struct {
@@ -118,8 +124,8 @@ func (api *AgentApi) Login(url string, user string, pass string) (*http.Response
 }
 
 // Status retrieves the current status of the agent
-func (api *AgentApi) Status() (*coreAgent.StatusReply, error) {
-	result := &coreAgent.StatusReply{}
+func (api *AgentApi) Status() (*StatusReply, error) {
+	result := &StatusReply{}
 	res, err := api.request(http.MethodGet, "status", nil, result)
 	if err != nil || res.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get status: %v", err)
