@@ -12,7 +12,7 @@ Strategy:
 INSTALL excel;
 LOAD excel; 
 CREATE TABLE vinfo_raw AS
-SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', all_varchar=true);
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', header=true, all_varchar=true);
 
 -- Add potentially missing columns with NULL defaults for minimal schema support
 -- Only VM ID and VM are required; all other columns are optional

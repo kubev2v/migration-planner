@@ -50,9 +50,10 @@ func (v ValidationResult) Error() error {
 
 // Validation codes for errors
 const (
-	CodeNoVMs         = "NO_VMS"
-	CodeMissingVMID   = "MISSING_VM_ID"
-	CodeMissingVMName = "MISSING_VM_NAME"
+	CodeNoVMs          = "NO_VMS"
+	CodeMissingVMID    = "MISSING_VM_ID"
+	CodeMissingVMName  = "MISSING_VM_NAME"
+	CodeMissingCluster = "MISSING_CLUSTER"
 )
 
 // Validation codes for warnings
@@ -83,24 +84,27 @@ var warningChecks = []struct {
 }
 
 // ValidateSchema checks the ingested schema for required tables, columns, and data.
+// The table parameter specifies which table to validate VM data against
+// (e.g., "vinfo_raw" for RVTools, "vinfo" for SQLite).
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
-func (p *Parser) ValidateSchema(ctx context.Context) ValidationResult {
+func (p *Parser) ValidateSchema(ctx context.Context, table string) ValidationResult {
 	result := ValidationResult{}
 
-	p.validateVinfoData(ctx, &result)
+	p.validateVinfoData(ctx, &result, table)
 	p.validateOptionalTables(ctx, &result)
 
 	return result
 }
 
-// validateVinfoData checks vinfo_raw for VM data quality.
-// Reports NO_VMS if sheet has no data rows, otherwise reports specific column errors.
-func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult) {
+// validateVinfoData checks the specified table for VM data quality.
+// Reports NO_VMS if table has no data rows, otherwise reports specific column errors.
+// The table parameter allows validating against "vinfo_raw" (RVTools) or "vinfo" (SQLite).
+func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult, table string) {
 	// First check if we have any rows at all (independent of column existence)
-	if p.countRows(ctx, `SELECT COUNT(*) FROM vinfo_raw`) == 0 {
+	if p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, table)) == 0 {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Code:    CodeNoVMs,
-			Table:   "vinfo_raw",
+			Table:   table,
 			Message: "No VMs found in vInfo sheet - cannot build inventory without VM data",
 		})
 		return
@@ -108,21 +112,30 @@ func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult
 
 	// Rows exist — check each required column independently.
 	// hasValidColumnData returns false if column is missing OR has no valid values.
-	if !p.hasValidColumnData(ctx, "vinfo_raw", "VM ID") {
+	if !p.hasValidColumnData(ctx, table, "VM ID") {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Code:    CodeMissingVMID,
-			Table:   "vinfo_raw",
+			Table:   table,
 			Column:  "VM ID",
-			Message: "VM ID column is missing or has no valid values - VMs cannot be identified",
+			Message: "'VM ID' column is missing or empty in the vInfo sheet - VMs cannot be identified",
 		})
 	}
 
-	if !p.hasValidColumnData(ctx, "vinfo_raw", "VM") {
+	if !p.hasValidColumnData(ctx, table, "VM") {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Code:    CodeMissingVMName,
-			Table:   "vinfo_raw",
+			Table:   table,
 			Column:  "VM",
-			Message: "VM name column is missing or has no valid values - VMs cannot be identified",
+			Message: "'VM' column is missing or empty in the vInfo sheet - VMs cannot be identified",
+		})
+	}
+
+	if !p.hasValidColumnData(ctx, table, "Cluster") {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeMissingCluster,
+			Table:   table,
+			Column:  "Cluster",
+			Message: "'Cluster' column is missing or empty in the vInfo sheet - cannot determine cluster membership",
 		})
 	}
 }
