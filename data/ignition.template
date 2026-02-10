@@ -64,18 +64,6 @@ storage:
         name: core
       group:
         name: core
-    - path: /home/core/.migration-planner/config
-      overwrite: true
-      user:
-        name: core
-      group:
-        name: core
-    - path: /home/core/.migration-planner/data
-      overwrite: true
-      user:
-        name: core
-      group:
-        name: core
   files:
     {{if .IpAddress}}
     - path: /etc/NetworkManager/system-connections/static.nmconnection
@@ -106,7 +94,7 @@ storage:
           insecure = true
     {{end}}
     {{ if .Token }}
-    - path: /home/core/.migration-planner/data/jwt.json
+    - path: /home/core/.migration-planner/jwt.json
       mode: 0644
       contents:
         inline: |
@@ -141,21 +129,28 @@ storage:
               skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:localhost/migration-planner-agent:latest
           fi
 
-    - path: /home/core/.migration-planner/config/config.yaml
+    - path: /run/agent.env
       contents:
         inline: |
-          config-dir: /agent/config
-          data-dir: /agent/data
-          persistent-data-dir: /agent/persistent-data
-          www-dir: /app/www
-          policies-dir: /app/policies
-          log-level: debug
-          update-interval: 5s
-          source-id: {{.SourceID}}
-          planner-service:
-            service:
-              server: {{.PlannerService}}
-              ui: {{.PlannerServiceUI}}
+          AGENT_SERVER_HTTP_PORT=3333
+          AGENT_SERVER_MODE=prod
+          AGENT_AUTHENTICATION_ENABLED=true
+          AGENT_AUTHENTICATION_JWT_FILEPATH=/app/jwt.json
+          AGENT_OPA_POLICIES_FOLDER=/app/policies
+          AGENT_SOURCE_ID={{.SourceID}}
+          AGENT_DATA_FOLDER=/var/lib/agent
+          AGENT_CONSOLE_URL={{.PlannerService}}
+          AGENT_SERVER_STATICS_FOLDER=/app/static
+          AGENT_LEGACY_STATUS_ENABLED=true
+{{ if .HttpProxyUrl }}
+          HTTP_PROXY={{ .HttpProxyUrl }}
+{{ end }}
+{{ if .HttpsProxyUrl }}
+          HTTPS_PROXY={{ .HttpsProxyUrl }}
+{{ end }}
+{{ if .NoProxyDomain }}
+          NO_PROXY={{ .NoProxyDomain }}
+{{ end }}
       mode: 0644
       user:
         name: core
@@ -171,30 +166,19 @@ storage:
           [Container]
           Image=localhost/migration-planner-agent:latest
           ContainerName=planner-agent
-          AutoUpdate=registry
-          Exec= -config /agent/config/config.yaml
-          PublishPort=3333:3333
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
-          Volume=/home/core/.migration-planner:/agent:Z
-          Volume=/var/lib/data:/agent/persistent-data:Z
-{{ if .HttpProxyUrl }}
-          Environment=HTTP_PROXY={{ .HttpProxyUrl }}
-{{ end }}
-{{ if .HttpsProxyUrl }}
-          Environment=HTTPS_PROXY={{ .HttpsProxyUrl }}
-{{ end }}
-{{ if .NoProxyDomain }}
-          Environment=NO_PROXY={{ .NoProxyDomain }}
-{{ end }}
+          Volume=/var/lib/data:/var/lib/agent:Z
+          Volume=/home/core/.migration-planner/jwt.json:/app/jwt.json:Z
+          EnvironmentFile=/run/agent.env
           Network=host
           UserNS=keep-id:uid=1001
 
           [Service]
           Restart=on-failure
           RestartSec=5
-          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done'
+          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done && echo "AGENT_ID=$(cat /var/lib/data/agent_id)" >> /run/agent.env'
 
           [Install]
           WantedBy=multi-user.target default.target
