@@ -50,9 +50,10 @@ func (v ValidationResult) Error() error {
 
 // Validation codes for errors
 const (
-	CodeNoVMs         = "NO_VMS"
-	CodeMissingVMID   = "MISSING_VM_ID"
-	CodeMissingVMName = "MISSING_VM_NAME"
+	CodeNoVMs          = "NO_VMS"
+	CodeMissingVMID    = "MISSING_VM_ID"
+	CodeMissingVMName  = "MISSING_VM_NAME"
+	CodeMissingCluster = "MISSING_CLUSTER"
 )
 
 // Validation codes for warnings
@@ -113,7 +114,7 @@ func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult
 			Code:    CodeMissingVMID,
 			Table:   "vinfo_raw",
 			Column:  "VM ID",
-			Message: "VM ID column is missing or has no valid values - VMs cannot be identified",
+			Message: "'VM ID' column is missing or empty in the vInfo sheet - VMs cannot be identified",
 		})
 	}
 
@@ -122,7 +123,16 @@ func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult
 			Code:    CodeMissingVMName,
 			Table:   "vinfo_raw",
 			Column:  "VM",
-			Message: "VM name column is missing or has no valid values - VMs cannot be identified",
+			Message: "'VM' column is missing or empty in the vInfo sheet - VMs cannot be identified",
+		})
+	}
+
+	if !p.hasValidColumnData(ctx, "vinfo_raw", "Cluster") {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeMissingCluster,
+			Table:   "vinfo_raw",
+			Column:  "Cluster",
+			Message: "'Cluster' column is missing or empty in the vInfo sheet - cannot determine cluster membership",
 		})
 	}
 }

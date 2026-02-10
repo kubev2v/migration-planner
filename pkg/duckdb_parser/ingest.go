@@ -34,7 +34,6 @@ func isCriticalStatement(stmt string) bool {
 var xlsxErrorMappings = map[string]string{
 	"No xl/workbook.xml found":         "The file is corrupted or not a valid Excel file",
 	"\"vInfo\" not found in xlsx file": "File is not a valid RVTools export (missing required 'vInfo' sheet)",
-	"not found in xlsx file":           "Required worksheet not found in the Excel file",
 }
 
 // translateXLSXError converts technical DuckDB xlsx errors to user-friendly messages.
@@ -46,19 +45,6 @@ func translateXLSXError(err error) error {
 		}
 	}
 	return err
-}
-
-// ClearData removes all data from tables without dropping the schema.
-// This allows re-ingestion of new RVTools data into the same database instance.
-func (p *Parser) ClearData() error {
-	query, err := p.builder.ClearDataQuery()
-	if err != nil {
-		return fmt.Errorf("building clear data query: %w", err)
-	}
-	if err := p.executeStatements(query); err != nil {
-		return fmt.Errorf("clearing data: %w", err)
-	}
-	return nil
 }
 
 // IngestRvTools ingests data from an RVTools Excel file, runs VM validation if a validator
