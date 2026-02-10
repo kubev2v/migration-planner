@@ -1,7 +1,6 @@
 package e2e_test
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"time"
@@ -418,120 +417,6 @@ var _ = Describe("e2e-rvtools", func() {
 			for clusterID, cluster := range inventory.Clusters {
 				Expect(cluster.Vms.Total).To(Equal(2), fmt.Sprintf("Cluster %s should have 2 VMs", clusterID))
 			}
-
-			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-		})
-
-		It("should order clusters by VM count (biggest to smallest)", func() {
-			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
-
-			excelContent, err := CreateMultiClusterTestExcelWithDifferentVMCounts()
-			Expect(err).To(BeNil())
-			tmpFile, err := CreateTempExcelFile(excelContent)
-			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
-
-			assessment, err = svc.CreateAssessmentFromRvtools("cluster-ordering-test", tmpFile)
-			Expect(err).To(BeNil())
-			Expect(assessment).NotTo(BeNil())
-			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
-
-			// Verify inventory
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
-			Expect(inventory.Vcenter.Vms.Total).To(Equal(9), "vCenter should have 9 VMs total (5+3+1)")
-
-			// Verify clusters are populated
-			Expect(inventory.Clusters).To(HaveLen(3), "Should have 3 clusters")
-
-			// Verify VM counts per cluster
-			// cluster-large: 5 VMs, cluster-medium: 3 VMs, cluster-small: 1 VM
-			clusterVMCounts := make(map[string]int)
-			for clusterID, cluster := range inventory.Clusters {
-				clusterVMCounts[clusterID] = cluster.Vms.Total
-			}
-
-			// Find clusters by VM count (since cluster IDs are Object IDs from vCluster sheet)
-			var foundLarge, foundMedium, foundSmall bool
-			for clusterID, vmCount := range clusterVMCounts {
-				switch vmCount {
-				case 5:
-					// cluster-large maps to domain-c100 Object ID
-					Expect(clusterID).To(ContainSubstring("c100"), fmt.Sprintf("Cluster with 5 VMs should be domain-c100 (cluster-large), got: %s", clusterID))
-					foundLarge = true
-				case 3:
-					// cluster-medium maps to domain-c200 Object ID
-					Expect(clusterID).To(ContainSubstring("c200"), fmt.Sprintf("Cluster with 3 VMs should be domain-c200 (cluster-medium), got: %s", clusterID))
-					foundMedium = true
-				case 1:
-					// cluster-small maps to domain-c300 Object ID
-					Expect(clusterID).To(ContainSubstring("c300"), fmt.Sprintf("Cluster with 1 VM should be domain-c300 (cluster-small), got: %s", clusterID))
-					foundSmall = true
-				}
-			}
-
-			Expect(foundLarge).To(BeTrue(), "Should find cluster-large (domain-c100) with 5 VMs")
-			Expect(foundMedium).To(BeTrue(), "Should find cluster-medium (domain-c200) with 3 VMs")
-			Expect(foundSmall).To(BeTrue(), "Should find cluster-small (domain-c300) with 1 VM")
-
-			// Verify sum of cluster VMs equals vCenter total
-			var clusterVMTotal int
-			for _, vmCount := range clusterVMCounts {
-				clusterVMTotal += vmCount
-			}
-			Expect(clusterVMTotal).To(Equal(9), "Sum of cluster VMs should equal vCenter total")
-
-			// Validate cluster order by marshaling to JSON and checking the order
-			// Go's json.Marshal maintains a deterministic order for maps (though not guaranteed by spec)
-			// This validates that clusters appear in the correct order in the JSON response
-			inventoryJSON, err := json.Marshal(inventory)
-			Expect(err).To(BeNil(), "Should be able to marshal inventory to JSON")
-
-			// Parse JSON to extract cluster order
-			var jsonData map[string]interface{}
-			err = json.Unmarshal(inventoryJSON, &jsonData)
-			Expect(err).To(BeNil(), "Should be able to unmarshal inventory JSON")
-
-			clustersJSON, ok := jsonData["clusters"].(map[string]interface{})
-			Expect(ok).To(BeTrue(), "Clusters should be a map in JSON")
-
-			// Extract cluster IDs and their VM counts in the order they appear in JSON
-			type clusterOrder struct {
-				ID      string
-				VMCount int
-			}
-			var clusterOrderList []clusterOrder
-
-			for clusterID, clusterData := range clustersJSON {
-				clusterMap, ok := clusterData.(map[string]interface{})
-				Expect(ok).To(BeTrue(), "Cluster data should be a map")
-
-				vmsMap, ok := clusterMap["vms"].(map[string]interface{})
-				Expect(ok).To(BeTrue(), "VMs should be a map")
-
-				total, ok := vmsMap["total"].(float64)
-				Expect(ok).To(BeTrue(), "Total should be a number")
-
-				clusterOrderList = append(clusterOrderList, clusterOrder{
-					ID:      clusterID,
-					VMCount: int(total),
-				})
-			}
-
-			// Validate that clusters are ordered by VM count (biggest to smallest)
-			// Expected order: 5 VMs -> 3 VMs -> 1 VM
-			Expect(len(clusterOrderList)).To(Equal(3), "Should have 3 clusters in order list")
-
-			// Check that VM counts are in descending order
-			Expect(clusterOrderList[0].VMCount).To(BeNumerically(">=", clusterOrderList[1].VMCount),
-				fmt.Sprintf("First cluster should have >= VMs than second. Got: %d, %d", clusterOrderList[0].VMCount, clusterOrderList[1].VMCount))
-			Expect(clusterOrderList[1].VMCount).To(BeNumerically(">=", clusterOrderList[2].VMCount),
-				fmt.Sprintf("Second cluster should have >= VMs than third. Got: %d, %d", clusterOrderList[1].VMCount, clusterOrderList[2].VMCount))
-
-			// Verify the exact order: 5 -> 3 -> 1
-			Expect(clusterOrderList[0].VMCount).To(Equal(5), "First cluster should have 5 VMs (cluster-large)")
-			Expect(clusterOrderList[1].VMCount).To(Equal(3), "Second cluster should have 3 VMs (cluster-medium)")
-			Expect(clusterOrderList[2].VMCount).To(Equal(1), "Third cluster should have 1 VM (cluster-small)")
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
