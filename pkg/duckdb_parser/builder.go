@@ -56,11 +56,6 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"), ingestParams{FilePath: filePath})
 }
 
-// ClearDataQuery returns a query that deletes all data from tables without dropping the schema.
-func (b *QueryBuilder) ClearDataQuery() (string, error) {
-	return b.buildQuery("clear_data", mustGetTemplate("clear_data"), nil)
-}
-
 // queryParams holds all template parameters for queries.
 type queryParams struct {
 	NetworkColumns   string
