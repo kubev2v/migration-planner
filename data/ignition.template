@@ -178,7 +178,7 @@ storage:
           [Service]
           Restart=on-failure
           RestartSec=5
-          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done && echo "AGENT_ID=$(cat /var/lib/data/agent_id)" >> /run/agent.env'
+          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done && echo "AGENT_ID=$(cat /var/lib/data/agent_id)" >> /home/core/.migration-planner/agent.env'
 
           [Install]
           WantedBy=multi-user.target default.target
