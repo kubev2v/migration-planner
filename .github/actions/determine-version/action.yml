@@ -1,0 +1,43 @@
+# Composite action: compute semver version for API client publish.
+# Run after checkout with fetch-depth: 0.
+# - On tag: tag name without leading 'v' (e.g. v1.0.0 -> 1.0.0)
+# - On push to main: latest tag in repo by version (name) sort + short SHA
+# - On push to release-*: latest tag reachable from the branch + short SHA
+name: Determine Version
+description: Compute valid semver version (no leading v) for current ref
+
+outputs:
+  version:
+    description: 'Semver version string (e.g. 1.0.0 or 1.0.0-abc123def456)'
+    value: ${{ steps.version.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Compute version
+      id: version
+      shell: bash
+      run: |
+        strip_v() { echo "$1" | sed 's/^v//'; }
+        SHORT_SHA=$(git rev-parse --short=12 HEAD)
+        if [[ "${{ github.ref_type }}" == "tag" ]]; then
+          VERSION=$(strip_v "${{ github.ref_name }}")
+          echo "Using tag version: ${VERSION}"
+        else
+          git fetch --tags 2>/dev/null || true
+          if [[ "${{ github.ref_name }}" == "main" ]]; then
+            # Main: latest tag in repo by version (name) sort
+            LATEST_TAG=$(git tag --sort=-version:refname -l 2>/dev/null | head -1 || true)
+          else
+            # Release branch: latest tag reachable from this branch
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          fi
+          if [[ -n "${LATEST_TAG}" ]]; then
+            BASE=$(strip_v "${LATEST_TAG}")
+            VERSION="${BASE}-${SHORT_SHA}"
+          else
+            VERSION="0.0.0-${SHORT_SHA}"
+          fi
+          echo "Using version: ${VERSION}"
+        fi
+        echo "version=${VERSION}" >> $GITHUB_OUTPUT
