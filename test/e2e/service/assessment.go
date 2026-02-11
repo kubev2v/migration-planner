@@ -159,7 +159,7 @@ func (s *plannerService) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, erro
 }
 
 // GetAssessments lists all assessments
-func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentList, error) {
+func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentListResponse, error) {
 	zap.S().Infof("[PlannerService] Get assessments [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
 	res, err := s.api.GetRequest(apiV1AssessmentsPath)

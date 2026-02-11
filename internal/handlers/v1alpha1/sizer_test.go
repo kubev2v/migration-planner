@@ -89,8 +89,12 @@ func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Ass
 	return assessment, nil
 }
 
-func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (model.AssessmentList, error) {
+func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter, options *store.AssessmentQueryOptions) (model.AssessmentList, error) {
 	panic("List() not implemented in MockAssessmentStore for this test")
+}
+
+func (m *MockAssessmentStore) Count(ctx context.Context, filter *store.AssessmentQueryFilter) (int64, error) {
+	panic("Count() not implemented in MockAssessmentStore for this test")
 }
 
 func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {

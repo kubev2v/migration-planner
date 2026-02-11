@@ -77,7 +77,7 @@ func (s *DataStore) Job() Job {
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
-	assessments, err := s.Assessment().List(ctx, NewAssessmentQueryFilter())
+	assessments, err := s.Assessment().List(ctx, NewAssessmentQueryFilter(), nil)
 	if err != nil {
 		return model.InventoryStats{}, err
 	}

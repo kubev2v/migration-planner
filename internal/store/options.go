@@ -159,3 +159,24 @@ func (o *AssessmentQueryOptions) WithOrder(order string) *AssessmentQueryOptions
 	})
 	return o
 }
+
+// WithSort applies multi-field sorting
+func (o *AssessmentQueryOptions) WithSort(sorts []SortParam) *AssessmentQueryOptions {
+	o.QueryFn = append(o.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		for _, sort := range sorts {
+			direction := "ASC"
+			if sort.Desc {
+				direction = "DESC"
+			}
+			tx = tx.Order(sort.Field + " " + direction)
+		}
+		return tx
+	})
+	return o
+}
+
+// SortParam represents a single sort field and direction
+type SortParam struct {
+	Field string
+	Desc  bool
+}

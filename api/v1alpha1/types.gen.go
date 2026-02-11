@@ -114,6 +114,20 @@ type AssessmentForm struct {
 // AssessmentList defines model for AssessmentList.
 type AssessmentList = []Assessment
 
+// AssessmentListResponse defines model for AssessmentListResponse.
+type AssessmentListResponse struct {
+	Assessments []Assessment `json:"assessments"`
+
+	// Page Current page number
+	Page int `json:"page"`
+
+	// PageCount Total number of pages
+	PageCount int `json:"pageCount"`
+
+	// Total Total number of assessments matching the filter
+	Total int `json:"total"`
+}
+
 // AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
 type AssessmentRvtoolsForm struct {
 	// File File upload for assessment data
@@ -563,6 +577,21 @@ type PresignedUrl struct {
 type ListAssessmentsParams struct {
 	// SourceId Filter assessments by source ID
 	SourceId *openapi_types.UUID `form:"sourceId,omitempty" json:"sourceId,omitempty"`
+
+	// Source Filter assessments by source type (agent, inventory, rvtools)
+	Source *string `form:"source,omitempty" json:"source,omitempty"`
+
+	// Name Filter assessments by name pattern (case-insensitive partial match)
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// Sort Sort fields (format: 'field:direction', e.g., 'name:asc', 'created_at:desc'). Multiple sort fields can be specified.
+	Sort *[]string `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Page Page number (default: 1)
+	Page *int `form:"page,omitempty" json:"page,omitempty"`
+
+	// PageSize Items per page (default: 20, max: 100)
+	PageSize *int `form:"pageSize,omitempty" json:"pageSize,omitempty"`
 }
 
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.

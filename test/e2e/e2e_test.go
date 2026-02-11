@@ -303,9 +303,10 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment.Name).To(Equal("assessment1"))
 
-			assessments, err := svc.GetAssessments()
+			assessmentsResponse, err := svc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(*assessments).To(HaveLen(1))
+			Expect(assessmentsResponse.Assessments).To(HaveLen(1))
+			Expect(assessmentsResponse.Total).To(Equal(1))
 
 			err = svc.RemoveAssessment(assessment.Id)
 			Expect(err).To(BeNil())
