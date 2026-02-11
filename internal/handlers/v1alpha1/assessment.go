@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -14,6 +15,18 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/requestid"
 )
 
+const (
+	defaultPageSize = 20
+	maxPageSize     = 100
+)
+
+var validSortFields = map[string]bool{
+	"name":        true,
+	"created_at":  true,
+	"updated_at":  true,
+	"source_type": true,
+}
+
 // (GET /api/v1/assessments)
 func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.ListAssessmentsRequestObject) (server.ListAssessmentsResponseObject, error) {
 	logger := log.NewDebugLogger("assessment_handler").
@@ -24,6 +37,20 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 	user := auth.MustHaveUser(ctx)
 	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
+	// Parse pagination
+	page := 1
+	if request.Params.Page != nil && *request.Params.Page > 0 {
+		page = *request.Params.Page
+	}
+	pageSize := defaultPageSize
+	if request.Params.PageSize != nil && *request.Params.PageSize > 0 {
+		pageSize = *request.Params.PageSize
+		if pageSize > maxPageSize {
+			pageSize = maxPageSize
+		}
+	}
+
+	// Build service filter
 	filter := service.NewAssessmentFilter(user.Username, user.Organization)
 
 	// Extract sourceId from query parameter if provided
@@ -33,20 +60,75 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 		logger.Step("filter_by_source_id").WithString("source_id", sourceIdStr).Log()
 	}
 
-	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
+	// Extract source type filter if provided
+	if request.Params.Source != nil && *request.Params.Source != "" {
+		filter = filter.WithSource(*request.Params.Source)
+		logger.Step("filter_by_source").WithString("source", *request.Params.Source).Log()
+	}
+
+	// Extract name filter if provided
+	if request.Params.Name != nil && *request.Params.Name != "" {
+		filter = filter.WithNameLike(*request.Params.Name)
+		logger.Step("filter_by_name").WithString("name", *request.Params.Name).Log()
+	}
+
+	// Parse and validate sort params
+	if request.Params.Sort != nil {
+		sortFields := make([]service.SortField, 0, len(*request.Params.Sort))
+		for _, s := range *request.Params.Sort {
+			parts := strings.SplitN(s, ":", 2)
+			if len(parts) != 2 {
+				return server.ListAssessments400JSONResponse{
+					Message:   "invalid sort format, expected 'field:direction' (e.g., 'name:asc')",
+					RequestId: requestid.FromContextPtr(ctx),
+				}, nil
+			}
+			field, direction := parts[0], parts[1]
+			if !validSortFields[field] {
+				return server.ListAssessments400JSONResponse{
+					Message:   fmt.Sprintf("invalid sort field: %s", field),
+					RequestId: requestid.FromContextPtr(ctx),
+				}, nil
+			}
+			if direction != "asc" && direction != "desc" {
+				return server.ListAssessments400JSONResponse{
+					Message:   fmt.Sprintf("invalid sort direction: %s, must be 'asc' or 'desc'", direction),
+					RequestId: requestid.FromContextPtr(ctx),
+				}, nil
+			}
+			sortFields = append(sortFields, service.SortField{Field: field, Desc: direction == "desc"})
+		}
+		filter = filter.WithSort(sortFields)
+	}
+
+	// Set pagination
+	filter = filter.WithLimit(pageSize).WithOffset((page - 1) * pageSize)
+
+	assessments, total, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	logger.Success().WithInt("count", len(assessments)).Log()
+	// Calculate page count
+	pageCount := int((total + int64(pageSize) - 1) / int64(pageSize))
+	if pageCount == 0 {
+		pageCount = 1
+	}
+
+	logger.Success().WithInt("count", len(assessments)).WithInt("total", int(total)).Log()
 
 	apiAssessments, err := mappers.AssessmentListToApi(assessments)
 	if err != nil {
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err), RequestId: requestid.FromContextPtr(ctx)}, nil
 	}
 
-	return server.ListAssessments200JSONResponse(apiAssessments), nil
+	return server.ListAssessments200JSONResponse{
+		Assessments: apiAssessments,
+		Page:        page,
+		PageCount:   pageCount,
+		Total:       int(total),
+	}, nil
 }
 
 // (POST /api/v1/assessments)

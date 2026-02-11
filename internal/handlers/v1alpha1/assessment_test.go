@@ -100,11 +100,13 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			Expect(assessmentList).To(HaveLen(2)) // Only admin user's assessments
+			assessmentListResponse := resp.(server.ListAssessments200JSONResponse)
+			Expect(assessmentListResponse.Assessments).To(HaveLen(2)) // Only admin user's assessments
+			Expect(assessmentListResponse.Total).To(Equal(2))
+			Expect(assessmentListResponse.Page).To(Equal(1))
 
 			// Verify owner fields are included in API responses
-			for _, assessment := range assessmentList {
+			for _, assessment := range assessmentListResponse.Assessments {
 				Expect(assessment.OwnerFirstName).ToNot(BeNil())
 				Expect(*assessment.OwnerFirstName).To(Equal("John"))
 				Expect(assessment.OwnerLastName).ToNot(BeNil())
@@ -125,8 +127,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			Expect(assessmentList).To(HaveLen(0))
+			assessmentListResponse := resp.(server.ListAssessments200JSONResponse)
+			Expect(assessmentListResponse.Assessments).To(HaveLen(0))
+			Expect(assessmentListResponse.Total).To(Equal(0))
+			Expect(assessmentListResponse.Page).To(Equal(1))
 		})
 
 		It("filters assessments by sourceId query parameter", func() {
@@ -178,12 +182,13 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			assessmentListResponse := resp.(server.ListAssessments200JSONResponse)
 			// Should only return the assessment with the matching sourceID
-			Expect(assessmentList).To(HaveLen(1))
-			Expect(assessmentList[0].Id).To(Equal(assessmentID1))
-			Expect(assessmentList[0].SourceId).ToNot(BeNil())
-			Expect(*assessmentList[0].SourceId).To(Equal(sourceID))
+			Expect(assessmentListResponse.Assessments).To(HaveLen(1))
+			Expect(assessmentListResponse.Total).To(Equal(1))
+			Expect(assessmentListResponse.Assessments[0].Id).To(Equal(assessmentID1))
+			Expect(assessmentListResponse.Assessments[0].SourceId).ToNot(BeNil())
+			Expect(*assessmentListResponse.Assessments[0].SourceId).To(Equal(sourceID))
 		})
 
 		It("returns empty list when filtering by non-existent sourceId", func() {
@@ -224,9 +229,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			assessmentListResponse := resp.(server.ListAssessments200JSONResponse)
 			// Should return empty list when filtering by non-existent sourceID
-			Expect(assessmentList).To(HaveLen(0))
+			Expect(assessmentListResponse.Assessments).To(HaveLen(0))
+			Expect(assessmentListResponse.Total).To(Equal(0))
 		})
 
 		AfterEach(func() {

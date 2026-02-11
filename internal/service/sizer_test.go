@@ -86,8 +86,12 @@ func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Ass
 	return assessment, nil
 }
 
-func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (model.AssessmentList, error) {
+func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter, options *store.AssessmentQueryOptions) (model.AssessmentList, error) {
 	return nil, nil
+}
+
+func (m *MockAssessmentStore) Count(ctx context.Context, filter *store.AssessmentQueryFilter) (int64, error) {
+	return 0, nil
 }
 
 func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {

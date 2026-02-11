@@ -377,7 +377,7 @@ paths:
     get:
       tags:
         - assessment
-      description: List assessments
+      description: List assessments with filtering, sorting, and pagination
       operationId: listAssessments
       parameters:
         - name: sourceId
@@ -387,13 +387,56 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: source
+          in: query
+          description: Filter assessments by source type (agent, inventory, rvtools)
+          required: false
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Filter assessments by name pattern (case-insensitive partial match)
+          required: false
+          schema:
+            type: string
+        - name: sort
+          in: query
+          description: "Sort fields (format: 'field:direction', e.g., 'name:asc', 'created_at:desc'). Multiple sort fields can be specified."
+          required: false
+          schema:
+            type: array
+            items:
+              type: string
+        - name: page
+          in: query
+          description: "Page number (default: 1)"
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          description: "Items per page (default: 20, max: 100)"
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
       responses:
         "200":
           description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/AssessmentList"
+                $ref: "#/components/schemas/AssessmentListResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
@@ -1572,6 +1615,28 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Assessment"
+
+    AssessmentListResponse:
+      type: object
+      required:
+        - assessments
+        - total
+        - page
+        - pageCount
+      properties:
+        assessments:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assessment"
+        page:
+          type: integer
+          description: Current page number
+        pageCount:
+          type: integer
+          description: Total number of pages
+        total:
+          type: integer
+          description: Total number of assessments matching the filter
 
     ClusterRequirementsRequest:
       type: object

@@ -62,10 +62,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		It("lists all assessments for a user (private)", func() {
 			filter := service.NewAssessmentFilter("user1", "org1")
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			assessments, total, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
+			Expect(total).To(Equal(int64(2)))
 			for _, assessment := range assessments {
 				Expect(assessment.Username).To(Equal("user1"))
 			}
@@ -73,19 +74,21 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		It("filters assessments by source", func() {
 			filter := service.NewAssessmentFilter("user1", "org1").WithSource(service.SourceTypeInventory)
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			assessments, total, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
+			Expect(total).To(Equal(int64(1)))
 			Expect(assessments[0].SourceType).To(Equal(service.SourceTypeInventory))
 		})
 
 		It("filters assessments by name pattern", func() {
 			filter := service.NewAssessmentFilter("user1", "org1").WithNameLike("Test")
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			assessments, total, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
+			Expect(total).To(Equal(int64(2)))
 			for _, assessment := range assessments {
 				Expect(assessment.Name).To(ContainSubstring("Test"))
 			}
@@ -107,10 +110,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(sourceID.String())
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			assessments, total, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
+			Expect(total).To(Equal(int64(1)))
 			Expect(assessments[0].ID).To(Equal(assessment1ID))
 			Expect(assessments[0].SourceID).ToNot(BeNil())
 			Expect(*assessments[0].SourceID).To(Equal(sourceID))
@@ -128,10 +132,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			// Use a non-existent sourceID
 			nonExistentSourceID := uuid.New()
 			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(nonExistentSourceID.String())
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			assessments, total, err := svc.ListAssessments(context.TODO(), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(0))
+			Expect(total).To(Equal(int64(0)))
 		})
 
 		AfterEach(func() {
