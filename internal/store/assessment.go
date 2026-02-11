@@ -14,7 +14,8 @@ import (
 )
 
 type Assessment interface {
-	List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error)
+	List(ctx context.Context, filter *AssessmentQueryFilter, options *AssessmentQueryOptions) (model.AssessmentList, error)
+	Count(ctx context.Context, filter *AssessmentQueryFilter) (int64, error)
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
 	Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error)
 	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error)
@@ -32,9 +33,9 @@ func NewAssessmentStore(db *gorm.DB) Assessment {
 	return &AssessmentStore{db: db}
 }
 
-func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error) {
+func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter, options *AssessmentQueryOptions) (model.AssessmentList, error) {
 	var assessments model.AssessmentList
-	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC").Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
+	tx := a.getDB(ctx).Model(&assessments).Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
 		return db.Order("snapshots.created_at DESC")
 	})
 
@@ -44,11 +45,37 @@ func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilte
 		}
 	}
 
+	// Apply default sorting if no sort options provided
+	if options == nil || len(options.QueryFn) == 0 {
+		tx = tx.Order("created_at DESC")
+	} else {
+		for _, fn := range options.QueryFn {
+			tx = fn(tx)
+		}
+	}
+
 	result := tx.Find(&assessments)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 	return assessments, nil
+}
+
+func (a *AssessmentStore) Count(ctx context.Context, filter *AssessmentQueryFilter) (int64, error) {
+	var count int64
+	tx := a.getDB(ctx).Model(&model.Assessment{})
+
+	if filter != nil {
+		for _, fn := range filter.QueryFn {
+			tx = fn(tx)
+		}
+	}
+
+	result := tx.Count(&count)
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return count, nil
 }
 
 func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {

@@ -48,7 +48,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2, "assessment2", "org1", "user2", "John", "Doe", "rvtools", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter(), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 
@@ -73,7 +73,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "John", "Doe", "agent", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithOrgID("org1"))
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithOrgID("org1"), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 
@@ -94,7 +94,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID3, "assessment3", "org1", "user3", "John", "Doe", "agent", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithSourceType("rvtools"))
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithSourceType("rvtools"), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
 			Expect(assessments[0].SourceType).To(Equal("rvtools"))
@@ -112,14 +112,14 @@ var _ = Describe("assessment store", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID, `{"vcenter": {"id": "test2"}}`))
 			Expect(tx.Error).To(BeNil())
 
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter(), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
 			Expect(assessments[0].Snapshots).To(HaveLen(2))
 		})
 
 		It("list assessments - no assessments", func() {
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter(), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(0))
 		})
@@ -132,7 +132,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				assessmentID, "legacy-assessment", "org1", "legacy-user", "inventory")
 			Expect(tx.Error).To(BeNil())
 
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter(), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
 
@@ -578,7 +578,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		It("filters by name pattern", func() {
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithNameLike("Test"))
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithNameLike("Test"), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
 
@@ -589,7 +589,7 @@ var _ = Describe("assessment store", Ordered, func() {
 
 		It("filters by source ID", func() {
 			sourceID := "12345678-1234-1234-1234-123456789012"
-			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithSourceID(sourceID))
+			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter().WithSourceID(sourceID), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
 			Expect(assessments[0].SourceID.String()).To(Equal(sourceID))
@@ -599,7 +599,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			assessments, err := s.Assessment().List(context.TODO(),
 				store.NewAssessmentQueryFilter().
 					WithOrgID("org1").
-					WithSourceType("inventory"))
+					WithSourceType("inventory"), nil)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
 			Expect(assessments[0].OrgID).To(Equal("org1"))
