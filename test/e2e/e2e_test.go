@@ -348,57 +348,59 @@ var _ = Describe("e2e", func() {
 		})
 	})
 
-	// Context("Edge cases", func() {
-	// 	It("VM reboot", func() {
-	// 		zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+	Context("Edge cases", func() {
+		It("VM reboot", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-	// 		s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
-	// 			"core", "123456")
-	// 		Expect(err).To(BeNil())
-	// 		Expect(resCode).To(Equal(http.StatusAccepted))
-	// 		Expect(s.Status).ToNot(Equal(CollectorStatusError))
+			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
+				"core", "123456")
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(s.Status).ToNot(Equal(CollectorStatusError))
 
-	// 		Eventually(func() string {
-	// 			s, err = e2eAgent.Api.GetCollectorStatus()
-	// 			if err != nil {
-	// 				return ""
-	// 			}
-	// 			if s.Status == string(CollectorStatusError) {
-	// 				zap.S().Infof("Collector status is error: %s", s.Error)
-	// 			}
-	// 			return s.Status
-	// 		}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
-	// 		zap.S().Info("Collector completed successfully. Status collected.")
+			Eventually(func() string {
+				s, err = e2eAgent.Api.GetCollectorStatus()
+				if err != nil {
+					return ""
+				}
+				if s.Status == string(CollectorStatusError) {
+					zap.S().Infof("Collector status is error: %s", s.Error)
+				}
+				return s.Status
+			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
+			zap.S().Info("Collector completed successfully. Status collected.")
 
-	// 		// Restarting the VM
-	// 		err = e2eAgent.Agent.Restart()
-	// 		Expect(err).To(BeNil())
+			// Restarting the VM
+			err = e2eAgent.Agent.Restart()
+			Expect(err).To(BeNil())
 
-	// 		// wait for the agent to be up again
-	// 		var agentStatus *AgentStatus
-	// 		Eventually(func() string {
-	// 			agentStatus, err = e2eAgent.Api.Status()
-	// 			if err != nil {
-	// 				return ""
-	// 			}
-	// 			return agentStatus.ConsoleConnection
-	// 		}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
+			// wait for the agent to be up again
+			var agentStatus *AgentStatus
+			Eventually(func() string {
+				agentStatus, err = e2eAgent.Api.Status()
+				if err != nil {
+					return ""
+				}
+				return agentStatus.ConsoleConnection
+			}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
 
-	// 		// Restart VM should keep the inventory
-	// 		s, err = e2eAgent.Api.GetCollectorStatus()
-	// 		Expect(err).To(BeNil())
-	// 		Expect(s.Status).To(Equal(string(CollectorStatusCollected)))
+			// Restart VM should keep the inventory
+			s, err = e2eAgent.Api.GetCollectorStatus()
+			Expect(err).To(BeNil())
+			Expect(s.Status).To(Equal(string(CollectorStatusCollected)))
 
-	// 		zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
-	// 		Eventually(func() bool {
-	// 			isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
-	// 			Expect(err).To(BeNil())
-	// 			return isAgentIsUpToDate
-	// 		}, "3m", "2s").Should(BeTrue())
+			zap.S().Infof("Wait for agent status to be %s...", string(v1alpha1.AgentStatusUpToDate))
+			Eventually(func() bool {
+				isAgentIsUpToDate, err := AgentIsUpToDate(svc, source.Id)
+				if err != nil {
+					return false
+				}
+				return isAgentIsUpToDate
+			}, "3m", "2s").Should(BeTrue())
 
-	// 		zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
-	// 	})
-	// })
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
 
 	Context("Assessments", func() {
 		It("Test Assessment Endpoints With inventory", func() {
