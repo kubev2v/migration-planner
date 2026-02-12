@@ -2,7 +2,7 @@
 <Envelope xmlns="http://schemas.dmtf.org/ovf/envelope/1" xmlns:ovf="http://schemas.dmtf.org/ovf/envelope/1" xmlns:vmw="http://www.vmware.com/schema/ovf" xmlns:rasd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_ResourceAllocationSettingData" xmlns:vssd="http://schemas.dmtf.org/wbem/wscim/1/cim-schema/2/CIM_VirtualSystemSettingData">
   <References>
     <File ovf:href="MigrationAssessment.iso" ovf:id="file1" ovf:size="1244659712"/>
-    <File ovf:href="persistence-disk.vmdk" ovf:id="file2" ovf:size="68096"/>
+    <File ovf:href="persistence-disk.vmdk" ovf:id="file2" ovf:size="196608"/>
   </References>
   <DiskSection>
     <Info>Virtual disk information</Info>
