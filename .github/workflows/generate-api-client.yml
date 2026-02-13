@@ -1,0 +1,48 @@
+---
+name: Generate API Client
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [main]
+    tags:
+      - '*'
+
+# Required for npm Trusted Publishing (OIDC)
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  generate-client:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            # For tag creation, use the tag name
+            TAG_NAME="${{ github.ref_name }}"
+            VERSION="${TAG_NAME}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "Using tag version: ${VERSION}"
+          else
+            # For PR merge (push to main), use full commit SHA
+            FULL_SHA=$(git rev-parse HEAD)
+            VERSION="${FULL_SHA}"
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "Using commit SHA version: ${VERSION}"
+          fi
+
+      - name: Generate and publish API client
+        uses: kubev2v/migration-planner-client-generator/.github/workflows/generate-and-publish.yml@main
+        with:
+          openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1alpha1/openapi.yaml"
+          package-name: "@kubev2v/migration-planner-api-client"
+          package-version: ${{ steps.version.outputs.version }}
+        # Required: passes OIDC permissions to the reusable workflow
+        secrets: inherit
