@@ -256,6 +256,11 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 				return api.Assessment{}, fmt.Errorf("unsupported snapshot version: %d", snapshot.Version)
 			}
 			assessment.Snapshots[i].Inventory = inventory
+		} else {
+			// Initialize empty inventory with non-nil Clusters
+			assessment.Snapshots[i].Inventory = api.Inventory{
+				Clusters: make(map[string]api.InventoryData),
+			}
 		}
 	}
 
