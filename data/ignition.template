@@ -43,6 +43,7 @@ storage:
       device: {{ .PersistentDiskDevice }}
       format: ext4
       label: "DATA"
+      wipe_filesystem: true
 
   links:
     - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
