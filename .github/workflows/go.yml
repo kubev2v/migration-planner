@@ -13,10 +13,21 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      # Node required for setup-go post (cache save); needed when running with act
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
       - name: Setup libvirt
         run: |
           sudo apt update
-          sudo apt install libvirt-dev
+          sudo apt install -y libvirt-dev
 
       - name: Run golangci-lint
         run: make lint
@@ -27,8 +38,15 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Set up Go
         uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Check generated files are up to date
         run: |
@@ -43,8 +61,15 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v4
 
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Set up Go
         uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
 
       - name: Check that formatting does not introduce changes
         run: make check-format
@@ -55,13 +80,20 @@ jobs:
     - name: Check out code
       uses: actions/checkout@v4
 
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
     - name: Set up Go
       uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
 
     - name: Setup libvirt
       run: |
         sudo apt update
-        sudo apt install libvirt-dev
+        sudo apt install -y libvirt-dev
 
     - name: Setup Podman
       run: |
