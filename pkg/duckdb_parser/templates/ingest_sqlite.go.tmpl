@@ -144,11 +144,12 @@ SELECT
 FROM src.Host h
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Free MiB", "MHA", "Capacity MiB", "Type")
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
 SELECT
     string_agg(DISTINCT h.ID, ','),
     ds.Name,
     ds.Name,
+    ds.ID,
     ds.Free / 1048576,
     ds.MaintenanceMode = 'True',
     ds.Capacity / 1048576,
