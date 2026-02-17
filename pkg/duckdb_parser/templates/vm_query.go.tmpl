@@ -20,7 +20,7 @@ WITH disks AS (
             'Key': dk."Disk Key",
             'UnitNumber': dk."Unit #",
             'File': COALESCE(dk."Path", dk."Disk Path"),
-            'Capacity': CAST(COALESCE(dk."Capacity MiB", 0) AS BIGINT) * 1024 * 1024,
+            'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
             'Bus': dk."Shared Bus",
