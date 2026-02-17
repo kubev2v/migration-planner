@@ -51,6 +51,10 @@ func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (mode
 func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.Source, error) {
 	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&source)
 	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+			return nil, ErrDuplicateKey
+		}
+
 		return nil, result.Error
 	}
 

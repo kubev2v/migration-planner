@@ -3,6 +3,7 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -75,6 +76,10 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 
 	source, err := s.sourceSrv.CreateSource(ctx, sourceCreateForm)
 	if err != nil {
+		var dupErr *service.ErrDuplicateKey
+		if errors.As(err, &dupErr) {
+			return server.CreateSource400JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
+		}
 		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
 	}
 
