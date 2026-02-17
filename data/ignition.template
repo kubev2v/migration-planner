@@ -13,6 +13,37 @@ passwd:
 
 systemd:
   units:
+    - name: var-lib-data-resize.service
+      enabled: true
+      contents: |
+        [Unit]
+        Description=Resize data disk filesystem
+        Before=var-lib-data.mount
+        DefaultDependencies=no
+        After=local-fs.target
+
+        [Service]
+        Type=oneshot
+        ExecStart=/bin/bash -c '/usr/sbin/resize2fs -f {{ .PersistentDiskDevice }}'
+        RemainAfterExit=true
+
+        [Install]
+        RequiredBy=var-lib-data.mount
+    - name: var-lib-data.mount
+      enabled: true
+      contents: |
+        [Unit]
+        Requires=var-lib-data-resize.service
+        DefaultDependencies=no
+        After=var-lib-data-resize.service
+
+        [Mount]
+        What=/dev/disk/by-label/DATA
+        Where=/var/lib/data
+        Type=ext4
+
+        [Install]
+        WantedBy=local-fs.target
     - name: planner-agent-id.service
       enabled: true
       contents: |
@@ -27,15 +58,6 @@ systemd:
         RemainAfterExit=true
         [Install]
         WantedBy=multi-user.target
-    - name: var-lib-data.mount
-      enabled: true
-      contents: |
-        [Mount]
-        What=/dev/disk/by-label/DATA
-        Where=/var/lib/data
-        Type=ext4
-        [Install]
-        WantedBy=local-fs.target
 
 storage:
   filesystems:
@@ -43,7 +65,6 @@ storage:
       device: {{ .PersistentDiskDevice }}
       format: ext4
       label: "DATA"
-      wipe_filesystem: true
 
   links:
     - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer

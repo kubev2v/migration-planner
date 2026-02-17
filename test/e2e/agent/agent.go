@@ -13,6 +13,7 @@ import (
 // PlannerAgent defines the interface for interacting with a planner agent instance
 type PlannerAgent interface {
 	DumpLogs(string)
+	DumpDataDir() error
 	GetIp() (string, error)
 	Run() error
 	Restart() error
@@ -78,6 +79,28 @@ func (p *plannerAgentLibvirt) Run() error {
 	if err != nil {
 		return err
 	}
+
+	return nil
+}
+
+// DumpDataDir logs the contents of /var/lib/data and stats agent.duckdb
+func (p *plannerAgentLibvirt) DumpDataDir() error {
+	ip, err := p.GetIp()
+	if err != nil {
+		return fmt.Errorf("failed to get IP: %w", err)
+	}
+
+	lsOutput, err := RunSSHCommand(ip, "ls -la /var/lib/data")
+	if err != nil {
+		return fmt.Errorf("failed to ls /var/lib/data: %w", err)
+	}
+	zap.S().Infof("ls /var/lib/data:\n%s", lsOutput)
+
+	statOutput, err := RunSSHCommand(ip, "stat /var/lib/data/agent.duckdb")
+	if err != nil {
+		return fmt.Errorf("failed to stat agent.duckdb: %w", err)
+	}
+	zap.S().Infof("stat /var/lib/data/agent.duckdb:\n%s", statOutput)
 
 	return nil
 }

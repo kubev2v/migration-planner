@@ -107,7 +107,6 @@ var _ = Describe("e2e", func() {
 
 	Context("collect from vsphere", func() {
 		It("start collecting only when credentials are valid", func() {
-
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			_, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
@@ -370,12 +369,43 @@ var _ = Describe("e2e", func() {
 			}, "30s", "2s").Should(Equal(string(CollectorStatusCollected)))
 			zap.S().Info("Collector completed successfully. Status collected.")
 
+			// Dump data directory before reboot
+			zap.S().Info("Data directory BEFORE reboot:")
+			err = e2eAgent.Agent.DumpDataDir()
+			Expect(err).To(BeNil())
+
 			// Restarting the VM
 			err = e2eAgent.Agent.Restart()
 			Expect(err).To(BeNil())
 
 			// wait for the agent to be up again
+			zap.S().Info("Waiting for agent IP after reboot...")
+			Eventually(func() error {
+				agentIP, err = e2eAgent.Agent.GetIp()
+				return err
+			}, "3m", "2s").Should(BeNil())
+			zap.S().Infof("Agent IP after reboot: %s", agentIP)
+
+			// wait for the agent API to be up
 			var agentStatus *AgentStatus
+			agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+			e2eAgent.Api = DefaultAgentApi(agentApiBaseUrl)
+
+			zap.S().Info("Wait for planner-agent to be running...")
+			Eventually(func() error {
+				_, err := e2eAgent.Api.Status()
+				if err != nil {
+					return err
+				}
+				return nil
+			}, "3m", "2s").Should(BeNil())
+			zap.S().Info("Planner-agent is now running")
+
+			// Dump data directory after reboot
+			zap.S().Info("Data directory AFTER reboot:")
+			err = e2eAgent.Agent.DumpDataDir()
+			Expect(err).To(BeNil())
+
 			Eventually(func() string {
 				agentStatus, err = e2eAgent.Api.Status()
 				if err != nil {
