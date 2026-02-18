@@ -4,6 +4,8 @@ name: Generate API Client
 on:  # yamllint disable-line rule:truthy
   push:
     branches: [main, 'release-*']
+    paths:
+      - 'api/v1alpha1/openapi.yaml'
     tags:
       - '*'
 
