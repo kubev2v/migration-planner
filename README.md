@@ -3,7 +3,7 @@ This project is focused to provide an service to run manage the assessments repo
 which could provide a insights into VMware infrastructre and provide a suggestions to
 migration to Openshift Virtualization.
 
-The project provide a service and an agent. The service stores and previews assessments reports
+The project provide a service and an agent version 2. The service stores and previews assessments reports
 as well as it can generate the Agent, which OVA image that can be imported to VMware environment.
 
 The agent is responsible to collect the anonymous data from VMware environment.
