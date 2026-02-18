@@ -1,0 +1,53 @@
+name: React to Agent-UI Repo Changes
+
+on:
+  repository_dispatch:
+    types: [remote_repo_updated]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: "update-agent-ui-head"
+      MIGRATION_PLANNER_AGENT_UI_REPO_NAME: "kubev2v/migration-planner-agent-ui"
+      CONFIG_FILE: "build/migration-planner-iso/config"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read payload
+        id: payload
+        env:
+          SHA: ${{ github.event.client_payload.sha }}
+          REPO: ${{ github.event.client_payload.repo }}
+        run: |
+          echo "new_sha=$SHA" >> $GITHUB_OUTPUT
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+
+      - name: Update file
+        id: update
+        env:
+          NEW_SHA: ${{ steps.payload.outputs.new_sha }}
+        run: |
+          sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$NEW_SHA/" "$CONFIG_FILE"
+          grep -q "^AGENT_UI_IMAGE_TAG=$NEW_SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
+
+      - name: Create Pull Request
+        if: ${{ steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME }}
+        uses: peter-evans/create-pull-request@v8
+        with:
+          branch: ${{ env.BRANCH_NAME }}
+          commit-message: | 
+            chore: Trigger konflux pipeline. 
+            Reason: The latest sha in repo ${{ env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME }} was changed to ${{ steps.payload.outputs.new_sha }}.
+          title: "Update agent-ui Repo HEAD"
+          body: |
+            Auto update triggered by ${{ steps.payload.outputs.repo }}.
+            New SHA: ${{ steps.payload.outputs.new_sha }}
+          delete-branch: true
+
+
