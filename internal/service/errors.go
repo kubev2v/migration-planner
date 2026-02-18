@@ -55,6 +55,10 @@ func NewErrAssessmentNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "assessment")
 }
 
+func NewErrClusterNotFound(clusterID string, assessmentID uuid.UUID) *ErrResourceNotFound {
+	return &ErrResourceNotFound{fmt.Errorf("cluster %s not found in assessment %s", clusterID, assessmentID)}
+}
+
 type ErrAssessmentCreationForbidden struct {
 	error
 }

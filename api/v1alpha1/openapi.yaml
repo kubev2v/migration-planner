@@ -662,6 +662,74 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/assessments/{id}/migration-estimation:
+    post:
+      tags:
+        - assessment
+      description: Calculate migration time estimation for an assessment
+      operationId: calculateMigrationEstimation
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MigrationEstimationRequest"
+            example:
+              clusterId: "domain-c8"
+        required: true
+      responses:
+        "200":
+          description: Migration estimation calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationEstimationResponse"
+              example:
+                totalDuration: "4h30m0s"
+                breakdown:
+                  "Storage Migration":
+                    duration: "3h40m0s"
+                    reason: "1000.00 GB at 110 minutes per 500GB"
+                  "Post-Migration Checks":
+                    duration: "50m0s"
+                    reason: "500 VMs @ 60.0 mins each / 10 engineers"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/rvtools:
     post:
       tags:
@@ -1656,6 +1724,52 @@ components:
         - totalVMs
         - totalCPU
         - totalMemory
+
+    MigrationEstimationRequest:
+      type: object
+      description: Request payload for calculating migration time estimation
+      properties:
+        clusterId:
+          type: string
+          description: ID of the cluster to calculate migration estimation for
+          example: "domain-c8"
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
+        - clusterId
+
+    MigrationEstimationResponse:
+      type: object
+      description: Migration time estimation results
+      properties:
+        totalDuration:
+          type: string
+          description: Total estimated migration duration (formatted as duration string, e.g., "2h30m")
+          example: "4h30m0s"
+        breakdown:
+          type: object
+          description: Breakdown of estimation by calculator
+          additionalProperties:
+            $ref: "#/components/schemas/EstimationDetail"
+      required:
+        - totalDuration
+        - breakdown
+
+    EstimationDetail:
+      type: object
+      description: Detailed estimation result from a single calculator
+      properties:
+        duration:
+          type: string
+          description: Estimated duration for this component (formatted as duration string)
+          example: "3h40m0s"
+        reason:
+          type: string
+          description: Explanation of how the estimation was calculated
+          example: "1000.00 GB at 110 minutes per 500GB"
+      required:
+        - duration
+        - reason
 
     ClusterSizing:
       type: object

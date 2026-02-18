@@ -63,7 +63,7 @@ var _ = Describe("job handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s), nil)
 			resp, err := srv.GetJob(ctx, server.GetJobRequestObject{Id: 123})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetJob404JSONResponse{}).String()))
@@ -78,7 +78,7 @@ var _ = Describe("job handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s), nil)
 			resp, err := srv.CancelJob(ctx, server.CancelJobRequestObject{Id: 123})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CancelJob404JSONResponse{}).String()))
@@ -116,7 +116,7 @@ var _ = Describe("job handler", Ordered, func() {
 				LastName:     "User",
 			}
 			ctx = auth.NewTokenContext(context.TODO(), user)
-			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s))
+			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), service.NewJobService(s, nil), service.NewSizerService(sizerClient, s), nil)
 		})
 
 		It("returns 400 when name is empty", func() {
