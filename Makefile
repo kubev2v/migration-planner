@@ -7,7 +7,6 @@ GO_CACHE := -v $${HOME}/go/migration-planner-go-cache:/opt/app-root/src/go:Z -v 
 TIMEOUT ?= 30m
 VERBOSE ?= false
 REGISTRY ?= quay.io
-REGISTRY_ORG ?= kubev2v
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
 MIGRATION_PLANNER_AGENT_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent
