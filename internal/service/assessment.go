@@ -2,8 +2,12 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/util"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
@@ -11,7 +15,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -118,35 +121,14 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
 		inventory = source.Inventory
-		// Validate inventory has VMs before creating assessment
-		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
-			switch err.(type) {
-			case *util.ErrNoVMsInInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			case *util.ErrInventoryUnmarshalError:
-				return nil, fmt.Errorf("inventory data corruption: %w", err)
-			case *util.ErrEmptyInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			default:
-				return nil, fmt.Errorf("inventory validation failed: %w", err)
-			}
-		}
 	case SourceTypeInventory:
 		tracer.Step("process_inventory_source").Log()
 		inventory = createForm.Inventory
-		// Validate inventory has VMs before creating assessment
-		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
-			switch err.(type) {
-			case *util.ErrNoVMsInInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			case *util.ErrInventoryUnmarshalError:
-				return nil, fmt.Errorf("inventory data corruption: %w", err)
-			case *util.ErrEmptyInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			default:
-				return nil, fmt.Errorf("inventory validation failed: %w", err)
-			}
-		}
+	}
+
+	// Validate inventory has VMs before creating assessment
+	if err := ValidateInventoryHasVMs(inventory); err != nil {
+		return nil, err
 	}
 
 	ctx, err := as.store.NewTransactionContext(ctx)
@@ -271,6 +253,44 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 	}
 
 	tracer.Success().WithString("deleted_assessment_name", assessment.Name).Log()
+	return nil
+}
+
+// ValidateInventoryHasVMs validates that inventory has at least one VM
+// Returns typed errors to distinguish between validation failures and data corruption
+func ValidateInventoryHasVMs(inventory []byte) error {
+	if len(inventory) == 0 {
+		return NewErrEmptyInventory()
+	}
+
+	// Unmarshal does not return error when v1 inventory is unmarshal into a v2 struct.
+	// The only way to differentiate the version is to check the internal structure.
+	version := util.GetInventoryVersion(inventory)
+	switch version {
+	case model.SnapshotVersionV1:
+		var invData v1alpha1.InventoryData
+		if err := json.Unmarshal(inventory, &invData); err != nil {
+			return NewErrInventoryUnmarshalError(1, err)
+		}
+		if invData.Vms.Total == 0 {
+			return NewErrNoVMsInInventory()
+		}
+	default:
+		var inv v1alpha1.Inventory
+		if err := json.Unmarshal(inventory, &inv); err != nil {
+			return NewErrInventoryUnmarshalError(2, err)
+		}
+		totalVMs := 0
+		if inv.Vcenter != nil {
+			totalVMs += inv.Vcenter.Vms.Total
+		}
+		for _, clusterData := range inv.Clusters {
+			totalVMs += clusterData.Vms.Total
+		}
+		if totalVMs == 0 {
+			return NewErrNoVMsInInventory()
+		}
+	}
 	return nil
 }
 
