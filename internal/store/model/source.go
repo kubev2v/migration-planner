@@ -16,10 +16,10 @@ type Label struct {
 type Source struct {
 	gorm.Model
 	ID          uuid.UUID `gorm:"primaryKey;"`
-	Name        string    `gorm:"uniqueIndex:name_org_id;not null"`
+	Name        string    `gorm:"uniqueIndex:sources_org_id_user_name;not null"`
 	VCenterID   string
-	Username    string
-	OrgID       string `gorm:"uniqueIndex:name_org_id;not null"`
+	Username    string `gorm:"uniqueIndex:sources_org_id_user_name"`
+	OrgID       string `gorm:"uniqueIndex:sources_org_id_user_name;not null"`
 	Inventory   []byte `gorm:"type:jsonb"`
 	OnPremises  bool
 	Agents      []Agent    `gorm:"constraint:OnDelete:CASCADE;"`

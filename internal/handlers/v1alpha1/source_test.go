@@ -291,6 +291,38 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(count).To(Equal(0))
 		})
 
+		It("returns 400 when source name already exists in env (duplicate name and org_id)", func() {
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s))
+
+			// First create succeeds
+			resp1, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "my-source",
+				},
+			})
+			Expect(err).To(BeNil())
+			_, ok := resp1.(server.CreateSource201JSONResponse)
+			Expect(ok).To(BeTrue(), "first create should return 201")
+
+			// Second create with same name and same org_id hits unique constraint → handler returns 400 with clear message
+			resp2, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "my-source",
+				},
+			})
+			Expect(err).To(BeNil())
+			badReq, ok := resp2.(server.CreateSource400JSONResponse)
+			Expect(ok).To(BeTrue(), "duplicate source name should return 400, got %T", resp2)
+			Expect(badReq.Message).To(ContainSubstring("already exists"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")

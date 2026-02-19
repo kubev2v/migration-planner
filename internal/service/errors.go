@@ -83,12 +83,16 @@ type ErrDuplicateKey struct {
 	error
 }
 
-func NewErrDuplicateKey(resourceType, key string) *ErrDuplicateKey {
-	return &ErrDuplicateKey{fmt.Errorf("%s with %s already exists", resourceType, key)}
+func NewErrDuplicateKey(resourceType, name string) *ErrDuplicateKey {
+	return &ErrDuplicateKey{fmt.Errorf("%s with name %q already exists", resourceType, name)}
 }
 
 func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
-	return NewErrDuplicateKey("assessment", fmt.Sprintf("name '%s'", name))
+	return NewErrDuplicateKey("assessment", name)
+}
+
+func NewErrSourceDuplicateName(name string) *ErrDuplicateKey {
+	return NewErrDuplicateKey("source", name)
 }
 
 // Job-related errors

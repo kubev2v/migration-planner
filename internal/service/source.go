@@ -86,6 +86,11 @@ func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.Sou
 	result, err := s.store.Source().Create(ctx, sourceForm.ToSource())
 	if err != nil {
 		_, _ = store.Rollback(ctx)
+
+		if errors.Is(err, store.ErrDuplicateKey) {
+			return model.Source{}, NewErrSourceDuplicateName(sourceForm.Name)
+		}
+
 		return model.Source{}, err
 	}
 
