@@ -134,3 +134,30 @@ type ErrInvalidRequest struct {
 func NewErrInvalidRequest(message string) *ErrInvalidRequest {
 	return &ErrInvalidRequest{errors.New(message)}
 }
+
+// ErrEmptyInventory indicates the inventory data is empty
+type ErrEmptyInventory struct {
+	error
+}
+
+func NewErrEmptyInventory() *ErrEmptyInventory {
+	return &ErrEmptyInventory{errors.New("inventory is empty")}
+}
+
+// ErrInventoryUnmarshalError indicates the inventory data cannot be unmarshaled (corrupted data)
+type ErrInventoryUnmarshalError struct {
+	error
+}
+
+func NewErrInventoryUnmarshalError(version int, err error) *ErrInventoryUnmarshalError {
+	return &ErrInventoryUnmarshalError{fmt.Errorf("failed to unmarshal v%d inventory: %v", version, err)}
+}
+
+// ErrNoVMsInInventory indicates the inventory has no VMs (validation failure)
+type ErrNoVMsInInventory struct {
+	error
+}
+
+func NewErrNoVMsInInventory() *ErrNoVMsInInventory {
+	return &ErrNoVMsInInventory{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
+}
