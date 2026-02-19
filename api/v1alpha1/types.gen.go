@@ -216,6 +216,15 @@ type Error struct {
 	RequestId *string `json:"requestId,omitempty"`
 }
 
+// EstimationDetail Detailed estimation result from a single calculator
+type EstimationDetail struct {
+	// Duration Estimated duration for this component (formatted as duration string)
+	Duration string `json:"duration"`
+
+	// Reason Explanation of how the estimation was calculated
+	Reason string `json:"reason"`
+}
+
 // Histogram defines model for Histogram.
 type Histogram struct {
 	Data     []int `json:"data"`
@@ -343,6 +352,21 @@ type JobStatus string
 type Label struct {
 	Key   string `json:"key" validate:"required,label"`
 	Value string `json:"value" validate:"required,label"`
+}
+
+// MigrationEstimationRequest Request payload for calculating migration time estimation
+type MigrationEstimationRequest struct {
+	// ClusterId ID of the cluster to calculate migration estimation for
+	ClusterId string `json:"clusterId" validate:"required"`
+}
+
+// MigrationEstimationResponse Migration time estimation results
+type MigrationEstimationResponse struct {
+	// Breakdown Breakdown of estimation by calculator
+	Breakdown map[string]EstimationDetail `json:"breakdown"`
+
+	// TotalDuration Total estimated migration duration (formatted as duration string, e.g., "2h30m")
+	TotalDuration string `json:"totalDuration"`
 }
 
 // MigrationIssue defines model for MigrationIssue.
@@ -582,6 +606,9 @@ type UpdateAssessmentJSONRequestBody = AssessmentUpdate
 
 // CalculateAssessmentClusterRequirementsJSONRequestBody defines body for CalculateAssessmentClusterRequirements for application/json ContentType.
 type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
+
+// CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
+type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate

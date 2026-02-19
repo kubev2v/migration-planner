@@ -7,6 +7,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
@@ -319,5 +320,22 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 			TotalCPU:    form.InventoryTotals.TotalCPU,
 			TotalMemory: form.InventoryTotals.TotalMemory,
 		},
+	}
+}
+
+// MigrationEstimationResultToAPI converts service MigrationAssessmentResult to API response
+func MigrationEstimationResultToAPI(result service.MigrationAssessmentResult) v1alpha1.MigrationEstimationResponse {
+	breakdown := make(map[string]v1alpha1.EstimationDetail)
+
+	for name, estimation := range result.Breakdown {
+		breakdown[name] = v1alpha1.EstimationDetail{
+			Duration: estimation.Duration.String(),
+			Reason:   estimation.Reason,
+		}
+	}
+
+	return v1alpha1.MigrationEstimationResponse{
+		TotalDuration: result.TotalDuration.String(),
+		Breakdown:     breakdown,
 	}
 }

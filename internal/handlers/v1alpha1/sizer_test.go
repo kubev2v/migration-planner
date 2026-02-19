@@ -267,6 +267,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -298,6 +299,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -365,6 +367,7 @@ var _ = Describe("sizer handler", func() {
 						service.NewAssessmentService(mockStore, nil),
 						nil,
 						service.NewSizerService(sizerClient, mockStore),
+						nil,
 					)
 
 					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -389,6 +392,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -417,6 +421,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -447,6 +452,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -476,6 +482,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -502,10 +509,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -531,10 +539,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -561,10 +570,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -594,10 +604,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -626,10 +637,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -659,10 +671,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -690,10 +703,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -720,10 +734,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -751,10 +766,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusServiceUnavailable, true)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -784,10 +800,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -818,10 +835,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -848,10 +866,11 @@ var _ = Describe("sizer handler", func() {
 				testServer = createTestSizerServer(nil, http.StatusInternalServerError, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
-					nil,
+					nil, // sourceService
 					service.NewAssessmentService(mockStore, nil),
-					nil,
+					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
