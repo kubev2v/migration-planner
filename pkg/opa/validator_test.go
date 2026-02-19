@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/kubev2v/forklift/pkg/controller/provider/model/vsphere"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 )
 
 const testPolicy = `package io.konveyor.forklift.vmware
@@ -133,7 +133,7 @@ func TestNewValidator_EmptyPolicies(t *testing.T) {
 	}
 }
 
-func TestValidator_Concerns_WithConcern(t *testing.T) {
+func TestValidator_Validate_WithConcern(t *testing.T) {
 	policies := map[string]string{
 		"test.rego": testPolicy,
 	}
@@ -143,12 +143,9 @@ func TestValidator_Concerns_WithConcern(t *testing.T) {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
 
-	// Test VM that should trigger concern
-	vmInput := map[string]interface{}{
-		"name": "test-vm-with-concern",
-	}
-
-	concerns, err := validator.concerns(context.Background(), vmInput)
+	concerns, err := validator.Validate(context.Background(), models.VM{
+		Name: "test-vm-with-concern",
+	})
 	if err != nil {
 		t.Fatalf("concerns() failed: %v", err)
 	}
@@ -158,7 +155,7 @@ func TestValidator_Concerns_WithConcern(t *testing.T) {
 	}
 }
 
-func TestValidator_ValidateVMS(t *testing.T) {
+func TestValidator_Validate_WithoutConcern(t *testing.T) {
 	policies := map[string]string{
 		"test.rego": testPolicy,
 	}
@@ -168,44 +165,9 @@ func TestValidator_ValidateVMS(t *testing.T) {
 		t.Fatalf("Failed to create validator: %v", err)
 	}
 
-	var vms []vsphere.VM
-	vms = append(vms, vsphere.VM{
-		GuestID: "rhel6guest",
+	concerns, err := validator.Validate(context.Background(), models.VM{
+		Name: "clean-vm",
 	})
-
-	for i := range vms {
-		concerns, err := validator.ValidateVM(context.Background(), vms[i])
-		if err != nil {
-			t.Fatalf("ValidateVM() failed: %v", err)
-		}
-		vms[i].Concerns = concerns
-	}
-
-	if len(vms) != 1 {
-		t.Errorf("Expected 1 vm, got %d", len(vms))
-	}
-
-	if len(vms[0].Concerns) != 1 {
-		t.Errorf("Expected 1 concern, got %d", len(vms[0].Concerns))
-	}
-}
-
-func TestValidator_Concerns_WithoutConcern(t *testing.T) {
-	policies := map[string]string{
-		"test.rego": testPolicy,
-	}
-
-	validator, err := NewValidator(policies)
-	if err != nil {
-		t.Fatalf("Failed to create validator: %v", err)
-	}
-
-	// Test VM that should NOT trigger concern
-	vmInput := map[string]interface{}{
-		"name": "clean-vm",
-	}
-
-	concerns, err := validator.concerns(context.Background(), vmInput)
 	if err != nil {
 		t.Fatalf("concerns() failed: %v", err)
 	}
