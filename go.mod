@@ -227,7 +227,7 @@ require (
 	k8s.io/apiextensions-apiserver v0.34.1 // indirect
 	k8s.io/klog/v2 v2.130.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20260127142750-a19766b6e2d4 // indirect
-	k8s.io/utils v0.0.0-20260108192941-914a6e750570 // indirect
+	k8s.io/utils v0.0.0-20260210185600-b8788abfbbc2 // indirect
 	kubevirt.io/api v1.6.2 // indirect
 	kubevirt.io/containerized-data-importer-api v1.63.1 // indirect
 	kubevirt.io/controller-lifecycle-operator-sdk/api v0.2.4 // indirect
