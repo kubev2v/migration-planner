@@ -306,18 +306,30 @@ clean:
 	- rm -f -r bin
 
 ##################### "make lint" support start ##########################
-GOLANGCI_LINT_VERSION := v1.64.8
+GOLANGCI_LINT_VERSION := v2.10.1
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
-# Download golangci-lint locally if not already present
+# Run every time: if installed version != required, remove binary so $(GOLANGCI_LINT) will re-install
+.PHONY: check-golangci-lint-version
+check-golangci-lint-version:
+	@if [ -f '$(GOLANGCI_LINT)' ]; then \
+		installed=$$('$(GOLANGCI_LINT)' version 2>/dev/null | sed -n 's/.*version \([0-9.]*\).*/\1/p' | head -1); \
+		required=$$(echo '$(GOLANGCI_LINT_VERSION)' | sed 's/^v//'); \
+		if [ -n "$$installed" ] && [ "$$installed" != "$$required" ]; then \
+			echo "🔍 Installed golangci-lint $$installed != required $(GOLANGCI_LINT_VERSION), re-installing..."; \
+			rm -f '$(GOLANGCI_LINT)'; \
+		fi; \
+	fi
+
+# Download golangci-lint if not present
 $(GOLANGCI_LINT):
 	@echo "🔍 Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
+	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
 		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
 	@echo "✅ 'golangci-lint' installed successfully."
 
 # Run linter
-lint: $(GOLANGCI_LINT)
+lint: check-golangci-lint-version $(GOLANGCI_LINT)
 	@echo "🔍 Running golangci-lint..."
 	@$(GOLANGCI_LINT) run --timeout=5m
 	@echo "✅ Lint passed successfully!"
