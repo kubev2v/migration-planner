@@ -344,10 +344,10 @@ $(MOQ):
 	@go install github.com/matryer/moq@latest
 	@echo "✅ 'moq' installed successfully."
 
-# Code generation
+# Code generation (exclude agent-v2 submodule)
 generate: $(MOQ)
 	@echo "⚙️ Running go generate..."
-	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./...)
+	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./... | grep -v 'agent-v2' || true)
 	@echo "⚙️ Running mockgen script..."
 	@hack/mockgen.sh
 	@$(MAKE) format
