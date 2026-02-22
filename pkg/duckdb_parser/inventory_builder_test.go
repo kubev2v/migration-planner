@@ -62,7 +62,7 @@ func setupTestParser(t *testing.T, validator Validator) (*Parser, *sql.DB, func(
 	require.NoError(t, parser.Init())
 
 	cleanup := func() {
-		db.Close()
+		_ = db.Close()
 	}
 	return parser, db, cleanup
 }
@@ -135,7 +135,7 @@ func createTestExcel(t *testing.T, sheets ...ExcelSheet) string {
 	t.Helper()
 
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	firstSheet := true
 	for _, sh := range sheets {
@@ -175,7 +175,7 @@ func createTestExcelWithCustomHeaders(t *testing.T, vInfoHeaders []string, vms [
 	t.Helper()
 
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	vInfoIndex, err := f.NewSheet("vInfo")
 	require.NoError(t, err)
@@ -811,7 +811,7 @@ func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
 	}
 
 	tmpFile := createTestExcel(t, append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))...)
-	defer os.Remove(tmpFile)
+	defer func() { _ = os.Remove(tmpFile) }()
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)

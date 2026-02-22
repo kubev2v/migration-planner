@@ -40,7 +40,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 	})
 
 	AfterEach(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("authenticator", func() {

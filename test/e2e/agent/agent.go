@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e/utils"
+	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	libvirt "github.com/libvirt/libvirt-go"
-	. "github.com/onsi/ginkgo/v2"
+	ginkgo "github.com/onsi/ginkgo/v2"
 	"go.uber.org/zap"
 )
 
@@ -38,8 +38,8 @@ func NewPlannerAgent(name, url string) (*plannerAgentLibvirt, error) {
 
 // DumpLogs prints journal logs from the agent VM to the GinkgoWriter
 func (p *plannerAgentLibvirt) DumpLogs(agentIp string) {
-	stdout, _ := RunSSHCommand(agentIp, "journalctl --no-pager")
-	fmt.Fprintf(GinkgoWriter, "Journal: %v\n", stdout)
+	stdout, _ := e2eutils.RunSSHCommand(agentIp, "journalctl --no-pager")
+	_, _ = fmt.Fprintf(ginkgo.GinkgoWriter, "Journal: %v\n", stdout)
 }
 
 // GetIp retrieves the IP address of the agent VM
@@ -66,7 +66,7 @@ func (p *plannerAgentLibvirt) GetIp() (string, error) {
 			}
 		}
 	}
-	return "", fmt.Errorf("No IP found")
+	return "", fmt.Errorf("no IP found")
 }
 
 // Run prepares and launches the planner agent VM
@@ -90,13 +90,13 @@ func (p *plannerAgentLibvirt) DumpDataDir() error {
 		return fmt.Errorf("failed to get IP: %w", err)
 	}
 
-	lsOutput, err := RunSSHCommand(ip, "ls -la /var/lib/data")
+	lsOutput, err := e2eutils.RunSSHCommand(ip, "ls -la /var/lib/data")
 	if err != nil {
 		return fmt.Errorf("failed to ls /var/lib/data: %w", err)
 	}
 	zap.S().Infof("ls /var/lib/data:\n%s", lsOutput)
 
-	statOutput, err := RunSSHCommand(ip, "stat /var/lib/data/agent.duckdb")
+	statOutput, err := e2eutils.RunSSHCommand(ip, "stat /var/lib/data/agent.duckdb")
 	if err != nil {
 		return fmt.Errorf("failed to stat agent.duckdb: %w", err)
 	}

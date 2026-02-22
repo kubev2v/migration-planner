@@ -34,7 +34,7 @@ var _ = Describe("label store", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("UpdateLabels", func() {

@@ -36,7 +36,7 @@ func NewCmdCreateAssessment() *cobra.Command {
 			if err := o.Complete(cmd, args); err != nil {
 				return err
 			}
-			if err := o.GlobalOptions.Validate(args); err != nil {
+			if err := o.Validate(args); err != nil {
 				return err
 			}
 			return o.Run(cmd.Context(), args)
@@ -68,7 +68,7 @@ func (o *CreateAssessmentOptions) Run(ctx context.Context, args []string) error 
 	if err != nil {
 		return fmt.Errorf("opening file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)

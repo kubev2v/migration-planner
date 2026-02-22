@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
-	. "github.com/kubev2v/migration-planner/test/e2e/utils"
+	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"go.uber.org/zap"
 )
 
@@ -23,7 +23,7 @@ type plannerService struct {
 
 // DefaultPlannerService initializes a planner service using default *auth.User credentials
 func DefaultPlannerService() (*plannerService, error) {
-	return NewPlannerService(DefaultUserAuth())
+	return NewPlannerService(e2eutils.DefaultUserAuth())
 }
 
 // NewPlannerService initializes the planner service with custom *auth.User credentials

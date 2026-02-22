@@ -37,7 +37,7 @@ var _ = Describe("agent service", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("Update agent status", func() {

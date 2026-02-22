@@ -159,17 +159,17 @@ func printTable(response interface{}, kind string, id *uuid.UUID) error {
 	default:
 		return fmt.Errorf("unknown resource type %s", kind)
 	}
-	w.Flush()
+	_ = w.Flush()
 	return nil
 }
 
 func printSourcesTable(w *tabwriter.Writer, sources ...api.Source) {
-	fmt.Fprintln(w, "ID\tName\tAgent ID\tAgent Status\tHas inventory")
+	_, _ = fmt.Fprintln(w, "ID\tName\tAgent ID\tAgent Status\tHas inventory")
 	for _, s := range sources {
 		if s.Agent != nil {
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, s.Agent.Id, s.Agent.Status, s.Inventory != nil)
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, s.Agent.Id, s.Agent.Status, s.Inventory != nil)
 			continue
 		}
-		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, "", "", s.Inventory != nil)
+		_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%v\n", s.Id, s.Name, "", "", s.Inventory != nil)
 	}
 }

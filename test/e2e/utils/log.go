@@ -4,11 +4,11 @@ import (
 	"sort"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	e2e "github.com/kubev2v/migration-planner/test/e2e"
 	"go.uber.org/zap"
 )
 
-// LogExecutionSummary logs the execution time of all tests stored in the TestsExecutionTime map.
+// LogExecutionSummary logs the execution time of all tests stored in the e2e.TestsExecutionTime map.
 // It sorts the tests by duration in descending order and logs the test name along with its execution duration.
 func LogExecutionSummary() {
 	zap.S().Infof("============Summarizing execution time============")
@@ -20,7 +20,7 @@ func LogExecutionSummary() {
 
 	var results []testResult
 
-	for test, duration := range TestsExecutionTime {
+	for test, duration := range e2e.TestsExecutionTime {
 		results = append(results, testResult{name: test, duration: duration})
 	}
 

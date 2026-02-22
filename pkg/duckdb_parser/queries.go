@@ -82,7 +82,7 @@ func (p *Parser) Clusters(ctx context.Context) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying clusters: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var cluster string
 		if err := rows.Scan(&cluster); err != nil {
@@ -104,7 +104,7 @@ func (p *Parser) ClusterDatacenters(ctx context.Context) (map[string]string, err
 	if err != nil {
 		return nil, fmt.Errorf("querying cluster datacenters: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var cluster, datacenter string
 		if err := rows.Scan(&cluster, &datacenter); err != nil {
@@ -126,7 +126,7 @@ func (p *Parser) ClusterObjectIDs(ctx context.Context) (map[string]string, error
 	if err != nil {
 		return nil, fmt.Errorf("querying cluster object ids: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var name, objectID string
 		if err := rows.Scan(&name, &objectID); err != nil {
@@ -215,7 +215,7 @@ func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) 
 	if err != nil {
 		return nil, fmt.Errorf("querying disk size tier: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var tier string
 		var summary inventory.DiskSizeTierSummary
@@ -238,7 +238,7 @@ func (p *Parser) DiskTypeSummary(ctx context.Context, filters Filters) ([]invent
 	if err != nil {
 		return nil, fmt.Errorf("querying disk type summary: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var s inventory.DiskTypeSummary
 		if err := rows.Scan(&s.Type, &s.VMCount, &s.TotalSizeTB); err != nil {
@@ -366,7 +366,7 @@ func (p *Parser) MigrationIssues(ctx context.Context, filters Filters, category 
 	if err != nil {
 		return nil, fmt.Errorf("querying migration issues: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var m inventory.MigrationIssue
 		if err := rows.Scan(&m.ID, &m.Label, &m.Category, &m.Assessment, &m.Count); err != nil {
@@ -451,7 +451,7 @@ func (p *Parser) ClustersPerDatacenter(ctx context.Context) ([]int, error) {
 	if err != nil {
 		return nil, fmt.Errorf("querying clusters per datacenter: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var dc string
 		var count int
@@ -470,7 +470,7 @@ func (p *Parser) readStringIntMap(ctx context.Context, query string) (map[string
 	if err != nil {
 		return nil, fmt.Errorf("querying: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var key string
 		var count int
@@ -488,7 +488,7 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 	if err != nil {
 		return nil, fmt.Errorf("querying VMs: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var vms []models.VM
 	for rows.Next() {

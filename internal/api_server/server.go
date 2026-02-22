@@ -80,7 +80,7 @@ func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 		}
 
 		body, err := io.ReadAll(r.Body)
-		r.Body.Close()
+		_ = r.Body.Close()
 		if err != nil {
 			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 			return

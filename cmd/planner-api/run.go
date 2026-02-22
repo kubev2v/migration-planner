@@ -63,7 +63,7 @@ var runCmd = &cobra.Command{
 		}
 
 		store := store.NewStore(db)
-		defer store.Close()
+		defer func() { _ = store.Close() }()
 
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {
 			zap.S().Fatalw("running initial migration", "error", err)

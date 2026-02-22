@@ -43,7 +43,7 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("ListAssessments", func() {

@@ -62,7 +62,7 @@ func (s *minioDownloader) Get(ctx context.Context, dst io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer object.Close()
+	defer func() { _ = object.Close() }()
 
 	objInfo, err := object.Stat()
 	if err != nil {

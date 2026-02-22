@@ -100,11 +100,11 @@ var _ = Describe("iso download manager", func() {
 			if err != nil {
 				log.Fatal(err)
 			}
-			defer os.Remove(f.Name())
+			defer func() { _ = os.Remove(f.Name()) }()
 
 			err = md.Download(context.TODO(), f)
 			Expect(err).To(BeNil())
-			f.Close()
+			_ = f.Close()
 
 			content, err := os.ReadFile(f.Name())
 			Expect(err).To(BeNil())

@@ -16,7 +16,7 @@ func ColumnToLetter(col int) string {
 
 func CreateExcelOnlyWithVInfo() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	// Only create vInfo sheet, missing vHost and other required sheets
 	sheetIndex, err := f.NewSheet("vInfo")
@@ -74,7 +74,7 @@ func CreateExcelOnlyWithVInfo() ([]byte, error) {
 
 func CreateLargeExcel() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type SheetConfig struct {
 		Headers []string
@@ -151,7 +151,7 @@ func CreateLargeExcel() ([]byte, error) {
 
 func CreateValidTestExcel() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type SheetConfig struct {
 		Headers []string
@@ -224,7 +224,7 @@ func CreateValidTestExcel() ([]byte, error) {
 // This replaces the static example1.xlsx file with a dynamically generated one that meets validation requirements
 func CreateExample1Excel() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type SheetConfig struct {
 		Headers []string
@@ -311,11 +311,11 @@ func CreateTempExcelFile(content []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	_, err = tmpFile.Write(content)
 	if err != nil {
-		os.Remove(tmpFile.Name())
+		_ = os.Remove(tmpFile.Name())
 		return "", err
 	}
 
@@ -326,7 +326,7 @@ func CreateTempExcelFile(content []byte) (string, error) {
 // Used for testing multi-cluster inventory scenarios.
 func CreateMultiClusterTestExcel() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type SheetConfig struct {
 		Headers []string
@@ -407,7 +407,7 @@ func CreateMultiClusterTestExcel() ([]byte, error) {
 // Contains VMs with CBT disabled, templates, and other concern-triggering configurations.
 func CreateExcelWithConcerns() ([]byte, error) {
 	f := excelize.NewFile()
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	type SheetConfig struct {
 		Headers []string

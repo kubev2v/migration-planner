@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -74,7 +73,7 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		v := util.GetInventoryVersion(s.Inventory)
 		switch v {
 		case model.SnapshotVersionV1:
-			i := v1alpha1.InventoryData{}
+			i := api.InventoryData{}
 			if err := json.Unmarshal(s.Inventory, &i); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 			}
@@ -83,13 +82,13 @@ func SourceToApi(s model.Source) (api.Source, error) {
 			}
 			// Normalize to prevent null values from database
 			normalizeInventoryData(&i)
-			source.Inventory = &v1alpha1.Inventory{
+			source.Inventory = &api.Inventory{
 				Vcenter:   &i,
 				VcenterId: i.Vcenter.Id,
 				Clusters:  map[string]api.InventoryData{},
 			}
 		default:
-			v2 := v1alpha1.Inventory{}
+			v2 := api.Inventory{}
 			if err := json.Unmarshal(s.Inventory, &v2); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
 			}
@@ -221,10 +220,10 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 			CreatedAt: snapshot.CreatedAt,
 		}
 		if len(snapshot.Inventory) > 0 {
-			inventory := v1alpha1.Inventory{}
+			inventory := api.Inventory{}
 			switch snapshot.Version {
 			case 1:
-				invV1 := v1alpha1.InventoryData{}
+				invV1 := api.InventoryData{}
 				if err := json.Unmarshal(snapshot.Inventory, &invV1); err != nil {
 					return api.Assessment{}, err
 				}
@@ -284,28 +283,28 @@ func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, er
 	return assessmentList, nil
 }
 
-func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsResponseForm) v1alpha1.ClusterRequirementsResponse {
-	resourceConsumption := v1alpha1.SizingResourceConsumption{
+func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsResponseForm) api.ClusterRequirementsResponse {
+	resourceConsumption := api.SizingResourceConsumption{
 		Cpu:    form.ResourceConsumption.CPU,
 		Memory: form.ResourceConsumption.Memory,
 	}
 
 	if form.ResourceConsumption.Limits.CPU != 0.0 || form.ResourceConsumption.Limits.Memory != 0.0 {
-		resourceConsumption.Limits = &v1alpha1.SizingResourceLimits{
+		resourceConsumption.Limits = &api.SizingResourceLimits{
 			Cpu:    form.ResourceConsumption.Limits.CPU,
 			Memory: form.ResourceConsumption.Limits.Memory,
 		}
 	}
 
 	if form.ResourceConsumption.OverCommitRatio.CPU != 0.0 || form.ResourceConsumption.OverCommitRatio.Memory != 0.0 {
-		resourceConsumption.OverCommitRatio = &v1alpha1.SizingOverCommitRatio{
+		resourceConsumption.OverCommitRatio = &api.SizingOverCommitRatio{
 			Cpu:    form.ResourceConsumption.OverCommitRatio.CPU,
 			Memory: form.ResourceConsumption.OverCommitRatio.Memory,
 		}
 	}
 
-	return v1alpha1.ClusterRequirementsResponse{
-		ClusterSizing: v1alpha1.ClusterSizing{
+	return api.ClusterRequirementsResponse{
+		ClusterSizing: api.ClusterSizing{
 			TotalNodes:        form.ClusterSizing.TotalNodes,
 			ControlPlaneNodes: form.ClusterSizing.ControlPlaneNodes,
 			WorkerNodes:       form.ClusterSizing.WorkerNodes,
@@ -314,7 +313,7 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 			TotalMemory:       form.ClusterSizing.TotalMemory,
 		},
 		ResourceConsumption: resourceConsumption,
-		InventoryTotals: v1alpha1.InventoryTotals{
+		InventoryTotals: api.InventoryTotals{
 			TotalVMs:    form.InventoryTotals.TotalVMs,
 			TotalCPU:    form.InventoryTotals.TotalCPU,
 			TotalMemory: form.InventoryTotals.TotalMemory,

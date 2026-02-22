@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/utils"
+	e2e "github.com/kubev2v/migration-planner/test/e2e"
+	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"go.uber.org/zap"
 )
 
@@ -25,12 +25,12 @@ type ServiceApi struct {
 // NewServiceApi creates and returns a new ServiceApi instance, initializing the base URL
 // and HTTP client for making requests to the service API
 func NewServiceApi(cred *auth.User) (*ServiceApi, error) {
-	token, err := GetToken(cred)
+	token, err := e2eutils.GetToken(cred)
 	if err != nil {
 		return nil, fmt.Errorf("error getting token: %v", err)
 	}
 	return &ServiceApi{
-		baseURL:    DefaultServiceUrl,
+		baseURL:    e2e.DefaultServiceUrl,
 		httpClient: &http.Client{},
 		jwtToken:   token,
 	}, nil
@@ -114,7 +114,7 @@ func (api *ServiceApi) MultipartRequest(path, filepathStr, assessmentName string
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)

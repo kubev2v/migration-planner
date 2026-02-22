@@ -85,7 +85,7 @@ func Untar(file *os.File, destFile string, fileName string) error {
 				if err != nil {
 					return fmt.Errorf("failed to create file: %w", err)
 				}
-				defer outFile.Close()
+				defer func() { _ = outFile.Close() }()
 
 				if _, err := io.Copy(outFile, tarReader); err != nil {
 					return fmt.Errorf("failed to write file: %w", err)

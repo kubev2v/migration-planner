@@ -8,7 +8,6 @@ import (
 	"path"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"go.uber.org/zap"
@@ -19,7 +18,7 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 	zap.S().Infof("[PlannerService] Creating source: user: %s, organization: %s",
 		s.credentials.Username, s.credentials.Organization)
 
-	params := &v1alpha1.CreateSourceJSONRequestBody{Name: name}
+	params := &api.CreateSourceJSONRequestBody{Name: name}
 
 	reqBody, err := json.Marshal(params)
 	if err != nil {
@@ -54,7 +53,7 @@ func (s *plannerService) GetImageUrl(id uuid.UUID) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to get source url: %w", err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	var result struct {
 		ExpiresAt string `json:"expires_at"`
@@ -159,10 +158,10 @@ func (s *plannerService) RemoveSources() error {
 }
 
 // UpdateSource updates the inventory of a specific source
-func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *v1alpha1.Inventory) error {
+func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *api.Inventory) error {
 	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	update := v1alpha1.UpdateInventoryJSONRequestBody{
+	update := api.UpdateInventoryJSONRequestBody{
 		AgentId:   uuid,
 		Inventory: *inventory,
 	}

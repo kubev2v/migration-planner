@@ -172,7 +172,7 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
 		return err
 	}
 
-	tw.Flush()
+	_ = tw.Flush()
 
 	return nil
 }
@@ -288,7 +288,7 @@ func (b *ImageBuilder) ovfSize() (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return -1, err
@@ -302,7 +302,7 @@ func (b *ImageBuilder) diskSize() (int, error) {
 	if err != nil {
 		return -1, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 	fileInfo, err := file.Stat()
 	if err != nil {
 		return -1, err

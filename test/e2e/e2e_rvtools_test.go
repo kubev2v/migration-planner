@@ -51,7 +51,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil(), "Failed to generate example Excel file")
 			tmpFile, err := CreateTempExcelFile(exampleContent)
 			Expect(err).To(BeNil(), "Failed to create temporary Excel file")
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			// Create Assessment
 			assessment, err = svc.CreateAssessmentFromRvtools("assessment", tmpFile)
@@ -82,7 +82,7 @@ var _ = Describe("e2e-rvtools", func() {
 			// Create a corrupted Excel file
 			tmpFile, err := CreateTempExcelFile([]byte("This is not an Excel file content"))
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			// Attempt to create assessment from corrupted file
 			assessment, err = svc.CreateAssessmentFromRvtools("corrupted-test", tmpFile)
@@ -99,7 +99,7 @@ var _ = Describe("e2e-rvtools", func() {
 			// Create an empty file
 			tmpFile, err := CreateTempExcelFile([]byte{})
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			// Attempt to create assessment from empty file
 			// Empty files are validated immediately at handler level before job creation
@@ -119,7 +119,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(missingSheetsContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			// Attempt to create assessment from file with missing sheets
 			assessment, err = svc.CreateAssessmentFromRvtools("missing-sheets-test", tmpFile)
@@ -142,7 +142,7 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 
 				// Create first assessment
 				assessment1, err := svc.CreateAssessmentFromRvtools("duplicate-name-test", tmpFile)
@@ -169,7 +169,7 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 
 				// Test empty name - validated immediately at handler level
 				assessment, err = svc.CreateAssessmentFromRvtools("", tmpFile)
@@ -205,7 +205,7 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(largeContent)
 				Expect(err).To(BeNil())
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 
 				// Attempt to create assessment from large file
 				assessment, err = svc.CreateAssessmentFromRvtools("large-file-test", tmpFile)
@@ -227,7 +227,7 @@ var _ = Describe("e2e-rvtools", func() {
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
-				defer os.Remove(tmpFile)
+				defer func() { _ = os.Remove(tmpFile) }()
 
 				// Create multiple assessments concurrently (simulate concurrent uploads)
 				done := make(chan bool, 3)
@@ -271,7 +271,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("inventory-vm-counts-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -294,7 +294,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("inventory-power-states-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -319,7 +319,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("inventory-infra-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -345,7 +345,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("inventory-resources-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -372,7 +372,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("multi-cluster-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -404,7 +404,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("cluster-totals-test", tmpFile)
 			Expect(err).To(BeNil())
@@ -430,7 +430,7 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
-			defer os.Remove(tmpFile)
+			defer func() { _ = os.Remove(tmpFile) }()
 
 			assessment, err = svc.CreateAssessmentFromRvtools("concerns-test", tmpFile)
 			Expect(err).To(BeNil())
