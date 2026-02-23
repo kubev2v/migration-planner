@@ -437,16 +437,14 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(assessment).NotTo(BeNil())
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
-			// Verify total VMs
+			// Verify total VMs (template VM is excluded at ingestion)
 			Expect(assessment.Snapshots).NotTo(BeEmpty())
 			inventory := assessment.Snapshots[0].Inventory
-			Expect(inventory.Vcenter.Vms.Total).To(Equal(3))
+			Expect(inventory.Vcenter.Vms.Total).To(Equal(2))
 
 			// Verify that migratable count and total are not equal when concerns exist
-			// At least one VM should not be fully migratable due to template/CBT concerns
+			// vm-normal has RDM disk (Critical), vm-cbt-disabled has CBT warning
 			vms := inventory.Vcenter.Vms
-			// Template VM should be not migratable (Critical)
-			// CBT disabled VM should have warning
 			Expect(vms.TotalMigratable).To(BeNumerically("<", vms.Total))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)

@@ -83,6 +83,7 @@ SELECT
 FROM vinfo_raw
 WHERE "VM" IS NOT NULL AND "VM" != ''
   AND "VM ID" IS NOT NULL AND TRIM("VM ID") != ''
+  AND LOWER(COALESCE("Template", '')) NOT IN ('true', '1', 'yes')
 ON CONFLICT DO NOTHING;
 
 WITH cleaned_networks AS (

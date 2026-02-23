@@ -63,7 +63,8 @@ LEFT JOIN src.Host h ON v.Host = h.ID
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID
 LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
 LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID
-CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about;
+CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
+WHERE v.IsTemplate = 0;
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
 SELECT
@@ -72,14 +73,16 @@ SELECT
     v.CpuHotRemoveEnabled = 1,
     v.CpuCount / NULLIF(v.CoresPerSocket, 0),
     v.CoresPerSocket
-FROM src.VM v;
+FROM src.VM v
+WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vmemory ("VM ID", "Hot Add", "Ballooned")
 SELECT
     v.ID,
     v.MemoryHotAddEnabled = 1,
     v.BalloonedMemory
-FROM src.VM v;
+FROM src.VM v
+WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
@@ -104,7 +107,7 @@ SELECT
     disk->>'unitNumber'
 FROM src.VM v,
 LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR"}]')) AS t(disk)
-WHERE v.Disks != '[]';
+WHERE v.Disks != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
@@ -128,7 +131,7 @@ LEFT JOIN src.Host h ON v.Host = h.ID
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID,
 LATERAL unnest(from_json(v.NICs, '[{"network":{"kind":"VARCHAR","id":"VARCHAR"},"mac":"VARCHAR","order":"INTEGER","deviceKey":"INTEGER"}]')) AS t(nic)
 LEFT JOIN src.Network n ON nic->'network'->>'id' = n.ID
-WHERE v.NICs != '[]';
+WHERE v.NICs != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
 SELECT
