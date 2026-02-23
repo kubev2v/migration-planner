@@ -220,9 +220,9 @@ func TestNewValidatorFromDir(t *testing.T) {
 	originalEnv := os.Getenv("OPA_POLICIES_DIR")
 	defer func() {
 		if originalEnv != "" {
-			os.Setenv("OPA_POLICIES_DIR", originalEnv)
+			_ = os.Setenv("OPA_POLICIES_DIR", originalEnv)
 		} else {
-			os.Unsetenv("OPA_POLICIES_DIR")
+			_ = os.Unsetenv("OPA_POLICIES_DIR")
 		}
 	}()
 

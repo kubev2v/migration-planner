@@ -35,7 +35,7 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *Asses
 	}
 }
 
-func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
+func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, int64, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("list_assessments").
 		WithString("username", filter.Username).
@@ -59,13 +59,35 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 		storeFilter = storeFilter.WithNameLike(filter.NameLike)
 	}
 
-	assessments, err := as.store.Assessment().List(ctx, storeFilter)
-	if err != nil {
-		return nil, fmt.Errorf("failed to list assessments: %w", err)
+	// Build query options for sorting and pagination
+	options := store.NewAssessmentQueryOptions()
+	if len(filter.Sort) > 0 {
+		sortParams := make([]store.SortParam, len(filter.Sort))
+		for i, s := range filter.Sort {
+			sortParams[i] = store.SortParam{Field: s.Field, Desc: s.Desc}
+		}
+		options = options.WithSort(sortParams)
+	}
+	if filter.Limit > 0 {
+		options = options.WithLimit(filter.Limit)
+	}
+	if filter.Offset > 0 {
+		options = options.WithOffset(filter.Offset)
 	}
 
-	tracer.Success().WithInt("count", len(assessments)).Log()
-	return assessments, nil
+	assessments, err := as.store.Assessment().List(ctx, storeFilter, options)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to list assessments: %w", err)
+	}
+
+	// Get total count for pagination
+	total, err := as.store.Assessment().Count(ctx, storeFilter)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to count assessments: %w", err)
+	}
+
+	tracer.Success().WithInt("count", len(assessments)).WithInt("total", int(total)).Log()
+	return assessments, total, nil
 }
 
 func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
@@ -283,6 +305,13 @@ type AssessmentFilter struct {
 	NameLike string
 	Limit    int
 	Offset   int
+	Sort     []SortField
+}
+
+// SortField represents a single sort field and direction
+type SortField struct {
+	Field string
+	Desc  bool
 }
 
 func NewAssessmentFilter(username, orgID string) *AssessmentFilter {
@@ -314,5 +343,10 @@ func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 
 func (f *AssessmentFilter) WithOffset(offset int) *AssessmentFilter {
 	f.Offset = offset
+	return f
+}
+
+func (f *AssessmentFilter) WithSort(sort []SortField) *AssessmentFilter {
+	f.Sort = sort
 	return f
 }

@@ -52,7 +52,7 @@ var _ = Describe("job handler", Ordered, func() {
 		if testServer != nil {
 			testServer.Close()
 		}
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("GetJob", func() {

@@ -166,9 +166,7 @@ func (o *DeployOptions) Run(ctx context.Context, args []string) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to hypervisor: %s", err)
 	}
-	defer func() {
-		conn.Close()
-	}()
+	defer func() { _, _ = conn.Close() }()
 
 	// try to find the storage pool
 	storagePool, err := conn.LookupStoragePoolByName(o.StoragePool)

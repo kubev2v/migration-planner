@@ -37,7 +37,7 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 
 	// Helper to process a single part with deferred cleanup
 	processPart := func(part *multipart.Part) error {
-		defer part.Close()
+		defer func() { _ = part.Close() }()
 
 		switch part.FormName() {
 		case "name":

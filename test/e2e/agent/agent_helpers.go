@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
-	. "github.com/kubev2v/migration-planner/test/e2e/utils"
+	e2e "github.com/kubev2v/migration-planner/test/e2e"
+	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"github.com/libvirt/libvirt-go"
 	"go.uber.org/zap"
 )
@@ -31,7 +31,7 @@ func (p *plannerAgentLibvirt) cleanupAgentFiles() error {
 	var errs []error
 
 	for _, f := range files {
-		if err := RemoveFile(f.path); err != nil {
+		if err := e2eutils.RemoveFile(f.path); err != nil {
 			errs = append(errs, fmt.Errorf("failed to remove %s: %w", f.name, err))
 		}
 	}
@@ -49,9 +49,9 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(ovaFile.Name())
+	defer func() { _ = os.Remove(ovaFile.Name()) }()
 
-	if err = os.Mkdir(DefaultBasePath, os.ModePerm); err != nil {
+	if err = os.Mkdir(e2e.DefaultBasePath, os.ModePerm); err != nil {
 		if !os.IsExist(err) {
 			return fmt.Errorf("creating default base path: %w", err)
 		}
@@ -68,7 +68,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 	zap.S().Infof("Successfully extracted the Iso and Vmdk files from the OVA.")
 
-	if err := ConvertVMDKtoQCOW2(p.vmdkDiskFilePath(), p.qcowDiskFilePath()); err != nil {
+	if err := e2eutils.ConvertVMDKtoQCOW2(p.vmdkDiskFilePath(), p.qcowDiskFilePath()); err != nil {
 		return fmt.Errorf("failed to convert vmdk to qcow: %w", err)
 	}
 
@@ -85,7 +85,7 @@ func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
 		return fmt.Errorf("failed to download image: %v", err)
 	}
 
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	if _, err = io.Copy(ovaFile, res.Body); err != nil {
 		return fmt.Errorf("failed to write to the file: %w", err)
@@ -120,17 +120,17 @@ func (p *plannerAgentLibvirt) createVm() error {
 // ovaValidateAndExtract validates the OVA as a tar archive and extracts the ISO and VMDK files
 // from it using their known filenames inside the archive.
 func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
-	if err := ValidateTar(ovaFile); err != nil {
+	if err := e2eutils.ValidateTar(ovaFile); err != nil {
 		return fmt.Errorf("failed to validate tar: %w", err)
 	}
 
 	// Untar ISO from OVA
-	if err := Untar(ovaFile, p.isoFilePath(), "MigrationAssessment.iso"); err != nil {
+	if err := e2eutils.Untar(ovaFile, p.isoFilePath(), "MigrationAssessment.iso"); err != nil {
 		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
 	// Untar VMDK from OVA
-	if err := Untar(ovaFile, p.vmdkDiskFilePath(), "persistence-disk.vmdk"); err != nil {
+	if err := e2eutils.Untar(ovaFile, p.vmdkDiskFilePath(), "persistence-disk.vmdk"); err != nil {
 		return fmt.Errorf("failed to uncompress the file: %w", err)
 	}
 
@@ -139,22 +139,22 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 
 // ovaFilePath returns the expected file path of the agent OVA,
 func (p *plannerAgentLibvirt) ovaFilePath() string {
-	return filepath.Join(Home, fmt.Sprintf("%s.ova", p.name))
+	return filepath.Join(e2e.Home, fmt.Sprintf("%s.ova", p.name))
 }
 
 // isoFilePath returns the expected file path of the agent ISO,
 func (p *plannerAgentLibvirt) isoFilePath() string {
-	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.iso", p.name))
+	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.iso", p.name))
 }
 
 // vmdkDiskFilePath returns the expected path of the VMDK disk image,
 func (p *plannerAgentLibvirt) vmdkDiskFilePath() string {
-	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.vmdk", p.name))
+	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.vmdk", p.name))
 }
 
 // qcowDiskFilePath returns the expected path of the QCOW2 disk image,
 func (p *plannerAgentLibvirt) qcowDiskFilePath() string {
-	return filepath.Join(DefaultBasePath, fmt.Sprintf("%s.qcow2", p.name))
+	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.qcow2", p.name))
 }
 
 // WaitForDomainState polls the libvirt domain state until the desired state is reached

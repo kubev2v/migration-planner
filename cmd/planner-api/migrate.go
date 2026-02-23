@@ -34,7 +34,7 @@ var migrateCmd = &cobra.Command{
 		}
 
 		store := store.NewStore(db)
-		defer store.Close()
+		defer func() { _ = store.Close() }()
 
 		zap.S().Info("Running database migrations")
 		if err := migrations.MigrateStore(db, cfg.Service.MigrationFolder); err != nil {

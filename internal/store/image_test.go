@@ -34,7 +34,7 @@ var _ = Describe("image infra store", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("create", func() {

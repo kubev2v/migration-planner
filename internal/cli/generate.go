@@ -62,7 +62,7 @@ func (o *GenerateOptions) Validate(args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to open rhcos base image file: %s", err)
 		}
-		rhcosFile.Close()
+		_ = rhcosFile.Close()
 	}
 
 	switch o.ImageType {
@@ -164,7 +164,7 @@ func getLocalIP() (net.IP, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	localAddr := conn.LocalAddr().(*net.UDPAddr)
 

@@ -1,0 +1,6 @@
+version: "2"
+
+run:
+  skip-dirs:
+    - agent-v2
+    - bin

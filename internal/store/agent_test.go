@@ -36,7 +36,7 @@ var _ = Describe("agent store", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("list", func() {

@@ -66,7 +66,7 @@ func (a *AgentApi) request(method string, path string, body []byte, result any) 
 	if err != nil {
 		return nil, fmt.Errorf("error getting response from local server: %v", err)
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {

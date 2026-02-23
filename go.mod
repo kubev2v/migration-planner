@@ -1,6 +1,6 @@
 module github.com/kubev2v/migration-planner
 
-go 1.24.9
+go 1.25.0
 
 require (
 	github.com/MicahParks/jwkset v0.11.0

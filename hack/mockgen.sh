@@ -10,8 +10,8 @@ fi
 # ensure mockgen is installed
 go install -v go.uber.org/mock/mockgen@v0.4.0
 
-# remove existing mocks
-find . -name 'mock_*.go' -type f -not -path './vendor/*' -delete
+# remove existing mocks (exclude vendor and agent-v2 submodule)
+find . -name 'mock_*.go' -type f -not -path './vendor/*' -not -path './agent-v2/*' -delete
 
 # file format '=' delimited: source=destination
 mock_list_file="hack/mock.list.txt"

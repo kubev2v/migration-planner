@@ -44,12 +44,12 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 	}
 	extensionDir := "/tmp/duckdb_extensions"
 	if _, err := db.Exec(fmt.Sprintf("SET extension_directory='%s';", extensionDir)); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("setting duckdb extension directory: %w", err)
 	}
 	parser := duckdb_parser.New(db, w.validator)
 	if err := parser.Init(); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, nil, fmt.Errorf("initializing duckdb schema: %w", err)
 	}
 	return parser, db, nil
@@ -84,7 +84,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
 	}
-	defer duckDB.Close()
+	defer func() { _ = duckDB.Close() }()
 
 	// Write file content to temp file for DuckDB ingestion
 	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
@@ -92,13 +92,13 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		return w.failJob(ctx, logger, job.ID, "create_temp_file", err, fmt.Sprintf("failed to create temp file: %v", err))
 	}
 	tempFilePath := tempFile.Name()
-	defer os.Remove(tempFilePath)
+	defer func() { _ = os.Remove(tempFilePath) }()
 
 	if _, err := tempFile.Write(job.Args.FileContent); err != nil {
-		tempFile.Close()
+		_ = tempFile.Close()
 		return w.failJob(ctx, logger, job.ID, "write_temp_file", err, fmt.Sprintf("failed to write temp file: %v", err))
 	}
-	tempFile.Close()
+	_ = tempFile.Close()
 
 	// Update status to validating before ingestion (which includes OPA validation)
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {

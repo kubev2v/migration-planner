@@ -27,7 +27,7 @@ func (h *HttpDownloader) Get(ctx context.Context, dst io.Writer) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("failed to download ISO %q, status code: %d", h.imagePath, resp.StatusCode)

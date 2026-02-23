@@ -31,7 +31,7 @@ var _ = Describe("migrations", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		s.Close()
+		_ = s.Close()
 	})
 
 	Context("store migrations", Ordered, func() {

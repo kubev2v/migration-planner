@@ -30,7 +30,7 @@ var _ = Describe("Store", Ordered, func() {
 	})
 
 	AfterAll(func() {
-		store.Close()
+		_ = store.Close()
 	})
 
 	Context("transaction", func() {

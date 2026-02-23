@@ -1,10 +1,10 @@
 package model
 
 import (
-	. "github.com/kubev2v/migration-planner/test/e2e/agent"
+	agentpkg "github.com/kubev2v/migration-planner/test/e2e/agent"
 )
 
 type E2EAgent struct {
-	Agent PlannerAgent
-	Api   *AgentApi
+	Agent agentpkg.PlannerAgent
+	Api   *agentpkg.AgentApi
 }
