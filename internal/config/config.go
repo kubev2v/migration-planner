@@ -31,7 +31,6 @@ type svcConfig struct {
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
-	S3                   S3
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
 }
@@ -41,15 +40,6 @@ type Auth struct {
 	JwkCertURL                 string `envconfig:"MIGRATION_PLANNER_JWK_URL" default:""`
 	LocalPrivateKey            string `envconfig:"MIGRATION_PLANNER_PRIVATE_KEY" default:""`
 	AgentAuthenticationEnabled bool   `envconfig:"MIGRATION_PLANNER_AGENT_AUTH_ENABLED" default:"true"`
-}
-
-type S3 struct {
-	Endpoint    string `envconfig:"MIGRATION_PLANNER_S3_ENDPOINT" default:""`
-	Bucket      string `envconfig:"MIGRATION_PLANNER_S3_BUCKET" default:""`
-	AccessKey   string `envconfig:"MIGRATION_PLANNER_S3_ACCESS_KEY" default:""`
-	SecretKey   string `envconfig:"MIGRATION_PLANNER_S3_SECRET_KEY" default:""`
-	IsoFileName string `envconfig:"MIGRATION_PLANNER_S3_ISO_FILENAME" default:""`
-	IsoSha256   string `envconfig:"MIGRATION_PLANNER_S3_ISO_SHA256" default:""`
 }
 
 type Sizer struct {
