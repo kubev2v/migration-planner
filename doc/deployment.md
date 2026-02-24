@@ -30,6 +30,7 @@ export MIGRATION_PLANNER_IMAGE_TAG=<agent_and_api_image_tag>    # Default: lates
 export MIGRATION_PLANNER_UI_IMAGE=<ui_image_source>             # Default: quay.io/kubev2v/migration-planner-ui  
 export MIGRATION_PLANNER_UI_IMAGE_TAG=<ui_image_tag>            # Default: latest  
 export MIGRATION_PLANNER_REPLICAS=<replica_count>               # Default: 1  
+export SERVICE_API_PATH=<api_path_prefix>                       # Default: /api/migration-assessment (allows multiple instances in same namespace)
 ```
 
 

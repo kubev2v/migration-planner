@@ -15,6 +15,8 @@ MIGRATION_PLANNER_ISO_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migrat
 MIGRATION_PLANNER_IMAGE_PULL_POLICY ?= Always
 MIGRATION_PLANNER_NAMESPACE ?= assisted-migration
 MIGRATION_PLANNER_REPLICAS ?= 1
+# API path prefix for the service (allows multiple instances in same namespace)
+SERVICE_API_PATH ?= /api/migration-assessment
 MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
 INSECURE_REGISTRY ?= "true"
@@ -215,9 +217,10 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
-       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}/api/migration-assessment \
+       -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
+       -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
-       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
@@ -234,6 +237,7 @@ delete-from-openshift: oc
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
+       -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
        -p SIZER_IMAGE=$(SIZER_IMAGE) \
        -p SIZER_PORT=$(SIZER_PORT) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
@@ -254,9 +258,10 @@ deploy-on-kind: oc
 	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/s3-secret-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/service-template.yml \
-	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443/api/migration-assessment \
+	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
+	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443/api/migration-assessment \
+	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
@@ -271,6 +276,7 @@ deploy-on-kind: oc
 delete-from-kind: oc
 	inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
 	oc process --local -f deploy/templates/service-template.yml \
+	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
 	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \

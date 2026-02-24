@@ -95,6 +95,9 @@ parameters:
     description: secret name for s3 credentials
     value: "migration-planner-s3-creds"
   # Envoy Config values
+  - name: SERVICE_API_PATH
+    description: API path prefix for this service (allows multiple instances in same namespace)
+    value: "/api/migration-assessment"
   - name: ENVOY_IMAGE
     description: Envoy container image
     value: docker.io/envoyproxy/envoy:v1.33.2
@@ -378,16 +381,16 @@ objects:
                           - "*"
                         routes:
                         - match:
-                            prefix: "/api/migration-assessment/health"
+                            prefix: "${SERVICE_API_PATH}/health"
                           route:
                             cluster: backend-agent-api
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/health$"
+                                regex: "^${SERVICE_API_PATH}/health$"
                               substitution: "/health"
                         - match:
                             safe_regex:
-                              regex: "^/api/migration-assessment/api/v1/sources/([0-9a-f-]+)/status$"
+                              regex: "^${SERVICE_API_PATH}/api/v1/sources/([0-9a-f-]+)/status$"
                             headers:
                             - name: ":method"
                               exact_match: "PUT"
@@ -395,49 +398,49 @@ objects:
                             cluster: backend-agent-api
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/sources/([0-9a-f-]+)/status$"
+                                regex: "^${SERVICE_API_PATH}/api/v1/sources/([0-9a-f-]+)/status$"
                               substitution: "/api/v1/sources/\\1/status"
                         - match:
-                            prefix: "/api/migration-assessment/api/v1/agents"
+                            prefix: "${SERVICE_API_PATH}/api/v1/agents"
                           route:
                             cluster: backend-agent-api
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/agents"
+                                regex: "^${SERVICE_API_PATH}/api/v1/agents"
                               substitution: "/api/v1/agents"
                         - match:
-                            prefix: "/api/migration-assessment/api/v1/sources"
+                            prefix: "${SERVICE_API_PATH}/api/v1/sources"
                           route:
                             cluster: backend-api
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/sources"
+                                regex: "^${SERVICE_API_PATH}/api/v1/sources"
                               substitution: "/api/v1/sources"
                         - match: 
-                            prefix: "/api/migration-assessment/api/v1/image"
+                            prefix: "${SERVICE_API_PATH}/api/v1/image"
                           route:
                             cluster: backend-image
                             timeout: 0s
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/image"
+                                regex: "^${SERVICE_API_PATH}/api/v1/image"
                               substitution: "/api/v1/image"
                         - match:
-                            prefix: "/api/migration-assessment/api/v1/assessments"
+                            prefix: "${SERVICE_API_PATH}/api/v1/assessments"
                           route:
                             cluster: backend-api
                             timeout: 0s
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/assessments"
+                                regex: "^${SERVICE_API_PATH}/api/v1/assessments"
                               substitution: "/api/v1/assessments"
                         - match:
-                            prefix: "/api/migration-assessment/api/v1/info"
+                            prefix: "${SERVICE_API_PATH}/api/v1/info"
                           route:
                             cluster: backend-api
                             regex_rewrite:
                               pattern:
-                                regex: "^/api/migration-assessment/api/v1/info"
+                                regex: "^${SERVICE_API_PATH}/api/v1/info"
                               substitution: "/api/v1/info"
                     http_filters:
                     - name: envoy.filters.http.router
