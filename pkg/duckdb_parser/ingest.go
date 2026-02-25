@@ -66,8 +66,11 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	// Drop vinfo_raw now that validation is complete
 	p.dropVinfoRaw()
 
-	// Only run VM validation if schema is valid (we have VMs to validate)
+	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
+		if err := p.populateComplexity(); err != nil {
+			return result, fmt.Errorf("populating complexity: %w", err)
+		}
 		if err := p.validateVMs(ctx); err != nil {
 			return result, fmt.Errorf("validating VMs: %w", err)
 		}
@@ -92,8 +95,11 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	// Validate schema against vinfo (SQLite inserts directly into vinfo, no vinfo_raw)
 	result := p.ValidateSchema(ctx, "vinfo")
 
-	// Only run VM validation if schema is valid (we have VMs to validate)
+	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
+		if err := p.populateComplexity(); err != nil {
+			return result, fmt.Errorf("populating complexity: %w", err)
+		}
 		if err := p.validateVMs(ctx); err != nil {
 			return result, fmt.Errorf("validating VMs: %w", err)
 		}
@@ -125,6 +131,18 @@ func (p *Parser) executeStatements(query string) error {
 			// Non-critical failures are logged but don't stop execution
 			zap.S().Debugw("non-critical statement failed", "error", err)
 		}
+	}
+	return nil
+}
+
+// populateComplexity computes and stores per-VM migration complexity based on OS type and disk size.
+func (p *Parser) populateComplexity() error {
+	query, err := p.builder.PopulateComplexityQuery()
+	if err != nil {
+		return fmt.Errorf("building complexity query: %w", err)
+	}
+	if _, err := p.db.Exec(query); err != nil {
+		return fmt.Errorf("executing complexity query: %w", err)
 	}
 	return nil
 }
