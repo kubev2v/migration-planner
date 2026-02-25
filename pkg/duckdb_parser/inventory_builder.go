@@ -197,6 +197,14 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		zap.S().Named("duckdb_parser").Warnf("Failed to get NIC tier distribution: %v", err)
 	}
 
+	// Get complexity distribution
+	complexityDist, err := p.ComplexityDistribution(ctx, filters)
+	if err == nil {
+		vmsData.DistributionByComplexity = complexityDist
+	} else {
+		zap.S().Named("duckdb_parser").Warnf("Failed to get complexity distribution: %v", err)
+	}
+
 	// Get disk size tier distribution (returns inventory types directly)
 	diskSizeTiers, err := p.DiskSizeTierDistribution(ctx, filters)
 	if err == nil {
