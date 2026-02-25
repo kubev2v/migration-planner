@@ -117,6 +117,13 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 // Assessment-related mappers
 
 func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest) mappers.ClusterRequirementsRequestForm {
+	// Default control plane node resources align with OVF sizer defaults and meet
+	// Assisted Installer prerequisites for control plane nodes.
+	const (
+		defaultControlPlaneCPU    = 6
+		defaultControlPlaneMemory = 16
+	)
+
 	form := mappers.ClusterRequirementsRequestForm{
 		ClusterID:               apiReq.ClusterId,
 		CpuOverCommitRatio:      string(apiReq.CpuOverCommitRatio),
@@ -125,12 +132,20 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 		WorkerNodeThreads:       0,
 		WorkerNodeMemory:        apiReq.WorkerNodeMemory,
 		ControlPlaneSchedulable: false,
+		ControlPlaneCPU:         defaultControlPlaneCPU,
+		ControlPlaneMemory:      defaultControlPlaneMemory,
 	}
 	if apiReq.ControlPlaneSchedulable != nil {
 		form.ControlPlaneSchedulable = *apiReq.ControlPlaneSchedulable
 	}
 	if apiReq.WorkerNodeThreads != nil {
 		form.WorkerNodeThreads = *apiReq.WorkerNodeThreads
+	}
+	if apiReq.ControlPlaneCPU != nil {
+		form.ControlPlaneCPU = *apiReq.ControlPlaneCPU
+	}
+	if apiReq.ControlPlaneMemory != nil {
+		form.ControlPlaneMemory = *apiReq.ControlPlaneMemory
 	}
 	return form
 }

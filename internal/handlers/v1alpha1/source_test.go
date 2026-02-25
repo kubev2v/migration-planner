@@ -299,7 +299,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), service.NewEstimationService(s))
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
 
 			// First create succeeds
 			resp1, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{

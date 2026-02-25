@@ -38,11 +38,6 @@ const (
 	// MaxNodeCount - if exceeded, recommend larger nodes
 	MaxNodeCount = 100
 
-	// ControlPlaneCPU is the default CPU for control plane nodes
-	ControlPlaneCPU = 6
-	// ControlPlaneMemory is the default memory (GB) for control plane nodes
-	ControlPlaneMemory = 16
-
 	// MachineSetNumberOfDisks is the number of disks for both worker and control plane machine sets
 	MachineSetNumberOfDisks = 24
 
@@ -181,8 +176,8 @@ func (s *SizerService) CalculateClusterRequirements(
 	includeControlPlane := true
 	controlPlaneSchedulable := req.ControlPlaneSchedulable
 
-	controlPlaneCPU := ControlPlaneCPU
-	controlPlaneMemory := ControlPlaneMemory
+	controlPlaneCPU := req.ControlPlaneCPU
+	controlPlaneMemory := req.ControlPlaneMemory
 
 	// Calculate effective CPU with SMT adjustment
 	effectiveCPU := CalculateEffectiveCPU(req.WorkerNodeCPU, req.WorkerNodeThreads)
