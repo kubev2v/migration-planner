@@ -1,0 +1,21 @@
+{{- /*
+Complexity Distribution Query Template - Returns VM distribution by migration complexity level.
+
+Complexity levels:
+  0 = Unsupported
+  1 = Easy
+  2 = Medium
+  3 = Hard
+  4 = WhiteGlove
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+*/ -}}
+SELECT
+    CAST("OsDiskComplexity" AS VARCHAR) AS complexity,
+    COUNT(*) AS count
+FROM vinfo
+WHERE 1=1
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+GROUP BY "OsDiskComplexity"
+ORDER BY "OsDiskComplexity";

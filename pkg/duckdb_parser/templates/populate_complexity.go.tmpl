@@ -47,10 +47,7 @@ vm_os_level AS (
     SELECT
         "VM ID",
         CASE
-            WHEN effective_os LIKE '%Oracle%' OR effective_os LIKE '%Microsoft SQL%' THEN 'database'
-            WHEN effective_os LIKE '%Red Hat%' OR effective_os LIKE '%Rocky Linux%' THEN 'easy'
-            WHEN effective_os LIKE '%CentOS%' OR effective_os LIKE '%Windows%' THEN 'medium'
-            WHEN effective_os LIKE '%Ubuntu%' OR effective_os LIKE '%SUSE Linux Enterprise%' THEN 'hard'
+{{.OSCaseClauses}}
             ELSE 'unsupported'
         END AS os_level
     FROM vm_os

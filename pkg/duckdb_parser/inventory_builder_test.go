@@ -831,3 +831,117 @@ func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, countCluster2, "VMs with shared disks in cluster2 only")
 }
+
+// TestBuildInventory_ComplexityDistribution tests that complexity is computed and distributed correctly.
+func TestBuildInventory_ComplexityDistribution(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// VMs with different OS types to test complexity classification
+	vms := []map[string]string{
+		// Red Hat (Easy OS) + small disk -> Easy (1)
+		{"VM": "vm-rhel", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Red Hat Enterprise Linux 8"},
+		// Windows (Medium OS) + small disk -> Medium (2)
+		{"VM": "vm-win", "VM ID": "vm-002", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Microsoft Windows Server 2019"},
+		// Ubuntu (Hard OS) + small disk -> Medium (2)
+		{"VM": "vm-ubuntu", "VM ID": "vm-003", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Ubuntu Linux 22.04"},
+		// Oracle (Database) -> White Glove (4) regardless of disk
+		{"VM": "vm-oracle", "VM ID": "vm-004", "Host": "esxi-host-1", "CPUs": "8", "Memory": "16384", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Oracle Linux 8"},
+		// Unknown OS -> Unsupported (0)
+		{"VM": "vm-unknown", "VM ID": "vm-005", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Some Unknown OS"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx)
+	require.NoError(t, err)
+
+	// Verify complexity distribution is populated
+	require.NotNil(t, inv.VCenter.VMs.DistributionByComplexity, "DistributionByComplexity should be populated")
+
+	dist := inv.VCenter.VMs.DistributionByComplexity
+	// Complexity levels: 0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove
+	// Expected: 1 Easy, 2 Medium (Windows + Ubuntu), 1 White Glove (Oracle), 1 Unsupported
+	assert.Equal(t, 1, dist["0"], "1 VM with unknown OS should be Unsupported (0)")
+	assert.Equal(t, 1, dist["1"], "1 VM with Red Hat should be Easy (1)")
+	assert.Equal(t, 2, dist["2"], "2 VMs (Windows, Ubuntu) should be Medium (2)")
+	assert.Equal(t, 1, dist["4"], "1 VM with Oracle should be WhiteGlove (4)")
+}
+
+// TestComplexityDistribution_WithDiskSize tests that disk size affects complexity.
+func TestComplexityDistribution_WithDiskSize(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// Red Hat VM with large disk should be Hard (3) due to disk size
+	vms := []map[string]string{
+		{"VM": "vm-rhel-large", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Red Hat Enterprise Linux 8"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	// Add large disk (25 TB = 25 * 1024 * 1024 MiB = 26214400 MiB) -> Hard disk tier
+	vDiskHeaders := []string{
+		"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+		"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+		"Thin", "Controller", "Label", "SCSI Unit #",
+	}
+	disks := []map[string]string{
+		{"VM ID": "vm-001", "Disk Key": "2000", "Unit #": "0", "Capacity MiB": "26214400"},
+	}
+
+	sheets := append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))
+	tmpFile := createTestExcel(t, sheets...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	dist, err := parser.ComplexityDistribution(ctx, Filters{})
+	require.NoError(t, err)
+
+	// Red Hat (Easy OS) + Hard disk tier = Hard (3)
+	assert.Equal(t, 1, dist["3"], "Red Hat with 25TB disk should be Hard (3)")
+	assert.Equal(t, 0, dist["1"], "No VMs should be Easy (1) with large disk")
+}
+
+// TestComplexityDistribution_ClusterFilter tests filtering by cluster.
+func TestComplexityDistribution_ClusterFilter(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-rhel", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "OS according to the VMware Tools": "Red Hat Enterprise Linux 8"},
+		{"VM": "vm-win", "VM ID": "vm-002", "Host": "esxi-host-2", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster2", "Datacenter": "dc1", "OS according to the VMware Tools": "Microsoft Windows Server 2019"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster2", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// Filter by cluster1 - should only see the Red Hat VM (Easy=1)
+	dist1, err := parser.ComplexityDistribution(ctx, Filters{Cluster: "cluster1"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, dist1["1"], "cluster1 should have 1 Easy (1) VM")
+	assert.Equal(t, 0, dist1["2"], "cluster1 should have no Medium (2) VMs")
+
+	// Filter by cluster2 - should only see the Windows VM (Medium=2)
+	dist2, err := parser.ComplexityDistribution(ctx, Filters{Cluster: "cluster2"})
+	require.NoError(t, err)
+	assert.Equal(t, 0, dist2["1"], "cluster2 should have no Easy (1) VMs")
+	assert.Equal(t, 1, dist2["2"], "cluster2 should have 1 Medium (2) VM")
+}

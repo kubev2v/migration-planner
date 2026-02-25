@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"embed"
 	"fmt"
+	"sort"
 	"strings"
 	"text/template"
+
+	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 )
 
 //go:embed templates/*.tmpl
@@ -64,6 +67,7 @@ type queryParams struct {
 	PowerStateFilter string
 	VmIDFilter       string
 	Category         string
+	OSCaseClauses    string
 	Limit            int
 	Offset           int
 }
@@ -189,6 +193,14 @@ func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
 		ClusterFilter: filters.Cluster,
 	}
 	return b.buildQuery("nic_tier_query", mustGetTemplate("nic_tier_query"), params)
+}
+
+// ComplexityDistributionQuery builds the complexity distribution query.
+func (b *QueryBuilder) ComplexityDistributionQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: filters.Cluster,
+	}
+	return b.buildQuery("complexity_distribution_query", mustGetTemplate("complexity_distribution_query"), params)
 }
 
 // DiskSizeTierQuery builds the disk size tier distribution query.
@@ -319,9 +331,30 @@ func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, er
 	return b.buildQuery("vms_with_shared_disks_count_query", mustGetTemplate("vms_with_shared_disks_count_query"), params)
 }
 
+// generateOSCaseClauses reads complexity.OSDifficultyScores and generates SQL WHEN clauses.
+func generateOSCaseClauses() string {
+	scoreToLevel := map[int]string{
+		1: "easy",
+		2: "medium",
+		3: "hard",
+		4: "database",
+	}
+	var clauses []string
+	for keyword, score := range complexity.OSDifficultyScores {
+		level := scoreToLevel[score]
+		clauses = append(clauses, fmt.Sprintf(
+			"            WHEN effective_os LIKE '%%%s%%' THEN '%s'", keyword, level))
+	}
+	sort.Strings(clauses) // deterministic output
+	return strings.Join(clauses, "\n")
+}
+
 // PopulateComplexityQuery returns a query that computes and stores per-VM migration complexity.
 func (b *QueryBuilder) PopulateComplexityQuery() (string, error) {
-	return b.buildQuery("populate_complexity", mustGetTemplate("populate_complexity"), nil)
+	params := queryParams{
+		OSCaseClauses: generateOSCaseClauses(),
+	}
+	return b.buildQuery("populate_complexity", mustGetTemplate("populate_complexity"), params)
 }
 
 func (b *QueryBuilder) buildQuery(name, tmplContent string, params any) (string, error) {
