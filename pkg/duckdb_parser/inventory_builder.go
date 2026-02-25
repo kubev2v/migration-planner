@@ -98,6 +98,7 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		DistributionByCPUTier:    make(map[string]int),
 		DistributionByMemoryTier: make(map[string]int),
 		DistributionByNICCount:   make(map[string]int),
+		DistributionByComplexity: make(map[string]int),
 		DiskSizeTiers:            make(map[string]inventory.DiskSizeTierSummary),
 		DiskTypes:                make(map[string]inventory.DiskTypeSummary),
 		MigrationWarnings:        []inventory.MigrationIssue{},
