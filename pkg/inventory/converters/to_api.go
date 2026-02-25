@@ -129,6 +129,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		DistributionByCpuTier:    &v.DistributionByCPUTier,
 		DistributionByMemoryTier: &v.DistributionByMemoryTier,
 		DistributionByNicCount:   &v.DistributionByNICCount,
+		DistributionByComplexity: &v.DistributionByComplexity,
 		DiskSizeTier:             &diskSizeTiers,
 		DiskTypes:                &diskTypes,
 		MigrationWarnings:        migrationWarnings,

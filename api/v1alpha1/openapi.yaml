@@ -1240,6 +1240,11 @@ components:
           description: Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
           additionalProperties:
             type: integer
+        distributionByComplexity:
+          type: object
+          description: Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
+          additionalProperties:
+            type: integer
         ramGB:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskGB:
