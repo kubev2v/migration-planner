@@ -41,6 +41,7 @@ type VM struct {
 	TotalDiskCapacityMiB     int32    `json:"totalDiskCapacityMiB" db:"Total disk capacity MiB"`
 	ProvisionedMiB           int32    `json:"provisionedMiB" db:"Provisioned MiB"`
 	ResourcePool             string   `json:"resourcePool" db:"Resource pool"`
+	OsDiskComplexity         int32    `json:"osDiskComplexity" db:"OsDiskComplexity"`
 	Concerns                 Concerns `json:"concerns"`
 	NumaNodeAffinity         []string `json:"numaNodeAffinity"` // Always empty for RVTools, included for OPA compatibility
 }

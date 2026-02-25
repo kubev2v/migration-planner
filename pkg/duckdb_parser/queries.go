@@ -519,6 +519,7 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 			&vm.TotalDiskCapacityMiB,
 			&vm.ProvisionedMiB,
 			&vm.ResourcePool,
+			&vm.OsDiskComplexity,
 			&vm.CpuHotAddEnabled,
 			&vm.CpuHotRemoveEnabled,
 			&vm.CpuSockets,

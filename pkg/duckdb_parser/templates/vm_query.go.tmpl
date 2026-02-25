@@ -92,6 +92,7 @@ SELECT
     COALESCE(i."Total disk capacity MiB", 0) AS "TotalDiskCapacityMiB",
     COALESCE(i."Provisioned MiB", 0) AS "ProvisionedMiB",
     COALESCE(i."Resource pool", '') AS "ResourcePool",
+    COALESCE(i."OsDiskComplexity", 0) AS "OsDiskComplexity",
     COALESCE(c."Hot Add", false) AS "CpuHotAddEnabled",
     COALESCE(c."Hot Remove", false) AS "CpuHotRemoveEnabled",
     COALESCE(c."Sockets", 0) AS "CpuSockets",

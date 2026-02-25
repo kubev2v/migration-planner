@@ -1,0 +1,97 @@
+{{- /*
+Populate Complexity Template - Computes per-VM migration complexity from OS type and disk size.
+
+Complexity levels (stored as INTEGER):
+  0 = Unsupported
+  1 = Easy
+  2 = Medium
+  3 = Hard
+  4 = White Glove
+
+OS difficulty mapping:
+  Easy:       Red Hat, Rocky Linux
+  Medium:     CentOS, Windows
+  Hard:       Ubuntu, SUSE Linux Enterprise
+  Database:   Oracle, Microsoft SQL (always White Glove regardless of disk)
+  Unsupported: anything else (always 0)
+
+Disk size tiers (total disk capacity from vdisk, converted to TB):
+  Easy:       0-10 TB
+  Medium:     10-20 TB
+  Hard:       20-50 TB
+  White Glove: >50 TB
+
+Combined matrix:
+  OS Easy   + Disk Easy/Medium  → 1 (Easy)
+  OS Easy   + Disk Hard/WG      → 3 (Hard)
+  OS Medium + Disk Easy/Medium  → 2 (Medium)
+  OS Medium + Disk Hard/WG      → 3 (Hard)
+  OS Hard   + Disk Easy/Medium  → 2 (Medium)
+  OS Hard   + Disk Hard/WG      → 3 (Hard)
+  OS Database (any disk)        → 4 (White Glove)
+  OS Unsupported (any disk)     → 0
+
+No template parameters required.
+*/ -}}
+WITH vm_os AS (
+    SELECT
+        "VM ID",
+        COALESCE(
+            NULLIF("OS according to the VMware Tools", ''),
+            NULLIF("OS according to the configuration file", ''),
+            ''
+        ) AS effective_os
+    FROM vinfo
+),
+vm_os_level AS (
+    SELECT
+        "VM ID",
+        CASE
+            WHEN effective_os LIKE '%Oracle%' OR effective_os LIKE '%Microsoft SQL%' THEN 'database'
+            WHEN effective_os LIKE '%Red Hat%' OR effective_os LIKE '%Rocky Linux%' THEN 'easy'
+            WHEN effective_os LIKE '%CentOS%' OR effective_os LIKE '%Windows%' THEN 'medium'
+            WHEN effective_os LIKE '%Ubuntu%' OR effective_os LIKE '%SUSE Linux Enterprise%' THEN 'hard'
+            ELSE 'unsupported'
+        END AS os_level
+    FROM vm_os
+),
+vm_disk_totals AS (
+    SELECT
+        i."VM ID",
+        COALESCE(SUM(d."Capacity MiB"), 0) / 1048576.0 AS total_disk_tb
+    FROM vinfo i
+    LEFT JOIN vdisk d ON i."VM ID" = d."VM ID"
+    GROUP BY i."VM ID"
+),
+vm_disk_level AS (
+    SELECT
+        "VM ID",
+        CASE
+            WHEN total_disk_tb < 10 THEN 'easy'
+            WHEN total_disk_tb < 20 THEN 'medium'
+            WHEN total_disk_tb < 50 THEN 'hard'
+            ELSE 'whiteglove'
+        END AS disk_level
+    FROM vm_disk_totals
+),
+vm_complexity AS (
+    SELECT
+        o."VM ID",
+        CASE
+            WHEN o.os_level = 'unsupported' THEN 0
+            WHEN o.os_level = 'database' THEN 4
+            WHEN o.os_level = 'easy' AND dl.disk_level IN ('easy', 'medium') THEN 1
+            WHEN o.os_level = 'easy' THEN 3
+            WHEN o.os_level = 'medium' AND dl.disk_level IN ('easy', 'medium') THEN 2
+            WHEN o.os_level = 'medium' THEN 3
+            WHEN o.os_level = 'hard' AND dl.disk_level IN ('easy', 'medium') THEN 2
+            WHEN o.os_level = 'hard' THEN 3
+            ELSE 0
+        END AS complexity
+    FROM vm_os_level o
+    JOIN vm_disk_level dl ON o."VM ID" = dl."VM ID"
+)
+UPDATE vinfo
+SET "OsDiskComplexity" = vc.complexity
+FROM vm_complexity vc
+WHERE vinfo."VM ID" = vc."VM ID";
