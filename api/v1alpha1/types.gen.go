@@ -134,6 +134,12 @@ type ClusterRequirementsRequest struct {
 	// ClusterId ID of the cluster to calculate requirements for
 	ClusterId string `json:"clusterId" validate:"required"`
 
+	// ControlPlaneCPU CPU cores per control plane node (default: 6)
+	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=200"`
+
+	// ControlPlaneMemory Memory (GB) per control plane node (default: 16)
+	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=512"`
+
 	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
 	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
 

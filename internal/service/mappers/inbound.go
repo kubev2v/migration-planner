@@ -232,6 +232,8 @@ type ClusterRequirementsRequestForm struct {
 	WorkerNodeThreads       int
 	WorkerNodeMemory        int
 	ControlPlaneSchedulable bool
+	ControlPlaneCPU         int
+	ControlPlaneMemory      int
 }
 
 type ClusterRequirementsResponseForm struct {

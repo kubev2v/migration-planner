@@ -1682,6 +1682,18 @@ components:
           type: boolean
           default: false
           description: Allow workload scheduling on control plane nodes
+        controlPlaneCPU:
+          type: integer
+          default: 6
+          description: "CPU cores per control plane node (default: 6)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2,max=200"
+        controlPlaneMemory:
+          type: integer
+          default: 16
+          description: "Memory (GB) per control plane node (default: 16)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=4,max=512"
       required:
         - clusterId
         - cpuOverCommitRatio
