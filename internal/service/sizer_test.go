@@ -167,6 +167,32 @@ func createTestAssessment(id uuid.UUID, clusterID string, totalVMs, totalCPU, to
 }
 
 func createTestSizerResponse(nodeCount, workerNodes, controlPlaneNodes, totalCPU, totalMemory int) *client.SizerResponse {
+	// Build control plane nodes
+	controlPlaneNodesList := make([]client.Node, controlPlaneNodes)
+	for i := range controlPlaneNodesList {
+		controlPlaneNodesList[i] = client.Node{IsControlPlane: true}
+	}
+
+	// Build worker nodes
+	workerNodesList := make([]client.Node, workerNodes)
+	for i := range workerNodesList {
+		workerNodesList[i] = client.Node{IsControlPlane: false}
+	}
+
+	advanced := []client.Zone{}
+	if controlPlaneNodes > 0 {
+		advanced = append(advanced, client.Zone{
+			Zone:  "zone1",
+			Nodes: controlPlaneNodesList,
+		})
+	}
+	if workerNodes > 0 {
+		advanced = append(advanced, client.Zone{
+			Zone:  "zone2",
+			Nodes: workerNodesList,
+		})
+	}
+
 	return &client.SizerResponse{
 		Success: true,
 		Data: client.SizerData{
@@ -185,23 +211,7 @@ func createTestSizerResponse(nodeCount, workerNodes, controlPlaneNodes, totalCPU
 					Memory: 1.5,
 				},
 			},
-			Advanced: []client.Zone{
-				{
-					Zone: "zone1",
-					Nodes: []client.Node{
-						{IsControlPlane: true},
-						{IsControlPlane: true},
-						{IsControlPlane: true},
-					},
-				},
-				{
-					Zone: "zone2",
-					Nodes: []client.Node{
-						{IsControlPlane: false},
-						{IsControlPlane: false},
-					},
-				},
-			},
+			Advanced: advanced,
 		},
 	}
 }
@@ -243,6 +253,7 @@ var _ = Describe("sizer service", func() {
 				WorkerNodeCPU:           8,
 				WorkerNodeMemory:        16,
 				ControlPlaneSchedulable: false,
+				ControlPlaneNodeCount:   3,
 			}
 		})
 
@@ -434,7 +445,7 @@ var _ = Describe("sizer service", func() {
 				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
 			})
 
-			It("successfully handles fallback node counting when totalNodes < 3", func() {
+			It("successfully handles fallback node counting when totalNodes < controlPlaneNodeCount", func() {
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(&client.SizerResponse{
@@ -457,12 +468,65 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				// Base: 2 workers (no control plane since totalNodes < 3)
+				// Fallback case: totalNodes (2) < controlPlaneNodeCount (3)
+				// Assign all available nodes to control plane (partial HA setup)
+				// No worker nodes, so no failover nodes
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(2))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(2))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
+			})
+
+			It("successfully handles single node cluster (1 control plane)", func() {
+				request.ControlPlaneNodeCount = 1
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(3, 2, 1, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				// Base: 2 workers + 1 control plane = 3 total
 				// Failover: max(2, ceil(2*0.10)) = 2 nodes added
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(4))
-				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(5))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(1))
 				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
 				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
+			})
+
+			It("successfully handles single node cluster fallback when totalNodes < 1", func() {
+				request.ControlPlaneNodeCount = 1
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(&client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   0,
+						TotalCPU:    40,
+						TotalMemory: 80,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    100.0,
+							Memory: 200.0,
+						},
+						Advanced: nil,
+					},
+				}, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				// Base: 0 nodes (no control plane since totalNodes < 1)
+				// Failover: 0 (no worker nodes to calculate from)
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(0))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
 			})
 		})
 

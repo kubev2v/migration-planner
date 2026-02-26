@@ -408,7 +408,6 @@ var _ = Describe("sizer handler", func() {
 					MemoryOverCommitRatio: api.MemoryOneToTwo,
 					WorkerNodeCPU:         8,
 					WorkerNodeMemory:      16,
-					// ControlPlaneCPU and ControlPlaneMemory are nil (defaults should be used)
 				}
 
 				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
@@ -453,6 +452,93 @@ var _ = Describe("sizer handler", func() {
 				_, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
 				Expect(ok).To(BeTrue())
 			})
+
+			It("successfully handles single node cluster (1 control plane)", func() {
+				one := api.N1
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+					ControlPlaneNodeCount: &one,
+				}
+
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				sizerResponse := createTestSizerResponse(3, 2, 1, 40, 80)
+				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				Expect(resp).NotTo(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(1))
+			})
+
+			It("successfully handles HA cluster (3 control plane) - explicit", func() {
+				three := api.N3
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+					ControlPlaneNodeCount: &three,
+				}
+
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				sizerResponse := createTestSizerResponse(5, 2, 3, 40, 80)
+				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				Expect(resp).NotTo(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+			})
+
+			It("defaults to 3 control plane nodes when controlPlaneNodeCount is not provided", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+					// ControlPlaneNodeCount is nil - should default to 3
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+			})
+
 		})
 
 		Context("validation errors", func() {
@@ -693,6 +779,41 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("workerNodeThreads (8) must be >= workerNodeCPU (16)"))
 			})
+
+			invalidControlPlaneNodeCounts := []int{0, 2, 4, 5, 10}
+			for _, invalidCount := range invalidControlPlaneNodeCounts {
+				It(fmt.Sprintf("returns 400 when controlPlaneNodeCount is invalid (%d)", invalidCount), func() {
+					invalidValue := api.ClusterRequirementsRequestControlPlaneNodeCount(invalidCount)
+					request := &api.ClusterRequirementsRequest{
+						ClusterId:             clusterID,
+						CpuOverCommitRatio:    api.CpuOneToFour,
+						MemoryOverCommitRatio: api.MemoryOneToTwo,
+						WorkerNodeCPU:         8,
+						WorkerNodeMemory:      16,
+						ControlPlaneNodeCount: &invalidValue,
+					}
+
+					testServer = createTestSizerServer(nil, http.StatusOK, false)
+					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+					handler = handlers.NewServiceHandler(
+						nil,
+						service.NewAssessmentService(mockStore, nil),
+						nil,
+						service.NewSizerService(sizerClient, mockStore),
+						nil,
+					)
+
+					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+						Id:   assessmentID,
+						Body: request,
+					})
+
+					Expect(err).To(BeNil())
+					errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+					Expect(ok).To(BeTrue())
+					Expect(errorResp.Message).To(ContainSubstring("invalid controlPlaneNodeCount"))
+				})
+			}
 
 		})
 
