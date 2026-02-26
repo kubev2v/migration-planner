@@ -147,6 +147,11 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 	if apiReq.ControlPlaneMemory != nil {
 		form.ControlPlaneMemory = *apiReq.ControlPlaneMemory
 	}
+	if apiReq.ControlPlaneNodeCount != nil {
+		form.ControlPlaneNodeCount = int(*apiReq.ControlPlaneNodeCount)
+	} else {
+		form.ControlPlaneNodeCount = int(v1alpha1.N3)
+	}
 	return form
 }
 

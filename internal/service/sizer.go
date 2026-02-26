@@ -201,6 +201,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithString("worker_node_effective_cpu", fmt.Sprintf("%.2f", effectiveCPU)).
 		WithInt("worker_node_memory", req.WorkerNodeMemory).
 		WithBool("control_plane_schedulable", controlPlaneSchedulable).
+		WithInt("control_plane_node_count", req.ControlPlaneNodeCount).
 		Build()
 
 	// Use effective CPU for all calculations
@@ -254,6 +255,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		controlPlaneSchedulable,
 		controlPlaneCPU,
 		controlPlaneMemory,
+		req.ControlPlaneNodeCount,
 	)
 
 	// Call sizer service
@@ -266,7 +268,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("sizer service returned empty response")
 	}
 
-	transformed := s.transformSizerResponse(sizerResponse)
+	transformed := s.transformSizerResponse(sizerResponse, req.ControlPlaneNodeCount)
 
 	if transformed.ClusterSizing.TotalNodes > MaxNodeCount {
 		minNodeCPU, minNodeMemory := s.calculateMinimumNodeSize(
@@ -514,6 +516,7 @@ func (s *SizerService) buildSizerPayload(
 	controlPlaneSchedulable bool,
 	controlPlaneCPU int,
 	controlPlaneMemory int,
+	controlPlaneNodeCount int,
 ) *client.SizerRequest {
 	machineSets := []client.MachineSet{
 		{
@@ -557,7 +560,7 @@ func (s *SizerService) buildSizerPayload(
 		workloads = []client.Workload{
 			{
 				Name:         "control-plane-services",
-				Count:        3,
+				Count:        controlPlaneNodeCount,
 				UsesMachines: []string{"controlPlane"},
 				Services: []client.ServiceDescriptor{
 					{
@@ -605,12 +608,11 @@ func (s *SizerService) buildSizerPayload(
 }
 
 // transformSizerResponse maps sizer service response to API response
-func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerResponse) TransformedSizerResponse {
-	totalNodes := sizerResponse.Data.NodeCount
-	workerNodes := 0
-	controlPlaneNodes := 0
+func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerResponse, controlPlaneNodeCount int) TransformedSizerResponse {
+	var workerNodes, controlPlaneNodes int
 
 	if len(sizerResponse.Data.Advanced) > 0 {
+		// Count nodes from Advanced field
 		for _, zone := range sizerResponse.Data.Advanced {
 			for _, node := range zone.Nodes {
 				if node.IsControlPlane {
@@ -621,18 +623,21 @@ func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerRespons
 			}
 		}
 	} else {
-		if totalNodes >= 3 {
-			controlPlaneNodes = 3
-			workerNodes = totalNodes - 3
+		// Fallback when Advanced is missing (legacy/error cases). Normally sizer returns Advanced.
+		total := sizerResponse.Data.NodeCount
+		if total < controlPlaneNodeCount {
+			controlPlaneNodes = total
+			workerNodes = 0
 		} else {
-			workerNodes = totalNodes
+			controlPlaneNodes = controlPlaneNodeCount
+			workerNodes = total - controlPlaneNodeCount
 		}
 	}
 
-	// Add failover capacity: max(2 nodes, 10% of worker nodes)
 	failoverNodes := calculateFailoverNodes(workerNodes)
 	workerNodes += failoverNodes
-	totalNodes += failoverNodes
+
+	totalNodes := controlPlaneNodes + workerNodes
 
 	resourceConsumptionForm := mappers.ResourceConsumptionForm{
 		CPU:    sizerResponse.Data.ResourceConsumption.CPU,

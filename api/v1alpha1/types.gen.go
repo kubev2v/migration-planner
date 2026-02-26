@@ -26,6 +26,12 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
+// Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
+const (
+	N1 ClusterRequirementsRequestControlPlaneNodeCount = 1
+	N3 ClusterRequirementsRequestControlPlaneNodeCount = 3
+)
+
 // Defines values for ClusterRequirementsRequestCpuOverCommitRatio.
 const (
 	CpuOneToFour ClusterRequirementsRequestCpuOverCommitRatio = "1:4"
@@ -140,6 +146,9 @@ type ClusterRequirementsRequest struct {
 	// ControlPlaneMemory Memory (GB) per control plane node (default: 16)
 	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=512"`
 
+	// ControlPlaneNodeCount Number of control plane nodes (1 for single node, 3 for HA)
+	ControlPlaneNodeCount *ClusterRequirementsRequestControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty" validate:"omitempty,oneof=1 3"`
+
 	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
 	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
 
@@ -158,6 +167,9 @@ type ClusterRequirementsRequest struct {
 	// WorkerNodeThreads Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
 	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2"`
 }
+
+// ClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes (1 for single node, 3 for HA)
+type ClusterRequirementsRequestControlPlaneNodeCount int
 
 // ClusterRequirementsRequestCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
 type ClusterRequirementsRequestCpuOverCommitRatio string

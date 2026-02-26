@@ -55,6 +55,17 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio)}, nil
 	}
 
+	// Validate controlPlaneNodeCount (API enum handles this in production, but tests bypass middleware)
+	if request.Body.ControlPlaneNodeCount != nil {
+		count := int(*request.Body.ControlPlaneNodeCount)
+		if count != 1 && count != 3 {
+			logger.Error(fmt.Errorf("invalid controlPlaneNodeCount: %d", count)).Log()
+			return server.CalculateAssessmentClusterRequirements400JSONResponse{
+				Message: fmt.Sprintf("invalid controlPlaneNodeCount: %d", count),
+			}, nil
+		}
+	}
+
 	// Validate SMT configuration if threads provided
 	if request.Body.WorkerNodeThreads != nil {
 		threads := *request.Body.WorkerNodeThreads
