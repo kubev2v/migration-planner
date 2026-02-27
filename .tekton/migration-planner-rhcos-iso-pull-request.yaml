@@ -186,6 +186,11 @@ spec:
         value: "1d"
       - name: COMMIT_SHA
         value: $(tasks.clone-repository.results.commit)
+      - name: BUILD_ARGS
+        value:
+        - $(params.build-args[*])
+        - GIT_COMMIT=$(tasks.clone-repository.results.commit)
+        - VERSION={{target_branch}}-pull-request
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
