@@ -1,6 +1,6 @@
-# Deployment of the Assisted Migration Service on OpenShift
+# Deployment of the OpenShift Migration Advisor on OpenShift
 
-This project provides YAML template files for deploying the **Assisted Migration Service** on OpenShift. This document outlines the deployment process.
+This project provides YAML template files for deploying the **OpenShift Migration Advisor** on OpenShift. This document outlines the deployment process.
 
 By default, images are deployed from the `quay.io/kubev2v` namespace. New images are built and pushed to Quay after each PR is merged into this repository.
 
@@ -35,7 +35,7 @@ export SERVICE_API_PATH=<api_path_prefix>                       # Default: /api/
 
 
 ### 3. Deploy to OpenShift
-Run the following command to deploy the Assisted Migration Service and its dependencies (including the UI and database):
+Run the following command to deploy the OpenShift Migration Advisor and its dependencies (including the UI and database):
 ```sh
 make deploy-on-openshift
 ```
