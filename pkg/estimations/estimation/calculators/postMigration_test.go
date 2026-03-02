@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 func TestPostMigrationTroubleShooting_NameAndKeys(t *testing.T) {

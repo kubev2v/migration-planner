@@ -198,6 +198,27 @@ type ClusterSizing struct {
 	WorkerNodes int `json:"workerNodes"`
 }
 
+// ComplexityDiskScoreEntry One entry in the disk complexity breakdown
+type ComplexityDiskScoreEntry struct {
+	// Score Complexity score from 1 to 4, where 1 is the least complex disk footprint and 4 is the most complex. Score 1: <=10 TB provisioned; score 2: <=20 TB; score 3: <=50 TB; score 4: >50 TB.
+	Score int `json:"score"`
+
+	// TotalSizeTB Total provisioned storage in TB for VMs at this score
+	TotalSizeTB float64 `json:"totalSizeTB"`
+
+	// VmCount Number of VMs at this complexity score
+	VmCount int `json:"vmCount"`
+}
+
+// ComplexityOSScoreEntry One entry in the OS complexity breakdown
+type ComplexityOSScoreEntry struct {
+	// Score Complexity score from 0 to 4, where 1 indicates the least complex OS to migrate and 0 indicates an OS that could not be classified.
+	Score int `json:"score"`
+
+	// VmCount Number of VMs at this complexity score
+	VmCount int `json:"vmCount"`
+}
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`
@@ -355,6 +376,27 @@ type JobStatus string
 type Label struct {
 	Key   string `json:"key" validate:"required,label"`
 	Value string `json:"value" validate:"required,label"`
+}
+
+// MigrationComplexityRequest Request payload for calculating migration complexity estimation
+type MigrationComplexityRequest struct {
+	// ClusterId ID of the cluster to calculate complexity estimation for
+	ClusterId string `json:"clusterId" validate:"required"`
+}
+
+// MigrationComplexityResponse Migration complexity estimation results
+type MigrationComplexityResponse struct {
+	// ComplexityByDisk Disk-size complexity scores, one entry per score level (1-4). Score 1 is the least complex disk footprint; score 4 is the most complex. Scores correspond to provisioned disk size: 1 (<=10 TB), 2 (<=20 TB), 3 (<=50 TB), 4 (>50 TB). All four score levels are always present.
+	ComplexityByDisk []ComplexityDiskScoreEntry `json:"complexityByDisk"`
+
+	// ComplexityByOS OS complexity scores, one entry per score level (0-4). Score 1 indicates the least complex OS to migrate; score 0 indicates an OS that could not be classified. All five score levels are always present.
+	ComplexityByOS []ComplexityOSScoreEntry `json:"complexityByOS"`
+
+	// DiskSizeRatings Static lookup table mapping each disk-size tier label to its numeric complexity score. The content is identical for every cluster and reflects the DiskSizeScores configuration in the complexity package.
+	DiskSizeRatings map[string]int `json:"diskSizeRatings"`
+
+	// OsRatings Per-OS-name score for every OS found in this cluster's inventory. Keys are the OS name strings exactly as they appear in vms.osInfo; values are the numeric complexity score assigned by ClassifyOS (0 = unclassified, 1-4 = increasing complexity). The map contains one entry per distinct OS name in the cluster, regardless of how many VMs run it.
+	OsRatings map[string]int `json:"osRatings"`
 }
 
 // MigrationEstimationRequest Request payload for calculating migration time estimation
@@ -609,6 +651,9 @@ type UpdateAssessmentJSONRequestBody = AssessmentUpdate
 
 // CalculateAssessmentClusterRequirementsJSONRequestBody defines body for CalculateAssessmentClusterRequirements for application/json ContentType.
 type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
+
+// CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
+type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
 
 // CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
 type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest

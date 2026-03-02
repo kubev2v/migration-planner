@@ -3,7 +3,7 @@ package calculators
 import (
 	"fmt"
 
-	"github.com/kubev2v/migration-planner/internal/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 func getInt(p estimation.Param) (int, error) {

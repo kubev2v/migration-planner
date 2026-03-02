@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 const (

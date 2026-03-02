@@ -9,11 +9,20 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/estimation"
-	"github.com/kubev2v/migration-planner/internal/estimation/calculators"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation/calculators"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
+
+// MigrationComplexityResult holds the output of a complexity estimation run.
+type MigrationComplexityResult struct {
+	ComplexityByDisk []complexity.DiskComplexityEntry // scores 1–4, always 4 entries
+	ComplexityByOS   []complexity.OSDifficultyEntry   // scores 0–4, always 5 entries
+	DiskSizeRatings  map[string]complexity.Score      // static tier label → score lookup
+	OSRatings        map[string]complexity.Score      // per-inventory OS name → score
+}
 
 // MigrationAssessmentResult represents the result of a migration assessment calculation
 type MigrationAssessmentResult struct {
@@ -121,6 +130,102 @@ func (es *EstimationService) CalculateMigrationEstimation(
 	return &MigrationAssessmentResult{
 		TotalDuration: totalDuration,
 		Breakdown:     results,
+	}, nil
+}
+
+// CalculateMigrationComplexity calculates OS and disk complexity breakdowns
+// for the given cluster within the assessment's inventory.
+func (es *EstimationService) CalculateMigrationComplexity(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	clusterID string,
+) (*MigrationComplexityResult, error) {
+	logger := es.logger.WithContext(ctx)
+	tracer := logger.Operation("calculate_migration_complexity").
+		WithUUID("assessment_id", assessmentID).
+		WithString("cluster_id", clusterID).
+		Build()
+
+	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			tracer.Error(err).Log()
+			return nil, NewErrAssessmentNotFound(assessmentID)
+		}
+		tracer.Error(err).Log()
+		return nil, fmt.Errorf("failed to get assessment: %w", err)
+	}
+
+	if len(assessment.Snapshots) == 0 {
+		err := fmt.Errorf("assessment has no snapshots")
+		tracer.Error(err).Log()
+		return nil, err
+	}
+
+	latestSnapshot := assessment.Snapshots[0]
+	if len(latestSnapshot.Inventory) == 0 {
+		err := fmt.Errorf("latest snapshot has empty inventory")
+		tracer.Error(err).Log()
+		return nil, err
+	}
+
+	var inventory api.Inventory
+	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
+		tracer.Error(err).Log()
+		return nil, fmt.Errorf("failed to parse inventory: %w", err)
+	}
+
+	if len(inventory.Clusters) == 0 {
+		err := fmt.Errorf("inventory has no clusters")
+		tracer.Error(err).Log()
+		return nil, err
+	}
+
+	clusterInventory, exists := inventory.Clusters[clusterID]
+	if !exists {
+		err := NewErrClusterNotFound(clusterID, assessmentID)
+		tracer.Error(err).Log()
+		return nil, err
+	}
+
+	result, err := es.buildComplexityResult(clusterInventory)
+	if err != nil {
+		tracer.Error(err).Log()
+		return nil, err
+	}
+
+	tracer.Success().Log()
+	return result, nil
+}
+
+// buildComplexityResult converts cluster inventory data into complexity breakdowns.
+func (es *EstimationService) buildComplexityResult(clusterInventory api.InventoryData) (*MigrationComplexityResult, error) {
+	if clusterInventory.Vms.OsInfo == nil {
+		return nil, fmt.Errorf("inventory has no osInfo data")
+	}
+	if clusterInventory.Vms.DiskSizeTier == nil {
+		return nil, fmt.Errorf("inventory has no diskSizeTier data")
+	}
+
+	osEntries := make([]complexity.VMOsEntry, 0, len(*clusterInventory.Vms.OsInfo))
+	for osName, info := range *clusterInventory.Vms.OsInfo {
+		osEntries = append(osEntries, complexity.VMOsEntry{Name: osName, Count: info.Count})
+	}
+
+	diskEntries := make([]complexity.DiskTierInput, 0, len(*clusterInventory.Vms.DiskSizeTier))
+	for label, tier := range *clusterInventory.Vms.DiskSizeTier {
+		diskEntries = append(diskEntries, complexity.DiskTierInput{
+			Label:       label,
+			VMCount:     tier.VmCount,
+			TotalSizeTB: tier.TotalSizeTB,
+		})
+	}
+
+	return &MigrationComplexityResult{
+		ComplexityByOS:   complexity.OSBreakdown(osEntries),
+		ComplexityByDisk: complexity.DiskBreakdown(diskEntries),
+		DiskSizeRatings:  complexity.DiskSizeRangeRatings(),
+		OSRatings:        complexity.OSRatings(osEntries),
 	}, nil
 }
 

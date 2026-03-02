@@ -322,6 +322,33 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 	}
 }
 
+// MigrationComplexityResultToAPI converts the service result to the API response type.
+func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) api.MigrationComplexityResponse {
+	byDisk := make([]api.ComplexityDiskScoreEntry, len(result.ComplexityByDisk))
+	for i, entry := range result.ComplexityByDisk {
+		byDisk[i] = api.ComplexityDiskScoreEntry{
+			Score:       entry.Score,
+			VmCount:     entry.VMCount,
+			TotalSizeTB: entry.TotalSizeTB,
+		}
+	}
+
+	byOS := make([]api.ComplexityOSScoreEntry, len(result.ComplexityByOS))
+	for i, entry := range result.ComplexityByOS {
+		byOS[i] = api.ComplexityOSScoreEntry{
+			Score:   entry.Score,
+			VmCount: entry.VMCount,
+		}
+	}
+
+	return api.MigrationComplexityResponse{
+		ComplexityByDisk: byDisk,
+		ComplexityByOS:   byOS,
+		DiskSizeRatings:  result.DiskSizeRatings,
+		OsRatings:        result.OSRatings,
+	}
+}
+
 // MigrationEstimationResultToAPI converts service MigrationAssessmentResult to API response
 func MigrationEstimationResultToAPI(result service.MigrationAssessmentResult) api.MigrationEstimationResponse {
 	breakdown := make(map[string]api.EstimationDetail)

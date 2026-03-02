@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 func TestStorageMigration_Calculate_WithDefaultRate(t *testing.T) {

@@ -47,6 +47,9 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments/{id}/cluster-requirements)
 	CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (POST /api/v1/assessments/{id}/complexity-estimation)
+	CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (POST /api/v1/assessments/{id}/migration-estimation)
 	CalculateMigrationEstimation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -130,6 +133,11 @@ func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, 
 
 // (POST /api/v1/assessments/{id}/cluster-requirements)
 func (_ Unimplemented) CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/complexity-estimation)
+func (_ Unimplemented) CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -407,6 +415,32 @@ func (siw *ServerInterfaceWrapper) CalculateAssessmentClusterRequirements(w http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CalculateAssessmentClusterRequirements(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CalculateMigrationComplexity operation middleware
+func (siw *ServerInterfaceWrapper) CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CalculateMigrationComplexity(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -812,6 +846,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/cluster-requirements", wrapper.CalculateAssessmentClusterRequirements)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/complexity-estimation", wrapper.CalculateMigrationComplexity)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/migration-estimation", wrapper.CalculateMigrationEstimation)
@@ -1364,6 +1401,69 @@ type CalculateAssessmentClusterRequirements503JSONResponse Error
 func (response CalculateAssessmentClusterRequirements503JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexityRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CalculateMigrationComplexityJSONRequestBody
+}
+
+type CalculateMigrationComplexityResponseObject interface {
+	VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error
+}
+
+type CalculateMigrationComplexity200JSONResponse MigrationComplexityResponse
+
+func (response CalculateMigrationComplexity200JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexity400JSONResponse Error
+
+func (response CalculateMigrationComplexity400JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexity401JSONResponse Error
+
+func (response CalculateMigrationComplexity401JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexity403JSONResponse Error
+
+func (response CalculateMigrationComplexity403JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexity404JSONResponse Error
+
+func (response CalculateMigrationComplexity404JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateMigrationComplexity500JSONResponse Error
+
+func (response CalculateMigrationComplexity500JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -1963,6 +2063,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments/{id}/cluster-requirements)
 	CalculateAssessmentClusterRequirements(ctx context.Context, request CalculateAssessmentClusterRequirementsRequestObject) (CalculateAssessmentClusterRequirementsResponseObject, error)
 
+	// (POST /api/v1/assessments/{id}/complexity-estimation)
+	CalculateMigrationComplexity(ctx context.Context, request CalculateMigrationComplexityRequestObject) (CalculateMigrationComplexityResponseObject, error)
+
 	// (POST /api/v1/assessments/{id}/migration-estimation)
 	CalculateMigrationEstimation(ctx context.Context, request CalculateMigrationEstimationRequestObject) (CalculateMigrationEstimationResponseObject, error)
 
@@ -2280,6 +2383,39 @@ func (sh *strictHandler) CalculateAssessmentClusterRequirements(w http.ResponseW
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CalculateAssessmentClusterRequirementsResponseObject); ok {
 		if err := validResponse.VisitCalculateAssessmentClusterRequirementsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CalculateMigrationComplexity operation middleware
+func (sh *strictHandler) CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CalculateMigrationComplexityRequestObject
+
+	request.Id = id
+
+	var body CalculateMigrationComplexityJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CalculateMigrationComplexity(ctx, request.(CalculateMigrationComplexityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CalculateMigrationComplexity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CalculateMigrationComplexityResponseObject); ok {
+		if err := validResponse.VisitCalculateMigrationComplexityResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
