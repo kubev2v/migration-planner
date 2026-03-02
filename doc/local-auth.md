@@ -1,4 +1,4 @@
-# Setup local authentication for Assisted Migration
+# Setup local authentication for OpenShift Migration Advisor
 
 In order to use local authentication, we must generate a RSA private key used to sign the jwt.
 

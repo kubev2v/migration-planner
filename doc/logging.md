@@ -1,7 +1,7 @@
 ## Logging
 
 This document provides an overview of  the recommended way to develop and implement logging.
-Assisted migration project uses [zap](https://github.com/uber-go/zap) for logging.
+OpenShift Migration Advisor project uses [zap](https://github.com/uber-go/zap) for logging.
 
 ### Logging Conventions
 

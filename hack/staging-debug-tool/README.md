@@ -7,7 +7,7 @@ A comprehensive debugging environment for Migration Planner with staging data an
 1. **Obtain GABI access and token**:
 
    - Request access by creating a merge request to add your user in the GABI app-interface config: [gabi-assisted-migration.yml](https://gitlab.cee.redhat.com/service/app-interface/-/blob/master/data/services/gabi/gabi-instances/gabi-assisted-migration.yml?ref_type=heads)
-   - After access is granted, retrieve your token from the stage cluster: [Assisted Migration (stage)](https://console-openshift-console.apps.crcs02ue1.urby.p1.openshiftapps.com/add/all-namespaces)
+   - After access is granted, retrieve your token from the stage cluster: [OpenShift Migration Advisor (stage)](https://console-openshift-console.apps.crcs02ue1.urby.p1.openshiftapps.com/add/all-namespaces)
    - Export the token (format starts with `sha256~`):
 
      ```bash

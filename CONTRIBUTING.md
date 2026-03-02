@@ -15,9 +15,9 @@ Before starting any implementation, please share your proposed design or approac
 This allows for early feedback and ensures alignment with the project's direction.  
 To do this, please follow these steps:
 
-1. **Open a Jira Ticket:** Ensure a Jira ticket exists for your change under the `ECOPROJECT` project with the `Assisted migration` component.
+1. **Open a Jira Ticket:** Ensure a Jira ticket exists for your change under the `ECOPROJECT` project with the `OpenShift Migration Advisor` component.
 2. **Create a Design Document:** For new features, create a detailed design document and link it to the Jira ticket.
-3. **Present Your Design:** Share your proposed change and design during the Assisted Migration Office Hours.
+3. **Present Your Design:** Share your proposed change and design during the OpenShift Migration Advisor Office Hours.
 
 ### Make Your Changes
 

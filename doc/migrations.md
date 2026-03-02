@@ -1,6 +1,6 @@
 # How add migration files and migrate the database
 
-Assisted-Migration use [goose](https://github.com/pressly/goose) to migrate the database.
+OpenShift Migration Advisor uses [goose](https://github.com/pressly/goose) to migrate the database.
 
 ## Add a new migration file
 The migration sql files are located in `pkg/migrations/sql`. 

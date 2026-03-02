@@ -1,4 +1,4 @@
-# GitHub Workflows for Assisted Migration
+# GitHub Workflows for OpenShift Migration Advisor
 
 ## `kind.yml` - 📦 Migration Planner E2E (end-to-end) Test Suite
 
