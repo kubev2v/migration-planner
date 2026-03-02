@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/estimation"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 // Param prefix = parameter keys in the params map given to the calculator

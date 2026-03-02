@@ -14,6 +14,58 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+// helpers for complexity tests
+
+func buildOsInfo(entries map[string]int) *map[string]api.OsInfo {
+	m := make(map[string]api.OsInfo, len(entries))
+	for name, count := range entries {
+		m[name] = api.OsInfo{Count: count}
+	}
+	return &m
+}
+
+func buildDiskSizeTier(entries map[string]api.DiskSizeTierSummary) *map[string]api.DiskSizeTierSummary {
+	return &entries
+}
+
+func createTestInventoryForComplexity(clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) []byte {
+	inventory := api.Inventory{
+		Clusters: map[string]api.InventoryData{
+			clusterID: {
+				Vms: api.VMs{
+					Total:        10,
+					OsInfo:       osInfo,
+					DiskSizeTier: diskSizeTier,
+					DiskGB:       api.VMResourceBreakdown{Total: 100},
+					CpuCores:     api.VMResourceBreakdown{Total: 40},
+					RamGB:        api.VMResourceBreakdown{Total: 80},
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(inventory)
+	Expect(err).ToNot(HaveOccurred())
+	return data
+}
+
+func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) *model.Assessment {
+	return &model.Assessment{
+		ID:       id,
+		Name:     "test-assessment",
+		OrgID:    orgID,
+		Username: username,
+		Snapshots: []model.Snapshot{
+			{
+				ID:           1,
+				CreatedAt:    time.Now(),
+				Inventory:    createTestInventoryForComplexity(clusterID, osInfo, diskSizeTier),
+				AssessmentID: id,
+				Version:      2,
+			},
+		},
+	}
+}
+
 func createTestInventoryForEstimation(clusterID string, totalVMs, totalDiskGB int) []byte {
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
@@ -75,6 +127,231 @@ var _ = Describe("EstimationService", func() {
 		clusterID = "cluster-test-123"
 		testUsername = "test-user"
 		testOrgID = "test-org"
+	})
+
+	Describe("CalculateMigrationComplexity", func() {
+		var defaultOsInfo *map[string]api.OsInfo
+		var defaultDiskTier *map[string]api.DiskSizeTierSummary
+
+		BeforeEach(func() {
+			defaultOsInfo = buildOsInfo(map[string]int{
+				"Red Hat Enterprise Linux 9 (64-bit)": 100,
+				"CentOS 7 (64-bit)":                   20,
+				"FreeBSD (64-bit)":                    5,
+			})
+			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+				"Easy (0-10TB)": {VmCount: 125, TotalSizeTB: 8.5},
+			})
+		})
+
+		Context("successful calculation", func() {
+			It("returns a result with 5 OS entries and 4 disk entries", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ComplexityByOS).To(HaveLen(5))
+				Expect(result.ComplexityByDisk).To(HaveLen(4))
+			})
+
+			It("places OS names into the correct score buckets", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				// score 0: FreeBSD (5 VMs, unclassified) — always first in canonical order
+				Expect(result.ComplexityByOS[0].Score).To(Equal(0))
+				Expect(result.ComplexityByOS[0].VMCount).To(Equal(5))
+				// score 1: Red Hat (100 VMs)
+				Expect(result.ComplexityByOS[1].Score).To(Equal(1))
+				Expect(result.ComplexityByOS[1].VMCount).To(Equal(100))
+				// score 2: CentOS (20 VMs)
+				Expect(result.ComplexityByOS[2].Score).To(Equal(2))
+				Expect(result.ComplexityByOS[2].VMCount).To(Equal(20))
+			})
+
+			It("maps disk tier labels to correct scores with correct size values", func() {
+				diskTier := buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+					"Easy (0-10TB)":       {VmCount: 80, TotalSizeTB: 5.0},
+					"Medium (10-20TB)":    {VmCount: 10, TotalSizeTB: 15.0},
+					"Hard (20-50TB)":      {VmCount: 5, TotalSizeTB: 30.0},
+					"White Glove (>50TB)": {VmCount: 1, TotalSizeTB: 75.0},
+				})
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, diskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				Expect(result.ComplexityByDisk[0].Score).To(Equal(1))
+				Expect(result.ComplexityByDisk[0].VMCount).To(Equal(80))
+				Expect(result.ComplexityByDisk[0].TotalSizeTB).To(Equal(5.0))
+				Expect(result.ComplexityByDisk[3].Score).To(Equal(4))
+				Expect(result.ComplexityByDisk[3].VMCount).To(Equal(1))
+				Expect(result.ComplexityByDisk[3].TotalSizeTB).To(Equal(75.0))
+			})
+
+			It("OS entries are always in canonical score order 0 through 4", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				for i, entry := range result.ComplexityByOS {
+					Expect(entry.Score).To(Equal(i))
+				}
+			})
+
+			It("disk entries are always in canonical score order 1 through 4", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				for i, entry := range result.ComplexityByDisk {
+					Expect(entry.Score).To(Equal(i + 1))
+				}
+			})
+		})
+
+		Context("assumptions fields", func() {
+			It("diskSizeRatings contains exactly the 4 range keys with correct scores", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				Expect(result.DiskSizeRatings).To(HaveLen(4))
+				Expect(result.DiskSizeRatings["0-10TB"]).To(Equal(1))
+				Expect(result.DiskSizeRatings["10-20TB"]).To(Equal(2))
+				Expect(result.DiskSizeRatings["20-50TB"]).To(Equal(3))
+				Expect(result.DiskSizeRatings[">50TB"]).To(Equal(4))
+			})
+
+			It("osRatings contains one entry per distinct OS name from the inventory", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				// defaultOsInfo has 3 distinct OS names
+				Expect(result.OSRatings).To(HaveLen(3))
+				Expect(result.OSRatings["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
+				Expect(result.OSRatings["CentOS 7 (64-bit)"]).To(Equal(2))
+				Expect(result.OSRatings["FreeBSD (64-bit)"]).To(Equal(0))
+			})
+		})
+
+		Context("assessment not found", func() {
+			It("returns ErrResourceNotFound when assessment does not exist", func() {
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrResourceNotFound)
+				Expect(ok).To(BeTrue())
+			})
+
+			It("returns error when store returns error", func() {
+				mockStore.getError = store.ErrRecordNotFound
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+			})
+		})
+
+		Context("snapshot validation", func() {
+			It("returns error when assessment has no snapshots", func() {
+				mockStore.assessments[assessmentID] = &model.Assessment{
+					ID:        assessmentID,
+					OrgID:     testOrgID,
+					Username:  testUsername,
+					Snapshots: []model.Snapshot{},
+				}
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("no snapshots"))
+			})
+
+			It("returns error when snapshot has empty inventory", func() {
+				mockStore.assessments[assessmentID] = &model.Assessment{
+					ID:       assessmentID,
+					OrgID:    testOrgID,
+					Username: testUsername,
+					Snapshots: []model.Snapshot{
+						{ID: 1, Inventory: []byte{}, AssessmentID: assessmentID},
+					},
+				}
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("empty inventory"))
+			})
+		})
+
+		Context("invalid cluster ID", func() {
+			It("returns ErrResourceNotFound when cluster ID is not in inventory", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, "other-cluster", defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "non-existent-cluster")
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrResourceNotFound)
+				Expect(ok).To(BeTrue())
+			})
+		})
+
+		Context("missing inventory data", func() {
+			It("returns error when osInfo is nil", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, nil, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("osInfo"))
+			})
+
+			It("returns error when diskSizeTier is nil", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, nil,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("diskSizeTier"))
+			})
+		})
 	})
 
 	Describe("CalculateMigrationEstimation", func() {
