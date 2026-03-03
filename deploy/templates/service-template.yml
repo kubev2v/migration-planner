@@ -16,7 +16,7 @@ parameters:
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_IMAGE
-    description: The container registry and image name for the migration planner ISO
+    description: The container registry and image name for the OpenShift Migration Advisor ISO
     value: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso
   - name: MIGRATION_PLANNER_URL
     description: The API URL of the migration assessment
@@ -157,7 +157,7 @@ objects:
         app: migration-planner
         port: metrics
       annotations:
-        description: Expose the migration planner metrics endpoint
+        description: Expose the OpenShift Migration Advisor metrics endpoint
       name: migration-planner-metrics
     spec:
       selector:

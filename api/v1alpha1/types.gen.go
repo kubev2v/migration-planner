@@ -107,7 +107,7 @@ type AssessmentForm struct {
 
 	// SourceType Source of the assessment data:
 	//  * `inventory` - Manual inventory upload via JSON
-	//  * `agent` - Collected by migration planner agent
+	//  * `agent` - Collected by OpenShift Migration Advisor agent
 	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent"`
 }
 
@@ -246,7 +246,7 @@ type Host struct {
 	Vendor   string `json:"vendor"`
 }
 
-// Info Migration planner information
+// Info OpenShift Migration Advisor information
 type Info struct {
 	// GitCommit Git commit hash
 	GitCommit string `json:"gitCommit"`

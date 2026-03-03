@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Migration Planner image API
+  title: OpenShift Migration Advisor image API
   version: undefined
   license:
     name: Apache 2.0
