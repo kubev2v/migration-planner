@@ -17,5 +17,12 @@ func (s *ServiceHandler) GetInfo(ctx context.Context, request server.GetInfoRequ
 		VersionName: versionInfo.GitVersion,
 	}
 
+	if versionInfo.AgentGitCommit != "" {
+		response.AgentGitCommit = &versionInfo.AgentGitCommit
+	}
+	if versionInfo.AgentVersionName != "" {
+		response.AgentVersionName = &versionInfo.AgentVersionName
+	}
+
 	return server.GetInfo200JSONResponse(response), nil
 }

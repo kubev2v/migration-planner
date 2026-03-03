@@ -22,19 +22,27 @@ var (
 	buildDate string
 	// state of git tree, either "clean" or "dirty"
 	gitTreeState string
+	// agentCommitFromGit is a constant representing the agent git commit SHA
+	// that generated this build. It should be set during build via -ldflags.
+	agentCommitFromGit string
+	// agentVersionFromGit is a constant representing the agent version tag
+	// that generated this build. It should be set during build via -ldflags.
+	agentVersionFromGit string
 )
 
 type Info struct {
-	Major        string `json:"major"`
-	Minor        string `json:"minor"`
-	GitVersion   string `json:"gitVersion"`
-	GitCommit    string `json:"gitCommit"`
-	GitTreeState string `json:"gitTreeState"`
-	BuildDate    string `json:"buildDate"`
-	GoVersion    string `json:"goVersion"`
-	Compiler     string `json:"compiler"`
-	Platform     string `json:"platform"`
-	Patch        string `json:"patch"`
+	Major            string `json:"major"`
+	Minor            string `json:"minor"`
+	GitVersion       string `json:"gitVersion"`
+	GitCommit        string `json:"gitCommit"`
+	GitTreeState     string `json:"gitTreeState"`
+	BuildDate        string `json:"buildDate"`
+	GoVersion        string `json:"goVersion"`
+	Compiler         string `json:"compiler"`
+	Platform         string `json:"platform"`
+	Patch            string `json:"patch"`
+	AgentGitCommit   string `json:"agentGitCommit"`
+	AgentVersionName string `json:"agentVersionName"`
 }
 
 func (info Info) String() string {
@@ -43,15 +51,17 @@ func (info Info) String() string {
 
 func Get() Info {
 	return Info{
-		Major:        majorFromGit,
-		Minor:        minorFromGit,
-		GitCommit:    commitFromGit,
-		GitVersion:   versionFromGit,
-		GitTreeState: gitTreeState,
-		BuildDate:    buildDate,
-		GoVersion:    runtime.Version(),
-		Compiler:     runtime.Compiler,
-		Platform:     fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		Patch:        patchFromGit,
+		Major:            majorFromGit,
+		Minor:            minorFromGit,
+		GitCommit:        commitFromGit,
+		GitVersion:       versionFromGit,
+		GitTreeState:     gitTreeState,
+		BuildDate:        buildDate,
+		GoVersion:        runtime.Version(),
+		Compiler:         runtime.Compiler,
+		Platform:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		Patch:            patchFromGit,
+		AgentGitCommit:   agentCommitFromGit,
+		AgentVersionName: agentVersionFromGit,
 	}
 }
