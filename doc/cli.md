@@ -29,7 +29,7 @@ This is generating a binary `planner` in `bin` folder.
 The list of available commands is:
 ```bash
 $ planner -h
-planner controls the Migration Planner service.
+planner controls the OpenShift Migration Advisor service.
 
 Usage:
   planner [flags] [options]
@@ -125,7 +125,7 @@ $ planner deploy source-1 --name agent1 --qemu-url qemu+ssh://virtuser@remote-ho
 
 #### e2e
 
-The e2e command is used to run the end-to-end (E2E) test suite for the Migration Planner. This is primarily intended for development and QA purposes,  
+The e2e command is used to run the end-to-end (E2E) test suite for the OpenShift Migration Advisor. This is primarily intended for development and QA purposes,  
 allowing you to verify the full end-to-end workflow locally using libvirt, simulated vSphere (VCSIM), and a local registry.
 
 ```bash

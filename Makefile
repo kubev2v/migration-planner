@@ -61,7 +61,7 @@ help:
 	@echo "    build:           run all builds"
 	@echo "    clean:           clean up all containers and volumes"
 	@echo "    migrate:         run database migrations"
-	@echo "    run:             run the migration planner API service"
+	@echo "    run:             run the OpenShift Migration Advisor API service"
 	@echo "    integration-test: run e2e integration tests"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
@@ -208,7 +208,7 @@ push-containers: push-api-container push-agent-container
 deploy-on-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
-	echo "*** Deploy Migration Planner on Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
+	echo "*** Deploy OpenShift Migration Advisor on OpenShift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/s3-secret-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
@@ -224,12 +224,12 @@ deploy-on-openshift: oc
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
-	echo "*** Migration Planner has been deployed successfully on Openshift ***"; \
+	echo "*** OpenShift Migration Advisor has been deployed successfully on OpenShift ***"; \
 
 delete-from-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
-	echo "*** Delete Migration Planner from Openshift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***"; \
+	echo "*** Delete OpenShift Migration Advisor from OpenShift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***"; \
 	openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
 	openshift_project=$$(oc project -q); \
 	oc process -f deploy/templates/service-template.yml \
@@ -247,11 +247,11 @@ delete-from-openshift: oc
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
 	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
 	oc delete route planner-agent planner-image; \
-	echo "*** Migration Planner has been deleted successfully from Openshift ***"
+	echo "*** OpenShift Migration Advisor has been deleted successfully from OpenShift ***"
 
 deploy-on-kind: oc
 	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-		echo "*** Deploy Migration Planner on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
+		echo "*** Deploy OpenShift Migration Advisor on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
 	oc process --local -f  deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
@@ -271,7 +271,7 @@ deploy-on-kind: oc
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
 	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
 	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	echo "*** Migration Planner has been deployed successfully on Kind ***"
+	echo "*** OpenShift Migration Advisor has been deployed successfully on Kind ***"
 
 delete-from-kind: oc
 	inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \

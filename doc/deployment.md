@@ -6,7 +6,7 @@ By default, images are deployed from the `quay.io/kubev2v` namespace. New images
 
 ### Notice
 This deployment also includes the **UI** and uses the following template:  
-[Migration Planner UI Template](https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml)
+[OpenShift Migration Advisor UI Template](https://raw.githubusercontent.com/kubev2v/migration-planner-ui/refs/heads/main/deploy/templates/ui-template.yml)
 
 ## Deploying on OpenShift
 

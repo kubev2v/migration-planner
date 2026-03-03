@@ -1,10 +1,10 @@
 # GitHub Workflows for OpenShift Migration Advisor
 
-## `kind.yml` - 📦 Migration Planner E2E (end-to-end) Test Suite
+## `kind.yml` - 📦 OpenShift Migration Advisor E2E (end-to-end) Test Suite
 
 ### 🔍 Overview
 
-This repository includes a powerful **End-to-End (E2E) test suite** designed to validate the **Migration Planner** system.   
+This repository includes a powerful **End-to-End (E2E) test suite** designed to validate the **OpenShift Migration Advisor** system.   
 It simulates scenarios where agents interact with a central service to give assessment for virtual machine migration from vCenter to openshift.
 
 The suite verifies the behavior of agents and services, handles image operations, manages credentials, monitors agent statuses, and enforces access boundaries.

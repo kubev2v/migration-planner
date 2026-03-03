@@ -1,6 +1,6 @@
-# Migration Planner ISO Builder
+# OpenShift Migration Advisor ISO Builder
 
-Builds a bootable RHCOS ISO with embedded migration planner agent image.
+Builds a bootable RHCOS ISO with embedded OpenShift Migration Advisor agent image.
 
 ## Files
 
