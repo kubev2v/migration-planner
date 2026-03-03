@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Migration Planner API
+  title: OpenShift Migration Advisor API
   version: undefined
   license:
     name: Apache 2.0
@@ -878,7 +878,7 @@ paths:
     get:
       tags:
         - info
-      description: Get migration planner information
+      description: Get OpenShift Migration Advisor information
       operationId: getInfo
       responses:
         "200":
@@ -1595,7 +1595,7 @@ components:
           description: >
             Source of the assessment data:
              * `inventory` - Manual inventory upload via JSON
-             * `agent` - Collected by migration planner agent
+             * `agent` - Collected by OpenShift Migration Advisor agent
         sourceId:
           type: string
           format: uuid
@@ -1885,7 +1885,7 @@ components:
 
     Info:
       type: object
-      description: Migration planner information
+      description: OpenShift Migration Advisor information
       properties:
         gitCommit:
           type: string

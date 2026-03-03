@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Migration Planner API - agent endpoint
+  title: OpenShift Migration Advisor API - agent endpoint
   version: undefined
   license:
     name: Apache 2.0
