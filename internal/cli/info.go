@@ -140,7 +140,7 @@ func (o *InfoOptions) printInfo(info InfoResponse) error {
 		if o.Remote {
 			source = "Remote Service"
 		}
-		fmt.Printf("Migration Planner %s Information:\n", source)
+		fmt.Printf("OpenShift Migration Advisor %s Information:\n", source)
 		fmt.Printf("  Version Name: %s\n", info.VersionName)
 		fmt.Printf("  Git Commit:   %s\n", info.GitCommit)
 	}
