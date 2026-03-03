@@ -275,6 +275,12 @@ type Host struct {
 
 // Info OpenShift Migration Advisor information
 type Info struct {
+	// AgentGitCommit Agent git commit hash
+	AgentGitCommit *string `json:"agentGitCommit"`
+
+	// AgentVersionName Agent version name, based on git tag
+	AgentVersionName *string `json:"agentVersionName"`
+
 	// GitCommit Git commit hash
 	GitCommit string `json:"gitCommit"`
 

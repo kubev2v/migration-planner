@@ -4,6 +4,8 @@ FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS builde
 ARG GCFLAGS=""
 ARG SOURCE_GIT_COMMIT=""
 ARG SOURCE_GIT_TAG=""
+ARG AGENT_GIT_COMMIT=""
+ARG AGENT_GIT_TAG=""
 
 WORKDIR /app
 
@@ -18,6 +20,9 @@ RUN source hack/version.sh && \
     echo "SOURCE_GIT_COMMIT=${SOURCE_GIT_COMMIT}" && \
     echo "SOURCE_GIT_COMMIT_SHORT=${SOURCE_GIT_COMMIT_SHORT}" && \
     echo "SOURCE_GIT_TAG=${SOURCE_GIT_TAG}" && \
+    echo "AGENT_GIT_COMMIT=${AGENT_GIT_COMMIT}" && \
+    echo "AGENT_GIT_COMMIT_SHORT=${AGENT_GIT_COMMIT_SHORT}" && \
+    echo "AGENT_GIT_TAG=${AGENT_GIT_TAG}" && \
     echo "MAJOR=${MAJOR} MINOR=${MINOR} PATCH=${PATCH}" && \
     echo "GO_LDFLAGS=${GO_LDFLAGS}" && \
     echo "=== END VERSION BUILD INFO ===" && \

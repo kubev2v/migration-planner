@@ -28,6 +28,27 @@ if [ -z "$SOURCE_GIT_TAG" ]; then
         || echo "v0.0.0-${SOURCE_GIT_COMMIT_SHORT}")
 fi
 
+# Get agent git commit
+# If AGENT_GIT_COMMIT is already set (from build args), use it
+# Otherwise, default to SOURCE_GIT_COMMIT
+if [ -z "$AGENT_GIT_COMMIT" ]; then
+    export AGENT_GIT_COMMIT="$SOURCE_GIT_COMMIT"
+fi
+
+# Calculate short commit from agent commit
+if [ -n "$AGENT_GIT_COMMIT" ]; then
+    export AGENT_GIT_COMMIT_SHORT="${AGENT_GIT_COMMIT:0:7}"
+else
+    export AGENT_GIT_COMMIT_SHORT=""
+fi
+
+# Get agent git tag
+# If AGENT_GIT_TAG is already set (from build args), use it
+# Otherwise, default to SOURCE_GIT_TAG
+if [ -z "$AGENT_GIT_TAG" ]; then
+    export AGENT_GIT_TAG="$SOURCE_GIT_TAG"
+fi
+
 # Get git tree state
 if [ ! -d ".git/" ] || git diff --quiet 2>/dev/null; then
     export SOURCE_GIT_TREE_STATE="clean"
@@ -51,4 +72,6 @@ export GO_LDFLAGS="\
 -X github.com/kubev2v/migration-planner/pkg/version.versionFromGit=${SOURCE_GIT_TAG} \
 -X github.com/kubev2v/migration-planner/pkg/version.commitFromGit=${SOURCE_GIT_COMMIT} \
 -X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=${SOURCE_GIT_TREE_STATE} \
--X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP}"
+-X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP} \
+-X github.com/kubev2v/migration-planner/pkg/version.agentCommitFromGit=${AGENT_GIT_COMMIT} \
+-X github.com/kubev2v/migration-planner/pkg/version.agentVersionFromGit=${AGENT_GIT_TAG}"
