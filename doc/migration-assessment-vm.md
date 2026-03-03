@@ -58,6 +58,6 @@ journalctl --user -f -u planner-agent
 ```
 And search for the error in the log:
 ```
-level=error msg="failed connecting to migration planner: dial tcp: http://non-working-ip:7443
+level=error msg="failed connecting to OpenShift Migration Advisor: dial tcp: http://non-working-ip:7443
 ```
 Make sure `non-working-ip` has a properly setup OpenShift Migration Advisor and is listening on port `7443`.

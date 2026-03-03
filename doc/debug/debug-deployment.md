@@ -1,7 +1,7 @@
-# Deploying Migration Planner in Debug Mode
+# Deploying OpenShift Migration Advisor in Debug Mode
 
 ## Objective  
-This guide explains how to deploy the Migration Planner application in debug mode on OpenShift.
+This guide explains how to deploy the OpenShift Migration Advisor application in debug mode on OpenShift.
 Debug mode enables additional logging and debugging features for development purposes.
 
 ## 📌 Prerequisites

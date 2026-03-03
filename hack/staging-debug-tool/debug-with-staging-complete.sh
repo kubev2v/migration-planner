@@ -19,14 +19,14 @@ source .env-debug
 
 # Validate repository paths exist
 if [ ! -d "$MIGRATION_PLANNER_REPO" ]; then
-    echo "❌ Migration Planner repository not found at: $MIGRATION_PLANNER_REPO"
+    echo "❌ OpenShift Migration Advisor repository not found at: $MIGRATION_PLANNER_REPO"
     echo "💡 Please update MIGRATION_PLANNER_REPO in .env-debug file"
     echo "   Copy .env-debug.example to .env-debug and edit the repository paths"
     exit 1
 fi
 
 if [ ! -d "$MIGRATION_PLANNER_UI_REPO" ]; then
-    echo "❌ Migration Planner UI repository not found at: $MIGRATION_PLANNER_UI_REPO"
+    echo "❌ OpenShift Migration Advisor UI repository not found at: $MIGRATION_PLANNER_UI_REPO"
     echo "💡 Please update MIGRATION_PLANNER_UI_REPO in .env-debug file"
     echo "   Copy .env-debug.example to .env-debug and edit the repository paths"
     exit 1
@@ -147,7 +147,7 @@ else
 fi
 echo "  ✅ All tables loaded successfully - see extraction summary above for record counts"
 echo ""
-echo "🎯 Complete Migration Planner stack ready with real staging data!"
+echo "🎯 Complete OpenShift Migration Advisor stack ready with real staging data!"
 echo "💡 Access the UI at http://localhost:3000/openshift/migration-assessment to interact with the loaded staging data"
 echo ""
 echo "📁 All staging artifacts are now organized in: $SCRIPT_DIR/"
@@ -165,7 +165,7 @@ if [ "$AUTH_MODE" = "local" ]; then
     echo "   1. Open: http://localhost:3000/set-ui-token.html"
     echo "   2. Generate tokens: ./generate-user-tokens.sh"
     echo "   3. Copy a token and paste it in the UI auth page"
-    echo "   4. Refresh the Migration Planner UI to use the token"
+    echo "   4. Refresh the OpenShift Migration Advisor UI to use the token"
     echo ""
     echo "🔧 API Testing:"
     echo "   curl -H 'X-Authorization: Bearer \$TOKEN_11009103' http://localhost:3443/api/v1/sources"

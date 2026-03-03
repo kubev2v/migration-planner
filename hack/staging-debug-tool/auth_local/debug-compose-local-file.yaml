@@ -78,7 +78,7 @@ services:
       iso-creator:
         condition: service_completed_successfully
 
-  # Migration Planner UI with local auth support
+  # OpenShift Migration Advisor UI with local auth support
   planner-ui:
     container_name: planner-ui
     image: localhost/stagedb_planner-ui:latest-local

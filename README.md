@@ -1,7 +1,7 @@
 # Migration assessment
 This project is focused to provide an service to run manage the assessments reports
 which could provide a insights into VMware infrastructre and provide a suggestions to
-migration to Openshift Virtualization.
+migration to OpenShift Virtualization.
 
 The project provide a service and an agent version 2. The service stores and previews assessments reports
 as well as it can generate the Agent, which OVA image that can be imported to VMware environment.
@@ -44,4 +44,4 @@ VMs:
 ![Flow Diagram](doc/img/flow.svg)
 
 ## Contributing to the project
-Detailed documentation for developing and contributing to Migration Planner can be found in our [contribution guide](CONTRIBUTING.md).
+Detailed documentation for developing and contributing to OpenShift Migration Advisor can be found in our [contribution guide](CONTRIBUTING.md).

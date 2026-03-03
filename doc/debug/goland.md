@@ -1,4 +1,4 @@
-# Debugging Migration Planner with GoLand
+# Debugging OpenShift Migration Advisor with GoLand
 
 This guide provides step-by-step instructions on how to debug a Go application both **locally** and **remotely** using GoLand. 
 
@@ -9,7 +9,7 @@ For remote debugging your application should be already set up and running. plea
 
 ## Step 1: Open the Project in GoLand  
 
-Open the assisted-migration project in GoLand.
+Open the OpenShift Migration Advisor project in GoLand.
 
 ## Step 2: Set Breakpoints
 

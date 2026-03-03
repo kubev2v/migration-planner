@@ -1,13 +1,13 @@
-# Contributing to Migration Planner
+# Contributing to OpenShift Migration Advisor
 
-Thank you for your interest in contributing to the Migration Planner project!  
+Thank you for your interest in contributing to the OpenShift Migration Advisor project!  
 We value your contributions and are excited to work with you to improve our codebase.
 
 This guide will help you get started.
 
 ## How to contribute
 
-This section focuses on contributing code to the Migration Planner project.
+This section focuses on contributing code to the OpenShift Migration Advisor project.
 
 ### Share Your Design
 
@@ -116,7 +116,7 @@ It includes:
 ## How to review
 
 Thank you for taking the time to review contributions!  
-Your feedback is crucial for maintaining the quality and stability of Migration Planner.
+Your feedback is crucial for maintaining the quality and stability of OpenShift Migration Advisor.
 
 ### General Review Guidelines
 

@@ -1,6 +1,6 @@
 # Local Development Guide
 
-This guide provides instructions for setting up and running the Migration Planner locally for development purposes.
+This guide provides instructions for setting up and running the OpenShift Migration Advisor locally for development purposes.
 
 ## Prerequisites
 
@@ -9,7 +9,7 @@ This guide provides instructions for setting up and running the Migration Planne
 - Docker or Podman
 - Git
 
-## Clone the Migration-Planner repository
+## Clone the repository
 
 ```bash
 # Clone the migration-planner repository
@@ -17,9 +17,9 @@ git clone https://github.com/kubev2v/migration-planner.git
 cd migration-planner
 ```
 
-## Run the Migration Planner API locally
+## Run the OpenShift Migration Advisor API locally
 
-Follow these steps to get the Migration Planner running locally:
+Follow these steps to get the OpenShift Migration Advisor running locally:
 
 ### 1. Build the Project
 
@@ -61,7 +61,7 @@ These settings disable authentication for local development, making it easier to
 
 ### 5. Run the Application
 
-Start the Migration Planner API server:
+Start the OpenShift Migration Advisor API server:
 
 ```bash
 make run
@@ -78,9 +78,9 @@ curl http://localhost:3443/api/v1/sources
 
 Expected response: JSON data or empty arrays (not 404 errors).
 
-## Use the Migration Planner API
+## Use the OpenShift Migration Advisor API
 
-There are different ways to use the Migration Planner API:
+There are different ways to use the OpenShift Migration Advisor API:
 
 ### 1. Run the UI
 
@@ -276,7 +276,7 @@ curl -X POST http://localhost:9200/api/v1/size/custom \
   }' | jq .
 ```
 
-## Run the Migration Planner Agent locally
+## Run the OpenShift Migration Advisor Agent locally
 
 Follow these steps to get the agent running locally:
 
@@ -309,7 +309,7 @@ echo "Agent ID: $AGENT_ID"
 
 ### 3. Build and run the Agent Application
 
-Start the Migration Planner Agent BE:
+Start the OpenShift Migration Advisor Agent BE:
 
 ```bash
 # Build and run the agent from the agent-v2 submodule

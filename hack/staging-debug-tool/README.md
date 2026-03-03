@@ -1,6 +1,6 @@
-# Migration Planner Debug Environment
+# OpenShift Migration Advisor Debug Environment
 
-A comprehensive debugging environment for Migration Planner with staging data and multiple authentication modes.
+A comprehensive debugging environment for OpenShift Migration Advisor with staging data and multiple authentication modes.
 
 ## Quick Setup
 
@@ -34,7 +34,7 @@ A comprehensive debugging environment for Migration Planner with staging data an
 
 ## Purpose
 
-This project provides a complete debugging setup for Migration Planner development with:
+This project provides a complete debugging setup for OpenShift Migration Advisor development with:
 
 - **Real staging data** from production environments
 - **Two authentication modes** for different development scenarios
@@ -62,8 +62,8 @@ This project provides a complete debugging setup for Migration Planner developme
 
 ### 🌐 **Complete Stack**
 
-- Migration Planner API with debugging enabled
-- Migration Planner UI with authentication support
+- OpenShift Migration Advisor API with debugging enabled
+- OpenShift Migration Advisor UI with authentication support
 - PostgreSQL database with staging data
 - Proper container networking and proxying
 
@@ -97,13 +97,13 @@ staging-debug-tool/
 ### Required Software
 
 - **Podman** or Docker with compose
-- **Go toolchain** (for Migration Planner API building)
+- **Go toolchain** (for OpenShift Migration Advisor API building)
 - **Node.js 18+** (for UI building)
 
 ### Required Repositories
 
-- **Migration Planner API**: `migration-planner`
-- **Migration Planner UI**: `migration-planner-ui-app`
+- **OpenShift Migration Advisor API**: `migration-planner`
+- **OpenShift Migration Advisor UI**: `migration-planner-ui-app`
 
 ### Environment Variables
 
@@ -193,7 +193,7 @@ Create `.vscode/launch.json`:
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Connect to Migration Planner",
+      "name": "Connect to OpenShift Migration Advisor",
       "type": "go",
       "request": "attach",
       "mode": "remote",

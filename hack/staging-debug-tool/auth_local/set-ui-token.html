@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Migration Planner - Set Authentication Token</title>
+    <title>OpenShift Migration Advisor - Set Authentication Token</title>
     <style>
       body {
         font-family: "Red Hat Text", Arial, sans-serif;
@@ -81,7 +81,7 @@
   </head>
   <body>
     <div class="container">
-      <h1>🔑 Migration Planner - Authentication Setup</h1>
+      <h1>🔑 OpenShift Migration Advisor - Authentication Setup</h1>
 
       <div class="info">
         <strong>📋 Instructions:</strong>
@@ -92,7 +92,7 @@
           </li>
           <li>Copy one of the generated tokens from the script output</li>
           <li>Paste the token below and click "Set Token"</li>
-          <li>Refresh the Migration Planner UI to use the new token</li>
+          <li>Refresh the OpenShift Migration Advisor UI to use the new token</li>
         </ol>
       </div>
 
@@ -158,7 +158,7 @@
 
           localStorage.setItem("MIGRATION_PLANNER_TOKEN", token);
           showStatus(
-            "Token set successfully! Refresh the Migration Planner UI to use it.",
+            "Token set successfully! Refresh the OpenShift Migration Advisor UI to use it.",
             "success"
           );
           updateCurrentToken();
