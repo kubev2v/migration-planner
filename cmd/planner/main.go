@@ -17,7 +17,7 @@ func main() {
 func NewPlannerCtlCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "planner [flags] [options]",
-		Short: "planner controls the Migration Planner service.",
+		Short: "planner controls the OpenShift Migration Advisor service.",
 		Run: func(cmd *cobra.Command, args []string) {
 			_ = cmd.Help()
 			os.Exit(1)

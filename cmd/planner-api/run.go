@@ -74,7 +74,7 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("running River migration", "error", err)
 		}
 
-		// The migration planner API expects the RHCOS ISO to be on disk
+		// The OpenShift Migration Advisor API expects the RHCOS ISO to be on disk
 		if err := ensureIsoExist(cfg.Service.IsoPath); err != nil {
 			zap.S().Fatalw("validate iso", "error", err)
 			return err
