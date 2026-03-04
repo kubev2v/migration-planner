@@ -3,10 +3,12 @@ VMs With Shared Disks Count Query Template - Returns count of VMs that have at l
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 SELECT COUNT(DISTINCT d."VM ID")
 FROM vdisk d
 JOIN vinfo i ON d."VM ID" = i."VM ID"
 WHERE d."Sharing mode" = true
-{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}};
 

@@ -7,6 +7,7 @@ This matches the old implementation behavior.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 WITH vm_disk_totals AS (
     SELECT
@@ -16,6 +17,7 @@ WITH vm_disk_totals AS (
     LEFT JOIN vdisk d ON i."VM ID" = d."VM ID"
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
     GROUP BY i."VM ID"
 )
 SELECT

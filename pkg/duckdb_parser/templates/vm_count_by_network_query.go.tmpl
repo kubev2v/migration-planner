@@ -6,11 +6,14 @@ A VM with 2 NICs on the same network is counted twice.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 SELECT "Network" AS network, COUNT(*) AS count
 FROM vnetwork n
-{{- if .ClusterFilter }}
+{{- if or .ClusterFilter .VmIDList }}
 JOIN vinfo i ON n."VM ID" = i."VM ID"
-WHERE i."Cluster" = '{{.ClusterFilter}}'
+WHERE 1=1
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
 {{- end}}
 GROUP BY "Network";

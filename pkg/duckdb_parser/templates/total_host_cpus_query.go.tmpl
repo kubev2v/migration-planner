@@ -3,8 +3,10 @@ Total Host CPUs Query Template - Returns sum of physical CPU cores across hosts.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: when set, sum CPUs only for hosts that have those VMs
 */ -}}
 SELECT COALESCE(SUM("# Cores"), 0)
 FROM vhost
 WHERE 1=1
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND "Object ID" IN (SELECT DISTINCT "Host" FROM vinfo WHERE "VM ID" IN {{.VmIDList}}){{end}};

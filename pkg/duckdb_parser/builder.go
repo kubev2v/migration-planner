@@ -63,9 +63,22 @@ type queryParams struct {
 	OSFilter         string
 	PowerStateFilter string
 	VmIDFilter       string
+	VmIDList         string // IN ('id1','id2') with escaped quotes, or empty
 	Category         string
 	Limit            int
 	Offset           int
+}
+
+// buildVmIDList returns a SQL fragment for IN (id1, id2, ...) with single quotes escaped, or "" if ids is empty.
+func buildVmIDList(ids []string) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	escaped := make([]string, len(ids))
+	for i, id := range ids {
+		escaped[i] = "'" + strings.ReplaceAll(id, "'", "''") + "'"
+	}
+	return "(" + strings.Join(escaped, ",") + ")"
 }
 
 // VMQuery builds the VM query with filters and pagination.
@@ -83,6 +96,7 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 		OSFilter:         filters.OS,
 		PowerStateFilter: filters.PowerState,
 		VmIDFilter:       filters.VmId,
+		VmIDList:         buildVmIDList(filters.VmIDs),
 		Limit:            options.Limit,
 		Offset:           options.Offset,
 	}
@@ -93,6 +107,7 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -103,6 +118,7 @@ func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string,
 func (b *QueryBuilder) NetworkQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -113,6 +129,7 @@ func (b *QueryBuilder) NetworkQuery(filters Filters, options Options) (string, e
 func (b *QueryBuilder) HostQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -123,6 +140,7 @@ func (b *QueryBuilder) HostQuery(filters Filters, options Options) (string, erro
 func (b *QueryBuilder) OsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("os_query", mustGetTemplate("os_query"), params)
 }
@@ -147,6 +165,7 @@ func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter:    filters.Cluster,
 		PowerStateFilter: filters.PowerState,
+		VmIDList:         buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("vm_count_query", mustGetTemplate("vm_count_query"), params)
 }
@@ -155,6 +174,7 @@ func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) PowerStateCountsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("power_state_counts_query", mustGetTemplate("power_state_counts_query"), params)
 }
@@ -163,6 +183,7 @@ func (b *QueryBuilder) PowerStateCountsQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) HostPowerStateCountsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("host_power_state_counts_query", mustGetTemplate("host_power_state_counts_query"), params)
 }
@@ -171,6 +192,7 @@ func (b *QueryBuilder) HostPowerStateCountsQuery(filters Filters) (string, error
 func (b *QueryBuilder) CPUTierQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("cpu_tier_query", mustGetTemplate("cpu_tier_query"), params)
 }
@@ -179,6 +201,7 @@ func (b *QueryBuilder) CPUTierQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) MemoryTierQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("memory_tier_query", mustGetTemplate("memory_tier_query"), params)
 }
@@ -187,6 +210,7 @@ func (b *QueryBuilder) MemoryTierQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("nic_tier_query", mustGetTemplate("nic_tier_query"), params)
 }
@@ -195,6 +219,7 @@ func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) DiskSizeTierQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("disk_size_tier_query", mustGetTemplate("disk_size_tier_query"), params)
 }
@@ -203,6 +228,7 @@ func (b *QueryBuilder) DiskSizeTierQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("disk_type_summary_query", mustGetTemplate("disk_type_summary_query"), params)
 }
@@ -211,6 +237,7 @@ func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) ResourceTotalsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("resource_totals_query", mustGetTemplate("resource_totals_query"), params)
 }
@@ -219,6 +246,7 @@ func (b *QueryBuilder) ResourceTotalsQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) AllocatedVCPUsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("allocated_vcpus_query", mustGetTemplate("allocated_vcpus_query"), params)
 }
@@ -227,6 +255,7 @@ func (b *QueryBuilder) AllocatedVCPUsQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) AllocatedMemoryQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("allocated_memory_query", mustGetTemplate("allocated_memory_query"), params)
 }
@@ -235,6 +264,7 @@ func (b *QueryBuilder) AllocatedMemoryQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) TotalHostCPUsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("total_host_cpus_query", mustGetTemplate("total_host_cpus_query"), params)
 }
@@ -243,6 +273,7 @@ func (b *QueryBuilder) TotalHostCPUsQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) TotalHostMemoryQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("total_host_memory_query", mustGetTemplate("total_host_memory_query"), params)
 }
@@ -251,6 +282,7 @@ func (b *QueryBuilder) TotalHostMemoryQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) VMCountByNetworkQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("vm_count_by_network_query", mustGetTemplate("vm_count_by_network_query"), params)
 }
@@ -269,6 +301,7 @@ func (b *QueryBuilder) ClustersPerDatacenterQuery() (string, error) {
 func (b *QueryBuilder) MigratableCountQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("migratable_count_query", mustGetTemplate("migratable_count_query"), params)
 }
@@ -277,6 +310,7 @@ func (b *QueryBuilder) MigratableCountQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) MigratableWithWarningsCountQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("migratable_with_warnings_count_query", mustGetTemplate("migratable_with_warnings_count_query"), params)
 }
@@ -285,6 +319,7 @@ func (b *QueryBuilder) MigratableWithWarningsCountQuery(filters Filters) (string
 func (b *QueryBuilder) NotMigratableCountQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("not_migratable_count_query", mustGetTemplate("not_migratable_count_query"), params)
 }
@@ -293,6 +328,7 @@ func (b *QueryBuilder) NotMigratableCountQuery(filters Filters) (string, error) 
 func (b *QueryBuilder) MigrationIssuesQuery(filters Filters, category string) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 		Category:      category,
 	}
 	return b.buildQuery("migration_issues_query", mustGetTemplate("migration_issues_query"), params)
@@ -302,6 +338,7 @@ func (b *QueryBuilder) MigrationIssuesQuery(filters Filters, category string) (s
 func (b *QueryBuilder) ResourceBreakdownsQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("resource_breakdowns_query", mustGetTemplate("resource_breakdowns_query"), params)
 }
@@ -315,6 +352,7 @@ func (b *QueryBuilder) VCenterQuery() (string, error) {
 func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
+		VmIDList:      buildVmIDList(filters.VmIDs),
 	}
 	return b.buildQuery("vms_with_shared_disks_count_query", mustGetTemplate("vms_with_shared_disks_count_query"), params)
 }

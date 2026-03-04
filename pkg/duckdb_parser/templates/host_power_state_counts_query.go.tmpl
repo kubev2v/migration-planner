@@ -5,6 +5,7 @@ status when vHost sheet is empty/missing.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 WITH vhost_global_count AS (
     SELECT COUNT(*) as cnt FROM vhost
@@ -14,6 +15,7 @@ vhost_states AS (
     FROM vhost
     WHERE 1=1
     {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND "Object ID" IN (SELECT DISTINCT "Host" FROM vinfo WHERE "VM ID" IN {{.VmIDList}}){{end}}
     GROUP BY state
 ),
 vinfo_fallback AS (
@@ -21,6 +23,7 @@ vinfo_fallback AS (
     FROM vinfo
     WHERE "Host" IS NOT NULL AND "Host" != ''
     {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND "VM ID" IN {{.VmIDList}}{{end}}
 )
 SELECT state, count FROM vhost_states
 WHERE (SELECT cnt FROM vhost_global_count) > 0

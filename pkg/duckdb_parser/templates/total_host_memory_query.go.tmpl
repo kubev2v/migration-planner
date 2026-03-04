@@ -3,8 +3,10 @@ Total Host Memory Query Template - Returns sum of host memory (MB).
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: when set, sum memory only for hosts that have those VMs
 */ -}}
 SELECT COALESCE(SUM("# Memory"), 0)
 FROM vhost
 WHERE 1=1
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND "Object ID" IN (SELECT DISTINCT "Host" FROM vinfo WHERE "VM ID" IN {{.VmIDList}}){{end}};

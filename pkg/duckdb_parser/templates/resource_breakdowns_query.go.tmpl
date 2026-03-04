@@ -12,6 +12,7 @@ resources for VMs that are fully migratable without any warnings.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 WITH vm_concerns AS (
     SELECT DISTINCT
@@ -22,6 +23,7 @@ WITH vm_concerns AS (
     LEFT JOIN concerns c ON i."VM ID" = c."VM_ID"
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
     GROUP BY i."VM ID"
 ),
 vm_resources AS (
@@ -35,6 +37,7 @@ vm_resources AS (
     LEFT JOIN vm_concerns vc ON i."VM ID" = vc.vm_id
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
 ),
 disk_resources AS (
     SELECT
@@ -45,6 +48,7 @@ disk_resources AS (
     JOIN vinfo i ON d."VM ID" = i."VM ID"
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
     GROUP BY d."VM ID"
 ),
 nic_resources AS (
@@ -55,6 +59,7 @@ nic_resources AS (
     JOIN vinfo i ON n."VM ID" = i."VM ID"
     WHERE 1=1
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
     GROUP BY n."VM ID"
 ),
 combined AS (

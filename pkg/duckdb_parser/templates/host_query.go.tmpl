@@ -4,6 +4,7 @@ Falls back to vInfo when vHost sheet is empty/missing.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list); when set, only hosts that have those VMs
   - Limit/Offset: pagination
 */ -}}
 WITH vhost_global_count AS (
@@ -21,6 +22,7 @@ vhost_data AS (
     FROM vhost
     WHERE 1=1
     {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND "Object ID" IN (SELECT DISTINCT "Host" FROM vinfo WHERE "VM ID" IN {{.VmIDList}}){{end}}
 ),
 vinfo_fallback AS (
     SELECT DISTINCT
@@ -34,6 +36,7 @@ vinfo_fallback AS (
     FROM vinfo
     WHERE "Host" IS NOT NULL AND "Host" != ''
     {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND "VM ID" IN {{.VmIDList}}{{end}}
 )
 SELECT "cluster", "cpuCores", "cpuSockets", "id", "memoryMB", "model", "vendor"
 FROM vhost_data
