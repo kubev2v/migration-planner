@@ -28,12 +28,12 @@ jobs:
 
       - name: Determine version
         id: version
-        uses: ./.github/actions/determine-version
+        uses: kubev2v/migration-planner-workflows/.github/actions/determine-version@main
 
   generate-client:
     name: Generate and publish API client
     needs: version
-    uses: kubev2v/migration-planner-client-generator/.github/workflows/generate-and-publish.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/generate-and-publish.yml@main
     with:
       openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1alpha1/openapi.yaml"
       package-name: "@openshift-migration-advisor/planner-sdk"
