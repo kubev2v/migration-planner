@@ -77,8 +77,8 @@ github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkp
 github.com/dustin/go-humanize v1.0.1/go.mod h1:Mu1zIs6XwVuF/gI1OepvI0qD18qycQx+mFykh5fBlto=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57 h1:x5yxNrq8XffV/OoNUeFPM6hxHVi5OTspSTBxr/9pemg=
 github.com/elliotwutingfeng/asciiset v0.0.0-20260129054604-cfde2086bc57/go.mod h1:GLo/8fDswSAniFG+BFIaiSPcK610jyzgEhWYPQwuQdw=
-github.com/erofs/go-erofs v0.0.0-20260209061334-237e4b380d2f h1:R2JZealttYwHr4LXDw6gsuJQGPNBiHSxVn7by4VHMVo=
-github.com/erofs/go-erofs v0.0.0-20260209061334-237e4b380d2f/go.mod h1:XkSeN9MHszGd4+3gcEjadJLYHCQpWzJ7/8yznzMuzJs=
+github.com/erofs/go-erofs v0.0.0-20260306012827-a05c5cb1ea64 h1:0ejRZ+9VC97kpYd6szbEBLawa1eTVPJRALLLIXfQgao=
+github.com/erofs/go-erofs v0.0.0-20260306012827-a05c5cb1ea64/go.mod h1:XkSeN9MHszGd4+3gcEjadJLYHCQpWzJ7/8yznzMuzJs=
 github.com/felixge/httpsnoop v1.0.4 h1:NFTV2Zj1bL4mc9sqWACXbQFVBBg2W3GPvqp8/ESS2Wg=
 github.com/felixge/httpsnoop v1.0.4/go.mod h1:m8KPJKqk1gH5J9DgRY2ASl2lWCfGKXixSwevea8zH2U=
 github.com/fortytw2/leaktest v1.3.0 h1:u8491cBMTQ8ft8aeV+adlcytMZylmA5nnwwkRZjI8vw=
