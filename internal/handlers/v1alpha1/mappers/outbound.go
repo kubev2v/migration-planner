@@ -155,6 +155,14 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		}
 	}
 
+	// Map agent version and warning (from ImageInfra, independent of agents)
+	if s.ImageInfra.AgentVersion != nil {
+		source.AgentVersion = s.ImageInfra.AgentVersion
+	}
+	if warning := service.CheckAgentVersionWarning(&s.ImageInfra); warning != nil {
+		source.AgentVersionWarning = warning
+	}
+
 	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
 	// TODO:
 	// Remark: If multiple agents are deployed, we pass only the first one based on created_at timestamp

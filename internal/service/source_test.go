@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -618,6 +619,110 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			id := uuid.New()
 			f := service.NewSourceFilter(service.WithSourceID(id))
 			Expect(f.ID).To(Equal(id))
+		})
+	})
+
+	Context("CheckAgentVersionWarning", func() {
+		It("returns nil when imageInfra is nil", func() {
+			result := service.CheckAgentVersionWarning(nil)
+			Expect(result).To(BeNil())
+		})
+
+		It("returns nil when AgentVersion is nil", func() {
+			imageInfra := &model.ImageInfra{
+				AgentVersion: nil,
+			}
+			result := service.CheckAgentVersionWarning(imageInfra)
+			Expect(result).To(BeNil())
+		})
+
+		It("returns warning when AgentVersion is empty and current version is available", func() {
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName != "" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr(""),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).NotTo(BeNil())
+				Expect(*result).To(ContainSubstring("No version information"))
+				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
+			}
+		})
+
+		It("returns nil when current version is not available", func() {
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName == "" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr("v0.5.1"),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).To(BeNil())
+			} else {
+				Skip("Skipping test: build version is available (cannot test unavailable version scenario)")
+			}
+		})
+
+		It("returns nil when versions match", func() {
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName != "" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).To(BeNil())
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
+			}
+		})
+
+		It("returns warning when versions differ", func() {
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName != "" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr("v0.1.0-test"),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).NotTo(BeNil())
+				Expect(*result).To(ContainSubstring("version mismatch"))
+				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
+				Expect(*result).To(ContainSubstring("v0.1.0-test"))
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
+			}
+		})
+
+		It("returns nil when stored version is 'unknown'", func() {
+			imageInfra := &model.ImageInfra{
+				AgentVersion: util.ToStrPtr("unknown"),
+			}
+			result := service.CheckAgentVersionWarning(imageInfra)
+			Expect(result).To(BeNil())
+		})
+
+		It("returns nil when stored version is invalid format", func() {
+			imageInfra := &model.ImageInfra{
+				AgentVersion: util.ToStrPtr("dev-build"),
+			}
+			result := service.CheckAgentVersionWarning(imageInfra)
+			Expect(result).To(BeNil())
+		})
+
+		It("returns warning when stored version is baseline v0.5.0 and current is newer", func() {
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName != "" && versionInfo.AgentVersionName != "v0.5.0" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr("v0.5.0"),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).NotTo(BeNil())
+				Expect(*result).To(ContainSubstring("version mismatch"))
+				Expect(*result).To(ContainSubstring("v0.5.0"))
+				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
+			} else {
+				Skip("Skipping test: current version is v0.5.0 or not available")
+			}
 		})
 	})
 })

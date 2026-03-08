@@ -1035,6 +1035,14 @@ components:
               $ref: "#/components/schemas/ValidatedSSHPublicKey"
             vmNetwork:
               $ref: "#/components/schemas/VmNetwork"
+        agentVersion:
+          type: string
+          nullable: true
+          description: Agent version (version tag) stored when OVA was downloaded
+        agentVersionWarning:
+          type: string
+          nullable: true
+          description: Warning message if stored agent version differs from current agent version
       required:
         - id
         - name
