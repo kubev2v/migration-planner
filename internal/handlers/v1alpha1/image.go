@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
 
@@ -101,6 +103,22 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	}
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+
+	versionInfo := version.Get()
+	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName, "agent_git_commit", versionInfo.AgentGitCommit)
+	} else {
+		// Use detached context to ensure version persists even if client disconnects
+		persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		// Use atomic update to prevent race conditions during concurrent downloads
+		if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
+			zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
+		} else {
+			zap.S().Named("image_service").Infow("stored agent version", "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
+		}
+	}
 
 	return imageServer.GetImageByToken200ApplicationovfResponse{Body: bytes.NewReader([]byte{})}, nil
 }

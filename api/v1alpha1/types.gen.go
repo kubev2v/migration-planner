@@ -511,10 +511,16 @@ type Snapshot struct {
 
 // Source defines model for Source.
 type Source struct {
-	Agent     *Agent             `json:"agent,omitempty"`
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
-	Infra     *struct {
+	Agent *Agent `json:"agent,omitempty"`
+
+	// AgentVersion Agent version (version tag) stored when OVA was downloaded
+	AgentVersion *string `json:"agentVersion"`
+
+	// AgentVersionWarning Warning message if stored agent version differs from current agent version
+	AgentVersionWarning *string            `json:"agentVersionWarning"`
+	CreatedAt           time.Time          `json:"createdAt"`
+	Id                  openapi_types.UUID `json:"id"`
+	Infra               *struct {
 		Proxy        *AgentProxy            `json:"proxy,omitempty"`
 		SshPublicKey *ValidatedSSHPublicKey `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 		VmNetwork    *VmNetwork             `json:"vmNetwork,omitempty"`

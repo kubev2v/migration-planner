@@ -18,4 +18,5 @@ type ImageInfra struct {
 	SubnetMask       string
 	DefaultGateway   string
 	Dns              string
+	AgentVersion     *string
 }

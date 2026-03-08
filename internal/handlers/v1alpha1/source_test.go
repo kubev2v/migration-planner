@@ -13,6 +13,7 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -461,6 +462,121 @@ var _ = Describe("source handler", Ordered, func() {
 
 			// Verify VM network is nil (no network data)
 			Expect(source.Infra.VmNetwork).To(BeNil())
+		})
+
+		It("successfully retrieve the source -- with agent version set", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra data with agent_version
+			insertImageInfraStm := `INSERT INTO image_infras
+				(source_id, agent_version)
+				VALUES ('%s', 'v0.5.1');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+
+			// Verify agent version is set
+			Expect(source.AgentVersion).NotTo(BeNil())
+			Expect(*source.AgentVersion).To(Equal("v0.5.1"))
+		})
+
+		It("successfully retrieve the source -- with agent version warning when versions differ", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra data with old agent_version
+			insertImageInfraStm := `INSERT INTO image_infras
+				(source_id, agent_version)
+				VALUES ('%s', 'v0.1.0');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+
+			// Verify agent version is set
+			Expect(source.AgentVersion).NotTo(BeNil())
+			Expect(*source.AgentVersion).To(Equal("v0.1.0"))
+
+			// Verify warning is set if current version differs (may be nil if current version is not available)
+			versionInfo := version.Get()
+			if versionInfo.AgentVersionName != "" && versionInfo.AgentVersionName != "v0.1.0" {
+				Expect(source.AgentVersionWarning).NotTo(BeNil())
+				Expect(*source.AgentVersionWarning).To(ContainSubstring("version mismatch"))
+				Expect(*source.AgentVersionWarning).To(ContainSubstring(versionInfo.AgentVersionName))
+				Expect(*source.AgentVersionWarning).To(ContainSubstring("v0.1.0"))
+			}
+		})
+
+		It("successfully retrieve the source -- without agent version (nil)", func() {
+			firstSourceID := uuid.New()
+			firstAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra data without agent_version (NULL)
+			insertImageInfraStm := `INSERT INTO image_infras
+				(source_id)
+				VALUES ('%s');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, firstSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
+
+			source := resp.(server.GetSource200JSONResponse)
+			Expect(source.Id.String()).To(Equal(firstSourceID.String()))
+
+			// Verify agent version is nil when not set
+			Expect(source.AgentVersion).To(BeNil())
+			// Verify no warning when agent version is not set
+			Expect(source.AgentVersionWarning).To(BeNil())
 		})
 
 		It("successfully retrieve the source -- with labels", func() {

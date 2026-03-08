@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/version"
 )
 
 type SourceService struct {
@@ -260,4 +261,34 @@ func WithOrgID(orgID string) SourceFilterFunc {
 	return func(s *SourceFilter) {
 		s.OrgID = orgID
 	}
+}
+
+// CheckAgentVersionWarning compares stored agent version with current and returns warning if they differ.
+func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
+	versionInfo := version.Get()
+	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+		return nil
+	}
+	currentVersion := versionInfo.AgentVersionName
+
+	// Handle missing version (edge case if migration hasn't run)
+	if imageInfra == nil || imageInfra.AgentVersion == nil || *imageInfra.AgentVersion == "" {
+		message := "No version information available for this OVA. Current system version: " + currentVersion +
+			". Consider downloading a new OVA to ensure compatibility."
+		return &message
+	}
+
+	storedVersion := *imageInfra.AgentVersion
+	if !version.IsValidAgentVersion(storedVersion) {
+		return nil
+	}
+
+	if storedVersion == currentVersion {
+		return nil
+	}
+
+	message := "Agent version mismatch detected. The OVA was downloaded with version " + storedVersion +
+		", but the current system version is " + currentVersion +
+		". Consider downloading a new OVA to ensure compatibility."
+	return &message
 }
