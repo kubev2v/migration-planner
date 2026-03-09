@@ -1,4 +1,4 @@
-name: React to Agent-UI Repo Changes
+name: React to Agent Repositories Changes
 
 on:
   repository_dispatch:
@@ -11,16 +11,19 @@ permissions:
 jobs:
   update:
     concurrency:
-      group: agent-ui-repo-update
+      group: agent-repositories-update
       cancel-in-progress: true
     runs-on: ubuntu-latest
     env:
-      BRANCH_NAME: "update-agent-ui-head"
+      BRANCH_NAME: "update-agent-repositories"
+      MIGRATION_PLANNER_AGENT_REPO_NAME: "kubev2v/assisted-migration-agent"
       MIGRATION_PLANNER_AGENT_UI_REPO_NAME: "kubev2v/migration-planner-agent-ui"
       CONFIG_FILE: "build/migration-planner-iso/config"
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: true
 
       - name: Read payload
         id: payload
@@ -32,12 +35,25 @@ jobs:
           echo "repo=$REPO" >> $GITHUB_OUTPUT
 
       - name: Update file
+        if: ${{ steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME }}
         id: update
         env:
           NEW_SHA: ${{ steps.payload.outputs.new_sha }}
         run: |
           sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$NEW_SHA/" "$CONFIG_FILE"
           grep -q "^AGENT_UI_IMAGE_TAG=$NEW_SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
+
+      - name: Update agent submodule
+        if: ${{ steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_REPO_NAME }}
+        id: update-submodule
+        env:
+          NEW_SHA: ${{ steps.payload.outputs.new_sha }}
+        run: |
+          echo "Updating agent submodule to ${NEW_SHA}"
+          git submodule update --init agent-v2
+          git -C agent-v2 fetch origin "${NEW_SHA}"
+          git -C agent-v2 checkout --detach "${NEW_SHA}"
+          git add agent-v2
 
       - name: Generate GitHub App token
         id: app-token
@@ -48,18 +64,16 @@ jobs:
           owner: kubev2v
 
       - name: Create Pull Request
-        if: ${{ steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME }}
+        if: ${{ steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME ||
+          steps.payload.outputs.repo == env.MIGRATION_PLANNER_AGENT_REPO_NAME }}
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ steps.app-token.outputs.token }}
           branch: ${{ env.BRANCH_NAME }}
           commit-message: |
-            NO-JIRA | ci: Trigger konflux pipeline. 
-            Reason: The latest sha in repo ${{ env.MIGRATION_PLANNER_AGENT_UI_REPO_NAME }} was changed to ${{ steps.payload.outputs.new_sha }}.
-          title: "[AUTOMATION] Update agent-ui Repo HEAD"
+            NO-JIRA | ci: Trigger Konflux pipeline. 
+            Changes to the agent repo or the agent-ui have been detected.
+          title: "[AUTOMATION] Update Agent submodule or Agent-UI"
           body: |
             Auto update triggered by ${{ steps.payload.outputs.repo }}.
-            New SHA: ${{ steps.payload.outputs.new_sha }}
           delete-branch: true
-
-
