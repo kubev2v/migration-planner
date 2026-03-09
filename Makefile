@@ -28,7 +28,7 @@ PODMAN ?= podman
 DOCKER_CONF ?= $(CURDIR)/docker-config
 DOCKER_AUTH_FILE ?= ${DOCKER_CONF}/auth.json
 PKG_MANAGER ?= apt
-SIZER_IMAGE ?= quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+SIZER_IMAGE ?= quay.io/redhat-user-workloads/odf-sizer-lib-tenant/sizer
 SIZER_IMAGE_TAG ?= latest
 SIZER_PORT ?= 9200
 
