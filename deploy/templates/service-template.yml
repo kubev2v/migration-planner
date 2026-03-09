@@ -88,10 +88,10 @@ parameters:
   # Sizer Service Config values
   - name: SIZER_IMAGE
     description: Sizer service container image
-    value: quay.io/redhat-user-workloads/assisted-migration-tenant/odf-sizer
+    value: quay.io/redhat-user-workloads/odf-sizer-lib-tenant/sizer
   - name: SIZER_IMAGE_TAG
     description: Sizer service container image Tag
-    value: 8932a5061e96f53e81817d916c0efcf2d25e9c51
+    value: latest
   - name: SIZER_REPLICAS
     description: Number of replicas of the sizer service to run
     value: "2"
