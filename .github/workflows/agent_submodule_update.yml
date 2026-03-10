@@ -1,0 +1,65 @@
+name: React to Agent Repository Changes
+
+on:
+  repository_dispatch:
+    types: [agent_repo_updated]
+
+permissions:
+  contents: read
+
+jobs:
+  update-agent-submodule:
+    if: github.event.client_payload.repo == 'kubev2v/assisted-migration-agent'
+    concurrency:
+      group: agent-submodule-update
+      cancel-in-progress: true
+    runs-on: ubuntu-latest
+    env:
+      BRANCH_NAME: "update-agent-submodule"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - name: Read payload
+        id: payload
+        env:
+          SHA: ${{ github.event.client_payload.sha }}
+          REPO: ${{ github.event.client_payload.repo }}
+        run: |
+          echo "new_sha=$SHA" >> $GITHUB_OUTPUT
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+
+      - name: Update agent submodule
+        id: update-submodule
+        env:
+          NEW_SHA: ${{ steps.payload.outputs.new_sha }}
+        run: |
+          echo "Updating agent submodule to ${NEW_SHA}"
+          git submodule update --init agent-v2
+          git -C agent-v2 fetch origin "${NEW_SHA}"
+          git -C agent-v2 checkout --detach "${NEW_SHA}"
+          git add agent-v2
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+          private-key: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
+          owner: kubev2v
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch: ${{ env.BRANCH_NAME }}
+          commit-message: |
+            NO-JIRA | feat: Agent repository changes have been detected. 
+            Update submodule to reflect the SHA: ${{ steps.payload.outputs.new_sha }}.
+          title: "[AUTOMATION] Update Agent submodule"
+          body: |
+            Auto update triggered by ${{ steps.payload.outputs.repo }}.
+            SHA: ${{ steps.payload.outputs.new_sha }}.
+          delete-branch: true
