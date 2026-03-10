@@ -173,7 +173,8 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, NewErrInvalidClusterInventory(req.ClusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
 	}
 
-	includeControlPlane := true
+	includeControlPlane := !req.HostedControlPlane
+	effectiveCPNodeCount := effectiveControlPlaneNodeCount(req)
 	controlPlaneSchedulable := req.ControlPlaneSchedulable
 
 	controlPlaneCPU := req.ControlPlaneCPU
@@ -201,7 +202,8 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithString("worker_node_effective_cpu", fmt.Sprintf("%.2f", effectiveCPU)).
 		WithInt("worker_node_memory", req.WorkerNodeMemory).
 		WithBool("control_plane_schedulable", controlPlaneSchedulable).
-		WithInt("control_plane_node_count", req.ControlPlaneNodeCount).
+		WithBool("hosted_control_plane", req.HostedControlPlane).
+		WithInt("control_plane_node_count", effectiveCPNodeCount).
 		Build()
 
 	// Use effective CPU for all calculations
@@ -255,7 +257,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		controlPlaneSchedulable,
 		controlPlaneCPU,
 		controlPlaneMemory,
-		req.ControlPlaneNodeCount,
+		effectiveCPNodeCount,
 	)
 
 	// Call sizer service
@@ -268,7 +270,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("sizer service returned empty response")
 	}
 
-	transformed := s.transformSizerResponse(sizerResponse, req.ControlPlaneNodeCount)
+	transformed := s.transformSizerResponse(sizerResponse, effectiveCPNodeCount)
 
 	if transformed.ClusterSizing.TotalNodes > MaxNodeCount {
 		minNodeCPU, minNodeMemory := s.calculateMinimumNodeSize(
@@ -504,6 +506,13 @@ func (s *SizerService) formatNodeSizeError(workerCPU, workerMemory, inventoryCPU
 		minCPU, minMemory,
 	)
 	return NewErrInvalidRequest(message)
+}
+
+func effectiveControlPlaneNodeCount(req *mappers.ClusterRequirementsRequestForm) int {
+	if req.HostedControlPlane {
+		return 0
+	}
+	return req.ControlPlaneNodeCount
 }
 
 // buildSizerPayload transforms batched services into sizer API format

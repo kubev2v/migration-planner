@@ -296,6 +296,46 @@ var _ = Describe("sizer service", func() {
 				Expect(result).NotTo(BeNil())
 			})
 
+			It("successfully handles hosted control plane (worker nodes only)", func() {
+				request.HostedControlPlane = true
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+
+				var sizerPayload client.SizerRequest
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+						Expect(json.NewDecoder(r.Body).Decode(&sizerPayload)).To(Succeed())
+					}
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(createTestSizerResponse(4, 4, 0, 40, 80))
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(6))
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(6))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
+
+				Expect(sizerPayload.MachineSets).To(HaveLen(1))
+				Expect(sizerPayload.MachineSets[0].Name).To(Equal("worker"))
+				Expect(sizerPayload.Workloads).To(HaveLen(1))
+				Expect(sizerPayload.Workloads[0].Name).To(Equal("vm-workload"))
+			})
+
 			It("successfully handles different over-commit ratios", func() {
 				cpuRatios := []string{"1:1", "1:2", "1:4", "1:6"}
 				memoryRatios := []string{"1:1", "1:2", "1:4"}

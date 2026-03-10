@@ -354,6 +354,120 @@ var _ = Describe("sizer handler", func() {
 				Expect(successResp.ResourceConsumption.Memory).To(Equal(200.0))
 			})
 
+			It("returns 200 with hostedControlPlane true and zero control plane nodes in response", func() {
+				hostedTrue := true
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+					HostedControlPlane:    &hostedTrue,
+					// Control plane fields must not be specified when hostedControlPlane is true
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(createTestSizerResponse(4, 4, 0, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				Expect(resp).NotTo(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(6))
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(6))
+			})
+
+			type hostedControlPlaneValidationCase struct {
+				name          string
+				setupRequest  func(*api.ClusterRequirementsRequest)
+				expectedError string
+			}
+
+			hostedControlPlaneValidationCases := []hostedControlPlaneValidationCase{
+				{
+					name: "returns 400 when hostedControlPlane is true and controlPlaneNodeCount is specified",
+					setupRequest: func(req *api.ClusterRequirementsRequest) {
+						count := api.ClusterRequirementsRequestControlPlaneNodeCount(3)
+						req.ControlPlaneNodeCount = &count
+					},
+					expectedError: "controlPlaneNodeCount cannot be specified when hostedControlPlane is true",
+				},
+				{
+					name: "returns 400 when hostedControlPlane is true and controlPlaneCPU is specified",
+					setupRequest: func(req *api.ClusterRequirementsRequest) {
+						cpu := 8
+						req.ControlPlaneCPU = &cpu
+					},
+					expectedError: "controlPlaneCPU cannot be specified when hostedControlPlane is true",
+				},
+				{
+					name: "returns 400 when hostedControlPlane is true and controlPlaneMemory is specified",
+					setupRequest: func(req *api.ClusterRequirementsRequest) {
+						memory := 16
+						req.ControlPlaneMemory = &memory
+					},
+					expectedError: "controlPlaneMemory cannot be specified when hostedControlPlane is true",
+				},
+				{
+					name: "returns 400 when hostedControlPlane is true and controlPlaneSchedulable is specified",
+					setupRequest: func(req *api.ClusterRequirementsRequest) {
+						schedulable := false
+						req.ControlPlaneSchedulable = &schedulable
+					},
+					expectedError: "controlPlaneSchedulable cannot be specified when hostedControlPlane is true",
+				},
+			}
+
+			for _, tc := range hostedControlPlaneValidationCases {
+				tc := tc
+				It(tc.name, func() {
+					hostedTrue := true
+					request := &api.ClusterRequirementsRequest{
+						ClusterId:             clusterID,
+						CpuOverCommitRatio:    api.CpuOneToFour,
+						MemoryOverCommitRatio: api.MemoryOneToTwo,
+						WorkerNodeCPU:         8,
+						WorkerNodeMemory:      16,
+						HostedControlPlane:    &hostedTrue,
+					}
+					tc.setupRequest(request)
+
+					mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+					handler = handlers.NewServiceHandler(
+						nil,
+						service.NewAssessmentService(mockStore, nil),
+						nil,
+						nil,
+						nil,
+					)
+
+					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+						Id:   assessmentID,
+						Body: request,
+					})
+
+					Expect(err).To(BeNil())
+					Expect(resp).NotTo(BeNil())
+					errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+					Expect(ok).To(BeTrue())
+					Expect(errorResp.Message).To(Equal(tc.expectedError))
+				})
+			}
+
 			intPtr := func(v int) *int { return &v }
 			cases := []struct {
 				name    string

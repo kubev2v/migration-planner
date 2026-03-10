@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
@@ -55,14 +56,22 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio)}, nil
 	}
 
+	// Validate that control plane fields are not provided when hosted control plane is enabled
+	if err := validateNoControlPlaneFieldsWhenHosted(request.Body); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
+	}
+
 	// Validate controlPlaneNodeCount (API enum handles this in production, but tests bypass middleware)
-	if request.Body.ControlPlaneNodeCount != nil {
-		count := int(*request.Body.ControlPlaneNodeCount)
-		if count != 1 && count != 3 {
-			logger.Error(fmt.Errorf("invalid controlPlaneNodeCount: %d", count)).Log()
-			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message: fmt.Sprintf("invalid controlPlaneNodeCount: %d", count),
-			}, nil
+	if request.Body.HostedControlPlane == nil || !*request.Body.HostedControlPlane {
+		if request.Body.ControlPlaneNodeCount != nil {
+			count := int(*request.Body.ControlPlaneNodeCount)
+			if count != 1 && count != 3 {
+				logger.Error(fmt.Errorf("invalid controlPlaneNodeCount: %d", count)).Log()
+				return server.CalculateAssessmentClusterRequirements400JSONResponse{
+					Message: fmt.Sprintf("invalid controlPlaneNodeCount: %d", count),
+				}, nil
+			}
 		}
 	}
 
@@ -134,4 +143,28 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 	// Convert domain model to API response
 	apiResponse := mappers.ClusterRequirementsResponseFormToAPI(*res)
 	return server.CalculateAssessmentClusterRequirements200JSONResponse(apiResponse), nil
+}
+
+// validateNoControlPlaneFieldsWhenHosted checks that control plane fields are not provided
+// when hosted control plane mode is enabled. Returns an error if any control plane field is present.
+func validateNoControlPlaneFieldsWhenHosted(req *api.ClusterRequirementsRequest) error {
+	if req.HostedControlPlane == nil || !*req.HostedControlPlane {
+		return nil
+	}
+
+	// Check each control plane field directly (not through interface{} to avoid nil pointer issues)
+	if req.ControlPlaneNodeCount != nil {
+		return fmt.Errorf("controlPlaneNodeCount cannot be specified when hostedControlPlane is true")
+	}
+	if req.ControlPlaneCPU != nil {
+		return fmt.Errorf("controlPlaneCPU cannot be specified when hostedControlPlane is true")
+	}
+	if req.ControlPlaneMemory != nil {
+		return fmt.Errorf("controlPlaneMemory cannot be specified when hostedControlPlane is true")
+	}
+	if req.ControlPlaneSchedulable != nil {
+		return fmt.Errorf("controlPlaneSchedulable cannot be specified when hostedControlPlane is true")
+	}
+
+	return nil
 }
