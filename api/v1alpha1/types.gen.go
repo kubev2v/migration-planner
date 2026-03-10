@@ -143,17 +143,20 @@ type ClusterRequirementsRequest struct {
 	// ControlPlaneCPU CPU cores per control plane node (default: 6)
 	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=200"`
 
-	// ControlPlaneMemory Memory (GB) per control plane node (default: 16)
+	// ControlPlaneMemory Memory in GB per control plane node (default: 16)
 	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=512"`
 
-	// ControlPlaneNodeCount Number of control plane nodes (1 for single node, 3 for HA)
+	// ControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
 	ControlPlaneNodeCount *ClusterRequirementsRequestControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty" validate:"omitempty,oneof=1 3"`
 
-	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
+	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes (default: false)
 	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
 
 	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
 	CpuOverCommitRatio ClusterRequirementsRequestCpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
+
+	// HostedControlPlane If true, control plane is hosted externally. Incompatible with control plane fields (default: false)
+	HostedControlPlane *bool `json:"hostedControlPlane,omitempty"`
 
 	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
 	MemoryOverCommitRatio ClusterRequirementsRequestMemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
@@ -168,7 +171,7 @@ type ClusterRequirementsRequest struct {
 	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2"`
 }
 
-// ClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes (1 for single node, 3 for HA)
+// ClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
 type ClusterRequirementsRequestControlPlaneNodeCount int
 
 // ClusterRequirementsRequestCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")

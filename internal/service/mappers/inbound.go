@@ -235,6 +235,7 @@ type ClusterRequirementsRequestForm struct {
 	ControlPlaneCPU         int
 	ControlPlaneMemory      int
 	ControlPlaneNodeCount   int
+	HostedControlPlane      bool
 }
 
 type ClusterRequirementsResponseForm struct {
