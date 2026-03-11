@@ -166,15 +166,18 @@ var _ = Describe("EstimationService", func() {
 				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
 
 				Expect(err).To(BeNil())
-				// score 0: FreeBSD (5 VMs, unclassified) — always first in canonical order
+				// score 0: no unknown entries
 				Expect(result.ComplexityByOS[0].Score).To(Equal(0))
-				Expect(result.ComplexityByOS[0].VMCount).To(Equal(5))
-				// score 1: Red Hat (100 VMs)
+				Expect(result.ComplexityByOS[0].VMCount).To(Equal(0))
+				// score 1: Red Hat (100 VMs) + CentOS 7 (20 VMs)
 				Expect(result.ComplexityByOS[1].Score).To(Equal(1))
-				Expect(result.ComplexityByOS[1].VMCount).To(Equal(100))
-				// score 2: CentOS (20 VMs)
+				Expect(result.ComplexityByOS[1].VMCount).To(Equal(120))
+				// score 2: no medium entries
 				Expect(result.ComplexityByOS[2].Score).To(Equal(2))
-				Expect(result.ComplexityByOS[2].VMCount).To(Equal(20))
+				Expect(result.ComplexityByOS[2].VMCount).To(Equal(0))
+				// score 3: FreeBSD (5 VMs)
+				Expect(result.ComplexityByOS[3].Score).To(Equal(3))
+				Expect(result.ComplexityByOS[3].VMCount).To(Equal(5))
 			})
 
 			It("maps disk tier labels to correct scores with correct size values", func() {
@@ -302,8 +305,8 @@ var _ = Describe("EstimationService", func() {
 				// defaultOsInfo has 3 distinct OS names
 				Expect(result.OSRatings).To(HaveLen(3))
 				Expect(result.OSRatings["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
-				Expect(result.OSRatings["CentOS 7 (64-bit)"]).To(Equal(2))
-				Expect(result.OSRatings["FreeBSD (64-bit)"]).To(Equal(0))
+				Expect(result.OSRatings["CentOS 7 (64-bit)"]).To(Equal(1))
+				Expect(result.OSRatings["FreeBSD (64-bit)"]).To(Equal(3))
 			})
 		})
 

@@ -16,31 +16,114 @@ var OSScores = []Score{0, 1, 2, 3, 4}
 // DiskScores lists all valid disk complexity scores in canonical order.
 var DiskScores = []Score{1, 2, 3, 4}
 
-// OSDifficultyScores maps OS keyword substrings to their numeric complexity score.
-// ClassifyOS checks whether each key is a substring of the VM's OS name.
+// OSDifficultyScores maps OS name substrings to numeric complexity scores.
+// ClassifyOS checks whether each key is a case-insensitive substring of the VM's OS name.
 //
-// The keyword set is designed so that no standard VMware OS name matches more than
-// one keyword, making map-iteration order irrelevant in practice. If you add a
-// keyword that could overlap with an existing one, prefer the ordered-slice approach
-// instead to guarantee deterministic results.
+// When multiple keys match the same OS name, all matching keys carry the same score,
+// so non-deterministic map iteration order does not affect the result.
 //
-// Edit this map to adjust OS complexity scoring. The mapping follows the
-// migration difficulty table in complexity.md:
+// Score semantics:
 //
-//	Score 0 — fallback when no keyword matches (unclassified)
-//	Score 1 — Red Hat Enterprise Linux, Rocky Linux
-//	Score 2 — CentOS, Windows
-//	Score 3 — Ubuntu, SUSE Linux Enterprise
-//	Score 4 — Oracle, Microsoft SQL (database workloads)
+//	0 = unknown (no key matched)
+//	1 = score 1 easiest
+//	2 = score 2
+//	3 = score 3
+//	4 = score 4 hardest
 var OSDifficultyScores = map[string]Score{
-	"Red Hat":               1,
-	"Rocky Linux":           1,
-	"CentOS":                2,
-	"Windows":               2,
-	"Ubuntu":                3,
-	"SUSE Linux Enterprise": 3,
-	"Oracle":                4,
-	"Microsoft SQL":         4,
+	// --- Red Hat Enterprise Linux ---
+	"Red Hat Enterprise Linux 4":  2,
+	"Red Hat Enterprise Linux 5":  2,
+	"Red Hat Enterprise Linux 6":  1,
+	"Red Hat Enterprise Linux 7":  1,
+	"Red Hat Enterprise Linux 8":  1,
+	"Red Hat Enterprise Linux 9":  1,
+	"Red Hat Enterprise Linux 10": 1,
+	"Red Hat Fedora":              1,
+
+	// --- CentOS ---
+	"CentOS 4": 2,
+	"CentOS 5": 2,
+	"CentOS 6": 1,
+	"CentOS 7": 1,
+	"CentOS 8": 1,
+	"CentOS 9": 1,
+
+	// --- Oracle Linux ---
+	"Oracle Linux 4": 2,
+	"Oracle Linux 5": 2,
+	"Oracle Linux 6": 1,
+	"Oracle Linux 7": 1,
+	"Oracle Linux 8": 1,
+	"Oracle Linux 9": 1,
+
+	// --- Rocky Linux ---
+	"Rocky Linux 8": 1,
+	"Rocky Linux 9": 1,
+
+	// --- AlmaLinux ---
+	"AlmaLinux 8": 3,
+	"AlmaLinux 9": 3,
+
+	// --- SUSE Linux Enterprise ---
+	"SUSE Linux Enterprise 8":  3,
+	"SUSE Linux Enterprise 9":  3,
+	"SUSE Linux Enterprise 10": 3,
+	"SUSE Linux Enterprise 11": 3,
+	"SUSE Linux Enterprise 12": 2,
+	"SUSE Linux Enterprise 15": 2,
+	"SUSE openSUSE":            3,
+
+	// --- Ubuntu ---
+	"Ubuntu Linux 18.04": 3,
+	"Ubuntu Linux 20.04": 3,
+	"Ubuntu Linux 22.04": 3,
+	"Ubuntu Linux 24.04": 3,
+	"Ubuntu Linux":       3,
+
+	// --- Debian ---
+	"Debian GNU/Linux 5":  3,
+	"Debian GNU/Linux 6":  3,
+	"Debian GNU/Linux 7":  3,
+	"Debian GNU/Linux 8":  3,
+	"Debian GNU/Linux 9":  3,
+	"Debian GNU/Linux 10": 3,
+	"Debian GNU/Linux 11": 3,
+	"Debian GNU/Linux 12": 3,
+
+	// --- Windows Server ---
+	"Microsoft Windows Server 2000":    3,
+	"Microsoft Windows Server 2003":    3,
+	"Microsoft Windows Server 2008 R2": 3,
+	"Microsoft Windows Server 2008":    3,
+	"Microsoft Windows Server 2012 R2": 3,
+	"Microsoft Windows Server 2012":    3,
+	"Microsoft Windows Server 2016":    2,
+	"Microsoft Windows Server 2019":    2,
+	"Microsoft Windows Server 2022":    2,
+	"Microsoft Windows Server 2025":    2,
+
+	// --- Windows Desktop ---
+	"Microsoft Windows XP":    3,
+	"Microsoft Windows Vista": 3,
+	"Microsoft Windows 7":     3,
+	"Microsoft Windows 8":     3,
+	"Microsoft Windows 10":    2,
+	"Microsoft Windows 11":    2,
+
+	// --- Oracle Solaris ---
+	"Oracle Solaris 10": 3,
+	"Oracle Solaris 11": 3,
+
+	// --- FreeBSD ---
+	"FreeBSD": 3,
+
+	// --- Other explicitly-rated OSes ---
+	"VMware Photon OS": 3,
+	"Amazon Linux 2":   3,
+	"CoreOS Linux":     3,
+	"Apple macOS":      3,
+
+	"Microsoft SQL": 4,
 }
 
 // DiskSizeScores maps the pre-computed inventory tier label strings (produced by
@@ -60,8 +143,8 @@ var DiskSizeScores = map[string]Score{
 }
 
 // ClassifyOS returns the numeric complexity score for the given OS name by
-// checking whether each keyword in OSDifficultyScores appears as a substring.
-// Returns 0 if no keyword matches (unclassified).
+// checking whether each key in OSDifficultyScores appears as a case-insensitive
+// substring of osName. Returns 0 if no key matches (unknown).
 func ClassifyOS(osName string) Score {
 	normalized := strings.ToLower(osName)
 	for keyword, score := range OSDifficultyScores {
