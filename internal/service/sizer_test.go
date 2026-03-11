@@ -104,6 +104,11 @@ func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
 
 // createTestSizerServer creates an HTTP test server that mocks the sizer service
 func createTestSizerServer(response *client.SizerResponse, healthStatus int, healthError bool) *httptest.Server {
+	return createTestSizerServerWithRequestCapture(response, healthStatus, healthError, nil)
+}
+
+// createTestSizerServerWithRequestCapture is like createTestSizerServer but captures the POST body into captured.
+func createTestSizerServerWithRequestCapture(response *client.SizerResponse, healthStatus int, healthError bool, captured *client.SizerRequest) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/health" {
 			if healthError {
@@ -114,6 +119,9 @@ func createTestSizerServer(response *client.SizerResponse, healthStatus int, hea
 			return
 		}
 		if r.URL.Path == "/api/v1/size/custom" {
+			if captured != nil && r.Body != nil {
+				_ = json.NewDecoder(r.Body).Decode(captured)
+			}
 			if response == nil {
 				w.WriteHeader(http.StatusInternalServerError)
 				return
@@ -519,6 +527,66 @@ var _ = Describe("sizer service", func() {
 
 			It("successfully handles single node cluster (1 control plane)", func() {
 				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
+				request.ControlPlaneCPU = 50
+				request.ControlPlaneMemory = 100
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				var sizerReq client.SizerRequest
+				testServer = createTestSizerServerWithRequestCapture(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false, &sizerReq)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(1))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(1))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
+
+				Expect(sizerReq.MachineSets).To(HaveLen(1))
+				Expect(sizerReq.MachineSets[0].Name).To(Equal("controlPlane"))
+				Expect(sizerReq.MachineSets[0].AllowWorkloadScheduling).NotTo(BeNil())
+				Expect(*sizerReq.MachineSets[0].AllowWorkloadScheduling).To(BeTrue())
+				var vmWorkload, cpServicesWorkload *client.Workload
+				for i := range sizerReq.Workloads {
+					switch sizerReq.Workloads[i].Name {
+					case "vm-workload":
+						vmWorkload = &sizerReq.Workloads[i]
+					case "control-plane-services":
+						cpServicesWorkload = &sizerReq.Workloads[i]
+					}
+				}
+				Expect(vmWorkload).NotTo(BeNil())
+				Expect(vmWorkload.UsesMachines).To(ContainElement("controlPlane"))
+				Expect(cpServicesWorkload).NotTo(BeNil())
+				Expect(cpServicesWorkload.UsesMachines).To(ContainElement("controlPlane"))
+			})
+
+			It("returns error when single node requested with non-schedulable control plane", func() {
+				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = false
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("single-node clusters require schedulable control planes"))
+				Expect(err.Error()).To(ContainSubstring("Set ControlPlaneSchedulable to true"))
+			})
+
+			It("returns error when single node workload does not fit", func() {
+				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 2, 1, 40, 80), http.StatusOK, false)
@@ -527,18 +595,104 @@ var _ = Describe("sizer service", func() {
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
-				Expect(err).To(BeNil())
-				Expect(result).NotTo(BeNil())
-				// Base: 2 workers + 1 control plane = 3 total
-				// Failover: max(2, ceil(2*0.10)) = 2 nodes added
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(5))
-				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(1))
-				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
-				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("workload does not fit on a single node"))
 			})
 
-			It("successfully handles single node cluster fallback when totalNodes < 1", func() {
+			It("returns ErrInvalidRequest when single node and sizer returns not-schedulable error", func() {
 				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusInternalServerError)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{
+							"success": false,
+							"error":   "Workload \"vm-workload\" is not schedulable. All available MachineSets are too small to run this workload. Minimum required: at least 200 CPU and 512 GB memory.",
+						})
+						return
+					}
+				}))
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("workload does not fit on a single node"))
+			})
+
+			DescribeTable("single node fit error messages",
+				func(cpuVal, memoryVal int, expectSpecific bool) {
+					request.ControlPlaneNodeCount = 1
+					request.ControlPlaneSchedulable = true
+					request.ControlPlaneCPU = cpuVal
+					request.ControlPlaneMemory = memoryVal
+					assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+					mockStore.assessments[assessmentID] = assessment
+					testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 40, 80), http.StatusOK, false)
+					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+					sizerService = service.NewSizerService(sizerClient, mockStore)
+
+					result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+					Expect(err).NotTo(BeNil())
+					Expect(result).To(BeNil())
+					_, ok := err.(*service.ErrInvalidRequest)
+					Expect(ok).To(BeTrue())
+
+					if expectSpecific {
+						Expect(err.Error()).To(ContainSubstring("Use at least"))
+						Expect(err.Error()).To(ContainSubstring("CPU"))
+						Expect(err.Error()).To(ContainSubstring("GB memory"))
+					} else {
+						Expect(err.Error()).To(Equal("workload does not fit on a single node. Use a multi-node cluster."))
+					}
+				},
+				Entry("returns 'Use at least X CPU / Y GB' when CP is below minimum", 16, 16, true),
+				Entry("returns 'Use a multi-node cluster' when CP is at or above minimum", 60, 120, false),
+				Entry("returns 'Use a multi-node cluster' when CP is at max supported", service.MaxRecommendedNodeCPU, service.MaxRecommendedNodeMemory, false),
+			)
+
+			It("returns 'Use a multi-node cluster' when workload exceeds max supported single-node size", func() {
+				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
+				request.ControlPlaneCPU = 100
+				request.ControlPlaneMemory = 200
+				// Create inventory that requires > 200 CPU (max) on a single node
+				// With 70% capacity: 300 CPU needs 300/0.7 = ~429 effective CPU which exceeds max of 200
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 300, 600)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 300, 600), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				// Should recommend multi-node, not "use at least 200 CPU" which would be misleading
+				Expect(err.Error()).To(Equal("workload does not fit on a single node. Use a multi-node cluster."))
+				Expect(err.Error()).NotTo(ContainSubstring("Use at least"))
+			})
+
+			It("successfully handles single node cluster when sizer returns 0 nodes", func() {
+				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(&client.SizerResponse{
@@ -561,10 +715,8 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				// Base: 0 nodes (no control plane since totalNodes < 1)
-				// Failover: 0 (no worker nodes to calculate from)
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(0))
-				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(1))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(1))
 				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
 				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
 			})
