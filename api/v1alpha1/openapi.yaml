@@ -1903,11 +1903,20 @@ components:
             regardless of how many VMs run it.
           additionalProperties:
             type: integer
+        complexityByOSName:
+          type: array
+          description: >
+            Per-OS-name complexity breakdown. One entry per distinct OS name found in the
+            cluster's inventory. Each entry carries the OS name string, its numeric
+            complexity score (0–4), and the number of VMs running it.
+          items:
+            $ref: "#/components/schemas/ComplexityOSNameEntry"
       required:
         - complexityByDisk
         - complexityByOS
         - diskSizeRatings
         - osRatings
+        - complexityByOSName
 
     ComplexityDiskScoreEntry:
       type: object
@@ -1944,6 +1953,28 @@ components:
           type: integer
           description: Number of VMs at this complexity score
       required:
+        - score
+        - vmCount
+
+    ComplexityOSNameEntry:
+      type: object
+      description: One entry in the per-OS-name complexity breakdown.
+      properties:
+        osName:
+          type: string
+          description: >
+            The OS name exactly as it appears in vms.osInfo (e.g.
+            "Red Hat Enterprise Linux 9 (64-bit)").
+        score:
+          type: integer
+          description: >
+            Complexity score assigned by ClassifyOS. 0 = unclassified, 1 = least
+            complex, 4 = most complex.
+        vmCount:
+          type: integer
+          description: Number of VMs running this OS.
+      required:
+        - osName
         - score
         - vmCount
 

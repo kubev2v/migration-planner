@@ -540,6 +540,47 @@ var _ = Describe("estimation handler", func() {
 					Expect(entry.Score).To(Equal(i))
 				}
 			})
+
+			It("returns complexityByOSName with one entry per distinct OS name", func() {
+				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+
+				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				response := resp.(server.CalculateMigrationComplexity200JSONResponse)
+				// createTestInventoryForComplexityHandler has 3 distinct OS names
+				Expect(response.ComplexityByOSName).To(HaveLen(3))
+			})
+
+			It("returns complexityByOSName with correct osName, score and vmCount for a known OS", func() {
+				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+
+				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				response := resp.(server.CalculateMigrationComplexity200JSONResponse)
+				byName := map[string]api.ComplexityOSNameEntry{}
+				for _, e := range response.ComplexityByOSName {
+					byName[e.OsName] = e
+				}
+				rhel := byName["Red Hat Enterprise Linux 9 (64-bit)"]
+				Expect(rhel.Score).To(Equal(1))
+				Expect(rhel.VmCount).To(Equal(50))
+				centos := byName["CentOS 7 (64-bit)"]
+				Expect(centos.Score).To(Equal(2))
+				Expect(centos.VmCount).To(Equal(10))
+			})
+
 		})
 
 		Context("request validation errors", func() {

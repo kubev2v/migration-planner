@@ -2,6 +2,7 @@ package complexity
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 )
 
@@ -134,6 +135,32 @@ func OSBreakdown(osEntries []VMOsEntry) []OSDifficultyEntry {
 	for i, s := range OSScores {
 		result[i] = OSDifficultyEntry{Score: s, VMCount: counts[s]}
 	}
+	return result
+}
+
+// OSNameEntry is one row in the per-OS-name complexity breakdown.
+type OSNameEntry struct {
+	Name    string // OS name as reported by VMware
+	Score   Score
+	VMCount int
+}
+
+// OSNameBreakdown returns one OSNameEntry per distinct OS name in osEntries.
+func OSNameBreakdown(osEntries []VMOsEntry) []OSNameEntry {
+	result := make([]OSNameEntry, len(osEntries))
+	for i, e := range osEntries {
+		result[i] = OSNameEntry{
+			Name:    e.Name,
+			Score:   ClassifyOS(e.Name),
+			VMCount: e.Count,
+		}
+	}
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Score != result[j].Score {
+			return result[i].Score < result[j].Score
+		}
+		return result[i].Name < result[j].Name
+	})
 	return result
 }
 

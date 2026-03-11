@@ -226,6 +226,55 @@ var _ = Describe("EstimationService", func() {
 			})
 		})
 
+		Context("ComplexityByOSName field", func() {
+			It("has one entry per distinct OS name in the inventory", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				// defaultOsInfo has 3 distinct OS names
+				Expect(result.ComplexityByOSName).To(HaveLen(3))
+			})
+
+			It("assigns correct scores to each OS name", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				byName := map[string]int{}
+				for _, e := range result.ComplexityByOSName {
+					byName[e.Name] = e.Score
+				}
+				Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
+				Expect(byName["CentOS 7 (64-bit)"]).To(Equal(2))
+				Expect(byName["FreeBSD (64-bit)"]).To(Equal(0))
+			})
+
+			It("preserves VM counts from the inventory", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(err).To(BeNil())
+				byName := map[string]int{}
+				for _, e := range result.ComplexityByOSName {
+					byName[e.Name] = e.VMCount
+				}
+				Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(100))
+				Expect(byName["CentOS 7 (64-bit)"]).To(Equal(20))
+				Expect(byName["FreeBSD (64-bit)"]).To(Equal(5))
+			})
+
+		})
+
 		Context("assumptions fields", func() {
 			It("diskSizeRatings contains exactly the 4 range keys with correct scores", func() {
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(

@@ -222,6 +222,18 @@ type ComplexityDiskScoreEntry struct {
 	VmCount int `json:"vmCount"`
 }
 
+// ComplexityOSNameEntry One entry in the per-OS-name complexity breakdown.
+type ComplexityOSNameEntry struct {
+	// OsName The OS name exactly as it appears in vms.osInfo (e.g. "Red Hat Enterprise Linux 9 (64-bit)").
+	OsName string `json:"osName"`
+
+	// Score Complexity score assigned by ClassifyOS. 0 = unclassified, 1 = least complex, 4 = most complex.
+	Score int `json:"score"`
+
+	// VmCount Number of VMs running this OS.
+	VmCount int `json:"vmCount"`
+}
+
 // ComplexityOSScoreEntry One entry in the OS complexity breakdown
 type ComplexityOSScoreEntry struct {
 	// Score Complexity score from 0 to 4, where 1 indicates the least complex OS to migrate and 0 indicates an OS that could not be classified.
@@ -409,6 +421,9 @@ type MigrationComplexityResponse struct {
 
 	// ComplexityByOS OS complexity scores, one entry per score level (0-4). Score 1 indicates the least complex OS to migrate; score 0 indicates an OS that could not be classified. All five score levels are always present.
 	ComplexityByOS []ComplexityOSScoreEntry `json:"complexityByOS"`
+
+	// ComplexityByOSName Per-OS-name complexity breakdown. One entry per distinct OS name found in the cluster's inventory. Each entry carries the OS name string, its numeric complexity score (0–4), and the number of VMs running it.
+	ComplexityByOSName []ComplexityOSNameEntry `json:"complexityByOSName"`
 
 	// DiskSizeRatings Static lookup table mapping each disk-size tier label to its numeric complexity score. The content is identical for every cluster and reflects the DiskSizeScores configuration in the complexity package.
 	DiskSizeRatings map[string]int `json:"diskSizeRatings"`
