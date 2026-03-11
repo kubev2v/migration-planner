@@ -569,17 +569,19 @@ var _ = Describe("sizer handler", func() {
 
 			It("successfully handles single node cluster (1 control plane)", func() {
 				one := api.N1
+				controlPlaneSchedulable := true
 				request := &api.ClusterRequirementsRequest{
-					ClusterId:             clusterID,
-					CpuOverCommitRatio:    api.CpuOneToFour,
-					MemoryOverCommitRatio: api.MemoryOneToTwo,
-					WorkerNodeCPU:         8,
-					WorkerNodeMemory:      16,
-					ControlPlaneNodeCount: &one,
+					ClusterId:               clusterID,
+					CpuOverCommitRatio:      api.CpuOneToFour,
+					MemoryOverCommitRatio:   api.MemoryOneToTwo,
+					WorkerNodeCPU:           8,
+					WorkerNodeMemory:        16,
+					ControlPlaneNodeCount:   &one,
+					ControlPlaneSchedulable: &controlPlaneSchedulable,
 				}
 
 				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
-				sizerResponse := createTestSizerResponse(3, 2, 1, 40, 80)
+				sizerResponse := createTestSizerResponse(1, 0, 1, 40, 80)
 				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -592,6 +594,9 @@ var _ = Describe("sizer handler", func() {
 				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
 				Expect(ok).To(BeTrue())
 				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(1))
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(1))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(successResp.ClusterSizing.FailoverNodes).To(Equal(0))
 			})
 
 			It("successfully handles HA cluster (3 control plane) - explicit", func() {

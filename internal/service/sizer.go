@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -247,6 +248,15 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithInt("num_services", len(services)).
 		Log()
 
+	singleNode := req.ControlPlaneNodeCount == 1
+	// Single-node clusters must have schedulable control planes
+	if singleNode && !controlPlaneSchedulable {
+		return nil, NewErrInvalidRequest(
+			"single-node clusters require schedulable control planes. " +
+				"Set ControlPlaneSchedulable to true or use multiple control plane nodes",
+		)
+	}
+
 	// Build sizer API payload
 	sizerPayload := s.buildSizerPayload(
 		services,
@@ -258,12 +268,16 @@ func (s *SizerService) CalculateClusterRequirements(
 		controlPlaneCPU,
 		controlPlaneMemory,
 		effectiveCPNodeCount,
+		singleNode,
 	)
 
 	// Call sizer service
 	sizerResponse, err := s.sizerClient.CalculateSizing(ctx, sizerPayload)
 	if err != nil {
 		tracer.Error(err).Log()
+		if singleNode && isSizerSchedulabilityError(err) {
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+		}
 		return nil, fmt.Errorf("failed to call sizer service: %w", err)
 	}
 	if sizerResponse == nil {
@@ -271,6 +285,10 @@ func (s *SizerService) CalculateClusterRequirements(
 	}
 
 	transformed := s.transformSizerResponse(sizerResponse, effectiveCPNodeCount)
+
+	if singleNode && sizerResponse.Data.NodeCount > 1 {
+		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+	}
 
 	if transformed.ClusterSizing.TotalNodes > MaxNodeCount {
 		minNodeCPU, minNodeMemory := s.calculateMinimumNodeSize(
@@ -526,7 +544,17 @@ func (s *SizerService) buildSizerPayload(
 	controlPlaneCPU int,
 	controlPlaneMemory int,
 	controlPlaneNodeCount int,
+	singleNode bool,
 ) *client.SizerRequest {
+	if singleNode {
+		return s.buildSingleNodeSizerPayload(
+			services,
+			platform,
+			controlPlaneCPU,
+			controlPlaneMemory,
+		)
+	}
+
 	machineSets := []client.MachineSet{
 		{
 			Name:          "worker",
@@ -616,6 +644,86 @@ func (s *SizerService) buildSizerPayload(
 	}
 }
 
+func (s *SizerService) buildSingleNodeSizerPayload(
+	services []BatchedService,
+	platform string,
+	controlPlaneCPU int,
+	controlPlaneMemory int,
+) *client.SizerRequest {
+	machineSets := []client.MachineSet{
+		{
+			Name:                    "controlPlane",
+			CPU:                     controlPlaneCPU,
+			Memory:                  controlPlaneMemory,
+			InstanceName:            "control-plane",
+			NumberOfDisks:           MachineSetNumberOfDisks,
+			OnlyFor:                 []string{},
+			Label:                   "Control Plane",
+			AllowWorkloadScheduling: util.BoolPtr(true),
+			ControlPlaneReserved: &client.ControlPlaneReserved{
+				CPU:    ControlPlaneReservedCPU,
+				Memory: ControlPlaneReservedMemory,
+			},
+		},
+	}
+
+	allServiceNames := make([]string, len(services))
+	for i := range services {
+		allServiceNames[i] = services[i].Name
+	}
+
+	vmServices := make([]client.ServiceDescriptor, len(services))
+	for i, svc := range services {
+		runsWith := make([]string, 0, len(services)-1)
+		for j := range services {
+			if j != i {
+				runsWith = append(runsWith, allServiceNames[j])
+			}
+		}
+		vmServices[i] = client.ServiceDescriptor{
+			Name:           svc.Name,
+			RequiredCPU:    svc.RequiredCPU,
+			RequiredMemory: svc.RequiredMemory,
+			LimitCPU:       svc.LimitCPU,
+			LimitMemory:    svc.LimitMemory,
+			Zones:          1,
+			RunsWith:       runsWith,
+			Avoid:          []string{},
+		}
+	}
+
+	workloads := []client.Workload{
+		{
+			Name:         "control-plane-services",
+			Count:        1,
+			UsesMachines: []string{"controlPlane"},
+			Services: []client.ServiceDescriptor{
+				{
+					Name:           "ControlPlane",
+					RequiredCPU:    ControlPlaneReservedCPU,
+					RequiredMemory: ControlPlaneReservedMemory,
+					Zones:          1,
+					RunsWith:       []string{},
+					Avoid:          []string{},
+				},
+			},
+		},
+		{
+			Name:         "vm-workload",
+			Count:        1,
+			UsesMachines: []string{"controlPlane"},
+			Services:     vmServices,
+		},
+	}
+
+	return &client.SizerRequest{
+		Platform:    platform,
+		MachineSets: machineSets,
+		Workloads:   workloads,
+		Detailed:    true,
+	}
+}
+
 // transformSizerResponse maps sizer service response to API response
 func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerResponse, controlPlaneNodeCount int) TransformedSizerResponse {
 	var workerNodes, controlPlaneNodes int
@@ -647,6 +755,13 @@ func (s *SizerService) transformSizerResponse(sizerResponse *client.SizerRespons
 	workerNodes += failoverNodes
 
 	totalNodes := controlPlaneNodes + workerNodes
+
+	if controlPlaneNodeCount == 1 {
+		totalNodes = 1
+		controlPlaneNodes = 1
+		workerNodes = 0
+		failoverNodes = 0
+	}
 
 	resourceConsumptionForm := mappers.ResourceConsumptionForm{
 		CPU:    sizerResponse.Data.ResourceConsumption.CPU,
@@ -694,4 +809,55 @@ func calculateFailoverNodes(workerNodes int) int {
 	}
 	percentageBased := int(math.Ceil(float64(workerNodes) * FailoverCapacityPercent / 100.0))
 	return max(MinFailoverNodes, percentageBased)
+}
+
+// isSizerSchedulabilityError detects schedulability failures by sizer error message substrings.
+func isSizerSchedulabilityError(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "not schedulable") ||
+		strings.Contains(msg, "Minimum required") ||
+		strings.Contains(msg, "too small")
+}
+
+func (s *SizerService) singleNodeFitError(totalCPU, totalMemory int, smtMultiplier float64, controlPlaneCPU, controlPlaneMemory int) error {
+	// Calculate uncapped minimum to detect if workload truly exceeds max supported size
+	denominator := 1.0 * CapacityMultiplier
+	minEffectiveCPUPerNode := float64(totalCPU) / denominator
+	uncappedMinNodeCPU := int(math.Ceil(minEffectiveCPUPerNode / smtMultiplier))
+	uncappedMinNodeMemory := int(math.Ceil(float64(totalMemory) / denominator))
+
+	// Round up to nearest even number for CPU, nearest multiple of 4 for memory
+	uncappedMinNodeCPU = int(math.Ceil(float64(uncappedMinNodeCPU)/2) * 2)
+	uncappedMinNodeMemory = int(math.Ceil(float64(uncappedMinNodeMemory)/4) * 4)
+
+	// If workload truly exceeds max supported size, recommend multi-node only
+	if uncappedMinNodeCPU > MaxRecommendedNodeCPU || uncappedMinNodeMemory > MaxRecommendedNodeMemory {
+		return NewErrInvalidRequest("workload does not fit on a single node. Use a multi-node cluster.")
+	}
+
+	// Otherwise use the calculated minimum (already below max)
+	// Ensure minimum is at least control plane reserve so the suggested size can schedule the CP
+	minReservedCPU := int(math.Ceil(ControlPlaneReservedCPU/2.0) * 2)
+	minReservedMemory := int(math.Ceil(ControlPlaneReservedMemory/4.0) * 4)
+	minNodeCPU := max(max(uncappedMinNodeCPU, MinFallbackNodeCPU), minReservedCPU)
+	minNodeMemory := max(max(uncappedMinNodeMemory, MinFallbackNodeMemory), minReservedMemory)
+
+	return NewErrInvalidRequest(singleNodeFitErrorMessage(controlPlaneCPU, controlPlaneMemory, minNodeCPU, minNodeMemory))
+}
+
+// singleNodeFitErrorMessage returns the error when single-node didn't fit. If the user
+// is already at/above our minimum or at max, we recommend multi-node only.
+func singleNodeFitErrorMessage(controlPlaneCPU, controlPlaneMemory, minNodeCPU, minNodeMemory int) string {
+	alreadyAtOrAbove := controlPlaneCPU >= minNodeCPU && controlPlaneMemory >= minNodeMemory
+	atMaxSupported := controlPlaneCPU >= MaxRecommendedNodeCPU && controlPlaneMemory >= MaxRecommendedNodeMemory
+	if alreadyAtOrAbove || atMaxSupported {
+		return "workload does not fit on a single node. Use a multi-node cluster."
+	}
+	return fmt.Sprintf(
+		"workload does not fit on a single node with the specified resources. Use at least %d CPU / %d GB memory per node for a single-node cluster, or use a multi-node cluster",
+		minNodeCPU, minNodeMemory,
+	)
 }
