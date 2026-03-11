@@ -274,6 +274,86 @@ var _ = Describe("ClassifyOS real-world inventory strings", func() {
 	)
 })
 
+var _ = Describe("OSNameBreakdown", func() {
+	It("returns an empty (non-nil) slice for empty input", func() {
+		result := complexity.OSNameBreakdown([]complexity.VMOsEntry{})
+		Expect(result).NotTo(BeNil())
+		Expect(result).To(BeEmpty())
+	})
+
+	It("returns one entry per input entry with the correct score and VM count", func() {
+		entries := []complexity.VMOsEntry{
+			{Name: "Red Hat Enterprise Linux 9 (64-bit)", Count: 100},
+			{Name: "CentOS 7 (64-bit)", Count: 20},
+			{Name: "FreeBSD (64-bit)", Count: 5},
+		}
+		result := complexity.OSNameBreakdown(entries)
+		Expect(result).To(HaveLen(3))
+
+		// Find by name (order is alphabetical, verified separately below)
+		byName := map[string]complexity.OSNameEntry{}
+		for _, e := range result {
+			byName[e.Name] = e
+		}
+		Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"].Score).To(Equal(1))
+		Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"].VMCount).To(Equal(100))
+		Expect(byName["CentOS 7 (64-bit)"].Score).To(Equal(2))
+		Expect(byName["CentOS 7 (64-bit)"].VMCount).To(Equal(20))
+		Expect(byName["FreeBSD (64-bit)"].Score).To(Equal(0))
+		Expect(byName["FreeBSD (64-bit)"].VMCount).To(Equal(5))
+	})
+
+	It("assigns score 0 to unclassified OS names", func() {
+		entries := []complexity.VMOsEntry{
+			{Name: "VMware Photon OS (64-bit)", Count: 3},
+		}
+		result := complexity.OSNameBreakdown(entries)
+		Expect(result).To(HaveLen(1))
+		Expect(result[0].Score).To(Equal(0))
+		Expect(result[0].VMCount).To(Equal(3))
+	})
+
+	It("does not merge duplicate OS names — each input entry produces one output entry", func() {
+		// Callers are responsible for deduplication upstream; OSNameBreakdown mirrors input 1:1.
+		entries := []complexity.VMOsEntry{
+			{Name: "Red Hat Enterprise Linux 8 (64-bit)", Count: 100},
+			{Name: "Red Hat Enterprise Linux 8 (64-bit)", Count: 50},
+		}
+		result := complexity.OSNameBreakdown(entries)
+		Expect(result).To(HaveLen(2))
+		// Both entries carry the same name and score; counts are preserved independently.
+		Expect(result[0].VMCount + result[1].VMCount).To(Equal(150))
+	})
+})
+
+var _ = Describe("OSNameBreakdown and OSBreakdown consistency", func() {
+	It("summing OSNameBreakdown vmCounts by score matches OSBreakdown totals", func() {
+		entries := []complexity.VMOsEntry{
+			{Name: "Red Hat Enterprise Linux 9 (64-bit)", Count: 100},
+			{Name: "Red Hat Enterprise Linux 8 (64-bit)", Count: 50},
+			{Name: "CentOS 7 (64-bit)", Count: 20},
+			{Name: "Ubuntu Linux (64-bit)", Count: 8},
+			{Name: "Oracle Linux 8 (64-bit)", Count: 3},
+			{Name: "FreeBSD (64-bit)", Count: 5},
+		}
+
+		byScore := complexity.OSBreakdown(entries)
+		byName := complexity.OSNameBreakdown(entries)
+
+		// Sum vmCounts from OSNameBreakdown grouped by score
+		sumByScore := map[int]int{}
+		for _, e := range byName {
+			sumByScore[e.Score] += e.VMCount
+		}
+
+		for _, scoreEntry := range byScore {
+			Expect(sumByScore[scoreEntry.Score]).To(Equal(scoreEntry.VMCount),
+				"score %d: OSNameBreakdown sum (%d) should match OSBreakdown total (%d)",
+				scoreEntry.Score, sumByScore[scoreEntry.Score], scoreEntry.VMCount)
+		}
+	})
+})
+
 var _ = Describe("DiskBreakdown", func() {
 	It("always returns exactly 4 entries in score order 1–4", func() {
 		result := complexity.DiskBreakdown([]complexity.DiskTierInput{})

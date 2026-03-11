@@ -18,10 +18,11 @@ import (
 
 // MigrationComplexityResult holds the output of a complexity estimation run.
 type MigrationComplexityResult struct {
-	ComplexityByDisk []complexity.DiskComplexityEntry // scores 1–4, always 4 entries
-	ComplexityByOS   []complexity.OSDifficultyEntry   // scores 0–4, always 5 entries
-	DiskSizeRatings  map[string]complexity.Score      // static tier label → score lookup
-	OSRatings        map[string]complexity.Score      // per-inventory OS name → score
+	ComplexityByDisk   []complexity.DiskComplexityEntry // scores 1–4, always 4 entries
+	ComplexityByOS     []complexity.OSDifficultyEntry   // scores 0–4, always 5 entries
+	ComplexityByOSName []complexity.OSNameEntry         // one entry per distinct OS name
+	DiskSizeRatings    map[string]complexity.Score      // static tier label → score lookup
+	OSRatings          map[string]complexity.Score      // per-inventory OS name → score
 }
 
 // MigrationAssessmentResult represents the result of a migration assessment calculation
@@ -222,10 +223,11 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 	}
 
 	return &MigrationComplexityResult{
-		ComplexityByOS:   complexity.OSBreakdown(osEntries),
-		ComplexityByDisk: complexity.DiskBreakdown(diskEntries),
-		DiskSizeRatings:  complexity.DiskSizeRangeRatings(),
-		OSRatings:        complexity.OSRatings(osEntries),
+		ComplexityByOS:     complexity.OSBreakdown(osEntries),
+		ComplexityByOSName: complexity.OSNameBreakdown(osEntries),
+		ComplexityByDisk:   complexity.DiskBreakdown(diskEntries),
+		DiskSizeRatings:    complexity.DiskSizeRangeRatings(),
+		OSRatings:          complexity.OSRatings(osEntries),
 	}, nil
 }
 

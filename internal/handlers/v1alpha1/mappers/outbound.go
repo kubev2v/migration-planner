@@ -341,11 +341,21 @@ func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) ap
 		}
 	}
 
+	byOSName := make([]api.ComplexityOSNameEntry, len(result.ComplexityByOSName))
+	for i, entry := range result.ComplexityByOSName {
+		byOSName[i] = api.ComplexityOSNameEntry{
+			OsName:  entry.Name,
+			Score:   entry.Score,
+			VmCount: entry.VMCount,
+		}
+	}
+
 	return api.MigrationComplexityResponse{
-		ComplexityByDisk: byDisk,
-		ComplexityByOS:   byOS,
-		DiskSizeRatings:  result.DiskSizeRatings,
-		OsRatings:        result.OSRatings,
+		ComplexityByDisk:   byDisk,
+		ComplexityByOS:     byOS,
+		ComplexityByOSName: byOSName,
+		DiskSizeRatings:    result.DiskSizeRatings,
+		OsRatings:          result.OSRatings,
 	}
 }
 
