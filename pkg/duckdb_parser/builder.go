@@ -343,7 +343,7 @@ func generateOSCaseClauses() string {
 	for keyword, score := range complexity.OSDifficultyScores {
 		level := scoreToLevel[score]
 		clauses = append(clauses, fmt.Sprintf(
-			"            WHEN effective_os LIKE '%%%s%%' THEN '%s'", keyword, level))
+			"            WHEN LOWER(effective_os) LIKE '%%%s%%' THEN '%s'", strings.ToLower(keyword), level))
 	}
 	sort.Strings(clauses) // deterministic output
 	return strings.Join(clauses, "\n")

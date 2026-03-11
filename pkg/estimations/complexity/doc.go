@@ -5,8 +5,8 @@
 // Two independent scoring dimensions are supported:
 //
 //   - OS complexity (scores 0–4): derived by substring-matching the VM's OS name
-//     against OSDifficultyScores. Score 1 is the least complex; score 5 means the
-//     OS could not be classified.
+//     against OSDifficultyScores. Score 1 is the least complex; score 0 means the
+//     OS is unknown and complexity can not be assessed.
 //
 //   - Disk complexity (scores 1–4): derived from the pre-computed disk-size tier
 //     labels stored in the inventory by the agent. Score 1 is the least complex;

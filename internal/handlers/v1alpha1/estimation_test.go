@@ -503,8 +503,8 @@ var _ = Describe("estimation handler", func() {
 				// createTestInventoryForComplexityHandler has 3 distinct OS names
 				Expect(response.OsRatings).To(HaveLen(3))
 				Expect(response.OsRatings["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
-				Expect(response.OsRatings["CentOS 7 (64-bit)"]).To(Equal(2))
-				Expect(response.OsRatings["FreeBSD (64-bit)"]).To(Equal(0))
+				Expect(response.OsRatings["CentOS 7 (64-bit)"]).To(Equal(1))
+				Expect(response.OsRatings["FreeBSD (64-bit)"]).To(Equal(3))
 			})
 
 			It("returns disk scores in canonical order 1 through 4", func() {

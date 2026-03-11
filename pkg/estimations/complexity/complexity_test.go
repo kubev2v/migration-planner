@@ -18,38 +18,57 @@ var _ = Describe("ClassifyOS", func() {
 		func(osName string, expectedScore int) {
 			Expect(complexity.ClassifyOS(osName)).To(Equal(expectedScore))
 		},
-		// Score 1 keywords
-		Entry("Red Hat exact", "Red Hat", 1),
-		Entry("Red Hat full name", "Red Hat Enterprise Linux 8 (64-bit)", 1),
-		Entry("Rocky Linux exact", "Rocky Linux", 1),
-		Entry("Rocky Linux full name", "Rocky Linux 9 (64-bit)", 1),
-		// Score 2 keywords
-		Entry("CentOS exact", "CentOS", 2),
-		Entry("CentOS full name", "CentOS 7 (64-bit)", 2),
-		Entry("Windows exact", "Windows", 2),
-		Entry("Windows full name", "Microsoft Windows Server 2019 (64-bit)", 2),
-		// Score 3 keywords
-		Entry("Ubuntu exact", "Ubuntu", 3),
-		Entry("Ubuntu full name", "Ubuntu Linux (64-bit)", 3),
-		Entry("SUSE exact", "SUSE Linux Enterprise", 3),
-		Entry("SUSE full name", "SUSE Linux Enterprise 15 (64-bit)", 3),
-		// Score 4 keywords
-		Entry("Oracle exact", "Oracle", 4),
-		Entry("Oracle full name", "Oracle Linux 8 (64-bit)", 4),
+		// Score 1
+		Entry("RHEL 4 is Medium", "Red Hat Enterprise Linux 4 (64-bit)", 2),
+		Entry("RHEL 5 is Medium", "Red Hat Enterprise Linux 5 (64-bit)", 2),
+		Entry("RHEL 6 is score 1", "Red Hat Enterprise Linux 6 (64-bit)", 1),
+		Entry("RHEL 8 is score 1", "Red Hat Enterprise Linux 8 (64-bit)", 1),
+		Entry("RHEL 9 is score 1", "Red Hat Enterprise Linux 9 (64-bit)", 1),
+		Entry("RHEL 10 is score 1", "Red Hat Enterprise Linux 10 (64-bit)", 1),
+		Entry("Red Hat Fedora is score 1", "Red Hat Fedora (64-bit)", 1),
+		Entry("Rocky Linux 9 is score 1", "Rocky Linux 9 (64-bit)", 1),
+		Entry("CentOS 6 is score 1", "CentOS 6 (64-bit)", 1),
+		Entry("CentOS 7 is score 1", "CentOS 7 (64-bit)", 1),
+		Entry("Oracle Linux 6 is score 1", "Oracle Linux 6 (64-bit)", 1),
+		Entry("Oracle Linux 8 is score 1", "Oracle Linux 8 (64-bit)", 1),
+		// Score 2
+		Entry("CentOS 4 is Medium", "CentOS 4/5 (32-bit)", 2),
+		Entry("CentOS 5 is Medium", "CentOS 5 (64-bit)", 2),
+		Entry("Oracle Linux 4 is Medium", "Oracle Linux 4 (64-bit)", 2),
+		Entry("Oracle Linux 5 is Medium", "Oracle Linux 5 (64-bit)", 2),
+		Entry("SUSE 12 is Medium", "SUSE Linux Enterprise 12 (64-bit)", 2),
+		Entry("SUSE 15 is Medium", "SUSE Linux Enterprise 15 (64-bit)", 2),
+		Entry("Windows Server 2019 is Medium", "Microsoft Windows Server 2019 (64-bit)", 2),
+		Entry("Windows 10 is Medium", "Microsoft Windows 10 (64-bit)", 2),
+		Entry("Windows 11 is Medium", "Microsoft Windows 11 (64-bit)", 2),
+		// Score 3
+		Entry("SUSE 11 is Hard", "SUSE Linux Enterprise 11 (64-bit)", 3),
+		Entry("Ubuntu Linux is Hard", "Ubuntu Linux (64-bit)", 3),
+		Entry("Ubuntu Linux 22.04 is Hard", "Ubuntu Linux 22.04 (64-bit)", 3),
+		Entry("Debian GNU/Linux 11 is Hard", "Debian GNU/Linux 11 (64-bit)", 3),
+		Entry("AlmaLinux 9 is Hard", "AlmaLinux 9 (64-bit)", 3),
+		Entry("FreeBSD is Hard", "FreeBSD (64-bit)", 3),
+		Entry("VMware Photon OS is Hard", "VMware Photon OS (64-bit)", 3),
+		Entry("Amazon Linux 2 is Hard", "Amazon Linux 2 (64-bit)", 3),
+		Entry("CoreOS Linux is Hard", "CoreOS Linux (64-bit)", 3),
+		Entry("Apple macOS is Hard", "Apple macOS (64-bit)", 3),
+		Entry("Oracle Solaris 11 is Hard", "Oracle Solaris 11 (64-bit)", 3),
+		Entry("Windows Server 2008 is Hard", "Microsoft Windows Server 2008 (64-bit)", 3),
+		Entry("Windows Server 2012 is Hard", "Microsoft Windows Server 2012 (64-bit)", 3),
+		Entry("Windows 7 is Hard", "Microsoft Windows 7 (64-bit)", 3),
+		// Score 4 — Jupiter fallback
 		Entry("Microsoft SQL exact", "Microsoft SQL", 4),
 		Entry("Microsoft SQL full name", "Microsoft SQL Server 2019", 4),
-		// Score 0 fallback (unclassified)
-		Entry("unknown OS", "FreeBSD (64-bit)", 0),
+		// Score 0 — unknown (no key matched)
 		Entry("empty string", "", 0),
 		Entry("generic other", "Other (64-bit)", 0),
-		Entry("Amazon Linux", "Amazon Linux 2 (64-bit)", 0),
+		Entry("Other Linux", "Other Linux (64-bit)", 0),
 		// Case-insensitive matching
-		Entry("all lowercase Red Hat", "red hat enterprise linux 8 (64-bit)", 1),
-		Entry("all uppercase CENTOS", "CENTOS 7 (64-BIT)", 2),
-		Entry("mixed case Windows", "microsoft WINDOWS server 2019", 2),
-		Entry("all lowercase ubuntu", "ubuntu linux (64-bit)", 3),
-		Entry("mixed case SUSE", "SUSE Linux enterprise 15 (64-bit)", 3),
-		Entry("all lowercase oracle", "oracle linux 8 (64-bit)", 4),
+		Entry("lowercase RHEL 9", "red hat enterprise linux 9 (64-bit)", 1),
+		Entry("uppercase CENTOS 7", "CENTOS 7 (64-BIT)", 1),
+		Entry("mixed case Windows 2019", "microsoft WINDOWS SERVER 2019 (64-bit)", 2),
+		Entry("lowercase SUSE 15", "suse linux enterprise 15 (64-bit)", 2),
+		Entry("lowercase Oracle Linux 8", "oracle linux 8 (64-bit)", 1),
 	)
 })
 
@@ -93,21 +112,21 @@ var _ = Describe("OSBreakdown", func() {
 		result := complexity.OSBreakdown(entries)
 
 		Expect(result[0].Score).To(Equal(0))
-		Expect(result[0].VMCount).To(Equal(10)) // FreeBSD (unclassified)
+		Expect(result[0].VMCount).To(Equal(0))
 		Expect(result[1].Score).To(Equal(1))
-		Expect(result[1].VMCount).To(Equal(150)) // 100 + 50 Red Hat
+		Expect(result[1].VMCount).To(Equal(180)) // RHEL 8 (100) + RHEL 9 (50) + CentOS 7 (30)
 		Expect(result[2].Score).To(Equal(2))
-		Expect(result[2].VMCount).To(Equal(30)) // CentOS
+		Expect(result[2].VMCount).To(Equal(0))
 		Expect(result[3].Score).To(Equal(3))
-		Expect(result[3].VMCount).To(Equal(0))
+		Expect(result[3].VMCount).To(Equal(10)) // FreeBSD
 		Expect(result[4].Score).To(Equal(4))
 		Expect(result[4].VMCount).To(Equal(0))
 	})
 
 	It("places unrecognised OS names into score 0", func() {
 		entries := []complexity.VMOsEntry{
-			{Name: "VMware Photon OS (64-bit)", Count: 5},
-			{Name: "Debian GNU/Linux 12 (64-bit)", Count: 3},
+			{Name: "Other (64-bit)", Count: 5},
+			{Name: "Other Linux (64-bit)", Count: 3},
 		}
 		result := complexity.OSBreakdown(entries)
 		Expect(result[0].Score).To(Equal(0))
@@ -116,18 +135,18 @@ var _ = Describe("OSBreakdown", func() {
 
 	It("scores covering all five tiers", func() {
 		entries := []complexity.VMOsEntry{
-			{Name: "Red Hat Enterprise Linux 9 (64-bit)", Count: 10},
-			{Name: "Microsoft Windows Server 2022 (64-bit)", Count: 5},
-			{Name: "Ubuntu Linux (64-bit)", Count: 3},
-			{Name: "Oracle Linux 8 (64-bit)", Count: 2},
-			{Name: "Other (64-bit)", Count: 1},
+			{Name: "Other (64-bit)", Count: 1},                         // score 0: unknown
+			{Name: "Red Hat Enterprise Linux 9 (64-bit)", Count: 10},   // score 1: Easiest
+			{Name: "Microsoft Windows Server 2022 (64-bit)", Count: 5}, // score 2
+			{Name: "Ubuntu Linux (64-bit)", Count: 3},                  // score 3
+			{Name: "Microsoft SQL Server 2019", Count: 2},              // score 4: Hardest
 		}
 		result := complexity.OSBreakdown(entries)
-		Expect(result[0].VMCount).To(Equal(1))  // score 0: unclassified (Other)
-		Expect(result[1].VMCount).To(Equal(10)) // score 1: Red Hat
-		Expect(result[2].VMCount).To(Equal(5))  // score 2: Windows
+		Expect(result[0].VMCount).To(Equal(1))  // score 0: Other (unknown)
+		Expect(result[1].VMCount).To(Equal(10)) // score 1: RHEL 9
+		Expect(result[2].VMCount).To(Equal(5))  // score 2: Windows Server 2022
 		Expect(result[3].VMCount).To(Equal(3))  // score 3: Ubuntu
-		Expect(result[4].VMCount).To(Equal(2))  // score 4: Oracle
+		Expect(result[4].VMCount).To(Equal(2))  // score 4: Microsoft SQL
 	})
 })
 
@@ -185,12 +204,12 @@ var _ = Describe("OSRatings", func() {
 		Expect(result["Red Hat Enterprise Linux 8 (64-bit)"]).To(Equal(1))
 	})
 
-	It("returns score 0 for an unclassified OS", func() {
+	It("returns score 0 for an unknown OS", func() {
 		result := complexity.OSRatings([]complexity.VMOsEntry{
-			{Name: "FreeBSD (64-bit)", Count: 3},
+			{Name: "Other (64-bit)", Count: 3},
 		})
 		Expect(result).To(HaveLen(1))
-		Expect(result["FreeBSD (64-bit)"]).To(Equal(0))
+		Expect(result["Other (64-bit)"]).To(Equal(0))
 	})
 
 	It("returns correct scores for multiple distinct OS names", func() {
@@ -204,10 +223,10 @@ var _ = Describe("OSRatings", func() {
 		result := complexity.OSRatings(entries)
 		Expect(result).To(HaveLen(5))
 		Expect(result["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
-		Expect(result["CentOS 7 (64-bit)"]).To(Equal(2))
+		Expect(result["CentOS 7 (64-bit)"]).To(Equal(1))
 		Expect(result["Ubuntu Linux (64-bit)"]).To(Equal(3))
-		Expect(result["Oracle Linux 8 (64-bit)"]).To(Equal(4))
-		Expect(result["FreeBSD (64-bit)"]).To(Equal(0))
+		Expect(result["Oracle Linux 8 (64-bit)"]).To(Equal(1))
+		Expect(result["FreeBSD (64-bit)"]).To(Equal(3))
 	})
 
 	It("produces one map entry per distinct OS name regardless of VM count", func() {
@@ -228,27 +247,27 @@ var _ = Describe("ClassifyOS real-world inventory strings", func() {
 		func(osName string, expectedScore int) {
 			Expect(complexity.ClassifyOS(osName)).To(Equal(expectedScore))
 		},
-		// CentOS → keyword "CentOS" → score 2
+		// CentOS
 		Entry("CentOS 4/5 32-bit", "CentOS 4/5 (32-bit)", 2),
 		Entry("CentOS 4/5/6 64-bit", "CentOS 4/5/6 (64-bit)", 2),
-		Entry("CentOS 6 64-bit", "CentOS 6 (64-bit)", 2),
-		Entry("CentOS 7 64-bit", "CentOS 7 (64-bit)", 2),
-		// Debian — no matching keyword → score 0
-		Entry("Debian GNU/Linux 11 64-bit", "Debian GNU/Linux 11 (64-bit)", 0),
-		// FreeBSD — no matching keyword → score 0
-		Entry("FreeBSD 64-bit", "FreeBSD (64-bit)", 0),
-		// Appgate / custom Linux — no matching keyword → score 0
+		Entry("CentOS 6 64-bit", "CentOS 6 (64-bit)", 1),
+		Entry("CentOS 7 64-bit", "CentOS 7 (64-bit)", 1),
+		// Debian
+		Entry("Debian GNU/Linux 11 64-bit", "Debian GNU/Linux 11 (64-bit)", 3),
+		// FreeBSD
+		Entry("FreeBSD 64-bit", "FreeBSD (64-bit)", 3),
+		// Appgate / custom Linux — no key matches → score 0
 		Entry("Appgate SDP Linux", "Linux 6.5.0-45-generic Appgate SDP 1.0 Appgate SDP 1.0", 0),
-		// Windows — keyword "Windows" → score 2
+		// Windows
 		Entry("Windows 10 64-bit", "Microsoft Windows 10 (64-bit)", 2),
-		Entry("Windows Server 2008 64-bit", "Microsoft Windows Server 2008 (64-bit)", 2),
-		Entry("Windows Server 2008 R2 64-bit", "Microsoft Windows Server 2008 R2 (64-bit)", 2),
-		Entry("Windows Server 2012 64-bit", "Microsoft Windows Server 2012 (64-bit)", 2),
+		Entry("Windows Server 2008 64-bit", "Microsoft Windows Server 2008 (64-bit)", 3),
+		Entry("Windows Server 2008 R2 64-bit", "Microsoft Windows Server 2008 R2 (64-bit)", 3),
+		Entry("Windows Server 2012 64-bit", "Microsoft Windows Server 2012 (64-bit)", 3),
 		Entry("Windows Server 2016 64-bit", "Microsoft Windows Server 2016 (64-bit)", 2),
 		Entry("Windows Server 2016 or later 64-bit", "Microsoft Windows Server 2016 or later (64-bit)", 2),
 		Entry("Windows Server 2019 64-bit", "Microsoft Windows Server 2019 (64-bit)", 2),
 		Entry("Windows Server 2022 64-bit", "Microsoft Windows Server 2022 (64-bit)", 2),
-		// Other / generic — no matching keyword → score 0
+		// Other / generic — no key matches → score 0
 		Entry("Other 32-bit", "Other (32-bit)", 0),
 		Entry("Other 64-bit", "Other (64-bit)", 0),
 		Entry("Other 2.6.x Linux 64-bit", "Other 2.6.x Linux (64-bit)", 0),
@@ -257,20 +276,33 @@ var _ = Describe("ClassifyOS real-world inventory strings", func() {
 		Entry("Other 4.x or later Linux 64-bit", "Other 4.x or later Linux (64-bit)", 0),
 		Entry("Other 5.x or later Linux 64-bit", "Other 5.x or later Linux (64-bit)", 0),
 		Entry("Other Linux 64-bit", "Other Linux (64-bit)", 0),
-		// Red Hat — keyword "Red Hat" → score 1
-		Entry("RHEL 5 64-bit", "Red Hat Enterprise Linux 5 (64-bit)", 1),
+		// Red Hat
+		Entry("RHEL 5 64-bit", "Red Hat Enterprise Linux 5 (64-bit)", 2),
 		Entry("RHEL 6 64-bit", "Red Hat Enterprise Linux 6 (64-bit)", 1),
 		Entry("RHEL 7 64-bit", "Red Hat Enterprise Linux 7 (64-bit)", 1),
 		Entry("RHEL 8 64-bit", "Red Hat Enterprise Linux 8 (64-bit)", 1),
 		Entry("RHEL 9 64-bit", "Red Hat Enterprise Linux 9 (64-bit)", 1),
 		Entry("Red Hat Fedora 64-bit", "Red Hat Fedora (64-bit)", 1),
-		// SUSE Linux Enterprise — keyword "SUSE Linux Enterprise" → score 3
+		// SUSE
 		Entry("SUSE Linux Enterprise 11 64-bit", "SUSE Linux Enterprise 11 (64-bit)", 3),
-		Entry("SUSE Linux Enterprise 12 64-bit", "SUSE Linux Enterprise 12 (64-bit)", 3),
-		// Ubuntu — keyword "Ubuntu" → score 3
+		Entry("SUSE Linux Enterprise 12 64-bit", "SUSE Linux Enterprise 12 (64-bit)", 2),
+		// Ubuntu
 		Entry("Ubuntu Linux 64-bit", "Ubuntu Linux (64-bit)", 3),
-		// VMware Photon OS — no matching keyword → score 0
-		Entry("VMware Photon OS 64-bit", "VMware Photon OS (64-bit)", 0),
+		// VMware Photon OS
+		Entry("VMware Photon OS 64-bit", "VMware Photon OS (64-bit)", 3),
+
+		Entry("RHEL 10 64-bit", "Red Hat Enterprise Linux 10 (64-bit)", 1),
+		Entry("Oracle Linux 4 64-bit", "Oracle Linux 4 (64-bit)", 2),
+		Entry("Oracle Linux 8 64-bit", "Oracle Linux 8 (64-bit)", 1),
+		Entry("Oracle Solaris 11 64-bit", "Oracle Solaris 11 (64-bit)", 3),
+		Entry("AlmaLinux 8 64-bit", "AlmaLinux 8 (64-bit)", 3),
+		Entry("AlmaLinux 9 64-bit", "AlmaLinux 9 (64-bit)", 3),
+		Entry("Rocky Linux 9 64-bit", "Rocky Linux 9 (64-bit)", 1),
+		Entry("Windows 11 64-bit", "Microsoft Windows 11 (64-bit)", 2),
+		Entry("Windows Server 2025 64-bit", "Microsoft Windows Server 2025 (64-bit)", 2),
+		Entry("Windows XP 32-bit", "Microsoft Windows XP Professional (32-bit)", 3),
+		Entry("Windows 7 64-bit", "Microsoft Windows 7 (64-bit)", 3),
+		Entry("Amazon Linux 2 64-bit", "Amazon Linux 2 (64-bit)", 3),
 	)
 })
 

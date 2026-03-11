@@ -1,37 +1,13 @@
 {{- /*
 Populate Complexity Template - Computes per-VM migration complexity from OS type and disk size.
 
-Complexity levels (stored as INTEGER):
-  0 = Unsupported
-  1 = Easy
-  2 = Medium
-  3 = Hard
-  4 = White Glove
+Complexity levels (stored as INTEGER): 0=Unknown, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove.
+See pkg/estimations/complexity/README.md for score definitions and heuristics.
 
-OS difficulty mapping:
-  Easy:       Red Hat, Rocky Linux
-  Medium:     CentOS, Windows
-  Hard:       Ubuntu, SUSE Linux Enterprise
-  Database:   Oracle, Microsoft SQL (always White Glove regardless of disk)
-  Unsupported: anything else (always 0)
+OS CASE clauses are injected via {{.OSCaseClauses}}, generated from OSDifficultyScores at
+query-build time. Disk thresholds and the OS×disk combination matrix are hardcoded below.
 
-Disk size tiers (total disk capacity from vdisk, converted to TB):
-  Easy:       0-10 TB
-  Medium:     10-20 TB
-  Hard:       20-50 TB
-  White Glove: >50 TB
-
-Combined matrix:
-  OS Easy   + Disk Easy/Medium  → 1 (Easy)
-  OS Easy   + Disk Hard/WG      → 3 (Hard)
-  OS Medium + Disk Easy/Medium  → 2 (Medium)
-  OS Medium + Disk Hard/WG      → 3 (Hard)
-  OS Hard   + Disk Easy/Medium  → 2 (Medium)
-  OS Hard   + Disk Hard/WG      → 3 (Hard)
-  OS Database (any disk)        → 4 (White Glove)
-  OS Unsupported (any disk)     → 0
-
-No template parameters required.
+No template parameters required (OSCaseClauses is pre-rendered before template execution).
 */ -}}
 WITH vm_os AS (
     SELECT
