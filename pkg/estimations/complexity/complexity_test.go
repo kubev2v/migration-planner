@@ -329,15 +329,15 @@ var _ = Describe("OSNameBreakdown", func() {
 		}
 		Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"].Score).To(Equal(1))
 		Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"].VMCount).To(Equal(100))
-		Expect(byName["CentOS 7 (64-bit)"].Score).To(Equal(2))
+		Expect(byName["CentOS 7 (64-bit)"].Score).To(Equal(1))
 		Expect(byName["CentOS 7 (64-bit)"].VMCount).To(Equal(20))
-		Expect(byName["FreeBSD (64-bit)"].Score).To(Equal(0))
+		Expect(byName["FreeBSD (64-bit)"].Score).To(Equal(3))
 		Expect(byName["FreeBSD (64-bit)"].VMCount).To(Equal(5))
 	})
 
 	It("assigns score 0 to unclassified OS names", func() {
 		entries := []complexity.VMOsEntry{
-			{Name: "VMware Photon OS (64-bit)", Count: 3},
+			{Name: "Other Linux (64-bit)", Count: 3},
 		}
 		result := complexity.OSNameBreakdown(entries)
 		Expect(result).To(HaveLen(1))
