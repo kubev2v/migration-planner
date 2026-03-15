@@ -161,6 +161,7 @@ storage:
           AGENT_OPA_POLICIES_FOLDER=/app/policies
           AGENT_SOURCE_ID={{.SourceID}}
           AGENT_DATA_FOLDER=/var/lib/agent
+          AGENT_VDDK_PARENT_FOLDER=/var/lib/agent
           AGENT_CONSOLE_URL={{.PlannerService}}
           AGENT_SERVER_STATICS_FOLDER=/app/static
           AGENT_LEGACY_STATUS_ENABLED=true
