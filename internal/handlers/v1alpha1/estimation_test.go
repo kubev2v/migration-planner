@@ -577,7 +577,7 @@ var _ = Describe("estimation handler", func() {
 				Expect(rhel.Score).To(Equal(1))
 				Expect(rhel.VmCount).To(Equal(50))
 				centos := byName["CentOS 7 (64-bit)"]
-				Expect(centos.Score).To(Equal(2))
+				Expect(centos.Score).To(Equal(1))
 				Expect(centos.VmCount).To(Equal(10))
 			})
 

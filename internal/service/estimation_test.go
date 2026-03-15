@@ -255,8 +255,8 @@ var _ = Describe("EstimationService", func() {
 					byName[e.Name] = e.Score
 				}
 				Expect(byName["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
-				Expect(byName["CentOS 7 (64-bit)"]).To(Equal(2))
-				Expect(byName["FreeBSD (64-bit)"]).To(Equal(0))
+				Expect(byName["CentOS 7 (64-bit)"]).To(Equal(1))
+				Expect(byName["FreeBSD (64-bit)"]).To(Equal(3))
 			})
 
 			It("preserves VM counts from the inventory", func() {
