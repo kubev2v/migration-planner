@@ -15,8 +15,6 @@ Key transformations:
   - Network → dvport for distributed virtual switches
 */ -}}
 
-INSTALL sqlite;
-LOAD sqlite;
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
 
 INSERT INTO vinfo (
