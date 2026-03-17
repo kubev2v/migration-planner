@@ -65,6 +65,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	}
 
 	form := v1alpha1.AssessmentForm(*request.Body)
+
+	// Validate name first for better error message
+	if err := validator.ValidateName(string(form.Name)); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+	}
+
 	if err := validateAssessmentData(form); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
 		return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil

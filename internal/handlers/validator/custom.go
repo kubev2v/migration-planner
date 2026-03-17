@@ -39,7 +39,10 @@ func nameValidator(fl validator.FieldLevel) bool {
 func ValidateName(name string) error {
 	ok := nameValidRegex.MatchString(name)
 	if !ok {
-		return NewErrInvalidName("The provided name: %s is invalid.", name)
+		return NewErrInvalidName(
+			"The provided name %q is invalid. Name must be 1-100 characters and contain only letters, numbers, underscores, periods, or hyphens (no spaces).",
+			name,
+		)
 	}
 
 	return nil
