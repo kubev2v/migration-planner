@@ -67,6 +67,11 @@ Start the OpenShift Migration Advisor API server:
 make run
 ```
 
+> **Note:** `make run` will automatically attempt to download the RHCOS ISO if it's not present locally.
+> This is a large file and may take a few minutes on the first run.
+> To skip the download, run with `DOWNLOAD_RHCOS=false make run`.
+
+
 ### 6. Verify API is Running
 
 The migration-planner API should be running on `http://localhost:3443`. Verify it's working:

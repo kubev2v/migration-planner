@@ -92,7 +92,7 @@ AIR := $(GOBIN)/air
 $(AIR):
 	@go install github.com/air-verse/air@v1.63.4
 
-run: $(AIR)
+run: $(AIR) image
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
@@ -132,7 +132,7 @@ run-sizer:
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
 	@if [ ! -f rhcos-live-iso.x86_64.iso ]; then \
-    	curl --silent -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso; \
+    	curl --progress-bar -C - -O https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/latest/rhcos-live-iso.x86_64.iso; \
     fi
 endif
 
