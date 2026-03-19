@@ -704,6 +704,11 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 			"VMFS": {Type: "VMFS", VMCount: 20, TotalSizeTB: 5.0},
 			"NFS":  {Type: "NFS", VMCount: 5, TotalSizeTB: 1.0},
 		},
+		DistributionByComplexity: map[string]int{"1": 5, "2": 3},
+		ComplexityDistribution: map[string]inventory.DiskSizeTierSummary{
+			"1": {VMCount: 5, TotalSizeTB: 0.05},
+			"2": {VMCount: 3, TotalSizeTB: 1.5},
+		},
 	}
 
 	result := toAPIVMs(&input)
@@ -734,6 +739,19 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 	for diskType, expected := range input.DiskTypes {
 		actual, exists := (*result.DiskTypes)[diskType]
 		require.True(t, exists)
+		assert.Equal(t, expected.VMCount, actual.VmCount)
+		assert.Equal(t, expected.TotalSizeTB, actual.TotalSizeTB)
+	}
+
+	// Verify old integer field is passed through directly
+	require.NotNil(t, result.DistributionByComplexity)
+	assert.Equal(t, input.DistributionByComplexity, *result.DistributionByComplexity)
+
+	// Verify new enriched field
+	require.NotNil(t, result.ComplexityDistribution)
+	for level, expected := range input.ComplexityDistribution {
+		actual, exists := (*result.ComplexityDistribution)[level]
+		require.True(t, exists, "complexity level %s should exist in result", level)
 		assert.Equal(t, expected.VMCount, actual.VmCount)
 		assert.Equal(t, expected.TotalSizeTB, actual.TotalSizeTB)
 	}

@@ -204,13 +204,28 @@ func (p *Parser) NicTierDistribution(ctx context.Context, filters Filters) (map[
 	return p.readStringIntMap(ctx, q)
 }
 
-// ComplexityDistribution returns VM distribution by migration complexity level (0-4).
-func (p *Parser) ComplexityDistribution(ctx context.Context, filters Filters) (map[string]int, error) {
+// ComplexityDistribution returns VM distribution by migration complexity level (0-4),
+// including VM count and total disk size in TB per level.
+func (p *Parser) ComplexityDistribution(ctx context.Context, filters Filters) (map[string]inventory.DiskSizeTierSummary, error) {
 	q, err := p.builder.ComplexityDistributionQuery(filters)
 	if err != nil {
 		return nil, fmt.Errorf("building complexity distribution query: %w", err)
 	}
-	return p.readStringIntMap(ctx, q)
+	result := make(map[string]inventory.DiskSizeTierSummary)
+	rows, err := p.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("querying complexity distribution: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var complexity string
+		var summary inventory.DiskSizeTierSummary
+		if err := rows.Scan(&complexity, &summary.VMCount, &summary.TotalSizeTB); err != nil {
+			return nil, fmt.Errorf("scanning complexity distribution: %w", err)
+		}
+		result[complexity] = summary
+	}
+	return result, rows.Err()
 }
 
 // DiskSizeTierDistribution returns VM distribution by disk size tier.

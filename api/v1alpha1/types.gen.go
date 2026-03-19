@@ -593,13 +593,16 @@ type VMResourceBreakdown struct {
 
 // VMs defines model for VMs.
 type VMs struct {
-	CpuCores     VMResourceBreakdown             `json:"cpuCores"`
-	DiskCount    VMResourceBreakdown             `json:"diskCount"`
-	DiskGB       VMResourceBreakdown             `json:"diskGB"`
-	DiskSizeTier *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
-	DiskTypes    *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
+	// ComplexityDistribution Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
+	ComplexityDistribution *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
+	CpuCores               VMResourceBreakdown             `json:"cpuCores"`
+	DiskCount              VMResourceBreakdown             `json:"diskCount"`
+	DiskGB                 VMResourceBreakdown             `json:"diskGB"`
+	DiskSizeTier           *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	DiskTypes              *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 
 	// DistributionByComplexity Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
+	// Deprecated:
 	DistributionByComplexity *map[string]int `json:"distributionByComplexity,omitempty"`
 
 	// DistributionByCpuTier Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")

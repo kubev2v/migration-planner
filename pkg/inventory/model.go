@@ -31,6 +31,7 @@ type VMsData struct {
 	DistributionByMemoryTier    map[string]int
 	DistributionByNICCount      map[string]int
 	DistributionByComplexity    map[string]int
+	ComplexityDistribution      map[string]DiskSizeTierSummary
 	DiskSizeTiers               map[string]DiskSizeTierSummary
 	DiskTypes                   map[string]DiskTypeSummary
 	MigrationWarnings           []MigrationIssue
