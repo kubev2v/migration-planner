@@ -1249,10 +1249,16 @@ components:
           additionalProperties:
             type: integer
         distributionByComplexity:
+          deprecated: true
           type: object
           description: Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
           additionalProperties:
             type: integer
+        complexityDistribution:
+          type: object
+          description: Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
+          additionalProperties:
+            $ref: "#/components/schemas/diskSizeTierSummary"
         ramGB:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskGB:
