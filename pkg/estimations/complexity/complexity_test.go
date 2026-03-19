@@ -455,3 +455,16 @@ var _ = Describe("DiskBreakdown", func() {
 		Expect(result[3].VMCount).To(Equal(1))
 	})
 })
+
+var _ = Describe("Correctly classify on name variations", func() {
+	DescribeTable("OS Name variations",
+		func(osName string, expectedScore int) {
+			Expect(complexity.ClassifyOS(osName)).To(Equal(expectedScore))
+		},
+		// Windows
+		Entry("Windows Server 2022 64-bit", "Microsoft Windows Server 2022 (64-bit)", 2),
+		Entry("Microsoft Windows Server 2022 x64", "Microsoft Windows Server 2022 x64", 2),
+		Entry("Windows Server 2022 x64", "Windows Server 2022 x64", 2),
+		Entry("Windows Server 2022 (64-bit)", "Windows Server 2022 (64-bit)", 2),
+	)
+})
