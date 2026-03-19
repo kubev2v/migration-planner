@@ -600,7 +600,7 @@ type VMs struct {
 	DiskTypes    *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 
 	// DistributionByComplexity Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
-	DistributionByComplexity *map[string]int `json:"distributionByComplexity,omitempty"`
+	DistributionByComplexity *map[string]DiskSizeTierSummary `json:"distributionByComplexity,omitempty"`
 
 	// DistributionByCpuTier Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
 	DistributionByCpuTier *map[string]int `json:"distributionByCpuTier,omitempty"`
