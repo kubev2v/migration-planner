@@ -1252,7 +1252,7 @@ components:
           type: object
           description: Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
           additionalProperties:
-            type: integer
+            $ref: "#/components/schemas/diskSizeTierSummary"
         ramGB:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskGB:

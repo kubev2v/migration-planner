@@ -62,6 +62,14 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		}
 	}
 
+	complexityDist := make(map[string]api.DiskSizeTierSummary, len(v.DistributionByComplexity))
+	for level, summary := range v.DistributionByComplexity {
+		complexityDist[level] = api.DiskSizeTierSummary{
+			VmCount:     summary.VMCount,
+			TotalSizeTB: summary.TotalSizeTB,
+		}
+	}
+
 	migrationWarnings := make([]api.MigrationIssue, 0, len(v.MigrationWarnings))
 	for _, w := range v.MigrationWarnings {
 		id := w.ID
@@ -129,7 +137,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		DistributionByCpuTier:    &v.DistributionByCPUTier,
 		DistributionByMemoryTier: &v.DistributionByMemoryTier,
 		DistributionByNicCount:   &v.DistributionByNICCount,
-		DistributionByComplexity: &v.DistributionByComplexity,
+		DistributionByComplexity: &complexityDist,
 		DiskSizeTier:             &diskSizeTiers,
 		DiskTypes:                &diskTypes,
 		MigrationWarnings:        migrationWarnings,

@@ -10,12 +10,26 @@ Complexity levels:
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+
+NOTE: 4 decimal places (vs 2 in disk_size_tier_query) because complexity buckets
+can contain VMs with small total disk sizes (e.g., 2 GiB ≈ 0.002 TiB) that would
+round to 0.00 with 2 decimal places.
 */ -}}
+WITH vm_disk_totals AS (
+    SELECT
+        i."VM ID",
+        i."OsDiskComplexity",
+        COALESCE(SUM(d."Capacity MiB"), 0) / 1048576.0 AS total_disk_tb
+    FROM vinfo i
+    LEFT JOIN vdisk d ON i."VM ID" = d."VM ID"
+    WHERE 1=1
+    {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    GROUP BY i."VM ID", i."OsDiskComplexity"
+)
 SELECT
     CAST("OsDiskComplexity" AS VARCHAR) AS complexity,
-    COUNT(*) AS count
-FROM vinfo
-WHERE 1=1
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+    COUNT(*) AS vm_count,
+    ROUND(SUM(total_disk_tb), 4) AS total_size_tb
+FROM vm_disk_totals
 GROUP BY "OsDiskComplexity"
 ORDER BY "OsDiskComplexity";

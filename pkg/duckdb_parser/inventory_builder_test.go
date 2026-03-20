@@ -831,3 +831,84 @@ func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, countCluster2, "VMs with shared disks in cluster2 only")
 }
+
+func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// Three VMs:
+	//   vm-1 (cluster-a): Easy (complexity=1), disk 2048 MiB ≈ 0.002 TB
+	//   vm-2 (cluster-a): Medium (complexity=2), disk 10240 MiB ≈ 0.01 TB
+	//   vm-3 (cluster-b): Unknown (complexity=0, DB default), disk 5120 MiB ≈ 0.005 TB
+	vms := []map[string]string{
+		{
+			"VM": "vm-easy", "VM ID": "vm-1", "CPUs": "2", "Memory": "4096",
+			"Powerstate": "poweredOn", "Cluster": "cluster-a", "Datacenter": "dc-1",
+		},
+		{
+			"VM": "vm-medium", "VM ID": "vm-2", "CPUs": "4", "Memory": "8192",
+			"Powerstate": "poweredOn", "Cluster": "cluster-a", "Datacenter": "dc-1",
+		},
+		{
+			"VM": "vm-unknown", "VM ID": "vm-3", "CPUs": "2", "Memory": "4096",
+			"Powerstate": "poweredOn", "Cluster": "cluster-b", "Datacenter": "dc-1",
+		},
+	}
+	hosts := []map[string]string{
+		{"Host": "host-1", "Cluster": "cluster-a", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
+		{"Host": "host-2", "Cluster": "cluster-b", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
+	}
+	vDiskHeaders := []string{
+		"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+		"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+		"Thin", "Controller", "Label", "SCSI Unit #",
+	}
+	disks := []map[string]string{
+		{"VM ID": "vm-1", "Disk Key": "2000", "Unit #": "0", "Path": "[ds1] vm-easy/disk.vmdk", "Capacity MiB": "2048", "Sharing mode": "false"},
+		{"VM ID": "vm-2", "Disk Key": "2001", "Unit #": "0", "Path": "[ds1] vm-medium/disk.vmdk", "Capacity MiB": "10240", "Sharing mode": "false"},
+		{"VM ID": "vm-3", "Disk Key": "2002", "Unit #": "0", "Path": "[ds1] vm-unknown/disk.vmdk", "Capacity MiB": "5120", "Sharing mode": "false"},
+	}
+
+	sheets := append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))
+	f := createTestExcel(t, sheets...)
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, f)
+	require.NoError(t, err)
+
+	// Manually set OsDiskComplexity: vm-1 → 1 (Easy), vm-2 → 2 (Medium).
+	// vm-3 is intentionally left at the DB default (0 = Unknown).
+	_, err = parser.db.ExecContext(ctx, `UPDATE vinfo SET "OsDiskComplexity" = 1 WHERE "VM ID" = 'vm-1'`)
+	require.NoError(t, err)
+	_, err = parser.db.ExecContext(ctx, `UPDATE vinfo SET "OsDiskComplexity" = 2 WHERE "VM ID" = 'vm-2'`)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, inv.VCenter)
+
+	dist := inv.VCenter.VMs.DistributionByComplexity
+
+	// complexity 1 (Easy) — vm-1
+	require.Contains(t, dist, "1")
+	assert.Equal(t, 1, dist["1"].VMCount)
+	assert.InDelta(t, 0.002, dist["1"].TotalSizeTB, 0.001)
+
+	// complexity 2 (Medium) — vm-2
+	require.Contains(t, dist, "2")
+	assert.Equal(t, 1, dist["2"].VMCount)
+	assert.InDelta(t, 0.01, dist["2"].TotalSizeTB, 0.001)
+
+	// complexity 0 (Unknown) — vm-3 was never UPDATEd so it keeps the default value
+	require.Contains(t, dist, "0", "VM with default OsDiskComplexity=0 should appear under key \"0\"")
+	assert.Equal(t, 1, dist["0"].VMCount)
+	assert.InDelta(t, 0.005, dist["0"].TotalSizeTB, 0.001)
+
+	// Cluster filter: only cluster-a contains vm-1 and vm-2; vm-3 (cluster-b) must be excluded.
+	clusterDist, err := parser.ComplexityDistribution(ctx, Filters{Cluster: "cluster-a"})
+	require.NoError(t, err)
+	assert.Contains(t, clusterDist, "1", "cluster-a filter should include complexity=1 (vm-1)")
+	assert.Contains(t, clusterDist, "2", "cluster-a filter should include complexity=2 (vm-2)")
+	assert.NotContains(t, clusterDist, "0", "cluster-a filter should exclude complexity=0 (vm-3 is in cluster-b)")
+	assert.Equal(t, 1, clusterDist["1"].VMCount)
+	assert.Equal(t, 1, clusterDist["2"].VMCount)
+}
