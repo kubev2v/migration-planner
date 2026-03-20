@@ -8,6 +8,7 @@ LEFT JOINs handle gracefully.
 Template Parameters:
   - NetworkColumns: Comma-separated list of network columns (e.g., i."Network #1", i."Network #2", ...)
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list fragment, e.g. ('id1','id2'))
   - OSFilter: filter by OS name
   - PowerStateFilter: filter by power state
   - Limit: max results (0 = unlimited)
@@ -114,6 +115,7 @@ LEFT JOIN nics n ON i."VM ID" = n."VM ID"
 LEFT JOIN concerns_agg con ON i."VM ID" = con."VM_ID"
 WHERE 1=1
 {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
 {{- if .OSFilter }} AND i."OS according to the configuration file" LIKE '%{{.OSFilter}}%'{{end}}
 {{- if .VmIDFilter }} AND i."VM ID" = '{{.VmIDFilter}}'{{end}}
 {{- if .PowerStateFilter }} AND i."Powerstate" = '{{.PowerStateFilter}}'{{end}}

@@ -4,8 +4,10 @@ Used for CPU overcommitment calculation.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 SELECT COALESCE(SUM("CPUs"), 0)
 FROM vinfo
 WHERE "Powerstate" = 'poweredOn'
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- if .VmIDList }} AND "VM ID" IN {{.VmIDList}}{{end}};

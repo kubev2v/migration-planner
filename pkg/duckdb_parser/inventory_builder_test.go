@@ -410,6 +410,47 @@ func TestBuildInventory_ClusterInventories(t *testing.T) {
 	}
 }
 
+// TestBuildInventoryData_VmIDListFilter verifies that BuildInventoryData with Filters.VmIDs
+// returns inventory data only for VMs whose "VM ID" is in the provided list.
+func TestBuildInventoryData_VmIDListFilter(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// Four VMs: vm-001 (4 CPU, 8GB), vm-002 (2 CPU, 4GB), vm-003 (4 CPU, 8GB), vm-004 (8 CPU, 16GB)
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOff", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-4", "VM ID": "vm-004", "VI SDK UUID": "uuid-4", "Host": "esxi-host-1", "CPUs": "8", "Memory": "16384", "Powerstate": "poweredOff", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "16", "# CPU": "2", "Object ID": "esxi-host-1", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// Filter to only vm-001 and vm-003 (4+4=8 CPUs, 8192+8192=16384 MB = 16 GB, both poweredOn)
+	filters := Filters{VmIDs: []string{"vm-001", "vm-003"}}
+	invData, err := parser.BuildInventoryData(ctx, filters)
+	require.NoError(t, err)
+	require.NotNil(t, invData)
+
+	// VM count should be 2
+	assert.Equal(t, 2, invData.VMs.Total, "Total VMs should be 2 when filtering by vm-001 and vm-003")
+
+	// Resource totals: only vm-001 and vm-003 (4+4 CPUs, 8+8 GB RAM)
+	assert.Equal(t, 8, invData.VMs.CPUCores.Total, "CPU cores should sum to 8 for vm-001 and vm-003")
+	assert.Equal(t, 16, invData.VMs.RamGB.Total, "RAM GB should sum to 16 for vm-001 and vm-003")
+
+	// Power state: both filtered VMs are poweredOn
+	assert.Equal(t, 2, invData.VMs.PowerStates["poweredOn"])
+	assert.Equal(t, 0, invData.VMs.PowerStates["poweredOff"])
+}
+
 func TestBuildInventory_EmptyData(t *testing.T) {
 	parser, _, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()

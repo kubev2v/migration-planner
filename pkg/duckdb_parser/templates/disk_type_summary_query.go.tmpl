@@ -3,6 +3,7 @@ Disk Type Summary Query Template - Returns disk usage aggregated by datastore ty
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VmIDList: filter by VM IDs (IN list)
 */ -}}
 WITH vm_disk_types AS (
     SELECT
@@ -14,6 +15,7 @@ WITH vm_disk_types AS (
     JOIN vinfo i ON d."VM ID" = i."VM ID"
     WHERE ds."Type" IS NOT NULL AND ds."Type" != ''
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- if .VmIDList }} AND i."VM ID" IN {{.VmIDList}}{{end}}
 )
 SELECT
     disk_type AS type,

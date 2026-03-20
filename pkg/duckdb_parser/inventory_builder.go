@@ -22,7 +22,7 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 	}
 
 	// Build vcenter-level inventory (no cluster filter)
-	vcenterData, err := p.buildInventoryData(ctx, Filters{})
+	vcenterData, err := p.BuildInventoryData(ctx, Filters{})
 	if err != nil {
 		return nil, fmt.Errorf("building vcenter inventory: %w", err)
 	}
@@ -52,7 +52,7 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 	clusterInventories := make(map[string]inventory.InventoryData)
 	for _, clusterName := range clusters {
 		clusterFilters := Filters{Cluster: clusterName}
-		clusterInv, err := p.buildInventoryData(ctx, clusterFilters)
+		clusterInv, err := p.BuildInventoryData(ctx, clusterFilters)
 		if err != nil {
 			zap.S().Named("duckdb_parser").Warnf("Failed to build inventory for cluster %s: %v", clusterName, err)
 			continue
@@ -70,8 +70,8 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 	}, nil
 }
 
-// buildInventoryData constructs an InventoryData for a given filter set.
-func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inventory.InventoryData, error) {
+// BuildInventoryData constructs an InventoryData for a given filter set.
+func (p *Parser) BuildInventoryData(ctx context.Context, filters Filters) (*inventory.InventoryData, error) {
 	// Build VMs section
 	vms, err := p.buildVMsData(ctx, filters)
 	if err != nil {
