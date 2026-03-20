@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"time"
@@ -815,73 +816,509 @@ var _ = Describe("sizer service", func() {
 	// calculateMinimumNodeSize, formatNodeSizeError, buildSizerPayload, transformSizerResponse)
 	// are tested indirectly through CalculateClusterRequirements above.
 
-	Describe("CalculateEffectiveCPU", func() {
-		Context("no SMT (threads == 0)", func() {
-			It("returns physical cores when threads is 0", func() {
-				result := service.CalculateEffectiveCPU(16, 0)
-				Expect(result).To(Equal(16.0))
-			})
+	Describe("VM Limit Enforcement", func() {
+		var (
+			assessmentID uuid.UUID
+			clusterID    string
+			request      *mappers.ClusterRequirementsRequestForm
+		)
 
-			It("returns physical cores when threads equals cores", func() {
-				result := service.CalculateEffectiveCPU(16, 16)
-				Expect(result).To(Equal(16.0))
-			})
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			clusterID = "cluster-vm-limit-test"
+			request = &mappers.ClusterRequirementsRequestForm{
+				ClusterID:               clusterID,
+				CpuOverCommitRatio:      "1:1",
+				MemoryOverCommitRatio:   "1:1",
+				WorkerNodeCPU:           32,
+				WorkerNodeMemory:        256,
+				ControlPlaneSchedulable: false,
+				ControlPlaneNodeCount:   3,
+			}
 		})
 
-		Context("SMT enabled", func() {
-			It("calculates effective CPU for 2:1 SMT ratio (16C/32T)", func() {
-				// Formula: 16 + ((32-16) * 0.5) = 16 + 8 = 24
-				result := service.CalculateEffectiveCPU(16, 32)
-				Expect(result).To(Equal(24.0))
+		Context("VM distribution stays within limit", func() {
+			It("handles exactly 200 VMs", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 200, 400, 800)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   4,
+						TotalCPU:    400,
+						TotalMemory: 800,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    400.0,
+							Memory: 800.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
 			})
 
-			It("calculates effective CPU for 4:1 SMT ratio (8C/32T)", func() {
-				// Formula: 8 + ((32-8) * 0.5) = 8 + 12 = 20
-				result := service.CalculateEffectiveCPU(8, 32)
-				Expect(result).To(Equal(20.0))
+			It("handles 199 VMs (just under limit)", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 199, 400, 800)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   4,
+						TotalCPU:    400,
+						TotalMemory: 800,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    400.0,
+							Memory: 800.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
 			})
 
-			It("calculates effective CPU for 2:1 SMT ratio (32C/64T)", func() {
-				// Formula: 32 + ((64-32) * 0.5) = 32 + 16 = 48
-				result := service.CalculateEffectiveCPU(32, 64)
-				Expect(result).To(Equal(48.0))
+			It("handles 400 VMs distributed across 2 nodes", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 400, 800, 1600)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-2-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   5,
+						TotalCPU:    800,
+						TotalMemory: 1600,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    800.0,
+							Memory: 1600.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
 			})
 
-			It("calculates effective CPU for odd number of cores (15C/30T)", func() {
-				// Formula: 15 + ((30-15) * 0.5) = 15 + 7.5 = 22.5
-				result := service.CalculateEffectiveCPU(15, 30)
-				Expect(result).To(Equal(22.5))
+			It("handles 1000 VMs distributed across 5+ nodes", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 1000, 2000, 4000)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-2-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-3-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-4-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-5-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   8,
+						TotalCPU:    2000,
+						TotalMemory: 4000,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    2000.0,
+							Memory: 4000.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
 			})
+
+			It("handles uneven distribution (301 VMs across 2 batches)", func() {
+				// aggregateVMsIntoServices splits 301 VMs as 151 + 150 (remainder to earlier batches).
+				// Both batches are under MaxVMsPerWorkerNode (200), so validation passes.
+				assessment := createTestAssessment(assessmentID, clusterID, 301, 600, 1200)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-2-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   5,
+						TotalCPU:    600,
+						TotalMemory: 1200,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    600.0,
+							Memory: 1200.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+			})
+
+			It("handles 1 VM", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 1, 2, 4)
+				mockStore.assessments[assessmentID] = assessment
+
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   4,
+						TotalCPU:    2,
+						TotalMemory: 4,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    2.0,
+							Memory: 4.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+			})
+
 		})
 
-		Context("edge cases", func() {
-			It("returns 0.0 when physicalCores is 0", func() {
-				result := service.CalculateEffectiveCPU(0, 16)
-				Expect(result).To(Equal(0.0))
+		Context("VM limit validation catches violations", func() {
+			It("returns error when sizer response shows >200 VMs on a single node", func() {
+				request.WorkerNodeCPU = 200
+				request.WorkerNodeMemory = 512
+				request.WorkerNodeThreads = 400
+
+				// 500 VMs = 5 batches of 100 VMs each
+				assessment := createTestAssessment(assessmentID, clusterID, 500, 1000, 2000)
+				mockStore.assessments[assessmentID] = assessment
+
+				// 3 batches = 300 VMs (exceeds limit)
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							// 3 batches = 300 VMs (exceeds limit)
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services", "vms-batch-2-services", "vms-batch-3-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-4-services"}},
+							{IsControlPlane: false, Services: []string{"vms-batch-5-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   6,
+						TotalCPU:    1000,
+						TotalMemory: 2000,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    1000.0,
+							Memory: 2000.0,
+						},
+						Advanced: advanced,
+					},
+				}
+
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("VM distribution constraint violated"))
+				Expect(err.Error()).To(ContainSubstring("exceeds limit"))
 			})
 
-			It("returns 0.0 when physicalCores is negative", func() {
-				result := service.CalculateEffectiveCPU(-1, 16)
-				Expect(result).To(Equal(0.0))
-			})
+			It("detects violation even with many small batches concentrated on one node", func() {
+				request.WorkerNodeCPU = 200
+				request.WorkerNodeMemory = 512
+				request.WorkerNodeThreads = 0
 
-			It("returns physical cores when threads < physicalCores (invalid config)", func() {
-				// Invalid: threads (8) < cores (16)
-				result := service.CalculateEffectiveCPU(16, 8)
-				Expect(result).To(Equal(16.0))
-			})
+				// 250 VMs with low resources creates 2 batches (125 VMs each)
+				assessment := createTestAssessment(assessmentID, clusterID, 250, 125, 250)
+				mockStore.assessments[assessmentID] = assessment
 
-			It("handles single core with SMT (1C/2T)", func() {
-				// Formula: 1 + ((2-1) * 0.5) = 1 + 0.5 = 1.5
-				result := service.CalculateEffectiveCPU(1, 2)
-				Expect(result).To(Equal(1.5))
-			})
+				// Simulate both batches on same node = 250 VMs (exceeds limit)
+				advanced := []client.Zone{
+					{
+						Zone: "zone1",
+						Nodes: []client.Node{
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+							{IsControlPlane: true, Services: []string{"ControlPlane"}},
+						},
+					},
+					{
+						Zone: "zone2",
+						Nodes: []client.Node{
+							{IsControlPlane: false, Services: []string{"vms-batch-1-services", "vms-batch-2-services"}},
+						},
+					},
+				}
+				response := &client.SizerResponse{
+					Success: true,
+					Data: client.SizerData{
+						NodeCount:   4,
+						TotalCPU:    125,
+						TotalMemory: 250,
+						ResourceConsumption: client.ResourceConsumption{
+							CPU:    125.0,
+							Memory: 250.0,
+						},
+						Advanced: advanced,
+					},
+				}
 
-			It("handles minimum valid cores (2C/4T)", func() {
-				// Formula: 2 + ((4-2) * 0.5) = 2 + 1 = 3
-				result := service.CalculateEffectiveCPU(2, 4)
-				Expect(result).To(Equal(3.0))
+				testServer = createTestSizerServer(response, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				Expect(err.Error()).To(ContainSubstring("VM distribution constraint violated"))
+				Expect(err.Error()).To(ContainSubstring("exceeds limit"))
 			})
 		})
 	})
+
+	DescribeTable("buildServiceAvoidLists",
+		func(services []service.BatchedService, expectedLen int, validator func([][]string)) {
+			result := service.BuildServiceAvoidLists(services)
+			Expect(result).To(HaveLen(expectedLen))
+			if validator != nil {
+				validator(result)
+			}
+		},
+		Entry("empty input", []service.BatchedService{}, 0, func(result [][]string) {
+			Expect(result).To(BeEmpty())
+			Expect(result).NotTo(BeNil())
+		}),
+		Entry("single service", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 100},
+		}, 1, func(result [][]string) {
+			Expect(result[0]).To(BeEmpty())
+		}),
+		Entry("all services with 0 VMs", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 0},
+			{Name: "vms-batch-2-services", VMCount: 0},
+			{Name: "vms-batch-3-services", VMCount: 0},
+		}, 3, func(result [][]string) {
+			for i := range result {
+				Expect(result[i]).To(BeEmpty())
+			}
+		}),
+		Entry("groups 2 services of 100 VMs together (maxServicesPerNode=2)", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 100},
+			{Name: "vms-batch-2-services", VMCount: 100},
+		}, 2, func(result [][]string) {
+			Expect(result[0]).To(BeEmpty())
+			Expect(result[1]).To(BeEmpty())
+		}),
+		Entry("separates 2 services of 150 VMs (maxServicesPerNode=1)", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 150},
+			{Name: "vms-batch-2-services", VMCount: 150},
+		}, 2, func(result [][]string) {
+			Expect(result[0]).To(ConsistOf("vms-batch-2-services"))
+			Expect(result[1]).To(ConsistOf("vms-batch-1-services"))
+		}),
+		Entry("creates 4 groups for 8 services of 100 VMs", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 100},
+			{Name: "vms-batch-2-services", VMCount: 100},
+			{Name: "vms-batch-3-services", VMCount: 100},
+			{Name: "vms-batch-4-services", VMCount: 100},
+			{Name: "vms-batch-5-services", VMCount: 100},
+			{Name: "vms-batch-6-services", VMCount: 100},
+			{Name: "vms-batch-7-services", VMCount: 100},
+			{Name: "vms-batch-8-services", VMCount: 100},
+		}, 8, func(result [][]string) {
+			// Group 0: services 1-2, Group 1: services 3-4, Group 2: services 5-6, Group 3: services 7-8
+			for i := 0; i < 8; i++ {
+				currentGroup := i / 2
+				expectedAvoids := []string{}
+				for j := 0; j < 8; j++ {
+					if i != j && j/2 != currentGroup {
+						expectedAvoids = append(expectedAvoids, fmt.Sprintf("vms-batch-%d-services", j+1))
+					}
+				}
+				Expect(result[i]).To(ConsistOf(expectedAvoids))
+			}
+		}),
+		Entry("uses maxVMsPerBatch based on largest service", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 50},
+			{Name: "vms-batch-2-services", VMCount: 50},
+			{Name: "vms-batch-3-services", VMCount: 150},
+			{Name: "vms-batch-4-services", VMCount: 50},
+		}, 4, func(result [][]string) {
+			Expect(result[0]).To(ConsistOf("vms-batch-2-services", "vms-batch-3-services", "vms-batch-4-services"))
+			Expect(result[1]).To(ConsistOf("vms-batch-1-services", "vms-batch-3-services", "vms-batch-4-services"))
+			Expect(result[2]).To(ConsistOf("vms-batch-1-services", "vms-batch-2-services", "vms-batch-4-services"))
+			Expect(result[3]).To(ConsistOf("vms-batch-1-services", "vms-batch-2-services", "vms-batch-3-services"))
+		}),
+		Entry("handles maxServicesPerNode > numServices", []service.BatchedService{
+			{Name: "vms-batch-1-services", VMCount: 10},
+			{Name: "vms-batch-2-services", VMCount: 10},
+		}, 2, func(result [][]string) {
+			Expect(result[0]).To(BeEmpty())
+			Expect(result[1]).To(BeEmpty())
+		}),
+	)
+
+	DescribeTable("CalculateEffectiveCPU",
+		func(physicalCores, threads int, expected float64) {
+			result := service.CalculateEffectiveCPU(physicalCores, threads)
+			Expect(result).To(Equal(expected))
+		},
+		Entry("no SMT (threads = 0)", 16, 0, 16.0),
+		Entry("no SMT (threads = cores)", 16, 16, 16.0),
+		Entry("2:1 SMT (16C/32T)", 16, 32, 24.0),
+		Entry("4:1 SMT (8C/32T)", 8, 32, 20.0),
+		Entry("2:1 SMT (32C/64T)", 32, 64, 48.0),
+		Entry("odd cores (15C/30T)", 15, 30, 22.5),
+		Entry("zero cores", 0, 16, 0.0),
+		Entry("negative cores", -1, 16, 0.0),
+		Entry("invalid: threads < cores", 16, 8, 16.0),
+		Entry("single core with SMT (1C/2T)", 1, 2, 1.5),
+		Entry("minimum cores (2C/4T)", 2, 4, 3.0),
+	)
 })
