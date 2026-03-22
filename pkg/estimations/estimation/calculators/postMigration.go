@@ -147,9 +147,6 @@ func (c *PostMigrationTroubleShooting) Calculate(params map[string]estimation.Pa
 	// Derive work-day count for the reason string (display only, does not affect duration)
 	workDays := int(math.Ceil(realTimeMins / (workHoursPerDay * 60)))
 
-	return estimation.Estimation{
-		Duration: time.Duration(realTimeMins * float64(time.Minute)),
-		Reason: fmt.Sprintf("%d VMs @ %.1f mins each / %d engineers working %.0f h/day for a total of %d work days",
-			vmCount, minsPerVM, engineerCount, workHoursPerDay, workDays),
-	}, nil
+	return estimation.NewPointEstimation(time.Duration(realTimeMins*float64(time.Minute)), fmt.Sprintf("%d VMs @ %.1f mins each / %d engineers working %.0f h/day for a total of %d work days",
+		vmCount, minsPerVM, engineerCount, workHoursPerDay, workDays)), nil
 }

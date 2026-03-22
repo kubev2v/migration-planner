@@ -269,8 +269,14 @@ type Error struct {
 
 // EstimationDetail Detailed estimation result from a single calculator
 type EstimationDetail struct {
-	// Duration Estimated duration for this component (formatted as duration string)
-	Duration string `json:"duration"`
+	// Duration Estimated duration for this component (point calculators only)
+	Duration *string `json:"duration,omitempty"`
+
+	// MaxDuration Maximum estimated duration (ranged calculators only)
+	MaxDuration *string `json:"maxDuration,omitempty"`
+
+	// MinDuration Minimum estimated duration (ranged calculators only)
+	MinDuration *string `json:"minDuration,omitempty"`
 
 	// Reason Explanation of how the estimation was calculated
 	Reason string `json:"reason"`
@@ -439,16 +445,16 @@ type MigrationComplexityResponse struct {
 type MigrationEstimationRequest struct {
 	// ClusterId ID of the cluster to calculate migration estimation for
 	ClusterId string `json:"clusterId" validate:"required"`
+
+	// EstimationSchema Schemas to run. Valid values: "network-based", "storage-offload". If omitted, all schemas are run.
+	EstimationSchema *[]string `json:"estimationSchema,omitempty"`
+
+	// Params Optional calculator parameter overrides. Keys must match known calculator param names (e.g. "transfer_rate_mbps", "work_hours_per_day", "troubleshoot_mins_per_vm", "post_migration_engineers"). User-supplied values take precedence over both defaults and inventory-derived values. Unknown keys are silently ignored.
+	Params *map[string]interface{} `json:"params,omitempty"`
 }
 
-// MigrationEstimationResponse Migration time estimation results
-type MigrationEstimationResponse struct {
-	// Breakdown Breakdown of estimation by calculator
-	Breakdown map[string]EstimationDetail `json:"breakdown"`
-
-	// TotalDuration Total estimated migration duration (formatted as duration string, e.g., "2h30m")
-	TotalDuration string `json:"totalDuration"`
-}
+// MigrationEstimationResponse Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
+type MigrationEstimationResponse map[string]SchemaEstimationResult
 
 // MigrationIssue defines model for MigrationIssue.
 type MigrationIssue struct {
@@ -472,6 +478,18 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// SchemaEstimationResult Estimation results for a single schema
+type SchemaEstimationResult struct {
+	// Breakdown Per-calculator results
+	Breakdown map[string]EstimationDetail `json:"breakdown"`
+
+	// MaxTotalDuration Maximum total estimated duration across all calculators
+	MaxTotalDuration string `json:"maxTotalDuration"`
+
+	// MinTotalDuration Minimum total estimated duration across all calculators
+	MinTotalDuration string `json:"minTotalDuration"`
+}
 
 // SizingOverCommitRatio Over-commit ratios
 type SizingOverCommitRatio struct {

@@ -61,19 +61,19 @@ func TestRegister_PanicsOnDuplicate(t *testing.T) {
 func TestRun_ReturnsResultsKeyedByName(t *testing.T) {
 	t.Parallel()
 	e := NewEngine()
-	e.Register(&mockCalculator{name: "calc-a", result: Estimation{Duration: 10 * time.Minute, Reason: "reason-a"}})
-	e.Register(&mockCalculator{name: "calc-b", result: Estimation{Duration: 20 * time.Minute, Reason: "reason-b"}})
+	e.Register(&mockCalculator{name: "calc-a", result: NewPointEstimation(10*time.Minute, "reason-a")})
+	e.Register(&mockCalculator{name: "calc-b", result: NewPointEstimation(20*time.Minute, "reason-b")})
 
 	results := e.Run(nil)
 
 	if len(results) != 2 {
 		t.Fatalf("expected 2 results, got %d", len(results))
 	}
-	if results["calc-a"].Duration != 10*time.Minute {
-		t.Errorf("calc-a: expected 10m, got %v", results["calc-a"].Duration)
+	if *results["calc-a"].Duration != 10*time.Minute {
+		t.Errorf("calc-a: expected 10m, got %v", *results["calc-a"].Duration)
 	}
-	if results["calc-b"].Duration != 20*time.Minute {
-		t.Errorf("calc-b: expected 20m, got %v", results["calc-b"].Duration)
+	if *results["calc-b"].Duration != 20*time.Minute {
+		t.Errorf("calc-b: expected 20m, got %v", *results["calc-b"].Duration)
 	}
 }
 
@@ -88,7 +88,7 @@ func TestRun_CalculatorErrorEncodedInReason(t *testing.T) {
 	if !ok {
 		t.Fatal("expected result for failing calculator")
 	}
-	if got.Duration != 0 {
+	if got.Duration == nil || *got.Duration != 0 {
 		t.Errorf("expected Duration 0 on error, got %v", got.Duration)
 	}
 	if got.Reason == "" {
@@ -122,5 +122,30 @@ func TestRun_EmptyEngine(t *testing.T) {
 	results := e.Run([]Param{{Key: "x", Value: 42}})
 	if len(results) != 0 {
 		t.Errorf("expected empty results for engine with no calculators, got %d", len(results))
+	}
+}
+
+func TestNewRangedEstimation_PanicsWhenMinExceedsMax(t *testing.T) {
+	t.Parallel()
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic when min > max, got none")
+		}
+	}()
+	NewRangedEstimation(2*time.Hour, 1*time.Hour, "inverted range")
+}
+
+func TestIsRanged_RequiresBothPointers(t *testing.T) {
+	t.Parallel()
+	// Only MinDuration set — must not be considered ranged
+	min := 1 * time.Hour
+	partial := Estimation{MinDuration: &min}
+	if partial.IsRanged() {
+		t.Error("expected IsRanged false when only MinDuration is set")
+	}
+	// Both set — must be ranged
+	full := NewRangedEstimation(1*time.Hour, 2*time.Hour, "valid range")
+	if !full.IsRanged() {
+		t.Error("expected IsRanged true for fully constructed ranged estimation")
 	}
 }

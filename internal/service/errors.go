@@ -142,3 +142,7 @@ type ErrInvalidRequest struct {
 func NewErrInvalidRequest(message string) *ErrInvalidRequest {
 	return &ErrInvalidRequest{errors.New(message)}
 }
+
+type ErrInvalidSchema struct{ Msg string }
+
+func (e *ErrInvalidSchema) Error() string { return e.Msg }

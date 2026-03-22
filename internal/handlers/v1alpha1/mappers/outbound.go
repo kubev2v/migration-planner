@@ -10,6 +10,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 // normalizeInventoryData ensures all nil maps and slices are initialized to empty ones
@@ -367,19 +369,39 @@ func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) ap
 	}
 }
 
-// MigrationEstimationResultToAPI converts service MigrationAssessmentResult to API response
-func MigrationEstimationResultToAPI(result service.MigrationAssessmentResult) api.MigrationEstimationResponse {
-	breakdown := make(map[string]api.EstimationDetail)
-
-	for name, estimation := range result.Breakdown {
-		breakdown[name] = api.EstimationDetail{
-			Duration: estimation.Duration.String(),
-			Reason:   estimation.Reason,
-		}
+// MigrationEstimationResultToAPI converts the schema-keyed service result map to the API response.
+func MigrationEstimationResultToAPI(
+	results map[engines.Schema]*service.MigrationAssessmentResult,
+) api.MigrationEstimationResponse {
+	response := make(api.MigrationEstimationResponse, len(results))
+	for schema, result := range results {
+		response[string(schema)] = schemaResultToAPI(result)
 	}
+	return response
+}
 
-	return api.MigrationEstimationResponse{
-		TotalDuration: result.TotalDuration.String(),
-		Breakdown:     breakdown,
+func schemaResultToAPI(result *service.MigrationAssessmentResult) api.SchemaEstimationResult {
+	breakdown := make(map[string]api.EstimationDetail, len(result.Breakdown))
+	for name, est := range result.Breakdown {
+		breakdown[name] = estimationDetailToAPI(est)
 	}
+	return api.SchemaEstimationResult{
+		MinTotalDuration: result.MinTotalDuration.String(),
+		MaxTotalDuration: result.MaxTotalDuration.String(),
+		Breakdown:        breakdown,
+	}
+}
+
+func estimationDetailToAPI(est estimation.Estimation) api.EstimationDetail {
+	detail := api.EstimationDetail{Reason: est.Reason}
+	if est.IsRanged() {
+		min := est.MinDuration.String()
+		max := est.MaxDuration.String()
+		detail.MinDuration = &min
+		detail.MaxDuration = &max
+	} else {
+		d := est.Duration.String()
+		detail.Duration = &d
+	}
+	return detail
 }

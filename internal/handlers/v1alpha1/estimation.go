@@ -8,6 +8,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
+	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -118,6 +120,22 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		return server.CalculateMigrationEstimation403JSONResponse{Message: message}, nil
 	}
 
+	// Parse optional estimation schemas from request body
+	var schemas []engines.Schema
+	if request.Body.EstimationSchema != nil {
+		for _, s := range *request.Body.EstimationSchema {
+			schemas = append(schemas, engines.Schema(s))
+		}
+	}
+
+	// Parse optional user-supplied param overrides
+	var userParams []estimation.Param
+	if request.Body.Params != nil {
+		for k, v := range *request.Body.Params {
+			userParams = append(userParams, estimation.Param{Key: k, Value: v})
+		}
+	}
+
 	logger.Step("calculate_estimation").
 		WithUUID("assessment_id", assessmentID).
 		WithString("cluster_id", clusterID).
@@ -125,13 +143,15 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		WithString("username", user.Username).
 		Log()
 
-	// Call estimation service
-	result, err := h.estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, clusterID)
+	result, err := h.estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, clusterID, schemas, userParams)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrInvalidSchema:
+			logger.Error(err).Log()
+			return server.CalculateMigrationEstimation400JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
 			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to calculate migration estimation"}, nil
@@ -141,10 +161,9 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 	logger.Success().
 		WithString("org_id", user.Organization).
 		WithString("username", user.Username).
-		WithString("total_duration", result.TotalDuration.String()).
+		WithInt("schema_count", len(result)).
 		Log()
 
-	// Convert domain model to API response
-	apiResponse := mappers.MigrationEstimationResultToAPI(*result)
+	apiResponse := mappers.MigrationEstimationResultToAPI(result)
 	return server.CalculateMigrationEstimation200JSONResponse(apiResponse), nil
 }
