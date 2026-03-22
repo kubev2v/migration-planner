@@ -683,6 +683,11 @@ paths:
               $ref: "#/components/schemas/MigrationEstimationRequest"
             example:
               clusterId: "domain-c8"
+              estimationSchema:
+                - "network-based"
+              params:
+                transfer_rate_mbps: 1000
+                work_hours_per_day: 6
         required: true
       responses:
         "200":
@@ -692,14 +697,27 @@ paths:
               schema:
                 $ref: "#/components/schemas/MigrationEstimationResponse"
               example:
-                totalDuration: "4h30m0s"
-                breakdown:
-                  "Storage Migration":
-                    duration: "3h40m0s"
-                    reason: "1000.00 GB at 110 minutes per 500GB"
-                  "Post-Migration Checks":
-                    duration: "50m0s"
-                    reason: "500 VMs @ 60.0 mins each / 10 engineers"
+                network-based:
+                  minTotalDuration: "4h30m0s"
+                  maxTotalDuration: "4h30m0s"
+                  breakdown:
+                    "Storage Migration":
+                      duration: "3h40m0s"
+                      reason: "1000.00 GB at 620 Mbps (220 min/500GB)"
+                    "Post-Migration Checks":
+                      duration: "50m0s"
+                      reason: "500 VMs @ 60.0 mins each / 10 engineers working 8 h/day for a total of 1 work days"
+                storage-offload:
+                  minTotalDuration: "58m20s"
+                  maxTotalDuration: "1h23m20s"
+                  breakdown:
+                    "Storage Offload":
+                      minDuration: "8m20s"
+                      maxDuration: "33m20s"
+                      reason: "1000.00 GB @ 0.5-2.0 GB/s transfer rate; assumes same storage array with x-copy enabled"
+                    "Post-Migration Checks":
+                      duration: "50m0s"
+                      reason: "500 VMs @ 60.0 mins each / 10 engineers working 8 h/day for a total of 1 work days"
         "400":
           description: Bad Request
           content:
@@ -1828,24 +1846,52 @@ components:
           example: "domain-c8"
           x-oapi-codegen-extra-tags:
             validate: "required"
+        estimationSchema:
+          type: array
+          description: >
+            Schemas to run. Valid values: "network-based", "storage-offload".
+            If omitted, all schemas are run.
+          items:
+            type: string
+        params:
+          type: object
+          description: >
+            Optional calculator parameter overrides. Keys must match known calculator
+            param names (e.g. "transfer_rate_mbps", "work_hours_per_day",
+            "troubleshoot_mins_per_vm", "post_migration_engineers").
+            User-supplied values take precedence over both defaults and
+            inventory-derived values. Unknown keys are silently ignored.
+          additionalProperties: true
       required:
         - clusterId
 
     MigrationEstimationResponse:
       type: object
-      description: Migration time estimation results
+      description: >
+        Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
+      additionalProperties:
+        $ref: "#/components/schemas/SchemaEstimationResult"
+
+    SchemaEstimationResult:
+      type: object
+      description: Estimation results for a single schema
       properties:
-        totalDuration:
+        minTotalDuration:
           type: string
-          description: Total estimated migration duration (formatted as duration string, e.g., "2h30m")
-          example: "4h30m0s"
+          description: Minimum total estimated duration across all calculators
+          example: "1h20m0s"
+        maxTotalDuration:
+          type: string
+          description: Maximum total estimated duration across all calculators
+          example: "5h20m0s"
         breakdown:
           type: object
-          description: Breakdown of estimation by calculator
+          description: Per-calculator results
           additionalProperties:
             $ref: "#/components/schemas/EstimationDetail"
       required:
-        - totalDuration
+        - minTotalDuration
+        - maxTotalDuration
         - breakdown
 
     EstimationDetail:
@@ -1854,14 +1900,20 @@ components:
       properties:
         duration:
           type: string
-          description: Estimated duration for this component (formatted as duration string)
+          description: Estimated duration for this component (point calculators only)
           example: "3h40m0s"
+        minDuration:
+          type: string
+          description: Minimum estimated duration (ranged calculators only)
+          example: "8m20s"
+        maxDuration:
+          type: string
+          description: Maximum estimated duration (ranged calculators only)
+          example: "33m20s"
         reason:
           type: string
           description: Explanation of how the estimation was calculated
-          example: "1000.00 GB at 110 minutes per 500GB"
       required:
-        - duration
         - reason
 
     MigrationComplexityRequest:

@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
+	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation/calculators"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -27,8 +28,9 @@ type MigrationComplexityResult struct {
 
 // MigrationAssessmentResult represents the result of a migration assessment calculation
 type MigrationAssessmentResult struct {
-	TotalDuration time.Duration
-	Breakdown     map[string]estimation.Estimation
+	MinTotalDuration time.Duration
+	MaxTotalDuration time.Duration
+	Breakdown        map[string]estimation.Estimation
 }
 
 // EstimationService orchestrates the migration time estimation workflow.
@@ -36,22 +38,13 @@ type MigrationAssessmentResult struct {
 // through the estimation Engine to produce a MigrationAssessmentResult.
 type EstimationService struct {
 	store  store.Store
-	engine *estimation.Engine
 	logger *log.StructuredLogger
 }
 
-// NewEstimationService creates an EstimationService with the default set of calculators registered.
+// NewEstimationService creates an EstimationService.
 func NewEstimationService(store store.Store) *EstimationService {
-	engine := estimation.NewEngine()
-
-	// Register calculators
-	// TODO: later phases can make this configurable by the user
-	engine.Register(calculators.NewStorageMigration())
-	engine.Register(calculators.NewPostMigrationTroubleShooting())
-
 	return &EstimationService{
 		store:  store,
-		engine: engine,
 		logger: log.NewDebugLogger("estimation_service"),
 	}
 }
@@ -61,7 +54,9 @@ func (es *EstimationService) CalculateMigrationEstimation(
 	ctx context.Context,
 	assessmentID uuid.UUID,
 	clusterID string,
-) (*MigrationAssessmentResult, error) {
+	schemas []engines.Schema,
+	userParams []estimation.Param,
+) (map[engines.Schema]*MigrationAssessmentResult, error) {
 	logger := es.logger.WithContext(ctx)
 	tracer := logger.Operation("calculate_migration_estimation").
 		WithUUID("assessment_id", assessmentID).
@@ -111,27 +106,44 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		return nil, err
 	}
 
-	params := es.mapClusterToParams(clusterInventory)
+	params := mergeParams(
+		defaultParams(),
+		es.mapClusterToParams(clusterInventory),
+		userParams,
+	)
 
 	tracer.Step("mapped_params").WithInt("param_count", len(params)).Log()
 
-	results := es.engine.Run(params)
+	engineMap, err := engines.BuildEngines(schemas)
+	if err != nil {
+		return nil, &ErrInvalidSchema{Msg: err.Error()}
+	}
 
-	// Calculate total duration (simple sum for now)
-	totalDuration := time.Duration(0)
-	for _, est := range results {
-		totalDuration += est.Duration
+	results := make(map[engines.Schema]*MigrationAssessmentResult, len(engineMap))
+	for schema, engine := range engineMap {
+		breakdown := engine.Run(params)
+		var minTotal, maxTotal time.Duration
+		for _, est := range breakdown {
+			if est.IsRanged() {
+				minTotal += *est.MinDuration
+				maxTotal += *est.MaxDuration
+			} else {
+				minTotal += *est.Duration
+				maxTotal += *est.Duration
+			}
+		}
+		results[schema] = &MigrationAssessmentResult{
+			MinTotalDuration: minTotal,
+			MaxTotalDuration: maxTotal,
+			Breakdown:        breakdown,
+		}
 	}
 
 	tracer.Success().
-		WithString("total_duration", totalDuration.String()).
-		WithInt("calculator_count", len(results)).
+		WithInt("schema_count", len(results)).
 		Log()
 
-	return &MigrationAssessmentResult{
-		TotalDuration: totalDuration,
-		Breakdown:     results,
-	}, nil
+	return results, nil
 }
 
 // CalculateMigrationComplexity calculates OS and disk complexity breakdowns
@@ -231,35 +243,101 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 	}, nil
 }
 
+// ParamDefinition describes a single calculator parameter that can be supplied
+// by the user to override the default or inventory-derived value.
+//
+// This slice is the single source of truth for two things:
+//  1. defaultParams() — derives the baseline []estimation.Param from it, so
+//     adding a new parameter here automatically makes it part of the merge.
+//  2. A future metadata endpoint (e.g. GET /api/v1/estimation/params) that
+//     lets the UI render dynamic input forms with correct display names, types,
+//     units, and valid ranges without hard-coding any of that in the frontend.
+//
+// When adding a new calculator parameter, add its definition here first.
+type ParamDefinition struct {
+	Key         string           // matches estimation.Param.Key and the calculator constant
+	DisplayName string           // human-readable label for UI forms
+	Type        string           // "number" or "integer"
+	Unit        string           // e.g. "Mbps", "hours", "minutes", "" if unitless
+	Min         *float64         // inclusive lower bound, nil if unbounded
+	Max         *float64         // inclusive upper bound, nil if unbounded
+	Default     any              // value used when neither inventory nor user supplies this key
+	Schemas     []engines.Schema // schemas that use this parameter; nil means all schemas
+}
+
+// estimationParamDefs is the authoritative list of user-overridable calculator parameters.
+// See ParamDefinition for the contract each field must satisfy.
+var estimationParamDefs = func() []ParamDefinition {
+	minRate := 0.1 // Mbps — prevent division by zero in StorageMigration
+	minHours := 0.5
+	minMins := 1.0
+	minEngineers := 1.0
+	return []ParamDefinition{
+		{
+			Key:         calculators.ParamTransferRateMbps,
+			DisplayName: "Network Transfer Rate",
+			Type:        "number",
+			Unit:        "Mbps",
+			Min:         &minRate,
+			Default:     calculators.DefaultTransferRateMbps,
+			Schemas:     []engines.Schema{engines.SchemaNetworkBased},
+		},
+		{
+			Key:         calculators.ParamWorkHoursPerDay,
+			DisplayName: "Work Hours per Day",
+			Type:        "number",
+			Unit:        "hours",
+			Min:         &minHours,
+			Default:     calculators.DefaultWorkHoursPerDay,
+		},
+		{
+			Key:         calculators.ParamTroubleshootMinsPerVM,
+			DisplayName: "Troubleshooting Time per VM",
+			Type:        "number",
+			Unit:        "minutes",
+			Min:         &minMins,
+			Default:     calculators.DefaultTroubleshootMinsPerVM,
+		},
+		{
+			Key:         calculators.ParamPostMigrationEngineers,
+			DisplayName: "Post-Migration Engineers",
+			Type:        "integer",
+			Unit:        "",
+			Min:         &minEngineers,
+			Default:     calculators.DefaultEngineerCount,
+		},
+	}
+}()
+
+// defaultParams derives the baseline []estimation.Param from estimationParamDefs.
+// Adding a new parameter to estimationParamDefs automatically includes it here.
+func defaultParams() []estimation.Param {
+	params := make([]estimation.Param, len(estimationParamDefs))
+	for i, def := range estimationParamDefs {
+		params[i] = estimation.Param{Key: def.Key, Value: def.Default}
+	}
+	return params
+}
+
+// mergeParams merges parameter layers left-to-right; later layers win on key conflicts.
+func mergeParams(layers ...[]estimation.Param) []estimation.Param {
+	merged := make(map[string]estimation.Param)
+	for _, layer := range layers {
+		for _, p := range layer {
+			merged[p.Key] = p
+		}
+	}
+	result := make([]estimation.Param, 0, len(merged))
+	for _, p := range merged {
+		result = append(result, p)
+	}
+	return result
+}
+
 // mapClusterToParams converts cluster inventory data to estimation parameters
 func (es *EstimationService) mapClusterToParams(clusterInventory api.InventoryData) []estimation.Param {
-	params := []estimation.Param{}
-
-	// Extract total disk GB from cluster VMs
-	totalDiskGB := clusterInventory.Vms.DiskGB.Total
-	params = append(params, estimation.Param{
-		Key:   calculators.ParamTotalDiskGB,
-		Value: float64(totalDiskGB),
-	})
-
-	// Extract total VM count
-	totalVMs := clusterInventory.Vms.Total
-	params = append(params, estimation.Param{
-		Key:   calculators.ParamVMCount,
-		Value: totalVMs,
-	})
-
-	// TODO: expose via API request body in a future phase
-	params = append(params, estimation.Param{
-		Key:   calculators.ParamTransferRateMbps,
-		Value: calculators.DefaultTransferRateMbps,
-	})
-
-	// TODO: expose via API request body in a future phase
-	params = append(params, estimation.Param{
-		Key:   calculators.ParamWorkHoursPerDay,
-		Value: calculators.DefaultWorkHoursPerDay,
-	})
-
-	return params
+	return []estimation.Param{
+		{Key: calculators.ParamTotalDiskGB, Value: float64(clusterInventory.Vms.DiskGB.Total)},
+		{Key: calculators.ParamVMCount, Value: clusterInventory.Vms.Total},
+	}
 }

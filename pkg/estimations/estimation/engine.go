@@ -42,10 +42,7 @@ func (e *Engine) Run(inputs []Param) map[string]Estimation {
 	for _, calc := range e.calculators {
 		est, err := calc.Calculate(paramMap)
 		if err != nil {
-			results[calc.Name()] = Estimation{
-				Duration: 0,
-				Reason:   fmt.Sprintf("Error: %v", err),
-			}
+			results[calc.Name()] = NewPointEstimation(0, fmt.Sprintf("Error: %v", err))
 			continue
 		}
 		results[calc.Name()] = est

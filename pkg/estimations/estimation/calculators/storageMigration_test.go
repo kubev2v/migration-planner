@@ -23,8 +23,11 @@ func TestStorageMigration_Calculate_WithDefaultRate(t *testing.T) {
 	// (1000 GB * 1024 MB/GB) / (620 Mbps / 8) / 60 s/min
 	expectedMins := (1000.0 * 1024.0) / (DefaultTransferRateMbps / 8) / 60.0
 	expectedDuration := time.Duration(expectedMins * float64(time.Minute))
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 	if result.Reason == "" {
 		t.Error("expected non-empty reason")
@@ -48,8 +51,11 @@ func TestStorageMigration_Calculate_WithCustomRate(t *testing.T) {
 	// (500 GB * 1024 MB/GB) / (1600 Mbps / 8) / 60 s/min
 	expectedMins := (500.0 * 1024.0) / (customRate / 8) / 60.0
 	expectedDuration := time.Duration(expectedMins * float64(time.Minute))
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 }
 
@@ -70,8 +76,11 @@ func TestStorageMigration_Calculate_HighBandwidth(t *testing.T) {
 
 	expectedMins := (1000.0 * 1024.0) / (highRate / 8) / 60.0
 	expectedDuration := time.Duration(expectedMins * float64(time.Minute))
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 }
 
@@ -87,8 +96,11 @@ func TestStorageMigration_Calculate_ZeroGB(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error for zero GB, got: %v", err)
 	}
-	if result.Duration != 0 {
-		t.Errorf("expected 0 duration for zero GB, got %v", result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != 0 {
+		t.Errorf("expected 0 duration for zero GB, got %v", *result.Duration)
 	}
 }
 

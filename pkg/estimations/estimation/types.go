@@ -1,6 +1,7 @@
 package estimation
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -20,8 +21,30 @@ type Param struct {
 	Value interface{} // The actual value (e.g., 1000, "fast", 0.8)
 }
 
-// Estimation the result of a Calculator calculation
+// Estimation is the result of a Calculator run.
+// Exactly one of {Duration} or {MinDuration, MaxDuration} will be non-nil.
+// Use NewPointEstimation or NewRangedEstimation to construct — never build the struct directly.
 type Estimation struct {
-	Duration time.Duration
-	Reason   string
+	Duration    *time.Duration // non-nil for point estimates
+	MinDuration *time.Duration // non-nil for ranged estimates
+	MaxDuration *time.Duration // non-nil for ranged estimates
+	Reason      string
 }
+
+// NewPointEstimation constructs an Estimation for a single-value calculator result.
+func NewPointEstimation(d time.Duration, reason string) Estimation {
+	return Estimation{Duration: &d, Reason: reason}
+}
+
+// NewRangedEstimation constructs an Estimation for a calculator that returns a duration range.
+// Panics if min > max, as that indicates a programming error in the calculator.
+func NewRangedEstimation(min, max time.Duration, reason string) Estimation {
+	if min > max {
+		panic(fmt.Sprintf("estimation: NewRangedEstimation: min (%v) must be <= max (%v)", min, max))
+	}
+	return Estimation{MinDuration: &min, MaxDuration: &max, Reason: reason}
+}
+
+// IsRanged reports whether this estimation carries a range rather than a point value.
+// Both MinDuration and MaxDuration must be non-nil; NewRangedEstimation always sets them together.
+func (e Estimation) IsRanged() bool { return e.MinDuration != nil && e.MaxDuration != nil }

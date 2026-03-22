@@ -49,8 +49,11 @@ func TestPostMigrationTroubleShooting_Calculate_WithDefaults(t *testing.T) {
 	// 10 VMs * 60 mins (default) = 600 mins total
 	// 600 mins / 10 engineers (default) = 60 mins
 	expectedDuration := 60 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 
 	// 60 mins / (8 h/day * 60) = 0.125 → ceil = 1 work day
@@ -80,8 +83,11 @@ func TestPostMigrationTroubleShooting_Calculate_WithCustomOptions(t *testing.T) 
 	// 12 VMs * 30 mins = 360 mins total
 	// 360 mins / 3 engineers = 120 mins
 	expectedDuration := 120 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 	if result.Reason == "" {
 		t.Error("expected non-empty reason")
@@ -106,8 +112,11 @@ func TestPostMigrationTroubleShooting_Calculate_WorkDaysCustomHours(t *testing.T
 
 	// Duration unchanged from formula
 	expectedDuration := 600 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 
 	expectedWorkDayStr := "3 work days"
@@ -229,8 +238,11 @@ func TestPostMigrationTroubleShooting_Calculate_ParamsOverrideDefaults(t *testin
 	// 20 VMs * 45 mins (from params) = 900 mins total
 	// 900 mins / 5 engineers (from params) = 180 mins
 	expectedDuration := 180 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 	if result.Reason == "" {
 		t.Error("expected non-empty reason")
@@ -259,8 +271,11 @@ func TestPostMigrationTroubleShooting_Calculate_ParamsOverrideStructOptions(t *t
 	// 15 VMs * 50 mins (from params, not struct) = 750 mins total
 	// 750 mins / 6 engineers (from params, not struct) = 125 mins
 	expectedDuration := 125 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 }
 
@@ -282,7 +297,10 @@ func TestPostMigrationTroubleShooting_Calculate_PartialParamOverride(t *testing.
 	// 20 VMs * 30 mins (from params) = 600 mins total
 	// 600 mins / 10 engineers (default) = 60 mins
 	expectedDuration := 60 * time.Minute
-	if result.Duration != expectedDuration {
-		t.Errorf("expected duration %v, got %v", expectedDuration, result.Duration)
+	if result.Duration == nil {
+		t.Fatal("expected point estimation, got ranged")
+	}
+	if *result.Duration != expectedDuration {
+		t.Errorf("expected duration %v, got %v", expectedDuration, *result.Duration)
 	}
 }
