@@ -701,12 +701,20 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			Expect(result).To(BeNil())
 		})
 
-		It("returns nil when stored version is invalid format", func() {
-			imageInfra := &model.ImageInfra{
-				AgentVersion: util.ToStrPtr("dev-build"),
+		It("returns warning when stored version differs from current (opaque tag)", func() {
+			versionInfo := version.Get()
+			if version.IsValidAgentVersion(versionInfo.AgentVersionName) && versionInfo.AgentVersionName != "dev-build" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr("dev-build"),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra)
+				Expect(result).NotTo(BeNil())
+				Expect(*result).To(ContainSubstring("version mismatch"))
+				Expect(*result).To(ContainSubstring("dev-build"))
+				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
+			} else {
+				Skip("Skipping test: build version empty, unknown, or dev-build")
 			}
-			result := service.CheckAgentVersionWarning(imageInfra)
-			Expect(result).To(BeNil())
 		})
 
 		It("returns warning when stored version is baseline v0.5.0 and current is newer", func() {
