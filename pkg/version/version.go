@@ -2,11 +2,8 @@ package version
 
 import (
 	"fmt"
-	"regexp"
 	"runtime"
 )
-
-var versionPattern = regexp.MustCompile(`^v\d+\.\d+\.\d+`)
 
 var (
 	// commitFromGit is a constant representing the source version that
@@ -69,11 +66,8 @@ func Get() Info {
 	}
 }
 
-// IsValidAgentVersion checks if the version string is valid (not empty, not "unknown", and matches semver pattern).
-// Valid versions must start with 'v' followed by major.minor.patch (e.g., v0.5.1, v0.5.1-25-g45c60d3).
+// IsValidAgentVersion reports whether ver is usable for agent version comparison and persistence.
+// Empty string and "unknown" are treated as missing.
 func IsValidAgentVersion(ver string) bool {
-	if ver == "" || ver == "unknown" {
-		return false
-	}
-	return versionPattern.MatchString(ver)
+	return ver != "" && ver != "unknown"
 }
