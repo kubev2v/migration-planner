@@ -899,6 +899,72 @@ var _ = Describe("sizer handler", func() {
 				Expect(errorResp.Message).To(ContainSubstring("workerNodeThreads (8) must be >= workerNodeCPU (16)"))
 			})
 
+			It("returns 400 when workerNodeThreads is below minimum", func() {
+				threads := 1
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeThreads:     &threads,
+					WorkerNodeMemory:      16,
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("workerNodeThreads must be at least 2"))
+			})
+
+			It("returns 400 when workerNodeThreads exceeds maximum", func() {
+				threads := 2001
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         200,
+					WorkerNodeThreads:     &threads,
+					WorkerNodeMemory:      16,
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("workerNodeThreads must be at most 2000"))
+			})
+
 			invalidControlPlaneNodeCounts := []int{0, 2, 4, 5, 10}
 			for _, invalidCount := range invalidControlPlaneNodeCounts {
 				It(fmt.Sprintf("returns 400 when controlPlaneNodeCount is invalid (%d)", invalidCount), func() {

@@ -1771,9 +1771,11 @@ components:
             validate: "required,min=4,max=512"
         workerNodeThreads:
           type: integer
+          minimum: 2
+          maximum: 2000
           description: Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
           x-oapi-codegen-extra-tags:
-            validate: "omitempty,min=2"
+            validate: "omitempty,min=2,max=2000"
         controlPlaneSchedulable:
           type: boolean
           description: "Allow workload scheduling on control plane nodes (default: false)"
