@@ -12,6 +12,12 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+// Bounds must match api/v1alpha1/openapi.yaml (ClusterRequirementsRequest.workerNodeThreads).
+const (
+	workerNodeThreadsMin = 2
+	workerNodeThreadsMax = 2000
+)
+
 // (POST /api/v1/assessments/{id}/cluster-requirements)
 func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Context, request server.CalculateAssessmentClusterRequirementsRequestObject) (server.CalculateAssessmentClusterRequirementsResponseObject, error) {
 	logger := log.NewDebugLogger("sizer_handler").
@@ -75,13 +81,24 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		}
 	}
 
-	// Validate SMT configuration if threads provided
 	if request.Body.WorkerNodeThreads != nil {
 		threads := *request.Body.WorkerNodeThreads
-		if threads < request.Body.WorkerNodeCPU {
-			logger.Error(fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU)).Log()
+		cpu := request.Body.WorkerNodeCPU
+		switch {
+		case threads < workerNodeThreadsMin:
+			logger.Error(fmt.Errorf("workerNodeThreads (%d) below minimum (%d)", threads, workerNodeThreadsMin)).Log()
 			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message: fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, request.Body.WorkerNodeCPU),
+				Message: fmt.Sprintf("workerNodeThreads must be at least %d, got: %d", workerNodeThreadsMin, threads),
+			}, nil
+		case threads > workerNodeThreadsMax:
+			logger.Error(fmt.Errorf("workerNodeThreads (%d) exceeds maximum (%d)", threads, workerNodeThreadsMax)).Log()
+			return server.CalculateAssessmentClusterRequirements400JSONResponse{
+				Message: fmt.Sprintf("workerNodeThreads must be at most %d, got: %d", workerNodeThreadsMax, threads),
+			}, nil
+		case threads < cpu:
+			logger.Error(fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, cpu)).Log()
+			return server.CalculateAssessmentClusterRequirements400JSONResponse{
+				Message: fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, cpu),
 			}, nil
 		}
 	}
