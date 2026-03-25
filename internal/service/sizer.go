@@ -211,28 +211,33 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithInt("control_plane_node_count", effectiveCPNodeCount).
 		Build()
 
-	// Use effective CPU for all calculations
-	targetCPU := effectiveCPU * CapacityMultiplier
-	targetMemory := float64(req.WorkerNodeMemory) * CapacityMultiplier
+	// Use effectiveControlPlaneNodeCount to handle hosted control plane (returns 0)
+	singleNode := effectiveControlPlaneNodeCount(req) == 1
 
-	minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches := s.calculateMinimumNodeSize(
-		totalCPU,
-		totalMemory,
-		MaxBatches,
-		CapacityMultiplier,
-		smtMultiplier,
-	)
+	// Early validation for multi-node clusters only (SNO validated by sizer API)
+	if !singleNode {
+		targetCPU := effectiveCPU * CapacityMultiplier
+		targetMemory := float64(req.WorkerNodeMemory) * CapacityMultiplier
 
-	estimatedBatchesCPU := int(math.Ceil(float64(totalCPU) / targetCPU))
-	estimatedBatchesMemory := int(math.Ceil(float64(totalMemory) / targetMemory))
-	estimatedBatches := max(estimatedBatchesCPU, estimatedBatchesMemory)
-
-	if estimatedBatches > MaxBatches {
-		return nil, s.formatNodeSizeError(
-			req.WorkerNodeCPU, req.WorkerNodeMemory,
-			totalCPU, totalMemory,
-			minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches,
+		minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches := s.calculateMinimumNodeSize(
+			totalCPU,
+			totalMemory,
+			MaxBatches,
+			CapacityMultiplier,
+			smtMultiplier,
 		)
+
+		estimatedBatchesCPU := int(math.Ceil(float64(totalCPU) / targetCPU))
+		estimatedBatchesMemory := int(math.Ceil(float64(totalMemory) / targetMemory))
+		estimatedBatches := max(estimatedBatchesCPU, estimatedBatchesMemory)
+
+		if estimatedBatches > MaxBatches {
+			return nil, s.formatNodeSizeError(
+				req.WorkerNodeCPU, req.WorkerNodeMemory,
+				totalCPU, totalMemory,
+				minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches,
+			)
+		}
 	}
 
 	services, err := s.aggregateVMsIntoServices(
@@ -246,6 +251,10 @@ func (s *SizerService) CalculateClusterRequirements(
 		CapacityMultiplier,
 	)
 	if err != nil {
+		// For SNO, convert technical errors to user-friendly message
+		if singleNode {
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+		}
 		return nil, NewErrInvalidRequest(err.Error())
 	}
 
@@ -253,7 +262,6 @@ func (s *SizerService) CalculateClusterRequirements(
 		WithInt("num_services", len(services)).
 		Log()
 
-	singleNode := req.ControlPlaneNodeCount == 1
 	// Single-node clusters must have schedulable control planes
 	if singleNode && !controlPlaneSchedulable {
 		return nil, NewErrInvalidRequest(
@@ -326,6 +334,9 @@ func (s *SizerService) CalculateClusterRequirements(
 	}
 
 	if maxVMsPerNode > MaxVMsPerWorkerNode {
+		if singleNode {
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+		}
 		err := NewErrInvalidRequest(fmt.Sprintf("VM distribution constraint violated: found %d VMs on a node, exceeds limit of %d per node",
 			maxVMsPerNode, MaxVMsPerWorkerNode))
 		s.logger.Operation("vm_limit_exceeded").

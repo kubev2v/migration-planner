@@ -691,6 +691,46 @@ var _ = Describe("sizer service", func() {
 				Expect(err.Error()).NotTo(ContainSubstring("Use at least"))
 			})
 
+			It("returns correct SNO error when sizer reports workload doesn't fit", func() {
+				request.ControlPlaneNodeCount = 1
+				request.ControlPlaneSchedulable = true
+				request.ControlPlaneCPU = 16
+				request.ControlPlaneMemory = 128
+				// Create a workload that sizer will reject
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 100, 200)
+				mockStore.assessments[assessmentID] = assessment
+				// Mock sizer to return a schedulability error (workload doesn't fit on CP)
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusInternalServerError)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{
+							"success": false,
+							"error":   "Workload is not schedulable. Control plane node is too small to run this workload.",
+						})
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				// Should return SNO-specific message, NOT "Worker node size ... is too small"
+				Expect(err.Error()).To(ContainSubstring("workload does not fit on a single node"))
+				Expect(err.Error()).NotTo(ContainSubstring("Worker node"))
+				Expect(err.Error()).NotTo(ContainSubstring("worker node"))
+			})
+
 			It("successfully handles single node cluster when sizer returns 0 nodes", func() {
 				request.ControlPlaneNodeCount = 1
 				request.ControlPlaneSchedulable = true
