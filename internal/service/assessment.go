@@ -15,6 +15,14 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+type AssessmentServicer interface {
+	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error)
+	GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
+	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error)
+	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error)
+	DeleteAssessment(ctx context.Context, id uuid.UUID) error
+}
+
 const (
 	SourceTypeAgent     string = "agent"
 	SourceTypeInventory string = "inventory"
@@ -47,8 +55,17 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 		WithInt("offset", filter.Offset).
 		Build()
 
-	storeFilter := store.NewAssessmentQueryFilter().WithUsername(filter.Username).WithOrgID(filter.OrgID)
+	storeFilter := store.NewAssessmentQueryFilter()
 
+	if len(filter.IDs) > 0 {
+		storeFilter = storeFilter.WithIDs(filter.IDs)
+	}
+	if filter.Username != "" {
+		storeFilter = storeFilter.WithUsername(filter.Username)
+	}
+	if filter.OrgID != "" {
+		storeFilter = storeFilter.WithOrgID(filter.OrgID)
+	}
 	if filter.Source != "" {
 		storeFilter = storeFilter.WithSourceType(filter.Source)
 	}
@@ -281,6 +298,7 @@ type AssessmentFilter struct {
 	Source   string
 	SourceID string
 	NameLike string
+	IDs      []uuid.UUID
 	Limit    int
 	Offset   int
 }

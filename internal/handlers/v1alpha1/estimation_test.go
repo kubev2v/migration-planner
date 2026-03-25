@@ -389,11 +389,9 @@ var _ = Describe("estimation handler", func() {
 					ClusterId: clusterID,
 				}
 
-				// Create assessment with different username
-				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, "other-user", user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					&ForbiddenAssessmentService{},
 					nil,
 					nil,
 					service.NewEstimationService(mockStore),
@@ -415,11 +413,9 @@ var _ = Describe("estimation handler", func() {
 					ClusterId: clusterID,
 				}
 
-				// Create assessment with different organization
-				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, "other-org", clusterID)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					&ForbiddenAssessmentService{},
 					nil,
 					nil,
 					service.NewEstimationService(mockStore),
@@ -765,8 +761,7 @@ var _ = Describe("estimation handler", func() {
 
 		Context("authorization errors", func() {
 			It("returns 403 when user has a different username", func() {
-				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, "other-user", user.Organization, clusterID)
-				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+				handler = handlers.NewServiceHandler(nil, &ForbiddenAssessmentService{}, nil, nil, service.NewEstimationService(mockStore))
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
@@ -780,8 +775,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns 403 when user belongs to a different organisation", func() {
-				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, "other-org", clusterID)
-				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+				handler = handlers.NewServiceHandler(nil, &ForbiddenAssessmentService{}, nil, nil, service.NewEstimationService(mockStore))
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,

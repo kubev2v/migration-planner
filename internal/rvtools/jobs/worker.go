@@ -176,6 +176,14 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		return w.failJob(ctx, logger, job.ID, "create_assessment", err, errMsg)
 	}
 
+	updates := store.NewRelationshipBuilder().
+		With(model.NewAssessmentResource(assessment.ID.String()), model.OwnerRelation, model.NewUserSubject(job.Args.Username)).
+		Build()
+
+	if err := w.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return fmt.Errorf("authz: failed to write owner relation: %w", err)
+	}
+
 	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()

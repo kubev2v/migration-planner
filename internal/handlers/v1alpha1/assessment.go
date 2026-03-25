@@ -139,23 +139,16 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.GetAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.GetAssessment403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
-	logger.Step("assessment_retrieved").WithString("assessment_name", assessment.Name).Log()
-
-	user := auth.MustHaveUser(ctx)
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("user", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.GetAssessment403JSONResponse{Message: message}, nil
-	}
-
-	logger.Step("authorization_check_passed").Log()
-	logger.Success().WithString("source_type", assessment.SourceType).Log()
+	logger.Success().WithString("assessment_name", assessment.Name).WithString("source_type", assessment.SourceType).Log()
 
 	apiAssessment, err := mappers.AssessmentToApi(*assessment)
 	if err != nil {
@@ -174,9 +167,6 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		WithRequestBody("request_body", request.Body).
 		Build()
 
-	user := auth.MustHaveUser(ctx)
-	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
-
 	if request.Body == nil {
 		logger.Error(fmt.Errorf("empty request body")).WithUUID("assessment_id", request.Id).Log()
 		return server.UpdateAssessment400JSONResponse{Message: "empty body"}, nil
@@ -184,35 +174,15 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 
 	assessmentID := request.Id
 
-	// Get assessment to check ownership
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
-	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_update").Log()
-			return server.UpdateAssessment404JSONResponse{Message: err.Error()}, nil
-		default:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_update").Log()
-			return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
-		}
-	}
-
-	logger.Step("assessment_retrieved_for_update").WithString("current_name", assessment.Name).Log()
-
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to update assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.UpdateAssessment403JSONResponse{Message: message}, nil
-	}
-
-	logger.Step("authorization_check_passed").Log()
-
 	updatedAssessment, err := h.assessmentSrv.UpdateAssessment(ctx, assessmentID, request.Body.Name)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.UpdateAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.UpdateAssessment403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrAgentUpdateForbidden:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.UpdateAssessment400JSONResponse{Message: err.Error()}, nil
@@ -243,40 +213,23 @@ func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.De
 		WithUUID("assessment_id", request.Id).
 		Build()
 
-	user := auth.MustHaveUser(ctx)
-	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
-
 	assessmentID := request.Id
 
-	// Get assessment to check ownership
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
-	if err != nil {
+	if err := h.assessmentSrv.DeleteAssessment(ctx, assessmentID); err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_delete").Log()
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.DeleteAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.DeleteAssessment403JSONResponse{Message: err.Error()}, nil
 		default:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).WithString("step", "get_for_delete").Log()
-			return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err)}, nil
 		}
 	}
 
-	logger.Step("assessment_retrieved_for_delete").WithString("assessment_name", assessment.Name).Log()
-
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to delete assessment %s by user with %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).WithUUID("assessment_id", assessmentID).WithString("username", user.Username).WithString("assessment_username", assessment.Username).Log()
-		return server.DeleteAssessment403JSONResponse{Message: message}, nil
-	}
-
-	logger.Step("authorization_check_passed").Log()
-
-	if err := h.assessmentSrv.DeleteAssessment(ctx, assessmentID); err != nil {
-		logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-		return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err)}, nil
-	}
-
-	logger.Success().WithString("deleted_assessment_name", assessment.Name).Log()
+	logger.Success().WithUUID("assessment_id", assessmentID).Log()
 	return server.DeleteAssessment200JSONResponse{}, nil
 }
 

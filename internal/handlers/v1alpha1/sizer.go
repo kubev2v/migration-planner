@@ -103,22 +103,19 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		}
 	}
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
+	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateAssessmentClusterRequirements404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.CalculateAssessmentClusterRequirements403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateAssessmentClusterRequirements500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
-	}
-
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
-		return server.CalculateAssessmentClusterRequirements403JSONResponse{Message: message}, nil
 	}
 
 	if err := h.sizerSrv.Health(ctx); err != nil {

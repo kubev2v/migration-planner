@@ -7,6 +7,14 @@ import (
 	"github.com/google/uuid"
 )
 
+type ErrForbidden struct {
+	error
+}
+
+func NewErrForbidden(resource string, id string) *ErrForbidden {
+	return &ErrForbidden{fmt.Errorf("forbidden: insufficient permissions on %s %s", resource, id)}
+}
+
 type ErrInvalidVCenterID struct {
 	error
 }

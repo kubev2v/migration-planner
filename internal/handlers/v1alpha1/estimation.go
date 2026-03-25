@@ -37,22 +37,18 @@ func (h *ServiceHandler) CalculateMigrationComplexity(ctx context.Context, reque
 		return server.CalculateMigrationComplexity400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
-	if err != nil {
+	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationComplexity404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.CalculateMigrationComplexity403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationComplexity500JSONResponse{Message: "failed to get assessment"}, nil
 		}
-	}
-
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
-		return server.CalculateMigrationComplexity403JSONResponse{Message: message}, nil
 	}
 
 	result, err := h.estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
@@ -100,24 +96,18 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		return server.CalculateMigrationEstimation400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
-	// Get assessment to verify ownership
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
-	if err != nil {
+	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.CalculateMigrationEstimation403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to get assessment"}, nil
 		}
-	}
-
-	// Verify user owns the assessment
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		message := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
-		return server.CalculateMigrationEstimation403JSONResponse{Message: message}, nil
 	}
 
 	// Parse optional estimation schemas from request body
