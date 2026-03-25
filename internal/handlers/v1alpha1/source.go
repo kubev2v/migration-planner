@@ -17,7 +17,7 @@ import (
 
 type ServiceHandler struct {
 	sourceSrv     *service.SourceService
-	assessmentSrv *service.AssessmentService
+	assessmentSrv service.AssessmentServicer
 	jobSrv        *service.JobService
 	sizerSrv      *service.SizerService
 	estimationSrv *service.EstimationService
@@ -25,7 +25,7 @@ type ServiceHandler struct {
 
 func NewServiceHandler(
 	sourceService *service.SourceService,
-	a *service.AssessmentService,
+	a service.AssessmentServicer,
 	j *service.JobService,
 	sizer *service.SizerService,
 	estimation *service.EstimationService,

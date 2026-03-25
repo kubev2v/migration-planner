@@ -27,7 +27,6 @@ var _ = Describe("migrations", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-
 	})
 
 	AfterAll(func() {
@@ -38,7 +37,6 @@ var _ = Describe("migrations", Ordered, func() {
 		It("fails to migration the db -- migration folder does not exists", func() {
 			err := migrations.MigrateStore(gormdb, "some folder")
 			Expect(err).NotTo(BeNil())
-
 		})
 
 		It("sucessfully migrate the db", func() {
@@ -56,12 +54,13 @@ var _ = Describe("migrations", Ordered, func() {
 				return exists
 			}
 
-			for _, table := range []string{"agents", "sources", "keys", "image_infras", "assessments"} {
+			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments"} {
 				Expect(tableExists(table)).To(BeTrue())
 			}
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DROP TABLE IF EXISTS relations;")
 			gormdb.Exec("DROP TABLE IF EXISTS snapshots;")
 			gormdb.Exec("DROP TABLE IF EXISTS assessments;")
 			gormdb.Exec("DROP TABLE IF EXISTS agents;")

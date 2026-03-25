@@ -12,6 +12,7 @@ type contextKey int
 
 const (
 	transactionKey contextKey = iota
+	txOwnerKey
 )
 
 type Tx struct {
@@ -25,6 +26,10 @@ func Commit(ctx context.Context) (context.Context, error) {
 		return ctx, nil
 	}
 
+	if owner, _ := ctx.Value(txOwnerKey).(bool); !owner {
+		return ctx, nil
+	}
+
 	newCtx := context.WithValue(ctx, transactionKey, nil)
 	return newCtx, tx.Commit()
 }
@@ -32,6 +37,10 @@ func Commit(ctx context.Context) (context.Context, error) {
 func Rollback(ctx context.Context) (context.Context, error) {
 	tx, ok := ctx.Value(transactionKey).(*Tx)
 	if !ok {
+		return ctx, nil
+	}
+
+	if owner, _ := ctx.Value(txOwnerKey).(bool); !owner {
 		return ctx, nil
 	}
 
@@ -52,7 +61,8 @@ func newTransactionContext(ctx context.Context, db *gorm.DB) (context.Context, e
 	//look into the context to see if we have another tx
 	_, found := ctx.Value(transactionKey).(*Tx)
 	if found {
-		return ctx, nil
+		// Join existing transaction as non-owner
+		return context.WithValue(ctx, txOwnerKey, false), nil
 	}
 
 	// create a new session
@@ -66,6 +76,7 @@ func newTransactionContext(ctx context.Context, db *gorm.DB) (context.Context, e
 	}
 
 	ctx = context.WithValue(ctx, transactionKey, tx)
+	ctx = context.WithValue(ctx, txOwnerKey, true)
 	return ctx, nil
 }
 

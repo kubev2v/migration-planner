@@ -1,6 +1,7 @@
 package store
 
 import (
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -94,6 +95,13 @@ func NewAssessmentQueryFilter() *AssessmentQueryFilter {
 
 func NewAssessmentQueryOptions() *AssessmentQueryOptions {
 	return &AssessmentQueryOptions{}
+}
+
+func (f *AssessmentQueryFilter) WithIDs(ids []uuid.UUID) *AssessmentQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id IN ?", ids)
+	})
+	return f
 }
 
 // Filter by username

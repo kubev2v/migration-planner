@@ -10,6 +10,7 @@ import (
 type Store interface {
 	NewTransactionContext(ctx context.Context) (context.Context, error)
 	Agent() Agent
+	Authz() Authz
 	Source() Source
 	ImageInfra() ImageInfra
 	PrivateKey() PrivateKey
@@ -22,6 +23,7 @@ type Store interface {
 
 type DataStore struct {
 	agent      Agent
+	authz      Authz
 	db         *gorm.DB
 	source     Source
 	imageInfra ImageInfra
@@ -40,12 +42,17 @@ func NewStore(db *gorm.DB) Store {
 		label:      NewLabelStore(db),
 		assessment: NewAssessmentStore(db),
 		job:        NewJobStore(db),
+		authz:      NewAuthzStore(db),
 		db:         db,
 	}
 }
 
 func (s *DataStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
 	return newTransactionContext(ctx, s.db)
+}
+
+func (s *DataStore) Authz() Authz {
+	return s.authz
 }
 
 func (s *DataStore) Source() Source {
@@ -85,6 +92,12 @@ func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error
 }
 
 func (s *DataStore) Close() error {
+	if s.authz != nil {
+		if err := s.authz.Close(); err != nil {
+			return err
+		}
+	}
+
 	sqlDB, err := s.db.DB()
 	if err != nil {
 		return err

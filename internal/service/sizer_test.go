@@ -35,6 +35,10 @@ func (m *MockStore) Assessment() store.Assessment {
 	return &MockAssessmentStore{store: m}
 }
 
+func (m *MockStore) Authz() store.Authz {
+	return nil
+}
+
 func (m *MockStore) Source() store.Source {
 	return nil
 }

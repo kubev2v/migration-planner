@@ -172,9 +172,15 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
+	var assessmentSvc service.AssessmentServicer
+	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator)
+	if s.cfg.Service.Auth.AuthenticationType != "none" {
+		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
+	}
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
-		service.NewAssessmentService(s.store, s.opaValidator),
+		assessmentSvc,
 		service.NewJobService(s.store, s.jobsClient.RiverClient),
 		service.NewSizerService(sizerClient, s.store),
 		service.NewEstimationService(s.store),

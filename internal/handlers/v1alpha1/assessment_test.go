@@ -783,12 +783,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment owned by different user", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
-			Expect(tx.Error).To(BeNil())
-
-			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
-			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -797,7 +791,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), &ForbiddenAssessmentService{}, nil, service.NewSizerService(nil, s), nil)
 			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment403JSONResponse{}).String()))
@@ -887,12 +881,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment owned by different user", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
-			Expect(tx.Error).To(BeNil())
-
-			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
-			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -901,7 +889,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), &ForbiddenAssessmentService{}, nil, service.NewSizerService(nil, s), nil)
 			hackedName := "hacked-name"
 			resp, err := srv.UpdateAssessment(ctx, server.UpdateAssessmentRequestObject{
 				Id: assessmentID,
@@ -1086,12 +1074,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 		It("returns 403 for assessment owned by different user", func() {
 			assessmentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "batman-assessment", "batman", "batman", "Bruce", "Wayne", service.SourceTypeInventory, "NULL"))
-			Expect(tx.Error).To(BeNil())
-
-			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
-			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -1100,16 +1082,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil), nil, service.NewSizerService(nil, s), nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), &ForbiddenAssessmentService{}, nil, service.NewSizerService(nil, s), nil)
 			resp, err := srv.DeleteAssessment(ctx, server.DeleteAssessmentRequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteAssessment403JSONResponse{}).String()))
-
-			// Verify assessment still exists (wasn't deleted by different user)
-			count := 0
-			tx = gormdb.Raw("SELECT COUNT(*) FROM assessments WHERE id = ?", assessmentID.String()).Scan(&count)
-			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(1))
 		})
 
 		AfterEach(func() {

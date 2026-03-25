@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
@@ -36,6 +37,34 @@ func NewMockStore() *MockStore {
 
 func (m *MockStore) Assessment() store.Assessment {
 	return &MockAssessmentStore{store: m}
+}
+
+func (m *MockStore) Authz() store.Authz {
+	return nil
+}
+
+// ForbiddenAssessmentService is a mock AssessmentServicer that returns ErrForbidden
+// from all methods. Used to test handler 403 responses.
+type ForbiddenAssessmentService struct{}
+
+func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]model.Assessment, error) {
+	return nil, service.NewErrForbidden("assessment", "list")
+}
+
+func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappers.AssessmentCreateForm) (*model.Assessment, error) {
+	return nil, service.NewErrForbidden("assessment", "create")
+}
+
+func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*model.Assessment, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) DeleteAssessment(_ context.Context, id uuid.UUID) error {
+	return service.NewErrForbidden("assessment", id.String())
 }
 
 func (m *MockStore) Source() store.Source {
@@ -979,13 +1008,11 @@ var _ = Describe("sizer handler", func() {
 					WorkerNodeMemory:      16,
 				}
 
-				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, "different-user", user.Organization, clusterID)
-				// Create handler with mockStore
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					&ForbiddenAssessmentService{},
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1011,13 +1038,11 @@ var _ = Describe("sizer handler", func() {
 					WorkerNodeMemory:      16,
 				}
 
-				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, "different-org", clusterID)
-				// Create handler with mockStore
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					&ForbiddenAssessmentService{},
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
