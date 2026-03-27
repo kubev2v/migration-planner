@@ -9,6 +9,8 @@ This guide provides instructions for setting up and running the OpenShift Migrat
 - Docker or Podman
 - Git
 
+Additional system packages (Fedora / RHEL): `gcc-c++`, `libstdc++-devel`, `podman-compose`
+
 ## Clone the repository
 
 ```bash
