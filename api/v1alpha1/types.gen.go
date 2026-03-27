@@ -47,6 +47,26 @@ const (
 	MemoryOneToTwo  ClusterRequirementsRequestMemoryOverCommitRatio = "1:2"
 )
 
+// Defines values for GroupKind.
+const (
+	GroupKindAdmin   GroupKind = "admin"
+	GroupKindPartner GroupKind = "partner"
+)
+
+// Defines values for GroupCreateKind.
+const (
+	GroupCreateKindAdmin   GroupCreateKind = "admin"
+	GroupCreateKindPartner GroupCreateKind = "partner"
+)
+
+// Defines values for IdentityKind.
+const (
+	IdentityKindAdmin    IdentityKind = "admin"
+	IdentityKindCustomer IdentityKind = "customer"
+	IdentityKindPartner  IdentityKind = "partner"
+	IdentityKindRegular  IdentityKind = "regular"
+)
+
 // Defines values for JobStatus.
 const (
 	Cancelled  JobStatus = "cancelled"
@@ -63,6 +83,12 @@ const (
 	Dvswitch    NetworkType = "dvswitch"
 	Standard    NetworkType = "standard"
 	Unsupported NetworkType = "unsupported"
+)
+
+// Defines values for ListGroupsParamsKind.
+const (
+	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
+	ListGroupsParamsKindPartner ListGroupsParamsKind = "partner"
 )
 
 // Agent defines model for Agent.
@@ -288,6 +314,44 @@ type EstimationDetail struct {
 	Reason string `json:"reason"`
 }
 
+// Group defines model for Group.
+type Group struct {
+	Company     string             `json:"company"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	Description *string            `json:"description,omitempty"`
+	Icon        string             `json:"icon"`
+	Id          openapi_types.UUID `json:"id"`
+	Kind        GroupKind          `json:"kind"`
+	Name        string             `json:"name"`
+	UpdatedAt   time.Time          `json:"updatedAt"`
+}
+
+// GroupKind defines model for Group.Kind.
+type GroupKind string
+
+// GroupCreate defines model for GroupCreate.
+type GroupCreate struct {
+	Company     string          `json:"company" validate:"required"`
+	Description string          `json:"description" validate:"required"`
+	Icon        string          `json:"icon" validate:"required"`
+	Kind        GroupCreateKind `json:"kind" validate:"required,oneof=partner admin"`
+	Name        string          `json:"name" validate:"required"`
+}
+
+// GroupCreateKind defines model for GroupCreate.Kind.
+type GroupCreateKind string
+
+// GroupList defines model for GroupList.
+type GroupList = []Group
+
+// GroupUpdate defines model for GroupUpdate.
+type GroupUpdate struct {
+	Company     *string `json:"company,omitempty" validate:"omitempty"`
+	Description *string `json:"description,omitempty" validate:"omitempty"`
+	Icon        *string `json:"icon,omitempty"`
+	Name        *string `json:"name,omitempty" validate:"omitempty"`
+}
+
 // Histogram defines model for Histogram.
 type Histogram struct {
 	Data     []int `json:"data"`
@@ -311,6 +375,17 @@ type Host struct {
 	Model    string `json:"model"`
 	Vendor   string `json:"vendor"`
 }
+
+// Identity defines model for Identity.
+type Identity struct {
+	GroupId   *string      `json:"groupId"`
+	Kind      IdentityKind `json:"kind"`
+	PartnerId *string      `json:"partnerId"`
+	Username  string       `json:"username"`
+}
+
+// IdentityKind defines model for Identity.Kind.
+type IdentityKind string
 
 // Info OpenShift Migration Advisor information
 type Info struct {
@@ -421,6 +496,29 @@ type JobStatus string
 type Label struct {
 	Key   string `json:"key" validate:"required,label"`
 	Value string `json:"value" validate:"required,label"`
+}
+
+// Member defines model for Member.
+type Member struct {
+	CreatedAt time.Time           `json:"createdAt"`
+	Email     openapi_types.Email `json:"email"`
+	GroupId   openapi_types.UUID  `json:"groupId"`
+	UpdatedAt *time.Time          `json:"updatedAt,omitempty"`
+	Username  string              `json:"username"`
+}
+
+// MemberCreate defines model for MemberCreate.
+type MemberCreate struct {
+	Email    openapi_types.Email `json:"email" validate:"required,email"`
+	Username string              `json:"username" validate:"required"`
+}
+
+// MemberList defines model for MemberList.
+type MemberList = []Member
+
+// MemberUpdate defines model for MemberUpdate.
+type MemberUpdate struct {
+	Email *openapi_types.Email `json:"email,omitempty" validate:"omitempty,email"`
 }
 
 // MigrationComplexityRequest Request payload for calculating migration complexity estimation
@@ -737,6 +835,21 @@ type ListAssessmentsParams struct {
 	SourceId *openapi_types.UUID `form:"sourceId,omitempty" json:"sourceId,omitempty"`
 }
 
+// ListGroupsParams defines parameters for ListGroups.
+type ListGroupsParams struct {
+	// Kind Filter by group kind
+	Kind *ListGroupsParamsKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Name Filter by name (case-insensitive partial match)
+	Name *string `form:"name,omitempty" json:"name,omitempty"`
+
+	// Company Filter by company (case-insensitive partial match)
+	Company *string `form:"company,omitempty" json:"company,omitempty"`
+}
+
+// ListGroupsParamsKind defines parameters for ListGroups.
+type ListGroupsParamsKind string
+
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
@@ -757,6 +870,18 @@ type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
 
 // CalculateMigrationEstimationByComplexityJSONRequestBody defines body for CalculateMigrationEstimationByComplexity for application/json ContentType.
 type CalculateMigrationEstimationByComplexityJSONRequestBody = MigrationEstimationRequest
+
+// CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
+type CreateGroupJSONRequestBody = GroupCreate
+
+// UpdateGroupJSONRequestBody defines body for UpdateGroup for application/json ContentType.
+type UpdateGroupJSONRequestBody = GroupUpdate
+
+// CreateGroupMemberJSONRequestBody defines body for CreateGroupMember for application/json ContentType.
+type CreateGroupMemberJSONRequestBody = MemberCreate
+
+// UpdateGroupMemberJSONRequestBody defines body for UpdateGroupMember for application/json ContentType.
+type UpdateGroupMemberJSONRequestBody = MemberUpdate
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate

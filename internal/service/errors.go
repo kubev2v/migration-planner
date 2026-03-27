@@ -39,6 +39,10 @@ func NewErrAgentNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "agent")
 }
 
+func NewErrMemberNotFound(username string) *ErrResourceNotFound {
+	return &ErrResourceNotFound{fmt.Errorf("member %s not found", username)}
+}
+
 type ErrFileCorrupted struct {
 	error
 }
@@ -89,6 +93,14 @@ type ErrInventoryHasNoVMs struct {
 
 func NewErrInventoryHasNoVMs() *ErrInventoryHasNoVMs {
 	return &ErrInventoryHasNoVMs{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
+}
+
+type ErrMembershipMismatch struct {
+	error
+}
+
+func NewErrMembershipMismatch(username string, groupID uuid.UUID) *ErrMembershipMismatch {
+	return &ErrMembershipMismatch{fmt.Errorf("member %s does not belong to group %s", username, groupID)}
 }
 
 type ErrDuplicateKey struct {
