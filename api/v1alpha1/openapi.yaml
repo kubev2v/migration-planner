@@ -1027,6 +1027,440 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/identity:
+    get:
+      tags:
+        - account
+      description: Returns the authenticated user's profile. If a local account exists, returns stored user data. Otherwise returns a synthesized regular user.
+      operationId: getIdentity
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Identity"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/groups:
+    get:
+      tags:
+        - account
+      description: List all groups
+      operationId: listGroups
+      parameters:
+        - name: kind
+          in: query
+          description: Filter by group kind
+          required: false
+          schema:
+            type: string
+            enum: [partner, admin]
+        - name: name
+          in: query
+          description: Filter by name (case-insensitive partial match)
+          required: false
+          schema:
+            type: string
+        - name: company
+          in: query
+          description: Filter by company (case-insensitive partial match)
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - account
+      description: Create a group
+      operationId: createGroup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupCreate"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/groups/{id}:
+    get:
+      tags:
+        - account
+      description: Get a group by ID
+      operationId: getGroup
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      tags:
+        - account
+      description: Update a group
+      operationId: updateGroup
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GroupUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - account
+      description: Delete a group
+      operationId: deleteGroup
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/groups/{id}/members:
+    get:
+      tags:
+        - account
+      description: List members in a group
+      operationId: listGroupMembers
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemberList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      tags:
+        - account
+      description: Create a member in a group
+      operationId: createGroupMember
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberCreate"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/groups/{id}/members/{username}:
+    put:
+      tags:
+        - account
+      description: Update a member in a group
+      operationId: updateGroupMember
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: username
+          in: path
+          description: Username of the member
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemberUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Member"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - account
+      description: >
+        Delete the member record from the specified group.
+        Because a member must always belong to a group,
+        this operation permanently deletes the member — not just the membership.
+      operationId: removeGroupMember
+      parameters:
+        - name: id
+          in: path
+          description: ID of the group
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: username
+          in: path
+          description: Username of the member
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /health:
     get:
       tags:
@@ -1790,6 +2224,163 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Assessment"
+
+    Group:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+          enum: [partner, admin]
+        icon:
+          type: string
+        company:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - kind
+        - icon
+        - company
+        - createdAt
+        - updatedAt
+
+    GroupCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        description:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        kind:
+          type: string
+          enum: [partner, admin]
+          x-oapi-codegen-extra-tags:
+            validate: "required,oneof=partner admin"
+        icon:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        company:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
+        - name
+        - icon
+        - description
+        - kind
+        - company
+
+    GroupUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty"
+        description:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty"
+        icon:
+          type: string
+        company:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty"
+
+    GroupList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Group"
+
+    Member:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        groupId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - username
+        - groupId
+        - email
+        - createdAt
+
+    MemberCreate:
+      type: object
+      properties:
+        username:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            validate: "required,email"
+      required:
+        - username
+        - email
+
+    MemberUpdate:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,email"
+
+    Identity:
+      type: object
+      properties:
+        username:
+          type: string
+        kind:
+          type: string
+          enum: [partner, customer, regular, admin]
+        groupId:
+          type: string
+          nullable: true
+        partnerId:
+          type: string
+          nullable: true
+      required:
+        - username
+        - kind
+
+    MemberList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Member"
 
     ClusterRequirementsRequest:
       type: object

@@ -184,6 +184,7 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewJobService(s.store, s.jobsClient.RiverClient),
 		service.NewSizerService(sizerClient, s.store),
 		service.NewEstimationService(s.store),
+		service.NewAccountsService(s.store),
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}

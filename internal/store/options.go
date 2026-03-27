@@ -167,3 +167,54 @@ func (o *AssessmentQueryOptions) WithOrder(order string) *AssessmentQueryOptions
 	})
 	return o
 }
+
+// Group filters
+
+type GroupQueryFilter BaseQuerier
+
+func NewGroupQueryFilter() *GroupQueryFilter {
+	return &GroupQueryFilter{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
+}
+
+func (f *GroupQueryFilter) ByKind(kind string) *GroupQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("kind = ?", kind)
+	})
+	return f
+}
+
+func (f *GroupQueryFilter) ByParentID(id uuid.UUID) *GroupQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("parent_id = ?", id)
+	})
+	return f
+}
+
+func (f *GroupQueryFilter) ByName(name string) *GroupQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("name ILIKE ?", "%"+name+"%")
+	})
+	return f
+}
+
+func (f *GroupQueryFilter) ByCompany(company string) *GroupQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("company ILIKE ?", "%"+company+"%")
+	})
+	return f
+}
+
+// Member filters
+
+type MemberQueryFilter BaseQuerier
+
+func NewMemberQueryFilter() *MemberQueryFilter {
+	return &MemberQueryFilter{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
+}
+
+func (f *MemberQueryFilter) ByGroupID(id uuid.UUID) *MemberQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("group_id = ?", id)
+	})
+	return f
+}

@@ -72,6 +72,10 @@ func (m *MockStore) Statistics(ctx context.Context) (model.InventoryStats, error
 	return model.InventoryStats{}, nil
 }
 
+func (m *MockStore) Accounts() store.Accounts {
+	return nil
+}
+
 func (m *MockStore) Close() error {
 	return nil
 }
