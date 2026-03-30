@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -114,29 +115,9 @@ func (es *EstimationService) CalculateMigrationEstimation(
 
 	tracer.Step("mapped_params").WithInt("param_count", len(params)).Log()
 
-	engineMap, err := engines.BuildEngines(schemas)
+	results, err := es.RunEstimation(schemas, params)
 	if err != nil {
-		return nil, &ErrInvalidSchema{Msg: err.Error()}
-	}
-
-	results := make(map[engines.Schema]*MigrationAssessmentResult, len(engineMap))
-	for schema, engine := range engineMap {
-		breakdown := engine.Run(params)
-		var minTotal, maxTotal time.Duration
-		for _, est := range breakdown {
-			if est.IsRanged() {
-				minTotal += *est.MinDuration
-				maxTotal += *est.MaxDuration
-			} else {
-				minTotal += *est.Duration
-				maxTotal += *est.Duration
-			}
-		}
-		results[schema] = &MigrationAssessmentResult{
-			MinTotalDuration: minTotal,
-			MaxTotalDuration: maxTotal,
-			Breakdown:        breakdown,
-		}
+		return nil, err
 	}
 
 	tracer.Success().
@@ -243,6 +224,25 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 	}, nil
 }
 
+// buildComplexityByOsDisk converts the sparse ComplexityDistribution map (string score → DiskSizeTierSummary)
+// into a []OSDiskEntry in canonical score order (0–4). Absent scores carry VMCount == 0 and TotalSizeTB == 0.
+func buildComplexityByOsDisk(dist *map[string]api.DiskSizeTierSummary) []complexity.OSDiskEntry {
+	result := make([]complexity.OSDiskEntry, len(complexity.OSScores))
+	for i, s := range complexity.OSScores {
+		var vmCount int
+		var totalSizeTB float64
+		if dist != nil {
+			key := strconv.Itoa(s)
+			if entry, ok := (*dist)[key]; ok {
+				vmCount = entry.VmCount
+				totalSizeTB = entry.TotalSizeTB
+			}
+		}
+		result[i] = complexity.OSDiskEntry{Score: s, VMCount: vmCount, TotalSizeTB: totalSizeTB}
+	}
+	return result
+}
+
 // ParamDefinition describes a single calculator parameter that can be supplied
 // by the user to override the default or inventory-derived value.
 //
@@ -340,4 +340,107 @@ func (es *EstimationService) mapClusterToParams(clusterInventory api.InventoryDa
 		{Key: calculators.ParamTotalDiskGB, Value: float64(clusterInventory.Vms.DiskGB.Total)},
 		{Key: calculators.ParamVMCount, Value: clusterInventory.Vms.Total},
 	}
+}
+
+// OsDiskComplexityResult holds the OsDisk complexity buckets for one cluster.
+type OsDiskComplexityResult struct {
+	Buckets []complexity.OSDiskEntry
+}
+
+// CalculateOsDiskComplexity fetches the cluster inventory and returns the
+// combined OS+Disk complexity distribution. Used by the by-complexity handler.
+func (es *EstimationService) CalculateOsDiskComplexity(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	clusterID string,
+) (*OsDiskComplexityResult, error) {
+	logger := es.logger.WithContext(ctx)
+	tracer := logger.Operation("calculate_osdisk_complexity").
+		WithUUID("assessment_id", assessmentID).
+		WithString("cluster_id", clusterID).
+		Build()
+
+	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			tracer.Error(err).Log()
+			return nil, NewErrAssessmentNotFound(assessmentID)
+		}
+		tracer.Error(err).Log()
+		return nil, fmt.Errorf("failed to get assessment: %w", err)
+	}
+	if len(assessment.Snapshots) == 0 {
+		return nil, fmt.Errorf("assessment has no snapshots")
+	}
+	latestSnapshot := assessment.Snapshots[0]
+	if len(latestSnapshot.Inventory) == 0 {
+		return nil, fmt.Errorf("latest snapshot has empty inventory")
+	}
+
+	var inventory api.Inventory
+	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
+		return nil, fmt.Errorf("failed to parse inventory: %w", err)
+	}
+	if len(inventory.Clusters) == 0 {
+		return nil, fmt.Errorf("inventory has no clusters")
+	}
+	clusterInventory, exists := inventory.Clusters[clusterID]
+	if !exists {
+		return nil, NewErrClusterNotFound(clusterID, assessmentID)
+	}
+
+	buckets := buildComplexityByOsDisk(clusterInventory.Vms.ComplexityDistribution)
+	tracer.Success().Log()
+	return &OsDiskComplexityResult{Buckets: buckets}, nil
+}
+
+// EstimationContext carries the parameters used to compute per-bucket estimates.
+type EstimationContext struct {
+	Schemas    []engines.Schema
+	BaseParams []estimation.Param // scalar params only; excludes per-bucket vmCount/diskGB
+}
+
+// BuildBaseParams returns the merged base params (defaults + user overrides),
+// without any per-bucket inventory values.
+func (es *EstimationService) BuildBaseParams(userParams []estimation.Param) []estimation.Param {
+	return mergeParams(defaultParams(), userParams)
+}
+
+// BuildBucketParams returns params for a single complexity bucket.
+// diskGB = bucket.TotalSizeTB * 1000 (decimal TB as reported by VMware).
+func (es *EstimationService) BuildBucketParams(baseParams []estimation.Param, vmCount int, diskGB float64) []estimation.Param {
+	return mergeParams(baseParams, []estimation.Param{
+		{Key: calculators.ParamVMCount, Value: vmCount},
+		{Key: calculators.ParamTotalDiskGB, Value: diskGB},
+	})
+}
+
+// RunEstimation builds engines from schemas and runs them with the provided
+// fully-merged params. Performs no store access.
+// When schemas is empty, engines.BuildEngines uses all known schemas.
+func (es *EstimationService) RunEstimation(schemas []engines.Schema, params []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error) {
+	engineMap, err := engines.BuildEngines(schemas)
+	if err != nil {
+		return nil, &ErrInvalidSchema{Msg: err.Error()}
+	}
+	results := make(map[engines.Schema]*MigrationAssessmentResult, len(engineMap))
+	for schema, engine := range engineMap {
+		breakdown := engine.Run(params)
+		var minTotal, maxTotal time.Duration
+		for _, est := range breakdown {
+			if est.IsRanged() {
+				minTotal += *est.MinDuration
+				maxTotal += *est.MaxDuration
+			} else {
+				minTotal += *est.Duration
+				maxTotal += *est.Duration
+			}
+		}
+		results[schema] = &MigrationAssessmentResult{
+			MinTotalDuration: minTotal,
+			MaxTotalDuration: maxTotal,
+			Breakdown:        breakdown,
+		}
+	}
+	return results, nil
 }

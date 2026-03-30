@@ -86,6 +86,15 @@ var _ = Describe("ScoreDiskTierLabel", func() {
 	)
 })
 
+var _ = Describe("OSDiskEntry", func() {
+	It("OSDiskEntry has Score, VMCount, TotalSizeTB fields", func() {
+		entry := complexity.OSDiskEntry{Score: 2, VMCount: 10, TotalSizeTB: 5.5}
+		Expect(entry.Score).To(Equal(2))
+		Expect(entry.VMCount).To(Equal(10))
+		Expect(entry.TotalSizeTB).To(Equal(5.5))
+	})
+})
+
 var _ = Describe("OSBreakdown", func() {
 	It("always returns exactly 5 entries in score order 0–4", func() {
 		result := complexity.OSBreakdown([]complexity.VMOsEntry{})
@@ -382,6 +391,75 @@ var _ = Describe("OSNameBreakdown and OSBreakdown consistency", func() {
 			Expect(sumByScore[scoreEntry.Score]).To(Equal(scoreEntry.VMCount),
 				"score %d: OSNameBreakdown sum (%d) should match OSBreakdown total (%d)",
 				scoreEntry.Score, sumByScore[scoreEntry.Score], scoreEntry.VMCount)
+		}
+	})
+})
+
+var _ = Describe("CombineComplexity", func() {
+	DescribeTable("ComplexityMatrix cells",
+		func(osScore, diskScore, expected int) {
+			Expect(complexity.CombineComplexity(osScore, diskScore)).To(Equal(expected))
+		},
+		// OS score 0 (unknown) — all disk scores yield 0
+		Entry("os=0 disk=1", 0, 1, 0),
+		Entry("os=0 disk=2", 0, 2, 0),
+		Entry("os=0 disk=3", 0, 3, 0),
+		Entry("os=0 disk=4", 0, 4, 0),
+		// OS score 1 (easy)
+		Entry("os=1 disk=1", 1, 1, 1),
+		Entry("os=1 disk=2", 1, 2, 1),
+		Entry("os=1 disk=3", 1, 3, 3),
+		Entry("os=1 disk=4", 1, 4, 3),
+		// OS score 2 (medium)
+		Entry("os=2 disk=1", 2, 1, 2),
+		Entry("os=2 disk=2", 2, 2, 2),
+		Entry("os=2 disk=3", 2, 3, 3),
+		Entry("os=2 disk=4", 2, 4, 3),
+		// OS score 3 (hard)
+		Entry("os=3 disk=1", 3, 1, 2),
+		Entry("os=3 disk=2", 3, 2, 2),
+		Entry("os=3 disk=3", 3, 3, 3),
+		Entry("os=3 disk=4", 3, 4, 3),
+		// OS score 4 (database/white-glove)
+		Entry("os=4 disk=1", 4, 1, 4),
+		Entry("os=4 disk=2", 4, 2, 4),
+		Entry("os=4 disk=3", 4, 3, 4),
+		Entry("os=4 disk=4", 4, 4, 4),
+	)
+
+	It("returns 0 for an unmapped OS score", func() {
+		Expect(complexity.CombineComplexity(99, 1)).To(Equal(0))
+	})
+})
+
+var _ = Describe("ComplexityMatrix", func() {
+	It("has a row for every OS score in OSScores", func() {
+		for _, osScore := range complexity.OSScores {
+			Expect(complexity.ComplexityMatrix).To(HaveKey(osScore),
+				"ComplexityMatrix missing row for OS score %d", osScore)
+		}
+	})
+
+	It("has a column for every disk score in DiskScores in every row", func() {
+		for _, osScore := range complexity.OSScores {
+			inner := complexity.ComplexityMatrix[osScore]
+			for _, diskScore := range complexity.DiskScores {
+				Expect(inner).To(HaveKey(diskScore),
+					"ComplexityMatrix missing column disk=%d for OS score %d", diskScore, osScore)
+			}
+		}
+	})
+
+	It("matrix values match CombineComplexity for all cells", func() {
+		for _, osScore := range complexity.OSScores {
+			inner := complexity.ComplexityMatrix[osScore]
+			for _, diskScore := range complexity.DiskScores {
+				matrixVal := inner[diskScore]
+				combined := complexity.CombineComplexity(osScore, diskScore)
+				Expect(combined).To(Equal(matrixVal),
+					"CombineComplexity(%d,%d)=%d does not match ComplexityMatrix[%d][%d]=%d",
+					osScore, diskScore, combined, osScore, diskScore, matrixVal)
+			}
 		}
 	})
 })

@@ -61,15 +61,16 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 
 // queryParams holds all template parameters for queries.
 type queryParams struct {
-	NetworkColumns   string
-	ClusterFilter    string
-	OSFilter         string
-	PowerStateFilter string
-	VmIDFilter       string
-	Category         string
-	OSCaseClauses    string
-	Limit            int
-	Offset           int
+	NetworkColumns          string
+	ClusterFilter           string
+	OSFilter                string
+	PowerStateFilter        string
+	VmIDFilter              string
+	Category                string
+	OSCaseClauses           string
+	ComplexityMatrixClauses string
+	Limit                   int
+	Offset                  int
 }
 
 // VMQuery builds the VM query with filters and pagination.
@@ -349,10 +350,58 @@ func generateOSCaseClauses() string {
 	return strings.Join(clauses, "\n")
 }
 
+// generateComplexityMatrixCaseClauses reads complexity.ComplexityMatrix and generates
+// SQL WHEN clauses for the combined OS+disk complexity CASE expression.
+func generateComplexityMatrixCaseClauses() string {
+	osScoreToLevel := map[complexity.Score]string{
+		0: "unsupported",
+		1: "easy",
+		2: "medium",
+		3: "hard",
+		4: "database",
+	}
+	diskScoreToLevel := map[complexity.Score]string{
+		1: "easy",
+		2: "medium",
+		3: "hard",
+		4: "whiteglove",
+	}
+
+	// Collect and sort outer (OS) keys for deterministic output.
+	osKeys := make([]complexity.Score, 0, len(complexity.ComplexityMatrix))
+	for osScore := range complexity.ComplexityMatrix {
+		osKeys = append(osKeys, osScore)
+	}
+	sort.Ints(osKeys)
+
+	var clauses []string
+	for _, osScore := range osKeys {
+		inner := complexity.ComplexityMatrix[osScore]
+		osLevel := osScoreToLevel[osScore]
+
+		// Collect and sort inner (disk) keys for deterministic output.
+		diskKeys := make([]complexity.Score, 0, len(inner))
+		for diskScore := range inner {
+			diskKeys = append(diskKeys, diskScore)
+		}
+		sort.Ints(diskKeys)
+
+		for _, diskScore := range diskKeys {
+			combined := inner[diskScore]
+			diskLevel := diskScoreToLevel[diskScore]
+			clauses = append(clauses, fmt.Sprintf(
+				"            WHEN o.os_level = '%s' AND dl.disk_level = '%s' THEN %d",
+				osLevel, diskLevel, combined))
+		}
+	}
+	return strings.Join(clauses, "\n")
+}
+
 // PopulateComplexityQuery returns a query that computes and stores per-VM migration complexity.
 func (b *QueryBuilder) PopulateComplexityQuery() (string, error) {
 	params := queryParams{
-		OSCaseClauses: generateOSCaseClauses(),
+		OSCaseClauses:           generateOSCaseClauses(),
+		ComplexityMatrixClauses: generateComplexityMatrixCaseClauses(),
 	}
 	return b.buildQuery("populate_complexity", mustGetTemplate("populate_complexity"), params)
 }

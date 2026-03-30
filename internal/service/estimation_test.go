@@ -50,6 +50,60 @@ func createTestInventoryForComplexity(clusterID string, osInfo *map[string]api.O
 	return data
 }
 
+func buildComplexityDistribution(entries map[string]api.DiskSizeTierSummary) *map[string]api.DiskSizeTierSummary {
+	return &entries
+}
+
+func createTestInventoryWithComplexityDistribution(
+	clusterID string,
+	osInfo *map[string]api.OsInfo,
+	diskSizeTier *map[string]api.DiskSizeTierSummary,
+	dist *map[string]api.DiskSizeTierSummary,
+) []byte {
+	inventory := api.Inventory{
+		Clusters: map[string]api.InventoryData{
+			clusterID: {
+				Vms: api.VMs{
+					Total:                  10,
+					OsInfo:                 osInfo,
+					DiskSizeTier:           diskSizeTier,
+					ComplexityDistribution: dist,
+					DiskGB:                 api.VMResourceBreakdown{Total: 100},
+					CpuCores:               api.VMResourceBreakdown{Total: 40},
+					RamGB:                  api.VMResourceBreakdown{Total: 80},
+				},
+			},
+		},
+	}
+	data, err := json.Marshal(inventory)
+	Expect(err).ToNot(HaveOccurred())
+	return data
+}
+
+func createTestAssessmentWithComplexityDistribution(
+	id uuid.UUID,
+	username, orgID, clusterID string,
+	osInfo *map[string]api.OsInfo,
+	diskSizeTier *map[string]api.DiskSizeTierSummary,
+	dist *map[string]api.DiskSizeTierSummary,
+) *model.Assessment {
+	return &model.Assessment{
+		ID:       id,
+		Name:     "test-assessment",
+		OrgID:    orgID,
+		Username: username,
+		Snapshots: []model.Snapshot{
+			{
+				ID:           1,
+				CreatedAt:    time.Now(),
+				Inventory:    createTestInventoryWithComplexityDistribution(clusterID, osInfo, diskSizeTier, dist),
+				AssessmentID: id,
+				Version:      2,
+			},
+		},
+	}
+}
+
 func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) *model.Assessment {
 	return &model.Assessment{
 		ID:       id,
@@ -684,6 +738,111 @@ var _ = Describe("EstimationService", func() {
 
 				Expect(fastDuration).To(BeNumerically("<", defaultDuration))
 			})
+		})
+	})
+
+	Describe("CalculateOsDiskComplexity", func() {
+		var defaultOsInfo *map[string]api.OsInfo
+		var defaultDiskTier *map[string]api.DiskSizeTierSummary
+
+		BeforeEach(func() {
+			defaultOsInfo = buildOsInfo(map[string]int{
+				"Red Hat Enterprise Linux 9 (64-bit)": 100,
+			})
+			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+				"Easy (0-10TB)": {VmCount: 100, TotalSizeTB: 5.0},
+			})
+		})
+
+		It("returns 5 buckets with VMCount and TotalSizeTB", func() {
+			dist := buildComplexityDistribution(map[string]api.DiskSizeTierSummary{
+				"1": {VmCount: 30, TotalSizeTB: 5.0},
+				"2": {VmCount: 15, TotalSizeTB: 12.0},
+			})
+			mockStore.assessments[assessmentID] = createTestAssessmentWithComplexityDistribution(
+				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier, dist,
+			)
+
+			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, clusterID)
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.Buckets).To(HaveLen(5))
+			Expect(result.Buckets[1].VMCount).To(Equal(30))
+			Expect(result.Buckets[1].TotalSizeTB).To(Equal(5.0))
+			Expect(result.Buckets[2].VMCount).To(Equal(15))
+			Expect(result.Buckets[2].TotalSizeTB).To(Equal(12.0))
+		})
+
+		It("returns error for unknown assessment", func() {
+			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, uuid.New(), clusterID)
+			Expect(err).To(HaveOccurred())
+		})
+
+		It("returns error for unknown cluster", func() {
+			mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
+				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
+			)
+			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, "wrong-cluster")
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("RunEstimation", func() {
+		It("returns results for each requested schema", func() {
+			params := []estimation.Param{
+				{Key: "vm_count", Value: 10},
+				{Key: "total_disk_gb", Value: 1000.0},
+				{Key: "work_hours_per_day", Value: 8.0},
+				{Key: "troubleshoot_mins_per_vm", Value: 30.0},
+				{Key: "post_migration_engineers", Value: 2},
+			}
+			results, err := estimationSrv.RunEstimation(
+				[]engines.Schema{engines.SchemaNetworkBased},
+				params,
+			)
+			Expect(err).ToNot(HaveOccurred())
+			Expect(results).To(HaveKey(engines.SchemaNetworkBased))
+			Expect(results[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
+		})
+
+		It("returns an error for an unknown schema", func() {
+			_, err := estimationSrv.RunEstimation(
+				[]engines.Schema{"invalid-schema"},
+				[]estimation.Param{},
+			)
+			Expect(err).To(HaveOccurred())
+		})
+	})
+
+	Describe("BuildBaseParams", func() {
+		It("returns defaults when no user params supplied", func() {
+			params := estimationSrv.BuildBaseParams(nil)
+			Expect(params).NotTo(BeEmpty())
+		})
+
+		It("user params override defaults", func() {
+			userParams := []estimation.Param{{Key: "work_hours_per_day", Value: 12.0}}
+			params := estimationSrv.BuildBaseParams(userParams)
+			var found float64
+			for _, p := range params {
+				if p.Key == "work_hours_per_day" {
+					found = p.Value.(float64)
+				}
+			}
+			Expect(found).To(Equal(12.0))
+		})
+	})
+
+	Describe("BuildBucketParams", func() {
+		It("adds vmCount and totalDiskGB on top of base params", func() {
+			base := estimationSrv.BuildBaseParams(nil)
+			params := estimationSrv.BuildBucketParams(base, 50, 5000.0)
+			keys := make(map[string]any)
+			for _, p := range params {
+				keys[p.Key] = p.Value
+			}
+			Expect(keys["vm_count"]).To(Equal(50))
+			Expect(keys["total_disk_gb"]).To(Equal(5000.0))
 		})
 	})
 })

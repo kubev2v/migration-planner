@@ -142,6 +142,28 @@ var DiskSizeScores = map[string]Score{
 	"White Glove (>50TB)": 4,
 }
 
+// ComplexityMatrix maps OS complexity score (outer key) to disk complexity score
+// (inner key) to the combined migration complexity score.
+//
+// OS scores  — 0: unknown, 1: easy, 2: medium, 3: hard, 4: database/white-glove
+// Disk scores — 1: 0-10 TB, 2: 10-20 TB, 3: 20-50 TB, 4: >50 TB
+var ComplexityMatrix = map[Score]map[Score]Score{
+	0: {1: 0, 2: 0, 3: 0, 4: 0},
+	1: {1: 1, 2: 1, 3: 3, 4: 3},
+	2: {1: 2, 2: 2, 3: 3, 4: 3},
+	3: {1: 2, 2: 2, 3: 3, 4: 3},
+	4: {1: 4, 2: 4, 3: 4, 4: 4},
+}
+
+// CombineComplexity looks up the combined migration complexity score for the
+// given OS and disk complexity scores. Returns 0 for any unmapped combination.
+func CombineComplexity(osScore, diskScore Score) Score {
+	if inner, ok := ComplexityMatrix[osScore]; ok {
+		return inner[diskScore]
+	}
+	return 0
+}
+
 // ClassifyOS returns the numeric complexity score for the given OS name by
 // checking whether each key in OSDifficultyScores appears as a case-insensitive
 // substring of osName. Returns 0 if no key matches (unknown).
@@ -197,6 +219,13 @@ type DiskTierInput struct {
 type OSDifficultyEntry struct {
 	Score   Score
 	VMCount int
+}
+
+// OSDiskEntry is one row in the combined OS+Disk complexity breakdown.
+type OSDiskEntry struct {
+	Score       Score
+	VMCount     int
+	TotalSizeTB float64
 }
 
 // DiskComplexityEntry is one row in the disk complexity breakdown.

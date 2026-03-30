@@ -134,6 +134,11 @@ type ClientInterface interface {
 
 	CalculateMigrationEstimation(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CalculateMigrationEstimationByComplexityWithBody request with any body
+	CalculateMigrationEstimationByComplexityWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CalculateMigrationEstimationByComplexity(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetInfo request
 	GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -356,6 +361,30 @@ func (c *Client) CalculateMigrationEstimationWithBody(ctx context.Context, id op
 
 func (c *Client) CalculateMigrationEstimation(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateMigrationEstimationRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateMigrationEstimationByComplexityWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateMigrationEstimationByComplexityRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateMigrationEstimationByComplexity(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateMigrationEstimationByComplexityRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -976,6 +1005,53 @@ func NewCalculateMigrationEstimationRequestWithBody(server string, id openapi_ty
 	return req, nil
 }
 
+// NewCalculateMigrationEstimationByComplexityRequest calls the generic CalculateMigrationEstimationByComplexity builder with application/json body
+func NewCalculateMigrationEstimationByComplexityRequest(server string, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCalculateMigrationEstimationByComplexityRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewCalculateMigrationEstimationByComplexityRequestWithBody generates requests for CalculateMigrationEstimationByComplexity with any type of body
+func NewCalculateMigrationEstimationByComplexityRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/%s/migration-estimation/by-complexity", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewGetInfoRequest generates requests for GetInfo
 func NewGetInfoRequest(server string) (*http.Request, error) {
 	var err error
@@ -1440,6 +1516,11 @@ type ClientWithResponsesInterface interface {
 
 	CalculateMigrationEstimationWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationResponse, error)
 
+	// CalculateMigrationEstimationByComplexityWithBodyWithResponse request with any body
+	CalculateMigrationEstimationByComplexityWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationByComplexityResponse, error)
+
+	CalculateMigrationEstimationByComplexityWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationByComplexityResponse, error)
+
 	// GetInfoWithResponse request
 	GetInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInfoResponse, error)
 
@@ -1766,6 +1847,33 @@ func (r CalculateMigrationEstimationResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CalculateMigrationEstimationResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CalculateMigrationEstimationByComplexityResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *MigrationEstimationByComplexityResponse
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CalculateMigrationEstimationByComplexityResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CalculateMigrationEstimationByComplexityResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -2180,6 +2288,23 @@ func (c *ClientWithResponses) CalculateMigrationEstimationWithResponse(ctx conte
 		return nil, err
 	}
 	return ParseCalculateMigrationEstimationResponse(rsp)
+}
+
+// CalculateMigrationEstimationByComplexityWithBodyWithResponse request with arbitrary body returning *CalculateMigrationEstimationByComplexityResponse
+func (c *ClientWithResponses) CalculateMigrationEstimationByComplexityWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationByComplexityResponse, error) {
+	rsp, err := c.CalculateMigrationEstimationByComplexityWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateMigrationEstimationByComplexityResponse(rsp)
+}
+
+func (c *ClientWithResponses) CalculateMigrationEstimationByComplexityWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationByComplexityResponse, error) {
+	rsp, err := c.CalculateMigrationEstimationByComplexity(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateMigrationEstimationByComplexityResponse(rsp)
 }
 
 // GetInfoWithResponse request returning *GetInfoResponse
@@ -2896,6 +3021,67 @@ func ParseCalculateMigrationEstimationResponse(rsp *http.Response) (*CalculateMi
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest MigrationEstimationResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCalculateMigrationEstimationByComplexityResponse parses an HTTP response from a CalculateMigrationEstimationByComplexityWithResponse call
+func ParseCalculateMigrationEstimationByComplexityResponse(rsp *http.Response) (*CalculateMigrationEstimationByComplexityResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CalculateMigrationEstimationByComplexityResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MigrationEstimationByComplexityResponse
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
