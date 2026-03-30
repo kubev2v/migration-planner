@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
@@ -59,6 +60,9 @@ func normalizeInventoryData(data *api.InventoryData) {
 	}
 	if data.Vms.DistributionByNicCount == nil {
 		data.Vms.DistributionByNicCount = &map[string]int{}
+	}
+	if data.Vms.DistributionByComplexity == nil {
+		data.Vms.DistributionByComplexity = &map[string]int{}
 	}
 }
 
@@ -389,6 +393,62 @@ func schemaResultToAPI(result *service.MigrationAssessmentResult) api.SchemaEsti
 		MinTotalDuration: result.MinTotalDuration.String(),
 		MaxTotalDuration: result.MaxTotalDuration.String(),
 		Breakdown:        breakdown,
+	}
+}
+
+// OsDiskEstimationResultToAPI maps the OsDisk complexity buckets, per-bucket estimation
+// results, estimation context, and complexity matrix into the API response.
+func OsDiskEstimationResultToAPI(
+	buckets []complexity.OSDiskEntry,
+	estimations map[int]map[string]*service.MigrationAssessmentResult,
+	estimationCtx *service.EstimationContext,
+	complexityMatrix map[complexity.Score]map[complexity.Score]complexity.Score,
+) api.MigrationEstimationByComplexityResponse {
+	entries := make([]api.OsDiskEstimationEntry, len(buckets))
+	for i, b := range buckets {
+		entry := api.OsDiskEstimationEntry{
+			Score:           b.Score,
+			VmCount:         b.VMCount,
+			TotalDiskSizeTB: float32(b.TotalSizeTB),
+		}
+		if schemaResults, ok := estimations[b.Score]; ok {
+			apiEst := make(map[string]api.SchemaEstimationResult, len(schemaResults))
+			for schema, r := range schemaResults {
+				apiEst[schema] = schemaResultToAPI(r)
+			}
+			entry.Estimation = &apiEst
+		}
+		entries[i] = entry
+	}
+
+	matrix := make(map[string]map[string]int, len(complexityMatrix))
+	for osScore, diskMap := range complexityMatrix {
+		inner := make(map[string]int, len(diskMap))
+		for diskScore, combined := range diskMap {
+			inner[fmt.Sprintf("%d", diskScore)] = combined
+		}
+		matrix[fmt.Sprintf("%d", osScore)] = inner
+	}
+
+	var ctx *api.EstimationContext
+	if estimationCtx != nil {
+		params := make(map[string]float32, len(estimationCtx.BaseParams))
+		for _, p := range estimationCtx.BaseParams {
+			if v, ok := p.Value.(float64); ok {
+				params[p.Key] = float32(v)
+			}
+		}
+		schemas := make([]string, len(estimationCtx.Schemas))
+		for i, s := range estimationCtx.Schemas {
+			schemas[i] = string(s)
+		}
+		ctx = &api.EstimationContext{Schemas: &schemas, Params: &params}
+	}
+
+	return api.MigrationEstimationByComplexityResponse{
+		ComplexityByOsDisk: entries,
+		ComplexityMatrix:   matrix,
+		EstimationContext:  ctx,
 	}
 }
 

@@ -914,3 +914,37 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 	assert.Equal(t, 1, clusterEnriched["1"].VMCount)
 	assert.Equal(t, 1, clusterEnriched["2"].VMCount)
 }
+
+// TestPopulateComplexityQuery_ContainsExpectedWhenClauses verifies that
+// PopulateComplexityQuery produces SQL containing a representative sample of
+// the WHEN clauses derived from the ComplexityMatrix.
+func TestPopulateComplexityQuery_ContainsExpectedWhenClauses(t *testing.T) {
+	b := NewBuilder()
+	sql, err := b.PopulateComplexityQuery()
+	require.NoError(t, err)
+	require.NotEmpty(t, sql)
+
+	// Representative WHEN clauses — one from each "corner" of the matrix.
+	expectedClauses := []string{
+		"o.os_level = 'easy' AND dl.disk_level = 'easy' THEN 1",
+		"o.os_level = 'database' AND dl.disk_level = 'whiteglove' THEN 4",
+		"o.os_level = 'unsupported' AND dl.disk_level = 'easy' THEN 0",
+		"o.os_level = 'medium' AND dl.disk_level = 'hard' THEN 3",
+		"o.os_level = 'hard' AND dl.disk_level = 'medium' THEN 2",
+	}
+	for _, clause := range expectedClauses {
+		assert.Contains(t, sql, clause, "SQL should contain WHEN clause: %s", clause)
+	}
+}
+
+// TestPopulateComplexityQuery_IsDeterministic verifies that calling
+// PopulateComplexityQuery twice produces identical SQL output.
+func TestPopulateComplexityQuery_IsDeterministic(t *testing.T) {
+	b := NewBuilder()
+	sql1, err1 := b.PopulateComplexityQuery()
+	sql2, err2 := b.PopulateComplexityQuery()
+
+	require.NoError(t, err1)
+	require.NoError(t, err2)
+	assert.Equal(t, sql1, sql2, "PopulateComplexityQuery output must be deterministic")
+}

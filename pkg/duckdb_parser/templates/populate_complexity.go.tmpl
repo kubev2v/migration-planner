@@ -51,14 +51,7 @@ vm_complexity AS (
     SELECT
         o."VM ID",
         CASE
-            WHEN o.os_level = 'unsupported' THEN 0
-            WHEN o.os_level = 'database' THEN 4
-            WHEN o.os_level = 'easy' AND dl.disk_level IN ('easy', 'medium') THEN 1
-            WHEN o.os_level = 'easy' THEN 3
-            WHEN o.os_level = 'medium' AND dl.disk_level IN ('easy', 'medium') THEN 2
-            WHEN o.os_level = 'medium' THEN 3
-            WHEN o.os_level = 'hard' AND dl.disk_level IN ('easy', 'medium') THEN 2
-            WHEN o.os_level = 'hard' THEN 3
+{{.ComplexityMatrixClauses}}
             ELSE 0
         END AS complexity
     FROM vm_os_level o

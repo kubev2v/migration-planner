@@ -105,6 +105,41 @@ func createTestAssessmentForEstimationHandler(id uuid.UUID, username, orgID, clu
 	}
 }
 
+func createTestAssessmentForByComplexityHandler(id uuid.UUID, username, orgID, clusterID string) *model.Assessment {
+	dist := map[string]api.DiskSizeTierSummary{
+		"1": {VmCount: 30, TotalSizeTB: 5.0},
+		"2": {VmCount: 10, TotalSizeTB: 12.0},
+	}
+	osInfo := map[string]api.OsInfo{
+		"Red Hat Enterprise Linux 9 (64-bit)": {Count: 30},
+		"Windows Server 2019":                 {Count: 10},
+	}
+	diskTier := map[string]api.DiskSizeTierSummary{
+		"Easy (0-10TB)":    {VmCount: 30, TotalSizeTB: 5.0},
+		"Medium (10-20TB)": {VmCount: 10, TotalSizeTB: 12.0},
+	}
+	inventory := api.Inventory{
+		Clusters: map[string]api.InventoryData{
+			clusterID: {
+				Vms: api.VMs{
+					Total:                  40,
+					OsInfo:                 &osInfo,
+					DiskSizeTier:           &diskTier,
+					ComplexityDistribution: &dist,
+					DiskGB:                 api.VMResourceBreakdown{Total: 17000},
+					CpuCores:               api.VMResourceBreakdown{Total: 160},
+					RamGB:                  api.VMResourceBreakdown{Total: 320},
+				},
+			},
+		},
+	}
+	data, _ := json.Marshal(inventory)
+	return &model.Assessment{
+		ID: id, Name: "test", OrgID: orgID, Username: username,
+		Snapshots: []model.Snapshot{{ID: 1, Inventory: data, AssessmentID: id, Version: 2}},
+	}
+}
+
 var _ = Describe("estimation handler", func() {
 	var (
 		mockStore    *MockStore
@@ -822,6 +857,92 @@ var _ = Describe("estimation handler", func() {
 
 				Expect(err).To(BeNil())
 				_, ok := resp.(server.CalculateMigrationComplexity500JSONResponse)
+				Expect(ok).To(BeTrue())
+			})
+		})
+	})
+
+	Describe("CalculateMigrationEstimationByComplexity", func() {
+		Context("successful requests", func() {
+			It("returns 200 with complexityByOsDisk (5 entries) and complexityMatrix", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForByComplexityHandler(
+					assessmentID, user.Username, user.Organization, clusterID,
+				)
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id:   assessmentID,
+						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+					})
+
+				Expect(err).To(BeNil())
+				response, ok := resp.(server.CalculateMigrationEstimationByComplexity200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(response.ComplexityByOsDisk).To(HaveLen(5))
+				Expect(response.ComplexityMatrix).NotTo(BeEmpty())
+			})
+
+			It("populates estimation for non-empty buckets", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForByComplexityHandler(
+					assessmentID, user.Username, user.Organization, clusterID,
+				)
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id:   assessmentID,
+						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+					})
+
+				Expect(err).To(BeNil())
+				response := resp.(server.CalculateMigrationEstimationByComplexity200JSONResponse)
+				var score1 *api.OsDiskEstimationEntry
+				for i := range response.ComplexityByOsDisk {
+					if response.ComplexityByOsDisk[i].Score == 1 {
+						score1 = &response.ComplexityByOsDisk[i]
+					}
+				}
+				Expect(score1).NotTo(BeNil())
+				Expect(score1.Estimation).NotTo(BeNil())
+			})
+
+			It("returns estimationContext", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForByComplexityHandler(
+					assessmentID, user.Username, user.Organization, clusterID,
+				)
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore))
+
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id:   assessmentID,
+						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+					})
+
+				Expect(err).To(BeNil())
+				response := resp.(server.CalculateMigrationEstimationByComplexity200JSONResponse)
+				Expect(response.EstimationContext).NotTo(BeNil())
+			})
+
+			It("returns 404 for unknown assessment", func() {
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id:   uuid.New(),
+						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+					})
+				Expect(err).To(BeNil())
+				_, ok := resp.(server.CalculateMigrationEstimationByComplexity404JSONResponse)
+				Expect(ok).To(BeTrue())
+			})
+
+			It("returns 400 for empty body", func() {
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id:   assessmentID,
+						Body: nil,
+					})
+				Expect(err).To(BeNil())
+				_, ok := resp.(server.CalculateMigrationEstimationByComplexity400JSONResponse)
 				Expect(ok).To(BeTrue())
 			})
 		})

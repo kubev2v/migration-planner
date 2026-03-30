@@ -748,6 +748,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/assessments/{id}/migration-estimation/by-complexity:
+    post:
+      tags:
+        - assessment
+      description: Calculate migration time estimation broken down by combined OS+Disk complexity
+      operationId: CalculateMigrationEstimationByComplexity
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MigrationEstimationRequest"
+        required: true
+      responses:
+        "200":
+          description: Migration estimation by complexity calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MigrationEstimationByComplexityResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/{id}/complexity-estimation:
     post:
       tags:
@@ -1949,7 +2006,7 @@ components:
           description: >
             OS complexity scores, one entry per score level (0-4).
             Score 1 indicates the least complex OS to migrate; score 0 indicates an
-            OS that could not be classified. All five score levels are always present.
+            OS with unknown complexity. All five score levels are always present.
           items:
             $ref: "#/components/schemas/ComplexityOSScoreEntry"
         diskSizeRatings:
@@ -1965,7 +2022,7 @@ components:
           description: >
             Per-OS-name score for every OS found in this cluster's inventory. Keys are the
             OS name strings exactly as they appear in vms.osInfo; values are the numeric
-            complexity score assigned by ClassifyOS (0 = unclassified, 1-4 = increasing
+            complexity score assigned by ClassifyOS (0 = unknown, 1-4 = increasing
             complexity). The map contains one entry per distinct OS name in the cluster,
             regardless of how many VMs run it.
           additionalProperties:
@@ -2015,7 +2072,7 @@ components:
           type: integer
           description: >
             Complexity score from 0 to 4, where 1 indicates the least complex OS
-            to migrate and 0 indicates an OS that could not be classified.
+            to migrate and 0 indicates an OS with unknown complexity.
         vmCount:
           type: integer
           description: Number of VMs at this complexity score
@@ -2035,7 +2092,7 @@ components:
         score:
           type: integer
           description: >
-            Complexity score assigned by ClassifyOS. 0 = unclassified, 1 = least
+            Complexity score assigned by ClassifyOS. 0 = unknown, 1 = least
             complex, 4 = most complex.
         vmCount:
           type: integer
@@ -2159,6 +2216,62 @@ components:
          * `completed` - Assessment created successfully
          * `failed` - Job failed with error
          * `cancelled` - Job was cancelled
+
+    EstimationContext:
+      type: object
+      properties:
+        schemas:
+          type: array
+          items:
+            type: string
+        params:
+          type: object
+          additionalProperties:
+            type: number
+
+    OsDiskEstimationEntry:
+      type: object
+      required:
+        - score
+        - vmCount
+        - totalDiskSizeTB
+      properties:
+        score:
+          type: integer
+          description: "Combined OS+Disk complexity score (0-4)."
+        vmCount:
+          type: integer
+          description: "Number of VMs at this complexity level."
+        totalDiskSizeTB:
+          type: number
+          description: "Total provisioned disk across VMs in this bucket (decimal TB). 0.0 when ComplexityDistribution is absent from the inventory."
+        estimation:
+          type: object
+          additionalProperties:
+            $ref: '#/components/schemas/SchemaEstimationResult'
+          description: "Full estimation breakdown keyed by schema name. Absent for empty buckets (vmCount == 0)."
+
+    MigrationEstimationByComplexityResponse:
+      type: object
+      required:
+        - complexityByOsDisk
+        - complexityMatrix
+      properties:
+        complexityByOsDisk:
+          type: array
+          items:
+            $ref: '#/components/schemas/OsDiskEstimationEntry'
+          description: "Combined OS+Disk complexity distribution with per-bucket estimation. All 5 score levels (0-4) always present."
+        complexityMatrix:
+          type: object
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: integer
+          description: "Decision matrix: outer keys are OS scores (0-4), inner keys are disk scores (1-4), values are combined scores."
+        estimationContext:
+          $ref: '#/components/schemas/EstimationContext'
+          description: "Parameters used to compute the estimates."
 
     Info:
       type: object
