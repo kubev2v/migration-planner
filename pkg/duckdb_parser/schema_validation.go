@@ -3,6 +3,9 @@ package duckdb_parser
 import (
 	"context"
 	"fmt"
+	"strings"
+
+	"go.uber.org/zap"
 )
 
 // ValidationResult contains errors and warnings from schema validation.
@@ -50,10 +53,12 @@ func (v ValidationResult) Error() error {
 
 // Validation codes for errors
 const (
-	CodeNoVMs          = "NO_VMS"
-	CodeMissingVMID    = "MISSING_VM_ID"
-	CodeMissingVMName  = "MISSING_VM_NAME"
-	CodeMissingCluster = "MISSING_CLUSTER"
+	CodeNoVMs                  = "NO_VMS"
+	CodeMissingVMID            = "MISSING_VM_ID"
+	CodeMissingVMName          = "MISSING_VM_NAME"
+	CodeMissingCluster         = "MISSING_CLUSTER"
+	CodeMissingVISDKUUID       = "MISSING_VI_SDK_UUID"
+	CodeColumnValidationFailed = "COLUMN_VALIDATION_FAILED"
 )
 
 // Validation codes for warnings
@@ -100,8 +105,16 @@ func (p *Parser) ValidateSchema(ctx context.Context, table string) ValidationRes
 // Reports NO_VMS if table has no data rows, otherwise reports specific column errors.
 // The table parameter allows validating against "vinfo_raw" (RVTools) or "vinfo" (SQLite).
 func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult, table string) {
-	// First check if we have any rows at all (independent of column existence)
-	if p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, table)) == 0 {
+	rowCount, err := p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, table))
+	if err != nil {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    CodeColumnValidationFailed,
+			Table:   table,
+			Message: fmt.Sprintf("could not read vInfo table: %v", err),
+		})
+		return
+	}
+	if rowCount == 0 {
 		result.Errors = append(result.Errors, ValidationIssue{
 			Code:    CodeNoVMs,
 			Table:   table,
@@ -110,47 +123,61 @@ func (p *Parser) validateVinfoData(ctx context.Context, result *ValidationResult
 		return
 	}
 
-	// Rows exist — check each required column independently.
-	// hasValidColumnData returns false if column is missing OR has no valid values.
-	if !p.hasValidColumnData(ctx, table, "VM ID") {
-		result.Errors = append(result.Errors, ValidationIssue{
-			Code:    CodeMissingVMID,
-			Table:   table,
-			Column:  "VM ID",
-			Message: "'VM ID' column is missing or empty in the vInfo sheet - VMs cannot be identified",
-		})
-	}
+	p.appendNonEmptyColumnIssue(ctx, result, table, "VM ID", CodeMissingVMID, "'VM ID' column is missing or empty in the vInfo sheet - VMs cannot be identified")
+	p.appendNonEmptyColumnIssue(ctx, result, table, "VM", CodeMissingVMName, "'VM' column is missing or empty in the vInfo sheet - VMs cannot be identified")
+	p.appendNonEmptyColumnIssue(ctx, result, table, "Cluster", CodeMissingCluster, "'Cluster' column is missing or empty in the vInfo sheet - cannot determine cluster membership")
 
-	if !p.hasValidColumnData(ctx, table, "VM") {
-		result.Errors = append(result.Errors, ValidationIssue{
-			Code:    CodeMissingVMName,
-			Table:   table,
-			Column:  "VM",
-			Message: "'VM' column is missing or empty in the vInfo sheet - VMs cannot be identified",
-		})
+	if table == "vinfo_raw" {
+		p.appendNonEmptyColumnIssue(ctx, result, table, "VI SDK UUID", CodeMissingVISDKUUID, "The RVTools export is missing the 'VI SDK UUID' column on the vInfo sheet, or all values are empty. That column is required to identify your vCenter. Re-export the file using RVTools so the vInfo sheet includes a non-empty VI SDK UUID for at least one VM.")
 	}
+}
 
-	if !p.hasValidColumnData(ctx, table, "Cluster") {
+// appendNonEmptyColumnIssue appends a user-facing error if the column has no non-empty values,
+// or COLUMN_VALIDATION_FAILED if the database query fails (so query errors are not mistaken for bad data).
+func (p *Parser) appendNonEmptyColumnIssue(ctx context.Context, result *ValidationResult, table, column, code, emptyMsg string) {
+	hasData, err := p.hasValidColumnData(ctx, table, column)
+	if err != nil {
 		result.Errors = append(result.Errors, ValidationIssue{
-			Code:    CodeMissingCluster,
+			Code:    CodeColumnValidationFailed,
 			Table:   table,
-			Column:  "Cluster",
-			Message: "'Cluster' column is missing or empty in the vInfo sheet - cannot determine cluster membership",
+			Column:  column,
+			Message: fmt.Sprintf("could not validate column %q: %v", column, err),
+		})
+		return
+	}
+	if !hasData {
+		result.Errors = append(result.Errors, ValidationIssue{
+			Code:    code,
+			Table:   table,
+			Column:  column,
+			Message: emptyMsg,
 		})
 	}
 }
 
 // hasValidColumnData checks if a table has a column with at least one non-empty value.
-// Returns false if the column doesn't exist or has no valid values.
-func (p *Parser) hasValidColumnData(ctx context.Context, table, column string) bool {
+// Returns (false, nil) if the column is missing or empty; (false, err) if the query fails.
+func (p *Parser) hasValidColumnData(ctx context.Context, table, column string) (bool, error) {
 	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s WHERE "%s" IS NOT NULL AND TRIM("%s") != ''`, table, column, column)
-	return p.countRows(ctx, query) > 0
+	n, err := p.countRows(ctx, query)
+	if err != nil {
+		return false, err
+	}
+	return n > 0, nil
 }
 
 // validateOptionalTables checks that optional tables have data, producing warnings if empty.
 func (p *Parser) validateOptionalTables(ctx context.Context, result *ValidationResult) {
 	for _, check := range warningChecks {
-		if p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, check.table)) == 0 {
+		n, err := p.countRows(ctx, fmt.Sprintf(`SELECT COUNT(*) FROM %s`, check.table))
+		if err != nil {
+			// Log unexpected errors (connection, permissions); missing tables are expected
+			if !isTableMissingError(err) {
+				zap.S().Named("duckdb_parser").Warnf("Failed to validate optional table %s: %v", check.table, err)
+			}
+			continue
+		}
+		if n == 0 {
 			result.Warnings = append(result.Warnings, ValidationIssue{
 				Code:    check.code,
 				Table:   check.table,
@@ -160,11 +187,19 @@ func (p *Parser) validateOptionalTables(ctx context.Context, result *ValidationR
 	}
 }
 
-// countRows executes a COUNT query and returns the result, or 0 on any error.
-func (p *Parser) countRows(ctx context.Context, query string) int {
+func (p *Parser) countRows(ctx context.Context, query string) (int, error) {
 	var count int
 	if err := p.db.QueryRowContext(ctx, query).Scan(&count); err != nil {
-		return 0
+		return 0, err
 	}
-	return count
+	return count, nil
+}
+
+// isTableMissingError returns true if the error indicates a table doesn't exist.
+func isTableMissingError(err error) bool {
+	errMsg := strings.ToLower(err.Error())
+	return strings.Contains(errMsg, "table") &&
+		(strings.Contains(errMsg, "not found") ||
+			strings.Contains(errMsg, "does not exist") ||
+			strings.Contains(errMsg, "no such table"))
 }

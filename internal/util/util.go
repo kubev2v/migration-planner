@@ -151,16 +151,19 @@ func BoolPtr(b bool) *bool {
 	return &b
 }
 
-// Unmarshal does not return error when v1 inventory is unmarshal into a v2 struct.
-// The only way to differentiate the version is to check the internal structure.
+// GetInventoryVersion returns v2 if JSON has top-level "clusters" or "vcenter_id"; else v1.
 func GetInventoryVersion(inventory []byte) int {
-	i := v1alpha1.Inventory{}
-	_ = json.Unmarshal(inventory, &i)
-
-	if i.VcenterId == "" {
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal(inventory, &keys); err != nil {
 		return model.SnapshotVersionV1
 	}
-	return model.SnapshotVersionV2
+	if _, ok := keys["clusters"]; ok {
+		return model.SnapshotVersionV2
+	}
+	if _, ok := keys["vcenter_id"]; ok {
+		return model.SnapshotVersionV2
+	}
+	return model.SnapshotVersionV1
 }
 
 // ErrEmptyInventory indicates the inventory data is empty

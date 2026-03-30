@@ -2,6 +2,8 @@ package duckdb_parser
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
@@ -433,6 +435,9 @@ func (p *Parser) VCenterID(ctx context.Context) (string, error) {
 	}
 	var vcenterID string
 	if err := p.db.QueryRowContext(ctx, q).Scan(&vcenterID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
 		return "", fmt.Errorf("scanning vcenter id: %w", err)
 	}
 	return vcenterID, nil

@@ -472,25 +472,46 @@ func TestValidation_ErrorCodes(t *testing.T) {
 			forbiddenCodes: []string{CodeNoVMs},
 		},
 		{
-			name:           "missing VM ID column and empty VM values reports both errors",
-			customHeaders:  []string{"VM", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
-			vms:            []map[string]string{{"VM": "", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
-			expectedCodes:  []string{CodeMissingVMID, CodeMissingVMName},
+			name:           "missing VM ID column and empty VM values reports query error and missing name",
+			customHeaders:  []string{"VM", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "", "VI SDK UUID": "550e8400-e29b-41d4-a716-446655440000", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeColumnValidationFailed, CodeMissingVMName},
 			forbiddenCodes: []string{CodeNoVMs},
 		},
 		{
 			name:           "missing Cluster column reports MISSING_CLUSTER",
-			customHeaders:  []string{"VM", "VM ID", "Host", "CPUs", "Memory", "Powerstate", "Datacenter"},
-			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Datacenter": "dc1"}},
+			customHeaders:  []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "550e8400-e29b-41d4-a716-446655440000", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Datacenter": "dc1"}},
 			expectedCodes:  []string{CodeMissingCluster},
 			forbiddenCodes: []string{CodeNoVMs, CodeMissingVMID, CodeMissingVMName},
 		},
 		{
 			name:           "empty Cluster values reports MISSING_CLUSTER",
-			customHeaders:  []string{"VM", "VM ID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
-			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "", "Datacenter": "dc1"}},
+			customHeaders:  []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "550e8400-e29b-41d4-a716-446655440000", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "", "Datacenter": "dc1"}},
 			expectedCodes:  []string{CodeMissingCluster},
 			forbiddenCodes: []string{CodeNoVMs, CodeMissingVMID, CodeMissingVMName},
+		},
+		{
+			name:           "missing VI SDK UUID column reports MISSING_VI_SDK_UUID",
+			customHeaders:  []string{"VM", "VM ID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeMissingVISDKUUID},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+		{
+			name:           "empty VI SDK UUID values report MISSING_VI_SDK_UUID",
+			customHeaders:  []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeMissingVISDKUUID},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+		{
+			name:           "whitespace-only VI SDK UUID values report MISSING_VI_SDK_UUID",
+			customHeaders:  []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "   ", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeMissingVISDKUUID},
+			forbiddenCodes: []string{CodeNoVMs},
 		},
 	}
 
@@ -751,18 +772,18 @@ func TestBuildInventory_MigratableWithWarnings(t *testing.T) {
 	assert.Equal(t, 2, inv.VCenter.VMs.TotalMigratableWithWarnings, "VMs with warnings should be counted")
 }
 
-// TestBuildInventory_MinimalSchema tests that a file with only VM ID, VM, and Cluster
-// columns (the minimal required schema) correctly ingests VMs and builds an inventory.
+// TestBuildInventory_MinimalSchema tests that a file with only VM ID, VM, Cluster, and VI SDK UUID
+// columns (the minimal required schema for RVTools) correctly ingests VMs and builds an inventory.
 func TestBuildInventory_MinimalSchema(t *testing.T) {
 	parser, _, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()
 
-	// Create Excel with only the minimal required columns
-	minimalHeaders := []string{"VM ID", "VM", "Cluster"}
+	vcUUID := "550e8400-e29b-41d4-a716-446655440000"
+	minimalHeaders := []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}
 	vms := []map[string]string{
-		{"VM ID": "vm-100", "VM": "VM-SRV-0000", "Cluster": "cluster-1"},
-		{"VM ID": "vm-101", "VM": "VM-SRV-0001", "Cluster": "cluster-1"},
-		{"VM ID": "vm-102", "VM": "VM-SRV-0002", "Cluster": "cluster-1"},
+		{"VM ID": "vm-100", "VM": "VM-SRV-0000", "Cluster": "cluster-1", "VI SDK UUID": vcUUID},
+		{"VM ID": "vm-101", "VM": "VM-SRV-0001", "Cluster": "cluster-1", "VI SDK UUID": vcUUID},
+		{"VM ID": "vm-102", "VM": "VM-SRV-0002", "Cluster": "cluster-1", "VI SDK UUID": vcUUID},
 	}
 
 	tmpFile := createTestExcelWithCustomHeaders(t, minimalHeaders, vms)
@@ -775,6 +796,7 @@ func TestBuildInventory_MinimalSchema(t *testing.T) {
 	inv, err := parser.BuildInventory(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, 3, inv.VCenter.VMs.Total, "Should have 3 VMs from minimal schema")
+	assert.Equal(t, vcUUID, inv.VCenterID, "VCenterID should be populated from VI SDK UUID column")
 }
 
 // TestBuildInventory_VMsWithSharedDisksCount ingests Excel with vDisk data and asserts
