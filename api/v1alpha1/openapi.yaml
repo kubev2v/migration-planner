@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
   title: OpenShift Migration Advisor API
-  version: undefined
+  version: v1alpha1
   license:
     name: Apache 2.0
     url: https://www.apache.org/licenses/LICENSE-2.0.html
@@ -245,7 +245,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/Error"
         "500":
-          description: NotFound
+          description: Internal Server Error
           content:
             application/json:
               schema:
