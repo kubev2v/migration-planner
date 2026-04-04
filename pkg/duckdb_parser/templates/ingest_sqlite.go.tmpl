@@ -170,6 +170,13 @@ SELECT
 FROM src.Network n
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
 
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
+SELECT
+    a.APIVersion,
+    a.Product,
+    a.InstanceUuid
+FROM src.About a;
+
 DETACH src;
 
 -- Populate Network # columns in vinfo from vnetwork table
