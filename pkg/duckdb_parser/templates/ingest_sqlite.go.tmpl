@@ -25,7 +25,7 @@ INSERT INTO vinfo (
     "DNS Name", "Primary IP Address", "In Use MiB",
     "Template", "CBT", "EnableUUID",
     "Datacenter", "Cluster", "HW version",
-    "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID"
+    "Total disk capacity MiB", "Provisioned MiB", "Resource pool"
 )
 SELECT
     v.ID,
@@ -54,14 +54,12 @@ SELECT
     '',
     0,
     0,
-    '',
-    about.InstanceUuid
+    ''
 FROM src.VM v
 LEFT JOIN src.Host h ON v.Host = h.ID
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID
 LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
 LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID
-CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
 WHERE v.IsTemplate = 0;
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
@@ -169,6 +167,14 @@ SELECT
     n.VlanId
 FROM src.Network n
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
+
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
+SELECT
+    a.APIVersion,
+    a.Product,
+    a.InstanceUuid
+FROM src.About a
+LIMIT 1;
 
 DETACH src;
 
