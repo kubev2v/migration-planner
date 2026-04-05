@@ -17,9 +17,9 @@
   <VirtualSystem ovf:id="MigrationAssessment">
     <Info>A Virtual system</Info>
     <Name>MigrationAssessment</Name>
-    <OperatingSystemSection ovf:id="80" ovf:version="9" vmw:osType="rhel9_64Guest">
+    <OperatingSystemSection ovf:id="80" vmw:osType="other3xLinux64Guest">
       <Info>The kind of installed guest operating system</Info>
-      <Description>Red Hat Enterprise Linux 9 (64-bit)</Description>
+      <Description>Other Linux (64-bit)</Description>
     </OperatingSystemSection>
     <VirtualHardwareSection>
       <Info>Virtual hardware requirements</Info>
@@ -27,7 +27,7 @@
         <vssd:ElementName>Virtual Hardware Family</vssd:ElementName>
         <vssd:InstanceID>0</vssd:InstanceID>
         <vssd:VirtualSystemIdentifier>MigrationAssessment</vssd:VirtualSystemIdentifier>
-        <vssd:VirtualSystemType>vmx-20</vssd:VirtualSystemType>
+        <vssd:VirtualSystemType>vmx-17</vssd:VirtualSystemType>
       </System>
       <Item>
         <rasd:AllocationUnits>hertz * 10^6</rasd:AllocationUnits>
