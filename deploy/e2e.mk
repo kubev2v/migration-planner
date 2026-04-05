@@ -80,7 +80,7 @@ build_planner_iso_container:
 	make migration-planner-agent-container
 	$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE)
 	make migration-planner-iso-container TLS_VERIFY=false
-	$(PODMAN) builder prune -af || true # Clean up Docker to free space before loading large ISO image (1.4GB)
+	$(PODMAN) builder prune -af || true # Clean up Docker to free space before loading large ISO image (2.7GB)
 	kind load docker-image $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) --name $(E2E_CLUSTER_NAME)
 	$(PODMAN) rmi $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 

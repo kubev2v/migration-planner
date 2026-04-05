@@ -63,7 +63,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 				return err
 			}
 			return nil
-		}, "3m", "2s").Should(BeNil())
+		}, "10m", "2s").Should(BeNil())
 		zap.S().Info("Planner-agent is now running")
 
 		zap.S().Info("Setup complete for test.")

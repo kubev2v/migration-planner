@@ -83,24 +83,24 @@ func (p *plannerAgentLibvirt) Run() error {
 	return nil
 }
 
-// DumpDataDir logs the contents of /var/lib/data and stats agent.duckdb
+// DumpDataDir logs the contents of /var/lib/data/agent and stats agent.duckdb
 func (p *plannerAgentLibvirt) DumpDataDir() error {
 	ip, err := p.GetIp()
 	if err != nil {
 		return fmt.Errorf("failed to get IP: %w", err)
 	}
 
-	lsOutput, err := e2eutils.RunSSHCommand(ip, "ls -la /var/lib/data")
+	lsOutput, err := e2eutils.RunSSHCommand(ip, "ls -la /var/lib/data/agent")
 	if err != nil {
-		return fmt.Errorf("failed to ls /var/lib/data: %w", err)
+		return fmt.Errorf("failed to ls /var/lib/data/agent: %w", err)
 	}
-	zap.S().Infof("ls /var/lib/data:\n%s", lsOutput)
+	zap.S().Infof("ls /var/lib/data/agent:\n%s", lsOutput)
 
-	statOutput, err := e2eutils.RunSSHCommand(ip, "stat /var/lib/data/agent.duckdb")
+	statOutput, err := e2eutils.RunSSHCommand(ip, "stat /var/lib/data/agent/agent.duckdb")
 	if err != nil {
 		return fmt.Errorf("failed to stat agent.duckdb: %w", err)
 	}
-	zap.S().Infof("stat /var/lib/data/agent.duckdb:\n%s", statOutput)
+	zap.S().Infof("stat /var/lib/data/agent/agent.duckdb:\n%s", statOutput)
 
 	return nil
 }
