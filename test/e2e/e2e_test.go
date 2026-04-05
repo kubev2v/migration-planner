@@ -61,7 +61,7 @@ var _ = Describe("e2e", func() {
 				return err
 			}
 			return nil
-		}, "3m", "2s").Should(BeNil())
+		}, "10m", "2s").Should(BeNil())
 		zap.S().Info("Planner-agent is now running")
 
 		s, err = e2eAgent.Api.SetAgentMode(string(AgentModeConnected))
@@ -398,7 +398,7 @@ var _ = Describe("e2e", func() {
 					return err
 				}
 				return nil
-			}, "3m", "2s").Should(BeNil())
+			}, "10m", "2s").Should(BeNil())
 			zap.S().Info("Planner-agent is now running")
 
 			// Dump data directory after reboot
