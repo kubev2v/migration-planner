@@ -424,6 +424,38 @@ objects:
                               pattern:
                                 regex: "^${SERVICE_API_PATH}/api/v1/info"
                               substitution: "/api/v1/info"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/groups"
+                          route:
+                            cluster: backend-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/groups"
+                              substitution: "/api/v1/groups"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/partners"
+                          route:
+                            cluster: backend-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/partners"
+                              substitution: "/api/v1/partners"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/customers"
+                          route:
+                            cluster: backend-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/customers"
+                              substitution: "/api/v1/customers"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/identity"
+                          route:
+                            cluster: backend-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/identity"
+                              substitution: "/api/v1/identity"
                     http_filters:
                     - name: envoy.filters.http.router
                       typed_config:

@@ -39,7 +39,8 @@ var _ = Describe("accounts handler", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewAccountsService(s))
+		accountsSvc := service.NewAccountsService(s)
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, accountsSvc, service.NewPartnerService(s, accountsSvc))
 	})
 
 	AfterAll(func() {
@@ -87,7 +88,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 			Expect(body.PartnerId).To(BeNil())
 		})
 
-		It("returns partner identity with partnerId", func() {
+		It("returns partner identity when member belongs to partner group", func() {
 			orgID := uuid.New()
 			userID := uuid.New()
 
@@ -106,11 +107,46 @@ var _ = Describe("accounts handler", Ordered, func() {
 			Expect(body.Username).To(Equal("partneruser"))
 			Expect(string(body.Kind)).To(Equal("partner"))
 			Expect(*body.GroupId).To(Equal(orgID.String()))
+			Expect(body.PartnerId).To(BeNil())
+		})
+
+		It("returns customer identity when user has accepted partner request", func() {
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customeruser', 'partner1', 'accepted', 'Name', 'Contact', '555-0001', 'c@example.com', 'Location')", uuid.New()))
+			Expect(tx.Error).To(BeNil())
+
+			authUser := auth.User{Username: "customeruser", Organization: "jwt-org"}
+			ctx := auth.NewTokenContext(context.TODO(), authUser)
+
+			resp, err := srv.GetIdentity(ctx, server.GetIdentityRequestObject{})
+			Expect(err).To(BeNil())
+
+			body := resp.(server.GetIdentity200JSONResponse)
+			Expect(body.Username).To(Equal("customeruser"))
+			Expect(string(body.Kind)).To(Equal("customer"))
+			Expect(body.GroupId).To(BeNil())
 			Expect(body.PartnerId).ToNot(BeNil())
-			Expect(*body.PartnerId).To(Equal(orgID.String()))
+			Expect(*body.PartnerId).To(Equal("partner1"))
+		})
+
+		It("returns regular when partner request is pending", func() {
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'pendinguser', 'partner1', 'pending', 'Name', 'Contact', '555-0001', 'p@example.com', 'Location')", uuid.New()))
+			Expect(tx.Error).To(BeNil())
+
+			authUser := auth.User{Username: "pendinguser", Organization: "jwt-org"}
+			ctx := auth.NewTokenContext(context.TODO(), authUser)
+
+			resp, err := srv.GetIdentity(ctx, server.GetIdentityRequestObject{})
+			Expect(err).To(BeNil())
+
+			body := resp.(server.GetIdentity200JSONResponse)
+			Expect(body.Username).To(Equal("pendinguser"))
+			Expect(string(body.Kind)).To(Equal("regular"))
+			Expect(body.GroupId).To(BeNil())
+			Expect(body.PartnerId).To(BeNil())
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 		})

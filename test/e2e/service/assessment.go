@@ -71,20 +71,20 @@ func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1
 		}
 
 		switch job.Status {
-		case v1alpha1.Completed:
+		case v1alpha1.JobStatusCompleted:
 			if job.AssessmentId == nil {
 				return nil, fmt.Errorf("job completed but no assessment ID returned")
 			}
 			return s.GetAssessment(*job.AssessmentId)
-		case v1alpha1.Failed:
+		case v1alpha1.JobStatusFailed:
 			errMsg := "unknown error"
 			if job.Error != nil {
 				errMsg = *job.Error
 			}
 			return nil, fmt.Errorf("job failed: %s", errMsg)
-		case v1alpha1.Cancelled:
+		case v1alpha1.JobStatusCancelled:
 			return nil, fmt.Errorf("job was cancelled")
-		case v1alpha1.Pending, v1alpha1.Parsing, v1alpha1.Validating:
+		case v1alpha1.JobStatusPending, v1alpha1.JobStatusParsing, v1alpha1.JobStatusValidating:
 			// Still processing, continue polling
 			zap.S().Infof("[PlannerService] Job %d status: %s, waiting...", job.Id, job.Status)
 			time.Sleep(pollInterval)

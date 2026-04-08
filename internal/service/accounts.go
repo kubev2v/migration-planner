@@ -21,46 +21,60 @@ func NewAccountsService(store store.Store) *AccountsService {
 
 // Identity
 
+type IdentityKind string
+
+const (
+	KindRegular  IdentityKind = "regular"
+	KindCustomer IdentityKind = "customer"
+	KindPartner  IdentityKind = "partner"
+	KindAdmin    IdentityKind = "admin"
+)
+
 type Identity struct {
 	Username  string
-	Kind      string
+	Kind      IdentityKind
 	GroupID   *string
 	PartnerID *string
 }
 
-// FIX: This needs to be updated once partner/customers logic has been implemented
-func (s *AccountsService) GetIdentity(ctx context.Context, authUser auth.User) (Identity, error) {
-	member, err := s.store.Accounts().GetMember(ctx, authUser.Username)
+func (s *AccountsService) IsKind(ctx context.Context, user auth.User, kind IdentityKind) (bool, error) {
+	identity, err := s.GetIdentity(ctx, user)
 	if err != nil {
-		if !errors.Is(err, store.ErrRecordNotFound) {
-			return Identity{}, err
-		}
-		// member not found so return a regular user inferred from jwt
-		return Identity{
-			Username: authUser.Username,
-			Kind:     "regular",
-		}, nil
+		return false, err
+	}
+	return identity.Kind == kind, nil
+}
+
+func (s *AccountsService) GetIdentity(ctx context.Context, authUser auth.User) (Identity, error) {
+	// 1. Customer: accepted partner request
+	partners, err := s.store.PartnerCustomer().List(ctx,
+		store.NewPartnerQueryFilter().ByUsername(authUser.Username).ByStatus(model.RequestStatusAccepted))
+	if err != nil {
+		return Identity{}, err
+	}
+	if len(partners) > 0 {
+		partnerID := partners[0].PartnerID
+		return Identity{Username: authUser.Username, Kind: KindCustomer, PartnerID: &partnerID}, nil
 	}
 
-	groupID := member.GroupID.String()
-	identity := Identity{
-		Username: member.Username,
-		Kind:     "regular",
-		GroupID:  &groupID,
+	// 2. Member-based roles: partner / admin
+	member, err := s.store.Accounts().GetMember(ctx, authUser.Username)
+	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
+		return Identity{}, err
 	}
 
 	if member.Group != nil {
+		groupID := member.GroupID.String()
 		switch member.Group.Kind {
-		case "admin":
-			identity.Kind = "admin"
 		case "partner":
-			identity.Kind = "partner"
-			partnerID := member.GroupID.String()
-			identity.PartnerID = &partnerID
+			return Identity{Username: member.Username, Kind: KindPartner, GroupID: &groupID}, nil
+		case "admin":
+			return Identity{Username: member.Username, Kind: KindAdmin, GroupID: &groupID}, nil
 		}
 	}
 
-	return identity, nil
+	// 3. Regular
+	return Identity{Username: authUser.Username, Kind: KindRegular}, nil
 }
 
 func (s *AccountsService) ListGroups(ctx context.Context, filter *store.GroupQueryFilter) (model.GroupList, error) {

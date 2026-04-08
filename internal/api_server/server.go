@@ -178,13 +178,22 @@ func (s *Server) Run(ctx context.Context) error {
 		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
 	}
 
+	accountsSvc := service.NewAccountsService(s.store)
+
+	var partnerSvc service.PartnerServicer
+	partnerSvc = service.NewPartnerService(s.store, accountsSvc)
+	if s.cfg.Service.Auth.AuthenticationType != "none" {
+		partnerSvc = service.NewAuthzPartnerService(partnerSvc, accountsSvc, s.store)
+	}
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
 		service.NewJobService(s.store, s.jobsClient.RiverClient),
 		service.NewSizerService(sizerClient, s.store),
 		service.NewEstimationService(s.store),
-		service.NewAccountsService(s.store),
+		accountsSvc,
+		partnerSvc,
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
