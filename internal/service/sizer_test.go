@@ -56,6 +56,10 @@ func (m *MockStore) Job() store.Job {
 	return nil
 }
 
+func (m *MockStore) PartnerCustomer() store.PartnerCustomer {
+	return nil
+}
+
 func (m *MockStore) PrivateKey() store.PrivateKey {
 	return nil
 }

@@ -120,7 +120,7 @@ func (s *JobService) CancelJob(ctx context.Context, jobID int64, orgID, username
 	}
 
 	// Check if job can be cancelled
-	if job.Status == v1alpha1.Completed || job.Status == v1alpha1.Failed || job.Status == v1alpha1.Cancelled {
+	if job.Status == v1alpha1.JobStatusCompleted || job.Status == v1alpha1.JobStatusFailed || job.Status == v1alpha1.JobStatusCancelled {
 		return job, nil // Already in terminal state
 	}
 

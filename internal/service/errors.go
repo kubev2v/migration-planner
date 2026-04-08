@@ -31,6 +31,10 @@ func NewErrResourceNotFound(id uuid.UUID, resourceType string) *ErrResourceNotFo
 	return &ErrResourceNotFound{fmt.Errorf("%s %s not found", resourceType, id)}
 }
 
+func NewErrResourceNotFoundByStr(id string, resourceType string) *ErrResourceNotFound {
+	return &ErrResourceNotFound{fmt.Errorf("%s %s not found", resourceType, id)}
+}
+
 func NewErrSourceNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "source")
 }
@@ -170,3 +174,11 @@ func (e *ErrInvalidSchema) Error() string { return e.Msg }
 type ErrInvalidEstimationParam struct{ Msg string }
 
 func (e *ErrInvalidEstimationParam) Error() string { return e.Msg }
+
+type ErrActiveRequestExists struct {
+	error
+}
+
+func NewErrActiveRequestExists(username string) *ErrActiveRequestExists {
+	return &ErrActiveRequestExists{fmt.Errorf("user %s already has an active partner request", username)}
+}
