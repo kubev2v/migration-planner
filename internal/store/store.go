@@ -18,6 +18,7 @@ type Store interface {
 	Assessment() Assessment
 	Job() Job
 	Accounts() Accounts
+	Partner() Partner
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
 }
@@ -33,6 +34,7 @@ type DataStore struct {
 	assessment Assessment
 	job        Job
 	accounts   Accounts
+	partner    Partner
 }
 
 func NewStore(db *gorm.DB) Store {
@@ -46,6 +48,7 @@ func NewStore(db *gorm.DB) Store {
 		job:        NewJobStore(db),
 		authz:      NewAuthzStore(db),
 		accounts:   NewAccountsStore(db),
+		partner:    NewPartnerStore(db),
 		db:         db,
 	}
 }
@@ -88,6 +91,10 @@ func (s *DataStore) Job() Job {
 
 func (s *DataStore) Accounts() Accounts {
 	return s.accounts
+}
+
+func (s *DataStore) Partner() Partner {
+	return s.partner
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {

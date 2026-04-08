@@ -139,6 +139,12 @@ type ClientInterface interface {
 
 	CalculateMigrationEstimationByComplexity(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListCustomers request
+	ListCustomers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveCustomer request
+	RemoveCustomer(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListGroups request
 	ListGroups(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -179,6 +185,31 @@ type ClientInterface interface {
 
 	// GetInfo request
 	GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPartners request
+	ListPartners(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListPartnerRequests request
+	ListPartnerRequests(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelPartnerRequest request
+	CancelPartnerRequest(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdatePartnerRequestWithBody request with any body
+	UpdatePartnerRequestWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdatePartnerRequest(ctx context.Context, id openapi_types.UUID, body UpdatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// LeavePartner request
+	LeavePartner(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetPartner request
+	GetPartner(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreatePartnerRequestWithBody request with any body
+	CreatePartnerRequestWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CreatePartnerRequest(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DeleteSources request
 	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -433,6 +464,30 @@ func (c *Client) CalculateMigrationEstimationByComplexity(ctx context.Context, i
 	return c.Client.Do(req)
 }
 
+func (c *Client) ListCustomers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCustomersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) RemoveCustomer(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveCustomerRequest(c.Server, username)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) ListGroups(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListGroupsRequest(c.Server, params)
 	if err != nil {
@@ -603,6 +658,114 @@ func (c *Client) GetIdentity(ctx context.Context, reqEditors ...RequestEditorFn)
 
 func (c *Client) GetInfo(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetInfoRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListPartners(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPartnersRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) ListPartnerRequests(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListPartnerRequestsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CancelPartnerRequest(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelPartnerRequestRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePartnerRequestWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePartnerRequestRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdatePartnerRequest(ctx context.Context, id openapi_types.UUID, body UpdatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdatePartnerRequestRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) LeavePartner(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewLeavePartnerRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetPartner(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetPartnerRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePartnerRequestWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePartnerRequestRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CreatePartnerRequest(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreatePartnerRequestRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1258,6 +1421,67 @@ func NewCalculateMigrationEstimationByComplexityRequestWithBody(server string, i
 	return req, nil
 }
 
+// NewListCustomersRequest generates requests for ListCustomers
+func NewListCustomersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/customers")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRemoveCustomerRequest generates requests for RemoveCustomer
+func NewRemoveCustomerRequest(server string, username string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "username", runtime.ParamLocationPath, username)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/customers/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListGroupsRequest generates requests for ListGroups
 func NewListGroupsRequest(server string, params *ListGroupsParams) (*http.Request, error) {
 	var err error
@@ -1724,6 +1948,256 @@ func NewGetInfoRequest(server string) (*http.Request, error) {
 	return req, nil
 }
 
+// NewListPartnersRequest generates requests for ListPartners
+func NewListPartnersRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListPartnerRequestsRequest generates requests for ListPartnerRequests
+func NewListPartnerRequestsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/requests")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCancelPartnerRequestRequest generates requests for CancelPartnerRequest
+func NewCancelPartnerRequestRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/requests/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdatePartnerRequestRequest calls the generic UpdatePartnerRequest builder with application/json body
+func NewUpdatePartnerRequestRequest(server string, id openapi_types.UUID, body UpdatePartnerRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdatePartnerRequestRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdatePartnerRequestRequestWithBody generates requests for UpdatePartnerRequest with any type of body
+func NewUpdatePartnerRequestRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/requests/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewLeavePartnerRequest generates requests for LeavePartner
+func NewLeavePartnerRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetPartnerRequest generates requests for GetPartner
+func NewGetPartnerRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreatePartnerRequestRequest calls the generic CreatePartnerRequest builder with application/json body
+func NewCreatePartnerRequestRequest(server string, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreatePartnerRequestRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewCreatePartnerRequestRequestWithBody generates requests for CreatePartnerRequest with any type of body
+func NewCreatePartnerRequestRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/partners/%s/request", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewDeleteSourcesRequest generates requests for DeleteSources
 func NewDeleteSourcesRequest(server string) (*http.Request, error) {
 	var err error
@@ -2166,6 +2640,12 @@ type ClientWithResponsesInterface interface {
 
 	CalculateMigrationEstimationByComplexityWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateMigrationEstimationByComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationByComplexityResponse, error)
 
+	// ListCustomersWithResponse request
+	ListCustomersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCustomersResponse, error)
+
+	// RemoveCustomerWithResponse request
+	RemoveCustomerWithResponse(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*RemoveCustomerResponse, error)
+
 	// ListGroupsWithResponse request
 	ListGroupsWithResponse(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*ListGroupsResponse, error)
 
@@ -2206,6 +2686,31 @@ type ClientWithResponsesInterface interface {
 
 	// GetInfoWithResponse request
 	GetInfoWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*GetInfoResponse, error)
+
+	// ListPartnersWithResponse request
+	ListPartnersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPartnersResponse, error)
+
+	// ListPartnerRequestsWithResponse request
+	ListPartnerRequestsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPartnerRequestsResponse, error)
+
+	// CancelPartnerRequestWithResponse request
+	CancelPartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelPartnerRequestResponse, error)
+
+	// UpdatePartnerRequestWithBodyWithResponse request with any body
+	UpdatePartnerRequestWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePartnerRequestResponse, error)
+
+	UpdatePartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, body UpdatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePartnerRequestResponse, error)
+
+	// LeavePartnerWithResponse request
+	LeavePartnerWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*LeavePartnerResponse, error)
+
+	// GetPartnerWithResponse request
+	GetPartnerWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetPartnerResponse, error)
+
+	// CreatePartnerRequestWithBodyWithResponse request with any body
+	CreatePartnerRequestWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error)
+
+	CreatePartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error)
 
 	// DeleteSourcesWithResponse request
 	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
@@ -2563,6 +3068,58 @@ func (r CalculateMigrationEstimationByComplexityResponse) StatusCode() int {
 	return 0
 }
 
+type ListCustomersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PartnerRequestList
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCustomersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCustomersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type RemoveCustomerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveCustomerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveCustomerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type ListGroupsResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -2832,6 +3389,180 @@ func (r GetInfoResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r GetInfoResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListPartnersResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *GroupList
+	JSON401      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPartnersResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPartnersResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type ListPartnerRequestsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PartnerRequestList
+	JSON401      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r ListPartnerRequestsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListPartnerRequestsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CancelPartnerRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelPartnerRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelPartnerRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdatePartnerRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *PartnerRequest
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdatePartnerRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdatePartnerRequestResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type LeavePartnerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r LeavePartnerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r LeavePartnerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetPartnerResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Group
+	JSON401      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetPartnerResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetPartnerResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CreatePartnerRequestResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON201      *PartnerRequest
+	JSON400      *Error
+	JSON401      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CreatePartnerRequestResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreatePartnerRequestResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -3242,6 +3973,24 @@ func (c *ClientWithResponses) CalculateMigrationEstimationByComplexityWithRespon
 	return ParseCalculateMigrationEstimationByComplexityResponse(rsp)
 }
 
+// ListCustomersWithResponse request returning *ListCustomersResponse
+func (c *ClientWithResponses) ListCustomersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCustomersResponse, error) {
+	rsp, err := c.ListCustomers(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCustomersResponse(rsp)
+}
+
+// RemoveCustomerWithResponse request returning *RemoveCustomerResponse
+func (c *ClientWithResponses) RemoveCustomerWithResponse(ctx context.Context, username string, reqEditors ...RequestEditorFn) (*RemoveCustomerResponse, error) {
+	rsp, err := c.RemoveCustomer(ctx, username, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveCustomerResponse(rsp)
+}
+
 // ListGroupsWithResponse request returning *ListGroupsResponse
 func (c *ClientWithResponses) ListGroupsWithResponse(ctx context.Context, params *ListGroupsParams, reqEditors ...RequestEditorFn) (*ListGroupsResponse, error) {
 	rsp, err := c.ListGroups(ctx, params, reqEditors...)
@@ -3371,6 +4120,85 @@ func (c *ClientWithResponses) GetInfoWithResponse(ctx context.Context, reqEditor
 		return nil, err
 	}
 	return ParseGetInfoResponse(rsp)
+}
+
+// ListPartnersWithResponse request returning *ListPartnersResponse
+func (c *ClientWithResponses) ListPartnersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPartnersResponse, error) {
+	rsp, err := c.ListPartners(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPartnersResponse(rsp)
+}
+
+// ListPartnerRequestsWithResponse request returning *ListPartnerRequestsResponse
+func (c *ClientWithResponses) ListPartnerRequestsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListPartnerRequestsResponse, error) {
+	rsp, err := c.ListPartnerRequests(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListPartnerRequestsResponse(rsp)
+}
+
+// CancelPartnerRequestWithResponse request returning *CancelPartnerRequestResponse
+func (c *ClientWithResponses) CancelPartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*CancelPartnerRequestResponse, error) {
+	rsp, err := c.CancelPartnerRequest(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelPartnerRequestResponse(rsp)
+}
+
+// UpdatePartnerRequestWithBodyWithResponse request with arbitrary body returning *UpdatePartnerRequestResponse
+func (c *ClientWithResponses) UpdatePartnerRequestWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdatePartnerRequestResponse, error) {
+	rsp, err := c.UpdatePartnerRequestWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePartnerRequestResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdatePartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, body UpdatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdatePartnerRequestResponse, error) {
+	rsp, err := c.UpdatePartnerRequest(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdatePartnerRequestResponse(rsp)
+}
+
+// LeavePartnerWithResponse request returning *LeavePartnerResponse
+func (c *ClientWithResponses) LeavePartnerWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*LeavePartnerResponse, error) {
+	rsp, err := c.LeavePartner(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseLeavePartnerResponse(rsp)
+}
+
+// GetPartnerWithResponse request returning *GetPartnerResponse
+func (c *ClientWithResponses) GetPartnerWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetPartnerResponse, error) {
+	rsp, err := c.GetPartner(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetPartnerResponse(rsp)
+}
+
+// CreatePartnerRequestWithBodyWithResponse request with arbitrary body returning *CreatePartnerRequestResponse
+func (c *ClientWithResponses) CreatePartnerRequestWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error) {
+	rsp, err := c.CreatePartnerRequestWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePartnerRequestResponse(rsp)
+}
+
+func (c *ClientWithResponses) CreatePartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error) {
+	rsp, err := c.CreatePartnerRequest(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreatePartnerRequestResponse(rsp)
 }
 
 // DeleteSourcesWithResponse request returning *DeleteSourcesResponse
@@ -4184,6 +5012,114 @@ func ParseCalculateMigrationEstimationByComplexityResponse(rsp *http.Response) (
 	return response, nil
 }
 
+// ParseListCustomersResponse parses an HTTP response from a ListCustomersWithResponse call
+func ParseListCustomersResponse(rsp *http.Response) (*ListCustomersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCustomersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PartnerRequestList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveCustomerResponse parses an HTTP response from a RemoveCustomerWithResponse call
+func ParseRemoveCustomerResponse(rsp *http.Response) (*RemoveCustomerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveCustomerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListGroupsResponse parses an HTTP response from a ListGroupsWithResponse call
 func ParseListGroupsResponse(rsp *http.Response) (*ListGroupsResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -4688,6 +5624,328 @@ func ParseGetInfoResponse(rsp *http.Response) (*GetInfoResponse, error) {
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPartnersResponse parses an HTTP response from a ListPartnersWithResponse call
+func ParseListPartnersResponse(rsp *http.Response) (*ListPartnersResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPartnersResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest GroupList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListPartnerRequestsResponse parses an HTTP response from a ListPartnerRequestsWithResponse call
+func ParseListPartnerRequestsResponse(rsp *http.Response) (*ListPartnerRequestsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListPartnerRequestsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PartnerRequestList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCancelPartnerRequestResponse parses an HTTP response from a CancelPartnerRequestWithResponse call
+func ParseCancelPartnerRequestResponse(rsp *http.Response) (*CancelPartnerRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelPartnerRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdatePartnerRequestResponse parses an HTTP response from a UpdatePartnerRequestWithResponse call
+func ParseUpdatePartnerRequestResponse(rsp *http.Response) (*UpdatePartnerRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdatePartnerRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PartnerRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseLeavePartnerResponse parses an HTTP response from a LeavePartnerWithResponse call
+func ParseLeavePartnerResponse(rsp *http.Response) (*LeavePartnerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &LeavePartnerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetPartnerResponse parses an HTTP response from a GetPartnerWithResponse call
+func ParseGetPartnerResponse(rsp *http.Response) (*GetPartnerResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetPartnerResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Group
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreatePartnerRequestResponse parses an HTTP response from a CreatePartnerRequestWithResponse call
+func ParseCreatePartnerRequestResponse(rsp *http.Response) (*CreatePartnerRequestResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreatePartnerRequestResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest PartnerRequest
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

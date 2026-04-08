@@ -85,6 +85,19 @@ const (
 	Unsupported NetworkType = "unsupported"
 )
 
+// Defines values for PartnerRequestRequestStatus.
+const (
+	PartnerRequestRequestStatusAccepted PartnerRequestRequestStatus = "accepted"
+	PartnerRequestRequestStatusAwaiting PartnerRequestRequestStatus = "awaiting"
+	PartnerRequestRequestStatusRejected PartnerRequestRequestStatus = "rejected"
+)
+
+// Defines values for PartnerRequestUpdateStatus.
+const (
+	PartnerRequestUpdateStatusAccepted PartnerRequestUpdateStatus = "accepted"
+	PartnerRequestUpdateStatusRejected PartnerRequestUpdateStatus = "rejected"
+)
+
 // Defines values for ListGroupsParamsKind.
 const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
@@ -608,6 +621,44 @@ type OsDiskEstimationEntry struct {
 	VmCount int `json:"vmCount"`
 }
 
+// PartnerRequest defines model for PartnerRequest.
+type PartnerRequest struct {
+	ContactName   string                      `json:"contactName"`
+	ContactPhone  string                      `json:"contactPhone"`
+	Email         string                      `json:"email"`
+	Id            openapi_types.UUID          `json:"id"`
+	Location      string                      `json:"location"`
+	Name          string                      `json:"name"`
+	PartnerId     openapi_types.UUID          `json:"partnerId"`
+	Reason        *string                     `json:"reason"`
+	RequestStatus PartnerRequestRequestStatus `json:"requestStatus"`
+	Username      string                      `json:"username"`
+}
+
+// PartnerRequestCreate defines model for PartnerRequestCreate.
+type PartnerRequestCreate struct {
+	ContactName  string `json:"contactName" validate:"required"`
+	ContactPhone string `json:"contactPhone" validate:"required"`
+	Email        string `json:"email" validate:"required,email"`
+	Location     string `json:"location" validate:"required"`
+	Name         string `json:"name" validate:"required"`
+}
+
+// PartnerRequestList defines model for PartnerRequestList.
+type PartnerRequestList = []PartnerRequest
+
+// PartnerRequestRequestStatus defines model for PartnerRequestRequestStatus.
+type PartnerRequestRequestStatus string
+
+// PartnerRequestUpdate defines model for PartnerRequestUpdate.
+type PartnerRequestUpdate struct {
+	Reason *string                    `json:"reason,omitempty"`
+	Status PartnerRequestUpdateStatus `json:"status"`
+}
+
+// PartnerRequestUpdateStatus defines model for PartnerRequestUpdateStatus.
+type PartnerRequestUpdateStatus string
+
 // SchemaEstimationResult Estimation results for a single schema
 type SchemaEstimationResult struct {
 	// Breakdown Per-calculator results
@@ -882,6 +933,12 @@ type CreateGroupMemberJSONRequestBody = MemberCreate
 
 // UpdateGroupMemberJSONRequestBody defines body for UpdateGroupMember for application/json ContentType.
 type UpdateGroupMemberJSONRequestBody = MemberUpdate
+
+// UpdatePartnerRequestJSONRequestBody defines body for UpdatePartnerRequest for application/json ContentType.
+type UpdatePartnerRequestJSONRequestBody = PartnerRequestUpdate
+
+// CreatePartnerRequestJSONRequestBody defines body for CreatePartnerRequest for application/json ContentType.
+type CreatePartnerRequestJSONRequestBody = PartnerRequestCreate
 
 // CreateSourceJSONRequestBody defines body for CreateSource for application/json ContentType.
 type CreateSourceJSONRequestBody = SourceCreate
