@@ -351,6 +351,11 @@ spec:
         values:
         - "false"
     - name: ecosystem-cert-preflight-checks
+      computeResources:
+        requests:
+          memory: 2Gi
+        limits:
+          memory: 2Gi
       params:
       - name: image-url
         value: $(tasks.build-image-index.results.IMAGE_URL)
