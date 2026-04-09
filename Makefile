@@ -19,7 +19,6 @@ MIGRATION_PLANNER_REPLICAS ?= 1
 SERVICE_API_PATH ?= /api/migration-assessment
 MIGRATION_PLANNER_AUTH ?= local
 PERSISTENT_DISK_DEVICE ?= /dev/sda
-INSECURE_REGISTRY ?= "true"
 DOWNLOAD_RHCOS ?= true
 RHCOS_PASSWORD ?= '$$$$y$$$$j9T$$$$hUUbW8zoB.Qcmpwm4/RuK1$$$$FMtuDAxNLp3sEa2PnGiJdXr8uYbvUNPlVDXpcJim529'
 IFACE ?= eth0

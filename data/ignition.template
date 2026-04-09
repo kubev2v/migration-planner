@@ -55,10 +55,9 @@ systemd:
         Type=oneshot
         ExecStart=/bin/bash -c 'cat /sys/class/dmi/id/product_uuid > /var/lib/data/agent_id'
         ExecStartPost=/bin/bash -c 'chown -R core:core /var/lib/data'
-        RemainAfterExit=true
+        RemainAfterExit=yes
         [Install]
         WantedBy=multi-user.target
-
 storage:
   filesystems:
     - path: /var/lib/data
@@ -73,8 +72,47 @@ storage:
         name: core
       group:
         name: core
+    - path: /home/core/.config/systemd/user/default.target.wants/planner-agent-image-load.service
+      target: /home/core/.config/systemd/user/planner-agent-image-load.service
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/containers/systemd/planner-agent-image-load.service
+      target: /home/core/.config/systemd/user/planner-agent-image-load.service
+      user:
+        name: core
+      group:
+        name: core
   directories:
+    - path: /var/lib/data/tmp
+      mode: 0777
+      overwrite: true
     - path: /home/core/.config
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/containers
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/containers/systemd
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/systemd/user
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/systemd/user/default.target.wants
       overwrite: true
       user:
         name: core
@@ -115,6 +153,58 @@ storage:
           location = "{{.InsecureRegistry}}"
           insecure = true
     {{end}}
+    - path: /home/core/.config/containers/storage.conf
+      overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [storage]
+          driver = "overlay"
+          runroot = "/var/lib/data/run"
+          graphroot = "/var/lib/data/containers/storage"
+    - path: /usr/local/sbin/load-planner-agent-image.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/bash
+          set -euo pipefail
+
+          if ! command -v skopeo >/dev/null 2>&1; then
+            exit 1
+          fi
+
+          readonly IMAGE_TAR=/run/media/iso/images/migration-planner-agent.tar
+
+          if [[ ! -f "$IMAGE_TAR" ]]; then
+            exit 1
+          fi
+
+          exec /usr/bin/skopeo copy --tmpdir /var/lib/data/tmp/ \
+            "oci-archive:${IMAGE_TAR}" \
+            "containers-storage:localhost/migration-planner-agent:latest"
+    - path: /home/core/.config/systemd/user/planner-agent-image-load.service
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [Unit]
+          Description=Load migration planner agent OCI image into local containers storage
+
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          Environment=TMPDIR=/var/lib/data/tmp
+          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done && /usr/bin/mkdir -p /var/lib/data/tmp'
+          ExecStart=/usr/local/sbin/load-planner-agent-image.sh
+
+          [Install]
+          WantedBy=default.target
     {{ if .Token }}
     - path: /home/core/.migration-planner/jwt.json
       mode: 0644
@@ -135,22 +225,6 @@ storage:
       contents:
         inline: |
           PasswordAuthentication yes
-    - path: /etc/systemd/user-generators/100-skopeo.sh
-      mode: 0775
-      contents:
-        inline: |
-          #!/usr/bin/bash
-          IMAGE_STORAGE=/run/media/iso/images/migration-planner-agent.tar
-          if ! command -v skopeo 2>&1 >/dev/null
-          then
-            echo "skopeo could not be found"
-            exit 0
-          fi
-
-          if [ -f $IMAGE_STORAGE ]; then
-              skopeo copy oci-archive:$IMAGE_STORAGE containers-storage:localhost/migration-planner-agent:latest
-          fi
-
     - path: /home/core/.migration-planner/agent.env
       contents:
         inline: |
@@ -184,6 +258,8 @@ storage:
         inline: |
           [Unit]
           Description=Planner agent quadlet
+          After=planner-agent-image-load.service
+          Requires=planner-agent-image-load.service
 
           [Container]
           Image=localhost/migration-planner-agent:latest
@@ -198,9 +274,10 @@ storage:
           UserNS=keep-id:uid=1001
 
           [Service]
+          TimeoutStartSec=300
           Restart=on-failure
           RestartSec=5
-          ExecStartPre=/bin/bash -c 'until [ -f /var/lib/data/agent_id ]; do sleep 1; done && echo "AGENT_AGENT_ID=$(cat /var/lib/data/agent_id)" >> /home/core/.migration-planner/agent.env'
+          ExecStartPre=/usr/bin/bash -c 'echo "AGENT_AGENT_ID=$(cat /var/lib/data/agent_id)" >> /home/core/.migration-planner/agent.env'
 
           [Install]
           WantedBy=multi-user.target default.target
