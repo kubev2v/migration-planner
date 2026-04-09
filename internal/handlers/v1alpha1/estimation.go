@@ -150,7 +150,12 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		schemaResults, err := h.estimationSrv.RunEstimation(schemas, bucketParams)
 		if err != nil {
 			logger.Error(err).Log()
-			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to run estimation"}, nil
+			switch err.(type) {
+			case *service.ErrInvalidSchema:
+				return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: err.Error()}, nil
+			default:
+				return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to run estimation"}, nil
+			}
 		}
 		bucketEstimations[bucket.Score] = make(map[string]*service.MigrationAssessmentResult, len(schemaResults))
 		for schema, r := range schemaResults {
