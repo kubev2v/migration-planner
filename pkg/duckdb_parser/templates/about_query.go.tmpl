@@ -1,0 +1,6 @@
+{{- /*
+About Query Template — single row of vCenter API / product / instance metadata.
+*/ -}}
+SELECT "APIVersion", "Product", "InstanceUuid"
+FROM about
+LIMIT 1;

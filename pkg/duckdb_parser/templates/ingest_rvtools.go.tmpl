@@ -40,6 +40,8 @@ ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "HW version" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Provisioned MiB" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Resource pool" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK Server type" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK API Version" VARCHAR;
 
 INSERT INTO vinfo (
     "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
@@ -49,7 +51,7 @@ INSERT INTO vinfo (
     "DNS Name", "Primary IP Address", "In Use MiB",
     "Template", "CBT", "EnableUUID",
     "Datacenter", "Cluster", "HW version",
-    "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID"
+    "Total disk capacity MiB", "Provisioned MiB", "Resource pool"
 )
 SELECT
     "VM ID",
@@ -78,13 +80,20 @@ SELECT
     "HW version",
     NULL,
     TRY_CAST("Provisioned MiB" AS INTEGER),
-    "Resource pool",
-    "VI SDK UUID"
+    "Resource pool"
 FROM vinfo_raw
 WHERE "VM" IS NOT NULL AND "VM" != ''
   AND "VM ID" IS NOT NULL AND TRIM("VM ID") != ''
   AND LOWER(COALESCE("Template", '')) NOT IN ('true', '1', 'yes')
 ON CONFLICT DO NOTHING;
+
+-- Single about row
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
+SELECT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
+FROM vinfo_raw
+WHERE "VI SDK UUID" IS NOT NULL
+ORDER BY "VI SDK API Version" IS NOT NULL DESC
+LIMIT 1;
 
 WITH cleaned_networks AS (
     SELECT
