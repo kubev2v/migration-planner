@@ -1,6 +1,6 @@
 # Minimum permissions for the agent account
 
-The **agent** only gathers information from vCenter, therefore a **read only** permission whould be enough. 
+The **agent** only gathers information from vCenter, therefore a **read only** permission should be enough. 
 
 One such role is the [Read Only Role](https://docs.vmware.com/en/VMware-vSphere/7.0/com.vmware.vsphere.security.doc/GUID-93B962A7-93FA-4E96-B68F-AE66D3D6C663.html).
 
