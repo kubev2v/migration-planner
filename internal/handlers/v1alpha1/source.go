@@ -22,6 +22,7 @@ type ServiceHandler struct {
 	sizerSrv      *service.SizerService
 	estimationSrv *service.EstimationService
 	accountsSrv   *service.AccountsService
+	partnerSrv    service.PartnerServicer
 }
 
 func NewServiceHandler(
@@ -31,6 +32,7 @@ func NewServiceHandler(
 	sizer *service.SizerService,
 	estimation *service.EstimationService,
 	accounts *service.AccountsService,
+	partner service.PartnerServicer,
 ) *ServiceHandler {
 	return &ServiceHandler{
 		sourceSrv:     sourceService,
@@ -39,6 +41,7 @@ func NewServiceHandler(
 		sizerSrv:      sizer,
 		estimationSrv: estimation,
 		accountsSrv:   accounts,
+		partnerSrv:    partner,
 	}
 }
 

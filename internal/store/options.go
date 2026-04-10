@@ -2,6 +2,7 @@ package store
 
 import (
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 )
 
@@ -79,6 +80,40 @@ func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter 
 		return tx.Where("on_premises IS NOT TRUE")
 	})
 	return qf
+}
+
+type PartnerQueryFilter BaseQuerier
+
+func NewPartnerQueryFilter() *PartnerQueryFilter {
+	return &PartnerQueryFilter{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
+}
+
+func (f *PartnerQueryFilter) ByID(id uuid.UUID) *PartnerQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("id = ?", id)
+	})
+	return f
+}
+
+func (f *PartnerQueryFilter) ByUsername(username string) *PartnerQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("username = ?", username)
+	})
+	return f
+}
+
+func (f *PartnerQueryFilter) ByPartnerID(partnerID string) *PartnerQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("partner_id = ?", partnerID)
+	})
+	return f
+}
+
+func (f *PartnerQueryFilter) ByStatus(status model.RequestStatus) *PartnerQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("request_status = ?", status)
+	})
+	return f
 }
 
 type AssessmentQueryFilter struct {

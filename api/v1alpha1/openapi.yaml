@@ -1461,6 +1461,338 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/partners:
+    get:
+      tags:
+        - partner
+      description: List available partner organizations
+      operationId: listPartners
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/partners/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Partner group ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      tags:
+        - partner
+      description: Get my partner organization details
+      operationId: getPartner
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Group"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - partner
+      description: Leave partner organization
+      operationId: leavePartner
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/partners/{id}/request:
+    parameters:
+      - name: id
+        in: path
+        description: Partner group ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+    post:
+      tags:
+        - partner
+      description: Submit a partner request. Only regular users can make this request.
+      operationId: createPartnerRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartnerRequestCreate"
+        required: true
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerRequest"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/partners/requests:
+    get:
+      tags:
+        - partner
+      description: List my partner requests
+      operationId: listPartnerRequests
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerRequestList"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/partners/requests/{id}:
+    parameters:
+      - name: id
+        in: path
+        description: Partner request ID
+        required: true
+        schema:
+          type: string
+          format: uuid
+    delete:
+      tags:
+        - partner
+      description: Cancel a pending partner request
+      operationId: cancelPartnerRequest
+      responses:
+        "200":
+          description: OK
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    put:
+      tags:
+        - partner
+      description: Accept or reject a customer request
+      operationId: updatePartnerRequest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PartnerRequestUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerRequest"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/customers:
+    get:
+      tags:
+        - partner
+      description: List customer requests for my partner organization
+      operationId: listCustomers
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PartnerRequestList"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/customers/{username}:
+    parameters:
+      - name: username
+        in: path
+        description: Customer username
+        required: true
+        schema:
+          type: string
+    delete:
+      tags:
+        - partner
+      description: Remove a customer from partner organization
+      operationId: removeCustomer
+      responses:
+        "200":
+          description: OK
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /health:
     get:
       tags:
@@ -2889,3 +3221,95 @@ components:
       required:
         - gitCommit
         - versionName
+
+    PartnerRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        username:
+          type: string
+        partnerId:
+          type: string
+          format: uuid
+        requestStatus:
+          $ref: "#/components/schemas/PartnerRequestRequestStatus"
+        name:
+          type: string
+        contactName:
+          type: string
+        contactPhone:
+          type: string
+        email:
+          type: string
+        location:
+          type: string
+        reason:
+          type: string
+          nullable: true
+      required:
+        - id
+        - username
+        - partnerId
+        - requestStatus
+        - name
+        - contactName
+        - contactPhone
+        - email
+        - location
+
+    PartnerRequestCreate:
+      type: object
+      properties:
+        name:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        contactName:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        contactPhone:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        email:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required,email"
+        location:
+          type: string
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
+        - name
+        - contactName
+        - contactPhone
+        - email
+        - location
+
+    PartnerRequestRequestStatus:
+      type: string
+      enum: [awaiting, accepted, rejected]
+
+    PartnerRequestUpdateStatus:
+      type: string
+      enum: [accepted, rejected]
+
+    PartnerRequestUpdate:
+      type: object
+      properties:
+        status:
+          $ref: "#/components/schemas/PartnerRequestUpdateStatus"
+          x-oapi-codegen-extra-tags:
+            validate: "required,oneof=accepted rejected"
+        reason:
+          type: string
+      required:
+        - status
+
+    PartnerRequestList:
+      type: array
+      items:
+        $ref: "#/components/schemas/PartnerRequest"

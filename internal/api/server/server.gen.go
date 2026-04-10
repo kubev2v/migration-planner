@@ -56,6 +56,12 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments/{id}/migration-estimation/by-complexity)
 	CalculateMigrationEstimationByComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (GET /api/v1/customers)
+	ListCustomers(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/v1/customers/{username})
+	RemoveCustomer(w http.ResponseWriter, r *http.Request, username string)
+
 	// (GET /api/v1/groups)
 	ListGroups(w http.ResponseWriter, r *http.Request, params ListGroupsParams)
 
@@ -88,6 +94,27 @@ type ServerInterface interface {
 
 	// (GET /api/v1/info)
 	GetInfo(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/partners)
+	ListPartners(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v1/partners/requests)
+	ListPartnerRequests(w http.ResponseWriter, r *http.Request)
+
+	// (DELETE /api/v1/partners/requests/{id})
+	CancelPartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v1/partners/requests/{id})
+	UpdatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /api/v1/partners/{id})
+	LeavePartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/partners/{id})
+	GetPartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (POST /api/v1/partners/{id}/request)
+	CreatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(w http.ResponseWriter, r *http.Request)
@@ -184,6 +211,16 @@ func (_ Unimplemented) CalculateMigrationEstimationByComplexity(w http.ResponseW
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (GET /api/v1/customers)
+func (_ Unimplemented) ListCustomers(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/customers/{username})
+func (_ Unimplemented) RemoveCustomer(w http.ResponseWriter, r *http.Request, username string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (GET /api/v1/groups)
 func (_ Unimplemented) ListGroups(w http.ResponseWriter, r *http.Request, params ListGroupsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
@@ -236,6 +273,41 @@ func (_ Unimplemented) GetIdentity(w http.ResponseWriter, r *http.Request) {
 
 // (GET /api/v1/info)
 func (_ Unimplemented) GetInfo(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/partners)
+func (_ Unimplemented) ListPartners(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/partners/requests)
+func (_ Unimplemented) ListPartnerRequests(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/partners/requests/{id})
+func (_ Unimplemented) CancelPartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/partners/requests/{id})
+func (_ Unimplemented) UpdatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/partners/{id})
+func (_ Unimplemented) LeavePartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/partners/{id})
+func (_ Unimplemented) GetPartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/partners/{id}/request)
+func (_ Unimplemented) CreatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -590,6 +662,47 @@ func (siw *ServerInterfaceWrapper) CalculateMigrationEstimationByComplexity(w ht
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// ListCustomers operation middleware
+func (siw *ServerInterfaceWrapper) ListCustomers(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCustomers(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// RemoveCustomer operation middleware
+func (siw *ServerInterfaceWrapper) RemoveCustomer(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "username" -------------
+	var username string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "username", chi.URLParam(r, "username"), &username, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "username", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveCustomer(w, r, username)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // ListGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListGroups(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -870,6 +983,166 @@ func (siw *ServerInterfaceWrapper) GetInfo(w http.ResponseWriter, r *http.Reques
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetInfo(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ListPartners operation middleware
+func (siw *ServerInterfaceWrapper) ListPartners(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPartners(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// ListPartnerRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListPartnerRequests(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPartnerRequests(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CancelPartnerRequest operation middleware
+func (siw *ServerInterfaceWrapper) CancelPartnerRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelPartnerRequest(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdatePartnerRequest operation middleware
+func (siw *ServerInterfaceWrapper) UpdatePartnerRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdatePartnerRequest(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// LeavePartner operation middleware
+func (siw *ServerInterfaceWrapper) LeavePartner(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LeavePartner(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetPartner operation middleware
+func (siw *ServerInterfaceWrapper) GetPartner(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPartner(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreatePartnerRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreatePartnerRequest(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePartnerRequest(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1245,6 +1518,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/migration-estimation/by-complexity", wrapper.CalculateMigrationEstimationByComplexity)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/customers", wrapper.ListCustomers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/customers/{username}", wrapper.RemoveCustomer)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/groups", wrapper.ListGroups)
 	})
 	r.Group(func(r chi.Router) {
@@ -1276,6 +1555,27 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/info", wrapper.GetInfo)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/partners", wrapper.ListPartners)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/partners/requests", wrapper.ListPartnerRequests)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/partners/requests/{id}", wrapper.CancelPartnerRequest)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/partners/requests/{id}", wrapper.UpdatePartnerRequest)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/partners/{id}", wrapper.LeavePartner)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/partners/{id}", wrapper.GetPartner)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/partners/{id}/request", wrapper.CreatePartnerRequest)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
@@ -2015,6 +2315,119 @@ func (response CalculateMigrationEstimationByComplexity500JSONResponse) VisitCal
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListCustomersRequestObject struct {
+}
+
+type ListCustomersResponseObject interface {
+	VisitListCustomersResponse(w http.ResponseWriter) error
+}
+
+type ListCustomers200JSONResponse PartnerRequestList
+
+func (response ListCustomers200JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCustomers400JSONResponse Error
+
+func (response ListCustomers400JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCustomers401JSONResponse Error
+
+func (response ListCustomers401JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCustomers403JSONResponse Error
+
+func (response ListCustomers403JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListCustomers500JSONResponse Error
+
+func (response ListCustomers500JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveCustomerRequestObject struct {
+	Username string `json:"username"`
+}
+
+type RemoveCustomerResponseObject interface {
+	VisitRemoveCustomerResponse(w http.ResponseWriter) error
+}
+
+type RemoveCustomer200Response struct {
+}
+
+func (response RemoveCustomer200Response) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type RemoveCustomer400JSONResponse Error
+
+func (response RemoveCustomer400JSONResponse) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveCustomer401JSONResponse Error
+
+func (response RemoveCustomer401JSONResponse) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveCustomer403JSONResponse Error
+
+func (response RemoveCustomer403JSONResponse) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveCustomer404JSONResponse Error
+
+func (response RemoveCustomer404JSONResponse) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type RemoveCustomer500JSONResponse Error
+
+func (response RemoveCustomer500JSONResponse) VisitRemoveCustomerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListGroupsRequestObject struct {
 	Params ListGroupsParams
 }
@@ -2504,6 +2917,321 @@ func (response GetInfo200JSONResponse) VisitGetInfoResponse(w http.ResponseWrite
 type GetInfo500JSONResponse Error
 
 func (response GetInfo500JSONResponse) VisitGetInfoResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartnersRequestObject struct {
+}
+
+type ListPartnersResponseObject interface {
+	VisitListPartnersResponse(w http.ResponseWriter) error
+}
+
+type ListPartners200JSONResponse GroupList
+
+func (response ListPartners200JSONResponse) VisitListPartnersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartners401JSONResponse Error
+
+func (response ListPartners401JSONResponse) VisitListPartnersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartners500JSONResponse Error
+
+func (response ListPartners500JSONResponse) VisitListPartnersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartnerRequestsRequestObject struct {
+}
+
+type ListPartnerRequestsResponseObject interface {
+	VisitListPartnerRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListPartnerRequests200JSONResponse PartnerRequestList
+
+func (response ListPartnerRequests200JSONResponse) VisitListPartnerRequestsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartnerRequests401JSONResponse Error
+
+func (response ListPartnerRequests401JSONResponse) VisitListPartnerRequestsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListPartnerRequests500JSONResponse Error
+
+func (response ListPartnerRequests500JSONResponse) VisitListPartnerRequestsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelPartnerRequestRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type CancelPartnerRequestResponseObject interface {
+	VisitCancelPartnerRequestResponse(w http.ResponseWriter) error
+}
+
+type CancelPartnerRequest200Response struct {
+}
+
+func (response CancelPartnerRequest200Response) VisitCancelPartnerRequestResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type CancelPartnerRequest401JSONResponse Error
+
+func (response CancelPartnerRequest401JSONResponse) VisitCancelPartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelPartnerRequest404JSONResponse Error
+
+func (response CancelPartnerRequest404JSONResponse) VisitCancelPartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CancelPartnerRequest500JSONResponse Error
+
+func (response CancelPartnerRequest500JSONResponse) VisitCancelPartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequestRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdatePartnerRequestJSONRequestBody
+}
+
+type UpdatePartnerRequestResponseObject interface {
+	VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error
+}
+
+type UpdatePartnerRequest200JSONResponse PartnerRequest
+
+func (response UpdatePartnerRequest200JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequest400JSONResponse Error
+
+func (response UpdatePartnerRequest400JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequest401JSONResponse Error
+
+func (response UpdatePartnerRequest401JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequest403JSONResponse Error
+
+func (response UpdatePartnerRequest403JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequest404JSONResponse Error
+
+func (response UpdatePartnerRequest404JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdatePartnerRequest500JSONResponse Error
+
+func (response UpdatePartnerRequest500JSONResponse) VisitUpdatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type LeavePartnerRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type LeavePartnerResponseObject interface {
+	VisitLeavePartnerResponse(w http.ResponseWriter) error
+}
+
+type LeavePartner200Response struct {
+}
+
+func (response LeavePartner200Response) VisitLeavePartnerResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type LeavePartner401JSONResponse Error
+
+func (response LeavePartner401JSONResponse) VisitLeavePartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type LeavePartner404JSONResponse Error
+
+func (response LeavePartner404JSONResponse) VisitLeavePartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type LeavePartner500JSONResponse Error
+
+func (response LeavePartner500JSONResponse) VisitLeavePartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPartnerRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetPartnerResponseObject interface {
+	VisitGetPartnerResponse(w http.ResponseWriter) error
+}
+
+type GetPartner200JSONResponse Group
+
+func (response GetPartner200JSONResponse) VisitGetPartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPartner401JSONResponse Error
+
+func (response GetPartner401JSONResponse) VisitGetPartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPartner404JSONResponse Error
+
+func (response GetPartner404JSONResponse) VisitGetPartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetPartner500JSONResponse Error
+
+func (response GetPartner500JSONResponse) VisitGetPartnerResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePartnerRequestRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CreatePartnerRequestJSONRequestBody
+}
+
+type CreatePartnerRequestResponseObject interface {
+	VisitCreatePartnerRequestResponse(w http.ResponseWriter) error
+}
+
+type CreatePartnerRequest201JSONResponse PartnerRequest
+
+func (response CreatePartnerRequest201JSONResponse) VisitCreatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePartnerRequest400JSONResponse Error
+
+func (response CreatePartnerRequest400JSONResponse) VisitCreatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePartnerRequest401JSONResponse Error
+
+func (response CreatePartnerRequest401JSONResponse) VisitCreatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePartnerRequest404JSONResponse Error
+
+func (response CreatePartnerRequest404JSONResponse) VisitCreatePartnerRequestResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreatePartnerRequest500JSONResponse Error
+
+func (response CreatePartnerRequest500JSONResponse) VisitCreatePartnerRequestResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -3026,6 +3754,12 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments/{id}/migration-estimation/by-complexity)
 	CalculateMigrationEstimationByComplexity(ctx context.Context, request CalculateMigrationEstimationByComplexityRequestObject) (CalculateMigrationEstimationByComplexityResponseObject, error)
 
+	// (GET /api/v1/customers)
+	ListCustomers(ctx context.Context, request ListCustomersRequestObject) (ListCustomersResponseObject, error)
+
+	// (DELETE /api/v1/customers/{username})
+	RemoveCustomer(ctx context.Context, request RemoveCustomerRequestObject) (RemoveCustomerResponseObject, error)
+
 	// (GET /api/v1/groups)
 	ListGroups(ctx context.Context, request ListGroupsRequestObject) (ListGroupsResponseObject, error)
 
@@ -3058,6 +3792,27 @@ type StrictServerInterface interface {
 
 	// (GET /api/v1/info)
 	GetInfo(ctx context.Context, request GetInfoRequestObject) (GetInfoResponseObject, error)
+
+	// (GET /api/v1/partners)
+	ListPartners(ctx context.Context, request ListPartnersRequestObject) (ListPartnersResponseObject, error)
+
+	// (GET /api/v1/partners/requests)
+	ListPartnerRequests(ctx context.Context, request ListPartnerRequestsRequestObject) (ListPartnerRequestsResponseObject, error)
+
+	// (DELETE /api/v1/partners/requests/{id})
+	CancelPartnerRequest(ctx context.Context, request CancelPartnerRequestRequestObject) (CancelPartnerRequestResponseObject, error)
+
+	// (PUT /api/v1/partners/requests/{id})
+	UpdatePartnerRequest(ctx context.Context, request UpdatePartnerRequestRequestObject) (UpdatePartnerRequestResponseObject, error)
+
+	// (DELETE /api/v1/partners/{id})
+	LeavePartner(ctx context.Context, request LeavePartnerRequestObject) (LeavePartnerResponseObject, error)
+
+	// (GET /api/v1/partners/{id})
+	GetPartner(ctx context.Context, request GetPartnerRequestObject) (GetPartnerResponseObject, error)
+
+	// (POST /api/v1/partners/{id}/request)
+	CreatePartnerRequest(ctx context.Context, request CreatePartnerRequestRequestObject) (CreatePartnerRequestResponseObject, error)
 
 	// (DELETE /api/v1/sources)
 	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
@@ -3476,6 +4231,56 @@ func (sh *strictHandler) CalculateMigrationEstimationByComplexity(w http.Respons
 	}
 }
 
+// ListCustomers operation middleware
+func (sh *strictHandler) ListCustomers(w http.ResponseWriter, r *http.Request) {
+	var request ListCustomersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCustomers(ctx, request.(ListCustomersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCustomers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCustomersResponseObject); ok {
+		if err := validResponse.VisitListCustomersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// RemoveCustomer operation middleware
+func (sh *strictHandler) RemoveCustomer(w http.ResponseWriter, r *http.Request, username string) {
+	var request RemoveCustomerRequestObject
+
+	request.Username = username
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.RemoveCustomer(ctx, request.(RemoveCustomerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "RemoveCustomer")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(RemoveCustomerResponseObject); ok {
+		if err := validResponse.VisitRemoveCustomerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListGroups operation middleware
 func (sh *strictHandler) ListGroups(w http.ResponseWriter, r *http.Request, params ListGroupsParams) {
 	var request ListGroupsRequestObject
@@ -3779,6 +4584,198 @@ func (sh *strictHandler) GetInfo(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetInfoResponseObject); ok {
 		if err := validResponse.VisitGetInfoResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPartners operation middleware
+func (sh *strictHandler) ListPartners(w http.ResponseWriter, r *http.Request) {
+	var request ListPartnersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPartners(ctx, request.(ListPartnersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPartners")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPartnersResponseObject); ok {
+		if err := validResponse.VisitListPartnersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPartnerRequests operation middleware
+func (sh *strictHandler) ListPartnerRequests(w http.ResponseWriter, r *http.Request) {
+	var request ListPartnerRequestsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPartnerRequests(ctx, request.(ListPartnerRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPartnerRequests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPartnerRequestsResponseObject); ok {
+		if err := validResponse.VisitListPartnerRequestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelPartnerRequest operation middleware
+func (sh *strictHandler) CancelPartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CancelPartnerRequestRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelPartnerRequest(ctx, request.(CancelPartnerRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelPartnerRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelPartnerRequestResponseObject); ok {
+		if err := validResponse.VisitCancelPartnerRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdatePartnerRequest operation middleware
+func (sh *strictHandler) UpdatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdatePartnerRequestRequestObject
+
+	request.Id = id
+
+	var body UpdatePartnerRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdatePartnerRequest(ctx, request.(UpdatePartnerRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdatePartnerRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdatePartnerRequestResponseObject); ok {
+		if err := validResponse.VisitUpdatePartnerRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LeavePartner operation middleware
+func (sh *strictHandler) LeavePartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request LeavePartnerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LeavePartner(ctx, request.(LeavePartnerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LeavePartner")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LeavePartnerResponseObject); ok {
+		if err := validResponse.VisitLeavePartnerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPartner operation middleware
+func (sh *strictHandler) GetPartner(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetPartnerRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPartner(ctx, request.(GetPartnerRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPartner")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPartnerResponseObject); ok {
+		if err := validResponse.VisitGetPartnerResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePartnerRequest operation middleware
+func (sh *strictHandler) CreatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CreatePartnerRequestRequestObject
+
+	request.Id = id
+
+	var body CreatePartnerRequestJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePartnerRequest(ctx, request.(CreatePartnerRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePartnerRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePartnerRequestResponseObject); ok {
+		if err := validResponse.VisitCreatePartnerRequestResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
