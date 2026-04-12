@@ -32,6 +32,7 @@ jobs:
           # * red-hat-konflux[bot] - automatic bot responsible for any library or konflux integration update
           declare -a skip_pr_authors=(
             "red-hat-konflux[bot]"
+            "dependabot[bot]"
           )
           echo "The PR Author is \"${PR_AUTHOR}\""
           for skip_pr_author in "${skip_pr_authors[@]}"
@@ -42,7 +43,7 @@ jobs:
             fi
           done
 
-          VALID_TYPES="fix|feat|build|ci|docs|perf|refactor|style|test"
+          VALID_TYPES="fix|feat|build|chore|ci|docs|perf|refactor|style|test"
           PATTERN="^(NO-JIRA|[A-Z]+-[0-9]+) \| ($VALID_TYPES): .+"
           
           for message in "${commit_messages[@]}"

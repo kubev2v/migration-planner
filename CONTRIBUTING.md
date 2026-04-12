@@ -75,6 +75,7 @@ The commit contains the following structural types, to communicate your intent:
 * **fix:** A commit of the type `fix` patches a bug in your codebase (this correlates with `PATCH` in Semantic Versioning).
 * **feat:** A commit of the type `feat` introduces a new feature to the codebase (this correlates with `MINOR` in Semantic Versioning).
 * **build:** Changes that affect the build system or external dependencies
+* **chore:** Routine tasks, maintenance, or minor changes that don't modify source or test files
 * **ci:** Changes to our CI configuration files and scripts
 * **docs:** Documentation-only changes
 * **perf:** A code change that improves performance
