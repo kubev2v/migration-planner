@@ -248,15 +248,14 @@ var _ = Describe("e2e-rvtools", func() {
 					<-done
 				}
 
-				successCount := 0
-				for i, err := range errors {
-					if err == nil && assessments[i] != nil {
-						successCount++
-
-						_ = svc.RemoveAssessment(assessments[i].Id)
-					}
+				for _, err := range errors {
+					Expect(err).To(BeNil())
 				}
-				Expect(successCount).To(BeNumerically("==", 3))
+
+				for _, a := range assessments {
+					err = svc.RemoveAssessment(a.Id)
+					Expect(err).To(BeNil())
+				}
 
 				zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 			})
