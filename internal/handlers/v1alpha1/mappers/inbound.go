@@ -117,63 +117,27 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 // Assessment-related mappers
 
 func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest) mappers.ClusterRequirementsRequestForm {
-	// Default control plane node resources align with OVF sizer defaults and meet
-	// Assisted Installer prerequisites for control plane nodes.
-	const (
-		defaultControlPlaneCPU         = 6
-		defaultControlPlaneMemory      = 16
-		defaultControlPlaneNodeCount   = 3
-		defaultControlPlaneSchedulable = false
-	)
-
-	// Check if hosted control plane is enabled
-	hostedControlPlane := false
-	if apiReq.HostedControlPlane != nil {
-		hostedControlPlane = *apiReq.HostedControlPlane
-	}
-
+	// Map fields directly without applying defaults - preserve omission semantics
 	form := mappers.ClusterRequirementsRequestForm{
 		ClusterID:             apiReq.ClusterId,
 		CpuOverCommitRatio:    string(apiReq.CpuOverCommitRatio),
 		MemoryOverCommitRatio: string(apiReq.MemoryOverCommitRatio),
 		WorkerNodeCPU:         apiReq.WorkerNodeCPU,
-		WorkerNodeThreads:     0,
 		WorkerNodeMemory:      apiReq.WorkerNodeMemory,
-		HostedControlPlane:    hostedControlPlane,
+
+		// Optional fields - preserve nil if not provided
+		WorkerNodeThreads:       apiReq.WorkerNodeThreads,
+		HostedControlPlane:      apiReq.HostedControlPlane,
+		ControlPlaneSchedulable: apiReq.ControlPlaneSchedulable,
+		ControlPlaneCPU:         apiReq.ControlPlaneCPU,
+		ControlPlaneMemory:      apiReq.ControlPlaneMemory,
 	}
 
-	if apiReq.WorkerNodeThreads != nil {
-		form.WorkerNodeThreads = *apiReq.WorkerNodeThreads
+	// Convert ControlPlaneNodeCount from API type to int pointer
+	if apiReq.ControlPlaneNodeCount != nil {
+		nodeCount := int(*apiReq.ControlPlaneNodeCount)
+		form.ControlPlaneNodeCount = &nodeCount
 	}
-
-	// Only set control plane fields when NOT using hosted control plane
-	if !hostedControlPlane {
-		// Apply defaults or use provided values for control plane fields
-		if apiReq.ControlPlaneSchedulable != nil {
-			form.ControlPlaneSchedulable = *apiReq.ControlPlaneSchedulable
-		} else {
-			form.ControlPlaneSchedulable = defaultControlPlaneSchedulable
-		}
-
-		if apiReq.ControlPlaneCPU != nil {
-			form.ControlPlaneCPU = *apiReq.ControlPlaneCPU
-		} else {
-			form.ControlPlaneCPU = defaultControlPlaneCPU
-		}
-
-		if apiReq.ControlPlaneMemory != nil {
-			form.ControlPlaneMemory = *apiReq.ControlPlaneMemory
-		} else {
-			form.ControlPlaneMemory = defaultControlPlaneMemory
-		}
-
-		if apiReq.ControlPlaneNodeCount != nil {
-			form.ControlPlaneNodeCount = int(*apiReq.ControlPlaneNodeCount)
-		} else {
-			form.ControlPlaneNodeCount = defaultControlPlaneNodeCount
-		}
-	}
-	// When hostedControlPlane is true, control plane fields remain at zero values
 
 	return form
 }

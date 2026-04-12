@@ -25,13 +25,15 @@ import (
 
 // MockStore is a mock implementation of store.Store
 type MockStore struct {
-	assessments map[uuid.UUID]*model.Assessment
-	getError    error
+	assessments   map[uuid.UUID]*model.Assessment
+	clusterInputs map[string]*model.AssessmentClusterSizingInput
+	getError      error
 }
 
 func NewMockStore() *MockStore {
 	return &MockStore{
-		assessments: make(map[uuid.UUID]*model.Assessment),
+		assessments:   make(map[uuid.UUID]*model.Assessment),
+		clusterInputs: make(map[string]*model.AssessmentClusterSizingInput),
 	}
 }
 
@@ -95,6 +97,10 @@ func (m *MockStore) Label() store.Label {
 	panic("Label() not implemented in MockStore for this test")
 }
 
+func (m *MockStore) ClusterSizingInput() store.ClusterSizingInput {
+	return &MockClusterSizingInputStore{store: m}
+}
+
 func (m *MockStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
@@ -112,6 +118,10 @@ func (m *MockStore) Close() error {
 }
 
 type MockAssessmentStore struct {
+	store *MockStore
+}
+
+type MockClusterSizingInputStore struct {
 	store *MockStore
 }
 
@@ -140,6 +150,23 @@ func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID
 
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
 	panic("Delete() not implemented in MockAssessmentStore for this test")
+}
+
+func (m *MockClusterSizingInputStore) Upsert(ctx context.Context, input model.AssessmentClusterSizingInput) (*model.AssessmentClusterSizingInput, error) {
+	key := fmt.Sprintf("%s/%s", input.AssessmentID, input.ExternalClusterID)
+	copied := input
+	m.store.clusterInputs[key] = &copied
+	return &copied, nil
+}
+
+func (m *MockClusterSizingInputStore) Get(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*model.AssessmentClusterSizingInput, error) {
+	key := fmt.Sprintf("%s/%s", assessmentID, clusterID)
+	input, exists := m.store.clusterInputs[key]
+	if !exists {
+		return nil, store.ErrRecordNotFound
+	}
+	copied := *input
+	return &copied, nil
 }
 
 // createTestSizerServer creates an HTTP test server that mocks the sizer service
@@ -617,7 +644,7 @@ var _ = Describe("sizer handler", func() {
 			})
 
 			It("successfully handles single node cluster (1 control plane)", func() {
-				one := api.N1
+				one := api.ClusterRequirementsRequestControlPlaneNodeCountN1
 				controlPlaneSchedulable := true
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:               clusterID,
@@ -649,7 +676,7 @@ var _ = Describe("sizer handler", func() {
 			})
 
 			It("successfully handles HA cluster (3 control plane) - explicit", func() {
-				three := api.N3
+				three := api.ClusterRequirementsRequestControlPlaneNodeCountN3
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:             clusterID,
 					CpuOverCommitRatio:    api.CpuOneToFour,
@@ -1347,6 +1374,94 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("failed to calculate cluster requirements"))
 			})
+		})
+	})
+
+	Describe("GetAssessmentClusterRequirementsStoredInput", func() {
+		BeforeEach(func() {
+			mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+			testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+			handler = handlers.NewServiceHandler(
+				nil,
+				service.NewAssessmentService(mockStore, nil),
+				nil,
+				service.NewSizerService(sizerClient, mockStore),
+				nil,
+				nil,
+				nil,
+			)
+		})
+
+		It("returns 200 with sparse stored payload", func() {
+			workerCPU := 16
+			hosted := true
+			key := fmt.Sprintf("%s/%s", assessmentID, clusterID)
+			mockStore.clusterInputs[key] = &model.AssessmentClusterSizingInput{
+				AssessmentID:          assessmentID,
+				ExternalClusterID:     clusterID,
+				WorkerNodeCPU:         &workerCPU,
+				HostedControlPlane:    &hosted,
+				ControlPlaneCPU:       nil,
+				ControlPlaneMemory:    nil,
+				ControlPlaneNodeCount: nil,
+			}
+
+			resp, err := handler.GetAssessmentClusterRequirementsStoredInput(ctx, server.GetAssessmentClusterRequirementsStoredInputRequestObject{
+				Id: assessmentID,
+				Params: api.GetAssessmentClusterRequirementsStoredInputParams{
+					ClusterId: clusterID,
+				},
+			})
+			Expect(err).To(BeNil())
+			successResp, ok := resp.(server.GetAssessmentClusterRequirementsStoredInput200JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(successResp.ClusterId).To(Equal(clusterID))
+			Expect(successResp.WorkerNodeCPU).ToNot(BeNil())
+			Expect(*successResp.WorkerNodeCPU).To(Equal(16))
+			Expect(successResp.ControlPlaneCPU).To(BeNil())
+			Expect(successResp.ControlPlaneMemory).To(BeNil())
+		})
+
+		It("returns 404 when stored payload does not exist", func() {
+			resp, err := handler.GetAssessmentClusterRequirementsStoredInput(ctx, server.GetAssessmentClusterRequirementsStoredInputRequestObject{
+				Id: assessmentID,
+				Params: api.GetAssessmentClusterRequirementsStoredInputParams{
+					ClusterId: clusterID,
+				},
+			})
+			Expect(err).To(BeNil())
+			_, ok := resp.(server.GetAssessmentClusterRequirementsStoredInput404JSONResponse)
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns 404 when assessment does not exist", func() {
+			nonExistentID := uuid.New()
+
+			resp, err := handler.GetAssessmentClusterRequirementsStoredInput(ctx, server.GetAssessmentClusterRequirementsStoredInputRequestObject{
+				Id: nonExistentID,
+				Params: api.GetAssessmentClusterRequirementsStoredInputParams{
+					ClusterId: clusterID,
+				},
+			})
+			Expect(err).To(BeNil())
+			_, ok := resp.(server.GetAssessmentClusterRequirementsStoredInput404JSONResponse)
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns 403 when user is not authorized for assessment", func() {
+			otherUserAssessment := createTestAssessment(assessmentID, "other-user", user.Organization, clusterID)
+			mockStore.assessments[assessmentID] = otherUserAssessment
+
+			resp, err := handler.GetAssessmentClusterRequirementsStoredInput(ctx, server.GetAssessmentClusterRequirementsStoredInputRequestObject{
+				Id: assessmentID,
+				Params: api.GetAssessmentClusterRequirementsStoredInputParams{
+					ClusterId: clusterID,
+				},
+			})
+			Expect(err).To(BeNil())
+			_, ok := resp.(server.GetAssessmentClusterRequirementsStoredInput403JSONResponse)
+			Expect(ok).To(BeTrue())
 		})
 	})
 })

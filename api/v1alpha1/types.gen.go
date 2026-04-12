@@ -28,8 +28,8 @@ const (
 
 // Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
 const (
-	N1 ClusterRequirementsRequestControlPlaneNodeCount = 1
-	N3 ClusterRequirementsRequestControlPlaneNodeCount = 3
+	ClusterRequirementsRequestControlPlaneNodeCountN1 ClusterRequirementsRequestControlPlaneNodeCount = 1
+	ClusterRequirementsRequestControlPlaneNodeCountN3 ClusterRequirementsRequestControlPlaneNodeCount = 3
 )
 
 // Defines values for ClusterRequirementsRequestCpuOverCommitRatio.
@@ -45,6 +45,27 @@ const (
 	MemoryOneToFour ClusterRequirementsRequestMemoryOverCommitRatio = "1:4"
 	MemoryOneToOne  ClusterRequirementsRequestMemoryOverCommitRatio = "1:1"
 	MemoryOneToTwo  ClusterRequirementsRequestMemoryOverCommitRatio = "1:2"
+)
+
+// Defines values for ClusterRequirementsStoredInputControlPlaneNodeCount.
+const (
+	ClusterRequirementsStoredInputControlPlaneNodeCountN1 ClusterRequirementsStoredInputControlPlaneNodeCount = 1
+	ClusterRequirementsStoredInputControlPlaneNodeCountN3 ClusterRequirementsStoredInputControlPlaneNodeCount = 3
+)
+
+// Defines values for ClusterRequirementsStoredInputCpuOverCommitRatio.
+const (
+	ClusterRequirementsStoredInputCpuOverCommitRatioN11 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:1"
+	ClusterRequirementsStoredInputCpuOverCommitRatioN12 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:2"
+	ClusterRequirementsStoredInputCpuOverCommitRatioN14 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:4"
+	ClusterRequirementsStoredInputCpuOverCommitRatioN16 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:6"
+)
+
+// Defines values for ClusterRequirementsStoredInputMemoryOverCommitRatio.
+const (
+	ClusterRequirementsStoredInputMemoryOverCommitRatioN11 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:1"
+	ClusterRequirementsStoredInputMemoryOverCommitRatioN12 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:2"
+	ClusterRequirementsStoredInputMemoryOverCommitRatioN14 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:4"
 )
 
 // Defines values for GroupKind.
@@ -225,6 +246,51 @@ type ClusterRequirementsResponse struct {
 	// ResourceConsumption Resource consumption across the cluster
 	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
 }
+
+// ClusterRequirementsStoredInput Stored cluster requirements payload for a cluster
+type ClusterRequirementsStoredInput struct {
+	// ClusterId ID of the cluster
+	ClusterId string `json:"clusterId"`
+
+	// ControlPlaneCPU CPU cores per control plane node
+	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty"`
+
+	// ControlPlaneMemory Memory in GB per control plane node
+	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty"`
+
+	// ControlPlaneNodeCount Number of control plane nodes
+	ControlPlaneNodeCount *ClusterRequirementsStoredInputControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty"`
+
+	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes
+	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
+
+	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	CpuOverCommitRatio *ClusterRequirementsStoredInputCpuOverCommitRatio `json:"cpuOverCommitRatio,omitempty"`
+
+	// HostedControlPlane If true, control plane is hosted externally
+	HostedControlPlane *bool `json:"hostedControlPlane,omitempty"`
+
+	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+	MemoryOverCommitRatio *ClusterRequirementsStoredInputMemoryOverCommitRatio `json:"memoryOverCommitRatio,omitempty"`
+
+	// WorkerNodeCPU CPU cores per worker node
+	WorkerNodeCPU *int `json:"workerNodeCPU,omitempty"`
+
+	// WorkerNodeMemory Memory (GB) per worker node
+	WorkerNodeMemory *int `json:"workerNodeMemory,omitempty"`
+
+	// WorkerNodeThreads Number of CPU threads per worker node
+	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty"`
+}
+
+// ClusterRequirementsStoredInputControlPlaneNodeCount Number of control plane nodes
+type ClusterRequirementsStoredInputControlPlaneNodeCount int
+
+// ClusterRequirementsStoredInputCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+type ClusterRequirementsStoredInputCpuOverCommitRatio string
+
+// ClusterRequirementsStoredInputMemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+type ClusterRequirementsStoredInputMemoryOverCommitRatio string
 
 // ClusterSizing Overall cluster sizing summary
 type ClusterSizing struct {
@@ -882,6 +948,12 @@ type PresignedUrl struct {
 type ListAssessmentsParams struct {
 	// SourceId Filter assessments by source ID
 	SourceId *openapi_types.UUID `form:"sourceId,omitempty" json:"sourceId,omitempty"`
+}
+
+// GetAssessmentClusterRequirementsStoredInputParams defines parameters for GetAssessmentClusterRequirementsStoredInput.
+type GetAssessmentClusterRequirementsStoredInputParams struct {
+	// ClusterId ID of the VMware cluster
+	ClusterId string `form:"clusterId" json:"clusterId"`
 }
 
 // ListGroupsParams defines parameters for ListGroups.

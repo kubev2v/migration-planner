@@ -47,6 +47,9 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments/{id}/cluster-requirements)
 	CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (GET /api/v1/assessments/{id}/cluster-requirements/stored-input)
+	GetAssessmentClusterRequirementsStoredInput(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetAssessmentClusterRequirementsStoredInputParams)
+
 	// (POST /api/v1/assessments/{id}/complexity-estimation)
 	CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -193,6 +196,11 @@ func (_ Unimplemented) UpdateAssessment(w http.ResponseWriter, r *http.Request, 
 
 // (POST /api/v1/assessments/{id}/cluster-requirements)
 func (_ Unimplemented) CalculateAssessmentClusterRequirements(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/assessments/{id}/cluster-requirements/stored-input)
+func (_ Unimplemented) GetAssessmentClusterRequirementsStoredInput(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetAssessmentClusterRequirementsStoredInputParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -575,6 +583,50 @@ func (siw *ServerInterfaceWrapper) CalculateAssessmentClusterRequirements(w http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CalculateAssessmentClusterRequirements(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAssessmentClusterRequirementsStoredInput operation middleware
+func (siw *ServerInterfaceWrapper) GetAssessmentClusterRequirementsStoredInput(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAssessmentClusterRequirementsStoredInputParams
+
+	// ------------- Required query parameter "clusterId" -------------
+
+	if paramValue := r.URL.Query().Get("clusterId"); paramValue != "" {
+
+	} else {
+		siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "clusterId"})
+		return
+	}
+
+	err = runtime.BindQueryParameter("form", true, true, "clusterId", r.URL.Query(), &params.ClusterId)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "clusterId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssessmentClusterRequirementsStoredInput(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1509,6 +1561,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/cluster-requirements", wrapper.CalculateAssessmentClusterRequirements)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/assessments/{id}/cluster-requirements/stored-input", wrapper.GetAssessmentClusterRequirementsStoredInput)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/complexity-estimation", wrapper.CalculateMigrationComplexity)
 	})
 	r.Group(func(r chi.Router) {
@@ -2122,6 +2177,69 @@ type CalculateAssessmentClusterRequirements503JSONResponse Error
 func (response CalculateAssessmentClusterRequirements503JSONResponse) VisitCalculateAssessmentClusterRequirementsResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInputRequestObject struct {
+	Id     openapi_types.UUID `json:"id"`
+	Params GetAssessmentClusterRequirementsStoredInputParams
+}
+
+type GetAssessmentClusterRequirementsStoredInputResponseObject interface {
+	VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error
+}
+
+type GetAssessmentClusterRequirementsStoredInput200JSONResponse ClusterRequirementsStoredInput
+
+func (response GetAssessmentClusterRequirementsStoredInput200JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInput400JSONResponse Error
+
+func (response GetAssessmentClusterRequirementsStoredInput400JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInput401JSONResponse Error
+
+func (response GetAssessmentClusterRequirementsStoredInput401JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInput403JSONResponse Error
+
+func (response GetAssessmentClusterRequirementsStoredInput403JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInput404JSONResponse Error
+
+func (response GetAssessmentClusterRequirementsStoredInput404JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentClusterRequirementsStoredInput500JSONResponse Error
+
+func (response GetAssessmentClusterRequirementsStoredInput500JSONResponse) VisitGetAssessmentClusterRequirementsStoredInputResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -3772,6 +3890,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments/{id}/cluster-requirements)
 	CalculateAssessmentClusterRequirements(ctx context.Context, request CalculateAssessmentClusterRequirementsRequestObject) (CalculateAssessmentClusterRequirementsResponseObject, error)
 
+	// (GET /api/v1/assessments/{id}/cluster-requirements/stored-input)
+	GetAssessmentClusterRequirementsStoredInput(ctx context.Context, request GetAssessmentClusterRequirementsStoredInputRequestObject) (GetAssessmentClusterRequirementsStoredInputResponseObject, error)
+
 	// (POST /api/v1/assessments/{id}/complexity-estimation)
 	CalculateMigrationComplexity(ctx context.Context, request CalculateMigrationComplexityRequestObject) (CalculateMigrationComplexityResponseObject, error)
 
@@ -4152,6 +4273,33 @@ func (sh *strictHandler) CalculateAssessmentClusterRequirements(w http.ResponseW
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CalculateAssessmentClusterRequirementsResponseObject); ok {
 		if err := validResponse.VisitCalculateAssessmentClusterRequirementsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAssessmentClusterRequirementsStoredInput operation middleware
+func (sh *strictHandler) GetAssessmentClusterRequirementsStoredInput(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetAssessmentClusterRequirementsStoredInputParams) {
+	var request GetAssessmentClusterRequirementsStoredInputRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssessmentClusterRequirementsStoredInput(ctx, request.(GetAssessmentClusterRequirementsStoredInputRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssessmentClusterRequirementsStoredInput")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssessmentClusterRequirementsStoredInputResponseObject); ok {
+		if err := validResponse.VisitGetAssessmentClusterRequirementsStoredInputResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

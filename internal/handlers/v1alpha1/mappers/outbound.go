@@ -336,6 +336,32 @@ func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsRespon
 	}
 }
 
+func ClusterRequirementsInputFormToAPI(form mappers.ClusterRequirementsInputForm) api.ClusterRequirementsStoredInput {
+	response := api.ClusterRequirementsStoredInput{
+		ClusterId: form.ClusterID,
+	}
+
+	if form.CpuOverCommitRatio != nil {
+		response.CpuOverCommitRatio = (*api.ClusterRequirementsStoredInputCpuOverCommitRatio)(form.CpuOverCommitRatio)
+	}
+	if form.MemoryOverCommitRatio != nil {
+		response.MemoryOverCommitRatio = (*api.ClusterRequirementsStoredInputMemoryOverCommitRatio)(form.MemoryOverCommitRatio)
+	}
+	response.WorkerNodeCPU = form.WorkerNodeCPU
+	response.WorkerNodeThreads = form.WorkerNodeThreads
+	response.WorkerNodeMemory = form.WorkerNodeMemory
+	response.ControlPlaneSchedulable = form.ControlPlaneSchedulable
+	response.ControlPlaneCPU = form.ControlPlaneCPU
+	response.ControlPlaneMemory = form.ControlPlaneMemory
+	if form.ControlPlaneNodeCount != nil {
+		count := api.ClusterRequirementsStoredInputControlPlaneNodeCount(*form.ControlPlaneNodeCount)
+		response.ControlPlaneNodeCount = &count
+	}
+	response.HostedControlPlane = form.HostedControlPlane
+
+	return response
+}
+
 // MigrationComplexityResultToAPI converts the service result to the API response type.
 func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) api.MigrationComplexityResponse {
 	byDisk := make([]api.ComplexityDiskScoreEntry, len(result.ComplexityByDisk))

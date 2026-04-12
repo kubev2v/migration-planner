@@ -16,19 +16,22 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
 
 // MockStore is a mock implementation of store.Store
 type MockStore struct {
-	assessments map[uuid.UUID]*model.Assessment
-	getError    error
+	assessments   map[uuid.UUID]*model.Assessment
+	clusterInputs map[string]*model.AssessmentClusterSizingInput
+	getError      error
 }
 
 func NewMockStore() *MockStore {
 	return &MockStore{
-		assessments: make(map[uuid.UUID]*model.Assessment),
+		assessments:   make(map[uuid.UUID]*model.Assessment),
+		clusterInputs: make(map[string]*model.AssessmentClusterSizingInput),
 	}
 }
 
@@ -68,6 +71,10 @@ func (m *MockStore) Label() store.Label {
 	return nil
 }
 
+func (m *MockStore) ClusterSizingInput() store.ClusterSizingInput {
+	return &MockClusterSizingInputStore{store: m}
+}
+
 func (m *MockStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
@@ -85,6 +92,10 @@ func (m *MockStore) Close() error {
 }
 
 type MockAssessmentStore struct {
+	store *MockStore
+}
+
+type MockClusterSizingInputStore struct {
 	store *MockStore
 }
 
@@ -113,6 +124,23 @@ func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID
 
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
+}
+
+func (m *MockClusterSizingInputStore) Upsert(ctx context.Context, input model.AssessmentClusterSizingInput) (*model.AssessmentClusterSizingInput, error) {
+	key := fmt.Sprintf("%s/%s", input.AssessmentID, input.ExternalClusterID)
+	copied := input
+	m.store.clusterInputs[key] = &copied
+	return &copied, nil
+}
+
+func (m *MockClusterSizingInputStore) Get(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*model.AssessmentClusterSizingInput, error) {
+	key := fmt.Sprintf("%s/%s", assessmentID, clusterID)
+	input, exists := m.store.clusterInputs[key]
+	if !exists {
+		return nil, store.ErrRecordNotFound
+	}
+	copied := *input
+	return &copied, nil
 }
 
 // createTestSizerServer creates an HTTP test server that mocks the sizer service
@@ -273,8 +301,8 @@ var _ = Describe("sizer service", func() {
 				MemoryOverCommitRatio:   "1:2",
 				WorkerNodeCPU:           8,
 				WorkerNodeMemory:        16,
-				ControlPlaneSchedulable: false,
-				ControlPlaneNodeCount:   3,
+				ControlPlaneSchedulable: util.BoolPtr(false),
+				ControlPlaneNodeCount:   util.IntPtr(3),
 			}
 		})
 
@@ -304,7 +332,7 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles control plane schedulable enabled", func() {
-				request.ControlPlaneSchedulable = true
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
@@ -318,7 +346,7 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles hosted control plane (worker nodes only)", func() {
-				request.HostedControlPlane = true
+				request.HostedControlPlane = util.BoolPtr(true)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 
@@ -539,10 +567,10 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles single node cluster (1 control plane)", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
-				request.ControlPlaneCPU = 50
-				request.ControlPlaneMemory = 100
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
+				request.ControlPlaneCPU = util.IntPtr(50)
+				request.ControlPlaneMemory = util.IntPtr(100)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				var sizerReq client.SizerRequest
@@ -579,8 +607,8 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("returns error when single node requested with non-schedulable control plane", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = false
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(false)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false)
@@ -598,8 +626,8 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("returns error when single node workload does not fit", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 2, 1, 40, 80), http.StatusOK, false)
@@ -616,8 +644,8 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("returns ErrInvalidRequest when single node and sizer returns not-schedulable error", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -649,10 +677,10 @@ var _ = Describe("sizer service", func() {
 
 			DescribeTable("single node fit error messages",
 				func(cpuVal, memoryVal int, expectSpecific bool) {
-					request.ControlPlaneNodeCount = 1
-					request.ControlPlaneSchedulable = true
-					request.ControlPlaneCPU = cpuVal
-					request.ControlPlaneMemory = memoryVal
+					request.ControlPlaneNodeCount = util.IntPtr(1)
+					request.ControlPlaneSchedulable = util.BoolPtr(true)
+					request.ControlPlaneCPU = util.IntPtr(cpuVal)
+					request.ControlPlaneMemory = util.IntPtr(memoryVal)
 					assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 					mockStore.assessments[assessmentID] = assessment
 					testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 40, 80), http.StatusOK, false)
@@ -680,10 +708,10 @@ var _ = Describe("sizer service", func() {
 			)
 
 			It("returns 'Use a multi-node cluster' when workload exceeds max supported single-node size", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
-				request.ControlPlaneCPU = 100
-				request.ControlPlaneMemory = 200
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
+				request.ControlPlaneCPU = util.IntPtr(100)
+				request.ControlPlaneMemory = util.IntPtr(200)
 				// Create inventory that requires > 200 CPU (max) on a single node
 				// With 1:4 over-commit: 1000 CPU / 4 = 250 CPU actual
 				// With 0.8 capacity: 250 / 0.8 = 312.5 CPU needed (exceeds max of 200)
@@ -705,10 +733,10 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("returns correct SNO error when sizer reports workload doesn't fit", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
-				request.ControlPlaneCPU = 16
-				request.ControlPlaneMemory = 128
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
+				request.ControlPlaneCPU = util.IntPtr(16)
+				request.ControlPlaneMemory = util.IntPtr(128)
 				// Create a workload that sizer will reject
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 100, 200)
 				mockStore.assessments[assessmentID] = assessment
@@ -745,8 +773,8 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles single node cluster when sizer returns 0 nodes", func() {
-				request.ControlPlaneNodeCount = 1
-				request.ControlPlaneSchedulable = true
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				request.ControlPlaneSchedulable = util.BoolPtr(true)
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(&client.SizerResponse{
@@ -977,6 +1005,43 @@ var _ = Describe("sizer service", func() {
 				Expect(err.Error()).To(ContainSubstring("failed to call sizer service"))
 			})
 		})
+
+		Context("request persistence", func() {
+			It("does not persist sizing input when calculation fails", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+				Expect(err).ToNot(BeNil())
+				Expect(result).To(BeNil())
+
+				storedInput, getErr := sizerService.GetClusterRequirementsInput(ctx, assessmentID, clusterID)
+				Expect(storedInput).To(BeNil())
+				_, ok := getErr.(*service.ErrResourceNotFound)
+				Expect(ok).To(BeTrue())
+			})
+
+			It("loads persisted sizing input by assessment and cluster", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+				Expect(err).To(BeNil())
+
+				storedInput, err := sizerService.GetClusterRequirementsInput(ctx, assessmentID, clusterID)
+				Expect(err).To(BeNil())
+				Expect(storedInput).ToNot(BeNil())
+				Expect(storedInput.ClusterID).To(Equal(clusterID))
+				Expect(storedInput.WorkerNodeCPU).ToNot(BeNil())
+				Expect(*storedInput.WorkerNodeCPU).To(Equal(8))
+			})
+		})
 	})
 
 	Describe("Health", func() {
@@ -1037,8 +1102,8 @@ var _ = Describe("sizer service", func() {
 				MemoryOverCommitRatio:   "1:1",
 				WorkerNodeCPU:           32,
 				WorkerNodeMemory:        256,
-				ControlPlaneSchedulable: false,
-				ControlPlaneNodeCount:   3,
+				ControlPlaneSchedulable: util.BoolPtr(false),
+				ControlPlaneNodeCount:   util.IntPtr(3),
 			}
 		})
 
@@ -1321,7 +1386,7 @@ var _ = Describe("sizer service", func() {
 			It("returns error when sizer response shows >200 VMs on a single node", func() {
 				request.WorkerNodeCPU = 200
 				request.WorkerNodeMemory = 512
-				request.WorkerNodeThreads = 400
+				request.WorkerNodeThreads = util.IntPtr(400)
 
 				// 500 VMs = 5 batches of 100 VMs each
 				assessment := createTestAssessment(assessmentID, clusterID, 500, 1000, 2000)
@@ -1376,7 +1441,7 @@ var _ = Describe("sizer service", func() {
 			It("detects violation even with many small batches concentrated on one node", func() {
 				request.WorkerNodeCPU = 200
 				request.WorkerNodeMemory = 512
-				request.WorkerNodeThreads = 0
+				request.WorkerNodeThreads = nil
 
 				// 250 VMs with low resources creates 2 batches (125 VMs each)
 				assessment := createTestAssessment(assessmentID, clusterID, 250, 125, 250)

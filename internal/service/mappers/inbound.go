@@ -225,17 +225,34 @@ func (f *JobForm) ToAPIJob() *v1alpha1.Job {
 }
 
 type ClusterRequirementsRequestForm struct {
+	// Required fields (always present)
+	ClusterID             string
+	CpuOverCommitRatio    string
+	MemoryOverCommitRatio string
+	WorkerNodeCPU         int
+	WorkerNodeMemory      int
+
+	// Optional fields (use pointers to distinguish omitted vs zero-value)
+	WorkerNodeThreads       *int
+	ControlPlaneSchedulable *bool
+	ControlPlaneNodeCount   *int
+	ControlPlaneCPU         *int
+	ControlPlaneMemory      *int
+	HostedControlPlane      *bool
+}
+
+type ClusterRequirementsInputForm struct {
 	ClusterID               string
-	CpuOverCommitRatio      string
-	MemoryOverCommitRatio   string
-	WorkerNodeCPU           int
-	WorkerNodeThreads       int
-	WorkerNodeMemory        int
-	ControlPlaneSchedulable bool
-	ControlPlaneCPU         int
-	ControlPlaneMemory      int
-	ControlPlaneNodeCount   int
-	HostedControlPlane      bool
+	CpuOverCommitRatio      *string
+	MemoryOverCommitRatio   *string
+	WorkerNodeCPU           *int
+	WorkerNodeThreads       *int
+	WorkerNodeMemory        *int
+	ControlPlaneSchedulable *bool
+	ControlPlaneNodeCount   *int
+	ControlPlaneCPU         *int
+	ControlPlaneMemory      *int
+	HostedControlPlane      *bool
 }
 
 type ClusterRequirementsResponseForm struct {
