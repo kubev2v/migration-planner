@@ -2,8 +2,8 @@
 Disk Size Tier Query Template - Returns VM distribution by total disk size tier.
 
 This query counts ALL VMs from vinfo, including those with 0 disks.
-VMs with no disk entries are counted with 0 TB capacity and fall into "Easy (0-10TB)".
-This matches the old implementation behavior.
+VMs with no disk entries are counted with 0 TB capacity and fall into '0-100GiB'.
+This is the expected behavior.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
@@ -20,10 +20,14 @@ WITH vm_disk_totals AS (
 )
 SELECT
     CASE
-        WHEN total_disk_tb < 10 THEN 'Easy (0-10TB)'
-        WHEN total_disk_tb < 20 THEN 'Medium (10-20TB)'
-        WHEN total_disk_tb < 50 THEN 'Hard (20-50TB)'
-        ELSE 'White Glove (>50TB)'
+        WHEN total_disk_tb < 100.0/1024.0  THEN '0-100GiB'
+        WHEN total_disk_tb < 500.0/1024.0  THEN '100-500GiB'
+        WHEN total_disk_tb < 1             THEN '500GiB-1TiB'
+        WHEN total_disk_tb < 2             THEN '1-2TiB'
+        WHEN total_disk_tb < 5             THEN '2-5TiB'
+        WHEN total_disk_tb < 10            THEN '5-10TiB'
+        WHEN total_disk_tb < 20            THEN '10-20TiB'
+        ELSE                                    '20+TiB'
     END AS tier,
     COUNT(*) AS vm_count,
     ROUND(SUM(total_disk_tb), 2) AS total_size_tb

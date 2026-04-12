@@ -937,6 +937,59 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 	assert.Equal(t, 1, clusterEnriched["2"].VMCount)
 }
 
+// TestBuildInventory_DiskSizeTiers verifies that DiskSizeTiers uses new 8-bucket GiB labels
+// and DiskComplexityTiers uses the 4-bucket TiB labels, and that no old 4-bucket TB labels appear.
+func TestBuildInventory_DiskSizeTiers(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	vDiskHeaders := []string{
+		"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+		"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+		"Thin", "Controller", "Label", "SCSI Unit #",
+	}
+	// vm-001 gets a small disk (~50 GiB) → falls into "0-100GiB" display tier and "0-10TiB" complexity tier
+	// vm-002 gets a small disk (~50 GiB) → same
+	disks := []map[string]string{
+		{"VM ID": "vm-001", "Disk Key": "2000", "Unit #": "0", "Path": "[ds1] vm-1/disk.vmdk", "Capacity MiB": "51200", "Sharing mode": "false"},
+		{"VM ID": "vm-002", "Disk Key": "2001", "Unit #": "0", "Path": "[ds1] vm-2/disk.vmdk", "Capacity MiB": "51200", "Sharing mode": "false"},
+	}
+
+	tmpFile := createTestExcel(t, append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx)
+	require.NoError(t, err)
+	require.NotNil(t, inv.VCenter)
+
+	diskSizeTiers := inv.VCenter.VMs.DiskSizeTiers
+	diskComplexityTiers := inv.VCenter.VMs.DiskComplexityTiers
+
+	// DiskSizeTiers should use new 8-bucket GiB/TiB display labels — not old TB labels
+	oldLabels := []string{"Easy (0-10TB)", "Medium (10-20TB)", "Hard (20-50TB)", "White Glove (>50TB)"}
+	for _, old := range oldLabels {
+		assert.NotContains(t, diskSizeTiers, old, "DiskSizeTiers must not contain old label %q", old)
+	}
+
+	// Both VMs have ~50 GiB disks → should appear in "0-100GiB" bucket
+	assert.Contains(t, diskSizeTiers, "0-100GiB", "DiskSizeTiers should have new GiB label '0-100GiB'")
+	assert.Equal(t, 2, diskSizeTiers["0-100GiB"].VMCount, "Both VMs should be in '0-100GiB' tier")
+
+	// DiskComplexityTiers should use 4-bucket TiB labels
+	assert.Contains(t, diskComplexityTiers, "0-10TiB", "DiskComplexityTiers should have '0-10TiB' label")
+	assert.Equal(t, 2, diskComplexityTiers["0-10TiB"].VMCount, "Both VMs should be in '0-10TiB' complexity tier")
+}
+
 // TestPopulateComplexityQuery_ContainsExpectedWhenClauses verifies that
 // PopulateComplexityQuery produces SQL containing a representative sample of
 // the WHEN clauses derived from the ComplexityMatrix.

@@ -2143,6 +2143,13 @@ components:
           type: object
           additionalProperties:
             $ref: "#/components/schemas/diskSizeTierSummary"
+        diskComplexityTier:
+          type: object
+          description: >
+            Distribution of VMs across disk-complexity tiers used by the estimation engine
+            (0-10TiB, 10-20TiB, 20-50TiB, 50+TiB).
+          additionalProperties:
+            $ref: '#/components/schemas/diskSizeTierSummary'
         diskTypes:
           type: object
           additionalProperties:

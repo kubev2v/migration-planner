@@ -253,6 +253,29 @@ func (p *Parser) DiskSizeTierDistribution(ctx context.Context, filters Filters) 
 	return result, rows.Err()
 }
 
+// DiskComplexityTierDistribution returns VM distribution by disk complexity tier.
+func (p *Parser) DiskComplexityTierDistribution(ctx context.Context, filters Filters) (map[string]inventory.DiskSizeTierSummary, error) {
+	q, err := p.builder.DiskComplexityTierQuery(filters)
+	if err != nil {
+		return nil, fmt.Errorf("building disk complexity tier query: %w", err)
+	}
+	result := make(map[string]inventory.DiskSizeTierSummary)
+	rows, err := p.db.QueryContext(ctx, q)
+	if err != nil {
+		return nil, fmt.Errorf("querying disk complexity tier: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var tier string
+		var summary inventory.DiskSizeTierSummary
+		if err := rows.Scan(&tier, &summary.VMCount, &summary.TotalSizeTB); err != nil {
+			return nil, fmt.Errorf("scanning disk complexity tier: %w", err)
+		}
+		result[tier] = summary
+	}
+	return result, rows.Err()
+}
+
 // DiskTypeSummary returns disk usage aggregated by datastore type.
 func (p *Parser) DiskTypeSummary(ctx context.Context, filters Filters) ([]inventory.DiskTypeSummary, error) {
 	q, err := p.builder.DiskTypeSummaryQuery(filters)

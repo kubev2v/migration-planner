@@ -858,10 +858,13 @@ type VMs struct {
 	// ComplexityDistribution Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
 	ComplexityDistribution *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
 	CpuCores               VMResourceBreakdown             `json:"cpuCores"`
-	DiskCount              VMResourceBreakdown             `json:"diskCount"`
-	DiskGB                 VMResourceBreakdown             `json:"diskGB"`
-	DiskSizeTier           *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
-	DiskTypes              *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
+
+	// DiskComplexityTier Distribution of VMs across disk-complexity tiers used by the estimation engine (0-10TiB, 10-20TiB, 20-50TiB, 50+TiB).
+	DiskComplexityTier *map[string]DiskSizeTierSummary `json:"diskComplexityTier,omitempty"`
+	DiskCount          VMResourceBreakdown             `json:"diskCount"`
+	DiskGB             VMResourceBreakdown             `json:"diskGB"`
+	DiskSizeTier       *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
+	DiskTypes          *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
 
 	// DistributionByComplexity Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
 	// Deprecated:

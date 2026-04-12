@@ -101,6 +101,7 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		DistributionByComplexity: make(map[string]int),
 		ComplexityDistribution:   make(map[string]inventory.DiskSizeTierSummary),
 		DiskSizeTiers:            make(map[string]inventory.DiskSizeTierSummary),
+		DiskComplexityTiers:      make(map[string]inventory.DiskSizeTierSummary),
 		DiskTypes:                make(map[string]inventory.DiskTypeSummary),
 		MigrationWarnings:        []inventory.MigrationIssue{},
 		NotMigratableReasons:     []inventory.MigrationIssue{},
@@ -216,6 +217,14 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		vmsData.DiskSizeTiers = diskSizeTiers
 	} else {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get disk size tier distribution: %v", err)
+	}
+
+	// Get disk complexity tier distribution
+	diskComplexityTiers, err := p.DiskComplexityTierDistribution(ctx, filters)
+	if err == nil {
+		vmsData.DiskComplexityTiers = diskComplexityTiers
+	} else {
+		zap.S().Named("duckdb_parser").Warnf("Failed to get disk complexity tier distribution: %v", err)
 	}
 
 	// Get disk type summary and convert to map keyed by type

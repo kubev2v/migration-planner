@@ -164,15 +164,15 @@ var _ = Describe("DiskSizeRangeRatings", func() {
 		Expect(complexity.DiskSizeRangeRatings()).To(HaveLen(4))
 	})
 
-	It("keys contain only the numeric range, not the word prefix", func() {
+	It("keys contain only the new TiB-labelled format", func() {
 		ratings := complexity.DiskSizeRangeRatings()
-		Expect(ratings).To(HaveKey("0-10TB"))
-		Expect(ratings).To(HaveKey("10-20TB"))
-		Expect(ratings).To(HaveKey("20-50TB"))
-		Expect(ratings).To(HaveKey(">50TB"))
+		Expect(ratings).To(HaveKey("0-10TiB"))
+		Expect(ratings).To(HaveKey("10-20TiB"))
+		Expect(ratings).To(HaveKey("20-50TiB"))
+		Expect(ratings).To(HaveKey("50+TiB"))
 	})
 
-	It("no original word-prefixed keys are present", func() {
+	It("no legacy word-prefixed keys are present", func() {
 		ratings := complexity.DiskSizeRangeRatings()
 		Expect(ratings).NotTo(HaveKey("Easy (0-10TB)"))
 		Expect(ratings).NotTo(HaveKey("Medium (10-20TB)"))
@@ -180,12 +180,12 @@ var _ = Describe("DiskSizeRangeRatings", func() {
 		Expect(ratings).NotTo(HaveKey("White Glove (>50TB)"))
 	})
 
-	It("scores are preserved correctly after key reformatting", func() {
+	It("scores are preserved correctly for new TiB format", func() {
 		ratings := complexity.DiskSizeRangeRatings()
-		Expect(ratings["0-10TB"]).To(Equal(1))
-		Expect(ratings["10-20TB"]).To(Equal(2))
-		Expect(ratings["20-50TB"]).To(Equal(3))
-		Expect(ratings[">50TB"]).To(Equal(4))
+		Expect(ratings["0-10TiB"]).To(Equal(1))
+		Expect(ratings["10-20TiB"]).To(Equal(2))
+		Expect(ratings["20-50TiB"]).To(Equal(3))
+		Expect(ratings["50+TiB"]).To(Equal(4))
 	})
 
 	It("returns a new map each call (does not mutate DiskSizeScores)", func() {
@@ -195,6 +195,32 @@ var _ = Describe("DiskSizeRangeRatings", func() {
 		// Mutating the returned map must not affect DiskSizeScores
 		r1["0-10TB"] = 99
 		Expect(complexity.DiskSizeScores["Easy (0-10TB)"]).To(Equal(1))
+	})
+})
+
+var _ = Describe("ScoreDiskTierLabel", func() {
+	DescribeTable("new TiB complexity labels map to correct scores",
+		func(label string, expectedScore int) {
+			Expect(complexity.ScoreDiskTierLabel(label)).To(Equal(expectedScore))
+		},
+		Entry("0-10TiB → score 1", "0-10TiB", 1),
+		Entry("10-20TiB → score 2", "10-20TiB", 2),
+		Entry("20-50TiB → score 3", "20-50TiB", 3),
+		Entry("50+TiB → score 4", "50+TiB", 4),
+	)
+
+	DescribeTable("legacy labels still map to correct scores",
+		func(label string, expectedScore int) {
+			Expect(complexity.ScoreDiskTierLabel(label)).To(Equal(expectedScore))
+		},
+		Entry("Easy (0-10TB) → score 1", "Easy (0-10TB)", 1),
+		Entry("Medium (10-20TB) → score 2", "Medium (10-20TB)", 2),
+		Entry("Hard (20-50TB) → score 3", "Hard (20-50TB)", 3),
+		Entry("White Glove (>50TB) → score 4", "White Glove (>50TB)", 4),
+	)
+
+	It("returns 0 for an unknown label", func() {
+		Expect(complexity.ScoreDiskTierLabel("unknown")).To(Equal(0))
 	})
 })
 

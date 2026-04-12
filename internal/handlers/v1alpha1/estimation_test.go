@@ -24,18 +24,22 @@ func createTestInventoryForComplexityHandler(clusterID string) []byte {
 		"FreeBSD (64-bit)":                    {Count: 3, Supported: false},
 	}
 	diskSizeTier := map[string]api.DiskSizeTierSummary{
-		"Easy (0-10TB)": {VmCount: 63, TotalSizeTB: 5.5},
+		"0-100GiB": {VmCount: 63, TotalSizeTB: 5.5},
+	}
+	diskComplexityTier := map[string]api.DiskSizeTierSummary{
+		"0-10TiB": {VmCount: 63, TotalSizeTB: 5.5},
 	}
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
 			clusterID: {
 				Vms: api.VMs{
-					Total:        63,
-					OsInfo:       &osInfo,
-					DiskSizeTier: &diskSizeTier,
-					DiskGB:       api.VMResourceBreakdown{Total: 5632},
-					CpuCores:     api.VMResourceBreakdown{Total: 200},
-					RamGB:        api.VMResourceBreakdown{Total: 400},
+					Total:              63,
+					OsInfo:             &osInfo,
+					DiskSizeTier:       &diskSizeTier,
+					DiskComplexityTier: &diskComplexityTier,
+					DiskGB:             api.VMResourceBreakdown{Total: 5632},
+					CpuCores:           api.VMResourceBreakdown{Total: 200},
+					RamGB:              api.VMResourceBreakdown{Total: 400},
 				},
 			},
 		},
@@ -115,8 +119,12 @@ func createTestAssessmentForByComplexityHandler(id uuid.UUID, username, orgID, c
 		"Windows Server 2019":                 {Count: 10},
 	}
 	diskTier := map[string]api.DiskSizeTierSummary{
-		"Easy (0-10TB)":    {VmCount: 30, TotalSizeTB: 5.0},
-		"Medium (10-20TB)": {VmCount: 10, TotalSizeTB: 12.0},
+		"0-100GiB": {VmCount: 30, TotalSizeTB: 5.0},
+		"1-2TiB":   {VmCount: 10, TotalSizeTB: 12.0},
+	}
+	diskComplexityTierOsDisk := map[string]api.DiskSizeTierSummary{
+		"0-10TiB":  {VmCount: 30, TotalSizeTB: 5.0},
+		"10-20TiB": {VmCount: 10, TotalSizeTB: 12.0},
 	}
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
@@ -125,6 +133,7 @@ func createTestAssessmentForByComplexityHandler(id uuid.UUID, username, orgID, c
 					Total:                  40,
 					OsInfo:                 &osInfo,
 					DiskSizeTier:           &diskTier,
+					DiskComplexityTier:     &diskComplexityTierOsDisk,
 					ComplexityDistribution: &dist,
 					DiskGB:                 api.VMResourceBreakdown{Total: 17000},
 					CpuCores:               api.VMResourceBreakdown{Total: 160},
@@ -719,10 +728,10 @@ var _ = Describe("estimation handler", func() {
 				Expect(err).To(BeNil())
 				response := resp.(server.CalculateMigrationComplexity200JSONResponse)
 				Expect(response.DiskSizeRatings).To(HaveLen(4))
-				Expect(response.DiskSizeRatings["0-10TB"]).To(Equal(1))
-				Expect(response.DiskSizeRatings["10-20TB"]).To(Equal(2))
-				Expect(response.DiskSizeRatings["20-50TB"]).To(Equal(3))
-				Expect(response.DiskSizeRatings[">50TB"]).To(Equal(4))
+				Expect(response.DiskSizeRatings["0-10TiB"]).To(Equal(1))
+				Expect(response.DiskSizeRatings["10-20TiB"]).To(Equal(2))
+				Expect(response.DiskSizeRatings["20-50TiB"]).To(Equal(3))
+				Expect(response.DiskSizeRatings["50+TiB"]).To(Equal(4))
 			})
 
 			It("returns osRatings with one entry per OS in the cluster inventory", func() {
