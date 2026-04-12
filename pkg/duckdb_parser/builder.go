@@ -212,6 +212,14 @@ func (b *QueryBuilder) DiskSizeTierQuery(filters Filters) (string, error) {
 	return b.buildQuery("disk_size_tier_query", mustGetTemplate("disk_size_tier_query"), params)
 }
 
+// DiskComplexityTierQuery builds the disk complexity tier distribution query.
+func (b *QueryBuilder) DiskComplexityTierQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: filters.Cluster,
+	}
+	return b.buildQuery("disk_complexity_tier_query", mustGetTemplate("disk_complexity_tier_query"), params)
+}
+
 // DiskTypeSummaryQuery builds the disk type summary query.
 func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 	params := queryParams{

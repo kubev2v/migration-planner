@@ -198,22 +198,28 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 	if clusterInventory.Vms.OsInfo == nil {
 		return nil, fmt.Errorf("inventory has no osInfo data")
 	}
-	if clusterInventory.Vms.DiskSizeTier == nil {
-		return nil, fmt.Errorf("inventory has no diskSizeTier data")
+	// Prefer the dedicated complexity-tier field (new snapshots).
+	// Fall back to DiskSizeTier for old snapshots whose labels still match DiskSizeScores.
+	diskSource := clusterInventory.Vms.DiskComplexityTier
+	if diskSource == nil || len(*diskSource) == 0 {
+		diskSource = clusterInventory.Vms.DiskSizeTier
+	}
+	if diskSource == nil || len(*diskSource) == 0 {
+		return nil, fmt.Errorf("inventory has no disk tier data (diskComplexityTier or diskSizeTier)")
 	}
 
-	osEntries := make([]complexity.VMOsEntry, 0, len(*clusterInventory.Vms.OsInfo))
-	for osName, info := range *clusterInventory.Vms.OsInfo {
-		osEntries = append(osEntries, complexity.VMOsEntry{Name: osName, Count: info.Count})
-	}
-
-	diskEntries := make([]complexity.DiskTierInput, 0, len(*clusterInventory.Vms.DiskSizeTier))
-	for label, tier := range *clusterInventory.Vms.DiskSizeTier {
+	diskEntries := make([]complexity.DiskTierInput, 0, len(*diskSource))
+	for label, tier := range *diskSource {
 		diskEntries = append(diskEntries, complexity.DiskTierInput{
 			Label:       label,
 			VMCount:     tier.VmCount,
 			TotalSizeTB: tier.TotalSizeTB,
 		})
+	}
+
+	osEntries := make([]complexity.VMOsEntry, 0, len(*clusterInventory.Vms.OsInfo))
+	for osName, info := range *clusterInventory.Vms.OsInfo {
+		osEntries = append(osEntries, complexity.VMOsEntry{Name: osName, Count: info.Count})
 	}
 
 	return &MigrationComplexityResult{

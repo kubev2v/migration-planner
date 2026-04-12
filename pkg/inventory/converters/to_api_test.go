@@ -358,6 +358,58 @@ func TestAnonymizeNFSDatastore(t *testing.T) {
 	}
 }
 
+func TestToAPIVMs_DiskComplexityTier(t *testing.T) {
+	tests := []struct {
+		name           string
+		input          inventory.VMsData
+		expectNilField bool
+	}{
+		{
+			name: "nil DiskComplexityTiers produces nil API field",
+			input: inventory.VMsData{
+				DiskComplexityTiers: nil,
+			},
+			expectNilField: true,
+		},
+		{
+			name: "empty DiskComplexityTiers produces nil API field",
+			input: inventory.VMsData{
+				DiskComplexityTiers: map[string]inventory.DiskSizeTierSummary{},
+			},
+			expectNilField: true,
+		},
+		{
+			name: "populated DiskComplexityTiers produces non-nil API field with correct values",
+			input: inventory.VMsData{
+				DiskComplexityTiers: map[string]inventory.DiskSizeTierSummary{
+					"0-10TiB":  {VMCount: 50, TotalSizeTB: 3.5},
+					"10-20TiB": {VMCount: 10, TotalSizeTB: 12.0},
+				},
+			},
+			expectNilField: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := toAPIVMs(&tt.input)
+
+			if tt.expectNilField {
+				assert.Nil(t, result.DiskComplexityTier,
+					"DiskComplexityTier should be nil so omitempty omits it from JSON")
+			} else {
+				require.NotNil(t, result.DiskComplexityTier)
+				for tier, expected := range tt.input.DiskComplexityTiers {
+					actual, exists := (*result.DiskComplexityTier)[tier]
+					require.True(t, exists, "tier %s should exist in result", tier)
+					assert.Equal(t, expected.VMCount, actual.VmCount)
+					assert.Equal(t, expected.TotalSizeTB, actual.TotalSizeTB)
+				}
+			}
+		})
+	}
+}
+
 func TestToAPIInfra_Hosts(t *testing.T) {
 	tests := []struct {
 		name  string

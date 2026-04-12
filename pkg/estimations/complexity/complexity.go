@@ -1,7 +1,6 @@
 package complexity
 
 import (
-	"regexp"
 	"sort"
 	"strings"
 )
@@ -126,16 +125,27 @@ var OSDifficultyScores = map[string]Score{
 	"Microsoft SQL": 4,
 }
 
-// DiskSizeScores maps the pre-computed inventory tier label strings (produced by
-// the agent) to numeric complexity scores. The thresholds follow complexity.md:
+// DiskSizeScores maps disk tier label strings to numeric complexity scores.
 //
-//	Score 1 — provisioned disk ≤ 10 TB
-//	Score 2 — provisioned disk ≤ 20 TB
-//	Score 3 — provisioned disk ≤ 50 TB
-//	Score 4 — provisioned disk  > 50 TB
+// New labels (used by DiskComplexityTier in current snapshots):
 //
-// Edit this map to adjust disk complexity scoring.
+//	Score 1 — 0-10TiB
+//	Score 2 — 10-20TiB
+//	Score 3 — 20-50TiB
+//	Score 4 — >50TiB
+//
+// Legacy labels are retained for backward compatibility: old inventory snapshots
+// stored in the database use the original four-bucket labels ("Easy (0-10TB)" etc.)
+// and fall through the estimation service fallback path, which reads DiskSizeTier
+// when DiskComplexityTier is absent.
 var DiskSizeScores = map[string]Score{
+	// New complexity-tier labels (used by DiskComplexityTier in new snapshots)
+	"0-10TiB":  1,
+	"10-20TiB": 2,
+	"20-50TiB": 3,
+	"50+TiB":   4,
+	// Legacy labels — retained for backward-compat fallback on old inventory snapshots
+	// that only have DiskSizeTier with the original four-bucket labels.
 	"Easy (0-10TB)":       1,
 	"Medium (10-20TB)":    2,
 	"Hard (20-50TB)":      3,
@@ -183,23 +193,17 @@ func ScoreDiskTierLabel(label string) Score {
 	return DiskSizeScores[label]
 }
 
-// extracts the actual ranges from the keys of the DiskSizeScores (this is just formatting for the API layer)
-var diskTierRangeRe = regexp.MustCompile(`\(([^)]+)\)`)
-
-// DiskSizeRangeRatings returns the DiskSizeScores map with keys reformatted to
-// contain only the numeric range portion of each tier label (e.g. "Easy (0-10TB)"
-// becomes "0-10TB"). Use this when exposing the lookup table in API responses so
-// that UI-level label words ("Easy", "Hard", etc.) do not bleed into the data layer.
+// DiskSizeRangeRatings returns the new-format DiskSizeScores (TiB-labelled entries only),
+// suitable for API exposure. Legacy labels are excluded to prevent UI-level label words
+// from the old schema from bleeding into the data layer.
 func DiskSizeRangeRatings() map[string]Score {
-	result := make(map[string]Score, len(DiskSizeScores))
-	for label, score := range DiskSizeScores {
-		if m := diskTierRangeRe.FindStringSubmatch(label); m != nil {
-			result[m[1]] = score
-		} else {
-			result[label] = score
-		}
+	// Only return entries for the new TiB-labelled complexity tiers
+	return map[string]Score{
+		"0-10TiB":  1,
+		"10-20TiB": 2,
+		"20-50TiB": 3,
+		"50+TiB":   4,
 	}
-	return result
 }
 
 // VMOsEntry represents a single OS in the inventory with its VM count.

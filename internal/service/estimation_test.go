@@ -31,16 +31,20 @@ func buildDiskSizeTier(entries map[string]api.DiskSizeTierSummary) *map[string]a
 }
 
 func createTestInventoryForComplexity(clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) []byte {
+	diskComplexityTier := map[string]api.DiskSizeTierSummary{
+		"0-10TiB": {VmCount: 125, TotalSizeTB: 8.5},
+	}
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
 			clusterID: {
 				Vms: api.VMs{
-					Total:        10,
-					OsInfo:       osInfo,
-					DiskSizeTier: diskSizeTier,
-					DiskGB:       api.VMResourceBreakdown{Total: 100},
-					CpuCores:     api.VMResourceBreakdown{Total: 40},
-					RamGB:        api.VMResourceBreakdown{Total: 80},
+					Total:              10,
+					OsInfo:             osInfo,
+					DiskSizeTier:       diskSizeTier,
+					DiskComplexityTier: &diskComplexityTier,
+					DiskGB:             api.VMResourceBreakdown{Total: 100},
+					CpuCores:           api.VMResourceBreakdown{Total: 40},
+					RamGB:              api.VMResourceBreakdown{Total: 80},
 				},
 			},
 		},
@@ -122,6 +126,24 @@ func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID 
 	}
 }
 
+func createTestAssessmentFromRawInventory(id uuid.UUID, username, orgID string, inventory []byte) *model.Assessment {
+	return &model.Assessment{
+		ID:       id,
+		Name:     "test-assessment",
+		OrgID:    orgID,
+		Username: username,
+		Snapshots: []model.Snapshot{
+			{
+				ID:           1,
+				CreatedAt:    time.Now(),
+				Inventory:    inventory,
+				AssessmentID: id,
+				Version:      2,
+			},
+		},
+	}
+}
+
 func createTestInventoryForEstimation(clusterID string, totalVMs, totalDiskGB int) []byte {
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
@@ -196,7 +218,7 @@ var _ = Describe("EstimationService", func() {
 				"FreeBSD (64-bit)":                    5,
 			})
 			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
-				"Easy (0-10TB)": {VmCount: 125, TotalSizeTB: 8.5},
+				"0-100GiB": {VmCount: 125, TotalSizeTB: 8.5},
 			})
 		})
 
@@ -238,10 +260,10 @@ var _ = Describe("EstimationService", func() {
 
 			It("maps disk tier labels to correct scores with correct size values", func() {
 				diskTier := buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
-					"Easy (0-10TB)":       {VmCount: 80, TotalSizeTB: 5.0},
-					"Medium (10-20TB)":    {VmCount: 10, TotalSizeTB: 15.0},
-					"Hard (20-50TB)":      {VmCount: 5, TotalSizeTB: 30.0},
-					"White Glove (>50TB)": {VmCount: 1, TotalSizeTB: 75.0},
+					"0-100GiB":    {VmCount: 80, TotalSizeTB: 5.0},
+					"100-500GiB":  {VmCount: 10, TotalSizeTB: 15.0},
+					"500GiB-1TiB": {VmCount: 5, TotalSizeTB: 30.0},
+					"1-2TiB":      {VmCount: 1, TotalSizeTB: 75.0},
 				})
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, diskTier,
@@ -249,13 +271,15 @@ var _ = Describe("EstimationService", func() {
 
 				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
 
+				// DiskComplexityTier is set by createTestInventoryForComplexity with a fixed
+				// single entry: "0-10TiB" → score 1, VmCount 125, TotalSizeTB 8.5
 				Expect(err).To(BeNil())
 				Expect(result.ComplexityByDisk[0].Score).To(Equal(1))
-				Expect(result.ComplexityByDisk[0].VMCount).To(Equal(80))
-				Expect(result.ComplexityByDisk[0].TotalSizeTB).To(Equal(5.0))
+				Expect(result.ComplexityByDisk[0].VMCount).To(Equal(125))
+				Expect(result.ComplexityByDisk[0].TotalSizeTB).To(Equal(8.5))
 				Expect(result.ComplexityByDisk[3].Score).To(Equal(4))
-				Expect(result.ComplexityByDisk[3].VMCount).To(Equal(1))
-				Expect(result.ComplexityByDisk[3].TotalSizeTB).To(Equal(75.0))
+				Expect(result.ComplexityByDisk[3].VMCount).To(Equal(0))
+				Expect(result.ComplexityByDisk[3].TotalSizeTB).To(Equal(0.0))
 			})
 
 			It("OS entries are always in canonical score order 0 through 4", func() {
@@ -344,10 +368,10 @@ var _ = Describe("EstimationService", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result.DiskSizeRatings).To(HaveLen(4))
-				Expect(result.DiskSizeRatings["0-10TB"]).To(Equal(1))
-				Expect(result.DiskSizeRatings["10-20TB"]).To(Equal(2))
-				Expect(result.DiskSizeRatings["20-50TB"]).To(Equal(3))
-				Expect(result.DiskSizeRatings[">50TB"]).To(Equal(4))
+				Expect(result.DiskSizeRatings["0-10TiB"]).To(Equal(1))
+				Expect(result.DiskSizeRatings["10-20TiB"]).To(Equal(2))
+				Expect(result.DiskSizeRatings["20-50TiB"]).To(Equal(3))
+				Expect(result.DiskSizeRatings["50+TiB"]).To(Equal(4))
 			})
 
 			It("osRatings contains one entry per distinct OS name from the inventory", func() {
@@ -363,6 +387,38 @@ var _ = Describe("EstimationService", func() {
 				Expect(result.OSRatings["Red Hat Enterprise Linux 9 (64-bit)"]).To(Equal(1))
 				Expect(result.OSRatings["CentOS 7 (64-bit)"]).To(Equal(1))
 				Expect(result.OSRatings["FreeBSD (64-bit)"]).To(Equal(3))
+			})
+
+			It("falls back to DiskSizeTier when DiskComplexityTier is absent (old snapshot)", func() {
+				// Build inventory with only the old-style DiskSizeTier (no DiskComplexityTier)
+				oldStyleTier := buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+					"Easy (0-10TB)": {VmCount: 50, TotalSizeTB: 3.0},
+				})
+				oldInventory := createTestInventoryForComplexity(clusterID, defaultOsInfo, oldStyleTier)
+				// Override: strip out DiskComplexityTier to simulate old snapshot
+				var inv api.Inventory
+				Expect(json.Unmarshal(oldInventory, &inv)).To(Succeed())
+				inv.Clusters[clusterID] = api.InventoryData{
+					Vms: api.VMs{
+						Total:        10,
+						OsInfo:       defaultOsInfo,
+						DiskSizeTier: oldStyleTier,
+						// DiskComplexityTier intentionally absent (nil)
+						DiskGB:   api.VMResourceBreakdown{Total: 100},
+						CpuCores: api.VMResourceBreakdown{Total: 40},
+						RamGB:    api.VMResourceBreakdown{Total: 80},
+					},
+				}
+				data, err := json.Marshal(inv)
+				Expect(err).ToNot(HaveOccurred())
+				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				Expect(err).To(BeNil())
+				Expect(result.ComplexityByDisk).To(HaveLen(4))
+				// "Easy (0-10TB)" maps to score 1 — verify VmCount and TotalSizeTB flowed through
+				Expect(result.ComplexityByDisk[0].Score).To(Equal(1))
+				Expect(result.ComplexityByDisk[0].VMCount).To(Equal(50))
+				Expect(result.ComplexityByDisk[0].TotalSizeTB).To(Equal(3.0))
 			})
 		})
 
@@ -448,10 +504,55 @@ var _ = Describe("EstimationService", func() {
 				Expect(err.Error()).To(ContainSubstring("osInfo"))
 			})
 
-			It("returns error when diskSizeTier is nil", func() {
-				mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
-					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, nil,
-				)
+			It("returns error when both diskSizeTier and diskComplexityTier are nil", func() {
+				// Build inventory with no disk tier data at all (both fields absent)
+				noDiskInventory := api.Inventory{
+					Clusters: map[string]api.InventoryData{
+						clusterID: {
+							Vms: api.VMs{
+								Total:    10,
+								OsInfo:   defaultOsInfo,
+								DiskGB:   api.VMResourceBreakdown{Total: 100},
+								CpuCores: api.VMResourceBreakdown{Total: 40},
+								RamGB:    api.VMResourceBreakdown{Total: 80},
+								// DiskSizeTier and DiskComplexityTier intentionally nil
+							},
+						},
+					},
+				}
+				data, err := json.Marshal(noDiskInventory)
+				Expect(err).ToNot(HaveOccurred())
+				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("diskSizeTier"))
+			})
+
+			It("returns error when both diskSizeTier and diskComplexityTier are empty maps", func() {
+				// An external client could send {} for either field; empty maps must also
+				// trigger the fallback and ultimately the error, not silently return zeros.
+				emptyTier := map[string]api.DiskSizeTierSummary{}
+				noDiskInventory := api.Inventory{
+					Clusters: map[string]api.InventoryData{
+						clusterID: {
+							Vms: api.VMs{
+								Total:              10,
+								OsInfo:             defaultOsInfo,
+								DiskGB:             api.VMResourceBreakdown{Total: 100},
+								CpuCores:           api.VMResourceBreakdown{Total: 40},
+								RamGB:              api.VMResourceBreakdown{Total: 80},
+								DiskSizeTier:       &emptyTier,
+								DiskComplexityTier: &emptyTier,
+							},
+						},
+					},
+				}
+				data, err := json.Marshal(noDiskInventory)
+				Expect(err).ToNot(HaveOccurred())
+				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
 
 				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
 
@@ -750,7 +851,7 @@ var _ = Describe("EstimationService", func() {
 				"Red Hat Enterprise Linux 9 (64-bit)": 100,
 			})
 			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
-				"Easy (0-10TB)": {VmCount: 100, TotalSizeTB: 5.0},
+				"0-100GiB": {VmCount: 100, TotalSizeTB: 5.0},
 			})
 		})
 

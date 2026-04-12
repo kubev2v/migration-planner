@@ -54,6 +54,18 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		}
 	}
 
+	var diskComplexityTierPtr *map[string]api.DiskSizeTierSummary
+	if len(v.DiskComplexityTiers) > 0 {
+		m := make(map[string]api.DiskSizeTierSummary, len(v.DiskComplexityTiers))
+		for tier, summary := range v.DiskComplexityTiers {
+			m[tier] = api.DiskSizeTierSummary{
+				VmCount:     summary.VMCount,
+				TotalSizeTB: summary.TotalSizeTB,
+			}
+		}
+		diskComplexityTierPtr = &m
+	}
+
 	diskTypes := make(map[string]api.DiskTypeSummary)
 	for diskType, summary := range v.DiskTypes {
 		diskTypes[diskType] = api.DiskTypeSummary{
@@ -140,6 +152,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		DistributionByComplexity: &v.DistributionByComplexity,
 		ComplexityDistribution:   &complexityDist,
 		DiskSizeTier:             &diskSizeTiers,
+		DiskComplexityTier:       diskComplexityTierPtr,
 		DiskTypes:                &diskTypes,
 		MigrationWarnings:        migrationWarnings,
 		NotMigratableReasons:     notMigratableReasons,

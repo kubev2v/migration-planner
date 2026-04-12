@@ -33,6 +33,7 @@ type VMsData struct {
 	DistributionByComplexity    map[string]int
 	ComplexityDistribution      map[string]DiskSizeTierSummary
 	DiskSizeTiers               map[string]DiskSizeTierSummary
+	DiskComplexityTiers         map[string]DiskSizeTierSummary // 4-bucket complexity tiers for estimation engine
 	DiskTypes                   map[string]DiskTypeSummary
 	MigrationWarnings           []MigrationIssue
 	NotMigratableReasons        []MigrationIssue
