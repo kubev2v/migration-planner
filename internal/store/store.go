@@ -16,6 +16,7 @@ type Store interface {
 	PrivateKey() PrivateKey
 	Label() Label
 	Assessment() Assessment
+	ClusterSizingInput() ClusterSizingInput
 	Job() Job
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
@@ -32,6 +33,7 @@ type DataStore struct {
 	privateKey      PrivateKey
 	label           Label
 	assessment      Assessment
+	cluster         ClusterSizingInput
 	job             Job
 	accounts        Accounts
 	partnerCustomer PartnerCustomer
@@ -45,6 +47,7 @@ func NewStore(db *gorm.DB) Store {
 		privateKey:      NewCacheKeyStore(NewPrivateKey(db)),
 		label:           NewLabelStore(db),
 		assessment:      NewAssessmentStore(db),
+		cluster:         NewClusterSizingInputStore(db),
 		job:             NewJobStore(db),
 		authz:           NewAuthzStore(db),
 		accounts:        NewAccountsStore(db),
@@ -83,6 +86,10 @@ func (s *DataStore) Label() Label {
 
 func (s *DataStore) Assessment() Assessment {
 	return s.assessment
+}
+
+func (s *DataStore) ClusterSizingInput() ClusterSizingInput {
+	return s.cluster
 }
 
 func (s *DataStore) Job() Job {

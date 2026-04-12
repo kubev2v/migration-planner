@@ -18,6 +18,55 @@ const (
 	workerNodeThreadsMax = 2000
 )
 
+// (GET /api/v1/assessments/{id}/cluster-requirements/stored-input)
+func (h *ServiceHandler) GetAssessmentClusterRequirementsStoredInput(ctx context.Context, request server.GetAssessmentClusterRequirementsStoredInputRequestObject) (server.GetAssessmentClusterRequirementsStoredInputResponseObject, error) {
+	logger := log.NewDebugLogger("sizer_handler").
+		WithContext(ctx).
+		Operation("get_stored_assessment_cluster_requirements").
+		WithUUID("assessment_id", request.Id).
+		Build()
+
+	clusterID := request.Params.ClusterId
+
+	if clusterID == "" {
+		logger.Error(fmt.Errorf("clusterId is required")).Log()
+		return server.GetAssessmentClusterRequirementsStoredInput400JSONResponse{Message: "clusterId is required"}, nil
+	}
+
+	user := auth.MustHaveUser(ctx)
+	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			logger.Error(err).WithUUID("assessment_id", request.Id).Log()
+			return server.GetAssessmentClusterRequirementsStoredInput404JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).WithUUID("assessment_id", request.Id).Log()
+			return server.GetAssessmentClusterRequirementsStoredInput500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
+		}
+	}
+
+	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
+		message := fmt.Sprintf("forbidden to access assessment %s by user %s", request.Id, user.Username)
+		logger.Error(fmt.Errorf("authorization failed: %s", message)).Log()
+		return server.GetAssessmentClusterRequirementsStoredInput403JSONResponse{Message: message}, nil
+	}
+
+	storedInput, err := h.sizerSrv.GetClusterRequirementsInput(ctx, request.Id, clusterID)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			logger.Error(err).WithUUID("assessment_id", request.Id).WithString("cluster_id", clusterID).Log()
+			return server.GetAssessmentClusterRequirementsStoredInput404JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).WithUUID("assessment_id", request.Id).WithString("cluster_id", clusterID).Log()
+			return server.GetAssessmentClusterRequirementsStoredInput500JSONResponse{Message: fmt.Sprintf("failed to get stored cluster requirements: %v", err)}, nil
+		}
+	}
+
+	return server.GetAssessmentClusterRequirementsStoredInput200JSONResponse(mappers.ClusterRequirementsInputFormToAPI(*storedInput)), nil
+}
+
 // (POST /api/v1/assessments/{id}/cluster-requirements)
 func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Context, request server.CalculateAssessmentClusterRequirementsRequestObject) (server.CalculateAssessmentClusterRequirementsResponseObject, error) {
 	logger := log.NewDebugLogger("sizer_handler").

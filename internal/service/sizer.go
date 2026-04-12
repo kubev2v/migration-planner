@@ -15,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
@@ -143,6 +144,9 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
+	// Apply defaults for calculation purposes
+	calcReq := applyDefaults(req)
+
 	if len(assessment.Snapshots) == 0 {
 		return nil, fmt.Errorf("assessment has no snapshots")
 	}
@@ -163,9 +167,9 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("inventory has no clusters")
 	}
 
-	clusterInventory, exists := inventory.Clusters[req.ClusterID]
+	clusterInventory, exists := inventory.Clusters[calcReq.ClusterID]
 	if !exists {
-		return nil, fmt.Errorf("cluster %s not found in assessment %s", req.ClusterID, assessmentID)
+		return nil, fmt.Errorf("cluster %s not found in assessment %s", calcReq.ClusterID, assessmentID)
 	}
 
 	totalVMs := clusterInventory.Vms.Total
@@ -175,49 +179,67 @@ func (s *SizerService) CalculateClusterRequirements(
 	// Validate that the cluster has VMs with meaningful resources to migrate
 	// Reject clusters with no VMs or clusters where either CPU or Memory is zero
 	if totalVMs == 0 || totalCPU == 0 || totalMemory == 0 {
-		return nil, NewErrInvalidClusterInventory(req.ClusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
+		return nil, NewErrInvalidClusterInventory(calcReq.ClusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
 	}
 
-	includeControlPlane := !req.HostedControlPlane
-	effectiveCPNodeCount := effectiveControlPlaneNodeCount(req)
-	controlPlaneSchedulable := req.ControlPlaneSchedulable
+	// Extract values from pointers (defaults have been applied by applyDefaults)
+	hostedControlPlane := calcReq.HostedControlPlane != nil && *calcReq.HostedControlPlane
+	includeControlPlane := !hostedControlPlane
+	effectiveCPNodeCount := effectiveControlPlaneNodeCount(calcReq)
 
-	controlPlaneCPU := req.ControlPlaneCPU
-	controlPlaneMemory := req.ControlPlaneMemory
+	workerNodeThreads := 0
+	if calcReq.WorkerNodeThreads != nil {
+		workerNodeThreads = *calcReq.WorkerNodeThreads
+	}
+
+	controlPlaneSchedulable := false
+	if calcReq.ControlPlaneSchedulable != nil {
+		controlPlaneSchedulable = *calcReq.ControlPlaneSchedulable
+	}
+
+	controlPlaneCPU := 0
+	if calcReq.ControlPlaneCPU != nil {
+		controlPlaneCPU = *calcReq.ControlPlaneCPU
+	}
+
+	controlPlaneMemory := 0
+	if calcReq.ControlPlaneMemory != nil {
+		controlPlaneMemory = *calcReq.ControlPlaneMemory
+	}
 
 	// Calculate effective CPU with SMT adjustment
-	effectiveCPU := CalculateEffectiveCPU(req.WorkerNodeCPU, req.WorkerNodeThreads)
+	effectiveCPU := CalculateEffectiveCPU(calcReq.WorkerNodeCPU, workerNodeThreads)
 
 	// Calculate SMT multiplier for minimum node size calculation
 	smtMultiplier := 1.0 // Default: no SMT
-	if req.WorkerNodeCPU > 0 && req.WorkerNodeThreads > 0 && req.WorkerNodeThreads > req.WorkerNodeCPU {
-		smtMultiplier = effectiveCPU / float64(req.WorkerNodeCPU)
+	if calcReq.WorkerNodeCPU > 0 && workerNodeThreads > 0 && workerNodeThreads > calcReq.WorkerNodeCPU {
+		smtMultiplier = effectiveCPU / float64(calcReq.WorkerNodeCPU)
 	}
 
 	tracer := logger.Operation("calculate_cluster_requirements").
 		WithUUID("assessment_id", assessmentID).
-		WithString("cluster_id", req.ClusterID).
+		WithString("cluster_id", calcReq.ClusterID).
 		WithInt("inventory_total_cpu", totalCPU).
 		WithInt("inventory_total_memory", totalMemory).
 		WithInt("inventory_total_vms", totalVMs).
-		WithString("cpu_over_commit_ratio", req.CpuOverCommitRatio).
-		WithString("memory_over_commit_ratio", req.MemoryOverCommitRatio).
-		WithInt("worker_node_cpu", req.WorkerNodeCPU).
-		WithInt("worker_node_threads", req.WorkerNodeThreads).
+		WithString("cpu_over_commit_ratio", calcReq.CpuOverCommitRatio).
+		WithString("memory_over_commit_ratio", calcReq.MemoryOverCommitRatio).
+		WithInt("worker_node_cpu", calcReq.WorkerNodeCPU).
+		WithInt("worker_node_threads", workerNodeThreads).
 		WithString("worker_node_effective_cpu", fmt.Sprintf("%.2f", effectiveCPU)).
-		WithInt("worker_node_memory", req.WorkerNodeMemory).
+		WithInt("worker_node_memory", calcReq.WorkerNodeMemory).
 		WithBool("control_plane_schedulable", controlPlaneSchedulable).
-		WithBool("hosted_control_plane", req.HostedControlPlane).
+		WithBool("hosted_control_plane", hostedControlPlane).
 		WithInt("control_plane_node_count", effectiveCPNodeCount).
 		Build()
 
 	// Use effectiveControlPlaneNodeCount to handle hosted control plane (returns 0)
-	singleNode := effectiveControlPlaneNodeCount(req) == 1
+	singleNode := effectiveControlPlaneNodeCount(calcReq) == 1
 
 	// Early validation for multi-node clusters only (SNO validated by sizer API)
 	if !singleNode {
 		targetCPU := effectiveCPU * CapacityMultiplier
-		targetMemory := float64(req.WorkerNodeMemory) * CapacityMultiplier
+		targetMemory := float64(calcReq.WorkerNodeMemory) * CapacityMultiplier
 
 		minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches := s.calculateMinimumNodeSize(
 			totalCPU,
@@ -233,7 +255,7 @@ func (s *SizerService) CalculateClusterRequirements(
 
 		if estimatedBatches > MaxBatches {
 			return nil, s.formatNodeSizeError(
-				req.WorkerNodeCPU, req.WorkerNodeMemory,
+				calcReq.WorkerNodeCPU, calcReq.WorkerNodeMemory,
 				totalCPU, totalMemory,
 				minNodeCPUForMaxBatches, minNodeMemoryForMaxBatches,
 			)
@@ -245,15 +267,15 @@ func (s *SizerService) CalculateClusterRequirements(
 		float64(totalMemory),
 		totalVMs,
 		effectiveCPU,
-		req.WorkerNodeMemory,
-		req.CpuOverCommitRatio,
-		req.MemoryOverCommitRatio,
+		calcReq.WorkerNodeMemory,
+		calcReq.CpuOverCommitRatio,
+		calcReq.MemoryOverCommitRatio,
 		CapacityMultiplier,
 	)
 	if err != nil {
 		// For SNO, convert technical errors to user-friendly message
 		if singleNode {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, calcReq.CpuOverCommitRatio, calcReq.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory)
 		}
 		return nil, NewErrInvalidRequest(err.Error())
 	}
@@ -275,7 +297,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		services,
 		DefaultPlatform,
 		effectiveCPU,
-		req.WorkerNodeMemory,
+		calcReq.WorkerNodeMemory,
 		includeControlPlane,
 		controlPlaneSchedulable,
 		controlPlaneCPU,
@@ -289,7 +311,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	if err != nil {
 		tracer.Error(err).Log()
 		if singleNode && isSizerSchedulabilityError(err) {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, calcReq.CpuOverCommitRatio, calcReq.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory)
 		}
 		return nil, fmt.Errorf("failed to call sizer service: %w", err)
 	}
@@ -306,7 +328,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	transformed := s.transformSizerResponse(sizerResponse, effectiveCPNodeCount)
 
 	if singleNode && sizerResponse.Data.NodeCount > 1 {
-		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
+		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, calcReq.CpuOverCommitRatio, calcReq.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory)
 	}
 
 	// Calculate max VMs per node from sizer response for validation. We only validate when
@@ -335,7 +357,7 @@ func (s *SizerService) CalculateClusterRequirements(
 
 	if maxVMsPerNode > MaxVMsPerWorkerNode {
 		if singleNode {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, calcReq.CpuOverCommitRatio, calcReq.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory)
 		}
 		err := NewErrInvalidRequest(fmt.Sprintf("VM distribution constraint violated: found %d VMs on a node, exceeds limit of %d per node",
 			maxVMsPerNode, MaxVMsPerWorkerNode))
@@ -363,10 +385,15 @@ func (s *SizerService) CalculateClusterRequirements(
 		)
 
 		return nil, s.formatNodeSizeError(
-			req.WorkerNodeCPU, req.WorkerNodeMemory,
+			calcReq.WorkerNodeCPU, calcReq.WorkerNodeMemory,
 			totalCPU, totalMemory,
 			minNodeCPU, minNodeMemory,
 		)
+	}
+
+	if err := s.persistClusterSizingInput(ctx, assessmentID, req); err != nil {
+		tracer.Error(err).Log()
+		return nil, err
 	}
 
 	tracer.Success().
@@ -382,6 +409,135 @@ func (s *SizerService) CalculateClusterRequirements(
 			TotalMemory: totalMemory,
 		},
 	}, nil
+}
+
+func (s *SizerService) GetClusterRequirementsInput(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	clusterID string,
+) (*mappers.ClusterRequirementsInputForm, error) {
+	input, err := s.store.ClusterSizingInput().Get(ctx, assessmentID, clusterID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrClusterRequirementsNotFound(clusterID, assessmentID)
+		}
+		return nil, fmt.Errorf("failed to get stored cluster requirements input: %w", err)
+	}
+
+	return &mappers.ClusterRequirementsInputForm{
+		ClusterID:               input.ExternalClusterID,
+		CpuOverCommitRatio:      input.CpuOverCommitRatio,
+		MemoryOverCommitRatio:   input.MemoryOverCommitRatio,
+		WorkerNodeCPU:           input.WorkerNodeCPU,
+		WorkerNodeThreads:       input.WorkerNodeThreads,
+		WorkerNodeMemory:        input.WorkerNodeMemory,
+		ControlPlaneSchedulable: input.ControlPlaneSchedulable,
+		ControlPlaneNodeCount:   input.ControlPlaneNodeCount,
+		ControlPlaneCPU:         input.ControlPlaneCPU,
+		ControlPlaneMemory:      input.ControlPlaneMemory,
+		HostedControlPlane:      input.HostedControlPlane,
+	}, nil
+}
+
+func (s *SizerService) persistClusterSizingInput(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	req *mappers.ClusterRequirementsRequestForm,
+) error {
+	// Build input from ONLY what user provided (no defaults) - preserve sparse payload semantics
+	input := model.AssessmentClusterSizingInput{
+		AssessmentID:          assessmentID,
+		ExternalClusterID:     req.ClusterID,
+		CpuOverCommitRatio:    util.ToStrPtr(req.CpuOverCommitRatio),
+		MemoryOverCommitRatio: util.ToStrPtr(req.MemoryOverCommitRatio),
+		WorkerNodeCPU:         util.IntPtr(req.WorkerNodeCPU),
+		WorkerNodeMemory:      util.IntPtr(req.WorkerNodeMemory),
+
+		// Store optional fields exactly as provided (nil if omitted)
+		WorkerNodeThreads:       req.WorkerNodeThreads,
+		HostedControlPlane:      req.HostedControlPlane,
+		ControlPlaneSchedulable: req.ControlPlaneSchedulable,
+		ControlPlaneNodeCount:   req.ControlPlaneNodeCount,
+		ControlPlaneCPU:         req.ControlPlaneCPU,
+		ControlPlaneMemory:      req.ControlPlaneMemory,
+	}
+
+	_, err := s.store.ClusterSizingInput().Upsert(ctx, input)
+	if err != nil {
+		return fmt.Errorf("failed to persist cluster requirements input: %w", err)
+	}
+
+	return nil
+}
+
+// applyDefaults creates a copy of the request with defaults applied for calculation purposes
+func applyDefaults(req *mappers.ClusterRequirementsRequestForm) *mappers.ClusterRequirementsRequestForm {
+	// Default control plane node resources align with OVF sizer defaults and meet
+	// Assisted Installer prerequisites for control plane nodes.
+	const (
+		defaultControlPlaneCPU         = 6
+		defaultControlPlaneMemory      = 16
+		defaultControlPlaneNodeCount   = 3
+		defaultControlPlaneSchedulable = false
+		defaultHostedControlPlane      = false
+		defaultWorkerNodeThreads       = 0
+	)
+
+	calc := &mappers.ClusterRequirementsRequestForm{
+		// Required fields - copy as-is
+		ClusterID:             req.ClusterID,
+		CpuOverCommitRatio:    req.CpuOverCommitRatio,
+		MemoryOverCommitRatio: req.MemoryOverCommitRatio,
+		WorkerNodeCPU:         req.WorkerNodeCPU,
+		WorkerNodeMemory:      req.WorkerNodeMemory,
+
+		// Optional fields - apply defaults if not provided
+		WorkerNodeThreads:  req.WorkerNodeThreads,
+		HostedControlPlane: req.HostedControlPlane,
+	}
+
+	// Apply worker node threads default if not provided
+	if calc.WorkerNodeThreads == nil {
+		calc.WorkerNodeThreads = util.IntPtr(defaultWorkerNodeThreads)
+	}
+
+	// Apply hosted control plane default if not provided
+	if calc.HostedControlPlane == nil {
+		calc.HostedControlPlane = util.BoolPtr(defaultHostedControlPlane)
+	}
+
+	hostedCP := calc.HostedControlPlane != nil && *calc.HostedControlPlane
+
+	// Only apply control plane defaults for non-hosted control planes
+	if !hostedCP {
+		calc.ControlPlaneSchedulable = req.ControlPlaneSchedulable
+		if calc.ControlPlaneSchedulable == nil {
+			calc.ControlPlaneSchedulable = util.BoolPtr(defaultControlPlaneSchedulable)
+		}
+
+		calc.ControlPlaneNodeCount = req.ControlPlaneNodeCount
+		if calc.ControlPlaneNodeCount == nil {
+			calc.ControlPlaneNodeCount = util.IntPtr(defaultControlPlaneNodeCount)
+		}
+
+		calc.ControlPlaneCPU = req.ControlPlaneCPU
+		if calc.ControlPlaneCPU == nil {
+			calc.ControlPlaneCPU = util.IntPtr(defaultControlPlaneCPU)
+		}
+
+		calc.ControlPlaneMemory = req.ControlPlaneMemory
+		if calc.ControlPlaneMemory == nil {
+			calc.ControlPlaneMemory = util.IntPtr(defaultControlPlaneMemory)
+		}
+	} else {
+		// For hosted control plane, set to zero values (nil)
+		calc.ControlPlaneSchedulable = nil
+		calc.ControlPlaneNodeCount = nil
+		calc.ControlPlaneCPU = nil
+		calc.ControlPlaneMemory = nil
+	}
+
+	return calc
 }
 
 // Health checks if the sizer service is healthy
@@ -624,10 +780,13 @@ func (s *SizerService) formatNodeSizeError(workerCPU, workerMemory, inventoryCPU
 }
 
 func effectiveControlPlaneNodeCount(req *mappers.ClusterRequirementsRequestForm) int {
-	if req.HostedControlPlane {
+	if req.HostedControlPlane != nil && *req.HostedControlPlane {
 		return 0
 	}
-	return req.ControlPlaneNodeCount
+	if req.ControlPlaneNodeCount != nil {
+		return *req.ControlPlaneNodeCount
+	}
+	return 0
 }
 
 // BuildServiceAvoidLists enforces MaxVMsPerWorkerNode via avoid lists.
