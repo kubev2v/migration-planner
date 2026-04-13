@@ -681,10 +681,11 @@ var _ = Describe("sizer service", func() {
 				request.ControlPlaneCPU = 100
 				request.ControlPlaneMemory = 200
 				// Create inventory that requires > 200 CPU (max) on a single node
-				// With 70% capacity: 300 CPU needs 300/0.7 = ~429 effective CPU which exceeds max of 200
-				assessment := createTestAssessment(assessmentID, clusterID, 10, 300, 600)
+				// With 1:4 over-commit: 1000 CPU / 4 = 250 CPU actual
+				// With 0.8 capacity: 250 / 0.8 = 312.5 CPU needed (exceeds max of 200)
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 1000, 2000)
 				mockStore.assessments[assessmentID] = assessment
-				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 300, 600), http.StatusOK, false)
+				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 1000, 2000), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				sizerService = service.NewSizerService(sizerClient, mockStore)
 
