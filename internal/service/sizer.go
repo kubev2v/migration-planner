@@ -253,7 +253,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	if err != nil {
 		// For SNO, convert technical errors to user-friendly message
 		if singleNode {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
 		}
 		return nil, NewErrInvalidRequest(err.Error())
 	}
@@ -289,7 +289,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	if err != nil {
 		tracer.Error(err).Log()
 		if singleNode && isSizerSchedulabilityError(err) {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
 		}
 		return nil, fmt.Errorf("failed to call sizer service: %w", err)
 	}
@@ -306,7 +306,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	transformed := s.transformSizerResponse(sizerResponse, effectiveCPNodeCount)
 
 	if singleNode && sizerResponse.Data.NodeCount > 1 {
-		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+		return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
 	}
 
 	// Calculate max VMs per node from sizer response for validation. We only validate when
@@ -335,7 +335,7 @@ func (s *SizerService) CalculateClusterRequirements(
 
 	if maxVMsPerNode > MaxVMsPerWorkerNode {
 		if singleNode {
-			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.ControlPlaneCPU, req.ControlPlaneMemory)
+			return nil, s.singleNodeFitError(totalCPU, totalMemory, smtMultiplier, req.CpuOverCommitRatio, req.MemoryOverCommitRatio, req.ControlPlaneCPU, req.ControlPlaneMemory)
 		}
 		err := NewErrInvalidRequest(fmt.Sprintf("VM distribution constraint violated: found %d VMs on a node, exceeds limit of %d per node",
 			maxVMsPerNode, MaxVMsPerWorkerNode))
@@ -582,7 +582,6 @@ func (s *SizerService) calculateMinimumNodeSize(inventoryCPU, inventoryMemory in
 		return MinFallbackNodeCPU, MinFallbackNodeMemory
 	}
 
-	// Calculate minimum effective CPU needed per node
 	denominator := float64(maxCount) * capacityMultiplier
 	minEffectiveCPUPerNode := float64(inventoryCPU) / denominator
 
@@ -990,12 +989,24 @@ func isSizerSchedulabilityError(err error) bool {
 		strings.Contains(msg, "too small")
 }
 
-func (s *SizerService) singleNodeFitError(totalCPU, totalMemory int, smtMultiplier float64, controlPlaneCPU, controlPlaneMemory int) error {
-	// Calculate uncapped minimum to detect if workload truly exceeds max supported size
+func (s *SizerService) singleNodeFitError(totalCPU, totalMemory int, smtMultiplier float64, cpuOverCommitRatio, memoryOverCommitRatio string, controlPlaneCPU, controlPlaneMemory int) error {
+	// Apply over-commit ratios to get actual resource requests
+	cpuOverCommitMultiplier, err := s.getCpuOverCommitMultiplier(cpuOverCommitRatio)
+	if err != nil {
+		return err
+	}
+	memoryOverCommitMultiplier, err := s.getMemoryOverCommitMultiplier(memoryOverCommitRatio)
+	if err != nil {
+		return err
+	}
+
+	actualCPU := float64(totalCPU) / cpuOverCommitMultiplier
+	actualMemory := float64(totalMemory) / memoryOverCommitMultiplier
+
 	denominator := 1.0 * CapacityMultiplier
-	minEffectiveCPUPerNode := float64(totalCPU) / denominator
+	minEffectiveCPUPerNode := actualCPU / denominator
 	uncappedMinNodeCPU := int(math.Ceil(minEffectiveCPUPerNode / smtMultiplier))
-	uncappedMinNodeMemory := int(math.Ceil(float64(totalMemory) / denominator))
+	uncappedMinNodeMemory := int(math.Ceil(actualMemory / denominator))
 
 	// Round up to nearest even number for CPU, nearest multiple of 4 for memory
 	uncappedMinNodeCPU = int(math.Ceil(float64(uncappedMinNodeCPU)/2) * 2)
@@ -1024,8 +1035,13 @@ func singleNodeFitErrorMessage(controlPlaneCPU, controlPlaneMemory, minNodeCPU, 
 	if alreadyAtOrAbove || atMaxSupported {
 		return "workload does not fit on a single node. Use a multi-node cluster."
 	}
+
+	// Ensure recommendations are at least as large as current values
+	recommendedCPU := max(controlPlaneCPU, minNodeCPU)
+	recommendedMemory := max(controlPlaneMemory, minNodeMemory)
+
 	return fmt.Sprintf(
 		"workload does not fit on a single node with the specified resources. Use at least %d CPU / %d GB memory per node for a single-node cluster, or use a multi-node cluster",
-		minNodeCPU, minNodeMemory,
+		recommendedCPU, recommendedMemory,
 	)
 }
