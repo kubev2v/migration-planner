@@ -220,6 +220,7 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
+       -p MIGRATION_PLANNER_ADMIN_GROUP_FILE=$(MIGRATION_PLANNER_ADMIN_GROUP_FILE) \
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
@@ -268,6 +269,7 @@ deploy-on-kind: oc
 	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
+	   -p MIGRATION_PLANNER_ADMIN_GROUP_FILE=$(MIGRATION_PLANNER_ADMIN_GROUP_FILE) \
 	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
 	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** OpenShift Migration Advisor has been deployed successfully on Kind ***"

@@ -86,7 +86,11 @@ build_planner_iso_container:
 
 .PHONY: deploy_assisted_migration
 deploy_assisted_migration: oc
-	make deploy-on-kind MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda
+	oc process --local -f deploy/templates/admin-group-template.yml \
+		-p ADMIN_USERNAME=admin \
+		-p ADMIN_EMAIL=admin@example.com \
+		| oc apply -n default -f -
+	make deploy-on-kind MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda MIGRATION_PLANNER_ADMIN_GROUP_FILE=/etc/planner/admin-group.yaml
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &

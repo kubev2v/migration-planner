@@ -42,7 +42,7 @@ var _ = Describe("partner handler", Ordered, func() {
 		gormdb = db
 		accountsSvc := service.NewAccountsService(s)
 		partnerSvc := service.NewAuthzPartnerService(service.NewPartnerService(s, accountsSvc), accountsSvc, s)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, accountsSvc, partnerSvc)
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, partnerSvc, accountsSvc)
 	})
 
 	AfterAll(func() {

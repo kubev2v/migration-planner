@@ -247,7 +247,7 @@ var _ = Describe("partner service", Ordered, func() {
 			Expect(ok).To(BeTrue())
 
 			// User is still regular
-			accountsSvc := service.NewAccountsService(s)
+			accountsSvc := service.NewAccountsServicer(s)
 			identity, err := accountsSvc.GetIdentity(context.TODO(), user)
 			Expect(err).To(BeNil())
 			Expect(identity.Kind).To(Equal(service.KindRegular))

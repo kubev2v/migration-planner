@@ -2770,6 +2770,15 @@ func (response ListGroups401JSONResponse) VisitListGroupsResponse(w http.Respons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListGroups403JSONResponse Error
+
+func (response ListGroups403JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type ListGroups500JSONResponse Error
 
 func (response ListGroups500JSONResponse) VisitListGroupsResponse(w http.ResponseWriter) error {
@@ -2814,6 +2823,15 @@ func (response CreateGroup401JSONResponse) VisitCreateGroupResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type CreateGroup403JSONResponse Error
+
+func (response CreateGroup403JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type CreateGroup500JSONResponse Error
 
 func (response CreateGroup500JSONResponse) VisitCreateGroupResponse(w http.ResponseWriter) error {
@@ -2845,6 +2863,15 @@ type DeleteGroup401JSONResponse Error
 func (response DeleteGroup401JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteGroup403JSONResponse Error
+
+func (response DeleteGroup403JSONResponse) VisitDeleteGroupResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -2889,6 +2916,15 @@ type GetGroup401JSONResponse Error
 func (response GetGroup401JSONResponse) VisitGetGroupResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGroup403JSONResponse Error
+
+func (response GetGroup403JSONResponse) VisitGetGroupResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -2947,6 +2983,15 @@ func (response UpdateGroup401JSONResponse) VisitUpdateGroupResponse(w http.Respo
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateGroup403JSONResponse Error
+
+func (response UpdateGroup403JSONResponse) VisitUpdateGroupResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UpdateGroup404JSONResponse Error
 
 func (response UpdateGroup404JSONResponse) VisitUpdateGroupResponse(w http.ResponseWriter) error {
@@ -2987,6 +3032,15 @@ type ListGroupMembers401JSONResponse Error
 func (response ListGroupMembers401JSONResponse) VisitListGroupMembersResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListGroupMembers403JSONResponse Error
+
+func (response ListGroupMembers403JSONResponse) VisitListGroupMembersResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -3041,6 +3095,15 @@ type CreateGroupMember401JSONResponse Error
 func (response CreateGroupMember401JSONResponse) VisitCreateGroupMemberResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateGroupMember403JSONResponse Error
+
+func (response CreateGroupMember403JSONResponse) VisitCreateGroupMemberResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -3107,6 +3170,15 @@ func (response RemoveGroupMember401JSONResponse) VisitRemoveGroupMemberResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
+type RemoveGroupMember403JSONResponse Error
+
+func (response RemoveGroupMember403JSONResponse) VisitRemoveGroupMemberResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type RemoveGroupMember404JSONResponse Error
 
 func (response RemoveGroupMember404JSONResponse) VisitRemoveGroupMemberResponse(w http.ResponseWriter) error {
@@ -3158,6 +3230,15 @@ type UpdateGroupMember401JSONResponse Error
 func (response UpdateGroupMember401JSONResponse) VisitUpdateGroupMemberResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateGroupMember403JSONResponse Error
+
+func (response UpdateGroupMember403JSONResponse) VisitUpdateGroupMemberResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }

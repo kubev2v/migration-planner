@@ -73,6 +73,9 @@ parameters:
   - name: MIGRATION_PLANNER_AGENT_AUTH_ENABLED
     description: Enable agent authentication for agent-server
     value: "true"
+  - name: MIGRATION_PLANNER_ADMIN_GROUP_FILE
+    description: Path to YAML file defining the bootstrap admin group
+    value: ""
   - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
     description: Path to the migration folder containing the sql files used to migrate the db
     value: "/app/migrations"
@@ -611,6 +614,8 @@ objects:
                   value: ${MIGRATION_PLANNER_JWK_URL}
                 - name: MIGRATION_PLANNER_AGENT_AUTH_ENABLED
                   value: ${MIGRATION_PLANNER_AGENT_AUTH_ENABLED}
+                - name: MIGRATION_PLANNER_ADMIN_GROUP_FILE
+                  value: ${MIGRATION_PLANNER_ADMIN_GROUP_FILE}
                 # DB Config values
                 - name: MIGRATION_PLANNER_MIGRATIONS_FOLDER
                   value: ${MIGRATION_PLANNER_MIGRATIONS_FOLDER}
@@ -644,6 +649,9 @@ objects:
                   mountPath: "/.migration-planner"
                 - name: iso-storage
                   mountPath: /iso
+                - name: admin-group
+                  mountPath: /etc/planner
+                  readOnly: true
           serviceAccountName: migration-planner
           volumes:
             - name: iso-storage
@@ -654,6 +662,10 @@ objects:
             - name: envoy-config
               configMap:
                 name: migration-planner-envoy-config
+            - name: admin-group
+              configMap:
+                name: migration-planner-admin-group
+                optional: true
             - name: envoy-unix-sockets
               emptyDir:
                 medium: Memory

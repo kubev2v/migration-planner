@@ -40,7 +40,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 		s = store.NewStore(db)
 		gormdb = db
 		accountsSvc := service.NewAccountsService(s)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, accountsSvc, service.NewPartnerService(s, accountsSvc))
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), accountsSvc)
 	})
 
 	AfterAll(func() {
@@ -653,6 +653,80 @@ var _ = Describe("accounts handler", Ordered, func() {
 				gormdb.Exec("DELETE FROM members;")
 				gormdb.Exec("DELETE FROM groups;")
 			})
+		})
+	})
+
+	Context("Authz 403 responses", func() {
+		var authzSrv *handlers.ServiceHandler
+
+		BeforeAll(func() {
+			accountsSvc := service.NewAccountsService(s)
+			authzAccountsSvc := service.NewAuthzAccountsService(accountsSvc)
+			authzSrv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), authzAccountsSvc)
+		})
+
+		nonAdminCtx := func() context.Context {
+			return auth.NewTokenContext(context.TODO(), auth.User{Username: "regularuser", Organization: "org"})
+		}
+
+		It("ListGroups returns 403 for non-admin", func() {
+			resp, err := authzSrv.ListGroups(nonAdminCtx(), server.ListGroupsRequestObject{})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.ListGroups403JSONResponse{}))
+		})
+
+		It("CreateGroup returns 403 for non-admin", func() {
+			body := v1alpha1.GroupCreate{Name: "X", Kind: v1alpha1.GroupCreateKindPartner, Icon: "i", Company: "C"}
+			resp, err := authzSrv.CreateGroup(nonAdminCtx(), server.CreateGroupRequestObject{Body: &body})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.CreateGroup403JSONResponse{}))
+		})
+
+		It("GetGroup returns 403 for non-admin", func() {
+			resp, err := authzSrv.GetGroup(nonAdminCtx(), server.GetGroupRequestObject{Id: uuid.New()})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.GetGroup403JSONResponse{}))
+		})
+
+		It("UpdateGroup returns 403 for non-admin", func() {
+			name := "X"
+			body := v1alpha1.GroupUpdate{Name: &name}
+			resp, err := authzSrv.UpdateGroup(nonAdminCtx(), server.UpdateGroupRequestObject{Id: uuid.New(), Body: &body})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.UpdateGroup403JSONResponse{}))
+		})
+
+		It("DeleteGroup returns 403 for non-admin", func() {
+			resp, err := authzSrv.DeleteGroup(nonAdminCtx(), server.DeleteGroupRequestObject{Id: uuid.New()})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.DeleteGroup403JSONResponse{}))
+		})
+
+		It("ListGroupMembers returns 403 for non-admin", func() {
+			resp, err := authzSrv.ListGroupMembers(nonAdminCtx(), server.ListGroupMembersRequestObject{Id: uuid.New()})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.ListGroupMembers403JSONResponse{}))
+		})
+
+		It("CreateGroupMember returns 403 for non-admin", func() {
+			body := v1alpha1.MemberCreate{Username: "u", Email: "u@x.com"}
+			resp, err := authzSrv.CreateGroupMember(nonAdminCtx(), server.CreateGroupMemberRequestObject{Id: uuid.New(), Body: &body})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.CreateGroupMember403JSONResponse{}))
+		})
+
+		It("UpdateGroupMember returns 403 for non-admin", func() {
+			email := openapi_types.Email("u@x.com")
+			body := v1alpha1.MemberUpdate{Email: &email}
+			resp, err := authzSrv.UpdateGroupMember(nonAdminCtx(), server.UpdateGroupMemberRequestObject{Id: uuid.New(), Username: "u", Body: &body})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.UpdateGroupMember403JSONResponse{}))
+		})
+
+		It("RemoveGroupMember returns 403 for non-admin", func() {
+			resp, err := authzSrv.RemoveGroupMember(nonAdminCtx(), server.RemoveGroupMemberRequestObject{Id: uuid.New(), Username: "u"})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.RemoveGroupMember403JSONResponse{}))
 		})
 	})
 })
