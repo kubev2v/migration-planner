@@ -1,0 +1,24 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: migration-planner-admin-group
+parameters:
+  - name: ADMIN_USERNAME
+    description: Username of the bootstrap admin user
+    required: true
+  - name: ADMIN_EMAIL
+    description: Email of the bootstrap admin user
+    required: true
+
+objects:
+  - apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: migration-planner-admin-group
+    data:
+      admin-group.yaml: |
+        name: admin
+        members:
+          - username: ${ADMIN_USERNAME}
+            email: ${ADMIN_EMAIL}

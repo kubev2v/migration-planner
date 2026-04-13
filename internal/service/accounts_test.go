@@ -3,6 +3,7 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -24,7 +25,7 @@ var _ = Describe("accounts service", Ordered, func() {
 	var (
 		s      store.Store
 		gormdb *gorm.DB
-		svc    *service.AccountsService
+		svc    service.AccountsServicer
 	)
 
 	BeforeAll(func() {
@@ -35,7 +36,7 @@ var _ = Describe("accounts service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAccountsService(s)
+		svc = service.NewAccountsServicer(s)
 	})
 
 	AfterAll(func() {
@@ -372,6 +373,158 @@ var _ = Describe("accounts service", Ordered, func() {
 				gormdb.Exec("DELETE FROM groups;")
 			})
 		})
+	})
+
+	Context("Initialize", func() {
+		It("creates admin group and members from scratch", func() {
+			ag := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@rh.com"},
+					{Username: "bob", Email: "bob@rh.com"},
+				},
+			}
+
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			groups, err := svc.ListGroups(context.TODO(), nil)
+			Expect(err).To(BeNil())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Name).To(Equal("test-admins"))
+			Expect(groups[0].Company).To(Equal("test-admins"))
+			Expect(groups[0].Kind).To(Equal("admin"))
+			Expect(groups[0].Members).To(HaveLen(2))
+		})
+
+		It("replaces existing admin group on re-initialize", func() {
+			ag := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@rh.com"},
+				},
+			}
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			ag2 := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "bob", Email: "bob@rh.com"},
+					{Username: "carol", Email: "carol@rh.com"},
+				},
+			}
+			err = svc.Initialize(context.TODO(), ag2)
+			Expect(err).To(BeNil())
+
+			groups, err := svc.ListGroups(context.TODO(), nil)
+			Expect(err).To(BeNil())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Members).To(HaveLen(2))
+
+			usernames := []string{groups[0].Members[0].Username, groups[0].Members[1].Username}
+			Expect(usernames).To(ContainElements("bob", "carol"))
+		})
+
+		It("removes stale members on re-initialize", func() {
+			ag := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@rh.com"},
+					{Username: "bob", Email: "bob@rh.com"},
+					{Username: "carol", Email: "carol@rh.com"},
+				},
+			}
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			ag2 := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@rh.com"},
+				},
+			}
+			err = svc.Initialize(context.TODO(), ag2)
+			Expect(err).To(BeNil())
+
+			groups, err := svc.ListGroups(context.TODO(), nil)
+			Expect(err).To(BeNil())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Members).To(HaveLen(1))
+			Expect(groups[0].Members[0].Username).To(Equal("alice"))
+		})
+
+		It("preserves member email from config", func() {
+			ag := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@redhat.com"},
+				},
+			}
+
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			member, err := svc.GetMember(context.TODO(), "alice")
+			Expect(err).To(BeNil())
+			Expect(member.Email).To(Equal("alice@redhat.com"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+		})
+	})
+
+	Context("ParseAdminGroupFile", func() {
+		writeTempYAML := func(content string) string {
+			f, err := os.CreateTemp("", "admin-group-*.yaml")
+			Expect(err).To(BeNil())
+			_, err = f.WriteString(content)
+			Expect(err).To(BeNil())
+			Expect(f.Close()).To(BeNil())
+			DeferCleanup(func() { _ = os.Remove(f.Name()) })
+			return f.Name()
+		}
+
+		It("parses a valid file", func() {
+			path := writeTempYAML("name: test-admins\nmembers:\n  - username: alice\n    email: alice@rh.com\n")
+			ag, err := service.ParseAdminGroupFile(path)
+			Expect(err).To(BeNil())
+			Expect(ag.Name).To(Equal("test-admins"))
+			Expect(ag.Members).To(HaveLen(1))
+			Expect(ag.Members[0].Username).To(Equal("alice"))
+			Expect(ag.Members[0].Email).To(Equal("alice@rh.com"))
+		})
+
+		It("returns error for missing file", func() {
+			_, err := service.ParseAdminGroupFile("/nonexistent/path.yaml")
+			Expect(err).ToNot(BeNil())
+		})
+
+		It("deduplicates members by username", func() {
+			path := writeTempYAML("name: test-admins\nmembers:\n  - username: alice\n    email: alice@rh.com\n  - username: alice\n    email: alice2@rh.com\n")
+			ag, err := service.ParseAdminGroupFile(path)
+			Expect(err).To(BeNil())
+			Expect(ag.Members).To(HaveLen(1))
+		})
+
+		DescribeTable("returns error for invalid input",
+			func(content string, expectedErr string) {
+				path := writeTempYAML(content)
+				_, err := service.ParseAdminGroupFile(path)
+				Expect(err).ToNot(BeNil())
+				Expect(err.Error()).To(ContainSubstring(expectedErr))
+			},
+			Entry("empty name", "name: \"\"\nmembers:\n  - username: alice\n    email: alice@rh.com\n", "name is required"),
+			Entry("whitespace name", "name: \"   \"\nmembers:\n  - username: alice\n    email: alice@rh.com\n", "name is required"),
+			Entry("empty members", "name: test-admins\nmembers: []\n", "at least one member"),
+			Entry("empty username", "name: test-admins\nmembers:\n  - username: \"\"\n    email: alice@rh.com\n", "username is required"),
+			Entry("whitespace username", "name: test-admins\nmembers:\n  - username: \"  \"\n    email: alice@rh.com\n", "username is required"),
+			Entry("empty email", "name: test-admins\nmembers:\n  - username: alice\n    email: \"\"\n", "email is required"),
+			Entry("whitespace email", "name: test-admins\nmembers:\n  - username: alice\n    email: \"  \"\n", "email is required"),
+			Entry("invalid email", "name: test-admins\nmembers:\n  - username: alice\n    email: not-an-email\n", "invalid email"),
+		)
 	})
 
 	Context("Membership", func() {

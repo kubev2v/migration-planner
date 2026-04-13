@@ -4,18 +4,97 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/mail"
+	"os"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"gopkg.in/yaml.v3"
 )
+
+type AccountsServicer interface {
+	Initialize(ctx context.Context, adminGroup AdminGroup) error
+	GetIdentity(ctx context.Context, authUser auth.User) (Identity, error)
+	ListGroups(ctx context.Context, filter *store.GroupQueryFilter) (model.GroupList, error)
+	GetGroup(ctx context.Context, id uuid.UUID) (model.Group, error)
+	CreateGroup(ctx context.Context, group model.Group) (model.Group, error)
+	UpdateGroup(ctx context.Context, group model.Group) (model.Group, error)
+	DeleteGroup(ctx context.Context, id uuid.UUID) error
+	GetMember(ctx context.Context, username string) (model.Member, error)
+	ListGroupMembers(ctx context.Context, groupID uuid.UUID) (model.MemberList, error)
+	CreateMember(ctx context.Context, member model.Member) (model.Member, error)
+	UpdateGroupMember(ctx context.Context, groupID uuid.UUID, username string, member model.Member) (model.Member, error)
+	RemoveGroupMember(ctx context.Context, groupID uuid.UUID, username string) error
+}
+
+type AdminGroupMember struct {
+	Username string `yaml:"username"`
+	Email    string `yaml:"email"`
+}
+
+type AdminGroup struct {
+	Name    string             `yaml:"name"`
+	Members []AdminGroupMember `yaml:"members"`
+}
+
+func ParseAdminGroupFile(path string) (*AdminGroup, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("reading admin group file: %w", err)
+	}
+
+	var ag AdminGroup
+	if err := yaml.Unmarshal(data, &ag); err != nil {
+		return nil, fmt.Errorf("parsing admin group file: %w", err)
+	}
+
+	ag.Name = strings.TrimSpace(ag.Name)
+	if ag.Name == "" {
+		return nil, fmt.Errorf("admin group file: name is required")
+	}
+	if len(ag.Members) == 0 {
+		return nil, fmt.Errorf("admin group file: at least one member is required")
+	}
+
+	members := make(map[string]AdminGroupMember, len(ag.Members))
+	for i, m := range ag.Members {
+		m.Username = strings.TrimSpace(m.Username)
+		m.Email = strings.TrimSpace(m.Email)
+		if m.Username == "" {
+			return nil, fmt.Errorf("admin group file: member[%d] username is required", i)
+		}
+		if m.Email == "" {
+			return nil, fmt.Errorf("admin group file: member[%d] email is required", i)
+		}
+		if _, err := mail.ParseAddress(m.Email); err != nil {
+			return nil, fmt.Errorf("admin group file: member[%d] invalid email %q: %w", i, m.Email, err)
+		}
+		if _, exists := members[m.Username]; exists {
+			continue
+		}
+		members[m.Username] = m
+	}
+
+	ag.Members = make([]AdminGroupMember, 0, len(members))
+	for _, m := range members {
+		ag.Members = append(ag.Members, m)
+	}
+
+	return &ag, nil
+}
 
 type AccountsService struct {
 	store store.Store
 }
 
 func NewAccountsService(store store.Store) *AccountsService {
+	return &AccountsService{store: store}
+}
+
+func NewAccountsServicer(store store.Store) AccountsServicer {
 	return &AccountsService{store: store}
 }
 
@@ -75,6 +154,55 @@ func (s *AccountsService) GetIdentity(ctx context.Context, authUser auth.User) (
 
 	// 3. Regular
 	return Identity{Username: authUser.Username, Kind: KindRegular}, nil
+}
+
+func (s *AccountsService) Initialize(ctx context.Context, adminGroup AdminGroup) (retErr error) {
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return fmt.Errorf("starting transaction: %w", err)
+	}
+	defer func() {
+		if retErr != nil {
+			_, _ = store.Rollback(ctx)
+		}
+	}()
+
+	groups, err := s.store.Accounts().ListGroups(ctx,
+		store.NewGroupQueryFilter().ByName(adminGroup.Name).ByKind("admin"))
+	if err != nil {
+		return fmt.Errorf("looking up admin group: %w", err)
+	}
+
+	for _, g := range groups {
+		if err := s.store.Accounts().DeleteGroup(ctx, g.ID); err != nil {
+			return fmt.Errorf("deleting existing admin group %s: %w", g.ID, err)
+		}
+	}
+
+	group, err := s.store.Accounts().CreateGroup(ctx, model.Group{
+		ID:      uuid.New(),
+		Name:    adminGroup.Name,
+		Company: adminGroup.Name,
+		Kind:    "admin",
+	})
+	if err != nil {
+		return fmt.Errorf("creating admin group: %w", err)
+	}
+
+	for _, m := range adminGroup.Members {
+		if _, err := s.store.Accounts().CreateMember(ctx, model.Member{
+			Username: m.Username,
+			Email:    m.Email,
+			GroupID:  group.ID,
+		}); err != nil {
+			return fmt.Errorf("adding admin member %s: %w", m.Username, err)
+		}
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return fmt.Errorf("committing transaction: %w", err)
+	}
+	return nil
 }
 
 func (s *AccountsService) ListGroups(ctx context.Context, filter *store.GroupQueryFilter) (model.GroupList, error) {
