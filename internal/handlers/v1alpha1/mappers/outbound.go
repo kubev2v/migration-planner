@@ -376,12 +376,38 @@ func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) ap
 // MigrationEstimationResultToAPI converts the schema-keyed service result map to the API response.
 func MigrationEstimationResultToAPI(
 	results map[engines.Schema]*service.MigrationAssessmentResult,
+	estimationCtx *service.EstimationContext,
 ) api.MigrationEstimationResponse {
-	response := make(api.MigrationEstimationResponse, len(results))
+	estimation := make(map[string]api.SchemaEstimationResult, len(results))
 	for schema, result := range results {
-		response[string(schema)] = schemaResultToAPI(result)
+		estimation[string(schema)] = schemaResultToAPI(result)
 	}
-	return response
+
+	var ctx api.EstimationContext
+	if estimationCtx != nil {
+		params := paramMapToAPI(estimationCtx.BaseParams)
+		schemas := make([]string, len(estimationCtx.Schemas))
+		for i, s := range estimationCtx.Schemas {
+			schemas[i] = string(s)
+		}
+		ctx = api.EstimationContext{Schemas: &schemas, Params: &params}
+	}
+
+	return api.MigrationEstimationResponse{
+		Estimation:        estimation,
+		EstimationContext: ctx,
+	}
+}
+
+// paramMapToAPI converts a slice of estimation.Param to the map[string]float32 used in EstimationContext.
+func paramMapToAPI(params []estimation.Param) map[string]float32 {
+	m := make(map[string]float32, len(params))
+	for _, p := range params {
+		if v, ok := util.AnyToFloat32(p.Value); ok {
+			m[p.Key] = v
+		}
+	}
+	return m
 }
 
 func schemaResultToAPI(result *service.MigrationAssessmentResult) api.SchemaEstimationResult {
@@ -432,12 +458,7 @@ func OsDiskEstimationResultToAPI(
 
 	var ctx *api.EstimationContext
 	if estimationCtx != nil {
-		params := make(map[string]float32, len(estimationCtx.BaseParams))
-		for _, p := range estimationCtx.BaseParams {
-			if v, ok := p.Value.(float64); ok {
-				params[p.Key] = float32(v)
-			}
-		}
+		params := paramMapToAPI(estimationCtx.BaseParams)
 		schemas := make([]string, len(estimationCtx.Schemas))
 		for i, s := range estimationCtx.Schemas {
 			schemas[i] = string(s)

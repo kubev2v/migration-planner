@@ -93,6 +93,30 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
+	var schemas []engines.Schema
+	if request.Body.EstimationSchema != nil {
+		for _, s := range *request.Body.EstimationSchema {
+			schemas = append(schemas, engines.Schema(s))
+		}
+	}
+
+	var userParams []estimation.Param
+	if request.Body.Params != nil {
+		for k, v := range *request.Body.Params {
+			userParams = append(userParams, estimation.Param{Key: k, Value: v})
+		}
+	}
+
+	if err := h.estimationSrv.ValidateParams(userParams); err != nil {
+		logger.Error(err).Log()
+		switch err.(type) {
+		case *service.ErrInvalidEstimationParam:
+			return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to validate params"}, nil
+		}
+	}
+
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
@@ -120,20 +144,6 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		default:
 			logger.Error(err).Log()
 			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to calculate complexity"}, nil
-		}
-	}
-
-	var schemas []engines.Schema
-	if request.Body.EstimationSchema != nil {
-		for _, s := range *request.Body.EstimationSchema {
-			schemas = append(schemas, engines.Schema(s))
-		}
-	}
-
-	var userParams []estimation.Param
-	if request.Body.Params != nil {
-		for k, v := range *request.Body.Params {
-			userParams = append(userParams, estimation.Param{Key: k, Value: v})
 		}
 	}
 
@@ -201,20 +211,6 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		return server.CalculateMigrationEstimation400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
-	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
-		case *service.ErrForbidden:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateMigrationEstimation403JSONResponse{Message: err.Error()}, nil
-		default:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to get assessment"}, nil
-		}
-	}
-
 	// Parse optional estimation schemas from request body
 	var schemas []engines.Schema
 	if request.Body.EstimationSchema != nil {
@@ -228,6 +224,30 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 	if request.Body.Params != nil {
 		for k, v := range *request.Body.Params {
 			userParams = append(userParams, estimation.Param{Key: k, Value: v})
+		}
+	}
+
+	if err := h.estimationSrv.ValidateParams(userParams); err != nil {
+		logger.Error(err).Log()
+		switch err.(type) {
+		case *service.ErrInvalidEstimationParam:
+			return server.CalculateMigrationEstimation400JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to validate params"}, nil
+		}
+	}
+
+	baseParams := h.estimationSrv.BuildBaseParams(userParams)
+
+	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
+		logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.CalculateMigrationEstimation403JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to get assessment"}, nil
 		}
 	}
 
@@ -259,6 +279,12 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		WithInt("schema_count", len(result)).
 		Log()
 
-	apiResponse := mappers.MigrationEstimationResultToAPI(result)
+	resolvedSchemas := make([]engines.Schema, 0, len(result))
+	for s := range result {
+		resolvedSchemas = append(resolvedSchemas, s)
+	}
+	estimationCtx := &service.EstimationContext{Schemas: resolvedSchemas, BaseParams: baseParams}
+
+	apiResponse := mappers.MigrationEstimationResultToAPI(result, estimationCtx)
 	return server.CalculateMigrationEstimation200JSONResponse(apiResponse), nil
 }

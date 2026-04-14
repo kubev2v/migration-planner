@@ -186,16 +186,20 @@ var _ = Describe("estimation handler", func() {
 
 				Expect(err).To(BeNil())
 				Expect(resp).NotTo(BeNil())
-				// Check response type — MigrationEstimationResponse is map[string]SchemaEstimationResult
 				response, ok := resp.(server.CalculateMigrationEstimation200JSONResponse)
 				Expect(ok).To(BeTrue())
 				// When no schema filter is supplied all schemas are returned
-				Expect(response).NotTo(BeEmpty())
-				for _, schemaResult := range response {
+				Expect(response.Estimation).NotTo(BeEmpty())
+				for _, schemaResult := range response.Estimation {
 					Expect(schemaResult.MinTotalDuration).NotTo(BeEmpty())
 					Expect(schemaResult.MaxTotalDuration).NotTo(BeEmpty())
 					Expect(schemaResult.Breakdown).NotTo(BeEmpty())
 				}
+				// EstimationContext must reflect the schemas that actually ran
+				Expect(response.EstimationContext.Schemas).NotTo(BeNil())
+				Expect(*response.EstimationContext.Schemas).To(ConsistOf("network-based", "storage-offload"))
+				Expect(response.EstimationContext.Params).NotTo(BeNil())
+				Expect(*response.EstimationContext.Params).To(HaveKey("work_hours_per_day"))
 			})
 
 			It("returns response with breakdown containing all calculators", func() {
@@ -223,11 +227,11 @@ var _ = Describe("estimation handler", func() {
 				Expect(ok).To(BeTrue())
 
 				// Both schemas should be present when no filter is applied
-				Expect(response).To(HaveKey("network-based"))
-				Expect(response).To(HaveKey("storage-offload"))
+				Expect(response.Estimation).To(HaveKey("network-based"))
+				Expect(response.Estimation).To(HaveKey("storage-offload"))
 
 				// Verify each schema result has MinTotalDuration, MaxTotalDuration and breakdown
-				for schemaName, schemaResult := range response {
+				for schemaName, schemaResult := range response.Estimation {
 					Expect(schemaResult.MinTotalDuration).NotTo(BeEmpty(), "schema %s should have MinTotalDuration", schemaName)
 					Expect(schemaResult.MaxTotalDuration).NotTo(BeEmpty(), "schema %s should have MaxTotalDuration", schemaName)
 					Expect(schemaResult.Breakdown).NotTo(BeEmpty(), "schema %s should have breakdown", schemaName)
@@ -238,8 +242,8 @@ var _ = Describe("estimation handler", func() {
 				}
 
 				// network-based schema has Storage Migration and Post-Migration Checks
-				Expect(response["network-based"].Breakdown).To(HaveKey("Storage Migration"))
-				Expect(response["network-based"].Breakdown).To(HaveKey("Post-Migration Checks"))
+				Expect(response.Estimation["network-based"].Breakdown).To(HaveKey("Storage Migration"))
+				Expect(response.Estimation["network-based"].Breakdown).To(HaveKey("Post-Migration Checks"))
 			})
 
 			It("returns only the requested schema when estimationSchema filter is provided", func() {
@@ -267,9 +271,9 @@ var _ = Describe("estimation handler", func() {
 				Expect(err).To(BeNil())
 				response, ok := resp.(server.CalculateMigrationEstimation200JSONResponse)
 				Expect(ok).To(BeTrue())
-				Expect(response).To(HaveLen(1))
-				Expect(response).To(HaveKey("network-based"))
-				Expect(response).NotTo(HaveKey("storage-offload"))
+				Expect(response.Estimation).To(HaveLen(1))
+				Expect(response.Estimation).To(HaveKey("network-based"))
+				Expect(response.Estimation).NotTo(HaveKey("storage-offload"))
 			})
 
 			It("returns 400 when an unknown schema is requested", func() {
@@ -321,6 +325,55 @@ var _ = Describe("estimation handler", func() {
 				response, ok := resp.(server.CalculateMigrationEstimation400JSONResponse)
 				Expect(ok).To(BeTrue())
 				Expect(response.Message).To(ContainSubstring("empty body"))
+			})
+
+			It("returns 400 when an unknown param key is provided", func() {
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					nil,
+					service.NewEstimationService(mockStore),
+					nil,
+				)
+
+				resp, err := handler.CalculateMigrationEstimation(ctx, server.CalculateMigrationEstimationRequestObject{
+					Id: assessmentID,
+					Body: &api.MigrationEstimationRequest{
+						ClusterId: clusterID,
+						Params:    &map[string]interface{}{"bogus_param": 1.0},
+					},
+				})
+
+				Expect(err).To(BeNil())
+				response, ok := resp.(server.CalculateMigrationEstimation400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(response.Message).To(ContainSubstring("bogus_param"))
+			})
+
+			It("returns 400 when a param value is below its minimum", func() {
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil),
+					nil,
+					nil,
+					service.NewEstimationService(mockStore),
+					nil,
+				)
+
+				// transfer_rate_mbps has Min=0.1
+				resp, err := handler.CalculateMigrationEstimation(ctx, server.CalculateMigrationEstimationRequestObject{
+					Id: assessmentID,
+					Body: &api.MigrationEstimationRequest{
+						ClusterId: clusterID,
+						Params:    &map[string]interface{}{"transfer_rate_mbps": 0.0},
+					},
+				})
+
+				Expect(err).To(BeNil())
+				response, ok := resp.(server.CalculateMigrationEstimation400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(response.Message).To(ContainSubstring("transfer_rate_mbps"))
 			})
 
 			It("returns 400 when clusterId is empty", func() {
@@ -587,7 +640,7 @@ var _ = Describe("estimation handler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				baseResponse, ok := baseResp.(server.CalculateMigrationEstimation200JSONResponse)
 				Expect(ok).To(BeTrue())
-				baseDurationStr := baseResponse["network-based"].Breakdown["Storage Migration"].Duration
+				baseDurationStr := baseResponse.Estimation["network-based"].Breakdown["Storage Migration"].Duration
 				Expect(baseDurationStr).NotTo(BeNil())
 				baseDuration, err := time.ParseDuration(*baseDurationStr)
 				Expect(err).NotTo(HaveOccurred())
@@ -607,7 +660,7 @@ var _ = Describe("estimation handler", func() {
 				Expect(err).NotTo(HaveOccurred())
 				fastResponse, ok := fastResp.(server.CalculateMigrationEstimation200JSONResponse)
 				Expect(ok).To(BeTrue())
-				fastDurationStr := fastResponse["network-based"].Breakdown["Storage Migration"].Duration
+				fastDurationStr := fastResponse.Estimation["network-based"].Breakdown["Storage Migration"].Duration
 				Expect(fastDurationStr).NotTo(BeNil())
 				fastDuration, err := time.ParseDuration(*fastDurationStr)
 				Expect(err).NotTo(HaveOccurred())
@@ -957,6 +1010,45 @@ var _ = Describe("estimation handler", func() {
 				Expect(err).To(BeNil())
 				_, ok := resp.(server.CalculateMigrationEstimationByComplexity400JSONResponse)
 				Expect(ok).To(BeTrue())
+			})
+		})
+
+		Context("param validation errors", func() {
+			It("returns 400 when an unknown param key is provided", func() {
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore), nil)
+
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id: assessmentID,
+						Body: &api.MigrationEstimationRequest{
+							ClusterId: clusterID,
+							Params:    &map[string]interface{}{"bogus_param": 1.0},
+						},
+					})
+
+				Expect(err).To(BeNil())
+				response, ok := resp.(server.CalculateMigrationEstimationByComplexity400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(response.Message).To(ContainSubstring("bogus_param"))
+			})
+
+			It("returns 400 when a param value is below its minimum", func() {
+				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil), nil, nil, service.NewEstimationService(mockStore), nil)
+
+				// transfer_rate_mbps has Min=0.1
+				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
+					server.CalculateMigrationEstimationByComplexityRequestObject{
+						Id: assessmentID,
+						Body: &api.MigrationEstimationRequest{
+							ClusterId: clusterID,
+							Params:    &map[string]interface{}{"transfer_rate_mbps": 0.0},
+						},
+					})
+
+				Expect(err).To(BeNil())
+				response, ok := resp.(server.CalculateMigrationEstimationByComplexity400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(response.Message).To(ContainSubstring("transfer_rate_mbps"))
 			})
 		})
 	})
