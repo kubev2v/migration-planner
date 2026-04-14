@@ -151,6 +151,23 @@ func BoolPtr(b bool) *bool {
 	return &b
 }
 
+// AnyToFloat32 converts a numeric value of unknown type to float32.
+// Returns (value, true) for float64, float32, int, and int64 inputs; (0, false) otherwise.
+func AnyToFloat32(v any) (float32, bool) {
+	switch n := v.(type) {
+	case float64:
+		return float32(n), true
+	case float32:
+		return n, true
+	case int:
+		return float32(n), true
+	case int64:
+		return float32(n), true
+	default:
+		return 0, false
+	}
+}
+
 // GetInventoryVersion returns v2 if JSON has top-level "clusters" or "vcenter_id"; else v1.
 func GetInventoryVersion(inventory []byte) int {
 	var keys map[string]json.RawMessage

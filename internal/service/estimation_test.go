@@ -845,4 +845,69 @@ var _ = Describe("EstimationService", func() {
 			Expect(keys["total_disk_gb"]).To(Equal(5000.0))
 		})
 	})
+
+	Describe("ValidateParams", func() {
+		It("returns nil for an empty param list", func() {
+			err := estimationSrv.ValidateParams(nil)
+			Expect(err).To(BeNil())
+		})
+
+		It("returns nil for a known key with a valid value", func() {
+			params := []estimation.Param{{Key: "work_hours_per_day", Value: 8.0}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).To(BeNil())
+		})
+
+		It("returns ErrInvalidEstimationParam for an unknown key", func() {
+			params := []estimation.Param{{Key: "unknown_param", Value: 42.0}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).NotTo(BeNil())
+			_, ok := err.(*service.ErrInvalidEstimationParam)
+			Expect(ok).To(BeTrue(), "expected *ErrInvalidEstimationParam, got %T: %v", err, err)
+			Expect(err.Error()).To(ContainSubstring("unknown_param"))
+		})
+
+		It("returns ErrInvalidEstimationParam when a value is below its minimum", func() {
+			// transfer_rate_mbps has Min=0.1
+			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 0.0}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).NotTo(BeNil())
+			_, ok := err.(*service.ErrInvalidEstimationParam)
+			Expect(ok).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("transfer_rate_mbps"))
+		})
+
+		It("returns ErrInvalidEstimationParam for a non-numeric value", func() {
+			params := []estimation.Param{{Key: "work_hours_per_day", Value: "eight"}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).NotTo(BeNil())
+			_, ok := err.(*service.ErrInvalidEstimationParam)
+			Expect(ok).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("work_hours_per_day"))
+		})
+
+		It("returns ErrInvalidEstimationParam for a fractional value on an integer param", func() {
+			// post_migration_engineers has Type="integer"
+			params := []estimation.Param{{Key: "post_migration_engineers", Value: 1.5}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).NotTo(BeNil())
+			_, ok := err.(*service.ErrInvalidEstimationParam)
+			Expect(ok).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("post_migration_engineers"))
+		})
+
+		It("returns nil for a whole float on an integer param", func() {
+			// 2.0 is a valid integer value
+			params := []estimation.Param{{Key: "post_migration_engineers", Value: 2.0}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).To(BeNil())
+		})
+
+		It("returns nil for a value exactly at the minimum", func() {
+			// transfer_rate_mbps Min=0.1; 0.1 is valid
+			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 0.1}}
+			err := estimationSrv.ValidateParams(params)
+			Expect(err).To(BeNil())
+		})
+	})
 })

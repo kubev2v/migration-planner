@@ -166,3 +166,7 @@ func NewErrInvalidRequest(message string) *ErrInvalidRequest {
 type ErrInvalidSchema struct{ Msg string }
 
 func (e *ErrInvalidSchema) Error() string { return e.Msg }
+
+type ErrInvalidEstimationParam struct{ Msg string }
+
+func (e *ErrInvalidEstimationParam) Error() string { return e.Msg }

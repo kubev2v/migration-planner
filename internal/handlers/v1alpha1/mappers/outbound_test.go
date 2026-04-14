@@ -45,6 +45,49 @@ var _ = Describe("MigrationComplexityResultToAPI", func() {
 	})
 })
 
+var _ = Describe("MigrationEstimationResultToAPI", func() {
+	It("wraps results under estimation and populates estimationContext", func() {
+		results := map[engines.Schema]*service.MigrationAssessmentResult{
+			engines.SchemaNetworkBased: {
+				MinTotalDuration: 2 * time.Hour,
+				MaxTotalDuration: 4 * time.Hour,
+			},
+		}
+		ctx := &service.EstimationContext{
+			Schemas:    []engines.Schema{engines.SchemaNetworkBased},
+			BaseParams: []estimation.Param{{Key: "work_hours_per_day", Value: 8.0}},
+		}
+
+		resp := mappers.MigrationEstimationResultToAPI(results, ctx)
+
+		Expect(resp.Estimation).To(HaveKey("network-based"))
+		Expect(resp.EstimationContext.Schemas).NotTo(BeNil())
+		Expect(*resp.EstimationContext.Schemas).To(ContainElement("network-based"))
+		Expect(resp.EstimationContext.Params).NotTo(BeNil())
+		Expect(*resp.EstimationContext.Params).To(HaveKey("work_hours_per_day"))
+	})
+
+	It("preserves integer-typed param values in estimationContext", func() {
+		results := map[engines.Schema]*service.MigrationAssessmentResult{
+			engines.SchemaNetworkBased: {MinTotalDuration: time.Hour, MaxTotalDuration: time.Hour},
+		}
+		// post_migration_engineers default is int(10) — must not be silently dropped
+		ctx := &service.EstimationContext{
+			Schemas: []engines.Schema{engines.SchemaNetworkBased},
+			BaseParams: []estimation.Param{
+				{Key: "post_migration_engineers", Value: 10}, // int
+				{Key: "work_hours_per_day", Value: 8.0},      // float64
+			},
+		}
+
+		resp := mappers.MigrationEstimationResultToAPI(results, ctx)
+
+		Expect(resp.EstimationContext.Params).NotTo(BeNil())
+		Expect(*resp.EstimationContext.Params).To(HaveKey("post_migration_engineers"))
+		Expect(*resp.EstimationContext.Params).To(HaveKey("work_hours_per_day"))
+	})
+})
+
 var _ = Describe("OsDiskEstimationResultToAPI", func() {
 	It("maps complexityByOsDisk entries with estimation and estimationContext", func() {
 		buckets := []complexity.OSDiskEntry{

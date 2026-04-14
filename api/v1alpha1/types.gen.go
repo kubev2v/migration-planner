@@ -563,12 +563,16 @@ type MigrationEstimationRequest struct {
 	// EstimationSchema Schemas to run. Valid values: "network-based", "storage-offload". If omitted, all schemas are run.
 	EstimationSchema *[]string `json:"estimationSchema,omitempty"`
 
-	// Params Optional calculator parameter overrides. Keys must match known calculator param names (e.g. "transfer_rate_mbps", "work_hours_per_day", "troubleshoot_mins_per_vm", "post_migration_engineers"). User-supplied values take precedence over both defaults and inventory-derived values. Unknown keys are silently ignored.
+	// Params Optional calculator parameter overrides. Keys must match known calculator param names (e.g. "transfer_rate_mbps", "work_hours_per_day", "troubleshoot_mins_per_vm", "post_migration_engineers"). User-supplied values take precedence over both defaults and inventory-derived values. Unknown keys are rejected with HTTP 400.
 	Params *map[string]interface{} `json:"params,omitempty"`
 }
 
-// MigrationEstimationResponse Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
-type MigrationEstimationResponse map[string]SchemaEstimationResult
+// MigrationEstimationResponse Migration estimation result, including per-schema results and the parameters used.
+type MigrationEstimationResponse struct {
+	// Estimation Estimation results keyed by schema name (e.g. "network-based", "storage-offload").
+	Estimation        map[string]SchemaEstimationResult `json:"estimation"`
+	EstimationContext EstimationContext                 `json:"estimationContext"`
+}
 
 // MigrationIssue defines model for MigrationIssue.
 type MigrationIssue struct {

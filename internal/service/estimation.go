@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -413,6 +414,55 @@ func (es *EstimationService) BuildBucketParams(baseParams []estimation.Param, vm
 		{Key: calculators.ParamVMCount, Value: vmCount},
 		{Key: calculators.ParamTotalDiskGB, Value: diskGB},
 	})
+}
+
+// ValidateParams checks each user-supplied param against estimationParamDefs.
+// It returns ErrInvalidEstimationParam for unknown keys, non-numeric values,
+// fractional values on integer params, and values outside the Min/Max bounds.
+func (es *EstimationService) ValidateParams(userParams []estimation.Param) error {
+	if len(userParams) == 0 {
+		return nil
+	}
+	defs := make(map[string]ParamDefinition, len(estimationParamDefs))
+	for _, d := range estimationParamDefs {
+		defs[d.Key] = d
+	}
+	for _, p := range userParams {
+		def, ok := defs[p.Key]
+		if !ok {
+			return &ErrInvalidEstimationParam{Msg: fmt.Sprintf("unknown param key %q", p.Key)}
+		}
+		v, err := toFloat64(p.Value)
+		if err != nil {
+			return &ErrInvalidEstimationParam{Msg: fmt.Sprintf("param %q: value must be numeric", p.Key)}
+		}
+		if def.Type == "integer" && math.Trunc(v) != v {
+			return &ErrInvalidEstimationParam{Msg: fmt.Sprintf("param %q: value %v must be a whole number", p.Key, v)}
+		}
+		if def.Min != nil && v < *def.Min {
+			return &ErrInvalidEstimationParam{Msg: fmt.Sprintf("param %q: value %v is below minimum %v", p.Key, v, *def.Min)}
+		}
+		if def.Max != nil && v > *def.Max {
+			return &ErrInvalidEstimationParam{Msg: fmt.Sprintf("param %q: value %v exceeds maximum %v", p.Key, v, *def.Max)}
+		}
+	}
+	return nil
+}
+
+// toFloat64 coerces a param value to float64. Accepts float64, int, int64, and float32.
+func toFloat64(v any) (float64, error) {
+	switch n := v.(type) {
+	case float64:
+		return n, nil
+	case float32:
+		return float64(n), nil
+	case int:
+		return float64(n), nil
+	case int64:
+		return float64(n), nil
+	default:
+		return 0, fmt.Errorf("not numeric")
+	}
 }
 
 // RunEstimation builds engines from schemas and runs them with the provided
