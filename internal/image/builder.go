@@ -124,21 +124,21 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	return imageBuilder
 }
 
-func (b *ImageBuilder) Size() (int, error) {
+func (b *ImageBuilder) Size() (uint64, error) {
 	ignitionContent, err := b.generateIgnition()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	// Generate ISO data reader with ignition content
 	reader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return -1, fmt.Errorf("failed to read rhcos iso: %w", err)
+		return 0, fmt.Errorf("failed to read rhcos iso: %w", err)
 	}
 
 	size, err := b.computeSize(reader)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	return size, nil
@@ -283,56 +283,56 @@ func (b *ImageBuilder) writeOvf(tw *tar.Writer) error {
 	return nil
 }
 
-func (b *ImageBuilder) ovfSize() (int, error) {
+func (b *ImageBuilder) ovfSize() (uint64, error) {
 	file, err := os.Open(b.OvfFile)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	defer func() { _ = file.Close() }()
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
-	return b.calculateTarSize(int(fileInfo.Size())), nil
+	return b.calculateTarSize(uint64(fileInfo.Size())), nil
 }
 
-func (b *ImageBuilder) diskSize() (int, error) {
+func (b *ImageBuilder) diskSize() (uint64, error) {
 	file, err := os.Open(b.PersistentDiskImage)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 	defer func() { _ = file.Close() }()
 	fileInfo, err := file.Stat()
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
-	return b.calculateTarSize(int(fileInfo.Size())), nil
+	return b.calculateTarSize(uint64(fileInfo.Size())), nil
 }
 
-func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (int, error) {
+func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (uint64, error) {
 	length, err := reader.Seek(0, io.SeekEnd)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
 	// Reset the reader to start
 	_, err = reader.Seek(0, io.SeekStart)
 	if err != nil {
-		return -1, err
+		return 0, err
 	}
 
-	isoSize := b.calculateTarSize(int(length))
+	isoSize := b.calculateTarSize(uint64(length))
 
 	ovfSize, err := b.ovfSize()
 	if err != nil {
-		return -1, fmt.Errorf("failed to compute ovf size: %s", err)
+		return 0, fmt.Errorf("failed to compute ovf size: %s", err)
 	}
 
 	persistentDiskSize, err := b.diskSize()
 	if err != nil {
-		return -1, fmt.Errorf("failed to comute persistent disk size: %s", err)
+		return 0, fmt.Errorf("failed to comute persistent disk size: %s", err)
 	}
 
 	return isoSize + ovfSize + persistentDiskSize, nil
@@ -449,8 +449,8 @@ func (b *ImageBuilder) WithVmNetwork(network VmNetwork) *ImageBuilder {
 	return b
 }
 
-func (b *ImageBuilder) calculateTarSize(contentSize int) int {
-	const blockSize = 512
+func (b *ImageBuilder) calculateTarSize(contentSize uint64) uint64 {
+	const blockSize uint64 = 512
 
 	// Size of the tar header block
 	size := blockSize
