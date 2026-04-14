@@ -194,7 +194,7 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewEstimationService(s.store),
 		accountsSvc,
 		partnerSvc,
-	)
+	).WithS3Cfg(s.cfg.S3)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

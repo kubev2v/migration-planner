@@ -7,6 +7,10 @@ import (
 	"io"
 	"mime/multipart"
 
+	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
@@ -32,7 +36,7 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 
 	// Parse multipart form data
 	var name string
-	var fileContent []byte
+	var objectName string
 
 	// Helper to process a single part with deferred cleanup
 	processPart := func(part *multipart.Part) error {
@@ -45,16 +49,49 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 				return fmt.Errorf("failed to read name: %w", err)
 			}
 			name = string(nameBytes)
+			if err := validator.ValidateName(name); err != nil {
+				return err
+			}
 		case "file":
-			buff := bytes.NewBuffer([]byte{})
-			n, err := io.Copy(buff, part)
+			header := make([]byte, 4)
+
+			// read first 4 bytes from the stream
+			n, err := io.ReadFull(part, header)
 			if err != nil {
 				return fmt.Errorf("failed to read file: %w", err)
 			}
+
 			if n == 0 {
 				return fmt.Errorf("rvtools file is empty")
 			}
-			fileContent = buff.Bytes()
+
+			if err := validator.ValidateXLSXMagicBytes(header); err != nil {
+				return fmt.Errorf("invalid file format")
+			}
+
+			client, err := minio.New(h.S3.Endpoint, &minio.Options{
+				Creds:  credentials.NewStaticV4(h.S3.AccessKey, h.S3.SecretKey, ""),
+				Secure: false,
+			})
+			if err != nil {
+				return fmt.Errorf("failed to create s3 client: %w", err)
+			}
+
+			objectName = fmt.Sprintf("rvtool-%s.xlsx", uuid.New().String())
+
+			_, err = client.PutObject(
+				ctx,
+				h.S3.RvtoolsBucket,
+				objectName,
+				io.MultiReader(bytes.NewReader(header), part),
+				-1,
+				minio.PutObjectOptions{
+					ContentType: "application/octet-stream",
+				},
+			)
+			if err != nil {
+				return fmt.Errorf("failed to upload to minio: %w", err)
+			}
 		}
 		return nil
 	}
@@ -75,29 +112,14 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 		}
 	}
 
-	if err := validator.ValidateName(name); err != nil {
-		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
-	}
-	if len(fileContent) == 0 {
-		logger.Error(fmt.Errorf("file is required")).Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: "file is required"}, nil
-	}
-	if err := validator.ValidateXLSXMagicBytes(fileContent); err != nil {
-		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
-	}
-
-	logger.Step("file_read").WithInt("file_size", len(fileContent)).Log()
-
 	// Create job args
 	jobArgs := jobs.RVToolsJobArgs{
-		Name:        name,
-		FileContent: fileContent,
-		OrgID:       user.Organization,
-		Username:    user.Username,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
+		Name:              name,
+		S3RvtoolsFileName: objectName,
+		OrgID:             user.Organization,
+		Username:          user.Username,
+		FirstName:         user.FirstName,
+		LastName:          user.LastName,
 	}
 
 	// Create the job

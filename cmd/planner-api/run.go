@@ -10,6 +10,9 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
@@ -109,6 +112,10 @@ var runCmd = &cobra.Command{
 			}
 		}()
 
+		if err := ensureRvtoolsBucket(ctx, cfg.S3); err != nil {
+			zap.S().Fatalw("Error with Rvtools S3 bucket", "error", err)
+		}
+
 		// register metrics
 		metrics.RegisterMetrics(store)
 
@@ -153,6 +160,30 @@ func ensureIsoExist(path string) error {
 		}
 		return err
 	}
+	return nil
+}
+
+func ensureRvtoolsBucket(ctx context.Context, s3 *config.S3) error {
+	client, err := minio.New(s3.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(s3.AccessKey, s3.SecretKey, ""),
+		Secure: false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create s3 client: %w", err)
+	}
+
+	exists, err := client.BucketExists(ctx, s3.RvtoolsBucket)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		err = client.MakeBucket(ctx, s3.RvtoolsBucket, minio.MakeBucketOptions{})
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

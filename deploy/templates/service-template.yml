@@ -116,6 +116,14 @@ parameters:
   - name: SIZER_IMAGE_PULL_POLICY
     description: Image pull policy for the sizer service
     value: Always
+  - name: MIGRATION_PLANNER_S3_ENDPOINT
+    description: S3-compatible API endpoint host:port (in-cluster service for Kind)
+  - name: MIGRATION_PLANNER_S3_BUCKET
+    description: Bucket for RVTools objects
+  - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+    description: S3 access key
+  - name: MIGRATION_PLANNER_S3_SECRET_KEY
+    description: S3 secret key
 
 objects:
   - kind: ServiceAccount
@@ -639,6 +647,15 @@ objects:
                     secretKeyRef:
                       name: ${DB_SECRET_NAME}
                       key: db.user
+                # S3 / MinIO
+                - name: MIGRATION_PLANNER_S3_ENDPOINT
+                  value: ${MIGRATION_PLANNER_S3_ENDPOINT}
+                - name: MIGRATION_PLANNER_S3_BUCKET
+                  value: ${MIGRATION_PLANNER_S3_BUCKET}
+                - name: MIGRATION_PLANNER_S3_ACCESS_KEY
+                  value: ${MIGRATION_PLANNER_S3_ACCESS_KEY}
+                - name: MIGRATION_PLANNER_S3_SECRET_KEY
+                  value: ${MIGRATION_PLANNER_S3_SECRET_KEY}
               volumeMounts:
                 - name: migration-planner-dir
                   mountPath: "/.migration-planner"
