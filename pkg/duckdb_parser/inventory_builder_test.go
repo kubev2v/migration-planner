@@ -799,6 +799,249 @@ func TestBuildInventory_MinimalSchema(t *testing.T) {
 	assert.Equal(t, vcUUID, inv.VCenterID, "VCenterID should be populated from VI SDK UUID column")
 }
 
+// TestBuildInventory_LegacyRVToolsColumnNames ingests workbooks that use pre-3.9 and MB-era
+// column headers; normalization should map them to the canonical schema.
+func TestBuildInventory_LegacyRVToolsColumnNames(t *testing.T) {
+	vcUUID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	vmUUID := "00112233-4455-6677-8899-aabbccddeeff"
+	smbiosUUID := "aabbccdd-eeff-0011-2233-445566778899"
+
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "c1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-1", "Config status": "green"},
+	}
+	clustersRows := []map[string]string{{"Name": "c1", "Object ID": "domain-c1"}}
+
+	testCases := []struct {
+		name                    string
+		vInfoHeaders            []string
+		vmData                  map[string]string
+		vDatastoreHeaders       []string
+		datastoreData           map[string]string
+		vDiskHeaders            []string
+		diskData                map[string]string
+		expectVCenterID         string
+		expectStorageUsed       int64
+		expectProvisionedMiB    int32
+		expectDiskCapacity      int64
+		expectDatastoreFree     float64
+		expectDatastoreCapacity float64
+		expectSMBIOSUUID        string
+		expectEnableUUID        *bool
+	}{
+		{
+			name: "vCenter UUID and In use MB (lowercase)",
+			vInfoHeaders: []string{
+				"VM", "VM ID", "Cluster", "vCenter UUID", "Host", "CPUs", "Memory", "Powerstate",
+				"Datacenter", "In use MB", "Provisioned MB", "VM UUID",
+			},
+			vmData: map[string]string{
+				"VM": "legacy-vm-1", "VM ID": "vm-1", "Cluster": "c1", "vCenter UUID": vcUUID,
+				"Host": "esxi-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Datacenter": "dc1",
+				"In use MB": "512", "Provisioned MB": "10240", "VM UUID": vmUUID,
+			},
+			vDatastoreHeaders: []string{"Hosts", "Address", "Name", "Object ID", "Free MB", "MHA", "Capacity MB", "Type"},
+			datastoreData: map[string]string{
+				"Hosts": "esxi-1", "Address": "10.0.0.1", "Name": "ds-1", "Object ID": "ds-obj-1",
+				"Free MB": "1024", "MHA": "false", "Capacity MB": "5120", "Type": "VMFS",
+			},
+			vDiskHeaders: []string{
+				"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MB",
+				"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+				"Thin", "Controller", "Label", "SCSI Unit #",
+			},
+			diskData:                map[string]string{"VM ID": "vm-1", "Disk Key": "2000", "Unit #": "0", "Path": "[ds-1] vm/disk.vmdk", "Capacity MB": "2048", "Sharing mode": "false"},
+			expectVCenterID:         vcUUID,
+			expectStorageUsed:       512 * 1024 * 1024,
+			expectProvisionedMiB:    10240,
+			expectDiskCapacity:      2048,
+			expectDatastoreFree:     1024.0,
+			expectDatastoreCapacity: 5120.0,
+			expectSMBIOSUUID:        vmUUID, // Pre-4.3.1: VM UUID column contained SMBIOS UUID
+			expectEnableUUID:        nil,
+		},
+		{
+			name: "In Use MB (capital U) and In use MiB variant",
+			vInfoHeaders: []string{
+				"VM", "VM ID", "Cluster", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
+				"Datacenter", "In Use MB", "Provisioned MB", "VM UUID",
+			},
+			vmData: map[string]string{
+				"VM": "legacy-vm-2", "VM ID": "vm-2", "Cluster": "c1", "VI SDK UUID": vcUUID,
+				"Host": "esxi-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Datacenter": "dc1",
+				"In Use MB": "1024", "Provisioned MB": "20480", "VM UUID": vmUUID,
+			},
+			vDatastoreHeaders: []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"},
+			datastoreData: map[string]string{
+				"Hosts": "esxi-1", "Address": "10.0.0.2", "Name": "ds-2", "Object ID": "ds-obj-2",
+				"Free MiB": "2048", "MHA": "false", "Capacity MiB": "10240", "Type": "NFS",
+			},
+			vDiskHeaders: []string{
+				"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+				"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+				"Thin", "Controller", "Label", "SCSI Unit #",
+			},
+			diskData:                map[string]string{"VM ID": "vm-2", "Disk Key": "2000", "Unit #": "0", "Path": "[ds-2] vm/disk.vmdk", "Capacity MiB": "4096", "Sharing mode": "false"},
+			expectVCenterID:         vcUUID,
+			expectStorageUsed:       1024 * 1024 * 1024,
+			expectProvisionedMiB:    20480,
+			expectDiskCapacity:      4096,
+			expectDatastoreFree:     2048.0,
+			expectDatastoreCapacity: 10240.0,
+			expectSMBIOSUUID:        vmUUID,
+			expectEnableUUID:        nil,
+		},
+		{
+			name: "In use MiB (lowercase m) variant",
+			vInfoHeaders: []string{
+				"VM", "VM ID", "Cluster", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
+				"Datacenter", "In use MiB", "Provisioned MiB", "VM UUID",
+			},
+			vmData: map[string]string{
+				"VM": "legacy-vm-3", "VM ID": "vm-3", "Cluster": "c1", "VI SDK UUID": vcUUID,
+				"Host": "esxi-1", "CPUs": "8", "Memory": "16384", "Powerstate": "poweredOn", "Datacenter": "dc1",
+				"In use MiB": "2048", "Provisioned MiB": "40960", "VM UUID": vmUUID,
+			},
+			vDatastoreHeaders: []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"},
+			datastoreData: map[string]string{
+				"Hosts": "esxi-1", "Address": "10.0.0.3", "Name": "ds-3", "Object ID": "ds-obj-3",
+				"Free MiB": "4096", "MHA": "false", "Capacity MiB": "20480", "Type": "VMFS",
+			},
+			vDiskHeaders: []string{
+				"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+				"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+				"Thin", "Controller", "Label", "SCSI Unit #",
+			},
+			diskData:                map[string]string{"VM ID": "vm-3", "Disk Key": "2000", "Unit #": "0", "Path": "[ds-3] vm/disk.vmdk", "Capacity MiB": "8192", "Sharing mode": "false"},
+			expectVCenterID:         vcUUID,
+			expectStorageUsed:       2048 * 1024 * 1024,
+			expectProvisionedMiB:    40960,
+			expectDiskCapacity:      8192,
+			expectDatastoreFree:     4096.0,
+			expectDatastoreCapacity: 20480.0,
+			expectSMBIOSUUID:        vmUUID,
+			expectEnableUUID:        nil,
+		},
+		{
+			name: "SMBIOS UUID column present (modern 4.4.1+)",
+			vInfoHeaders: []string{
+				"VM", "VM ID", "Cluster", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
+				"Datacenter", "In Use MiB", "Provisioned MiB", "VM UUID", "SMBIOS UUID",
+			},
+			vmData: map[string]string{
+				"VM": "modern-vm", "VM ID": "vm-4", "Cluster": "c1", "VI SDK UUID": vcUUID,
+				"Host": "esxi-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Datacenter": "dc1",
+				"In Use MiB": "512", "Provisioned MiB": "10240", "VM UUID": vmUUID, "SMBIOS UUID": smbiosUUID,
+			},
+			vDatastoreHeaders: []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"},
+			datastoreData: map[string]string{
+				"Hosts": "esxi-1", "Address": "10.0.0.4", "Name": "ds-4", "Object ID": "ds-obj-4",
+				"Free MiB": "1024", "MHA": "false", "Capacity MiB": "5120", "Type": "VMFS",
+			},
+			vDiskHeaders: []string{
+				"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+				"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+				"Thin", "Controller", "Label", "SCSI Unit #",
+			},
+			diskData:                map[string]string{"VM ID": "vm-4", "Disk Key": "2000", "Unit #": "0", "Path": "[ds-4] vm/disk.vmdk", "Capacity MiB": "2048", "Sharing mode": "false"},
+			expectVCenterID:         vcUUID,
+			expectStorageUsed:       512 * 1024 * 1024,
+			expectProvisionedMiB:    10240,
+			expectDiskCapacity:      2048,
+			expectDatastoreFree:     1024.0,
+			expectDatastoreCapacity: 5120.0,
+			expectSMBIOSUUID:        smbiosUUID, // Should use SMBIOS UUID column, not VM UUID
+			expectEnableUUID:        nil,
+		},
+		{
+			name: "disk.EnableUUID legacy variant",
+			vInfoHeaders: []string{
+				"VM", "VM ID", "Cluster", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
+				"Datacenter", "In Use MiB", "Provisioned MiB", "VM UUID", "disk.EnableUUID",
+			},
+			vmData: map[string]string{
+				"VM": "legacy-vm-5", "VM ID": "vm-5", "Cluster": "c1", "VI SDK UUID": vcUUID,
+				"Host": "esxi-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Datacenter": "dc1",
+				"In Use MiB": "512", "Provisioned MiB": "10240", "VM UUID": vmUUID, "disk.EnableUUID": "true",
+			},
+			vDatastoreHeaders: []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"},
+			datastoreData: map[string]string{
+				"Hosts": "esxi-1", "Address": "10.0.0.5", "Name": "ds-5", "Object ID": "ds-obj-5",
+				"Free MiB": "1024", "MHA": "false", "Capacity MiB": "5120", "Type": "VMFS",
+			},
+			vDiskHeaders: []string{
+				"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+				"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+				"Thin", "Controller", "Label", "SCSI Unit #",
+			},
+			diskData:                map[string]string{"VM ID": "vm-5", "Disk Key": "2000", "Unit #": "0", "Path": "[ds-5] vm/disk.vmdk", "Capacity MiB": "2048", "Sharing mode": "false"},
+			expectVCenterID:         vcUUID,
+			expectStorageUsed:       512 * 1024 * 1024,
+			expectProvisionedMiB:    10240,
+			expectDiskCapacity:      2048,
+			expectDatastoreFree:     1024.0,
+			expectDatastoreCapacity: 5120.0,
+			expectSMBIOSUUID:        vmUUID,
+			expectEnableUUID:        boolPtr(true),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			vms := []map[string]string{tc.vmData}
+			vDatastoreRows := []map[string]string{tc.datastoreData}
+			disks := []map[string]string{tc.diskData}
+
+			sheets := []ExcelSheet{
+				NewExcelSheet("vInfo", tc.vInfoHeaders, vms),
+				NewExcelSheet("vHost", vHostHeaders, hosts),
+				NewExcelSheet("vDatastore", tc.vDatastoreHeaders, vDatastoreRows),
+				NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+				NewExcelSheet("vDisk", tc.vDiskHeaders, disks),
+			}
+			tmpFile := createTestExcel(t, sheets...)
+
+			ctx := context.Background()
+			result, err := parser.IngestRvTools(ctx, tmpFile)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "legacy headers should pass validation: %v", result.Errors)
+
+			inv, err := parser.BuildInventory(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tc.expectVCenterID, inv.VCenterID, "VCenterID mismatch")
+			assert.Equal(t, 1, inv.VCenter.VMs.Total, "VM count mismatch")
+
+			// Assert datastore values, not just presence
+			require.Len(t, inv.VCenter.Infra.Datastores, 1, "should have exactly one datastore")
+			ds := inv.VCenter.Infra.Datastores[0]
+			assert.Equal(t, tc.expectDatastoreFree/1024.0, ds.FreeCapacityGB, "Free capacity GB mismatch")
+			assert.Equal(t, tc.expectDatastoreCapacity/1024.0, ds.TotalCapacityGB, "Total capacity GB mismatch")
+
+			vmsOut, err := parser.VMs(ctx, Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, vmsOut, 1, "should have exactly one VM")
+			vm := vmsOut[0]
+
+			assert.Equal(t, tc.expectStorageUsed, vm.StorageUsed, "StorageUsed mismatch")
+			assert.Equal(t, tc.expectProvisionedMiB, vm.ProvisionedMiB, "ProvisionedMiB mismatch")
+			assert.Equal(t, tc.expectSMBIOSUUID, vm.UUID, "SMBIOS UUID mismatch")
+
+			if tc.expectEnableUUID != nil {
+				assert.Equal(t, *tc.expectEnableUUID, vm.DiskEnableUuid, "EnableUUID mismatch")
+			}
+
+			require.Len(t, vm.Disks, 1, "should have exactly one disk")
+			assert.Equal(t, tc.expectDiskCapacity, vm.Disks[0].Capacity, "Disk capacity mismatch")
+		})
+	}
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
 // TestBuildInventory_VMsWithSharedDisksCount ingests Excel with vDisk data and asserts
 // VMsWithSharedDisksCount returns the count of VMs that have at least one shared disk.
 func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
