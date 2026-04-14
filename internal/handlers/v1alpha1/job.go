@@ -1,11 +1,11 @@
 package v1alpha1
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"mime/multipart"
+	"os"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -32,7 +32,18 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 
 	// Parse multipart form data
 	var name string
-	var fileContent []byte
+	// Write file content to temp file for DuckDB ingestion
+	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
+	if err != nil {
+		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("error saving rvtool: %v", err)}, nil
+	}
+	cleanupTempFile := true
+	defer func() {
+		_ = tempFile.Close()
+		if cleanupTempFile {
+			_ = os.Remove(tempFile.Name())
+		}
+	}()
 
 	// Helper to process a single part with deferred cleanup
 	processPart := func(part *multipart.Part) error {
@@ -46,15 +57,13 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 			}
 			name = string(nameBytes)
 		case "file":
-			buff := bytes.NewBuffer([]byte{})
-			n, err := io.Copy(buff, part)
+			n, err := io.Copy(tempFile, part)
 			if err != nil {
-				return fmt.Errorf("failed to read file: %w", err)
+				return fmt.Errorf("failed to write file: %w", err)
 			}
 			if n == 0 {
 				return fmt.Errorf("rvtools file is empty")
 			}
-			fileContent = buff.Bytes()
 		}
 		return nil
 	}
@@ -79,25 +88,25 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 		logger.Error(err).WithString("step", "validation").Log()
 		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
 	}
-	if len(fileContent) == 0 {
-		logger.Error(fmt.Errorf("file is required")).Log()
-		return server.CreateRVToolsAssessment400JSONResponse{Message: "file is required"}, nil
+
+	_, err = tempFile.Seek(0, io.SeekStart)
+	if err != nil {
+		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("failed to seek file: %v", err)}, nil
 	}
-	if err := validator.ValidateXLSXMagicBytes(fileContent); err != nil {
+
+	if err := validator.ValidateXLSXMagicBytes(tempFile); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
 		return server.CreateRVToolsAssessment400JSONResponse{Message: err.Error()}, nil
 	}
 
-	logger.Step("file_read").WithInt("file_size", len(fileContent)).Log()
-
 	// Create job args
 	jobArgs := jobs.RVToolsJobArgs{
-		Name:        name,
-		FileContent: fileContent,
-		OrgID:       user.Organization,
-		Username:    user.Username,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
+		Name:            name,
+		RvtoolsFilePath: tempFile.Name(),
+		OrgID:           user.Organization,
+		Username:        user.Username,
+		FirstName:       user.FirstName,
+		LastName:        user.LastName,
 	}
 
 	// Create the job
@@ -106,6 +115,8 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 		logger.Error(err).Log()
 		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
 	}
+
+	cleanupTempFile = false
 
 	logger.Success().WithParam("job_id", job.Id).Log()
 

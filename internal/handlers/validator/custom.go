@@ -5,6 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"fmt"
+	"io"
 	"regexp"
 	"strconv"
 	"strings"
@@ -50,10 +52,18 @@ func ValidateName(name string) error {
 
 // ValidateXLSXMagicBytes checks if the file starts with ZIP magic bytes.
 // XLSX files are ZIP archives, so this is a fast preliminary check.
-func ValidateXLSXMagicBytes(data []byte) error {
-	if len(data) < 4 || !bytes.Equal(data[:4], xlsxMagicBytes) {
+func ValidateXLSXMagicBytes(r io.ReadSeeker) error {
+	header := make([]byte, 4)
+
+	_, err := r.Read(header)
+	if err != nil {
+		return fmt.Errorf("failed to read file header: %w", err)
+	}
+
+	if !bytes.Equal(header, xlsxMagicBytes) {
 		return NewErrInvalidFile("file is not a valid Excel file")
 	}
+
 	return nil
 }
 

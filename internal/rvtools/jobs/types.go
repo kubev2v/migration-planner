@@ -7,12 +7,12 @@ import (
 // RVToolsJobArgs contains the arguments for an RVTools assessment job.
 // This is stored in river_job.args as JSON.
 type RVToolsJobArgs struct {
-	Name        string `json:"name"`
-	FileContent []byte `json:"file_content"`
-	OrgID       string `json:"org_id"`
-	Username    string `json:"username"`
-	FirstName   string `json:"first_name"`
-	LastName    string `json:"last_name"`
+	Name            string `json:"name"`
+	RvtoolsFilePath string `json:"file_path"`
+	OrgID           string `json:"org_id"`
+	Username        string `json:"username"`
+	FirstName       string `json:"first_name"`
+	LastName        string `json:"last_name"`
 }
 
 // Kind returns the job kind for River registration.

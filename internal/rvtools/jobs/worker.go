@@ -79,6 +79,10 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
+	defer func() {
+		_ = os.Remove(job.Args.RvtoolsFilePath)
+	}()
+
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
 	if err != nil {
@@ -86,27 +90,13 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	}
 	defer func() { _ = duckDB.Close() }()
 
-	// Write file content to temp file for DuckDB ingestion
-	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_temp_file", err, fmt.Sprintf("failed to create temp file: %v", err))
-	}
-	tempFilePath := tempFile.Name()
-	defer func() { _ = os.Remove(tempFilePath) }()
-
-	if _, err := tempFile.Write(job.Args.FileContent); err != nil {
-		_ = tempFile.Close()
-		return w.failJob(ctx, logger, job.ID, "write_temp_file", err, fmt.Sprintf("failed to write temp file: %v", err))
-	}
-	_ = tempFile.Close()
-
 	// Update status to validating before ingestion (which includes OPA validation)
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {
 		logger.Error(err).WithString("step", "update_validating_status").Log()
 	}
 
 	// Ingest RVTools file using duckdb_parser
-	validationResult, err := parser.IngestRvTools(ctx, tempFilePath)
+	validationResult, err := parser.IngestRvTools(ctx, job.Args.RvtoolsFilePath)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "ingest_rvtools", err, fmt.Sprintf("error ingesting RVTools file: %v", err))
 	}
