@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -83,9 +84,16 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		return imageServer.GetImageByToken500JSONResponse{}, nil
 	}
 
+	// Get image size
+	size, err := imageBuilder.Size()
+	if err != nil {
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to read image size %s", err)}, nil
+	}
+
 	// Set proper headers of the OVA file:
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
+	writer.Header().Set("Content-Length", strconv.FormatUint(size, 10))
 
 	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
