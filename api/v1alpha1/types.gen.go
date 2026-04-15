@@ -4,6 +4,8 @@
 package v1alpha1
 
 import (
+	"encoding/json"
+	"fmt"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -65,6 +67,14 @@ const (
 	IdentityKindCustomer IdentityKind = "customer"
 	IdentityKindPartner  IdentityKind = "partner"
 	IdentityKindRegular  IdentityKind = "regular"
+)
+
+// Defines values for InventoryClustersClusterFeaturesDrsMode.
+const (
+	FullyAutomated     InventoryClustersClusterFeaturesDrsMode = "fullyAutomated"
+	Manual             InventoryClustersClusterFeaturesDrsMode = "manual"
+	None               InventoryClustersClusterFeaturesDrsMode = "none"
+	PartiallyAutomated InventoryClustersClusterFeaturesDrsMode = "partiallyAutomated"
 )
 
 // Defines values for JobStatus.
@@ -374,6 +384,9 @@ type Host struct {
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`
 	Vendor   string `json:"vendor"`
+
+	// VmotionEnabled Whether VMotion is enabled on the host
+	VmotionEnabled *bool `json:"vmotionEnabled,omitempty"`
 }
 
 // Identity defines model for Identity.
@@ -428,11 +441,33 @@ type Infra struct {
 // Inventory defines model for Inventory.
 type Inventory struct {
 	// Clusters Map of cluster names to their inventory data
-	Clusters map[string]InventoryData `json:"clusters"`
-	Vcenter  *InventoryData           `json:"vcenter,omitempty"`
+	Clusters Inventory_Clusters `json:"clusters"`
+	Vcenter  *InventoryData     `json:"vcenter,omitempty"`
 
 	// VcenterId ID of the vCenter
 	VcenterId string `json:"vcenter_id"`
+
+	// VcenterVersion Version of the vCenter
+	VcenterVersion *int `json:"vcenter_version,omitempty"`
+}
+
+// InventoryClustersClusterFeaturesDrsMode The DRS mode of the cluster if enabled
+type InventoryClustersClusterFeaturesDrsMode string
+
+// Inventory_Clusters Map of cluster names to their inventory data
+type Inventory_Clusters struct {
+	// ClusterFeatures Specific features supported by the cluster
+	ClusterFeatures *struct {
+		// DrsEnabled Whether DRS is enabled at the cluster level
+		DrsEnabled *bool `json:"drsEnabled,omitempty"`
+
+		// DrsMode The DRS mode of the cluster if enabled
+		DrsMode *InventoryClustersClusterFeaturesDrsMode `json:"drsMode,omitempty"`
+
+		// StorageDrsEnabled Whether Storage DRS is enabled at the cluster level
+		StorageDrsEnabled *bool `json:"storageDrsEnabled,omitempty"`
+	} `json:"clusterFeatures,omitempty"`
+	AdditionalProperties map[string]InventoryData `json:"-"`
 }
 
 // InventoryData defines model for InventoryData.
@@ -895,3 +930,71 @@ type UpdateSourceJSONRequestBody = SourceUpdate
 
 // UpdateInventoryJSONRequestBody defines body for UpdateInventory for application/json ContentType.
 type UpdateInventoryJSONRequestBody = UpdateInventory
+
+// Getter for additional properties for Inventory_Clusters. Returns the specified
+// element and whether it was found
+func (a Inventory_Clusters) Get(fieldName string) (value InventoryData, found bool) {
+	if a.AdditionalProperties != nil {
+		value, found = a.AdditionalProperties[fieldName]
+	}
+	return
+}
+
+// Setter for additional properties for Inventory_Clusters
+func (a *Inventory_Clusters) Set(fieldName string, value InventoryData) {
+	if a.AdditionalProperties == nil {
+		a.AdditionalProperties = make(map[string]InventoryData)
+	}
+	a.AdditionalProperties[fieldName] = value
+}
+
+// Override default JSON handling for Inventory_Clusters to handle AdditionalProperties
+func (a *Inventory_Clusters) UnmarshalJSON(b []byte) error {
+	object := make(map[string]json.RawMessage)
+	err := json.Unmarshal(b, &object)
+	if err != nil {
+		return err
+	}
+
+	if raw, found := object["clusterFeatures"]; found {
+		err = json.Unmarshal(raw, &a.ClusterFeatures)
+		if err != nil {
+			return fmt.Errorf("error reading 'clusterFeatures': %w", err)
+		}
+		delete(object, "clusterFeatures")
+	}
+
+	if len(object) != 0 {
+		a.AdditionalProperties = make(map[string]InventoryData)
+		for fieldName, fieldBuf := range object {
+			var fieldVal InventoryData
+			err := json.Unmarshal(fieldBuf, &fieldVal)
+			if err != nil {
+				return fmt.Errorf("error unmarshaling field %s: %w", fieldName, err)
+			}
+			a.AdditionalProperties[fieldName] = fieldVal
+		}
+	}
+	return nil
+}
+
+// Override default JSON handling for Inventory_Clusters to handle AdditionalProperties
+func (a Inventory_Clusters) MarshalJSON() ([]byte, error) {
+	var err error
+	object := make(map[string]json.RawMessage)
+
+	if a.ClusterFeatures != nil {
+		object["clusterFeatures"], err = json.Marshal(a.ClusterFeatures)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling 'clusterFeatures': %w", err)
+		}
+	}
+
+	for fieldName, field := range a.AdditionalProperties {
+		object[fieldName], err = json.Marshal(field)
+		if err != nil {
+			return nil, fmt.Errorf("error marshaling '%s': %w", fieldName, err)
+		}
+	}
+	return json.Marshal(object)
+}

@@ -1677,8 +1677,29 @@ components:
         vcenter_id:
           type: string
           description: ID of the vCenter
+        vcenter_version:
+          type: integer
+          description: Version of the vCenter
         clusters:
           type: object
+          properties:
+            clusterFeatures:
+              type: object
+              description: Specific features supported by the cluster
+              properties:
+                drsEnabled:
+                  type: boolean
+                  description: Whether DRS is enabled at the cluster level
+                  default: false
+                drsMode:
+                  type: string
+                  enum: [none, manual, fullyAutomated, partiallyAutomated]
+                  default: none
+                  description: The DRS mode of the cluster if enabled
+                storageDrsEnabled:
+                  type: boolean
+                  default: false
+                  description: Whether Storage DRS is enabled at the cluster level
           additionalProperties:
             $ref: "#/components/schemas/InventoryData"
           description: Map of cluster names to their inventory data
@@ -1922,6 +1943,10 @@ components:
           format: int64
           description: Host memory in MB
           nullable: true
+        vmotionEnabled:
+          type: boolean
+          description: Whether VMotion is enabled on the host
+          default: false
 
     Network:
       type: object

@@ -3,15 +3,24 @@ package inventory
 // Inventory is the domain representation of infrastructure inventory.
 // It contains vCenter-level data and per-cluster inventories.
 type Inventory struct {
-	VCenterID string
-	VCenter   *InventoryData
-	Clusters  map[string]InventoryData
+	VCenterID      string
+	VCenterVersion int
+	VCenter        *InventoryData
+	Clusters       map[string]InventoryData
 }
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).
 type InventoryData struct {
-	VMs   VMsData
-	Infra InfraData
+	VMs             VMsData
+	Infra           InfraData
+	ClusterFeatures ClusterFeatures
+}
+
+// ClusterFeatures contains specific features supported by the cluster.
+type ClusterFeatures struct {
+	DrsEnabled        bool
+	DrsMode           string
+	StorageDrsEnabled bool
 }
 
 // VMsData contains aggregated VM statistics and distribution data.
@@ -90,12 +99,13 @@ type DiskTypeSummary struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
-	ID         string
-	Vendor     string
-	Model      string
-	CpuCores   int
-	CpuSockets int
-	MemoryMB   int
+	ID             string
+	Vendor         string
+	Model          string
+	CpuCores       int
+	CpuSockets     int
+	MemoryMB       int
+	VMotionEnabled bool
 }
 
 // Datastore represents a VMware datastore.
