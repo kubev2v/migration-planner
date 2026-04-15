@@ -24,13 +24,14 @@ type Os struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
-	Cluster    string `db:"cluster" json:"-"`
-	CpuCores   int    `db:"cpuCores" json:"cpuCores"`
-	CpuSockets int    `db:"cpuSockets" json:"cpuSockets"`
-	Id         string `db:"id" json:"id"`
-	MemoryMB   int    `db:"memoryMB" json:"memoryMB"`
-	Model      string `db:"model" json:"model"`
-	Vendor     string `db:"vendor" json:"vendor"`
+	Cluster        string `db:"cluster" json:"-"`
+	CpuCores       int    `db:"cpuCores" json:"cpuCores"`
+	CpuSockets     int    `db:"cpuSockets" json:"cpuSockets"`
+	Id             string `db:"id" json:"id"`
+	MemoryMB       int    `db:"memoryMB" json:"memoryMB"`
+	Model          string `db:"model" json:"model"`
+	Vendor         string `db:"vendor" json:"vendor"`
+	VMotionEnabled bool   `db:"vmotionEnabled" json:"vmotionEnabled"`
 }
 
 // Network represents a VMware network.

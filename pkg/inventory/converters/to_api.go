@@ -15,8 +15,9 @@ func ToAPI(inv *inventory.Inventory) *api.Inventory {
 	}
 
 	result := &api.Inventory{
-		VcenterId: inv.VCenterID,
-		Clusters:  clusters,
+		VcenterId:      inv.VCenterID,
+		VcenterVersion: inv.VCenterVersion,
+		Clusters:       clusters,
 	}
 	if inv.VCenter != nil {
 		vcenter := toAPIInventoryData(inv.VCenter)
