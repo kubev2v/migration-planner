@@ -172,13 +172,13 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
+	accountsSvc := service.NewAccountsService(s.store)
+
 	var assessmentSvc service.AssessmentServicer
-	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator)
+	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, accountsSvc)
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
 		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
 	}
-
-	accountsSvc := service.NewAccountsService(s.store)
 
 	var partnerSvc service.PartnerServicer
 	partnerSvc = service.NewPartnerService(s.store, accountsSvc)

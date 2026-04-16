@@ -161,3 +161,45 @@ func (a *AuthzAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 
 	return nil
 }
+
+func (a *AuthzAssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	// get assessment first to capture the 404 if any
+	_, err := a.inner.GetAssessment(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(id.String()))
+	if err != nil {
+		return fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.SharePermission.In(resource.Permissions) {
+		return NewErrForbidden("assessment", id.String())
+	}
+
+	return a.inner.ShareAssessment(ctx, id)
+}
+
+func (a *AuthzAssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	// get assessment first to capture the 404 if any
+	_, err := a.inner.GetAssessment(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(id.String()))
+	if err != nil {
+		return fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.SharePermission.In(resource.Permissions) {
+		return NewErrForbidden("assessment", id.String())
+	}
+
+	return a.inner.UnshareAssessment(ctx, id)
+}
