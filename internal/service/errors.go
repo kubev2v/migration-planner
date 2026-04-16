@@ -179,6 +179,14 @@ type ErrInvalidEstimationParam struct{ Msg string }
 
 func (e *ErrInvalidEstimationParam) Error() string { return e.Msg }
 
+type ErrNotACustomer struct {
+	error
+}
+
+func NewErrNotACustomer(username string) *ErrNotACustomer {
+	return &ErrNotACustomer{fmt.Errorf("user %s is not a customer with an accepted partner relationship", username)}
+}
+
 type ErrActiveRequestExists struct {
 	error
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -21,6 +22,8 @@ type AssessmentServicer interface {
 	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error)
 	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
+	ShareAssessment(ctx context.Context, id uuid.UUID) error
+	UnshareAssessment(ctx context.Context, id uuid.UUID) error
 }
 
 const (
@@ -32,13 +35,15 @@ const (
 type AssessmentService struct {
 	store        store.Store
 	opaValidator *opa.Validator
+	accountsSvc  *AccountsService
 	logger       *log.StructuredLogger
 }
 
-func NewAssessmentService(store store.Store, opaValidator *opa.Validator) *AssessmentService {
+func NewAssessmentService(store store.Store, opaValidator *opa.Validator, accountsSvc *AccountsService) *AssessmentService {
 	return &AssessmentService{
 		store:        store,
 		opaValidator: opaValidator,
+		accountsSvc:  accountsSvc,
 		logger:       log.NewDebugLogger("assessment_service"),
 	}
 }
@@ -288,6 +293,94 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 	}
 
 	tracer.Success().WithString("deleted_assessment_name", assessment.Name).Log()
+	return nil
+}
+
+func (as *AssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	// Verify assessment exists
+	if _, err := as.store.Assessment().Get(ctx, id); err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrAssessmentNotFound(id)
+		}
+		return err
+	}
+
+	// Resolve identity — must be a customer with a partner
+	identity, err := as.accountsSvc.GetIdentity(ctx, user)
+	if err != nil {
+		return err
+	}
+	if identity.Kind != KindCustomer || identity.PartnerID == nil {
+		return NewErrNotACustomer(user.Username)
+	}
+
+	// Write viewer relation: assessment:id#viewer@org:partnerID
+	updates := store.NewRelationshipBuilder().
+		With(model.NewAssessmentResource(id.String()), model.ViewerRelation, model.NewOrgSubject(*identity.PartnerID)).
+		Build()
+
+	if err := as.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return fmt.Errorf("failed to share assessment: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (as *AssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	// Verify assessment exists
+	if _, err := as.store.Assessment().Get(ctx, id); err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrAssessmentNotFound(id)
+		}
+		return err
+	}
+
+	// Resolve identity — must be a customer with a partner
+	identity, err := as.accountsSvc.GetIdentity(ctx, user)
+	if err != nil {
+		return err
+	}
+	if identity.Kind != KindCustomer || identity.PartnerID == nil {
+		return NewErrNotACustomer(user.Username)
+	}
+
+	// Delete viewer relation: assessment:id#viewer@org:partnerID
+	updates := store.NewRelationshipBuilder().
+		Without(model.NewAssessmentResource(id.String()), model.ViewerRelation, model.NewOrgSubject(*identity.PartnerID)).
+		Build()
+
+	if err := as.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return fmt.Errorf("failed to unshare assessment: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
