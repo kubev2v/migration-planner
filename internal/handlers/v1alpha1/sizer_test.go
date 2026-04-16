@@ -69,6 +69,14 @@ func (f *ForbiddenAssessmentService) DeleteAssessment(_ context.Context, id uuid
 	return service.NewErrForbidden("assessment", id.String())
 }
 
+func (f *ForbiddenAssessmentService) ShareAssessment(_ context.Context, id uuid.UUID) error {
+	return service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) UnshareAssessment(_ context.Context, id uuid.UUID) error {
+	return service.NewErrForbidden("assessment", id.String())
+}
+
 func (m *MockStore) Source() store.Source {
 	panic("Source() not implemented in MockStore for this test")
 }
@@ -246,7 +254,7 @@ func setupTestHandler(store *MockStore, sizerResponse *client.SizerResponse, ass
 	sizerClient := client.NewSizerClient(testServer.URL, 5*time.Second)
 	handler := handlers.NewServiceHandler(
 		nil,
-		service.NewAssessmentService(store, nil),
+		service.NewAssessmentService(store, nil, nil),
 		nil,
 		service.NewSizerService(sizerClient, store),
 		nil,
@@ -349,7 +357,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -383,7 +391,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -441,7 +449,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -521,7 +529,7 @@ var _ = Describe("sizer handler", func() {
 					mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
 					handler = handlers.NewServiceHandler(
 						nil,
-						service.NewAssessmentService(mockStore, nil),
+						service.NewAssessmentService(mockStore, nil, nil),
 						nil,
 						nil,
 						nil,
@@ -571,7 +579,7 @@ var _ = Describe("sizer handler", func() {
 					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 					handler = handlers.NewServiceHandler(
 						nil,
-						service.NewAssessmentService(mockStore, nil),
+						service.NewAssessmentService(mockStore, nil, nil),
 						nil,
 						service.NewSizerService(sizerClient, mockStore),
 						nil,
@@ -717,7 +725,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -744,7 +752,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -775,7 +783,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -808,7 +816,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -840,7 +848,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -873,7 +881,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -905,7 +913,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -938,7 +946,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -974,7 +982,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1009,7 +1017,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -1044,7 +1052,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
 					nil,
@@ -1080,7 +1088,7 @@ var _ = Describe("sizer handler", func() {
 					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 					handler = handlers.NewServiceHandler(
 						nil,
-						service.NewAssessmentService(mockStore, nil),
+						service.NewAssessmentService(mockStore, nil, nil),
 						nil,
 						service.NewSizerService(sizerClient, mockStore),
 						nil,
@@ -1117,7 +1125,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1216,7 +1224,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1250,7 +1258,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1286,7 +1294,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1323,7 +1331,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1356,7 +1364,7 @@ var _ = Describe("sizer handler", func() {
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil, // sourceService
-					service.NewAssessmentService(mockStore, nil),
+					service.NewAssessmentService(mockStore, nil, nil),
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
@@ -1384,7 +1392,7 @@ var _ = Describe("sizer handler", func() {
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 			handler = handlers.NewServiceHandler(
 				nil,
-				service.NewAssessmentService(mockStore, nil),
+				service.NewAssessmentService(mockStore, nil, nil),
 				nil,
 				service.NewSizerService(sizerClient, mockStore),
 				nil,
