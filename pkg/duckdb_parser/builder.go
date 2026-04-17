@@ -327,9 +327,9 @@ func (b *QueryBuilder) ResourceBreakdownsQuery(filters Filters) (string, error) 
 	return b.buildQuery("resource_breakdowns_query", mustGetTemplate("resource_breakdowns_query"), params)
 }
 
-// VCenterQuery builds the vCenter ID query.
-func (b *QueryBuilder) VCenterQuery() (string, error) {
-	return b.buildQuery("vcenter_query", mustGetTemplate("vcenter_query"), nil)
+// AboutQuery builds the query for the single `about` table row (API/product/uuid).
+func (b *QueryBuilder) AboutQuery() (string, error) {
+	return b.buildQuery("about_query", mustGetTemplate("about_query"), nil)
 }
 
 // VMsWithSharedDisksCountQuery builds the VMs with shared disks count query.

@@ -40,6 +40,8 @@ ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "HW version" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Provisioned MiB" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Resource pool" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK Server type" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK API Version" VARCHAR;
 
 INSERT INTO vinfo (
     "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
@@ -85,6 +87,12 @@ WHERE "VM" IS NOT NULL AND "VM" != ''
   AND "VM ID" IS NOT NULL AND TRIM("VM ID") != ''
   AND LOWER(COALESCE("Template", '')) NOT IN ('true', '1', 'yes')
 ON CONFLICT DO NOTHING;
+
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
+SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
+FROM vinfo_raw
+WHERE "VI SDK UUID" IS NOT NULL
+ORDER BY "VI SDK API Version" IS NOT NULL DESC;
 
 WITH cleaned_networks AS (
     SELECT

@@ -450,20 +450,22 @@ func (p *Parser) ResourceBreakdowns(ctx context.Context, filters Filters) (AllRe
 	return result, nil
 }
 
-// VCenterID returns the vCenter UUID.
+// VCenterID returns the vCenter instance UUID from the `about` table.
 func (p *Parser) VCenterID(ctx context.Context) (string, error) {
-	q, err := p.builder.VCenterQuery()
+	a, err := p.about(ctx)
 	if err != nil {
-		return "", fmt.Errorf("building vcenter query: %w", err)
+		return "", err
 	}
-	var vcenterID string
-	if err := p.db.QueryRowContext(ctx, q).Scan(&vcenterID); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", nil
-		}
-		return "", fmt.Errorf("scanning vcenter id: %w", err)
+	return a.InstanceUuid, nil
+}
+
+// VCenterApiVersion returns the matching vCenter APIVersion from the `about` table.
+func (p *Parser) VCenterApiVersion(ctx context.Context) (string, error) {
+	a, err := p.about(ctx)
+	if err != nil {
+		return "", err
 	}
-	return vcenterID, nil
+	return a.APIVersion, nil
 }
 
 // DatacenterCount returns count of unique datacenters.
@@ -513,6 +515,30 @@ func (p *Parser) ClustersPerDatacenter(ctx context.Context) ([]int, error) {
 		counts = append(counts, count)
 	}
 	return counts, rows.Err()
+}
+
+// about returns the single row from the `about` table (vCenter API version, product, instance UUID).
+func (p *Parser) about(ctx context.Context) (models.About, error) {
+	q, err := p.builder.AboutQuery()
+	if err != nil {
+		return models.About{}, fmt.Errorf("building about query: %w", err)
+	}
+	var (
+		apiVersion   sql.NullString
+		product      sql.NullString
+		instanceUUID sql.NullString
+	)
+	if err := p.db.QueryRowContext(ctx, q).Scan(&apiVersion, &product, &instanceUUID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return models.About{}, nil
+		}
+		return models.About{}, fmt.Errorf("scanning about: %w", err)
+	}
+	return models.About{
+		APIVersion:   apiVersion.String,
+		Product:      product.String,
+		InstanceUuid: instanceUUID.String,
+	}, nil
 }
 
 // readStringIntMap is a helper for reading (string, int) result sets into a map.

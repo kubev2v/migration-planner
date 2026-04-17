@@ -18,7 +18,6 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 	vcenterID, err := p.VCenterID(ctx)
 	if err != nil {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get vCenter ID: %v", err)
-		vcenterID = ""
 	}
 
 	// Build vcenter-level inventory (no cluster filter)

@@ -140,6 +140,11 @@ CREATE TABLE IF NOT EXISTS dvswitch (
     "Name" VARCHAR
 );
 
+CREATE TABLE IF NOT EXISTS vcluster (
+    "Name" VARCHAR,
+    "Object ID" VARCHAR
+);
+
 CREATE TABLE IF NOT EXISTS concerns (
     "VM_ID" VARCHAR,
     "Concern_ID" VARCHAR,
@@ -149,7 +154,8 @@ CREATE TABLE IF NOT EXISTS concerns (
     FOREIGN KEY ("VM_ID") REFERENCES vinfo("VM ID")
 );
 
-CREATE TABLE IF NOT EXISTS vcluster (
-    "Name" VARCHAR,
-    "Object ID" VARCHAR
+CREATE TABLE IF NOT EXISTS about (
+    "APIVersion" VARCHAR,
+    "Product" VARCHAR,
+    "InstanceUuid" VARCHAR,
 );
