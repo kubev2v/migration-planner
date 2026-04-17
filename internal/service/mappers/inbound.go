@@ -119,22 +119,30 @@ func (f *SourceUpdateForm) ToSource(source *model.Source) {
 	}
 }
 
-func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
+func (f *SourceUpdateForm) ToImageInfra(sourceID uuid.UUID) model.ImageInfra {
+	imageInfra := model.ImageInfra{
+		SourceID: sourceID,
+	}
+
 	if f.SshPublicKey != nil {
 		imageInfra.SshPublicKey = *f.SshPublicKey
 	}
 	if f.CertificateChain != nil {
 		imageInfra.CertificateChain = *f.CertificateChain
 	}
+
 	if f.HttpUrl != nil {
 		imageInfra.HttpProxyUrl = *f.HttpUrl
 	}
+
 	if f.HttpsUrl != nil {
 		imageInfra.HttpsProxyUrl = *f.HttpsUrl
 	}
+
 	if f.NoProxy != nil {
 		imageInfra.NoProxyDomains = *f.NoProxy
 	}
+
 	if f.IpAddress != nil {
 		imageInfra.IpAddress = *f.IpAddress
 	}
@@ -147,6 +155,8 @@ func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
 	if f.Dns != nil {
 		imageInfra.Dns = *f.Dns
 	}
+
+	return imageInfra
 }
 
 func (f *SourceUpdateForm) ToLabels() []model.Label {
