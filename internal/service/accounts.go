@@ -145,6 +145,15 @@ func (s *AccountsService) CreateMember(ctx context.Context, member model.Member)
 	if _, err := s.GetGroup(ctx, member.GroupID); err != nil {
 		return model.Member{}, err
 	}
+
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return model.Member{}, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
 	created, err := s.store.Accounts().CreateMember(ctx, member)
 	if err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
@@ -152,6 +161,19 @@ func (s *AccountsService) CreateMember(ctx context.Context, member model.Member)
 		}
 		return model.Member{}, err
 	}
+
+	// Write org membership relation for authz
+	updates := store.NewRelationshipBuilder().
+		With(model.NewOrgResource(member.GroupID.String()), model.MemberRelation, model.NewUserSubject(member.Username)).
+		Build()
+	if err := s.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return model.Member{}, fmt.Errorf("failed to write member authz relation: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return model.Member{}, err
+	}
+
 	return created, nil
 }
 
@@ -203,5 +225,29 @@ func (s *AccountsService) RemoveGroupMember(ctx context.Context, groupID uuid.UU
 		return NewErrMembershipMismatch(username, groupID)
 	}
 
-	return s.store.Accounts().DeleteMember(ctx, member.ID)
+	ctx, err = s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	if err := s.store.Accounts().DeleteMember(ctx, member.ID); err != nil {
+		return err
+	}
+
+	// Remove org membership relation from authz
+	updates := store.NewRelationshipBuilder().
+		Without(model.NewOrgResource(groupID.String()), model.MemberRelation, model.NewUserSubject(username)).
+		Build()
+	if err := s.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return fmt.Errorf("failed to remove member authz relation: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+
+	return nil
 }

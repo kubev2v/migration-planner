@@ -230,6 +230,40 @@ func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.
 	return parsed.JSON200, nil
 }
 
+// ShareAssessment shares an assessment with the user's partner organization
+func (s *plannerService) ShareAssessment(id uuid.UUID) (int, error) {
+	zap.S().Infof("[PlannerService] Share assessment %s [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.PostRequest(path.Join(apiV1AssessmentsPath, id.String(), "share"), nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, fmt.Errorf("failed to share assessment. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return res.StatusCode, nil
+}
+
+// UnshareAssessment unshares an assessment from the user's partner organization
+func (s *plannerService) UnshareAssessment(id uuid.UUID) (int, error) {
+	zap.S().Infof("[PlannerService] Unshare assessment %s [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
+
+	res, err := s.api.DeleteRequest(path.Join(apiV1AssessmentsPath, id.String(), "share"))
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(res.Body)
+		return res.StatusCode, fmt.Errorf("failed to unshare assessment. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(b)))
+	}
+	return res.StatusCode, nil
+}
+
 // RemoveAssessment deletes a specific assessment by ID
 func (s *plannerService) RemoveAssessment(id uuid.UUID) error {
 	zap.S().Infof("[PlannerService] Delete assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)

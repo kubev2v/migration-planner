@@ -39,7 +39,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAssessmentService(s, nil)
+		svc = service.NewAssessmentService(s, nil, service.NewAccountsService(s))
 	})
 
 	AfterAll(func() {
@@ -910,6 +910,159 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("ShareAssessment", func() {
+		var assessmentID uuid.UUID
+		var partnerGroupID uuid.UUID
+
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			partnerGroupID = uuid.New()
+
+			// Create assessment
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Share Test", "org1", "customer1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create partner group
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner Org', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+		})
+
+		It("shares assessment when user is a customer with a partner", func() {
+			// Create accepted partner customer record
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.ShareAssessment(ctx, assessmentID)
+
+			Expect(err).To(BeNil())
+
+			// Verify viewer relation was created
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org' AND subject_id = ?", assessmentID.String(), partnerGroupID.String()).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
+		})
+
+		It("is idempotent — sharing twice does not error", func() {
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.ShareAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+
+			err = svc.ShareAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+
+			// Still only one relation
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org'", assessmentID.String()).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
+		})
+
+		It("returns ErrNotACustomer when user has no partner", func() {
+			ctx := ctxWithUser("regular-user", "org1")
+			err := svc.ShareAssessment(ctx, assessmentID)
+
+			Expect(err).ToNot(BeNil())
+			var notCustomer *service.ErrNotACustomer
+			Expect(errors.As(err, &notCustomer)).To(BeTrue())
+		})
+
+		It("returns error when assessment does not exist", func() {
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.ShareAssessment(ctx, uuid.New())
+
+			Expect(err).ToNot(BeNil())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessments;")
+		})
+	})
+
+	Context("UnshareAssessment", func() {
+		var assessmentID uuid.UUID
+		var partnerGroupID uuid.UUID
+
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			partnerGroupID = uuid.New()
+
+			// Create assessment
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Unshare Test", "org1", "customer1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			// Create partner group
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner Org', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			// Create accepted partner customer record
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+		})
+
+		It("removes viewer relation when assessment is shared", func() {
+			// Set up the share first
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "org", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.UnshareAssessment(ctx, assessmentID)
+
+			Expect(err).To(BeNil())
+
+			// Verify viewer relation was removed
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org'", assessmentID.String()).Scan(&count)
+			Expect(count).To(Equal(int64(0)))
+		})
+
+		It("is idempotent — unsharing when not shared does not error", func() {
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.UnshareAssessment(ctx, assessmentID)
+
+			Expect(err).To(BeNil())
+		})
+
+		It("returns ErrNotACustomer when user has no partner", func() {
+			ctx := ctxWithUser("regular-user", "org1")
+			err := svc.UnshareAssessment(ctx, assessmentID)
+
+			Expect(err).ToNot(BeNil())
+			var notCustomer *service.ErrNotACustomer
+			Expect(errors.As(err, &notCustomer)).To(BeTrue())
+		})
+
+		It("returns error when assessment does not exist", func() {
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.UnshareAssessment(ctx, uuid.New())
+
+			Expect(err).ToNot(BeNil())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
 })
