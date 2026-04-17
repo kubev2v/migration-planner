@@ -9,6 +9,7 @@ var singleConfig *Config = nil
 type Config struct {
 	Database *dbConfig
 	Service  *svcConfig
+	S3       *S3
 }
 
 type dbConfig struct {
@@ -33,6 +34,13 @@ type svcConfig struct {
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
+}
+
+type S3 struct {
+	Endpoint      string `envconfig:"MIGRATION_PLANNER_S3_ENDPOINT" default:"localhost:9000"`
+	RvtoolsBucket string `envconfig:"MIGRATION_PLANNER_S3_BUCKET" default:"rvtools"`
+	AccessKey     string `envconfig:"MIGRATION_PLANNER_S3_ACCESS_KEY" default:"admin"`
+	SecretKey     string `envconfig:"MIGRATION_PLANNER_S3_SECRET_KEY" default:"password"`
 }
 
 type Auth struct {

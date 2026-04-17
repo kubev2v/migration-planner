@@ -6,8 +6,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"time"
+
+	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/google/uuid"
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
@@ -25,13 +30,15 @@ type RVToolsWorker struct {
 	river.WorkerDefaults[RVToolsJobArgs]
 	store     store.Store
 	validator duckdb_parser.Validator // Shared, stateless
+	s3        *config.S3
 }
 
 // NewRVToolsWorker creates a new RVTools worker.
-func NewRVToolsWorker(store store.Store, validator duckdb_parser.Validator) *RVToolsWorker {
+func NewRVToolsWorker(store store.Store, validator duckdb_parser.Validator, cfg *config.S3) *RVToolsWorker {
 	return &RVToolsWorker{
 		store:     store,
 		validator: validator,
+		s3:        cfg,
 	}
 }
 
@@ -79,26 +86,33 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
+	client, err := minio.New(w.s3.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(w.s3.AccessKey, w.s3.SecretKey, ""),
+		Secure: false,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create s3 client: %w", err)
+	}
+
+	defer func() {
+		_ = client.RemoveObject(
+			ctx,
+			w.s3.RvtoolsBucket,
+			job.Args.S3RvtoolsFileName,
+			minio.RemoveObjectOptions{},
+		)
+	}()
+
+	// Write file content to temp file for DuckDB ingestion
+	tempFilePath, cleanup, err := w.downloadToTempFile(ctx, client, job.Args.S3RvtoolsFileName)
+	defer cleanup()
+
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
 	}
 	defer func() { _ = duckDB.Close() }()
-
-	// Write file content to temp file for DuckDB ingestion
-	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_temp_file", err, fmt.Sprintf("failed to create temp file: %v", err))
-	}
-	tempFilePath := tempFile.Name()
-	defer func() { _ = os.Remove(tempFilePath) }()
-
-	if _, err := tempFile.Write(job.Args.FileContent); err != nil {
-		_ = tempFile.Close()
-		return w.failJob(ctx, logger, job.ID, "write_temp_file", err, fmt.Sprintf("failed to write temp file: %v", err))
-	}
-	_ = tempFile.Close()
 
 	// Update status to validating before ingestion (which includes OPA validation)
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {
@@ -149,39 +163,10 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("creating_assessment").Log()
 
-	// Build assessment model
-	assessment := model.Assessment{
-		ID:         uuid.New(),
-		Name:       job.Args.Name,
-		OrgID:      job.Args.OrgID,
-		Username:   job.Args.Username,
-		SourceType: "rvtools",
-	}
-	if job.Args.FirstName != "" {
-		assessment.OwnerFirstName = &job.Args.FirstName
-	}
-	if job.Args.LastName != "" {
-		assessment.OwnerLastName = &job.Args.LastName
-	}
-
-	createdAssessment, err := w.store.Assessment().Create(ctx, assessment, inventoryJSON)
+	createdAssessment, err := w.createAssessment(ctx, job.Args, inventoryJSON)
 	if err != nil {
-		var errMsg string
-		if errors.Is(err, store.ErrDuplicateKey) {
-			// Same format as service.NewErrAssessmentDuplicateName
-			errMsg = fmt.Sprintf("assessment with name '%s' already exists", assessment.Name)
-		} else {
-			errMsg = fmt.Sprintf("failed to create assessment: %v", err)
-		}
-		return w.failJob(ctx, logger, job.ID, "create_assessment", err, errMsg)
-	}
-
-	updates := store.NewRelationshipBuilder().
-		With(model.NewAssessmentResource(assessment.ID.String()), model.OwnerRelation, model.NewUserSubject(job.Args.Username)).
-		Build()
-
-	if err := w.store.Authz().WriteRelationships(ctx, updates); err != nil {
-		return fmt.Errorf("authz: failed to write owner relation: %w", err)
+		logger.Error(err).WithString("step", "save_assessment").Log()
+		return err
 	}
 
 	// Update job with assessment ID
@@ -195,6 +180,83 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		Log()
 
 	return nil
+}
+
+func (w *RVToolsWorker) downloadToTempFile(
+	ctx context.Context,
+	client *minio.Client,
+	S3FileName string,
+) (string, func(), error) {
+
+	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
+	if err != nil {
+		return "", nil, err
+	}
+
+	cleanup := func() {
+		_ = os.Remove(tempFile.Name())
+	}
+
+	obj, err := client.GetObject(ctx, w.s3.RvtoolsBucket, S3FileName, minio.GetObjectOptions{})
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	defer func() {
+		_ = obj.Close()
+	}()
+
+	if _, err := io.Copy(tempFile, obj); err != nil {
+		cleanup()
+		return "", nil, err
+	}
+
+	_ = tempFile.Close()
+
+	return tempFile.Name(), cleanup, nil
+}
+
+func (w *RVToolsWorker) createAssessment(
+	ctx context.Context,
+	args RVToolsJobArgs,
+	inventoryJSON []byte,
+) (*model.Assessment, error) {
+	// Build assessment model
+	assessment := model.Assessment{
+		ID:         uuid.New(),
+		Name:       args.Name,
+		OrgID:      args.OrgID,
+		Username:   args.Username,
+		SourceType: "rvtools",
+	}
+	if args.FirstName != "" {
+		assessment.OwnerFirstName = &args.FirstName
+	}
+	if args.LastName != "" {
+		assessment.OwnerLastName = &args.LastName
+	}
+
+	createdAssessment, err := w.store.Assessment().Create(ctx, assessment, inventoryJSON)
+	if err != nil {
+		var errMsg string
+		if errors.Is(err, store.ErrDuplicateKey) {
+			// Same format as service.NewErrAssessmentDuplicateName
+			errMsg = fmt.Sprintf("assessment with name '%s' already exists", assessment.Name)
+		} else {
+			errMsg = fmt.Sprintf("failed to create assessment: %v", err)
+		}
+		return nil, fmt.Errorf(errMsg)
+	}
+
+	updates := store.NewRelationshipBuilder().
+		With(model.NewAssessmentResource(assessment.ID.String()), model.OwnerRelation, model.NewUserSubject(args.Username)).
+		Build()
+
+	if err := w.store.Authz().WriteRelationships(ctx, updates); err != nil {
+		return nil, fmt.Errorf("authz: failed to write owner relation: %w", err)
+	}
+
+	return createdAssessment, nil
 }
 
 // updateJobStatus updates the job's metadata with the current status using job store.

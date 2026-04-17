@@ -30,6 +30,12 @@ PKG_MANAGER ?= apt
 SIZER_IMAGE ?= quay.io/redhat-user-workloads/odf-sizer-lib-tenant/sizer
 SIZER_IMAGE_TAG ?= latest
 SIZER_PORT ?= 9200
+MINIO_IMAGE ?= quay.io/minio/minio
+MINIO_IMAGE_TAG ?= latest
+MINIO_API_PORT ?= 9000
+MINIO_CONSOLE_PORT ?= 9001
+MINIO_ROOT_USER ?= admin
+MINIO_ROOT_PASSWORD ?= password
 
 # OPA Configuration for eval mode
 MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
@@ -54,14 +60,15 @@ help:
 	@echo "    run:                    run the service for development"
 	@echo "    setup-opa-policies:     download OPA policies from Forklift project"
 	@echo "    clean-opa-policies:     clean OPA policies directory"
-	@echo "    generate:        regenerate all generated files"
-	@echo "    tidy:            tidy go mod"
-	@echo "    lint:            run golangci-lint"
-	@echo "    build:           run all builds"
-	@echo "    clean:           clean up all containers and volumes"
-	@echo "    migrate:         run database migrations"
-	@echo "    run:             run the OpenShift Migration Advisor API service"
-	@echo "    integration-test: run e2e integration tests"
+	@echo "    generate:        	   regenerate all generated files"
+	@echo "    tidy:                   tidy go mod"
+	@echo "    lint:                   run golangci-lint"
+	@echo "    build:                  run all builds"
+	@echo "    clean:                  clean up all containers and volumes"
+	@echo "    migrate:                run database migrations"
+	@echo "    run:                    run the OpenShift Migration Advisor API service"
+	@echo "    integration-test:       run e2e integration tests"
+	@echo "    minio:                  run local MinIO (S3-compatible; default creds match MIGRATION_PLANNER_S3_*)"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OC_VERSION ?= 4.17.9
@@ -91,7 +98,7 @@ AIR := $(GOBIN)/air
 $(AIR):
 	@go install github.com/air-verse/air@v1.63.4
 
-run: $(AIR) image
+run: $(AIR) image minio
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
@@ -127,6 +134,18 @@ run-sizer:
 	@echo "   Health: http://localhost:$(SIZER_PORT)/health"
 	@echo "   API:    http://localhost:$(SIZER_PORT)/api/v1/size/custom"
 
+minio:
+	@echo "🚀 Starting MinIO (S3 API :$(MINIO_API_PORT), console :$(MINIO_CONSOLE_PORT))..."
+	@$(PODMAN) rm -f migration-planner-minio-local 2>/dev/null || true
+	@$(PODMAN) run -d --name migration-planner-minio-local \
+		-p $(MINIO_API_PORT):9000 \
+		-p $(MINIO_CONSOLE_PORT):9001 \
+		-e MINIO_ROOT_USER=$(MINIO_ROOT_USER) \
+		-e MINIO_ROOT_PASSWORD=$(MINIO_ROOT_PASSWORD) \
+		$(MINIO_IMAGE):$(MINIO_IMAGE_TAG) \
+		server /data --console-address ":9001"
+	@echo "✅ MinIO running at http://localhost:$(MINIO_API_PORT) (console: http://localhost:$(MINIO_CONSOLE_PORT))"
+	@echo "   Root user: $(MINIO_ROOT_USER)  Root password: $(MINIO_ROOT_PASSWORD)"
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -256,6 +275,8 @@ deploy-on-kind: oc
 		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/s3-secret-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/minio-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc wait --for=condition=available deployment/migration-planner-minio --timeout=120s -n "${MIGRATION_PLANNER_NAMESPACE}"; \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
@@ -269,6 +290,7 @@ deploy-on-kind: oc
 	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
 	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
 	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
+	   -p MIGRATION_PLANNER_S3_ENDPOINT=migration-planner-minio:9000 \
 	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	echo "*** OpenShift Migration Advisor has been deployed successfully on Kind ***"
 
@@ -291,6 +313,7 @@ delete-from-kind: oc
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f deploy/templates/s3-secret-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/minio-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml
@@ -415,7 +438,7 @@ test-agent-v2: submodules
 	@echo "✅ All agent-v2 Unit tests passed successfully."
 
 # Full unit test cycle: build, prepare DB, run tests, and clean up
-unit-test: build kill-db deploy-db migrate test test-agent-v2 kill-db
+unit-test: build kill-db deploy-db migrate minio test test-agent-v2 kill-db
 
 # Run integration tests using ginkgo
 integration-test: $(GINKGO)
@@ -454,7 +477,7 @@ clean-opa-policies:
 	@echo "Cleaning OPA policies..."
 	@rm -rf $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
 
-.PHONY: run-sizer
+.PHONY: run-sizer minio
 
 # include the deployment targets
 include deploy/deploy.mk

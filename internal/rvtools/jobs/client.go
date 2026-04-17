@@ -31,7 +31,7 @@ func NewClient(ctx context.Context, cfg *config.Config, s store.Store, opaValida
 
 	// Create worker with store and OPA validator (each job creates its own DuckDB instance)
 	// opa.Validator now directly implements duckdb_parser.Validator
-	worker := NewRVToolsWorker(s, opaValidator)
+	worker := NewRVToolsWorker(s, opaValidator, cfg.S3)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
