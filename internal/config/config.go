@@ -31,6 +31,8 @@ type svcConfig struct {
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
+	TempImagesDir        string `envconfig:"MIGRATION_PLANNER_GENERATED_OVA_FOLDER" default:"/tmp"`
+	TempImagesDirLimit   string `envconfig:"MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT" default:""`
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
 }

@@ -8,11 +8,11 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/image"
 	"github.com/kubev2v/migration-planner/pkg/version"
 )
 

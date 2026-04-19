@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/pkg/image"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -150,7 +150,7 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 		return err
 	}
 
-	if err := imageBuilder.Generate(ctx, output); err != nil {
+	if err := imageBuilder.Generate(output); err != nil {
 		return fmt.Errorf("failed to write image: %s", err)
 	}
 

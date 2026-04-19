@@ -3,37 +3,37 @@ package v1alpha1
 import (
 	"bytes"
 	"context"
-	"errors"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
-	"time"
+	"regexp"
 
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/google/uuid"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
-	"github.com/kubev2v/migration-planner/internal/auth"
-	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/image"
-	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/metrics"
-	"github.com/kubev2v/migration-planner/pkg/version"
+	imageService "github.com/kubev2v/migration-planner/internal/service"
 	"go.uber.org/zap"
 )
 
+type Key int
+
+// Keys for values stored in request context (openapi strict handlers).
+const (
+	ResponseWriterKey Key = iota
+	RequestKey
+)
+
+var jwtPayloadRegexp = regexp.MustCompile(`^.+\.(.+)\..+`)
+
 type ImageHandler struct {
-	store store.Store
-	cfg   *config.Config
+	imageService *imageService.ImageSvc
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
+func NewImageHandler(srv *imageService.ImageSvc) *ImageHandler {
 	return &ImageHandler{
-		store: store,
-		cfg:   cfg,
+		imageService: srv,
 	}
 }
 
@@ -42,140 +42,80 @@ func (h *ImageHandler) Health(ctx context.Context, request imageServer.HealthReq
 }
 
 func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.HeadImageByTokenRequestObject) (imageServer.HeadImageByTokenResponseObject, error) {
-	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
+	if err := h.imageService.ValidateToken(ctx, req.Token); err != nil {
 		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
 	}
 
-	sourceId, err := image.IdFromJWT(req.Token)
+	sourceId, err := IdFromJWT(req.Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
+		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
 	}
-	_, err = h.getSource(ctx, sourceId)
-	if err != nil {
-		return imageServer.HeadImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
+
+	if err := h.imageService.Validate(ctx, sourceId); err != nil {
+		return imageServer.HeadImageByToken400JSONResponse{Message: err.Error()}, nil
 	}
 
 	return imageServer.HeadImageByToken200Response{}, nil
 }
 
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {
-	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
-	if !ok {
+	writer, ok := ctx.Value(ResponseWriterKey).(http.ResponseWriter)
+	r, ok2 := ctx.Value(RequestKey).(*http.Request)
+	if !ok || !ok2 {
 		return imageServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
 
-	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
+	if err := h.imageService.ValidateToken(ctx, req.Token); err != nil {
 		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
 	}
 
-	sourceId, err := image.IdFromJWT(req.Token)
+	sourceId, err := IdFromJWT(req.Token)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
-	}
-	source, err := h.getSource(ctx, sourceId)
-	if err != nil {
-		return imageServer.GetImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
+		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
 	}
 
-	imageBuilder := image.NewImageBuilder(source.ID)
-	imageBuilder.WithImageInfra(source.ImageInfra)
-
-	if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
-		return imageServer.GetImageByToken500JSONResponse{}, nil
-	}
-
-	// Get image size
-	size, err := imageBuilder.Size()
+	filePath, etag, err := h.imageService.GenerateOVA(ctx, sourceId)
 	if err != nil {
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to read image size %s", err)}, nil
-	}
-
-	// Set proper headers of the OVA file:
-	writer.Header().Set("Content-Type", "application/ovf")
-	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
-	writer.Header().Set("Content-Length", strconv.FormatUint(size, 10))
-
-	err = imageBuilder.Generate(ctx, writer)
-	if err != nil {
-		metrics.IncreaseOvaDownloadsTotalMetric("failed")
 		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
+		return imageServer.GetImageByToken500JSONResponse{Message: err.Error()}, nil
 	}
 
-	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", req.Name))
+	writer.Header().Set("Content-Type", "application/ovf")
+	writer.Header().Set("ETag", fmt.Sprintf("%q", etag))
 
-	versionInfo := version.Get()
-	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
-		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName, "agent_git_commit", versionInfo.AgentGitCommit)
-	} else {
-		// Use detached context to ensure version persists even if client disconnects
-		persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
+	h.imageService.UpdateAgentVersion(sourceId)
 
-		// Use atomic update to prevent race conditions during concurrent downloads
-		if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
-			zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
-		} else {
-			zap.S().Named("image_service").Infow("stored agent version", "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
-		}
-	}
+	http.ServeFile(writer, r, filePath)
 
 	return imageServer.GetImageByToken200ApplicationovfResponse{Body: bytes.NewReader([]byte{})}, nil
 }
 
-func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {
-	// get the key associated with source orgID to generate agent token
-	key, err := storeInstance.PrivateKey().Get(ctx, source.OrgID)
+func IdFromJWT(jwt string) (string, error) {
+	match := jwtPayloadRegexp.FindStringSubmatch(jwt)
+
+	if len(match) != 2 {
+		return "", fmt.Errorf("failed to parse JWT from URL")
+	}
+
+	decoded, err := base64.RawStdEncoding.DecodeString(match[1])
 	if err != nil {
-		if !errors.Is(err, store.ErrRecordNotFound) {
-			return err
-		}
-		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
-		if err != nil {
-			return err
-		}
-		if _, err := storeInstance.PrivateKey().Create(ctx, *newKey); err != nil {
-			return err
-		}
-		imageBuilder.WithAgentToken(token)
-	} else {
-		token, err := auth.GenerateAgentJWT(key, source)
-		if err != nil {
-			return err
-		}
-		imageBuilder.WithAgentToken(token)
-	}
-	return nil
-}
-
-func (h *ImageHandler) getSourceKey(token *jwt.Token) (interface{}, error) {
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return nil, fmt.Errorf("malformed token claims")
+		return "", err
 	}
 
-	sourceId, ok := claims["sub"].(string)
-	if !ok {
-		return nil, fmt.Errorf("token missing 'sub' claim")
+	var p struct {
+		Sub string `json:"sub"`
 	}
 
-	source, err := h.getSource(context.TODO(), sourceId)
+	err = json.Unmarshal(decoded, &p)
 	if err != nil {
-		return imageServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
+		return "", err
 	}
 
-	return []byte(source.ImageInfra.ImageTokenKey), nil
-}
-
-func (h *ImageHandler) getSource(ctx context.Context, sourceId string) (*model.Source, error) {
-	sourceUUID, err := uuid.Parse(sourceId)
-	if err != nil {
-		return nil, fmt.Errorf("invalid source ID")
-	}
-	source, err := h.store.Source().Get(ctx, sourceUUID)
-	if err != nil {
-		return nil, fmt.Errorf("invalid source ID")
+	switch {
+	case p.Sub != "":
+		return p.Sub, nil
 	}
 
-	return source, nil
+	return "", fmt.Errorf("sub ID not found in token")
 }
