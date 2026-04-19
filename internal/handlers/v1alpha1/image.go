@@ -6,7 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -22,18 +23,25 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	defaultImageTTL           = 30 * time.Minute
+	defaultTmpGeneratedOvaDir = "/tmp"
+)
+
 type ImageHandler struct {
-	store store.Store
-	cfg   *config.Config
+	store   store.Store
+	cfg     *config.Config
+	cleaner *image.ImageCleaner
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
+func NewImageHandler(store store.Store, cfg *config.Config, cleaner *image.ImageCleaner) *ImageHandler {
 	return &ImageHandler{
-		store: store,
-		cfg:   cfg,
+		store:   store,
+		cfg:     cfg,
+		cleaner: cleaner,
 	}
 }
 
@@ -60,7 +68,8 @@ func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.Hea
 
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {
 	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
-	if !ok {
+	r, ok2 := ctx.Value(image.RequestKey).(*http.Request)
+	if !ok || !ok2 {
 		return imageServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
 
@@ -77,32 +86,45 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		return imageServer.GetImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
 	}
 
-	imageBuilder := image.NewImageBuilder(source.ID)
-	imageBuilder.WithImageInfra(source.ImageInfra)
+	imageBuilder := image.NewImageBuilder(source.ID).WithImageInfra(source.ImageInfra)
 
-	if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
-		return imageServer.GetImageByToken500JSONResponse{}, nil
-	}
-
-	// Get image size
-	size, err := imageBuilder.Size()
+	sha, err := imageBuilder.IgnitionSHA()
 	if err != nil {
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to read image size %s", err)}, nil
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to get ignition sha %s", err)}, nil
 	}
 
-	// Set proper headers of the OVA file:
+	tag := fmt.Sprintf("%s_%s", source.ID.String(), sha)
+
+	tmpfile := filepath.Join(defaultTmpGeneratedOvaDir, fmt.Sprintf("%s.ova", tag))
+	if _, err := os.Stat(tmpfile); err != nil && os.IsNotExist(err) {
+		f, err := os.Create(tmpfile)
+		if err != nil {
+			return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to create tmp file: %v", err)}, nil
+		}
+		defer func() {
+			_ = f.Close()
+			h.cleaner.Register(tmpfile, defaultImageTTL)
+		}()
+
+		if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
+			return imageServer.GetImageByToken500JSONResponse{}, nil
+		}
+
+		if err := imageBuilder.Generate(f); err != nil {
+			metrics.IncreaseOvaDownloadsTotalMetric("failed")
+			zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
+			return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
+		}
+		metrics.IncreaseOvaDownloadsTotalMetric("successful")
+	}
+
+	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", req.Name))
 	writer.Header().Set("Content-Type", "application/ovf")
-	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
-	writer.Header().Set("Content-Length", strconv.FormatUint(size, 10))
+	writer.Header().Set("ETag", fmt.Sprintf("%q", tag))
 
-	err = imageBuilder.Generate(ctx, writer)
-	if err != nil {
-		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
+	if err := serveOVAContent(writer, r, req.Name, tmpfile); err != nil {
+		return imageServer.GetImageByToken500JSONResponse{Message: "failed to serve ova file"}, nil
 	}
-
-	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
@@ -121,6 +143,25 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	}
 
 	return imageServer.GetImageByToken200ApplicationovfResponse{Body: bytes.NewReader([]byte{})}, nil
+}
+
+func serveOVAContent(w http.ResponseWriter, r *http.Request, attachmentName, tmpfile string) error {
+	f, err := os.Open(tmpfile)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	fi, err := f.Stat()
+	if err != nil {
+		return err
+	}
+
+	if fi.Size() == 0 {
+		return fmt.Errorf("cached image %s is empty", tmpfile)
+	}
+
+	http.ServeContent(w, r, attachmentName, fi.ModTime(), f)
+	return nil
 }
 
 func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {

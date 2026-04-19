@@ -23,7 +23,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -112,16 +111,6 @@ func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Middleware to inject ResponseWriter into context
-func WithResponseWriter(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add ResponseWriter to context
-		ctx := context.WithValue(r.Context(), image.ResponseWriterKey, w)
-		// Pass the modified context to the next handler
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 func (s *Server) Run(ctx context.Context) error {
 	zap.S().Named("api_server").Info("Initializing API server")
 	swagger, err := api.GetSwagger()
@@ -161,7 +150,6 @@ func (s *Server) Run(ctx context.Context) error {
 		chiMiddleware.Recoverer,
 		detectOldSchemaMiddleware,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		WithResponseWriter,
 	)
 
 	// Initialize sizer client
