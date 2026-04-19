@@ -110,7 +110,7 @@ var runCmd = &cobra.Command{
 		}()
 
 		// register metrics
-		metrics.RegisterMetrics(store)
+		metrics.RegisterMetrics(store, cfg.Service.TempImagesDir)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
 			return apiserver.New(cfg, store, l, opaValidator, jobsClient)

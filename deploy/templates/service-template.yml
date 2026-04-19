@@ -13,6 +13,11 @@ parameters:
     value: Always
   - name: IMAGE_TAG
     value: latest
+  - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER
+    value: /app/images
+  - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT
+    description: Size limit for the generated OVA cache volume.
+    value: "10Gi"
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_IMAGE
@@ -598,6 +603,10 @@ objects:
                   value: ${MIGRATION_PLANNER_LOG_LEVEL}
                 - name: RHCOS_PASSWORD
                   value: "${RHCOS_PASSWORD}"
+                - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER
+                  value: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER}
+                - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT
+                  value: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT}
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}
@@ -644,10 +653,15 @@ objects:
                   mountPath: "/.migration-planner"
                 - name: iso-storage
                   mountPath: /iso
+                - name: generated-ova-folder
+                  mountPath: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER}
           serviceAccountName: migration-planner
           volumes:
             - name: iso-storage
               emptyDir: {}
+            - name: generated-ova-folder
+              emptyDir:
+                sizeLimit: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT}
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi

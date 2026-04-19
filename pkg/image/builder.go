@@ -3,7 +3,9 @@ package image
 import (
 	"archive/tar"
 	"bytes"
-	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -18,11 +20,6 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
-
-type Key int
-
-// Key to store the ResponseWriter in the context of openapi
-const ResponseWriterKey Key = 0
 
 type ImageType int
 
@@ -124,27 +121,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 	return imageBuilder
 }
 
-func (b *ImageBuilder) Size() (uint64, error) {
-	ignitionContent, err := b.generateIgnition()
-	if err != nil {
-		return 0, err
-	}
-
-	// Generate ISO data reader with ignition content
-	reader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to read rhcos iso: %w", err)
-	}
-
-	size, err := b.computeSize(reader)
-	if err != nil {
-		return 0, err
-	}
-
-	return size, nil
-}
-
-func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
+func (b *ImageBuilder) Generate(w io.Writer) error {
 	ignitionContent, err := b.generateIgnition()
 	if err != nil {
 		return err
@@ -177,6 +154,18 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
+func (b *ImageBuilder) Etag() (string, error) {
+	ignData := b.ignitionData()
+	ignData.Token = "" // ignore the token that may vary
+	dataBytes, err := json.Marshal(ignData)
+	if err != nil {
+		return "", err
+	}
+
+	sum := sha256.Sum256(dataBytes)
+	return hex.EncodeToString(sum[:]), nil
+}
+
 func (b *ImageBuilder) Validate() error {
 	ignitionContent, err := b.generateIgnition()
 	if err != nil {
@@ -192,7 +181,25 @@ func (b *ImageBuilder) Validate() error {
 }
 
 func (b *ImageBuilder) generateIgnition() (string, error) {
-	ignData := IgnitionData{
+	var buf bytes.Buffer
+	t, err := template.New("ignition.template").ParseFiles(b.Template)
+	if err != nil {
+		return "", fmt.Errorf("failed to read the ignition template: %w", err)
+	}
+	if err := t.Execute(&buf, b.ignitionData()); err != nil {
+		return "", fmt.Errorf("failed to parse the ignition template: %w", err)
+	}
+
+	dataOut, _, err := config.TranslateBytes(buf.Bytes(), common.TranslateBytesOptions{})
+	if err != nil {
+		return "", fmt.Errorf("failed to translate config: %w", err)
+	}
+
+	return string(dataOut), nil
+}
+
+func (b *ImageBuilder) ignitionData() IgnitionData {
+	return IgnitionData{
 		DebugMode:            b.DebugMode,
 		SourceID:             b.SourceID,
 		SshKey:               b.SshKey,
@@ -210,22 +217,6 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		DefaultGateway:       b.VmNetwork.DefaultGateway,
 		Dns:                  b.VmNetwork.Dns,
 	}
-
-	var buf bytes.Buffer
-	t, err := template.New("ignition.template").ParseFiles(b.Template)
-	if err != nil {
-		return "", fmt.Errorf("failed to read the ignition template: %w", err)
-	}
-	if err := t.Execute(&buf, ignData); err != nil {
-		return "", fmt.Errorf("failed to parse the ignition template: %w", err)
-	}
-
-	dataOut, _, err := config.TranslateBytes(buf.Bytes(), common.TranslateBytesOptions{})
-	if err != nil {
-		return "", fmt.Errorf("failed to translate config: %w", err)
-	}
-
-	return string(dataOut), nil
 }
 
 func (b *ImageBuilder) writeIso(reader overlay.OverlayReader, tw *tar.Writer) error {
@@ -281,61 +272,6 @@ func (b *ImageBuilder) writeOvf(tw *tar.Writer) error {
 	}
 
 	return nil
-}
-
-func (b *ImageBuilder) ovfSize() (uint64, error) {
-	file, err := os.Open(b.OvfFile)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = file.Close() }()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	return b.calculateTarSize(uint64(fileInfo.Size())), nil
-}
-
-func (b *ImageBuilder) diskSize() (uint64, error) {
-	file, err := os.Open(b.PersistentDiskImage)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = file.Close() }()
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return 0, err
-	}
-
-	return b.calculateTarSize(uint64(fileInfo.Size())), nil
-}
-
-func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (uint64, error) {
-	length, err := reader.Seek(0, io.SeekEnd)
-	if err != nil {
-		return 0, err
-	}
-
-	// Reset the reader to start
-	_, err = reader.Seek(0, io.SeekStart)
-	if err != nil {
-		return 0, err
-	}
-
-	isoSize := b.calculateTarSize(uint64(length))
-
-	ovfSize, err := b.ovfSize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to compute ovf size: %s", err)
-	}
-
-	persistentDiskSize, err := b.diskSize()
-	if err != nil {
-		return 0, fmt.Errorf("failed to comute persistent disk size: %s", err)
-	}
-
-	return isoSize + ovfSize + persistentDiskSize, nil
 }
 
 func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder {
@@ -447,18 +383,6 @@ func (b *ImageBuilder) WithCertificateChain(certs string) *ImageBuilder {
 func (b *ImageBuilder) WithVmNetwork(network VmNetwork) *ImageBuilder {
 	b.VmNetwork = network
 	return b
-}
-
-func (b *ImageBuilder) calculateTarSize(contentSize uint64) uint64 {
-	const blockSize uint64 = 512
-
-	// Size of the tar header block
-	size := blockSize
-
-	// Size of the file content, rounded up to nearest 512 bytes
-	size += ((contentSize + blockSize - 1) / blockSize) * blockSize
-
-	return size
 }
 
 func (b *ImageBuilder) writePersistenceDisk(tw *tar.Writer) error {
