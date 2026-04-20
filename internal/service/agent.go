@@ -42,16 +42,18 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 		if errors.Is(err, store.ErrRecordNotFound) {
 			return nil, NewErrSourceNotFound(updateForm.SourceID)
 		}
-		return nil, fmt.Errorf("failed to fetch source: %s", err)
+		return nil, fmt.Errorf("failed to fetch source: %w", err)
 	}
 
+	// we want to treat "not found" as a 404 but surface any other DB error as
+	// an actual internal error, otherwise real infra problems end up looking
+	// like the client asked for something that does not exist.
 	agent, err := as.store.Agent().Get(ctx, updateForm.AgentID)
-	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return nil, NewErrAgentNotFound(updateForm.AgentID)
-	}
-
-	if agent == nil {
-		return nil, NewErrAgentNotFound(updateForm.AgentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrAgentNotFound(updateForm.AgentID)
+		}
+		return nil, fmt.Errorf("failed to fetch agent: %w", err)
 	}
 
 	// don't allow updates of sources not associated with this agent
@@ -67,7 +69,7 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
 	updatedSource, err := as.store.Source().Update(ctx, *source)
 	if err != nil {
-		return nil, fmt.Errorf("failed to update source: %s", err)
+		return nil, fmt.Errorf("failed to update source: %w", err)
 	}
 
 	return updatedSource, nil
@@ -81,25 +83,25 @@ func (as *AgentService) UpdateAgentStatus(ctx context.Context, updateForm mapper
 		if errors.Is(err, store.ErrRecordNotFound) {
 			return nil, false, NewErrSourceNotFound(updateForm.SourceID)
 		}
-		return nil, false, fmt.Errorf("failed to fetch source: %s", err)
+		return nil, false, fmt.Errorf("failed to fetch source: %w", err)
 	}
 
 	agent, err := as.store.Agent().Get(ctx, updateForm.ID)
 	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
-		return nil, false, fmt.Errorf("failed to fetch the agent: %s", err)
+		return nil, false, fmt.Errorf("failed to fetch the agent: %w", err)
 	}
 
 	if agent == nil {
 		a, err := as.store.Agent().Create(ctx, updateForm.ToModel())
 		if err != nil {
-			return nil, false, fmt.Errorf("failed to create the agent: %s", err)
+			return nil, false, fmt.Errorf("failed to create the agent: %w", err)
 		}
 
 		return a, true, nil
 	}
 
 	if _, err := as.store.Agent().Update(ctx, updateForm.ToModel()); err != nil {
-		return nil, false, fmt.Errorf("failed to update agent: %s", err)
+		return nil, false, fmt.Errorf("failed to update agent: %w", err)
 	}
 
 	// must not block here.
