@@ -155,7 +155,7 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		if bucket.VMCount == 0 {
 			continue
 		}
-		diskGB := bucket.TotalSizeTB * 1000
+		diskGB := bucket.TotalSizeTB * 1024
 		bucketParams := h.estimationSrv.BuildBucketParams(baseParams, bucket.VMCount, diskGB)
 		schemaResults, err := h.estimationSrv.RunEstimation(schemas, bucketParams)
 		if err != nil {

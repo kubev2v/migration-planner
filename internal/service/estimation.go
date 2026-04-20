@@ -414,7 +414,7 @@ func (es *EstimationService) BuildBaseParams(userParams []estimation.Param) []es
 }
 
 // BuildBucketParams returns params for a single complexity bucket.
-// diskGB = bucket.TotalSizeTB * 1000 (decimal TB as reported by VMware).
+// diskGB = bucket.TotalSizeTB * 1024 (TiB → GiB; matches DiskGB.Total unit in the regular path).
 func (es *EstimationService) BuildBucketParams(baseParams []estimation.Param, vmCount int, diskGB float64) []estimation.Param {
 	return mergeParams(baseParams, []estimation.Param{
 		{Key: calculators.ParamVMCount, Value: vmCount},

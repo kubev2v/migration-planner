@@ -87,11 +87,11 @@ SELECT
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN disk_count ELSE 0 END), 0)::integer as disk_count_migratable,
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN disk_count ELSE 0 END), 0)::integer as disk_count_migratable_warnings,
     COALESCE(SUM(CASE WHEN has_critical = 1 THEN disk_count ELSE 0 END), 0)::integer as disk_count_not_migratable,
-    -- Disk GB (round per-VM before summing to match old implementation)
-    COALESCE(SUM(ROUND(disk_mib / 1024.0)), 0)::integer as disk_gb_total,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_migratable,
-    COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_migratable_warnings,
-    COALESCE(SUM(CASE WHEN has_critical = 1 THEN ROUND(disk_mib / 1024.0) ELSE 0 END), 0)::integer as disk_gb_not_migratable,
+    -- Disk GB (sum MiB first, then round once to minimise rounding error)
+    COALESCE(ROUND(SUM(disk_mib) / 1024.0), 0)::integer as disk_gb_total,
+    COALESCE(ROUND(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_migratable,
+    COALESCE(ROUND(SUM(CASE WHEN has_critical = 0 AND has_warning = 1 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_migratable_warnings,
+    COALESCE(ROUND(SUM(CASE WHEN has_critical = 1 THEN disk_mib ELSE 0 END) / 1024.0), 0)::integer as disk_gb_not_migratable,
     -- NIC Count
     COALESCE(SUM(nic_count), 0)::integer as nic_total,
     COALESCE(SUM(CASE WHEN has_critical = 0 AND has_warning = 0 THEN nic_count ELSE 0 END), 0)::integer as nic_migratable,
