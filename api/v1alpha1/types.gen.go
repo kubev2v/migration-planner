@@ -691,11 +691,12 @@ type PartnerRequest struct {
 	AcceptedAt    *time.Time           `json:"acceptedAt"`
 	ContactName   string               `json:"contactName"`
 	ContactPhone  string               `json:"contactPhone"`
+	CreatedAt     time.Time            `json:"createdAt"`
 	Email         string               `json:"email"`
 	Id            openapi_types.UUID   `json:"id"`
 	Location      string               `json:"location"`
 	Name          string               `json:"name"`
-	PartnerId     openapi_types.UUID   `json:"partnerId"`
+	Partner       PartnerSummary       `json:"partner"`
 	Reason        *string              `json:"reason"`
 	RequestStatus PartnerRequestStatus `json:"requestStatus"`
 	TerminatedAt  *time.Time           `json:"terminatedAt"`
@@ -721,6 +722,14 @@ type PartnerRequestStatus string
 type PartnerRequestUpdate struct {
 	Reason *string              `json:"reason,omitempty"`
 	Status PartnerRequestStatus `json:"status"`
+}
+
+// PartnerSummary defines model for PartnerSummary.
+type PartnerSummary struct {
+	Company string             `json:"company"`
+	Icon    string             `json:"icon"`
+	Id      openapi_types.UUID `json:"id"`
+	Name    string             `json:"name"`
 }
 
 // SchemaEstimationResult Estimation results for a single schema

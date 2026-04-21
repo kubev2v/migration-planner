@@ -44,10 +44,21 @@ var _ = Describe("partner service", Ordered, func() {
 	})
 
 	Context("ListRequests", func() {
-		It("returns all requests for a user", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", "partner1", "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+		var partnerGroupID1, partnerGroupID2 uuid.UUID
+
+		BeforeEach(func() {
+			partnerGroupID1 = uuid.New()
+			partnerGroupID2 = uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID1, "Partner1", "desc", "partner", "icon", "Acme1", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", "partner2", "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID2, "Partner2", "desc", "partner", "icon", "Acme2", "NULL"))
+			Expect(tx.Error).To(BeNil())
+		})
+
+		It("returns all requests for a user", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID1, "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID2, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			partners, err := srv.ListRequests(context.TODO(), auth.User{Username: "user1"})
@@ -63,6 +74,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
@@ -137,7 +149,10 @@ var _ = Describe("partner service", Ordered, func() {
 		})
 
 		It("fails when user already has an accepted request", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", "partner1", "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			existingGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, existingGroupID, "Existing Partner", "desc", "partner", "icon", "Corp", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", existingGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			pc := model.PartnerCustomer{
@@ -148,14 +163,17 @@ var _ = Describe("partner service", Ordered, func() {
 				Location:     "Location1",
 			}
 
-			_, err := srv.CreateRequest(context.TODO(), auth.User{Username: "user1"}, "partner2", pc)
+			_, err := srv.CreateRequest(context.TODO(), auth.User{Username: "user1"}, uuid.New().String(), pc)
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrActiveRequestExists)
 			Expect(ok).To(BeTrue())
 		})
 
 		It("fails when user already has a pending request", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			existingGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, existingGroupID, "Existing Partner", "desc", "partner", "icon", "Corp", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", existingGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			pc := model.PartnerCustomer{
@@ -166,7 +184,7 @@ var _ = Describe("partner service", Ordered, func() {
 				Location:     "Location1",
 			}
 
-			_, err := srv.CreateRequest(context.TODO(), auth.User{Username: "user1"}, "partner2", pc)
+			_, err := srv.CreateRequest(context.TODO(), auth.User{Username: "user1"}, uuid.New().String(), pc)
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrActiveRequestExists)
 			Expect(ok).To(BeTrue())
@@ -259,9 +277,17 @@ var _ = Describe("partner service", Ordered, func() {
 	})
 
 	Context("UpdateRequest", func() {
+		var partnerGroupID uuid.UUID
+
+		BeforeEach(func() {
+			partnerGroupID = uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+		})
+
 		It("successfully updates status to accepted", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			updated, err := srv.UpdateRequest(context.TODO(), auth.User{Username: "partneruser"}, requestID, model.Request{
@@ -274,7 +300,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("fails to update an already accepted request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			_, err := srv.UpdateRequest(context.TODO(), auth.User{Username: "partneruser"}, requestID, model.Request{
@@ -288,7 +314,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("fails to update an already rejected request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			_, err := srv.UpdateRequest(context.TODO(), auth.User{Username: "partneruser"}, requestID, model.Request{
@@ -301,7 +327,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("fails to reject without reason", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			_, err := srv.UpdateRequest(context.TODO(), auth.User{Username: "partneruser"}, requestID, model.Request{
@@ -314,7 +340,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("successfully updates status to rejected with reason", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			updated, err := srv.UpdateRequest(context.TODO(), auth.User{Username: "partneruser"}, requestID, model.Request{
@@ -330,13 +356,22 @@ var _ = Describe("partner service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("CancelRequest", func() {
+		var partnerGroupID uuid.UUID
+
+		BeforeEach(func() {
+			partnerGroupID = uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+		})
+
 		It("successfully cancels a request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			err := srv.CancelRequest(context.TODO(), auth.User{Username: "user1"}, requestID)
@@ -350,7 +385,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("fails to cancel an accepted request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			err := srv.CancelRequest(context.TODO(), auth.User{Username: "user1"}, requestID)
@@ -361,7 +396,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("fails to cancel a rejected request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			err := srv.CancelRequest(context.TODO(), auth.User{Username: "user1"}, requestID)
@@ -372,7 +407,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		It("returns not found when request belongs to another user", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			err := srv.CancelRequest(context.TODO(), auth.User{Username: "otheruser"}, requestID)
@@ -383,6 +418,7 @@ var _ = Describe("partner service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 

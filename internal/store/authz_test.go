@@ -32,6 +32,10 @@ var _ = Describe("authz store", Ordered, func() {
 	})
 
 	Context("WriteRelationships", func() {
+		BeforeEach(func() {
+			gormdb.Exec("DELETE FROM relations")
+		})
+
 		It("writes owner relation", func() {
 			updates := store.NewRelationshipBuilder().
 				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
