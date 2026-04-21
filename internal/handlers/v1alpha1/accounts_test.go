@@ -111,7 +111,10 @@ var _ = Describe("accounts handler", Ordered, func() {
 		})
 
 		It("returns customer identity when user has accepted partner request", func() {
-			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customeruser', 'partner1', 'accepted', 'Name', 'Contact', '555-0001', 'c@example.com', 'Location')", uuid.New()))
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, partnerGroupID, "Customer Partner", "desc", "partner", "icon", "CustPartnerCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customeruser', '%s', 'accepted', 'Name', 'Contact', '555-0001', 'c@example.com', 'Location')", uuid.New(), partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
 			authUser := auth.User{Username: "customeruser", Organization: "jwt-org"}
@@ -125,11 +128,14 @@ var _ = Describe("accounts handler", Ordered, func() {
 			Expect(string(body.Kind)).To(Equal("customer"))
 			Expect(body.GroupId).To(BeNil())
 			Expect(body.PartnerId).ToNot(BeNil())
-			Expect(*body.PartnerId).To(Equal("partner1"))
+			Expect(*body.PartnerId).To(Equal(partnerGroupID.String()))
 		})
 
 		It("returns regular when partner request is pending", func() {
-			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'pendinguser', 'partner1', 'pending', 'Name', 'Contact', '555-0001', 'p@example.com', 'Location')", uuid.New()))
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, partnerGroupID, "Pending Partner", "desc", "partner", "icon", "PendPartnerCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'pendinguser', '%s', 'pending', 'Name', 'Contact', '555-0001', 'p@example.com', 'Location')", uuid.New(), partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
 			authUser := auth.User{Username: "pendinguser", Organization: "jwt-org"}

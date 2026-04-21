@@ -6,7 +6,6 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type PartnerCustomer interface {
@@ -28,7 +27,7 @@ func NewPartnerCustomerStore(db *gorm.DB) PartnerCustomer {
 
 func (p *PartnerCustomerStore) List(ctx context.Context, filter *PartnerQueryFilter) (model.PartnerCustomerList, error) {
 	var partners model.PartnerCustomerList
-	tx := p.getDB(ctx).Model(&partners)
+	tx := p.getDB(ctx).Model(&partners).Preload("Partner")
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -44,19 +43,26 @@ func (p *PartnerCustomerStore) List(ctx context.Context, filter *PartnerQueryFil
 }
 
 func (p *PartnerCustomerStore) Create(ctx context.Context, pc model.PartnerCustomer) (*model.PartnerCustomer, error) {
-	result := p.getDB(ctx).Clauses(clause.Returning{}).Create(&pc)
-	if result.Error != nil {
-		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
-			return nil, ErrDuplicateKey
+	var created model.PartnerCustomer
+	err := p.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if result := tx.Create(&pc); result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+				return ErrDuplicateKey
+			}
+			return result.Error
 		}
-		return nil, result.Error
+		result := tx.Preload("Partner").First(&created, "id = ?", pc.ID)
+		return result.Error
+	})
+	if err != nil {
+		return nil, err
 	}
-	return &pc, nil
+	return &created, nil
 }
 
 func (p *PartnerCustomerStore) Get(ctx context.Context, filter *PartnerQueryFilter) (*model.PartnerCustomer, error) {
 	var pc model.PartnerCustomer
-	tx := p.getDB(ctx)
+	tx := p.getDB(ctx).Preload("Partner")
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -75,11 +81,18 @@ func (p *PartnerCustomerStore) Get(ctx context.Context, filter *PartnerQueryFilt
 }
 
 func (p *PartnerCustomerStore) Update(ctx context.Context, pc model.PartnerCustomer) (*model.PartnerCustomer, error) {
-	result := p.getDB(ctx).Model(&pc).Clauses(clause.Returning{}).Select("request_status", "reason", "accepted_at", "terminated_at").Updates(&pc)
-	if result.Error != nil {
-		return nil, result.Error
+	var updated model.PartnerCustomer
+	err := p.getDB(ctx).Transaction(func(tx *gorm.DB) error {
+		if result := tx.Model(&pc).Select("request_status", "reason", "accepted_at", "terminated_at").Updates(&pc); result.Error != nil {
+			return result.Error
+		}
+		result := tx.Preload("Partner").First(&updated, "id = ?", pc.ID)
+		return result.Error
+	})
+	if err != nil {
+		return nil, err
 	}
-	return &pc, nil
+	return &updated, nil
 }
 
 func (p *PartnerCustomerStore) getDB(ctx context.Context) *gorm.DB {

@@ -22,7 +22,7 @@ const (
 type PartnerCustomer struct {
 	ID            uuid.UUID     `gorm:"primaryKey;column:id;type:VARCHAR(255);"`
 	Username      string        `gorm:"not null;type:VARCHAR(100)"`
-	PartnerID     string        `gorm:"not null;type:VARCHAR(100)"`
+	PartnerID     string        `gorm:"not null;type:VARCHAR(255)"`
 	RequestStatus RequestStatus `gorm:"not null;type:request_status;default:'pending'"`
 	Name          string        `gorm:"not null;type:VARCHAR(100)"`
 	ContactName   string        `gorm:"not null;type:VARCHAR(100)"`
@@ -32,6 +32,8 @@ type PartnerCustomer struct {
 	Reason        *string       `gorm:"type:VARCHAR(255)"`
 	AcceptedAt    *time.Time    `gorm:"type:TIMESTAMPTZ"`
 	TerminatedAt  *time.Time    `gorm:"type:TIMESTAMPTZ"`
+	CreatedAt     time.Time     `gorm:"not null;default:now();type:TIMESTAMPTZ"`
+	Partner       *Group        `gorm:"foreignKey:PartnerID;references:ID"`
 }
 
 type Request struct {

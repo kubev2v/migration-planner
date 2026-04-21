@@ -44,8 +44,13 @@ func (h *ServiceHandler) ListPartnerRequests(ctx context.Context, request server
 		return server.ListPartnerRequests500JSONResponse{Message: fmt.Sprintf("failed to list requests: %v", err)}, nil
 	}
 
+	result, err := mappers.PartnerRequestListToApi(requests)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.ListPartnerRequests500JSONResponse{Message: fmt.Sprintf("failed to map requests: %v", err)}, nil
+	}
 	logger.Success().WithInt("count", len(requests)).Log()
-	return server.ListPartnerRequests200JSONResponse(mappers.PartnerRequestListToApi(requests)), nil
+	return server.ListPartnerRequests200JSONResponse(result), nil
 }
 
 // (POST /api/v1/partners/{id}/request)
@@ -80,8 +85,13 @@ func (h *ServiceHandler) CreatePartnerRequest(ctx context.Context, request serve
 		}
 	}
 
+	result, err := mappers.PartnerRequestToApi(*created)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.CreatePartnerRequest500JSONResponse{Message: fmt.Sprintf("failed to map request: %v", err)}, nil
+	}
 	logger.Success().WithString("username", created.Username).Log()
-	return server.CreatePartnerRequest201JSONResponse(mappers.PartnerRequestToApi(*created)), nil
+	return server.CreatePartnerRequest201JSONResponse(result), nil
 }
 
 // (DELETE /api/v1/partners/requests/{id})
@@ -183,8 +193,13 @@ func (h *ServiceHandler) ListCustomers(ctx context.Context, request server.ListC
 		}
 	}
 
+	result, err := mappers.PartnerRequestListToApi(customers)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.ListCustomers500JSONResponse{Message: fmt.Sprintf("failed to map customers: %v", err)}, nil
+	}
 	logger.Success().WithInt("count", len(customers)).Log()
-	return server.ListCustomers200JSONResponse(mappers.PartnerRequestListToApi(customers)), nil
+	return server.ListCustomers200JSONResponse(result), nil
 }
 
 // (PUT /api/v1/partners/requests/{id})
@@ -223,8 +238,13 @@ func (h *ServiceHandler) UpdatePartnerRequest(ctx context.Context, request serve
 		}
 	}
 
+	result, err := mappers.PartnerRequestToApi(*updated)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.UpdatePartnerRequest500JSONResponse{Message: fmt.Sprintf("failed to map request: %v", err)}, nil
+	}
 	logger.Success().WithString("username", updated.Username).WithString("status", string(updated.RequestStatus)).Log()
-	return server.UpdatePartnerRequest200JSONResponse(mappers.PartnerRequestToApi(*updated)), nil
+	return server.UpdatePartnerRequest200JSONResponse(result), nil
 }
 
 // (DELETE /api/v1/customers/{username})

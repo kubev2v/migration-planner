@@ -14,7 +14,8 @@ import (
 )
 
 const (
-	insertPartnerStm = "INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');"
+	insertPartnerStm      = "INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');"
+	insertPartnerGroupStm = "INSERT INTO groups (id, name, description, kind, icon, company) VALUES ('%s', '%s', 'desc', 'partner', 'icon', '%s');"
 )
 
 var _ = Describe("partner store", Ordered, func() {
@@ -38,10 +39,19 @@ var _ = Describe("partner store", Ordered, func() {
 	})
 
 	Context("list", func() {
+		var partner1ID, partner2ID uuid.UUID
+
+		BeforeEach(func() {
+			partner1ID = uuid.New()
+			partner2ID = uuid.New()
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partner1ID, "Partner1", "Acme1"))
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partner2ID, "Partner2", "Acme2"))
+		})
+
 		It("successfully list all partners", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partner1ID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", "partner2", "accepted", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", partner2ID, "accepted", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
 			Expect(tx.Error).To(BeNil())
 
 			partners, err := s.PartnerCustomer().List(context.TODO(), store.NewPartnerQueryFilter())
@@ -56,9 +66,9 @@ var _ = Describe("partner store", Ordered, func() {
 		})
 
 		It("successfully list partners filtered by username", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partner1ID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", "partner2", "pending", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", partner2ID, "pending", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
 			Expect(tx.Error).To(BeNil())
 
 			partners, err := s.PartnerCustomer().List(context.TODO(), store.NewPartnerQueryFilter().ByUsername("user1"))
@@ -68,21 +78,21 @@ var _ = Describe("partner store", Ordered, func() {
 		})
 
 		It("successfully list partners filtered by partner_id", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partner1ID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", "partner2", "pending", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", partner2ID, "pending", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
 			Expect(tx.Error).To(BeNil())
 
-			partners, err := s.PartnerCustomer().List(context.TODO(), store.NewPartnerQueryFilter().ByPartnerID("partner2"))
+			partners, err := s.PartnerCustomer().List(context.TODO(), store.NewPartnerQueryFilter().ByPartnerID(partner2ID.String()))
 			Expect(err).To(BeNil())
 			Expect(partners).To(HaveLen(1))
-			Expect(partners[0].PartnerID).To(Equal("partner2"))
+			Expect(partners[0].PartnerID).To(Equal(partner2ID.String()))
 		})
 
 		It("successfully list partners filtered by status", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partner1ID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", "partner2", "accepted", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user2", partner2ID, "accepted", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
 			Expect(tx.Error).To(BeNil())
 
 			partners, err := s.PartnerCustomer().List(context.TODO(), store.NewPartnerQueryFilter().ByStatus(model.RequestStatusAccepted))
@@ -93,15 +103,23 @@ var _ = Describe("partner store", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("create", func() {
+		var partnerID uuid.UUID
+
+		BeforeEach(func() {
+			partnerID = uuid.New()
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerID, "TestPartner", "TestCo"))
+		})
+
 		It("successfully creates a partner", func() {
 			pc := model.PartnerCustomer{
 				ID:           uuid.New(),
 				Username:     "testuser",
-				PartnerID:    "partner123",
+				PartnerID:    partnerID.String(),
 				Name:         "Test Partner",
 				ContactName:  "John Doe",
 				ContactPhone: "555-1234",
@@ -125,7 +143,7 @@ var _ = Describe("partner store", Ordered, func() {
 			pc := model.PartnerCustomer{
 				ID:           uuid.New(),
 				Username:     "testuser",
-				PartnerID:    "partner123",
+				PartnerID:    partnerID.String(),
 				Name:         "Test Partner",
 				ContactName:  "John Doe",
 				ContactPhone: "555-1234",
@@ -139,7 +157,7 @@ var _ = Describe("partner store", Ordered, func() {
 			pc2 := model.PartnerCustomer{
 				ID:           uuid.New(),
 				Username:     "testuser",
-				PartnerID:    "partner123",
+				PartnerID:    partnerID.String(),
 				Name:         "Another Partner",
 				ContactName:  "Jane Doe",
 				ContactPhone: "555-5678",
@@ -153,12 +171,20 @@ var _ = Describe("partner store", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("get", func() {
+		var partnerID uuid.UUID
+
+		BeforeEach(func() {
+			partnerID = uuid.New()
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerID, "Partner1", "Acme1"))
+		})
+
 		It("successfully get a partner by username", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partnerID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			partner, err := s.PartnerCustomer().Get(context.TODO(), store.NewPartnerQueryFilter().ByUsername("user1"))
@@ -168,13 +194,13 @@ var _ = Describe("partner store", Ordered, func() {
 		})
 
 		It("successfully get a partner by partner_id", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, uuid.New(), "user1", partnerID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
-			partner, err := s.PartnerCustomer().Get(context.TODO(), store.NewPartnerQueryFilter().ByPartnerID("partner1"))
+			partner, err := s.PartnerCustomer().Get(context.TODO(), store.NewPartnerQueryFilter().ByPartnerID(partnerID.String()))
 			Expect(err).To(BeNil())
 			Expect(partner).ToNot(BeNil())
-			Expect(partner.PartnerID).To(Equal("partner1"))
+			Expect(partner.PartnerID).To(Equal(partnerID.String()))
 		})
 
 		It("failed get a partner -- partner does not exist", func() {
@@ -186,13 +212,21 @@ var _ = Describe("partner store", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("update", func() {
+		var partnerID uuid.UUID
+
+		BeforeEach(func() {
+			partnerID = uuid.New()
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerID, "Partner1", "Acme1"))
+		})
+
 		It("successfully update request_status", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, requestID, "user1", partnerID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			updated, err := s.PartnerCustomer().Update(context.TODO(), model.PartnerCustomer{
@@ -206,13 +240,21 @@ var _ = Describe("partner store", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("cancel", func() {
+		var partnerID uuid.UUID
+
+		BeforeEach(func() {
+			partnerID = uuid.New()
+			gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerID, "Partner1", "Acme1"))
+		})
+
 		It("successfully cancels a partner request", func() {
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, requestID, "user1", "partner1", "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerStm, requestID, "user1", partnerID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
 
 			updated, err := s.PartnerCustomer().Update(context.TODO(), model.PartnerCustomer{
@@ -230,6 +272,7 @@ var _ = Describe("partner store", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 })

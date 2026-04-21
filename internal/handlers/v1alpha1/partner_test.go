@@ -96,7 +96,11 @@ var _ = Describe("partner handler", Ordered, func() {
 
 			created := resp.(server.CreatePartnerRequest201JSONResponse)
 			Expect(created.Username).To(Equal("regularuser"))
-			Expect(created.PartnerId).To(Equal(partnerGroupID))
+			Expect(created.Partner.Id).To(Equal(partnerGroupID))
+			Expect(created.Partner.Name).To(Equal("Partner Org"))
+			Expect(created.Partner.Company).To(Equal("Acme"))
+			Expect(created.Partner.Icon).To(Equal("icon"))
+			Expect(created.CreatedAt).ToNot(BeZero())
 			Expect(created.RequestStatus).To(Equal(api.PartnerRequestStatusPending))
 		})
 
@@ -163,11 +167,18 @@ var _ = Describe("partner handler", Ordered, func() {
 
 	Context("ListPartnerRequests", func() {
 		It("returns all requests for the authenticated user", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "user1", "partner1", "pending", "Co", "J", "555", "j@e.com", "NY"))
+			partner1ID := uuid.New()
+			partner2ID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerGroupStm, partner1ID, "Partner1", "desc", "partner", "icon1", "Acme1", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "user1", "partner2", "rejected", "Co", "J", "555", "j@e.com", "NY"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerGroupStm, partner2ID, "Partner2", "desc", "partner", "icon2", "Acme2", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "otheruser", "partner1", "pending", "Co", "J", "555", "j@e.com", "NY"))
+
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "user1", partner1ID, "pending", "Co", "J", "555", "j@e.com", "NY"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "user1", partner2ID, "rejected", "Co", "J", "555", "j@e.com", "NY"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, uuid.New(), "otheruser", partner1ID, "pending", "Co", "J", "555", "j@e.com", "NY"))
 			Expect(tx.Error).To(BeNil())
 
 			authUser := auth.User{Username: "user1", Organization: "org"}
@@ -182,13 +193,18 @@ var _ = Describe("partner handler", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
 	Context("CancelPartnerRequest", func() {
 		It("cancels a pending request", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, requestID, "user1", "partner1", "pending", "Co", "J", "555", "j@e.com", "NY"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, requestID, "user1", partnerGroupID, "pending", "Co", "J", "555", "j@e.com", "NY"))
 			Expect(tx.Error).To(BeNil())
 
 			authUser := auth.User{Username: "user1", Organization: "org"}
@@ -206,6 +222,7 @@ var _ = Describe("partner handler", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
 
@@ -413,8 +430,12 @@ var _ = Describe("partner handler", Ordered, func() {
 		})
 
 		It("returns 403 when non-partner user updates request", func() {
+			someGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerGroupStm, someGroupID, "Some Org", "desc", "partner", "icon", "SomeCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+
 			requestID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, requestID, "cust1", uuid.New(), "pending", "Co", "J", "555", "c@e.com", "NY"))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerHandlerCustomerStm, requestID, "cust1", someGroupID, "pending", "Co", "J", "555", "c@e.com", "NY"))
 			Expect(tx.Error).To(BeNil())
 
 			authUser := auth.User{Username: "regularuser", Organization: "org"}

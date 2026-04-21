@@ -3456,9 +3456,8 @@ components:
           format: uuid
         username:
           type: string
-        partnerId:
-          type: string
-          format: uuid
+        partner:
+          $ref: "#/components/schemas/PartnerSummary"
         requestStatus:
           $ref: "#/components/schemas/PartnerRequestStatus"
         name:
@@ -3482,16 +3481,38 @@ components:
           type: string
           format: date-time
           nullable: true
+        createdAt:
+          type: string
+          format: date-time
       required:
         - id
         - username
-        - partnerId
+        - partner
         - requestStatus
         - name
         - contactName
         - contactPhone
         - email
         - location
+        - createdAt
+
+    PartnerSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        company:
+          type: string
+        icon:
+          type: string
+      required:
+        - id
+        - name
+        - company
+        - icon
 
     PartnerRequestCreate:
       type: object
