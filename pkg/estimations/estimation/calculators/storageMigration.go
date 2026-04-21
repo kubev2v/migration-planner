@@ -97,5 +97,5 @@ func (c *StorageMigration) Calculate(params map[string]estimation.Param) (estima
 	minsPer500GB := (500.0 * 1024.0) / transferRateMBps / 60.0
 	duration := time.Duration(totalMinutes * float64(time.Minute))
 
-	return estimation.NewPointEstimation(duration, fmt.Sprintf("%.2f GB at %.0f Mbps (%.0f min/500GB)", totalGB, transferRateMbps, minsPer500GB)), nil
+	return estimation.NewPointEstimation(duration, fmt.Sprintf("%.2f GB at %g Mbps (%.0f min/500GB)", totalGB, transferRateMbps, minsPer500GB)), nil
 }
