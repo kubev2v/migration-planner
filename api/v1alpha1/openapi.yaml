@@ -1880,7 +1880,7 @@ paths:
     get:
       tags:
         - partner
-      description: List customer requests for my partner organization
+      description: List customers for my partner organization
       operationId: listCustomers
       responses:
         "200":
@@ -1888,7 +1888,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PartnerRequestList"
+                $ref: "#/components/schemas/CustomerList"
         "400":
           description: Bad Request
           content:
@@ -3564,3 +3564,31 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/PartnerRequest"
+
+    Customer:
+      type: object
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+        contactName:
+          type: string
+        contactPhone:
+          type: string
+        email:
+          type: string
+        location:
+          type: string
+      required:
+        - username
+        - name
+        - contactName
+        - contactPhone
+        - email
+        - location
+
+    CustomerList:
+      type: array
+      items:
+        $ref: "#/components/schemas/Customer"

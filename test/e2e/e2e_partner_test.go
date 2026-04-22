@@ -115,11 +115,10 @@ var _ = Describe("e2e-partner", func() {
 			}
 			Expect(found).To(BeTrue())
 
-			// Partner sees the pending request
+			// Partner sees no customers yet (pending requests are not customers)
 			customers, err := partnerSvc.ListCustomers()
 			Expect(err).To(BeNil())
-			Expect(*customers).To(HaveLen(1))
-			Expect((*customers)[0].RequestStatus).To(Equal(v1alpha1.PartnerRequestStatusPending))
+			Expect(*customers).To(HaveLen(0))
 
 			// Partner accepts the request
 			updated, statusCode, err := partnerSvc.UpdatePartnerRequest(request.Id, v1alpha1.PartnerRequestUpdate{
@@ -235,11 +234,10 @@ var _ = Describe("e2e-partner", func() {
 			err = partnerSvc.RemoveCustomer("regularuser")
 			Expect(err).To(BeNil())
 
-			// Partner sees the cancelled record
+			// Partner sees no customers (removed customer is no longer accepted)
 			customers, err := partnerSvc.ListCustomers()
 			Expect(err).To(BeNil())
-			Expect(*customers).To(HaveLen(1))
-			Expect((*customers)[0].RequestStatus).To(Equal(v1alpha1.PartnerRequestStatusCancelled))
+			Expect(*customers).To(HaveLen(0))
 
 			// User is regular again
 			identity, err = userSvc.GetIdentity()

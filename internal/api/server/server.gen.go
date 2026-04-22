@@ -2638,7 +2638,7 @@ type ListCustomersResponseObject interface {
 	VisitListCustomersResponse(w http.ResponseWriter) error
 }
 
-type ListCustomers200JSONResponse PartnerRequestList
+type ListCustomers200JSONResponse CustomerList
 
 func (response ListCustomers200JSONResponse) VisitListCustomersResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")

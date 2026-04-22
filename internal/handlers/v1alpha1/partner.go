@@ -193,11 +193,7 @@ func (h *ServiceHandler) ListCustomers(ctx context.Context, request server.ListC
 		}
 	}
 
-	result, err := mappers.PartnerRequestListToApi(customers)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.ListCustomers500JSONResponse{Message: fmt.Sprintf("failed to map customers: %v", err)}, nil
-	}
+	result := mappers.CustomerListToApi(customers)
 	logger.Success().WithInt("count", len(customers)).Log()
 	return server.ListCustomers200JSONResponse(result), nil
 }

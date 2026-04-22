@@ -162,7 +162,7 @@ func (s *plannerService) LeavePartner(partnerID uuid.UUID) error {
 	return nil
 }
 
-func (s *plannerService) ListCustomers() (*v1alpha1.PartnerRequestList, error) {
+func (s *plannerService) ListCustomers() (*v1alpha1.CustomerList, error) {
 	zap.S().Infof("[PlannerService] List customers [user: %s]", s.credentials.Username)
 
 	res, err := s.api.GetRequest(apiV1CustomersPath)

@@ -60,3 +60,22 @@ func PartnerRequestListToApi(pcs model.PartnerCustomerList) (api.PartnerRequestL
 	}
 	return result, nil
 }
+
+func CustomerToApi(pc model.PartnerCustomer) api.Customer {
+	return api.Customer{
+		Username:     pc.Username,
+		Name:         pc.Name,
+		ContactName:  pc.ContactName,
+		ContactPhone: pc.ContactPhone,
+		Email:        pc.Email,
+		Location:     pc.Location,
+	}
+}
+
+func CustomerListToApi(pcs model.PartnerCustomerList) api.CustomerList {
+	result := make(api.CustomerList, len(pcs))
+	for i, pc := range pcs {
+		result[i] = CustomerToApi(pc)
+	}
+	return result
+}
