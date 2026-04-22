@@ -3326,7 +3326,7 @@ func (r ShareAssessmentResponse) StatusCode() int {
 type ListCustomersResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
-	JSON200      *PartnerRequestList
+	JSON200      *CustomerList
 	JSON400      *Error
 	JSON401      *Error
 	JSON403      *Error
@@ -5495,7 +5495,7 @@ func ParseListCustomersResponse(rsp *http.Response) (*ListCustomersResponse, err
 
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest PartnerRequestList
+		var dest CustomerList
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

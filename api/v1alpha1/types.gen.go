@@ -346,6 +346,19 @@ type ComplexityOSScoreEntry struct {
 	VmCount int `json:"vmCount"`
 }
 
+// Customer defines model for Customer.
+type Customer struct {
+	ContactName  string `json:"contactName"`
+	ContactPhone string `json:"contactPhone"`
+	Email        string `json:"email"`
+	Location     string `json:"location"`
+	Name         string `json:"name"`
+	Username     string `json:"username"`
+}
+
+// CustomerList defines model for CustomerList.
+type CustomerList = []Customer
+
 // Datastore defines model for Datastore.
 type Datastore struct {
 	DiskId                  string `json:"diskId"`

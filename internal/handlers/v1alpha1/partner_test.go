@@ -299,7 +299,7 @@ var _ = Describe("partner handler", Ordered, func() {
 	})
 
 	Context("ListCustomers", func() {
-		It("returns customers for a partner user", func() {
+		It("returns only accepted customers for a partner user", func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerHandlerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
@@ -317,7 +317,10 @@ var _ = Describe("partner handler", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			body := resp.(server.ListCustomers200JSONResponse)
-			Expect(body).To(HaveLen(2))
+			Expect(body).To(HaveLen(1))
+			Expect(body[0].Username).To(Equal("cust1"))
+			Expect(body[0].Name).To(Equal("Co1"))
+			Expect(body[0].Email).To(Equal("c1@e.com"))
 		})
 
 		It("returns 403 when user is not a partner", func() {

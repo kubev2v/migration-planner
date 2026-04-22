@@ -165,7 +165,7 @@ func (s *PartnerService) ListCustomers(ctx context.Context, user auth.User) (mod
 	if err != nil {
 		return nil, err
 	}
-	return s.store.PartnerCustomer().List(ctx, store.NewPartnerQueryFilter().ByPartnerID(*identity.GroupID))
+	return s.store.PartnerCustomer().List(ctx, store.NewPartnerQueryFilter().ByPartnerID(*identity.GroupID).ByStatus(model.RequestStatusAccepted))
 }
 
 // UpdateRequest accepts or rejects a customer request.

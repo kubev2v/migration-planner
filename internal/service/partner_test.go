@@ -422,6 +422,33 @@ var _ = Describe("partner service", Ordered, func() {
 		})
 	})
 
+	Context("ListCustomers", func() {
+		It("returns only accepted customers", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user2", partnerGroupID, "pending", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user3", partnerGroupID, "rejected", "Name3", "Contact3", "555-0003", "user3@example.com", "Location3"))
+			Expect(tx.Error).To(BeNil())
+
+			customers, err := srv.ListCustomers(context.TODO(), auth.User{Username: "partneruser"})
+			Expect(err).To(BeNil())
+			Expect(customers).To(HaveLen(1))
+			Expect(customers[0].Username).To(Equal("user1"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+		})
+	})
+
 	Context("RemoveCustomer", func() {
 		It("successfully removes an accepted customer", func() {
 			partnerGroupID := uuid.New()

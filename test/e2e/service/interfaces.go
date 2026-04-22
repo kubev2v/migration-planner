@@ -53,7 +53,7 @@ type partnerApi interface {
 	UpdatePartnerRequest(uuid.UUID, v1alpha1.PartnerRequestUpdate) (*v1alpha1.PartnerRequest, int, error)
 	GetPartner(uuid.UUID) (*v1alpha1.Group, error)
 	LeavePartner(uuid.UUID) error
-	ListCustomers() (*v1alpha1.PartnerRequestList, error)
+	ListCustomers() (*v1alpha1.CustomerList, error)
 	RemoveCustomer(string) error
 }
 
