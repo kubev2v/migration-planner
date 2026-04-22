@@ -303,6 +303,30 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(ok).To(BeTrue())
 		})
 
+		// Covers the agent lookup branch in UpdateSourceInventory: when the
+		// source exists but the agent id does not, we should get back an
+		// ErrResourceNotFound (agent flavor), not a generic wrapped error.
+		It("returns agent not found when the source exists but the agent id is unknown", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vcenter",
+			})
+
+			srv := service.NewAgentService(s)
+			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID:  sourceID,
+				AgentID:   uuid.New(), // no agent was inserted for this id
+				VCenterID: "vcenter",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
