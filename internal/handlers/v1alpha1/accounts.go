@@ -53,8 +53,13 @@ func (h *ServiceHandler) ListGroups(ctx context.Context, request server.ListGrou
 
 	groups, err := h.accountsSrv.ListGroups(ctx, filter)
 	if err != nil {
-		logger.Error(err).Log()
-		return server.ListGroups500JSONResponse{Message: fmt.Sprintf("failed to list groups: %v", err)}, nil
+		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.ListGroups403JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.ListGroups500JSONResponse{Message: fmt.Sprintf("failed to list groups: %v", err)}, nil
+		}
 	}
 
 	return server.ListGroups200JSONResponse(mappers.GroupListToApi(groups)), nil
@@ -83,6 +88,8 @@ func (h *ServiceHandler) CreateGroup(ctx context.Context, request server.CreateG
 	created, err := h.accountsSrv.CreateGroup(ctx, group)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.CreateGroup403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrDuplicateKey:
 			return server.CreateGroup400JSONResponse{Message: "group already exists"}, nil
 		default:
@@ -106,6 +113,8 @@ func (h *ServiceHandler) GetGroup(ctx context.Context, request server.GetGroupRe
 	group, err := h.accountsSrv.GetGroup(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.GetGroup403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.GetGroup404JSONResponse{Message: "group not found"}, nil
 		default:
@@ -140,6 +149,8 @@ func (h *ServiceHandler) UpdateGroup(ctx context.Context, request server.UpdateG
 	existing, err := h.accountsSrv.GetGroup(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.UpdateGroup403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.UpdateGroup404JSONResponse{Message: "group not found"}, nil
 		default:
@@ -152,6 +163,8 @@ func (h *ServiceHandler) UpdateGroup(ctx context.Context, request server.UpdateG
 	result, err := h.accountsSrv.UpdateGroup(ctx, updated)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.UpdateGroup403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrDuplicateKey:
 			return server.UpdateGroup400JSONResponse{Message: "group already exists"}, nil
 		default:
@@ -175,6 +188,8 @@ func (h *ServiceHandler) DeleteGroup(ctx context.Context, request server.DeleteG
 	group, err := h.accountsSrv.GetGroup(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.DeleteGroup403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.DeleteGroup404JSONResponse{Message: "group not found"}, nil
 		default:
@@ -184,8 +199,13 @@ func (h *ServiceHandler) DeleteGroup(ctx context.Context, request server.DeleteG
 	}
 
 	if err := h.accountsSrv.DeleteGroup(ctx, request.Id); err != nil {
-		logger.Error(err).Log()
-		return server.DeleteGroup500JSONResponse{Message: fmt.Sprintf("failed to delete group: %v", err)}, nil
+		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.DeleteGroup403JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.DeleteGroup500JSONResponse{Message: fmt.Sprintf("failed to delete group: %v", err)}, nil
+		}
 	}
 
 	logger.Success().WithString("group_name", group.Name).Log()
@@ -203,6 +223,8 @@ func (h *ServiceHandler) ListGroupMembers(ctx context.Context, request server.Li
 	members, err := h.accountsSrv.ListGroupMembers(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.ListGroupMembers403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.ListGroupMembers404JSONResponse{Message: "group not found"}, nil
 		default:
@@ -231,6 +253,8 @@ func (h *ServiceHandler) UpdateGroupMember(ctx context.Context, request server.U
 	existing, err := h.accountsSrv.GetMember(ctx, request.Username)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.UpdateGroupMember403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.UpdateGroupMember404JSONResponse{Message: err.Error()}, nil
 		default:
@@ -244,6 +268,8 @@ func (h *ServiceHandler) UpdateGroupMember(ctx context.Context, request server.U
 	result, err := h.accountsSrv.UpdateGroupMember(ctx, request.Id, request.Username, updated)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.UpdateGroupMember403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.UpdateGroupMember404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrMembershipMismatch:
@@ -270,6 +296,8 @@ func (h *ServiceHandler) RemoveGroupMember(ctx context.Context, request server.R
 	err := h.accountsSrv.RemoveGroupMember(ctx, request.Id, request.Username)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.RemoveGroupMember403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.RemoveGroupMember404JSONResponse{Message: err.Error()}, nil
 		case *service.ErrMembershipMismatch:
@@ -301,6 +329,8 @@ func (h *ServiceHandler) CreateGroupMember(ctx context.Context, request server.C
 	created, err := h.accountsSrv.CreateMember(ctx, member)
 	if err != nil {
 		switch err.(type) {
+		case *service.ErrForbidden:
+			return server.CreateGroupMember403JSONResponse{Message: err.Error()}, nil
 		case *service.ErrResourceNotFound:
 			return server.CreateGroupMember404JSONResponse{Message: "group not found"}, nil
 		case *service.ErrDuplicateKey:

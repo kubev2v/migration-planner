@@ -172,18 +172,32 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
-	accountsSvc := service.NewAccountsService(s.store)
+	innerAccountsSvc := service.NewAccountsService(s.store)
 
-	var assessmentSvc service.AssessmentServicer
-	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, accountsSvc)
-	if s.cfg.Service.Auth.AuthenticationType != "none" {
-		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
+	if s.cfg.Service.AdminGroupFile != "" {
+		adminGroup, err := service.ParseAdminGroupFile(s.cfg.Service.AdminGroupFile)
+		if err != nil {
+			return fmt.Errorf("failed to load admin group: %w", err)
+		}
+		if err := innerAccountsSvc.Initialize(ctx, *adminGroup); err != nil {
+			return fmt.Errorf("failed to initialize admin group: %w", err)
+		}
+		zap.S().Named("api_server").Infof("Admin group %q initialized with %d members", adminGroup.Name, len(adminGroup.Members))
 	}
 
-	var partnerSvc service.PartnerServicer
-	partnerSvc = service.NewPartnerService(s.store, accountsSvc)
+	var (
+		partnerSvc    service.PartnerServicer
+		assessmentSvc service.AssessmentServicer
+		accountsSvc   service.AccountsServicer
+	)
+	partnerSvc = service.NewPartnerService(s.store, innerAccountsSvc)
+	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc)
+	accountsSvc = innerAccountsSvc
+
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
-		partnerSvc = service.NewAuthzPartnerService(partnerSvc, accountsSvc, s.store)
+		partnerSvc = service.NewAuthzPartnerService(partnerSvc, innerAccountsSvc, s.store)
+		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
+		accountsSvc = service.NewAuthzAccountsService(accountsSvc)
 	}
 
 	h := handlers.NewServiceHandler(
@@ -192,9 +206,10 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewJobService(s.store, s.jobsClient.RiverClient),
 		service.NewSizerService(sizerClient, s.store),
 		service.NewEstimationService(s.store),
-		accountsSvc,
 		partnerSvc,
+		accountsSvc,
 	)
+
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

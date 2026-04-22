@@ -33,6 +33,7 @@ type svcConfig struct {
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
+	AdminGroupFile       string `envconfig:"MIGRATION_PLANNER_ADMIN_GROUP_FILE" default:""`
 }
 
 type Auth struct {
