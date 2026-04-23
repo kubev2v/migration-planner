@@ -72,8 +72,28 @@ var _ = Describe("partner service", Ordered, func() {
 			Expect(partners).To(HaveLen(0))
 		})
 
+		It("returns all requests for the partner's group when called by a partner", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID1))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID1, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user2", partnerGroupID1, "accepted", "Name2", "Contact2", "555-0002", "user2@example.com", "Location2"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user3", partnerGroupID2, "pending", "Name3", "Contact3", "555-0003", "user3@example.com", "Location3"))
+			Expect(tx.Error).To(BeNil())
+
+			partners, err := srv.ListRequests(context.TODO(), auth.User{Username: "partneruser"})
+			Expect(err).To(BeNil())
+			Expect(partners).To(HaveLen(2))
+			for _, p := range partners {
+				Expect(p.PartnerID).To(Equal(partnerGroupID1.String()))
+			}
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 		})
 	})
