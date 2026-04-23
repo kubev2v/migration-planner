@@ -2096,6 +2096,10 @@ components:
           $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"
+        vmNetwork:
+          $ref: "#/components/schemas/VmNetwork"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
         labels:
           type: array
           items:
@@ -2104,6 +2108,13 @@ components:
               validate: "required,label"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive,required"
+        enableProxy:
+          type: boolean
+          description: "Set to false to clear all proxy fields. When true or omitted, proxy fields are preserved or updated normally."
+        networkConfigType:
+          type: string
+          enum: [dhcp, static]
+          description: "Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally."
       required:
         - name
 
@@ -2599,6 +2610,17 @@ components:
           $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"
+        vmNetwork:
+          $ref: "#/components/schemas/VmNetwork"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
+        enableProxy:
+          type: boolean
+          description: "Set to false to clear all proxy fields. When true or omitted, proxy fields are preserved or updated normally."
+        networkConfigType:
+          type: string
+          enum: [dhcp, static]
+          description: "Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally."
 
     UpdateInventory:
       type: object

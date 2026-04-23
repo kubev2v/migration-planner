@@ -114,6 +114,18 @@ const (
 	PartnerRequestStatusRejected  PartnerRequestStatus = "rejected"
 )
 
+// Defines values for SourceCreateNetworkConfigType.
+const (
+	SourceCreateNetworkConfigTypeDhcp   SourceCreateNetworkConfigType = "dhcp"
+	SourceCreateNetworkConfigTypeStatic SourceCreateNetworkConfigType = "static"
+)
+
+// Defines values for SourceUpdateNetworkConfigType.
+const (
+	SourceUpdateNetworkConfigTypeDhcp   SourceUpdateNetworkConfigType = "dhcp"
+	SourceUpdateNetworkConfigTypeStatic SourceUpdateNetworkConfigType = "static"
+)
+
 // Defines values for ListGroupsParamsKind.
 const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
@@ -822,25 +834,45 @@ type Source struct {
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {
 	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
-	Labels           *[]Label                   `json:"labels,omitempty" validate:"omitempty,dive,required"`
-	Name             ValidatedSourceName        `json:"name" validate:"required,source_name"`
-	Network          *VmNetwork                 `json:"network,omitempty"`
-	Proxy            *AgentProxy                `json:"proxy,omitempty"`
-	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+
+	// EnableProxy Set to false to clear all proxy fields. When true or omitted, proxy fields are preserved or updated normally.
+	EnableProxy *bool               `json:"enableProxy,omitempty"`
+	Labels      *[]Label            `json:"labels,omitempty" validate:"omitempty,dive,required"`
+	Name        ValidatedSourceName `json:"name" validate:"required,source_name"`
+	Network     *VmNetwork          `json:"network,omitempty"`
+
+	// NetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
+	NetworkConfigType *SourceCreateNetworkConfigType `json:"networkConfigType,omitempty"`
+	Proxy             *AgentProxy                    `json:"proxy,omitempty"`
+	SshPublicKey      *ValidatedSSHPublicKey         `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	VmNetwork         *VmNetwork                     `json:"vmNetwork,omitempty"`
 }
+
+// SourceCreateNetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
+type SourceCreateNetworkConfigType string
 
 // SourceList defines model for SourceList.
 type SourceList = []Source
 
 // SourceUpdate defines model for SourceUpdate.
 type SourceUpdate struct {
-	CertificateChain *ValidatedCertificateChain   `json:"certificateChain" validate:"omitnil,certs"`
-	Labels           *[]Label                     `json:"labels,omitempty" validate:"omitempty,dive,required"`
-	Name             *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name"`
-	Network          *VmNetwork                   `json:"network,omitempty"`
-	Proxy            *AgentProxy                  `json:"proxy,omitempty"`
-	SshPublicKey     *ValidatedSSHPublicKey       `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
+
+	// EnableProxy Set to false to clear all proxy fields. When true or omitted, proxy fields are preserved or updated normally.
+	EnableProxy *bool                        `json:"enableProxy,omitempty"`
+	Labels      *[]Label                     `json:"labels,omitempty" validate:"omitempty,dive,required"`
+	Name        *ValidatedOptionalSourceName `json:"name,omitempty" validate:"omitempty,source_name"`
+	Network     *VmNetwork                   `json:"network,omitempty"`
+
+	// NetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
+	NetworkConfigType *SourceUpdateNetworkConfigType `json:"networkConfigType,omitempty"`
+	Proxy             *AgentProxy                    `json:"proxy,omitempty"`
+	SshPublicKey      *ValidatedSSHPublicKey         `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	VmNetwork         *VmNetwork                     `json:"vmNetwork,omitempty"`
 }
+
+// SourceUpdateNetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
+type SourceUpdateNetworkConfigType string
 
 // Status Status is a return value for calls that don't return other objects.
 type Status struct {
