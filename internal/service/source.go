@@ -105,6 +105,7 @@ func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.Sou
 		return model.Source{}, err
 	}
 
+	result.ImageInfra = imageInfra
 	return *result, nil
 }
 

@@ -14,20 +14,22 @@ type Label struct {
 }
 
 type SourceCreateForm struct {
-	CertificateChain string
-	Name             string
-	HttpUrl          string
-	HttpsUrl         string
-	NoProxy          string
-	SshPublicKey     string
-	Username         string
-	OrgID            string
-	EmailDomain      string
-	Labels           map[string]string
-	IpAddress        string
-	SubnetMask       string
-	DefaultGateway   string
-	Dns              string
+	CertificateChain  string
+	Name              string
+	HttpUrl           string
+	HttpsUrl          string
+	NoProxy           string
+	SshPublicKey      string
+	Username          string
+	OrgID             string
+	EmailDomain       string
+	Labels            map[string]string
+	IpAddress         string
+	SubnetMask        string
+	DefaultGateway    string
+	Dns               string
+	EnableProxy       *bool
+	NetworkConfigType *string
 }
 
 func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string) model.ImageInfra {
@@ -43,6 +45,17 @@ func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string)
 		SubnetMask:       s.SubnetMask,
 		DefaultGateway:   s.DefaultGateway,
 		Dns:              s.Dns,
+	}
+	if s.EnableProxy != nil && !*s.EnableProxy {
+		imageInfra.HttpProxyUrl = ""
+		imageInfra.HttpsProxyUrl = ""
+		imageInfra.NoProxyDomains = ""
+	}
+	if s.NetworkConfigType != nil && *s.NetworkConfigType == "dhcp" {
+		imageInfra.IpAddress = ""
+		imageInfra.SubnetMask = ""
+		imageInfra.DefaultGateway = ""
+		imageInfra.Dns = ""
 	}
 	return imageInfra
 }
@@ -100,17 +113,19 @@ func UpdateSourceFromApi(m *model.Source, vCenterID string, inventory []byte) *m
 }
 
 type SourceUpdateForm struct {
-	Name             *string
-	Labels           []Label
-	SshPublicKey     *string
-	CertificateChain *string
-	HttpUrl          *string
-	HttpsUrl         *string
-	NoProxy          *string
-	IpAddress        *string
-	SubnetMask       *string
-	DefaultGateway   *string
-	Dns              *string
+	Name              *string
+	Labels            []Label
+	SshPublicKey      *string
+	CertificateChain  *string
+	HttpUrl           *string
+	HttpsUrl          *string
+	NoProxy           *string
+	IpAddress         *string
+	SubnetMask        *string
+	DefaultGateway    *string
+	Dns               *string
+	EnableProxy       *bool
+	NetworkConfigType *string
 }
 
 func (f *SourceUpdateForm) ToSource(source *model.Source) {
@@ -120,6 +135,17 @@ func (f *SourceUpdateForm) ToSource(source *model.Source) {
 }
 
 func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
+	if f.EnableProxy != nil && !*f.EnableProxy {
+		imageInfra.HttpProxyUrl = ""
+		imageInfra.HttpsProxyUrl = ""
+		imageInfra.NoProxyDomains = ""
+	}
+	if f.NetworkConfigType != nil && *f.NetworkConfigType == "dhcp" {
+		imageInfra.IpAddress = ""
+		imageInfra.SubnetMask = ""
+		imageInfra.DefaultGateway = ""
+		imageInfra.Dns = ""
+	}
 	if f.SshPublicKey != nil {
 		imageInfra.SshPublicKey = *f.SshPublicKey
 	}
@@ -150,6 +176,9 @@ func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
 }
 
 func (f *SourceUpdateForm) ToLabels() []model.Label {
+	if f.Labels == nil {
+		return nil
+	}
 	labels := make([]model.Label, len(f.Labels))
 	for i, label := range f.Labels {
 		labels[i] = model.Label{Key: label.Key, Value: label.Value}

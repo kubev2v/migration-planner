@@ -52,18 +52,24 @@ func mapIpv4Fields(vmnetwork *v1alpha1.VmNetwork) (ipAddress, subnetMask, defaul
 
 func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 	httpUrl, httpsUrl, noProxy := mapProxyFields(resource.Proxy)
-	ipAddress, subnetMask, defaultGateway, dns := mapIpv4Fields(resource.Network)
+	network := resource.VmNetwork
+	if network == nil {
+		network = resource.Network
+	}
+	ipAddress, subnetMask, defaultGateway, dns := mapIpv4Fields(network)
 
 	form := mappers.SourceCreateForm{
-		Name:           string(resource.Name),
-		Labels:         mapLabels(resource.Labels),
-		HttpUrl:        httpUrl,
-		HttpsUrl:       httpsUrl,
-		NoProxy:        noProxy,
-		IpAddress:      ipAddress,
-		SubnetMask:     subnetMask,
-		DefaultGateway: defaultGateway,
-		Dns:            dns,
+		Name:              string(resource.Name),
+		Labels:            mapLabels(resource.Labels),
+		HttpUrl:           httpUrl,
+		HttpsUrl:          httpsUrl,
+		NoProxy:           noProxy,
+		IpAddress:         ipAddress,
+		SubnetMask:        subnetMask,
+		DefaultGateway:    defaultGateway,
+		Dns:               dns,
+		EnableProxy:       resource.EnableProxy,
+		NetworkConfigType: (*string)(resource.NetworkConfigType),
 	}
 
 	if resource.SshPublicKey != nil {
@@ -78,16 +84,23 @@ func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 
 func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateForm {
 	httpUrl, httpsUrl, noProxy := mapProxyFieldsForUpdate(resource.Proxy)
-	ipAddress, subnetMask, defaultGateway, dns := mapIpv4Fields(resource.Network)
 
 	form := mappers.SourceUpdateForm{
-		HttpUrl:        httpUrl,
-		HttpsUrl:       httpsUrl,
-		NoProxy:        noProxy,
-		IpAddress:      &ipAddress,
-		SubnetMask:     &subnetMask,
-		DefaultGateway: &defaultGateway,
-		Dns:            &dns,
+		HttpUrl:  httpUrl,
+		HttpsUrl: httpsUrl,
+		NoProxy:  noProxy,
+	}
+
+	network := resource.VmNetwork
+	if network == nil {
+		network = resource.Network
+	}
+	if network != nil && network.Ipv4 != nil {
+		ipv4 := network.Ipv4
+		form.IpAddress = &ipv4.IpAddress
+		form.SubnetMask = &ipv4.SubnetMask
+		form.DefaultGateway = &ipv4.DefaultGateway
+		form.Dns = &ipv4.Dns
 	}
 
 	if resource.Name != nil {
@@ -110,6 +123,9 @@ func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateFor
 		}
 		form.Labels = labels
 	}
+
+	form.EnableProxy = resource.EnableProxy
+	form.NetworkConfigType = (*string)(resource.NetworkConfigType)
 
 	return form
 }
