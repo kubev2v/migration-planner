@@ -2916,12 +2916,12 @@ components:
           type: integer
           description: CPU cores per worker node
           x-oapi-codegen-extra-tags:
-            validate: "required,min=2,max=200"
+            validate: "required,min=2,max=384"
         workerNodeMemory:
           type: integer
           description: Memory (GB) per worker node
           x-oapi-codegen-extra-tags:
-            validate: "required,min=4,max=512"
+            validate: "required,min=4,max=4096"
         workerNodeThreads:
           type: integer
           minimum: 2
@@ -2936,12 +2936,12 @@ components:
           type: integer
           description: "CPU cores per control plane node (default: 6)"
           x-oapi-codegen-extra-tags:
-            validate: "omitempty,min=2,max=200"
+            validate: "omitempty,min=2,max=384"
         controlPlaneMemory:
           type: integer
           description: "Memory in GB per control plane node (default: 16)"
           x-oapi-codegen-extra-tags:
-            validate: "omitempty,min=4,max=512"
+            validate: "omitempty,min=4,max=4096"
         controlPlaneNodeCount:
           type: integer
           enum: [1, 3]
