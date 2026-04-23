@@ -29,7 +29,7 @@ const (
 	DefaultPlatform = "BAREMETAL"
 
 	// MaxBatches - if exceeded, recommend larger nodes
-	MaxBatches = 200
+	MaxBatches = 1000
 
 	// MinBatchCPU prevents tiny batches
 	MinBatchCPU = 1.0
@@ -57,9 +57,9 @@ const (
 	MinFallbackNodeMemory = 4
 
 	// MaxRecommendedNodeCPU is the maximum recommended CPU for nodes
-	MaxRecommendedNodeCPU = 200
+	MaxRecommendedNodeCPU = 384
 	// MaxRecommendedNodeMemory is the maximum recommended memory (GB) for nodes
-	MaxRecommendedNodeMemory = 512
+	MaxRecommendedNodeMemory = 4096
 
 	// MinFailoverNodes is the minimum number of failover nodes
 	MinFailoverNodes = 2
