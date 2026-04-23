@@ -827,6 +827,7 @@ type SourceCreate struct {
 	Network          *VmNetwork                 `json:"network,omitempty"`
 	Proxy            *AgentProxy                `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey     `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	VmNetwork        *VmNetwork                 `json:"vmNetwork,omitempty"`
 }
 
 // SourceList defines model for SourceList.
@@ -840,6 +841,7 @@ type SourceUpdate struct {
 	Network          *VmNetwork                   `json:"network,omitempty"`
 	Proxy            *AgentProxy                  `json:"proxy,omitempty"`
 	SshPublicKey     *ValidatedSSHPublicKey       `json:"sshPublicKey" validate:"omitnil,ssh_key"`
+	VmNetwork        *VmNetwork                   `json:"vmNetwork,omitempty"`
 }
 
 // Status Status is a return value for calls that don't return other objects.

@@ -105,7 +105,11 @@ func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.Sou
 		return model.Source{}, err
 	}
 
-	return *result, nil
+	created, err := s.store.Source().Get(ctx, result.ID)
+	if err != nil {
+		return model.Source{}, err
+	}
+	return *created, nil
 }
 
 func (s *SourceService) DeleteSources(ctx context.Context) error {

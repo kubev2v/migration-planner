@@ -150,6 +150,9 @@ func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
 }
 
 func (f *SourceUpdateForm) ToLabels() []model.Label {
+	if f.Labels == nil {
+		return nil
+	}
 	labels := make([]model.Label, len(f.Labels))
 	for i, label := range f.Labels {
 		labels[i] = model.Label{Key: label.Key, Value: label.Value}

@@ -2096,6 +2096,10 @@ components:
           $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"
+        vmNetwork:
+          $ref: "#/components/schemas/VmNetwork"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
         labels:
           type: array
           items:
@@ -2596,6 +2600,10 @@ components:
         proxy:
           $ref: "#/components/schemas/AgentProxy"
         network:
+          $ref: "#/components/schemas/VmNetwork"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,dive"
+        vmNetwork:
           $ref: "#/components/schemas/VmNetwork"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,dive"

@@ -602,6 +602,101 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			Expect(updatedSource.Labels[1].Value).To(Equal("critical"))
 		})
 
+		It("update with only sshPublicKey preserves proxy and network fields", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			initialImageInfra := model.ImageInfra{
+				SourceID:       uuid.MustParse(sourceID),
+				HttpProxyUrl:   "http://proxy.example.com",
+				HttpsProxyUrl:  "https://proxy.example.com",
+				NoProxyDomains: "localhost",
+				IpAddress:      "10.0.0.1",
+				SubnetMask:     "24",
+				DefaultGateway: "10.0.0.254",
+				Dns:            "8.8.8.8",
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+
+			newSshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCk83ddeteALlqCbO43E3ardbavFPboYIoFnlQZ3zVi+ls96c1x3P9DDWkNhuOgpQurull2y55Wm7HWLLK5hlk49s6tUuBDftH3XXfGMAmncBH9apGHxl0O+k/X1MrfhoEXHmmEwXTv+X6vC3BsZiazSOkKbIozHgnD7y1z83wuYWbbW0NYvgwhaoOtkWteKSJWwPxNaTwGCpj+RQ6xWygt5EbMSf7U3Ih2P1hcsa615zD5P2GSLxtLwWnHgWCylT/krdyIYlR1pqW9e/Iv2MKlGX6W1DSUxUz5BNxzCA8O53C0NSCeDFAhn9T8VE9U/RkGDtXBFJ8JVcmtM6S9buq5HZ12+0E0VCGFdmnvNT8XxdYrN0ff8f3DQI7ERgHEKQiqjrSPDv2+OMdv3nr3n5+tOBvQEn6aYDbnybILyrUP76UvLvjfgDTnnRxlkpw2Y43EtgtdeIUUo/VBSE9qfzRa21Pz3gBh6ZJE9xF+u6DstgvFigNJ7nMJoSktH5mzuBM= test@test"
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					SshPublicKey: util.ToStrPtr(newSshKey),
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.ImageInfra.SshPublicKey).To(Equal(newSshKey))
+			Expect(updatedSource.ImageInfra.HttpProxyUrl).To(Equal("http://proxy.example.com"))
+			Expect(updatedSource.ImageInfra.HttpsProxyUrl).To(Equal("https://proxy.example.com"))
+			Expect(updatedSource.ImageInfra.NoProxyDomains).To(Equal("localhost"))
+			Expect(updatedSource.ImageInfra.IpAddress).To(Equal("10.0.0.1"))
+			Expect(updatedSource.ImageInfra.SubnetMask).To(Equal("24"))
+			Expect(updatedSource.ImageInfra.DefaultGateway).To(Equal("10.0.0.254"))
+			Expect(updatedSource.ImageInfra.Dns).To(Equal("8.8.8.8"))
+		})
+
+		It("update without labels in body preserves existing labels", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			initialImageInfra := model.ImageInfra{
+				SourceID: uuid.MustParse(sourceID),
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+
+			initialLabels := []v1alpha1.Label{
+				{Key: "env", Value: "dev"},
+			}
+			_, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					Labels: &initialLabels,
+				},
+			})
+			Expect(err).To(BeNil())
+
+			newName := "renamed-without-touching-labels"
+			_, err = srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					Name: util.ToStrPtr(newName),
+				},
+			})
+			Expect(err).To(BeNil())
+
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.Name).To(Equal(newName))
+			Expect(updatedSource.Labels).To(HaveLen(1))
+			Expect(updatedSource.Labels[0].Key).To(Equal("env"))
+			Expect(updatedSource.Labels[0].Value).To(Equal("dev"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
