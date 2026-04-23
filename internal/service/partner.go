@@ -42,8 +42,17 @@ func (s *PartnerService) ListPartners(ctx context.Context) (model.GroupList, err
 	return s.store.Accounts().ListGroups(ctx, store.NewGroupQueryFilter().ByKind("partner"))
 }
 
-// ListRequests returns all partner requests for a user.
+// ListRequests returns partner requests.
+// For regular users, it returns their own requests.
+// For partners, it returns all requests for their group.
 func (s *PartnerService) ListRequests(ctx context.Context, user auth.User) (model.PartnerCustomerList, error) {
+	identity, err := s.accountsSvc.GetIdentity(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	if identity.Kind == KindPartner && identity.GroupID != nil {
+		return s.store.PartnerCustomer().List(ctx, store.NewPartnerQueryFilter().ByPartnerID(*identity.GroupID))
+	}
 	return s.store.PartnerCustomer().List(ctx, store.NewPartnerQueryFilter().ByUsername(user.Username))
 }
 
