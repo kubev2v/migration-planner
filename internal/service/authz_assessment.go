@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -12,16 +13,22 @@ import (
 )
 
 type AuthzAssessmentService struct {
-	inner AssessmentServicer
-	store store.Store
+	inner       AssessmentServicer
+	store       store.Store
+	accountsSrv *AccountsService
 }
 
-func NewAuthzAssessmentService(inner AssessmentServicer, s store.Store) AssessmentServicer {
-	return &AuthzAssessmentService{inner: inner, store: s}
+func NewAuthzAssessmentService(inner AssessmentServicer, s store.Store, accountsSrv *AccountsService) AssessmentServicer {
+	return &AuthzAssessmentService{inner: inner, store: s, accountsSrv: accountsSrv}
 }
 
 func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
+
+	identity, err := a.accountsSrv.GetIdentity(ctx, user)
+	if err != nil {
+		return []model.Assessment{}, err
+	}
 
 	resources, err := a.store.Authz().ListResources(ctx, user.Username, model.AssessmentResource)
 	if err != nil {
@@ -32,6 +39,7 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *As
 		return []model.Assessment{}, nil
 	}
 
+	permsByID := make(map[string][]model.Permission, len(resources))
 	ids := make([]uuid.UUID, 0, len(resources))
 	for _, r := range resources {
 		id, err := uuid.Parse(r.ID)
@@ -39,19 +47,56 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *As
 			continue
 		}
 		ids = append(ids, id)
+		permsByID[r.ID] = r.Permissions
 	}
 
 	filter.IDs = ids
 	filter.Username = ""
 	filter.OrgID = ""
 
-	return a.inner.ListAssessments(ctx, filter)
+	assessments, err := a.inner.ListAssessments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	var ownedIDs []string
+	for i, assessment := range assessments {
+		assessments[i].Permissions = permsByID[assessment.ID.String()]
+		if assessment.Username == user.Username {
+			ownedIDs = append(ownedIDs, assessment.ID.String())
+		}
+	}
+
+	var relsByID map[string][]model.Relationship
+	if len(ownedIDs) > 0 {
+		relsByID, err = a.store.Authz().ListBulkRelationship(ctx, ownedIDs)
+		if err != nil {
+			return nil, fmt.Errorf("authz: failed to list relationships: %w", err)
+		}
+	}
+
+	for i, assessment := range assessments {
+		if assessment.Username == user.Username {
+			assessments[i].Sharing = buildOwnerSharing(relsByID[assessment.ID.String()])
+			assessments[i].Permissions = slices.DeleteFunc(assessments[i].Permissions, func(s model.Permission) bool {
+				if identity.Kind == KindRegular || identity.Kind == KindPartner {
+					return s.String() == "share" || s.String() == "edit"
+				}
+				return s.String() == "edit"
+			})
+		} else {
+			assessments[i].Sharing = buildViewerSharing(assessment.Username)
+		}
+	}
+
+	// per design, the regular user cannot share so remove the permission
+
+	return assessments, nil
 }
 
 func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
-	// get assessment first to capture the 404 if any
 	assessment, err := a.inner.GetAssessment(ctx, id)
 	if err != nil {
 		return nil, err
@@ -64,6 +109,29 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 
 	if !model.ReadPermission.In(resource.Permissions) {
 		return nil, NewErrForbidden("assessment", id.String())
+	}
+
+	assessment.Permissions = resource.Permissions
+
+	if assessment.Username == user.Username {
+		rels, err := a.store.Authz().ListRelationships(ctx, model.NewAssessmentResource(id.String()))
+		if err != nil {
+			return nil, fmt.Errorf("authz: failed to list relationships: %w", err)
+		}
+		assessment.Sharing = buildOwnerSharing(rels)
+
+		identity, err := a.accountsSrv.GetIdentity(ctx, user)
+		if err != nil {
+			return nil, err
+		}
+		assessment.Permissions = slices.DeleteFunc(assessment.Permissions, func(s model.Permission) bool {
+			if identity.Kind == KindRegular || identity.Kind == KindPartner {
+				return s.String() == "share" || s.String() == "edit"
+			}
+			return s.String() == "edit"
+		})
+	} else {
+		assessment.Sharing = buildViewerSharing(assessment.Username)
 	}
 
 	return assessment, nil
@@ -103,7 +171,6 @@ func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createFor
 func (a *AuthzAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
-	// get assessment first to capture the 404 if any
 	_, err := a.inner.GetAssessment(ctx, id)
 	if err != nil {
 		return nil, err
@@ -202,4 +269,30 @@ func (a *AuthzAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	}
 
 	return a.inner.UnshareAssessment(ctx, id)
+}
+
+func buildOwnerSharing(rels []model.Relationship) *model.Sharing {
+	shared := make([]model.SharingSubject, 0, len(rels))
+	for _, r := range rels {
+		if r.Relation == model.OwnerRelation {
+			continue
+		}
+		st := string(r.Subject.Kind)
+		if r.Subject.Kind == model.OrgSubject {
+			st = "group"
+		}
+		shared = append(shared, model.SharingSubject{Type: st, ID: r.Subject.ID})
+	}
+	return &model.Sharing{
+		IsShared:   len(shared) > 0,
+		SharedWith: shared,
+	}
+}
+
+func buildViewerSharing(ownerUsername string) *model.Sharing {
+	return &model.Sharing{
+		IsShared:   true,
+		SharedWith: []model.SharingSubject{},
+		SharedBy:   &model.SharingSubject{Type: "username", ID: ownerUsername},
+	}
 }

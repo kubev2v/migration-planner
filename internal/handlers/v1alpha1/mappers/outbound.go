@@ -283,6 +283,28 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 	assessment.SourceType = sourceType
 	assessment.SourceId = a.SourceID
 
+	if len(a.Permissions) > 0 {
+		perms := make([]api.AssessmentPermissions, len(a.Permissions))
+		for i, p := range a.Permissions {
+			perms[i] = api.AssessmentPermissions(p)
+		}
+		assessment.Permissions = &perms
+	}
+
+	if a.Sharing != nil {
+		sharing := api.AssessmentSharing{
+			IsShared:   a.Sharing.IsShared,
+			SharedWith: make([]api.SharingSubject, len(a.Sharing.SharedWith)),
+		}
+		for i, s := range a.Sharing.SharedWith {
+			sharing.SharedWith[i] = api.SharingSubject{Type: s.Type, Id: s.ID}
+		}
+		if a.Sharing.SharedBy != nil {
+			sharing.SharedBy = &api.SharingSubject{Type: a.Sharing.SharedBy.Type, Id: a.Sharing.SharedBy.ID}
+		}
+		assessment.Sharing = &sharing
+	}
+
 	return assessment, nil
 }
 

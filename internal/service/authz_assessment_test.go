@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 const (
@@ -47,7 +48,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		gormdb = db
 		accountsSvc := service.NewAccountsService(s)
 		inner := service.NewAssessmentService(s, nil, accountsSvc)
-		svc = service.NewAuthzAssessmentService(inner, s)
+		svc = service.NewAuthzAssessmentService(inner, s, accountsSvc)
 	})
 
 	AfterAll(func() {
@@ -118,6 +119,115 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessments).To(HaveLen(1))
 		})
 
+		It("regular owner gets share and edit stripped, viewer gets read", func() {
+			var resourceID string
+			tx := gormdb.Raw("SELECT resource_id FROM relations WHERE subject_id = 'user1' LIMIT 1").Scan(&resourceID)
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", resourceID, "viewer", "user", "user3"))
+			Expect(tx.Error).To(BeNil())
+
+			// Regular owner does not see share or edit
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			for _, a := range assessments {
+				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			}
+
+			// Viewer sees only read
+			ctx = ctxWithUser("user3", "org1")
+			filter = &service.AssessmentFilter{}
+			assessments, err = svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(1))
+			Expect(assessments[0].Permissions).To(ConsistOf(model.ReadPermission))
+		})
+
+		It("customer owner keeps share permission", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'user1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			for _, a := range assessments {
+				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+			}
+
+			gormdb.Exec("DELETE FROM partners_customers")
+			gormdb.Exec("DELETE FROM groups")
+		})
+
+		It("partner owner gets share stripped like regular", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'user1', 'user1@test.com', '%s');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			for _, a := range assessments {
+				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			}
+
+			gormdb.Exec("DELETE FROM members")
+			gormdb.Exec("DELETE FROM groups")
+		})
+
+		It("returns sharing state for owner and viewer", func() {
+			var resourceID string
+			tx := gormdb.Raw("SELECT resource_id FROM relations WHERE subject_id = 'user1' LIMIT 1").Scan(&resourceID)
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", resourceID, "viewer", "org", "partner-org"))
+			Expect(tx.Error).To(BeNil())
+
+			// Owner sees sharedWith
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+
+			var shared *model.Assessment
+			for i, a := range assessments {
+				if a.ID.String() == resourceID {
+					shared = &assessments[i]
+				}
+			}
+			Expect(shared).ToNot(BeNil())
+			Expect(shared.Sharing).ToNot(BeNil())
+			Expect(shared.Sharing.IsShared).To(BeTrue())
+			Expect(shared.Sharing.SharedWith).To(HaveLen(1))
+			Expect(shared.Sharing.SharedWith[0].Type).To(Equal("group"))
+			Expect(shared.Sharing.SharedWith[0].ID).To(Equal("partner-org"))
+			Expect(shared.Sharing.SharedBy).To(BeNil())
+
+			// Viewer sees sharedBy
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "org", "partner-org", "member", "user", "partner-user"))
+			Expect(tx.Error).To(BeNil())
+
+			ctx = ctxWithUser("partner-user", "org1")
+			filter = &service.AssessmentFilter{}
+			assessments, err = svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(1))
+			Expect(assessments[0].Sharing).ToNot(BeNil())
+			Expect(assessments[0].Sharing.IsShared).To(BeTrue())
+			Expect(assessments[0].Sharing.SharedWith).To(BeEmpty())
+			Expect(assessments[0].Sharing.SharedBy).ToNot(BeNil())
+			Expect(assessments[0].Sharing.SharedBy.Type).To(Equal("username"))
+			Expect(assessments[0].Sharing.SharedBy.ID).To(Equal("user1"))
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM snapshots;")
@@ -166,6 +276,90 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessment).To(BeNil())
 			var forbidden *service.ErrForbidden
 			Expect(errors.As(err, &forbidden)).To(BeTrue())
+		})
+
+		It("regular owner gets share and edit stripped, viewer gets read", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "viewer-user"))
+			Expect(tx.Error).To(BeNil())
+
+			// Regular owner does not see share or edit
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+
+			// Viewer sees only read
+			ctx = ctxWithUser("viewer-user", "org1")
+			assessment, err = svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission))
+		})
+
+		It("customer owner keeps share permission", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'user1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+
+			gormdb.Exec("DELETE FROM partners_customers")
+			gormdb.Exec("DELETE FROM groups")
+		})
+
+		It("partner owner gets share stripped like regular", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'user1', 'user1@test.com', '%s');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+
+			gormdb.Exec("DELETE FROM members")
+			gormdb.Exec("DELETE FROM groups")
+		})
+
+		It("returns sharing state for owner and viewer", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "org", "partner-org"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "viewer-user"))
+			Expect(tx.Error).To(BeNil())
+
+			// Owner sees sharedWith (excluding own owner tuple)
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Sharing).ToNot(BeNil())
+			Expect(assessment.Sharing.IsShared).To(BeTrue())
+			Expect(assessment.Sharing.SharedWith).To(HaveLen(2))
+			Expect(assessment.Sharing.SharedBy).To(BeNil())
+
+			// Viewer sees sharedBy
+			ctx = ctxWithUser("viewer-user", "org1")
+			assessment, err = svc.GetAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.Sharing).ToNot(BeNil())
+			Expect(assessment.Sharing.IsShared).To(BeTrue())
+			Expect(assessment.Sharing.SharedWith).To(BeEmpty())
+			Expect(assessment.Sharing.SharedBy).ToNot(BeNil())
+			Expect(assessment.Sharing.SharedBy.Type).To(Equal("username"))
+			Expect(assessment.Sharing.SharedBy.ID).To(Equal("user1"))
 		})
 
 		AfterEach(func() {

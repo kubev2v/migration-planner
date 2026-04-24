@@ -16,6 +16,7 @@ type Authz interface {
 	ListResources(ctx context.Context, userID string, resourceType model.ResourceType) ([]model.Resource, error)
 	GetPermissions(ctx context.Context, userID string, resource model.Resource) (model.Resource, error)
 	ListRelationships(ctx context.Context, resource model.Resource) ([]model.Relationship, error)
+	ListBulkRelationship(ctx context.Context, resourceIDs []string) (map[string][]model.Relationship, error)
 	Close() error
 }
 
@@ -100,6 +101,23 @@ func (a *AuthzStore) ListRelationships(ctx context.Context, resource model.Resou
 	for i, r := range rows {
 		result[i] = r.ToRelationship()
 	}
+	return result, nil
+}
+func (a *AuthzStore) ListBulkRelationship(ctx context.Context, resourceIDs []string) (map[string][]model.Relationship, error) {
+	db := a.getDB(ctx)
+	q := db.Where("resource_id IN ?", resourceIDs)
+
+	var rows []model.RelationSqlModel
+	if err := q.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	result := map[string][]model.Relationship{}
+	for _, r := range rows {
+		rel := r.ToRelationship()
+		result[rel.ResourceID] = append(result[rel.ResourceID], rel)
+	}
+
 	return result, nil
 }
 

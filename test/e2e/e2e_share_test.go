@@ -139,6 +139,15 @@ var _ = Describe("e2e-share", func() {
 		It("customer shares assessment, partner sees it, then unshares", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
+			// Before sharing, customer sees owner permissions and isShared=false
+			customerAssessment, err := customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Permissions).ToNot(BeNil())
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.Read, v1alpha1.Share, v1alpha1.Delete))
+			Expect(customerAssessment.Sharing).ToNot(BeNil())
+			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
+			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
+
 			// Partner cannot see the assessment before sharing
 			partnerAssessments, err := partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
@@ -149,10 +158,18 @@ var _ = Describe("e2e-share", func() {
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
-			// Partner can now see the assessment
+			// Partner can now see the assessment with read permission
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
+
+			// Owner sees sharing state after sharing
+			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Sharing).ToNot(BeNil())
+			Expect(customerAssessment.Sharing.IsShared).To(BeTrue())
+			Expect(customerAssessment.Sharing.SharedWith).To(HaveLen(1))
+			Expect(customerAssessment.Sharing.SharedWith[0].Type).To(Equal("group"))
 
 			// Customer unshares the assessment
 			statusCode, err = customerSvc.UnshareAssessment(assessment.Id)
@@ -163,6 +180,15 @@ var _ = Describe("e2e-share", func() {
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
+
+			// After unsharing, customer still sees owner permissions and isShared=false
+			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Permissions).ToNot(BeNil())
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.Read, v1alpha1.Share, v1alpha1.Delete))
+			Expect(customerAssessment.Sharing).ToNot(BeNil())
+			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
+			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

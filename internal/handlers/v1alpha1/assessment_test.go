@@ -103,7 +103,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 			assessmentList := resp.(server.ListAssessments200JSONResponse)
 			Expect(assessmentList).To(HaveLen(2)) // Only admin user's assessments
 
-			// Verify owner fields are included in API responses
 			for _, assessment := range assessmentList {
 				Expect(assessment.OwnerFirstName).ToNot(BeNil())
 				Expect(*assessment.OwnerFirstName).To(Equal("John"))
@@ -264,7 +263,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(assessment.Name).To(Equal("test-assessment"))
 			Expect(assessment.SourceType).To(Equal(v1alpha1.AssessmentSourceType(service.SourceTypeInventory)))
 			Expect(assessment.Snapshots).To(HaveLen(1))
-			// Verify owner fields are populated from user context, not from API request
 			Expect(assessment.OwnerFirstName).ToNot(BeNil())
 			Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
 			Expect(assessment.OwnerLastName).ToNot(BeNil())
@@ -301,8 +299,6 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			assessment := resp.(server.CreateAssessment201JSONResponse)
 			Expect(assessment.Name).To(Equal("security-test-assessment"))
-
-			// Verify owner fields come from authenticated user context only
 			Expect(assessment.OwnerFirstName).ToNot(BeNil())
 			Expect(*assessment.OwnerFirstName).To(Equal("RealUser"))
 			Expect(assessment.OwnerLastName).ToNot(BeNil())
