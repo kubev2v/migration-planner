@@ -152,6 +152,7 @@ type Assessment struct {
 
 	// OwnerLastName Owner's last name
 	OwnerLastName *string              `json:"ownerLastName,omitempty"`
+	Permissions   *[]UserPermission    `json:"permissions,omitempty"`
 	Snapshots     []Snapshot           `json:"snapshots"`
 	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
 	SourceType    AssessmentSourceType `json:"sourceType"`
@@ -858,6 +859,12 @@ type Status struct {
 type UpdateInventory struct {
 	AgentId   openapi_types.UUID `json:"agentId"`
 	Inventory Inventory          `json:"inventory"`
+}
+
+// UserPermission defines model for UserPermission.
+type UserPermission struct {
+	Permissions []string `json:"permissions"`
+	Username    string   `json:"username"`
 }
 
 // VCenter defines model for VCenter.

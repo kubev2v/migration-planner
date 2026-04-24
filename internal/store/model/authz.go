@@ -33,6 +33,10 @@ const (
 // Permission represents a computed permission derived from relations.
 type Permission string
 
+func (p Permission) String() string {
+	return string(p)
+}
+
 const (
 	ReadPermission   Permission = "read"
 	EditPermission   Permission = "edit"

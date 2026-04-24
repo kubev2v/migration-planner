@@ -2666,6 +2666,10 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Snapshot"
+        permissions:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserPermission"
       required:
         - id
         - name
@@ -3592,3 +3596,16 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Customer"
+
+    UserPermission:
+      type: object
+      properties:
+        username:
+          type: string
+        permissions:
+          type: array
+          items:
+            type: string
+      required:
+        - username
+        - permissions
