@@ -196,10 +196,10 @@ type ClusterRequirementsRequest struct {
 	ClusterId string `json:"clusterId" validate:"required"`
 
 	// ControlPlaneCPU CPU cores per control plane node (default: 6)
-	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=200"`
+	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=384"`
 
 	// ControlPlaneMemory Memory in GB per control plane node (default: 16)
-	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=512"`
+	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=4096"`
 
 	// ControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
 	ControlPlaneNodeCount *ClusterRequirementsRequestControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty" validate:"omitempty,oneof=1 3"`
@@ -217,10 +217,10 @@ type ClusterRequirementsRequest struct {
 	MemoryOverCommitRatio ClusterRequirementsRequestMemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
 
 	// WorkerNodeCPU CPU cores per worker node
-	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
+	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=384"`
 
 	// WorkerNodeMemory Memory (GB) per worker node
-	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
+	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=4096"`
 
 	// WorkerNodeThreads Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
 	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2,max=2000"`
