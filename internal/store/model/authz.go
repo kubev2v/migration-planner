@@ -33,6 +33,10 @@ const (
 // Permission represents a computed permission derived from relations.
 type Permission string
 
+func (p Permission) String() string {
+	return string(p)
+}
+
 const (
 	ReadPermission   Permission = "read"
 	EditPermission   Permission = "edit"
@@ -117,6 +121,19 @@ func NewOrgResource(id string) Resource        { return Resource{Type: OrgResour
 
 func NewUserSubject(id string) Subject { return Subject{Kind: UserSubject, ID: id} }
 func NewOrgSubject(id string) Subject  { return Subject{Kind: OrgSubject, ID: id} }
+
+// SharingSubject identifies who an assessment is shared with or by.
+type SharingSubject struct {
+	Type string
+	ID   string
+}
+
+// Sharing captures the sharing state of an assessment for a given viewer.
+type Sharing struct {
+	IsShared   bool
+	SharedWith []SharingSubject
+	SharedBy   *SharingSubject
+}
 
 // Operation represents a write operation type.
 type Operation int

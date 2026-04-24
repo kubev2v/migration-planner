@@ -19,6 +19,13 @@ const (
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
 )
 
+// Defines values for AssessmentPermissions.
+const (
+	Delete AssessmentPermissions = "delete"
+	Read   AssessmentPermissions = "read"
+	Share  AssessmentPermissions = "share"
+)
+
 // Defines values for AssessmentSourceType.
 const (
 	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
@@ -163,11 +170,16 @@ type Assessment struct {
 	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
 
 	// OwnerLastName Owner's last name
-	OwnerLastName *string              `json:"ownerLastName,omitempty"`
-	Snapshots     []Snapshot           `json:"snapshots"`
-	SourceId      *openapi_types.UUID  `json:"sourceId,omitempty"`
-	SourceType    AssessmentSourceType `json:"sourceType"`
+	OwnerLastName *string                  `json:"ownerLastName,omitempty"`
+	Permissions   *[]AssessmentPermissions `json:"permissions,omitempty"`
+	Sharing       *AssessmentSharing       `json:"sharing,omitempty"`
+	Snapshots     []Snapshot               `json:"snapshots"`
+	SourceId      *openapi_types.UUID      `json:"sourceId,omitempty"`
+	SourceType    AssessmentSourceType     `json:"sourceType"`
 }
+
+// AssessmentPermissions defines model for Assessment.Permissions.
+type AssessmentPermissions string
 
 // AssessmentSourceType defines model for Assessment.SourceType.
 type AssessmentSourceType string
@@ -194,6 +206,13 @@ type AssessmentRvtoolsForm struct {
 
 	// Name Name of the assessment
 	Name string `json:"name" validate:"required,assessment_name"`
+}
+
+// AssessmentSharing defines model for AssessmentSharing.
+type AssessmentSharing struct {
+	IsShared   bool             `json:"isShared"`
+	SharedBy   *SharingSubject  `json:"sharedBy,omitempty"`
+	SharedWith []SharingSubject `json:"sharedWith"`
 }
 
 // AssessmentUpdate Update form of the assessment.
@@ -767,6 +786,12 @@ type SchemaEstimationResult struct {
 
 	// MinTotalDuration Minimum total estimated duration across all calculators
 	MinTotalDuration string `json:"minTotalDuration"`
+}
+
+// SharingSubject defines model for SharingSubject.
+type SharingSubject struct {
+	Id   string `json:"id"`
+	Type string `json:"type"`
 }
 
 // SizingOverCommitRatio Over-commit ratios

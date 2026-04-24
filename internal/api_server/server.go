@@ -165,7 +165,7 @@ func (s *Server) Run(ctx context.Context) error {
 	var assessmentSvc service.AssessmentServicer
 	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, accountsSvc)
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
-		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store)
+		assessmentSvc = service.NewAuthzAssessmentService(assessmentSvc, s.store, accountsSvc)
 	}
 
 	var partnerSvc service.PartnerServicer

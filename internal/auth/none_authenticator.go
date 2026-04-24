@@ -14,7 +14,7 @@ func (n *NoneAuthenticator) Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 		user := User{
-			Username:     "admin",
+			Username:     "partner1",
 			Organization: "internal",
 			FirstName:    "Admin",
 			LastName:     "User",

@@ -2688,6 +2688,13 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Snapshot"
+        permissions:
+          type: array
+          items:
+            type: string
+            enum: [read, share, delete]
+        sharing:
+          $ref: "#/components/schemas/AssessmentSharing"
       required:
         - id
         - name
@@ -3614,3 +3621,30 @@ components:
       type: array
       items:
         $ref: "#/components/schemas/Customer"
+
+    AssessmentSharing:
+      type: object
+      properties:
+        isShared:
+          type: boolean
+        sharedWith:
+          type: array
+          items:
+            $ref: "#/components/schemas/SharingSubject"
+        sharedBy:
+          $ref: "#/components/schemas/SharingSubject"
+          nullable: true
+      required:
+        - isShared
+        - sharedWith
+
+    SharingSubject:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: string
+      required:
+        - type
+        - id
