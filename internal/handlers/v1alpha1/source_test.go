@@ -193,11 +193,60 @@ var _ = Describe("source handler", Ordered, func() {
 			source, ok := resp.(server.CreateSource201JSONResponse)
 			Expect(ok).To(BeTrue())
 			Expect(source.Name).To(Equal("test"))
+			Expect(source.Infra).NotTo(BeNil())
+			Expect(source.Infra.Proxy).NotTo(BeNil())
+			Expect(*source.Infra.Proxy.HttpUrl).To(Equal("http://example.com"))
+			Expect(*source.Infra.Proxy.HttpsUrl).To(Equal("https://example.com"))
+			Expect(*source.Infra.Proxy.NoProxy).To(Equal("noproxy"))
 
 			count := 0
 			tx := gormdb.Raw("SELECT COUNT(*) FROM image_infras;").Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(1))
+		})
+
+		It("returns full infra on create including network", func() {
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			toStrPtr := func(s string) *string {
+				return &s
+			}
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
+				Body: &v1alpha1.CreateSourceJSONRequestBody{
+					Name: "full-infra",
+					Proxy: &v1alpha1.AgentProxy{
+						HttpUrl:  toStrPtr("http://localhost:8000"),
+						HttpsUrl: toStrPtr("https://localhost:8000"),
+						NoProxy:  toStrPtr("test.example.org"),
+					},
+					Network: &v1alpha1.VmNetwork{
+						Ipv4: &v1alpha1.Ipv4Config{
+							IpAddress:      "192.168.1.100",
+							SubnetMask:     "24",
+							DefaultGateway: "10.0.0.2",
+							Dns:            "8.8.8.8",
+						},
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			source, ok := resp.(server.CreateSource201JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(source.Infra).NotTo(BeNil())
+			Expect(source.Infra.Proxy).NotTo(BeNil())
+			Expect(source.Infra.VmNetwork).NotTo(BeNil())
+			Expect(source.Infra.VmNetwork.Ipv4).NotTo(BeNil())
+			Expect(source.Infra.VmNetwork.Ipv4.IpAddress).To(Equal("192.168.1.100"))
+			Expect(source.Infra.VmNetwork.Ipv4.SubnetMask).To(Equal("24"))
+			Expect(source.Infra.VmNetwork.Ipv4.DefaultGateway).To(Equal("10.0.0.2"))
+			Expect(source.Infra.VmNetwork.Ipv4.Dns).To(Equal("8.8.8.8"))
 		})
 
 		It("failed to create a source -- proxy paramters not valid", func() {
