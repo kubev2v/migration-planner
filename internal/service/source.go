@@ -148,8 +148,8 @@ func (s *SourceService) UpdateSource(ctx context.Context, id uuid.UUID, form map
 	}
 
 	// Update ImageInfra
-	form.ToImageInfra(&source.ImageInfra)
-	if _, err := s.store.ImageInfra().Update(ctx, source.ImageInfra); err != nil {
+	imageInfra := form.ToImageInfra(source.ID)
+	if _, err := s.store.ImageInfra().Update(ctx, imageInfra); err != nil {
 		return nil, err
 	}
 
