@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 const (
@@ -118,6 +119,47 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessments).To(HaveLen(1))
 		})
 
+		It("populates viewer permissions and excludes owner", func() {
+			var resourceID string
+			tx := gormdb.Raw("SELECT resource_id FROM relations WHERE subject_id = 'user1' LIMIT 1").Scan(&resourceID)
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", resourceID, "viewer", "user", "user3"))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+
+			var shared *model.Assessment
+			for i := range assessments {
+				if assessments[i].ID.String() == resourceID {
+					shared = &assessments[i]
+				}
+			}
+			Expect(shared).ToNot(BeNil())
+			Expect(shared.Permissions).To(HaveKey("user3"))
+			Expect(shared.Permissions["user3"]).To(ConsistOf(model.ReadPermission))
+			Expect(shared.Permissions).To(HaveKey("user1"))
+			Expect(shared.Permissions["user1"]).To(ConsistOf(model.ReadPermission, model.EditPermission, model.SharePermission, model.DeletePermission))
+		})
+
+		It("populates owner permissions when only owner relation exists", func() {
+			ctx := ctxWithUser("user1", "org1")
+			filter := service.NewAssessmentFilter("user1", "org1")
+
+			assessments, err := svc.ListAssessments(ctx, filter)
+			Expect(err).To(BeNil())
+			Expect(assessments).To(HaveLen(2))
+
+			for _, a := range assessments {
+				Expect(a.Permissions).To(HaveKey("user1"))
+				Expect(a.Permissions["user1"]).To(ConsistOf(model.ReadPermission, model.EditPermission, model.SharePermission, model.DeletePermission))
+			}
+		})
+
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM snapshots;")
@@ -166,6 +208,34 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessment).To(BeNil())
 			var forbidden *service.ErrForbidden
 			Expect(errors.As(err, &forbidden)).To(BeTrue())
+		})
+
+		It("populates viewer permissions and excludes owner", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "viewer-user"))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(HaveKey("viewer-user"))
+			Expect(assessment.Permissions["viewer-user"]).To(ConsistOf(model.ReadPermission))
+			Expect(assessment.Permissions).To(HaveKey("user1"))
+			Expect(assessment.Permissions["user1"]).To(ConsistOf(model.ReadPermission, model.EditPermission, model.SharePermission, model.DeletePermission))
+		})
+
+		It("populates owner permissions when only owner relation exists", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("user1", "org1")
+			assessment, err := svc.GetAssessment(ctx, assessmentID)
+
+			Expect(err).To(BeNil())
+			Expect(assessment.Permissions).To(HaveKey("user1"))
+			Expect(assessment.Permissions["user1"]).To(ConsistOf(model.ReadPermission, model.EditPermission, model.SharePermission, model.DeletePermission))
 		})
 
 		AfterEach(func() {

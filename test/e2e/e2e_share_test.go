@@ -139,6 +139,12 @@ var _ = Describe("e2e-share", func() {
 		It("customer shares assessment, partner sees it, then unshares", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
+			// Before sharing, customer sees only owner permissions
+			customerAssessment, err := customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Permissions).ToNot(BeNil())
+			Expect(findUserPermission(customerAssessment.Permissions, "sharecustomer")).To(BeTrue())
+
 			// Partner cannot see the assessment before sharing
 			partnerAssessments, err := partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
@@ -154,6 +160,12 @@ var _ = Describe("e2e-share", func() {
 			Expect(err).To(BeNil())
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
 
+			// Customer sees viewer permission for the partner group after sharing
+			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Permissions).ToNot(BeNil())
+			Expect(len(*customerAssessment.Permissions)).To(BeNumerically(">=", 2))
+
 			// Customer unshares the assessment
 			statusCode, err = customerSvc.UnshareAssessment(assessment.Id)
 			Expect(err).To(BeNil())
@@ -163,6 +175,13 @@ var _ = Describe("e2e-share", func() {
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
+
+			// After unsharing, only owner permission remains
+			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(customerAssessment.Permissions).ToNot(BeNil())
+			Expect(*customerAssessment.Permissions).To(HaveLen(1))
+			Expect(findUserPermission(customerAssessment.Permissions, "sharecustomer")).To(BeTrue())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -231,6 +250,18 @@ func findAssessment(list *v1alpha1.AssessmentList, id uuid.UUID) bool {
 	}
 	for _, a := range *list {
 		if a.Id == id {
+			return true
+		}
+	}
+	return false
+}
+
+func findUserPermission(perms *[]v1alpha1.UserPermission, username string) bool {
+	if perms == nil {
+		return false
+	}
+	for _, p := range *perms {
+		if p.Username == username {
 			return true
 		}
 	}

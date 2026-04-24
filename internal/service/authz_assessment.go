@@ -45,7 +45,30 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *As
 	filter.Username = ""
 	filter.OrgID = ""
 
-	return a.inner.ListAssessments(ctx, filter)
+	assessments, err := a.inner.ListAssessments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	stringIDs := make([]string, 0, len(assessments))
+	for _, assessment := range assessments {
+		stringIDs = append(stringIDs, assessment.ID.String())
+	}
+
+	if len(stringIDs) == 0 {
+		return assessments, nil
+	}
+
+	relsByResource, err := a.store.Authz().ListBulkRelationship(ctx, stringIDs)
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to list bulk relationships: %w", err)
+	}
+
+	for i, assessment := range assessments {
+		assessments[i].Permissions = buildPermissionMap(relsByResource[assessment.ID.String()])
+	}
+
+	return assessments, nil
 }
 
 func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
@@ -66,7 +89,22 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		return nil, NewErrForbidden("assessment", id.String())
 	}
 
+	rels, err := a.store.Authz().ListRelationships(ctx, model.NewAssessmentResource(id.String()))
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to list relationships: %w", err)
+	}
+
+	assessment.Permissions = buildPermissionMap(rels)
+
 	return assessment, nil
+}
+
+func buildPermissionMap(rels []model.Relationship) map[string][]model.Permission {
+	perms := make(map[string][]model.Permission, len(rels))
+	for _, rel := range rels {
+		perms[rel.Subject.ID] = rel.Relation.Permissions()
+	}
+	return perms
 }
 
 func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {

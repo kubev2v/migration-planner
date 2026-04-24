@@ -400,4 +400,70 @@ var _ = Describe("authz store", Ordered, func() {
 			gormdb.Exec("DELETE FROM relations")
 		})
 	})
+
+	Context("ListBulkRelationship", func() {
+		It("returns relationships grouped by resource ID", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewUserSubject("bob")).
+				With(model.NewAssessmentResource("assess2"), model.OwnerRelation, model.NewUserSubject("charlie")).
+				Build()
+			err := s.Authz().WriteRelationships(context.TODO(), updates)
+			Expect(err).To(BeNil())
+
+			result, err := s.Authz().ListBulkRelationship(context.TODO(), []string{"assess1", "assess2"})
+			Expect(err).To(BeNil())
+			Expect(result).To(HaveLen(2))
+			Expect(result["assess1"]).To(HaveLen(2))
+			Expect(result["assess2"]).To(HaveLen(1))
+			Expect(result["assess2"][0].Subject.ID).To(Equal("charlie"))
+		})
+
+		It("returns empty map when no IDs match", func() {
+			result, err := s.Authz().ListBulkRelationship(context.TODO(), []string{"nonexistent1", "nonexistent2"})
+			Expect(err).To(BeNil())
+			Expect(result).To(BeEmpty())
+		})
+
+		It("returns only requested resource IDs", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
+				With(model.NewAssessmentResource("assess2"), model.OwnerRelation, model.NewUserSubject("bob")).
+				With(model.NewAssessmentResource("assess3"), model.OwnerRelation, model.NewUserSubject("charlie")).
+				Build()
+			err := s.Authz().WriteRelationships(context.TODO(), updates)
+			Expect(err).To(BeNil())
+
+			result, err := s.Authz().ListBulkRelationship(context.TODO(), []string{"assess1", "assess3"})
+			Expect(err).To(BeNil())
+			Expect(result).To(HaveLen(2))
+			Expect(result).To(HaveKey("assess1"))
+			Expect(result).To(HaveKey("assess3"))
+			Expect(result).NotTo(HaveKey("assess2"))
+		})
+
+		It("handles single resource ID", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				Build()
+			err := s.Authz().WriteRelationships(context.TODO(), updates)
+			Expect(err).To(BeNil())
+
+			result, err := s.Authz().ListBulkRelationship(context.TODO(), []string{"assess1"})
+			Expect(err).To(BeNil())
+			Expect(result).To(HaveLen(1))
+			Expect(result["assess1"]).To(HaveLen(2))
+		})
+
+		It("handles empty ID list", func() {
+			result, err := s.Authz().ListBulkRelationship(context.TODO(), []string{})
+			Expect(err).To(BeNil())
+			Expect(result).To(BeEmpty())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations")
+		})
+	})
 })

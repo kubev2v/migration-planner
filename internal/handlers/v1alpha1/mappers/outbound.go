@@ -283,6 +283,21 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 	assessment.SourceType = sourceType
 	assessment.SourceId = a.SourceID
 
+	if len(a.Permissions) > 0 {
+		userPerms := make([]api.UserPermission, 0, len(a.Permissions))
+		for username, perms := range a.Permissions {
+			strPerms := make([]string, len(perms))
+			for i, p := range perms {
+				strPerms[i] = p.String()
+			}
+			userPerms = append(userPerms, api.UserPermission{
+				Username:    username,
+				Permissions: strPerms,
+			})
+		}
+		assessment.Permissions = &userPerms
+	}
+
 	return assessment, nil
 }
 
