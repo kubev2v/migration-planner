@@ -1,6 +1,6 @@
 module github.com/kubev2v/migration-planner
 
-go 1.25.0
+go 1.25.7
 
 require (
 	github.com/MicahParks/jwkset v0.11.0
@@ -51,6 +51,7 @@ require (
 
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/anchore/go-lzo v0.1.0 // indirect
 	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.40.0 // indirect
@@ -64,7 +65,7 @@ require (
 	github.com/coreos/ignition/v2 v2.24.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20260306102053-7a68b5426c74 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/diskfs/go-diskfs v1.7.0 // indirect
+	github.com/diskfs/go-diskfs v1.9.1 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.1.21 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
@@ -181,7 +182,7 @@ require (
 )
 
 replace (
-	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.4.1
+	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.9.1
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
