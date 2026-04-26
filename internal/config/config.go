@@ -35,6 +35,7 @@ type svcConfig struct {
 	TempImagesDirLimit   string `envconfig:"MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT" default:""`
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
+	CostEstimation       CostEstimation
 }
 
 type Auth struct {
@@ -47,6 +48,11 @@ type Auth struct {
 type Sizer struct {
 	ServiceURL string `envconfig:"SIZER_SERVICE_URL" default:"http://migration-planner-sizer:9200"`
 	Timeout    string `envconfig:"SIZER_SERVICE_TIMEOUT" default:"60s"`
+}
+
+type CostEstimation struct {
+	ServiceURL string `envconfig:"COST_ESTIMATION_SERVICE_URL" default:"http://migration-planner-cost-estimation:9300"`
+	Timeout    string `envconfig:"COST_ESTIMATION_SERVICE_TIMEOUT" default:"60s"`
 }
 
 func New() (*Config, error) {

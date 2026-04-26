@@ -53,6 +53,9 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments/{id}/complexity-estimation)
 	CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (POST /api/v1/assessments/{id}/cost-estimation)
+	CalculateCostEstimation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (POST /api/v1/assessments/{id}/migration-estimation)
 	CalculateMigrationEstimation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
@@ -212,6 +215,11 @@ func (_ Unimplemented) GetAssessmentClusterRequirementsStoredInput(w http.Respon
 
 // (POST /api/v1/assessments/{id}/complexity-estimation)
 func (_ Unimplemented) CalculateMigrationComplexity(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/assessments/{id}/cost-estimation)
+func (_ Unimplemented) CalculateCostEstimation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -669,6 +677,32 @@ func (siw *ServerInterfaceWrapper) CalculateMigrationComplexity(w http.ResponseW
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CalculateMigrationComplexity(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CalculateCostEstimation operation middleware
+func (siw *ServerInterfaceWrapper) CalculateCostEstimation(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CalculateCostEstimation(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1635,6 +1669,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/complexity-estimation", wrapper.CalculateMigrationComplexity)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/assessments/{id}/cost-estimation", wrapper.CalculateCostEstimation)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/migration-estimation", wrapper.CalculateMigrationEstimation)
 	})
 	r.Group(func(r chi.Router) {
@@ -2377,6 +2414,78 @@ type CalculateMigrationComplexity500JSONResponse Error
 func (response CalculateMigrationComplexity500JSONResponse) VisitCalculateMigrationComplexityResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimationRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *CalculateCostEstimationJSONRequestBody
+}
+
+type CalculateCostEstimationResponseObject interface {
+	VisitCalculateCostEstimationResponse(w http.ResponseWriter) error
+}
+
+type CalculateCostEstimation200JSONResponse CostEstimationResponse
+
+func (response CalculateCostEstimation200JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation400JSONResponse Error
+
+func (response CalculateCostEstimation400JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation401JSONResponse Error
+
+func (response CalculateCostEstimation401JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation403JSONResponse Error
+
+func (response CalculateCostEstimation403JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation404JSONResponse Error
+
+func (response CalculateCostEstimation404JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation500JSONResponse Error
+
+func (response CalculateCostEstimation500JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateCostEstimation503JSONResponse Error
+
+func (response CalculateCostEstimation503JSONResponse) VisitCalculateCostEstimationResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -4094,6 +4203,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments/{id}/complexity-estimation)
 	CalculateMigrationComplexity(ctx context.Context, request CalculateMigrationComplexityRequestObject) (CalculateMigrationComplexityResponseObject, error)
 
+	// (POST /api/v1/assessments/{id}/cost-estimation)
+	CalculateCostEstimation(ctx context.Context, request CalculateCostEstimationRequestObject) (CalculateCostEstimationResponseObject, error)
+
 	// (POST /api/v1/assessments/{id}/migration-estimation)
 	CalculateMigrationEstimation(ctx context.Context, request CalculateMigrationEstimationRequestObject) (CalculateMigrationEstimationResponseObject, error)
 
@@ -4537,6 +4649,39 @@ func (sh *strictHandler) CalculateMigrationComplexity(w http.ResponseWriter, r *
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CalculateMigrationComplexityResponseObject); ok {
 		if err := validResponse.VisitCalculateMigrationComplexityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CalculateCostEstimation operation middleware
+func (sh *strictHandler) CalculateCostEstimation(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request CalculateCostEstimationRequestObject
+
+	request.Id = id
+
+	var body CalculateCostEstimationJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CalculateCostEstimation(ctx, request.(CalculateCostEstimationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CalculateCostEstimation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CalculateCostEstimationResponseObject); ok {
+		if err := validResponse.VisitCalculateCostEstimationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

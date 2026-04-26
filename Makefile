@@ -30,6 +30,9 @@ PKG_MANAGER ?= apt
 SIZER_IMAGE ?= quay.io/redhat-user-workloads/odf-sizer-lib-tenant/sizer
 SIZER_IMAGE_TAG ?= latest
 SIZER_PORT ?= 9200
+COST_ESTIMATION_IMAGE ?= quay.io/redhat-user-workloads/oma-tenant/cost-estimation
+COST_ESTIMATION_IMAGE_TAG ?= latest
+COST_ESTIMATION_PORT ?= 9300
 
 # OPA Configuration for eval mode
 MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
@@ -127,6 +130,21 @@ run-sizer:
 	@echo "   Health: http://localhost:$(SIZER_PORT)/health"
 	@echo "   API:    http://localhost:$(SIZER_PORT)/api/v1/size/custom"
 
+run-ce:
+	@echo "🚀 Starting cost-estimation service container on port $(COST_ESTIMATION_PORT)..."
+	@$(PODMAN) rm -f migration-planner-cost-estimation-local 2>/dev/null || true
+	@$(PODMAN) run -d --name migration-planner-cost-estimation-local \
+		-p $(COST_ESTIMATION_PORT):$(COST_ESTIMATION_PORT) \
+		-e PORT=$(COST_ESTIMATION_PORT) \
+		$(COST_ESTIMATION_IMAGE):$(COST_ESTIMATION_IMAGE_TAG)
+	@echo "✅ Cost-estimation service running at http://localhost:$(COST_ESTIMATION_PORT)"
+	@echo "   Health: http://localhost:$(COST_ESTIMATION_PORT)/healthz"
+	@echo "   API:    http://localhost:$(COST_ESTIMATION_PORT)/v1/cost-estimation"
+
+stop-ce:
+	@echo "🛑 Stopping cost-estimation service container..."
+	@$(PODMAN) rm -f migration-planner-cost-estimation-local 2>/dev/null || true
+	@echo "✅ Cost-estimation service stopped"
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -454,7 +472,7 @@ clean-opa-policies:
 	@echo "Cleaning OPA policies..."
 	@rm -rf $(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)
 
-.PHONY: run-sizer
+.PHONY: run-sizer run-ce stop-ce
 
 # include the deployment targets
 include deploy/deploy.mk

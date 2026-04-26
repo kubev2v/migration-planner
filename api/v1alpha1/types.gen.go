@@ -346,6 +346,82 @@ type ComplexityOSScoreEntry struct {
 	VmCount int `json:"vmCount"`
 }
 
+// CostEstimationBreakdown Breakdown of cost estimation
+type CostEstimationBreakdown struct {
+	AdditionalStorageCosts      float64 `json:"additionalStorageCosts"`
+	AnsibleAutomationPlatform   float64 `json:"ansibleAutomationPlatform"`
+	MigrationConsultingServices float64 `json:"migrationConsultingServices"`
+	SoftwareSubscriptions       float64 `json:"softwareSubscriptions"`
+	SwingHardwareUpgrades       float64 `json:"swingHardwareUpgrades"`
+	ThirdPartyIsvCosts          float64 `json:"thirdPartyIsvCosts"`
+}
+
+// CostEstimationDiscounts Discount percentages for cost estimation
+type CostEstimationDiscounts struct {
+	// AapDiscountPct Ansible Automation Platform discount percentage
+	AapDiscountPct *float64 `json:"aapDiscountPct,omitempty"`
+
+	// RedhatDiscountPct Red Hat discount percentage
+	RedhatDiscountPct *float64 `json:"redhatDiscountPct,omitempty"`
+
+	// VcfDiscountPct VMware VCF discount percentage
+	VcfDiscountPct *float64 `json:"vcfDiscountPct,omitempty"`
+
+	// VvfDiscountPct VMware VVF discount percentage
+	VvfDiscountPct *float64 `json:"vvfDiscountPct,omitempty"`
+}
+
+// CostEstimationRequest Request for TCO cost estimation
+type CostEstimationRequest struct {
+	// ClusterId ID of the VMware cluster
+	ClusterId string `json:"clusterId"`
+
+	// Discounts Discount percentages for cost estimation
+	Discounts *CostEstimationDiscounts `json:"discounts,omitempty"`
+}
+
+// CostEstimationResponse TCO cost estimation response
+type CostEstimationResponse struct {
+	// CalculatorVersion Version of the cost calculator
+	CalculatorVersion string `json:"calculatorVersion"`
+
+	// Results TCO comparison results for different scenarios
+	Results CostEstimationResults `json:"results"`
+
+	// Savings Savings comparison (only included when OpenShift is cheaper)
+	Savings CostEstimationSavings `json:"savings"`
+}
+
+// CostEstimationResults TCO comparison results for different scenarios
+type CostEstimationResults struct {
+	// OpenshiftVirtualization Cost estimation for a specific scenario
+	OpenshiftVirtualization CostEstimationScenario `json:"openshiftVirtualization"`
+
+	// VmwareVcf Cost estimation for a specific scenario
+	VmwareVcf CostEstimationScenario `json:"vmwareVcf"`
+
+	// VmwareVvf Cost estimation for a specific scenario
+	VmwareVvf CostEstimationScenario `json:"vmwareVvf"`
+}
+
+// CostEstimationSavings Savings comparison (only included when OpenShift is cheaper)
+type CostEstimationSavings struct {
+	// VsVcf Savings compared to a VMware reference scenario
+	VsVcf *SavingsVsReference `json:"vsVcf,omitempty"`
+
+	// VsVvf Savings compared to a VMware reference scenario
+	VsVvf *SavingsVsReference `json:"vsVvf,omitempty"`
+}
+
+// CostEstimationScenario Cost estimation for a specific scenario
+type CostEstimationScenario struct {
+	// Breakdown Breakdown of cost estimation
+	Breakdown CostEstimationBreakdown `json:"breakdown"`
+
+	// TotalThreeYearCostEstimation Total 3-year cost estimation in USD
+	TotalThreeYearCostEstimation float64 `json:"totalThreeYearCostEstimation"`
+}
+
 // Customer defines model for Customer.
 type Customer struct {
 	ContactName  string `json:"contactName"`
@@ -745,6 +821,15 @@ type PartnerSummary struct {
 	Name    string             `json:"name"`
 }
 
+// SavingsVsReference Savings compared to a VMware reference scenario
+type SavingsVsReference struct {
+	// AbsoluteThreeYearUsd Absolute savings in USD over 3 years
+	AbsoluteThreeYearUsd float64 `json:"absoluteThreeYearUsd"`
+
+	// Percentage Savings as percentage of VMware reference TCO
+	Percentage float64 `json:"percentage"`
+}
+
 // SchemaEstimationResult Estimation results for a single schema
 type SchemaEstimationResult struct {
 	// Breakdown Per-calculator results
@@ -1010,6 +1095,9 @@ type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirements
 
 // CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
 type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
+
+// CalculateCostEstimationJSONRequestBody defines body for CalculateCostEstimation for application/json ContentType.
+type CalculateCostEstimationJSONRequestBody = CostEstimationRequest
 
 // CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
 type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest

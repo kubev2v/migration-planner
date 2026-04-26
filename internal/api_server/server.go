@@ -160,6 +160,14 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
+	// Initialize cost estimation client
+	costEstimationTimeout, err := time.ParseDuration(s.cfg.Service.CostEstimation.Timeout)
+	if err != nil {
+		zap.S().Named("api_server").Warnf("Invalid cost estimation timeout, using default 60s: %v", err)
+		costEstimationTimeout = 60 * time.Second
+	}
+	costEstimationClient := client.NewCostEstimationClient(s.cfg.Service.CostEstimation.ServiceURL, costEstimationTimeout)
+
 	accountsSvc := service.NewAccountsService(s.store)
 
 	var assessmentSvc service.AssessmentServicer
@@ -174,6 +182,8 @@ func (s *Server) Run(ctx context.Context) error {
 		partnerSvc = service.NewAuthzPartnerService(partnerSvc, accountsSvc, s.store)
 	}
 
+	costEstimationSvc := service.NewCostEstimationService(costEstimationClient, s.store, accountsSvc)
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
@@ -182,6 +192,7 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewEstimationService(s.store),
 		accountsSvc,
 		partnerSvc,
+		costEstimationSvc,
 	)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}

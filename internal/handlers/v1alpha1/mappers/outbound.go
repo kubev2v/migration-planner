@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -511,4 +512,48 @@ func estimationDetailToAPI(est estimation.Estimation) api.EstimationDetail {
 		detail.Duration = &d
 	}
 	return detail
+}
+
+// CostEstimationResponseToAPI converts the client response to the API response type
+func CostEstimationResponseToAPI(resp *client.CostEstimationResponse) api.CostEstimationResponse {
+	return api.CostEstimationResponse{
+		CalculatorVersion: resp.CalculatorVersion,
+		Results: api.CostEstimationResults{
+			VmwareVcf:               costEstimationScenarioToAPI(resp.Results.VmwareVcf),
+			VmwareVvf:               costEstimationScenarioToAPI(resp.Results.VmwareVvf),
+			OpenshiftVirtualization: costEstimationScenarioToAPI(resp.Results.OpenshiftVirtualization),
+		},
+		Savings: costEstimationSavingsToAPI(resp.Savings),
+	}
+}
+
+func costEstimationScenarioToAPI(scenario client.CostEstimationScenario) api.CostEstimationScenario {
+	return api.CostEstimationScenario{
+		TotalThreeYearCostEstimation: scenario.TotalThreeYearCostEstimation,
+		Breakdown: api.CostEstimationBreakdown{
+			SoftwareSubscriptions:       scenario.Breakdown.SoftwareSubscriptions,
+			AnsibleAutomationPlatform:   scenario.Breakdown.AnsibleAutomationPlatform,
+			MigrationConsultingServices: scenario.Breakdown.MigrationConsultingServices,
+			SwingHardwareUpgrades:       scenario.Breakdown.SwingHardwareUpgrades,
+			AdditionalStorageCosts:      scenario.Breakdown.AdditionalStorageCosts,
+			ThirdPartyIsvCosts:          scenario.Breakdown.ThirdPartyIsvCosts,
+		},
+	}
+}
+
+func costEstimationSavingsToAPI(savings client.CostEstimationSavings) api.CostEstimationSavings {
+	result := api.CostEstimationSavings{}
+	if savings.VsVcf != nil {
+		result.VsVcf = &api.SavingsVsReference{
+			AbsoluteThreeYearUsd: savings.VsVcf.AbsoluteThreeYearUsd,
+			Percentage:           savings.VsVcf.Percentage,
+		}
+	}
+	if savings.VsVvf != nil {
+		result.VsVvf = &api.SavingsVsReference{
+			AbsoluteThreeYearUsd: savings.VsVvf.AbsoluteThreeYearUsd,
+			Percentage:           savings.VsVvf.Percentage,
+		}
+	}
+	return result
 }

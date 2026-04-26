@@ -16,13 +16,14 @@ import (
 )
 
 type ServiceHandler struct {
-	sourceSrv     *service.SourceService
-	assessmentSrv service.AssessmentServicer
-	jobSrv        *service.JobService
-	sizerSrv      *service.SizerService
-	estimationSrv *service.EstimationService
-	accountsSrv   *service.AccountsService
-	partnerSrv    service.PartnerServicer
+	sourceSrv         *service.SourceService
+	assessmentSrv     service.AssessmentServicer
+	jobSrv            *service.JobService
+	sizerSrv          *service.SizerService
+	estimationSrv     *service.EstimationService
+	accountsSrv       *service.AccountsService
+	partnerSrv        service.PartnerServicer
+	costEstimationSrv *service.CostEstimationService
 }
 
 func NewServiceHandler(
@@ -33,15 +34,17 @@ func NewServiceHandler(
 	estimation *service.EstimationService,
 	accounts *service.AccountsService,
 	partner service.PartnerServicer,
+	costEstimation *service.CostEstimationService,
 ) *ServiceHandler {
 	return &ServiceHandler{
-		sourceSrv:     sourceService,
-		assessmentSrv: a,
-		jobSrv:        j,
-		sizerSrv:      sizer,
-		estimationSrv: estimation,
-		accountsSrv:   accounts,
-		partnerSrv:    partner,
+		sourceSrv:         sourceService,
+		assessmentSrv:     a,
+		jobSrv:            j,
+		sizerSrv:          sizer,
+		estimationSrv:     estimation,
+		accountsSrv:       accounts,
+		partnerSrv:        partner,
+		costEstimationSrv: costEstimation,
 	}
 }
 

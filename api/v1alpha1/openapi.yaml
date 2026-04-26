@@ -1012,6 +1012,69 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/assessments/{id}/cost-estimation:
+    post:
+      tags:
+        - assessment
+      description: Calculate TCO cost estimation for an assessment cluster (partner-only)
+      operationId: calculateCostEstimation
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CostEstimationRequest"
+        required: true
+      responses:
+        "200":
+          description: Cost estimation calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CostEstimationResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden - requires partner access
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Cost estimation service unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/rvtools:
     post:
       tags:
@@ -3250,6 +3313,151 @@ components:
         - osName
         - score
         - vmCount
+
+    CostEstimationRequest:
+      type: object
+      description: Request for TCO cost estimation
+      properties:
+        clusterId:
+          type: string
+          description: ID of the VMware cluster
+        discounts:
+          $ref: "#/components/schemas/CostEstimationDiscounts"
+      required:
+        - clusterId
+
+    CostEstimationDiscounts:
+      type: object
+      description: Discount percentages for cost estimation
+      properties:
+        vcfDiscountPct:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: VMware VCF discount percentage
+        vvfDiscountPct:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: VMware VVF discount percentage
+        redhatDiscountPct:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Red Hat discount percentage
+        aapDiscountPct:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          default: 0
+          description: Ansible Automation Platform discount percentage
+
+    CostEstimationResponse:
+      type: object
+      description: TCO cost estimation response
+      properties:
+        calculatorVersion:
+          type: string
+          description: Version of the cost calculator
+        results:
+          $ref: "#/components/schemas/CostEstimationResults"
+        savings:
+          $ref: "#/components/schemas/CostEstimationSavings"
+      required:
+        - calculatorVersion
+        - results
+        - savings
+
+    CostEstimationResults:
+      type: object
+      description: TCO comparison results for different scenarios
+      properties:
+        vmwareVcf:
+          $ref: "#/components/schemas/CostEstimationScenario"
+        vmwareVvf:
+          $ref: "#/components/schemas/CostEstimationScenario"
+        openshiftVirtualization:
+          $ref: "#/components/schemas/CostEstimationScenario"
+      required:
+        - vmwareVcf
+        - vmwareVvf
+        - openshiftVirtualization
+
+    CostEstimationSavings:
+      type: object
+      description: Savings comparison (only included when OpenShift is cheaper)
+      properties:
+        vsVcf:
+          $ref: "#/components/schemas/SavingsVsReference"
+        vsVvf:
+          $ref: "#/components/schemas/SavingsVsReference"
+
+    CostEstimationScenario:
+      type: object
+      description: Cost estimation for a specific scenario
+      properties:
+        totalThreeYearCostEstimation:
+          type: number
+          format: double
+          description: Total 3-year cost estimation in USD
+        breakdown:
+          $ref: "#/components/schemas/CostEstimationBreakdown"
+      required:
+        - totalThreeYearCostEstimation
+        - breakdown
+
+    CostEstimationBreakdown:
+      type: object
+      description: Breakdown of cost estimation
+      properties:
+        softwareSubscriptions:
+          type: number
+          format: double
+        ansibleAutomationPlatform:
+          type: number
+          format: double
+        migrationConsultingServices:
+          type: number
+          format: double
+        swingHardwareUpgrades:
+          type: number
+          format: double
+        additionalStorageCosts:
+          type: number
+          format: double
+        thirdPartyIsvCosts:
+          type: number
+          format: double
+      required:
+        - softwareSubscriptions
+        - ansibleAutomationPlatform
+        - migrationConsultingServices
+        - swingHardwareUpgrades
+        - additionalStorageCosts
+        - thirdPartyIsvCosts
+
+    SavingsVsReference:
+      type: object
+      description: Savings compared to a VMware reference scenario
+      properties:
+        absoluteThreeYearUsd:
+          type: number
+          format: double
+          description: Absolute savings in USD over 3 years
+        percentage:
+          type: number
+          format: double
+          description: Savings as percentage of VMware reference TCO
+      required:
+        - absoluteThreeYearUsd
+        - percentage
 
     ClusterSizing:
       type: object

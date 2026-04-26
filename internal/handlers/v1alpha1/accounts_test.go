@@ -40,7 +40,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 		s = store.NewStore(db)
 		gormdb = db
 		accountsSvc := service.NewAccountsService(s)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, accountsSvc, service.NewPartnerService(s, accountsSvc))
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, accountsSvc, service.NewPartnerService(s, accountsSvc), nil)
 	})
 
 	AfterAll(func() {
