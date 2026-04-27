@@ -1,0 +1,7 @@
+{{- /*
+VCenter Version Query Template - Extracts the vCenter api version from vInfo.
+*/ -}}
+SELECT DISTINCT "VI SDK API Version" as "vcenter_version"
+FROM vinfo
+WHERE "VI SDK API Version" IS NOT NULL
+LIMIT 1;

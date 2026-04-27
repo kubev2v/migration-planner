@@ -2177,6 +2177,9 @@ components:
         vcenter_id:
           type: string
           description: ID of the vCenter
+        vcenter_version:
+          type: string
+          description: Version of the vCenter api. For example "8.0.3.0"
         clusters:
           type: object
           additionalProperties:

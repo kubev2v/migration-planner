@@ -332,6 +332,11 @@ func (b *QueryBuilder) VCenterQuery() (string, error) {
 	return b.buildQuery("vcenter_query", mustGetTemplate("vcenter_query"), nil)
 }
 
+// VCenterVersionQuery builds the vCenter version query.
+func (b *QueryBuilder) VCenterVersionQuery() (string, error) {
+	return b.buildQuery("vcenter_version_query", mustGetTemplate("vcenter_version_query"), nil)
+}
+
 // VMsWithSharedDisksCountQuery builds the VMs with shared disks count query.
 func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, error) {
 	params := queryParams{

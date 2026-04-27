@@ -466,6 +466,23 @@ func (p *Parser) VCenterID(ctx context.Context) (string, error) {
 	return vcenterID, nil
 }
 
+// VCenterVersion returns the vCenter full api version.
+func (p *Parser) VCenterVersion(ctx context.Context) (string, error) {
+	q, err := p.builder.VCenterVersionQuery()
+	if err != nil {
+		return "", fmt.Errorf("building vcenter version query: %w", err)
+	}
+	var vcenterVersion string
+	if err := p.db.QueryRowContext(ctx, q).Scan(&vcenterVersion); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", nil
+		}
+		return "", fmt.Errorf("scanning vcenter version: %w", err)
+	}
+
+	return vcenterVersion, nil
+}
+
 // DatacenterCount returns count of unique datacenters.
 func (p *Parser) DatacenterCount(ctx context.Context) (int, error) {
 	q, err := p.builder.DatacenterCountQuery()
