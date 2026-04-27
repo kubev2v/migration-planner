@@ -219,7 +219,7 @@ deploy-on-openshift: oc
        -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
-       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
+       -p MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
@@ -241,7 +241,7 @@ delete-from-openshift: oc
        -p SIZER_PORT=$(SIZER_PORT) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
-       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
+       -p MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
 	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
@@ -260,7 +260,7 @@ deploy-on-kind: oc
 	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
+	   -p MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
@@ -278,7 +278,7 @@ delete-from-kind: oc
 	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
+	   -p MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL=http://$${inet_ip}:11443 \
 	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \

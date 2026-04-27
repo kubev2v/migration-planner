@@ -3,12 +3,16 @@ package service
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/kubev2v/migration-planner/internal/config"
 
 	"golang.org/x/sync/singleflight"
 
@@ -28,8 +32,10 @@ import (
 )
 
 const (
-	imageTTL           = 30 * time.Minute
-	estimatedImageSize = 3 * 1024 * 1024 * 1024 // 3 GiB
+	// imageExpirationTime define the expiration of the image download URL
+	imageExpirationTime = 4 * time.Hour
+	estimatedImageSize  = 3 * 1024 * 1024 * 1024 // 3 GiB
+	tokenEtagSep        = "+"                    // valid jwt and sha256 shouldn't contain '+'
 )
 
 type fileInfo struct {
@@ -40,74 +46,43 @@ type ImageSvc struct {
 	store         store.Store
 	tempImagesDir string
 	dirLimit      string
+	baseUrl       string
 	g             singleflight.Group
 }
 
-func NewImageSvc(s store.Store, tempImagesDir, tempImagesDirLimit string) *ImageSvc {
+func NewImageSvc(s store.Store, config *config.Config) *ImageSvc {
 	return &ImageSvc{
 		store:         s,
-		tempImagesDir: tempImagesDir,
-		dirLimit:      tempImagesDirLimit,
+		tempImagesDir: config.Service.TempImagesDir,
+		dirLimit:      config.Service.TempImagesDirLimit,
+		baseUrl:       config.Service.BaseImageEndpointUrl,
 	}
 }
 
-func (i *ImageSvc) GenerateOVA(ctx context.Context, sourceId string) (string, string, error) {
-	source, err := i.getSource(ctx, sourceId)
+func (i *ImageSvc) FilePath(etag string) string {
+	return filepath.Join(i.tempImagesDir, fmt.Sprintf("%s.ova", etag))
+}
+
+func (i *ImageSvc) GenerateDownloadURL(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
+	source, err := i.getSource(ctx, id.String())
 	if err != nil {
-		return "", "", err
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return "", time.Time{}, NewErrSourceNotFound(id)
+		}
+		return "", time.Time{}, fmt.Errorf("failed to get source %s: %w", id, err)
 	}
 
-	b := image.NewImageBuilder(source.ImageInfra.SourceID).WithImageInfra(source.ImageInfra)
-	etag, err := b.Etag()
+	etag, err := i.generateOVA(ctx, source)
 	if err != nil {
-		return "", "", err
+		return "", time.Time{}, err
 	}
 
-	tmpfile := filepath.Join(i.tempImagesDir, fmt.Sprintf("%s.ova", etag))
-	v, err, _ := i.g.Do(etag, func() (interface{}, error) {
-
-		if _, err := os.Stat(tmpfile); err == nil {
-			return tmpfile, nil
-		}
-
-		if err := i.ensureEnoughSpace(); err != nil {
-			return nil, err
-		}
-
-		f, err := os.Create(tmpfile)
-		if err != nil {
-			return nil, err
-		}
-
-		removeFile := false
-		defer func() {
-			_ = f.Close()
-			if removeFile {
-				_ = os.Remove(tmpfile)
-			}
-		}()
-
-		token, err := i.generateAgentToken(ctx, source)
-		if err != nil {
-			removeFile = true
-			return nil, err
-		}
-
-		if err := b.WithAgentToken(token).Generate(f); err != nil {
-			removeFile = true
-			metrics.IncreaseOvaDownloadsTotalMetric("failed")
-			return nil, err
-		}
-
-		metrics.IncreaseOvaDownloadsTotalMetric("successful")
-		return tmpfile, nil
-	})
-
+	url, expireAt, err := i.downloadURL(source, etag)
 	if err != nil {
-		return "", "", err
+		return "", time.Time{}, err
 	}
 
-	return v.(string), etag, nil
+	return url, expireAt, err
 }
 
 func (i *ImageSvc) ValidateToken(ctx context.Context, token string) error {
@@ -147,6 +122,28 @@ func (i *ImageSvc) UpdateAgentVersion(sourceId string) {
 	}
 
 	zap.S().Named("image_service").Infow("stored agent version", "source_id", sourceId, "agent_version", versionInfo.AgentVersionName)
+}
+
+func (i *ImageSvc) ParseTokenETag(input string) (string, string, error) {
+	var token, etag string
+
+	parts := strings.Split(input, tokenEtagSep)
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("invalid format")
+	}
+
+	token = parts[0]
+	etag = parts[1]
+
+	if token == "" || etag == "" {
+		return "", "", fmt.Errorf("missing token or etag")
+	}
+
+	return token, etag, nil
+}
+
+func (i *ImageSvc) buildTokenETag(token, etag string) string {
+	return token + tokenEtagSep + etag
 }
 
 func (i *ImageSvc) cleanOldFiles(files ...fileInfo) error {
@@ -215,7 +212,7 @@ func (i *ImageSvc) listFilesSplitByAge(cutoff time.Duration) ([]fileInfo, []file
 }
 
 func (i *ImageSvc) ensureEnoughSpace() error {
-	staleFiles, activeFiles, dirSize, err := i.listFilesSplitByAge(imageTTL)
+	staleFiles, activeFiles, dirSize, err := i.listFilesSplitByAge(imageExpirationTime)
 	if err != nil {
 		return err
 	}
@@ -264,6 +261,60 @@ func (i *ImageSvc) hasSpace(required uint64, directorySize int64) (bool, error) 
 	available := stat.Bavail * uint64(stat.Bsize)
 
 	return available > required, nil
+}
+
+func (i *ImageSvc) generateOVA(ctx context.Context, source *model.Source) (string, error) {
+	b := image.NewImageBuilder(source.ImageInfra.SourceID).WithImageInfra(source.ImageInfra)
+	etag, err := b.Etag()
+	if err != nil {
+		return "", err
+	}
+
+	tmpfile := i.FilePath(etag)
+	_, err, _ = i.g.Do(etag, func() (interface{}, error) {
+
+		if _, err := os.Stat(tmpfile); err == nil {
+			return tmpfile, nil
+		}
+
+		if err := i.ensureEnoughSpace(); err != nil {
+			return nil, err
+		}
+
+		f, err := os.Create(tmpfile)
+		if err != nil {
+			return nil, err
+		}
+
+		removeFile := false
+		defer func() {
+			_ = f.Close()
+			if removeFile {
+				_ = os.Remove(tmpfile)
+			}
+		}()
+
+		token, err := i.generateAgentToken(ctx, source)
+		if err != nil {
+			removeFile = true
+			return nil, err
+		}
+
+		if err := b.WithAgentToken(token).Generate(f); err != nil {
+			removeFile = true
+			metrics.IncreaseOvaDownloadsTotalMetric("failed")
+			return nil, err
+		}
+
+		metrics.IncreaseOvaDownloadsTotalMetric("successful")
+		return tmpfile, nil
+	})
+
+	if err != nil {
+		return "", err
+	}
+
+	return etag, nil
 }
 
 func (i *ImageSvc) getSource(ctx context.Context, sourceId string) (*model.Source, error) {
@@ -321,4 +372,53 @@ func (i *ImageSvc) generateAgentToken(ctx context.Context, source *model.Source)
 	}
 
 	return token, nil
+}
+
+func (i *ImageSvc) buildURL(suffix string, insecure bool, params map[string]string) (string, error) {
+	base, err := url.Parse(i.baseUrl)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse image service base URL: %v", err)
+	}
+	downloadURL := url.URL{
+		Scheme: base.Scheme,
+		Host:   base.Host,
+		Path:   path.Join(base.Path, suffix),
+	}
+	queryValues := url.Values{}
+	for k, v := range params {
+		if v != "" {
+			queryValues.Set(k, v)
+		}
+	}
+	downloadURL.RawQuery = queryValues.Encode()
+	if insecure {
+		downloadURL.Scheme = "http"
+	}
+	return downloadURL.String(), nil
+}
+
+func (i *ImageSvc) downloadURL(source *model.Source, etag string) (string, time.Time, error) {
+	token, exp, err := jwtForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), imageExpirationTime, source.ID.String())
+	if err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to sign image URL: %v", err)
+	}
+
+	path := fmt.Sprintf("%s/%s/%s.ova", "/api/v1/image/bytoken/", i.buildTokenETag(token, etag), source.Name)
+	shortURL, err := i.buildURL(path, false, map[string]string{})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return shortURL, exp, err
+}
+
+func jwtForSymmetricKey(key []byte, expiration time.Duration, sub string) (string, time.Time, error) {
+	expTime := time.Now().Add(expiration)
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"exp": expTime.Unix(),
+		"sub": sub,
+	})
+
+	signed, err := token.SignedString(key)
+	return signed, expTime, err
 }

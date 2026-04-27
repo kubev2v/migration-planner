@@ -2,8 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
-	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
@@ -11,8 +12,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/image"
 	"github.com/kubev2v/migration-planner/pkg/version"
 )
 
@@ -26,27 +25,6 @@ func NewSourceService(store store.Store, opaValidator *opa.Validator) *SourceSer
 		store:        store,
 		opaValidator: opaValidator,
 	}
-}
-
-// TODO should be moved to ImageService (to be created)
-func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
-	source, err := s.store.Source().Get(ctx, id)
-	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			return "", time.Now(), NewErrSourceNotFound(id)
-		}
-		return "", time.Time{}, err
-	}
-
-	// FIXME: refactor the environment vars + config.yaml
-	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
-
-	url, expireAt, err := image.GenerateDownloadURLByToken(baseUrl, source)
-	if err != nil {
-		return "", time.Time{}, err
-	}
-
-	return url, time.Time(*expireAt), err
 }
 
 func (s *SourceService) ListSources(ctx context.Context, filter *SourceFilter) ([]model.Source, error) {
@@ -74,7 +52,7 @@ func (s *SourceService) GetSource(ctx context.Context, id uuid.UUID) (*model.Sou
 
 func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.SourceCreateForm) (model.Source, error) {
 	// Generate a signing key for tokens for the source
-	imageTokenKey, err := image.HMACKey(32)
+	imageTokenKey, err := hmacKey(32)
 	if err != nil {
 		return model.Source{}, err
 	}
@@ -291,4 +269,19 @@ func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
 		", but the current system version is " + currentVersion +
 		". Consider downloading a new OVA to ensure compatibility."
 	return &message
+}
+
+// hmacKey generates a hex string representing n random bytes
+//
+// This string is intended to be used as a private key for signing and
+// verifying jwt tokens. Specifically ones used for downloading images
+// when using rhsso auth and the image service.
+func hmacKey(n int) (string, error) {
+	buf := make([]byte, n)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(buf), nil
 }

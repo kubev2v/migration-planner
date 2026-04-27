@@ -3,8 +3,10 @@ package service_test
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,7 +14,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	imgpkg "github.com/kubev2v/migration-planner/pkg/image"
 	"github.com/kubev2v/migration-planner/pkg/iso"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -98,7 +99,10 @@ var _ = Describe("image service", Ordered, func() {
 			var err error
 			tmpDir, err = os.MkdirTemp("", "image-svc-validate-*")
 			Expect(err).NotTo(HaveOccurred())
-			imgSvc = service.NewImageSvc(s, tmpDir, "")
+			c, err := config.New()
+			Expect(err).NotTo(HaveOccurred())
+			c.Service.TempImagesDir = tmpDir
+			imgSvc = service.NewImageSvc(s, c)
 		})
 
 		AfterEach(func() {
@@ -144,7 +148,10 @@ var _ = Describe("image service", Ordered, func() {
 			var err error
 			tmpDir, err = os.MkdirTemp("", "image-svc-token-*")
 			Expect(err).NotTo(HaveOccurred())
-			imgSvc = service.NewImageSvc(s, tmpDir, "")
+			c, err := config.New()
+			Expect(err).NotTo(HaveOccurred())
+			c.Service.TempImagesDir = tmpDir
+			imgSvc = service.NewImageSvc(s, c)
 
 			srcSvc := service.NewSourceService(s, nil)
 			created, err := srcSvc.CreateSource(context.Background(), mappers.SourceCreateForm{
@@ -170,29 +177,37 @@ var _ = Describe("image service", Ordered, func() {
 			err := imgSvc.ValidateToken(context.Background(), "not-a-jwt")
 			Expect(err).To(HaveOccurred())
 		})
+	})
 
-		It("rejects a token signed with a different key", func() {
-			otherKey := make([]byte, 32)
-			for i := range otherKey {
-				otherKey[i] = 0xAB
-			}
-			wrongToken, err := imgpkg.JWTForSymmetricKey(otherKey, time.Hour, sourceID.String())
+	Describe("ParseTokenETag", func() {
+		var imgSvc *service.ImageSvc
+
+		BeforeEach(func() {
+			c, err := config.New()
 			Expect(err).NotTo(HaveOccurred())
-
-			err = imgSvc.ValidateToken(context.Background(), wrongToken)
-			Expect(err).To(HaveOccurred())
+			imgSvc = service.NewImageSvc(s, c)
 		})
 
-		It("accepts a token from JWTForSymmetricKey with the source image key", func() {
-			token, err := imgpkg.JWTForSymmetricKey([]byte(tokenKey), time.Hour, sourceID.String())
-			Expect(err).NotTo(HaveOccurred())
+		It("returns an error when the separator is missing", func() {
+			_, _, err := imgSvc.ParseTokenETag("only-one-part")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("invalid format"))
+		})
 
-			err = imgSvc.ValidateToken(context.Background(), token)
-			Expect(err).NotTo(HaveOccurred())
+		It("returns an error when the token part is empty", func() {
+			_, _, err := imgSvc.ParseTokenETag("+etagvalue")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("missing token or etag"))
+		})
+
+		It("returns an error when the etag part is empty", func() {
+			_, _, err := imgSvc.ParseTokenETag("tokensegment+")
+			Expect(err).To(HaveOccurred())
+			Expect(err.Error()).To(ContainSubstring("missing token or etag"))
 		})
 	})
 
-	Describe("GenerateOVA", func() {
+	Describe("GenerateDownloadURL", func() {
 		var (
 			imgSvc *service.ImageSvc
 			tmpDir string
@@ -200,34 +215,34 @@ var _ = Describe("image service", Ordered, func() {
 
 		BeforeEach(func() {
 			var err error
-			tmpDir, err = os.MkdirTemp("", "image-svc-ova-*")
+			tmpDir, err = os.MkdirTemp("", "image-svc-gendurl-*")
 			Expect(err).NotTo(HaveOccurred())
-			imgSvc = service.NewImageSvc(s, tmpDir, "")
+			c, err := config.New()
+			Expect(err).NotTo(HaveOccurred())
+			c.Service.TempImagesDir = tmpDir
+			imgSvc = service.NewImageSvc(s, c)
 		})
 
 		AfterEach(func() {
 			_ = os.RemoveAll(tmpDir)
+			gormdb.Exec("DELETE FROM keys;")
 			gormdb.Exec("DELETE FROM labels;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM image_infras;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
 
-		It("returns an error for an invalid source ID", func() {
-			_, _, err := imgSvc.GenerateOVA(context.Background(), "bad-id")
+		It("returns ErrResourceNotFound when the source does not exist", func() {
+			_, _, err := imgSvc.GenerateDownloadURL(context.Background(), uuid.New())
 			Expect(err).To(HaveOccurred())
-			Expect(err.Error()).To(ContainSubstring("invalid source ID"))
-		})
-
-		It("returns an error when the source does not exist", func() {
-			_, _, err := imgSvc.GenerateOVA(context.Background(), uuid.NewString())
-			Expect(err).To(HaveOccurred())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
 		})
 	})
 
 	// Full OVA build needs RHCOS ISO, data/ignition.template, data/MigrationAssessment.ovf, data/persistence-disk.vmdk.
 	// pkg/image resolves those paths relative to the process working directory, so we chdir to the module root.
-	Describe("GenerateOVA integration", Ordered, func() {
+	Describe("GenerateDownloadURL integration", Ordered, func() {
 		var (
 			repoRoot string
 			origWd   string
@@ -237,10 +252,6 @@ var _ = Describe("image service", Ordered, func() {
 		)
 
 		BeforeAll(func() {
-			if os.Getenv("SKIP_RHCOS_ISO_DOWNLOAD") != "" {
-				Skip("SKIP_RHCOS_ISO_DOWNLOAD is set")
-			}
-
 			var err error
 			origWd, err = os.Getwd()
 			Expect(err).NotTo(HaveOccurred())
@@ -252,8 +263,12 @@ var _ = Describe("image service", Ordered, func() {
 				Skip(fmt.Sprintf("data/persistence-disk.vmdk not found (%v); add it to run this test", err))
 			}
 
-			isoPath = filepath.Join(os.TempDir(), "migration-planner-rhcos-integration.iso")
-			Expect(downloadRHCOSISO(isoPath, rhcosTestISOURL, rhcosTestISOChecksum)).To(Succeed())
+			isoPath = filepath.Join(repoRoot, "rhcos-live-iso.x86_64.iso")
+			if _, err := os.Stat(isoPath); err != nil {
+				isoPath = filepath.Join(os.TempDir(), "migration-planner-rhcos-integration.iso")
+				Expect(downloadRHCOSISO(isoPath, rhcosTestISOURL, rhcosTestISOChecksum)).To(Succeed())
+			}
+
 			Expect(os.Setenv("MIGRATION_PLANNER_ISO_PATH", isoPath)).To(Succeed())
 		})
 
@@ -261,9 +276,12 @@ var _ = Describe("image service", Ordered, func() {
 			Expect(os.Chdir(repoRoot)).To(Succeed())
 
 			var err error
-			tmpDir, err = os.MkdirTemp("", "image-svc-ova-int-*")
+			tmpDir, err = os.MkdirTemp("", "image-svc-gendurl-int-*")
 			Expect(err).NotTo(HaveOccurred())
-			imgSvc = service.NewImageSvc(s, tmpDir, "")
+			c, err := config.New()
+			Expect(err).NotTo(HaveOccurred())
+			c.Service.TempImagesDir = tmpDir
+			imgSvc = service.NewImageSvc(s, c)
 		})
 
 		AfterEach(func() {
@@ -284,7 +302,7 @@ var _ = Describe("image service", Ordered, func() {
 			}
 		})
 
-		It("downloads the ISO, generates one OVA per etag, and leaves a complete file on disk", func() {
+		It("downloads the ISO, generates one OVA per etag, and returns stable URLs for concurrent callers", func() {
 			srcSvc := service.NewSourceService(s, nil)
 			created, err := srcSvc.CreateSource(context.Background(), mappers.SourceCreateForm{
 				Name: "ova-int-" + uuid.NewString(), OrgID: "admin", Username: "admin",
@@ -293,41 +311,50 @@ var _ = Describe("image service", Ordered, func() {
 
 			const workers = 8
 			type result struct {
-				path string
-				etag string
-				err  error
+				downloadURL string
+				expiresAt   time.Time
+				err         error
 			}
 			ch := make(chan result, workers)
 			for i := 0; i < workers; i++ {
 				go func() {
-					p, e, err := imgSvc.GenerateOVA(context.Background(), created.ID.String())
-					ch <- result{path: p, etag: e, err: err}
+					u, exp, err := imgSvc.GenerateDownloadURL(context.Background(), created.ID)
+					ch <- result{downloadURL: u, expiresAt: exp, err: err}
 				}()
 			}
 
-			var firstPath, firstEtag string
+			var firstURL string
 			for i := 0; i < workers; i++ {
 				r := <-ch
 				Expect(r.err).NotTo(HaveOccurred())
-				Expect(r.etag).NotTo(BeEmpty())
-				if firstEtag == "" {
-					firstEtag = r.etag
-					firstPath = r.path
-				} else {
-					Expect(r.etag).To(Equal(firstEtag))
-					Expect(r.path).To(Equal(firstPath))
+				Expect(r.downloadURL).NotTo(BeEmpty())
+				Expect(r.expiresAt).NotTo(BeZero())
+				if firstURL == "" {
+					firstURL = r.downloadURL
 				}
 
-				fi, err := os.Stat(r.path)
+				parsed, err := url.Parse(r.downloadURL)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(fi.Size()).To(BeNumerically(">", 1100000000), "OVA file should be fully written when GenerateOVA returns")
+				Expect(parsed.Path).To(ContainSubstring("/api/v1/image/bytoken/"))
 
+				// Path: .../bytoken/{token+etag}/{sourceName}.ova
+				segments := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+				Expect(len(segments)).To(BeNumerically(">=", 4))
+				tokenETag := segments[len(segments)-2]
+				tok, etag, err := imgSvc.ParseTokenETag(tokenETag)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(tok).NotTo(BeEmpty())
+				Expect(etag).NotTo(BeEmpty())
+
+				ovaPath := imgSvc.FilePath(etag)
+				fi, err := os.Stat(ovaPath)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(fi.Size()).To(BeNumerically(">", 1100000000), "OVA file should be fully written when GenerateDownloadURL returns")
 			}
 
 			matches, err := filepath.Glob(filepath.Join(tmpDir, "*.ova"))
 			Expect(err).NotTo(HaveOccurred())
 			Expect(matches).To(HaveLen(1), "singleflight should produce one file per etag")
-			Expect(matches[0]).To(Equal(firstPath))
 		})
 	})
 })

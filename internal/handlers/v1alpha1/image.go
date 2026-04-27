@@ -1,17 +1,16 @@
 package v1alpha1
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"regexp"
 
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
 	imageService "github.com/kubev2v/migration-planner/internal/service"
-	"go.uber.org/zap"
 )
 
 type Key int
@@ -41,18 +40,28 @@ func (h *ImageHandler) Health(ctx context.Context, request imageServer.HealthReq
 	return nil, nil
 }
 
-func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.HeadImageByTokenRequestObject) (imageServer.HeadImageByTokenResponseObject, error) {
-	if err := h.imageService.ValidateToken(ctx, req.Token); err != nil {
-		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
-	}
-
-	sourceId, err := IdFromJWT(req.Token)
+func (h *ImageHandler) GenerateDownloadURL(ctx context.Context, request imageServer.GenerateDownloadURLRequestObject) (imageServer.GenerateDownloadURLResponseObject, error) {
+	url, expireAt, err := h.imageService.GenerateDownloadURL(ctx, request.Body.Id)
 	if err != nil {
-		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
+		var errResourceNotFound *imageService.ErrResourceNotFound
+		switch {
+		case errors.As(err, &errResourceNotFound):
+			return imageServer.GenerateDownloadURL400JSONResponse{Message: err.Error()}, nil
+		default:
+			return imageServer.GenerateDownloadURL500JSONResponse{}, nil
+		}
+	}
+	return imageServer.GenerateDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
+}
+
+func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.HeadImageByTokenRequestObject) (imageServer.HeadImageByTokenResponseObject, error) {
+	token, _, err := h.imageService.ParseTokenETag(req.Token)
+	if err != nil {
+		return imageServer.HeadImageByToken400JSONResponse{Message: err.Error()}, nil
 	}
 
-	if err := h.imageService.Validate(ctx, sourceId); err != nil {
-		return imageServer.HeadImageByToken400JSONResponse{Message: err.Error()}, nil
+	if err := h.imageService.ValidateToken(ctx, token); err != nil {
+		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
 	}
 
 	return imageServer.HeadImageByToken200Response{}, nil
@@ -65,30 +74,29 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		return imageServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
 
-	if err := h.imageService.ValidateToken(ctx, req.Token); err != nil {
-		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
+	jwt, etag, err := h.imageService.ParseTokenETag(req.Token)
+	if err != nil {
+		return imageServer.GetImageByToken400JSONResponse{Message: err.Error()}, nil
 	}
 
-	sourceId, err := IdFromJWT(req.Token)
-	if err != nil {
+	if err := h.imageService.ValidateToken(ctx, jwt); err != nil {
 		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
-	}
-
-	filePath, etag, err := h.imageService.GenerateOVA(ctx, sourceId)
-	if err != nil {
-		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
-		return imageServer.GetImageByToken500JSONResponse{Message: err.Error()}, nil
 	}
 
 	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", req.Name))
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("ETag", fmt.Sprintf("%q", etag))
 
+	http.ServeFile(writer, r, h.imageService.FilePath(etag))
+
+	sourceId, err := IdFromJWT(jwt)
+	if err != nil {
+		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
+	}
+
 	h.imageService.UpdateAgentVersion(sourceId)
 
-	http.ServeFile(writer, r, filePath)
-
-	return imageServer.GetImageByToken200ApplicationovfResponse{Body: bytes.NewReader([]byte{})}, nil
+	return nil, nil
 }
 
 func IdFromJWT(jwt string) (string, error) {
@@ -98,7 +106,7 @@ func IdFromJWT(jwt string) (string, error) {
 		return "", fmt.Errorf("failed to parse JWT from URL")
 	}
 
-	decoded, err := base64.RawStdEncoding.DecodeString(match[1])
+	decoded, err := base64.RawURLEncoding.DecodeString(match[1])
 	if err != nil {
 		return "", err
 	}

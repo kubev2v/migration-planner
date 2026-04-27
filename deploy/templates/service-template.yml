@@ -29,8 +29,7 @@ parameters:
   - name: MIGRATION_PLANNER_UI_URL
     description: The console URL of the migration assessment
     required: true
-  - name: MIGRATION_PLANNER_IMAGE_URL
-    description: The URL for the Agent OVA file
+  - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
     required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
@@ -66,8 +65,6 @@ parameters:
     value: "https://localhost:3443"
   - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
     value: "https://localhost:7443"
-  - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
-    value: "https://localhost:11443"
   - name: MIGRATION_PLANNER_LOG_LEVEL
     value: "info"
   # Auth Config values
@@ -574,8 +571,6 @@ objects:
                   value: ${MIGRATION_PLANNER_URL}
                 - name: CONFIG_SERVER_UI
                   value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
-                - name: MIGRATION_PLANNER_IMAGE_URL
-                  value: ${MIGRATION_PLANNER_IMAGE_URL}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE

@@ -8,6 +8,49 @@ info:
 servers:
   - url: /
 paths:
+  /api/v1/image-url:
+    post:
+      tags:
+        - image
+      description: Generate the OVA image URL
+      operationId: GenerateDownloadURL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              description: Source id
+              properties:
+                id:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: URL to download OVA image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/presigned-url"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /api/v1/image/bytoken/{token}/{name}:
     get:
       tags:
@@ -114,3 +157,17 @@ paths:
         "200":
           description: OK
 
+components:
+  schemas:
+    presigned-url:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          description: Pre-signed URL for downloading the source discovery image.
+        expires_at:
+          type: string
+          format: date-time
+          description: Expiration time for the URL token.

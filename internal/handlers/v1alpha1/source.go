@@ -257,25 +257,6 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 	return server.UpdateInventory200JSONResponse(response), nil
 }
 
-// (HEAD /api/v1/sources/{id}/image)
-func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
-	return nil, nil
-}
-
-// (GET /api/v1/sources/{id}/image-url)
-func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
-	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
-	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
-			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
-		default:
-			return server.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
-		}
-	}
-	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
-}
-
 // (GET /health)
 func (s *ServiceHandler) Health(ctx context.Context, request server.HealthRequestObject) (server.HealthResponseObject, error) {
 	return server.Health200Response{}, nil

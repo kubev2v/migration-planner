@@ -960,15 +960,6 @@ type OsInfo struct {
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
 
-// PresignedUrl defines model for presigned-url.
-type PresignedUrl struct {
-	// ExpiresAt Expiration time for the URL token.
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-
-	// Url Pre-signed URL for downloading the source discovery image.
-	Url string `json:"url"`
-}
-
 // ListAssessmentsParams defines parameters for ListAssessments.
 type ListAssessmentsParams struct {
 	// SourceId Filter assessments by source ID

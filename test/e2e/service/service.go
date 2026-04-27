@@ -9,6 +9,7 @@ import (
 )
 
 const (
+	apiV1ImagePath              = "/api/v1/image-url"
 	apiV1SourcesPath            = "/api/v1/sources"
 	apiV1AssessmentsPath        = "/api/v1/assessments"
 	apiV1AssessmentsRVToolsPath = "/api/v1/assessments/rvtools"

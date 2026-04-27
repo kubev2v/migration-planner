@@ -12,12 +12,16 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	. "github.com/kubev2v/migration-planner/api/v1alpha1/image"
 	"github.com/oapi-codegen/runtime"
 	strictnethttp "github.com/oapi-codegen/runtime/strictmiddleware/nethttp"
 )
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (POST /api/v1/image-url)
+	GenerateDownloadURL(w http.ResponseWriter, r *http.Request)
 
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string)
@@ -32,6 +36,11 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (POST /api/v1/image-url)
+func (_ Unimplemented) GenerateDownloadURL(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (GET /api/v1/image/bytoken/{token}/{name})
 func (_ Unimplemented) GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string) {
@@ -56,6 +65,21 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GenerateDownloadURL operation middleware
+func (siw *ServerInterfaceWrapper) GenerateDownloadURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GenerateDownloadURL(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // GetImageByToken operation middleware
 func (siw *ServerInterfaceWrapper) GetImageByToken(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +280,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/image-url", wrapper.GenerateDownloadURL)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/image/bytoken/{token}/{name}", wrapper.GetImageByToken)
 	})
 	r.Group(func(r chi.Router) {
@@ -266,6 +293,50 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 
 	return r
+}
+
+type GenerateDownloadURLRequestObject struct {
+	Body *GenerateDownloadURLJSONRequestBody
+}
+
+type GenerateDownloadURLResponseObject interface {
+	VisitGenerateDownloadURLResponse(w http.ResponseWriter) error
+}
+
+type GenerateDownloadURL200JSONResponse PresignedUrl
+
+func (response GenerateDownloadURL200JSONResponse) VisitGenerateDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateDownloadURL400JSONResponse externalRef0.Error
+
+func (response GenerateDownloadURL400JSONResponse) VisitGenerateDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateDownloadURL401JSONResponse externalRef0.Error
+
+func (response GenerateDownloadURL401JSONResponse) VisitGenerateDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GenerateDownloadURL500JSONResponse externalRef0.Error
+
+func (response GenerateDownloadURL500JSONResponse) VisitGenerateDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type GetImageByTokenRequestObject struct {
@@ -403,6 +474,9 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (POST /api/v1/image-url)
+	GenerateDownloadURL(ctx context.Context, request GenerateDownloadURLRequestObject) (GenerateDownloadURLResponseObject, error)
+
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(ctx context.Context, request GetImageByTokenRequestObject) (GetImageByTokenResponseObject, error)
 
@@ -440,6 +514,37 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GenerateDownloadURL operation middleware
+func (sh *strictHandler) GenerateDownloadURL(w http.ResponseWriter, r *http.Request) {
+	var request GenerateDownloadURLRequestObject
+
+	var body GenerateDownloadURLJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GenerateDownloadURL(ctx, request.(GenerateDownloadURLRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GenerateDownloadURL")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GenerateDownloadURLResponseObject); ok {
+		if err := validResponse.VisitGenerateDownloadURLResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetImageByToken operation middleware

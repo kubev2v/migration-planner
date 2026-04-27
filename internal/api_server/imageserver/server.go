@@ -109,7 +109,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		return fmt.Errorf("create temp images folder %q: %w", s.cfg.Service.TempImagesDir, err)
 	}
 
-	h := handlers.NewImageHandler(service.NewImageSvc(s.store, s.cfg.Service.TempImagesDir, s.cfg.Service.TempImagesDirLimit))
+	h := handlers.NewImageHandler(service.NewImageSvc(s.store, s.cfg))
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

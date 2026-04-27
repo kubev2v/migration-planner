@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"path"
 
+	imageApiS "github.com/kubev2v/migration-planner/api/v1alpha1/image"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
@@ -48,17 +50,24 @@ func (s *plannerService) CreateSource(name string) (*api.Source, error) {
 func (s *plannerService) GetImageUrl(id uuid.UUID) (string, error) {
 	zap.S().Infof("[PlannerService] Get image url [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	getImageUrlPath := path.Join(apiV1SourcesPath, id.String(), "image-url")
-	res, err := s.api.GetRequest(getImageUrlPath)
+	getImageUrlPath := path.Join(apiV1ImagePath)
+
+	rBody := imageApiS.GenerateDownloadURLJSONRequestBody{
+		Id: id,
+	}
+
+	bytes, err := json.Marshal(rBody)
+	if err != nil {
+		return "", err
+	}
+
+	res, err := s.api.PostRequest(getImageUrlPath, bytes)
 	if err != nil {
 		return "", fmt.Errorf("failed to get source url: %w", err)
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	var result struct {
-		ExpiresAt string `json:"expires_at"`
-		URL       string `json:"url"`
-	}
+	result := imageApiS.PresignedUrl{}
 
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
@@ -69,7 +78,7 @@ func (s *plannerService) GetImageUrl(id uuid.UUID) (string, error) {
 		return "", fmt.Errorf("failed to decod JSON: %w", err)
 	}
 
-	return result.URL, nil
+	return result.Url, nil
 }
 
 // GetSource fetches a single source by UUID
