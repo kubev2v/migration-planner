@@ -83,7 +83,7 @@ func NewExcelSheet(name string, headers []string, rows []map[string]string) Exce
 // Standard sheet header sets for ingestion template compatibility.
 var (
 	vInfoHeaders = []string{
-		"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate",
+		"VM", "VM ID", "VI SDK UUID", "VI SDK API Version", "Host", "CPUs", "Memory", "Powerstate",
 		"Cluster", "Datacenter", "Template", "CBT", "Firmware", "Connection state",
 		"FT State", "EnableUUID", "Folder", "DNS Name", "Primary IP Address",
 		"In Use MiB", "HW version", "Provisioned MiB", "Resource pool",
@@ -1473,4 +1473,78 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 	invNone, err := parser.BuildInventory(ctx, nonExistent)
 	require.NoError(t, err)
 	assert.Equal(t, 0, invNone.VCenter.VMs.Total, "Non-existent VMs should result in 0 count")
+}
+
+func TestVCenterVersion(t *testing.T) {
+	tests := []struct {
+		name            string
+		apiVersion      string
+		expectedVersion string
+	}{
+		{
+			name:            "valid version returned",
+			apiVersion:      "8.0.3.0",
+			expectedVersion: "8.0.3.0",
+		},
+		{
+			name:            "different version format",
+			apiVersion:      "7.0.1",
+			expectedVersion: "7.0.1",
+		},
+		{
+			name:            "empty version returns empty string",
+			apiVersion:      "",
+			expectedVersion: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			vms := []map[string]string{
+				{"VM": "test-vm", "VM ID": "vm-001", "VI SDK UUID": "test-vcenter-uuid", "VI SDK API Version": tt.apiVersion, "Cluster": "cluster1", "Datacenter": "dc1"},
+			}
+			hosts := []map[string]string{
+				{"Host": "test-host", "Cluster": "cluster1", "Datacenter": "dc1", "# Cores": "4", "# CPU": "1", "# Memory": "16384"},
+			}
+
+			tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+			ctx := context.Background()
+			_, err := parser.IngestRvTools(ctx, tmpFile)
+			require.NoError(t, err)
+
+			version, err := parser.VCenterApiVersion(ctx)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedVersion, version)
+
+			inv, err := parser.BuildInventory(ctx, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedVersion, inv.VCenterVersion)
+		})
+	}
+
+	t.Run("no VMs returns empty string", func(t *testing.T) {
+		parser, _, cleanup := setupTestParser(t, &testValidator{})
+		defer cleanup()
+
+		// Create Excel with no VMs
+		vms := []map[string]string{}
+		hosts := []map[string]string{}
+		tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+		ctx := context.Background()
+		_, err := parser.IngestRvTools(ctx, tmpFile)
+		require.NoError(t, err)
+
+		version, err := parser.VCenterApiVersion(ctx)
+		require.NoError(t, err)
+		assert.Equal(t, "", version)
+
+		inv, err := parser.BuildInventory(ctx, nil)
+		require.NoError(t, err)
+		assert.Equal(t, "", inv.VCenterVersion)
+	})
 }

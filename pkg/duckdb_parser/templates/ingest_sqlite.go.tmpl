@@ -134,6 +134,13 @@ LATERAL unnest(from_json(v.NICs, '[{"network":{"kind":"VARCHAR","id":"VARCHAR"},
 LEFT JOIN src.Network n ON nic->'network'->>'id' = n.ID
 WHERE v.NICs != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
 
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
+SELECT
+    a.APIVersion,
+    a.Product,
+    a.InstanceUuid
+FROM src.About a;
+
 INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
 SELECT
     c.Name,
