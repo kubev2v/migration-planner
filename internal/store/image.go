@@ -3,8 +3,9 @@ package store
 import (
 	"context"
 
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
+
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 type ImageInfra interface {
