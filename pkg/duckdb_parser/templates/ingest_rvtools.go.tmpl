@@ -40,6 +40,7 @@ ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "HW version" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Provisioned MiB" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Resource pool" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "VI SDK API Version" VARCHAR;
 
 -- Legacy RVTools headers (pre-3.9 vCenter UUID, MB vs MiB, disk.EnableUUID): ensure columns exist, then fold into canonical names used below.
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "vCenter UUID" VARCHAR;
@@ -78,7 +79,7 @@ INSERT INTO vinfo (
     "DNS Name", "Primary IP Address", "In Use MiB",
     "Template", "CBT", "EnableUUID",
     "Datacenter", "Cluster", "HW version",
-    "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID"
+    "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID", "VI SDK API Version"
 )
 SELECT
     "VM ID",
@@ -111,7 +112,8 @@ SELECT
     NULL,
     TRY_CAST("Provisioned MiB" AS INTEGER),
     "Resource pool",
-    "VI SDK UUID"
+    "VI SDK UUID",
+    "VI SDK API Version"
 FROM vinfo_raw
 WHERE "VM" IS NOT NULL AND "VM" != ''
   AND "VM ID" IS NOT NULL AND TRIM("VM ID") != ''

@@ -520,6 +520,9 @@ type Inventory struct {
 
 	// VcenterId ID of the vCenter
 	VcenterId string `json:"vcenter_id"`
+
+	// VcenterVersion Version of the vCenter api. For example "8.0.3.0"
+	VcenterVersion string `json:"vcenter_version,omitempty"`
 }
 
 // InventoryData defines model for InventoryData.

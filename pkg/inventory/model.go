@@ -3,9 +3,10 @@ package inventory
 // Inventory is the domain representation of infrastructure inventory.
 // It contains vCenter-level data and per-cluster inventories.
 type Inventory struct {
-	VCenterID string
-	VCenter   *InventoryData
-	Clusters  map[string]InventoryData
+	VCenterID      string
+	VCenter        *InventoryData
+	Clusters       map[string]InventoryData
+	VCenterVersion string
 }
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).
