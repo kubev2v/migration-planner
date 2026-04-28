@@ -712,12 +712,12 @@ var _ = Describe("sizer service", func() {
 				request.ControlPlaneSchedulable = util.BoolPtr(true)
 				request.ControlPlaneCPU = util.IntPtr(100)
 				request.ControlPlaneMemory = util.IntPtr(200)
-				// Create inventory that requires > 200 CPU (max) on a single node
-				// With 1:4 over-commit: 1000 CPU / 4 = 250 CPU actual
-				// With 0.8 capacity: 250 / 0.8 = 312.5 CPU needed (exceeds max of 200)
-				assessment := createTestAssessment(assessmentID, clusterID, 10, 1000, 2000)
+				// Create inventory that requires > 384 CPU (max) on a single node
+				// With 1:4 over-commit: 1230 CPU / 4 = 307.5 CPU actual
+				// With 0.8 capacity: 307.5 / 0.8 = 384.375 CPU needed (exceeds max of 384)
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 1230, 2000)
 				mockStore.assessments[assessmentID] = assessment
-				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 1000, 2000), http.StatusOK, false)
+				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 1230, 2000), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				sizerService = service.NewSizerService(sizerClient, mockStore)
 
@@ -727,7 +727,7 @@ var _ = Describe("sizer service", func() {
 				Expect(result).To(BeNil())
 				_, ok := err.(*service.ErrInvalidRequest)
 				Expect(ok).To(BeTrue())
-				// Should recommend multi-node, not "use at least 200 CPU" which would be misleading
+				// Should recommend multi-node, not "use at least ... CPU" which would be misleading
 				Expect(err.Error()).To(Equal("workload does not fit on a single node. Use a multi-node cluster."))
 				Expect(err.Error()).NotTo(ContainSubstring("Use at least"))
 			})
