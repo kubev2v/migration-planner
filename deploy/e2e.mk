@@ -86,7 +86,7 @@ build_planner_iso_container:
 
 .PHONY: deploy_assisted_migration
 deploy_assisted_migration: oc
-	make deploy-on-kind MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda
+	make deploy-on-kind MIGRATION_PLANNER_NAMESPACE=default PERSISTENT_DISK_DEVICE=/dev/vda SIZER_REPLICAS=0 COST_ESTIMATION_REPLICAS=0 COST_ESTIMATION_IMAGE_PULL_POLICY=Always
 	oc wait --for=condition=Ready pods --all --timeout=240s
 	sleep 30
 	oc port-forward --address 0.0.0.0 service/migration-planner-agent 7443:7443 > /dev/null 2>&1 &

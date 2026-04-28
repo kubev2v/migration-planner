@@ -283,6 +283,37 @@ curl -X POST http://localhost:9200/api/v1/size/custom \
   }' | jq .
 ```
 
+## Run the Cost Estimation Service locally
+
+The cost-estimation service runs as a separate container and calls migration-planner for identity and assessment data.
+
+### 1. Start the Cost Estimation Service
+
+```bash
+make run-ce
+```
+
+Optional overrides:
+
+```bash
+make run-ce COST_ESTIMATION_IMAGE=<image> COST_ESTIMATION_IMAGE_TAG=<tag> COST_ESTIMATION_PORT=9205 COST_ESTIMATION_MIGRATION_PLANNER_URL=http://host.containers.internal:3443
+```
+
+`make run-ce` passes the planner settings to CE as `PLANNER_BASE_URL` and `PLANNER_HTTP_TIMEOUT`.
+For local development it also sets `COST_ESTIMATION_AUTH_TYPE=none` and `COST_ESTIMATION_SKIP_PARTNER_CHECK=true`.
+
+### 2. Verify Cost Estimation is Running
+
+```bash
+curl http://localhost:9205/healthz
+```
+
+### 3. Verify CE to planner connectivity
+
+```bash
+curl -H "Authorization: Bearer <token>" http://localhost:9205/healthz
+```
+
 ## Run the OpenShift Migration Advisor Agent locally
 
 Follow these steps to get the agent running locally:

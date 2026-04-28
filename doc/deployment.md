@@ -31,6 +31,10 @@ export MIGRATION_PLANNER_UI_IMAGE=<ui_image_source>             # Default: quay.
 export MIGRATION_PLANNER_UI_IMAGE_TAG=<ui_image_tag>            # Default: latest  
 export MIGRATION_PLANNER_REPLICAS=<replica_count>               # Default: 1  
 export SERVICE_API_PATH=<api_path_prefix>                       # Default: /api/migration-assessment (allows multiple instances in same namespace)
+export COST_ESTIMATION_IMAGE=<cost_estimation_image_source>                               # Default: quay.io/redhat-user-workloads/assisted-migration-tenant/cost-estimation
+export COST_ESTIMATION_IMAGE_TAG=<cost_estimation_image_tag>                              # Default: latest
+export COST_ESTIMATION_PORT=<cost_estimation_container_port>                              # Default: 9205
+export COST_ESTIMATION_MIGRATION_PLANNER_TIMEOUT=<planner_timeout>                        # Default: 30s
 ```
 
 
@@ -41,6 +45,8 @@ make deploy-on-openshift
 ```
 
 The deployment process deploys all relevant parts of the project, including the UI and database.
+
+Cost-estimation is deployed as a decoupled service (`migration-planner-cost-estimation`) and calls migration-planner using the internal URL configured by `COST_ESTIMATION_MIGRATION_PLANNER_URL`.
 
 ### 4. Remove the Deployment
 To remove the deployment from OpenShift, including all related components, run:

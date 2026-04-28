@@ -121,6 +121,49 @@ parameters:
   - name: SIZER_IMAGE_PULL_POLICY
     description: Image pull policy for the sizer service
     value: Always
+  # Cost Estimation Service Config values
+  - name: COST_ESTIMATION_IMAGE
+    description: Cost estimation service container image
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/cost-estimation
+  - name: COST_ESTIMATION_IMAGE_TAG
+    description: Cost estimation service container image tag
+    value: latest
+  - name: COST_ESTIMATION_REPLICAS
+    description: Number of replicas of the cost estimation service to run
+    value: "2"
+  - name: COST_ESTIMATION_MEMORY_REQUEST
+    description: Memory request for the cost estimation pods
+    value: "256Mi"
+  - name: COST_ESTIMATION_MEMORY_LIMIT
+    description: Memory limit for the cost estimation pods
+    value: "512Mi"
+  - name: COST_ESTIMATION_CPU_REQUEST
+    description: CPU request for the cost estimation pods
+    value: "100m"
+  - name: COST_ESTIMATION_CPU_LIMIT
+    description: CPU limit for the cost estimation pods
+    value: "500m"
+  - name: COST_ESTIMATION_PORT
+    description: Port for the cost estimation service
+    value: "9205"
+  - name: COST_ESTIMATION_LOG_LEVEL
+    description: Log level for the cost estimation service
+    value: "info"
+  - name: COST_ESTIMATION_IMAGE_PULL_POLICY
+    description: Image pull policy for the cost estimation service
+    value: Always
+  - name: COST_ESTIMATION_MIGRATION_PLANNER_URL
+    description: Base URL that CE should use to call migration-planner API
+    value: "http://migration-planner-agent:7443${SERVICE_API_PATH}"
+  - name: COST_ESTIMATION_MIGRATION_PLANNER_TIMEOUT
+    description: HTTP timeout CE should use when calling migration-planner
+    value: "30s"
+  - name: COST_ESTIMATION_AUTH_TYPE
+    description: Cost estimation API authentication mode (none|rhsso)
+    value: "rhsso"
+  - name: COST_ESTIMATION_SKIP_PARTNER_CHECK
+    description: Skip partner identity check when true
+    value: "false"
 
 objects:
   - kind: ServiceAccount
@@ -205,6 +248,22 @@ objects:
           port: ${{SIZER_PORT}}
           protocol: TCP
           targetPort: ${{SIZER_PORT}}
+  - kind: Service
+    apiVersion: v1
+    metadata:
+      labels:
+        app: migration-planner-cost-estimation
+      annotations:
+        description: Cost estimation service
+      name: migration-planner-cost-estimation
+    spec:
+      selector:
+        app: migration-planner-cost-estimation
+      ports:
+        - name: http
+          port: ${{COST_ESTIMATION_PORT}}
+          protocol: TCP
+          targetPort: ${{COST_ESTIMATION_PORT}}
   - apiVersion: v1
     kind: ConfigMap
     metadata:
@@ -724,4 +783,68 @@ objects:
                 limits:
                   cpu: ${SIZER_CPU_LIMIT}
                   memory: ${SIZER_MEMORY_LIMIT}
+          serviceAccountName: migration-planner
+  - kind: Deployment
+    apiVersion: apps/v1
+    metadata:
+      name: migration-planner-cost-estimation
+      labels:
+        app: migration-planner-cost-estimation
+    spec:
+      selector:
+        matchLabels:
+          app: migration-planner-cost-estimation
+      replicas: ${{COST_ESTIMATION_REPLICAS}}
+      template:
+        metadata:
+          labels:
+            app: migration-planner-cost-estimation
+        spec:
+          containers:
+            - name: cost-estimation
+              image: ${COST_ESTIMATION_IMAGE}:${COST_ESTIMATION_IMAGE_TAG}
+              imagePullPolicy: ${COST_ESTIMATION_IMAGE_PULL_POLICY}
+              ports:
+                - containerPort: ${{COST_ESTIMATION_PORT}}
+                  name: http
+              env:
+                - name: PORT
+                  value: "${COST_ESTIMATION_PORT}"
+                - name: LOG_LEVEL
+                  value: ${COST_ESTIMATION_LOG_LEVEL}
+                - name: PLANNER_BASE_URL
+                  value: ${COST_ESTIMATION_MIGRATION_PLANNER_URL}
+                - name: PLANNER_HTTP_TIMEOUT
+                  value: ${COST_ESTIMATION_MIGRATION_PLANNER_TIMEOUT}
+                - name: COST_ESTIMATION_AUTH_TYPE
+                  value: ${COST_ESTIMATION_AUTH_TYPE}
+                - name: COST_ESTIMATION_SKIP_PARTNER_CHECK
+                  value: ${COST_ESTIMATION_SKIP_PARTNER_CHECK}
+                - name: COST_ESTIMATION_JWK_URL
+                  value: ${MIGRATION_PLANNER_JWK_URL}
+              livenessProbe:
+                httpGet:
+                  path: /healthz
+                  port: ${{COST_ESTIMATION_PORT}}
+                initialDelaySeconds: 10
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              readinessProbe:
+                httpGet:
+                  path: /healthz
+                  port: ${{COST_ESTIMATION_PORT}}
+                initialDelaySeconds: 5
+                timeoutSeconds: 5
+                periodSeconds: 10
+                successThreshold: 1
+                failureThreshold: 3
+              resources:
+                requests:
+                  cpu: ${COST_ESTIMATION_CPU_REQUEST}
+                  memory: ${COST_ESTIMATION_MEMORY_REQUEST}
+                limits:
+                  cpu: ${COST_ESTIMATION_CPU_LIMIT}
+                  memory: ${COST_ESTIMATION_MEMORY_LIMIT}
           serviceAccountName: migration-planner
