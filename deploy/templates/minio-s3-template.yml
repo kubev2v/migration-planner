@@ -1,0 +1,121 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: migration-planner-minio-s3
+parameters:
+  - name: MINIO_IMAGE
+    description: MinIO container image
+    value: quay.io/minio/minio
+  - name: MINIO_IMAGE_TAG
+    description: MinIO image tag
+    value: latest
+  - name: MINIO_ROOT_USER
+    description: MinIO root user (S3 access key)
+    value: admin
+  - name: MINIO_ROOT_PASSWORD
+    description: MinIO root password (S3 secret key)
+    value: password
+  - name: MINIO_BUCKET
+    description: Name of the MinIO bucket used for OVA storage
+    value: migration-planner
+  - name: MINIO_ENDPOINT
+    description: URL of the MinIO S3 endpoint
+objects:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: migration-planner-minio
+      labels:
+        app: migration-planner-minio
+    spec:
+      ports:
+        - name: api
+          port: 9000
+          protocol: TCP
+          targetPort: 9000
+        - name: console
+          port: 9001
+          targetPort: 9001
+      selector:
+        app: migration-planner-minio
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: migration-planner-minio
+      labels:
+        app: migration-planner-minio
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: migration-planner-minio
+      template:
+        metadata:
+          labels:
+            app: migration-planner-minio
+        spec:
+          containers:
+            - name: minio
+              env:
+                - name: MINIO_ROOT_USER
+                  value: ${MINIO_ROOT_USER}
+                - name: MINIO_ROOT_PASSWORD
+                  value: ${MINIO_ROOT_PASSWORD}
+                - name: MINIO_BUCKET
+                  value: ${MINIO_BUCKET}
+              # The planner expect the bucket to be existing
+              lifecycle:
+                postStart:
+                  exec:
+                    command:
+                      - /bin/sh
+                      - -c
+                      - >
+                        sleep 5;
+                        mkdir -p /data/${MINIO_BUCKET}
+              image: ${MINIO_IMAGE}:${MINIO_IMAGE_TAG}
+              imagePullPolicy: Always
+              args:
+                - server
+                - /data
+                - --console-address=:9001
+              ports:
+                - containerPort: 9000
+                  name: api
+                - containerPort: 9001
+                  name: console
+              readinessProbe:
+                tcpSocket:
+                  port: 9000
+                initialDelaySeconds: 5
+                periodSeconds: 5
+              livenessProbe:
+                tcpSocket:
+                  port: 9000
+                initialDelaySeconds: 10
+                periodSeconds: 20
+              volumeMounts:
+                - name: data
+                  mountPath: /data
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+                limits:
+                  cpu: 500m
+                  memory: 512Mi
+          volumes:
+            - name: data
+              emptyDir: {}
+
+  - kind: Secret
+    apiVersion: v1
+    metadata:
+      name: migration-advisor-ova-s3
+    type: Opaque
+    stringData:
+      bucket: ${MINIO_BUCKET}
+      endpoint: ${MINIO_ENDPOINT}
+      aws_access_key_id: ${MINIO_ROOT_USER}
+      aws_secret_access_key: ${MINIO_ROOT_PASSWORD}

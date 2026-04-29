@@ -13,11 +13,6 @@ parameters:
     value: Always
   - name: IMAGE_TAG
     value: latest
-  - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER
-    value: /app/images
-  - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT
-    description: Size limit for the generated OVA cache volume.
-    value: "10Gi"
   - name: MIGRATION_PLANNER_ISO_PATH
     value: /iso/rhcos-live-iso.x86_64.iso
   - name: MIGRATION_PLANNER_ISO_IMAGE
@@ -28,9 +23,6 @@ parameters:
     required: true
   - name: MIGRATION_PLANNER_UI_URL
     description: The console URL of the migration assessment
-    required: true
-  - name: MIGRATION_PLANNER_IMAGE_URL
-    description: The URL for the Agent OVA file
     required: true
   - name: MIGRATION_PLANNER_REPLICAS
     description: Number of replicas of the service to run.
@@ -51,6 +43,10 @@ parameters:
     description: The name of the OpenShift Secret used for the database.
     displayName: Database Secret Name
     value: migration-planner-db
+  - name: S3_SECRET_NAME
+    description: The name of the OpenShift Secret used for S3 credentials.
+    displayName: S3 Secret Name
+    value: migration-advisor-ova-s3
   - name: PERSISTENT_DISK_DEVICE
     value: /dev/sda
   - name: INSECURE_REGISTRY
@@ -60,14 +56,10 @@ parameters:
     value: ":13443"
   - name: MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS
     value: ":17443"
-  - name: MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS
-    value: ":21443"
   - name: MIGRATION_PLANNER_BASE_URL
     value: "https://localhost:3443"
   - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
     value: "https://localhost:7443"
-  - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
-    value: "https://localhost:11443"
   - name: MIGRATION_PLANNER_LOG_LEVEL
     value: "info"
   # Auth Config values
@@ -139,20 +131,6 @@ objects:
           port: 7443
           protocol: TCP
           targetPort: 7443
-      selector:
-        app: migration-planner
-  - kind: Service
-    apiVersion: v1
-    metadata:
-      labels:
-        app: migration-planner
-      name: migration-planner-image
-    spec:
-      ports:
-        - name: migration-planner-image
-          port: 21443
-          protocol: TCP
-          targetPort: 21443
       selector:
         app: migration-planner
   - kind: Service
@@ -269,21 +247,6 @@ objects:
                       socket_address:
                         address: 127.0.0.1
                         port_value: 17443
-          
-          # This cluster is used to send requests to the backend-image.
-          - name: backend-image
-            connect_timeout: 1s
-            type: STATIC
-            lb_policy: ROUND_ROBIN
-            load_assignment:
-              cluster_name: backend-image
-              endpoints:
-              - lb_endpoints:
-                - endpoint:
-                    address:
-                      socket_address:
-                        address: 127.0.0.1
-                        port_value: 21443
 
           listeners:
 
@@ -403,15 +366,6 @@ objects:
                               pattern:
                                 regex: "^${SERVICE_API_PATH}/api/v1/sources"
                               substitution: "/api/v1/sources"
-                        - match: 
-                            prefix: "${SERVICE_API_PATH}/api/v1/image"
-                          route:
-                            cluster: backend-image
-                            timeout: 0s
-                            regex_rewrite:
-                              pattern:
-                                regex: "^${SERVICE_API_PATH}/api/v1/image"
-                              substitution: "/api/v1/image"
                         - match:
                             prefix: "${SERVICE_API_PATH}/api/v1/assessments"
                           route:
@@ -517,8 +471,6 @@ objects:
                   name: api-port
                 - containerPort: 7443
                   name: agent-api-port
-                - containerPort: 11443
-                  name: image-port
                 - containerPort: 9000
                   name: metrics-envoy
               livenessProbe:
@@ -574,8 +526,6 @@ objects:
                   value: ${MIGRATION_PLANNER_URL}
                 - name: CONFIG_SERVER_UI
                   value: ${MIGRATION_PLANNER_UI_URL}/migrate/wizard
-                - name: MIGRATION_PLANNER_IMAGE_URL
-                  value: ${MIGRATION_PLANNER_IMAGE_URL}
                 - name: BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_URL}
                 - name: DEBUG_MODE
@@ -591,22 +541,14 @@ objects:
                   value: ${MIGRATION_PLANNER_ADDRESS}
                 - name: MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS
                   value: ${MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS}
-                - name: MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS
-                  value: ${MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS}
                 - name: MIGRATION_PLANNER_BASE_URL
                   value: ${MIGRATION_PLANNER_BASE_URL}
                 - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL}
-                - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
-                  value: ${MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL}
                 - name: MIGRATION_PLANNER_LOG_LEVEL
                   value: ${MIGRATION_PLANNER_LOG_LEVEL}
                 - name: RHCOS_PASSWORD
                   value: "${RHCOS_PASSWORD}"
-                - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER
-                  value: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER}
-                - name: MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT
-                  value: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT}
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}
@@ -648,20 +590,36 @@ objects:
                     secretKeyRef:
                       name: ${DB_SECRET_NAME}
                       key: db.user
+                # S3 Config values
+                - name: MIGRATION_PLANNER_OVA_S3_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: endpoint
+                - name: MIGRATION_PLANNER_OVA_S3_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: bucket
+                - name: MIGRATION_PLANNER_OVA_S3_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: aws_access_key_id
+                - name: MIGRATION_PLANNER_OVA_S3_SECRET_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${S3_SECRET_NAME}
+                      key: aws_secret_access_key
               volumeMounts:
                 - name: migration-planner-dir
                   mountPath: "/.migration-planner"
                 - name: iso-storage
                   mountPath: /iso
-                - name: generated-ova-folder
-                  mountPath: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER}
           serviceAccountName: migration-planner
           volumes:
             - name: iso-storage
               emptyDir: {}
-            - name: generated-ova-folder
-              emptyDir:
-                sizeLimit: ${MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT}
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi
