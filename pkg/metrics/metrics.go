@@ -62,9 +62,8 @@ func UpdateAgentStateCounterMetric(state string, count int) {
 	agentStatusCountMetric.With(labels).Set(float64(count))
 }
 
-func RegisterMetrics(s store.Store, tempImagesFolder string) {
+func RegisterMetrics(s store.Store) {
 	prometheus.MustRegister(newInventoryStatsCollector(s))
-	prometheus.MustRegister(newDirectoryCollector("temp_ova_directory", tempImagesFolder))
 	prometheus.MustRegister(ovaDownloadsTotalMetric)
 	prometheus.MustRegister(agentStatusCountMetric)
 	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)

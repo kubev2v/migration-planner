@@ -15,36 +15,6 @@ import (
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 )
 
-type ServiceHandler struct {
-	sourceSrv     *service.SourceService
-	assessmentSrv service.AssessmentServicer
-	jobSrv        *service.JobService
-	sizerSrv      *service.SizerService
-	estimationSrv *service.EstimationService
-	accountsSrv   *service.AccountsService
-	partnerSrv    service.PartnerServicer
-}
-
-func NewServiceHandler(
-	sourceService *service.SourceService,
-	a service.AssessmentServicer,
-	j *service.JobService,
-	sizer *service.SizerService,
-	estimation *service.EstimationService,
-	accounts *service.AccountsService,
-	partner service.PartnerServicer,
-) *ServiceHandler {
-	return &ServiceHandler{
-		sourceSrv:     sourceService,
-		assessmentSrv: a,
-		jobSrv:        j,
-		sizerSrv:      sizer,
-		estimationSrv: estimation,
-		accountsSrv:   accounts,
-		partnerSrv:    partner,
-	}
-}
-
 // validateSourceData validates the source data using the source validation rules
 func validateSourceData(data interface{}) error {
 	v := validator.NewValidator()
@@ -257,20 +227,33 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 	return server.UpdateInventory200JSONResponse(response), nil
 }
 
-// (HEAD /api/v1/sources/{id}/image)
-func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
-	return nil, nil
-}
-
 // (GET /api/v1/sources/{id}/image-url)
 func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
-	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
+		var errResourceNotFound *service.ErrResourceNotFound
+		switch {
+		case errors.As(err, &errResourceNotFound):
 			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
+			return server.GetSourceDownloadURL500JSONResponse{}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Organization != source.OrgID || user.Username != source.Username {
+		message := fmt.Sprintf("forbidden to generate url by user %s with org_id %s for source %s", user.Username, user.Organization, request.Id)
+		return server.GetSourceDownloadURL403JSONResponse{Message: message}, nil
+	}
+
+	url, expireAt, err := s.imageSrv.GenerateDownloadURL(ctx, request.Id)
+	if err != nil {
+		var errResourceNotFound *service.ErrResourceNotFound
+		switch {
+		case errors.As(err, &errResourceNotFound):
+			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.GetSourceDownloadURL500JSONResponse{}, nil
 		}
 	}
 	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil

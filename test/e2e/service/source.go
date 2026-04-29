@@ -55,6 +55,10 @@ func (s *plannerService) GetImageUrl(id uuid.UUID) (string, error) {
 	}
 	defer func() { _ = res.Body.Close() }()
 
+	if res.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get source url. status code: %d", res.StatusCode)
+	}
+
 	var result struct {
 		ExpiresAt string `json:"expires_at"`
 		URL       string `json:"url"`

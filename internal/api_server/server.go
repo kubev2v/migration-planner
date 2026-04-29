@@ -174,6 +174,11 @@ func (s *Server) Run(ctx context.Context) error {
 		partnerSvc = service.NewAuthzPartnerService(partnerSvc, accountsSvc, s.store)
 	}
 
+	is, err := service.NewImageService(ctx, s.store, s.cfg.S3)
+	if err != nil {
+		return fmt.Errorf("failed to create image service: %w", err)
+	}
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
@@ -182,7 +187,7 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewEstimationService(s.store),
 		accountsSvc,
 		partnerSvc,
-	)
+	).WithImageSrv(is)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

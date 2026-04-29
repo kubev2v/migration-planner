@@ -9,6 +9,7 @@ var singleConfig *Config = nil
 type Config struct {
 	Database *dbConfig
 	Service  *svcConfig
+	S3       *S3
 }
 
 type dbConfig struct {
@@ -23,18 +24,21 @@ type dbConfig struct {
 type svcConfig struct {
 	Address              string `envconfig:"MIGRATION_PLANNER_ADDRESS" default:":3443"`
 	AgentEndpointAddress string `envconfig:"MIGRATION_PLANNER_AGENT_ENDPOINT_ADDRESS" default:":7443"`
-	ImageEndpointAddress string `envconfig:"MIGRATION_PLANNER_IMAGE_ENDPOINT_ADDRESS" default:":11443"`
 	BaseUrl              string `envconfig:"MIGRATION_PLANNER_BASE_URL" default:"https://localhost:3443"`
 	BaseAgentEndpointUrl string `envconfig:"MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL" default:"https://localhost:7443"`
-	BaseImageEndpointUrl string `envconfig:"MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL" default:"https://localhost:11443"`
 	LogLevel             string `envconfig:"MIGRATION_PLANNER_LOG_LEVEL" default:"info"`
 	Auth                 Auth
 	MigrationFolder      string `envconfig:"MIGRATION_PLANNER_MIGRATIONS_FOLDER" default:""`
 	OpaPoliciesFolder    string `envconfig:"MIGRATION_PLANNER_OPA_POLICIES_FOLDER" default:"/app/policies"`
-	TempImagesDir        string `envconfig:"MIGRATION_PLANNER_GENERATED_OVA_FOLDER" default:"/tmp"`
-	TempImagesDirLimit   string `envconfig:"MIGRATION_PLANNER_GENERATED_OVA_FOLDER_SIZE_LIMIT" default:""`
 	IsoPath              string `envconfig:"MIGRATION_PLANNER_ISO_PATH" default:"rhcos-live-iso.x86_64.iso"`
 	Sizer                Sizer
+}
+
+type S3 struct {
+	Endpoint  string `envconfig:"MIGRATION_PLANNER_OVA_S3_ENDPOINT" default:"localhost:9000"`
+	OvaBucket string `envconfig:"MIGRATION_PLANNER_OVA_S3_BUCKET" default:""`
+	AccessKey string `envconfig:"MIGRATION_PLANNER_OVA_S3_ACCESS_KEY" default:""`
+	SecretKey string `envconfig:"MIGRATION_PLANNER_OVA_S3_SECRET_KEY" default:""`
 }
 
 type Auth struct {

@@ -1,9 +1,11 @@
 package agent
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -79,19 +81,71 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 // downloadOvaFromUrl fetches the OVA file from a remote URL and writes it to the provided file
 func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
-	res, err := http.Get(p.url) // Download OVA from the given URL
+	if p.url == "" {
+		return fmt.Errorf("failed to download image: URL is empty")
+	}
 
+	dialer := &net.Dialer{}
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			return dialer.DialContext(ctx, network, fmt.Sprintf("%s:%s", e2e.SystemIP, "9000"))
+		},
+	}
+
+	c := &http.Client{Transport: transport}
+
+	if err := p.waitForOva(c, time.Second*3, time.Minute*3); err != nil {
+		return err
+	}
+
+	res, err := c.Get(p.url)
 	if err != nil {
 		return fmt.Errorf("failed to download image: %v", err)
 	}
-
-	defer func() { _ = res.Body.Close() }()
+	defer func() {
+		_ = res.Body.Close()
+	}()
 
 	if _, err = io.Copy(ovaFile, res.Body); err != nil {
 		return fmt.Errorf("failed to write to the file: %w", err)
 	}
 
 	return nil
+}
+
+func (p *plannerAgentLibvirt) waitForOva(client *http.Client, interval time.Duration, maxWait time.Duration) error {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	timeout := time.After(maxWait)
+
+	for {
+		select {
+
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for ova")
+
+		case <-ticker.C:
+			req, err := http.NewRequest("GET", p.url, nil)
+			if err != nil {
+				return err
+			}
+
+			req.Header.Set("Range", "bytes=0-0")
+
+			zap.S().Infof("Health check [%s] [url: %s]", req.Method, req.URL.String())
+
+			resp, err := client.Do(req)
+			if err != nil {
+				continue // network issue → retry
+			}
+			_ = resp.Body.Close()
+
+			if resp.StatusCode == http.StatusPartialContent || resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+	}
 }
 
 // createVm defines and starts a VM by generating its XML configuration

@@ -13,7 +13,6 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
-	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
@@ -110,7 +109,7 @@ var runCmd = &cobra.Command{
 		}()
 
 		// register metrics
-		metrics.RegisterMetrics(store, cfg.Service.TempImagesDir)
+		metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
 			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
@@ -118,10 +117,6 @@ var runCmd = &cobra.Command{
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
 			return agentserver.New(cfg, store, l)
-		})
-
-		runServer(ctx, &wg, cancel, cfg.Service.ImageEndpointAddress, "image_server", func(l net.Listener) Server {
-			return imageserver.New(cfg, store, l)
 		})
 
 		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
