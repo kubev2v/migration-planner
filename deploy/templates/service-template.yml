@@ -40,7 +40,7 @@ parameters:
     value: "512Mi"
   - name: MIGRATION_PLANNER_MEMORY_LIMIT
     description: Memory limit for the API pods.
-    value: "2048Mi"
+    value: "4096Mi"
   - name: MIGRATION_PLANNER_CPU_REQUEST
     description: CPU request for the API pods.
     value: "300m"
