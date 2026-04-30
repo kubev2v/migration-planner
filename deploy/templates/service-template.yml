@@ -285,6 +285,21 @@ objects:
                         address: 127.0.0.1
                         port_value: 21443
 
+          # This cluster is used to send requests to the cost-estimation service.
+          - name: backend-cost-estimation
+            connect_timeout: 1s
+            type: STRICT_DNS
+            lb_policy: ROUND_ROBIN
+            load_assignment:
+              cluster_name: backend-cost-estimation
+              endpoints:
+              - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: cost-estimation
+                        port_value: 9205
+
           listeners:
 
           # This listener is used to accept /metrics and /ready requests.
@@ -461,6 +476,15 @@ objects:
                               pattern:
                                 regex: "^${SERVICE_API_PATH}/api/v1/identity"
                               substitution: "/api/v1/identity"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/cost-estimation"
+                          route:
+                            cluster: backend-cost-estimation
+                            timeout: 30s
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/cost-estimation"
+                              substitution: "/api/v1/cost-estimation"
                     http_filters:
                     - name: envoy.filters.http.router
                       typed_config:
