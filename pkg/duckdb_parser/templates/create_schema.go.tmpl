@@ -122,7 +122,8 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "Free MiB" DOUBLE DEFAULT 0.0,
     "MHA" BOOLEAN DEFAULT false,
     "Capacity MiB" DOUBLE DEFAULT 0.0,
-    "Type" VARCHAR
+    "Type" VARCHAR,
+    "Backing Devices" VARCHAR DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS vhba (
