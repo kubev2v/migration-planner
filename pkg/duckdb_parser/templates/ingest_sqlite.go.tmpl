@@ -145,7 +145,7 @@ SELECT
 FROM src.Host h
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices")
 SELECT
     string_agg(DISTINCT h.ID, ','),
     ds.Name,
@@ -154,14 +154,15 @@ SELECT
     ds.Free / 1048576,
     ds.MaintenanceMode = 'True',
     ds.Capacity / 1048576,
-    ds.Type
+    ds.Type,
+    COALESCE(ds.BackingDevicesNames, '[]')
 FROM src.Datastore ds
 LEFT JOIN (
     SELECT h.ID, h.Cluster, dsref->>'id' AS datastore_id
     FROM src.Host h,
     LATERAL unnest(from_json(h.Datastores, '[{"kind":"VARCHAR","id":"VARCHAR"}]')) AS t(dsref)
 ) h ON h.datastore_id = ds.ID
-GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type;
+GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.BackingDevicesNames;
 
 INSERT INTO dvport ("Port", "VLAN")
 SELECT
