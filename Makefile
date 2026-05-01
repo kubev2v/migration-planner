@@ -31,6 +31,15 @@ SIZER_IMAGE ?= quay.io/redhat-user-workloads/odf-sizer-lib-tenant/sizer
 SIZER_IMAGE_TAG ?= latest
 SIZER_PORT ?= 9200
 
+# Minio settings for local development
+MINIO_IMAGE ?= quay.io/minio/minio
+MINIO_IMAGE_TAG ?= latest
+MINIO_API_PORT ?= 9000
+MINIO_CONSOLE_PORT ?= 9001
+MINIO_ROOT_USER ?= admin
+MINIO_ROOT_PASSWORD ?= password
+MINIO_OVA_BUCKET ?= temp-ova
+
 # OPA Configuration for eval mode
 MIGRATION_PLANNER_OPA_POLICIES_FOLDER ?= $(CURDIR)/policies
 FORKLIFT_POLICIES_TMP_DIR ?= /tmp/forklift-policies
@@ -45,23 +54,24 @@ all: build build-containers
 
 help:
 	@echo "Targets:"
-	@echo "    generate:               regenerate all generated files"
-	@echo "    tidy:                   tidy go mod"
-	@echo "    lint:                   run golangci-lint"
-	@echo "    build:                  run all builds"
-	@echo "    clean:                  clean up all containers and volumes"
-	@echo "    test:                   run unit tests"
-	@echo "    run:                    run the service for development"
-	@echo "    setup-opa-policies:     download OPA policies from Forklift project"
-	@echo "    clean-opa-policies:     clean OPA policies directory"
-	@echo "    generate:        regenerate all generated files"
-	@echo "    tidy:            tidy go mod"
-	@echo "    lint:            run golangci-lint"
-	@echo "    build:           run all builds"
-	@echo "    clean:           clean up all containers and volumes"
-	@echo "    migrate:         run database migrations"
-	@echo "    run:             run the OpenShift Migration Advisor API service"
-	@echo "    integration-test: run e2e integration tests"
+	@echo "    generate:                regenerate all generated files"
+	@echo "    tidy:                    tidy go mod"
+	@echo "    lint:                    run golangci-lint"
+	@echo "    build:                   run all builds"
+	@echo "    clean:                   clean up all containers and volumes"
+	@echo "    test:                    run unit tests"
+	@echo "    run:                     run the service for development"
+	@echo "    setup-opa-policies:      download OPA policies from Forklift project"
+	@echo "    clean-opa-policies:      clean OPA policies directory"
+	@echo "    generate:        	    regenerate all generated files"
+	@echo "    tidy:            	    tidy go mod"
+	@echo "    lint:            	    run golangci-lint"
+	@echo "    build:           	    run all builds"
+	@echo "    clean:           		clean up all containers and volumes"
+	@echo "    migrate:         		run database migrations"
+	@echo "    run:             		run the OpenShift Migration Advisor API service"
+	@echo "    integration-test: 		run e2e integration tests"
+	@echo "    minio:                   run local MinIO (S3-compatible)"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
 OC_VERSION ?= 4.17.9
@@ -91,9 +101,12 @@ AIR := $(GOBIN)/air
 $(AIR):
 	@go install github.com/air-verse/air@v1.63.4
 
-run: $(AIR) image
+run: $(AIR) image minio
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
+	MIGRATION_PLANNER_OVA_S3_BUCKET=$(MINIO_OVA_BUCKET) \
+	MIGRATION_PLANNER_OVA_S3_ACCESS_KEY=$(MINIO_ROOT_USER) \
+	MIGRATION_PLANNER_OVA_S3_SECRET_KEY=$(MINIO_ROOT_PASSWORD) \
 	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
 
 run-agent: build-agent
@@ -127,6 +140,26 @@ run-sizer:
 	@echo "   Health: http://localhost:$(SIZER_PORT)/health"
 	@echo "   API:    http://localhost:$(SIZER_PORT)/api/v1/size/custom"
 
+minio:
+	@echo "🚀 Starting MinIO (S3 API :$(MINIO_API_PORT), console :$(MINIO_CONSOLE_PORT))..."
+	@$(PODMAN) rm -f migration-planner-minio-local 2>/dev/null || true
+	@$(PODMAN) run -d --name migration-planner-minio-local \
+		-p $(MINIO_API_PORT):9000 \
+		-p $(MINIO_CONSOLE_PORT):9001 \
+		-e MINIO_ROOT_USER=$(MINIO_ROOT_USER) \
+		-e MINIO_ROOT_PASSWORD=$(MINIO_ROOT_PASSWORD) \
+		$(MINIO_IMAGE):$(MINIO_IMAGE_TAG) \
+		server /data --console-address ":9001"
+
+	@echo "⏳ Waiting for MinIO to be ready..."
+	@sleep 3
+
+	@echo "🪣 Creating bucket..."
+	@$(PODMAN) run --rm --network host \
+		-e MC_HOST_local=http://$(MINIO_ROOT_USER):$(MINIO_ROOT_PASSWORD)@localhost:$(MINIO_API_PORT) \
+		docker.io/minio/mc mb local/$(MINIO_OVA_BUCKET) || true
+
+	@echo "✅ MinIO ready with bucket: my-bucket"
 
 image:
 ifeq ($(DOWNLOAD_RHCOS), true)
@@ -209,7 +242,7 @@ deploy-on-openshift: oc
 	openshift_project=$$(oc project -q); \
 	echo "*** Deploy OpenShift Migration Advisor on OpenShift. Project: $${openshift_project}, Base URL: $${openshift_base_url} ***";\
 	oc process -f deploy/templates/postgres-template.yml | oc apply -f -; \
-	oc process -f deploy/templates/s3-secret-template.yml | oc apply -f -; \
+	oc process -f deploy/templates/minio-s3-template.yml | oc apply -f -; \
 	oc process -f deploy/templates/service-template.yml \
        -p DEBUG_MODE=$(DEBUG_MODE) \
        -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
@@ -219,7 +252,6 @@ deploy-on-openshift: oc
        -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
-       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
 	   | oc apply -f -; \
 	oc expose service migration-planner-agent --name planner-agent; \
 	oc expose service migration-planner-image --name planner-image; \
@@ -241,10 +273,9 @@ delete-from-openshift: oc
        -p SIZER_PORT=$(SIZER_PORT) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url} \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
-       -p MIGRATION_PLANNER_IMAGE_URL=http://planner-image-$${openshift_project}.apps.$${openshift_base_url} \
 	   | oc delete -f -; \
 	oc process -f deploy/templates/postgres-template.yml | oc delete -f -; \
-	oc process -f deploy/templates/s3-secret-template.yml | oc delete -f -; \
+	oc process -f deploy/templates/minio-s3-template.yml | oc delete -f -; \
 	oc delete route planner-agent planner-image; \
 	echo "*** OpenShift Migration Advisor has been deleted successfully from OpenShift ***"
 
@@ -255,12 +286,14 @@ deploy-on-kind: oc
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/s3-secret-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/minio-s3-template.yml \
+	 -p MINIO_ENDPOINT=$${inet_ip}:9000 \
+	 | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc wait --for=condition=available deployment/migration-planner-minio --timeout=120s -n "${MIGRATION_PLANNER_NAMESPACE}"; \
 	oc process --local -f deploy/templates/service-template.yml \
 	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
@@ -278,7 +311,6 @@ delete-from-kind: oc
 	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
 	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
 	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
 	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
 	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
 	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
@@ -290,7 +322,9 @@ delete-from-kind: oc
 	oc process --local -f deploy/templates/pk-secret-template.yml \
 		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
 		| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/s3-secret-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
+	oc process --local -f deploy/templates/minio-s3-template.yml \
+	-p MINIO_ENDPOINT=$${inet_ip}:9000 \
+	| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
 
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml

@@ -79,6 +79,14 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 
 // downloadOvaFromUrl fetches the OVA file from a remote URL and writes it to the provided file
 func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
+	if p.url == "" {
+		return fmt.Errorf("failed to download image: URL is empty")
+	}
+
+	if err := p.waitForOva(time.Second*3, time.Minute*3); err != nil {
+		return err
+	}
+
 	res, err := http.Get(p.url) // Download OVA from the given URL
 
 	if err != nil {
@@ -92,6 +100,44 @@ func (p *plannerAgentLibvirt) downloadOvaFromUrl(ovaFile *os.File) error {
 	}
 
 	return nil
+}
+
+func (p *plannerAgentLibvirt) waitForOva(interval time.Duration, maxWait time.Duration) error {
+	client := &http.Client{
+		Timeout: 5 * time.Second,
+	}
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	timeout := time.After(maxWait)
+
+	for {
+		select {
+
+		case <-timeout:
+			return fmt.Errorf("timeout waiting for ova")
+
+		case <-ticker.C:
+			req, err := http.NewRequest("GET", p.url, nil)
+			if err != nil {
+				return err
+			}
+
+			// key part: only check 1 byte
+			req.Header.Set("Range", "bytes=0-0")
+
+			resp, err := client.Do(req)
+			if err != nil {
+				continue // network issue → retry
+			}
+			_ = resp.Body.Close()
+
+			if resp.StatusCode == http.StatusPartialContent || resp.StatusCode == http.StatusOK {
+				return nil
+			}
+		}
+	}
 }
 
 // createVm defines and starts a VM by generating its XML configuration

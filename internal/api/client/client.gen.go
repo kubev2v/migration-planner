@@ -242,9 +242,6 @@ type ClientInterface interface {
 
 	UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// HeadImage request
-	HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// GetSourceDownloadURL request
 	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -907,18 +904,6 @@ func (c *Client) UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID
 
 func (c *Client) UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSourceRequest(c.Server, id, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewHeadImageRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -2572,40 +2557,6 @@ func NewUpdateSourceRequestWithBody(server string, id openapi_types.UUID, conten
 	return req, nil
 }
 
-// NewHeadImageRequest generates requests for HeadImage
-func NewHeadImageRequest(server string, id openapi_types.UUID) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/sources/%s/image", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("HEAD", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewGetSourceDownloadURLRequest generates requests for GetSourceDownloadURL
 func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -2907,9 +2858,6 @@ type ClientWithResponsesInterface interface {
 	UpdateSourceWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
 
 	UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
-
-	// HeadImageWithResponse request
-	HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error)
 
 	// GetSourceDownloadURLWithResponse request
 	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
@@ -3981,34 +3929,15 @@ func (r UpdateSourceResponse) StatusCode() int {
 	return 0
 }
 
-type HeadImageResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-}
-
-// Status returns HTTPResponse.Status
-func (r HeadImageResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r HeadImageResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type GetSourceDownloadURLResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *PresignedUrl
 	JSON400      *Error
 	JSON401      *Error
+	JSON403      *Error
 	JSON404      *Error
+	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
@@ -4554,15 +4483,6 @@ func (c *ClientWithResponses) UpdateSourceWithResponse(ctx context.Context, id o
 		return nil, err
 	}
 	return ParseUpdateSourceResponse(rsp)
-}
-
-// HeadImageWithResponse request returning *HeadImageResponse
-func (c *ClientWithResponses) HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error) {
-	rsp, err := c.HeadImage(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseHeadImageResponse(rsp)
 }
 
 // GetSourceDownloadURLWithResponse request returning *GetSourceDownloadURLResponse
@@ -6758,22 +6678,6 @@ func ParseUpdateSourceResponse(rsp *http.Response) (*UpdateSourceResponse, error
 	return response, nil
 }
 
-// ParseHeadImageResponse parses an HTTP response from a HeadImageWithResponse call
-func ParseHeadImageResponse(rsp *http.Response) (*HeadImageResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &HeadImageResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	return response, nil
-}
-
 // ParseGetSourceDownloadURLResponse parses an HTTP response from a GetSourceDownloadURLWithResponse call
 func ParseGetSourceDownloadURLResponse(rsp *http.Response) (*GetSourceDownloadURLResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -6809,12 +6713,26 @@ func ParseGetSourceDownloadURLResponse(rsp *http.Response) (*GetSourceDownloadUR
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
