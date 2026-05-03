@@ -6,10 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"os"
 	"time"
-
-	"github.com/kubev2v/migration-planner/internal/service"
 
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -19,6 +16,7 @@ import (
 	"github.com/go-chi/cors"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/image"
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -53,24 +51,6 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
-// Middleware to inject request into context
-func withRequest(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ctx := context.WithValue(r.Context(), handlers.RequestKey, r)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
-// Middleware to inject ResponseWriter into context
-func withResponseWriter(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Add ResponseWriter to context
-		ctx := context.WithValue(r.Context(), handlers.ResponseWriterKey, w)
-		// Pass the modified context to the next handler
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 func (s *ImageServer) Run(ctx context.Context) error {
 	zap.S().Named("image_server").Info("Initializing Image-side API server")
 	swagger, err := api.GetSwagger()
@@ -95,8 +75,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "image_server"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		withResponseWriter,
-		withRequest,
+		apiserver.WithResponseWriter,
 		cors.Handler(cors.Options{
 			AllowedOrigins: []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
 			AllowedMethods: []string{"GET", "OPTIONS"},
@@ -105,11 +84,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		}),
 	)
 
-	if err := os.MkdirAll(s.cfg.Service.TempImagesDir, 0700); err != nil {
-		return fmt.Errorf("create temp images folder %q: %w", s.cfg.Service.TempImagesDir, err)
-	}
-
-	h := handlers.NewImageHandler(service.NewImageSvc(s.store, s.cfg.Service.TempImagesDir, s.cfg.Service.TempImagesDirLimit))
+	h := handlers.NewImageHandler(s.store, s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
