@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -38,6 +41,12 @@ func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) 
 		return "", time.Time{}, err
 	}
 
+	// Pre-generate and store agent JWT so all pods produce byte-identical OVAs.
+	// This is required for Akamai LFO byte-range requests across load-balanced pods.
+	if err := s.ensureAgentToken(ctx, source); err != nil {
+		return "", time.Time{}, fmt.Errorf("failed to ensure agent token: %w", err)
+	}
+
 	// FIXME: refactor the environment vars + config.yaml
 	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
 
@@ -47,6 +56,53 @@ func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) 
 	}
 
 	return url, time.Time(*expireAt), err
+}
+
+// ensureAgentToken generates and stores the agent JWT if it's missing or near expiration.
+func (s *SourceService) ensureAgentToken(ctx context.Context, source *model.Source) error {
+	if source.ImageInfra.AgentToken != nil && !isTokenNearExpiry(*source.ImageInfra.AgentToken) {
+		return nil
+	}
+
+	key, err := s.store.PrivateKey().Get(ctx, source.OrgID)
+	if err != nil {
+		if !errors.Is(err, store.ErrRecordNotFound) {
+			return err
+		}
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
+		if err != nil {
+			return err
+		}
+		if _, err := s.store.PrivateKey().Create(ctx, *newKey); err != nil {
+			return err
+		}
+		return s.store.ImageInfra().UpdateAgentToken(ctx, source.ID.String(), token)
+	}
+
+	token, err := auth.GenerateAgentJWT(key, source)
+	if err != nil {
+		return err
+	}
+	return s.store.ImageInfra().UpdateAgentToken(ctx, source.ID.String(), token)
+}
+
+// isTokenNearExpiry parses a JWT without verification and checks if it expires within 30 days.
+// The agent token lifetime is 90 days, so this renews when ~1/3 of the lifetime remains.
+func isTokenNearExpiry(tokenStr string) bool {
+	parser := jwt.NewParser()
+	token, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return true // can't parse → treat as expired
+	}
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return true
+	}
+	exp, err := claims.GetExpirationTime()
+	if err != nil || exp == nil {
+		return true
+	}
+	return time.Until(exp.Time) < 30*24*time.Hour
 }
 
 func (s *SourceService) ListSources(ctx context.Context, filter *SourceFilter) ([]model.Source, error) {

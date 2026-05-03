@@ -11,6 +11,7 @@ type ImageInfra interface {
 	Create(ctx context.Context, imageInfra model.ImageInfra) (*model.ImageInfra, error)
 	Update(ctx context.Context, imageInfra model.ImageInfra) (*model.ImageInfra, error)
 	UpdateAgentVersion(ctx context.Context, sourceID string, agentVersion string) error
+	UpdateAgentToken(ctx context.Context, sourceID string, agentToken string) error
 }
 
 type ImageInfraStore struct {
@@ -30,8 +31,8 @@ func (i *ImageInfraStore) Create(ctx context.Context, image model.ImageInfra) (*
 }
 
 func (i *ImageInfraStore) Update(ctx context.Context, image model.ImageInfra) (*model.ImageInfra, error) {
-	// Exclude agent_version to prevent overwriting concurrent updates from OVA downloads
-	if err := i.getDB(ctx).WithContext(ctx).Omit("agent_version").Save(&image).Error; err != nil {
+	// Exclude agent_version and agent_token to prevent overwriting concurrent updates
+	if err := i.getDB(ctx).WithContext(ctx).Omit("agent_version", "agent_token").Save(&image).Error; err != nil {
 		return nil, err
 	}
 	return &image, nil
@@ -44,6 +45,24 @@ func (i *ImageInfraStore) UpdateAgentVersion(ctx context.Context, sourceID strin
 		Model(&model.ImageInfra{}).
 		Where("source_id = ?", sourceID).
 		Update("agent_version", agentVersion)
+
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return ErrRecordNotFound
+	}
+
+	return nil
+}
+
+// UpdateAgentToken atomically updates only the agent_token field for a given source_id.
+func (i *ImageInfraStore) UpdateAgentToken(ctx context.Context, sourceID string, agentToken string) error {
+	result := i.getDB(ctx).WithContext(ctx).
+		Model(&model.ImageInfra{}).
+		Where("source_id = ?", sourceID).
+		Update("agent_token", agentToken)
 
 	if result.Error != nil {
 		return result.Error

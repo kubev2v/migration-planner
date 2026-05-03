@@ -24,6 +24,9 @@ type Key int
 // Key to store the ResponseWriter in the context of openapi
 const ResponseWriterKey Key = 0
 
+// Key to store the *http.Request in the context (needed for http.ServeContent)
+const RequestKey Key = 1
+
 type ImageType int
 
 const (
@@ -175,6 +178,82 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
 	_ = tw.Flush()
 
 	return nil
+}
+
+// OpenSeekableReader returns an io.ReadSeeker over the OVA TAR content, along with
+// the total size. This enables http.ServeContent to handle byte-range requests
+// (required for Akamai LFO). The caller must call Close() on the returned reader.
+// modTime is used for all TAR headers to ensure deterministic output across pods.
+func (b *ImageBuilder) OpenSeekableReader(modTime time.Time) (*SeekableTarReader, int64, error) {
+	ignitionContent, err := b.generateIgnition()
+	if err != nil {
+		return nil, 0, err
+	}
+
+	isoReader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read rhcos iso: %w", err)
+	}
+
+	// Ensure isoReader is closed on any error path below
+	success := false
+	defer func() {
+		if !success {
+			_ = isoReader.Close()
+		}
+	}()
+
+	// Get ISO size via seeking
+	isoSize, err := isoReader.Seek(0, io.SeekEnd)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to get iso size: %w", err)
+	}
+	if _, err := isoReader.Seek(0, io.SeekStart); err != nil {
+		return nil, 0, fmt.Errorf("failed to reset iso reader: %w", err)
+	}
+
+	// Read OVF (small file, ~7 KB)
+	ovfContent, err := os.ReadFile(b.OvfFile)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read ovf: %w", err)
+	}
+
+	// Read VMDK (small file, ~143 KB)
+	diskContent, err := os.ReadFile(b.PersistentDiskImage)
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to read persistence disk: %w", err)
+	}
+
+	entries := []TarEntry{
+		{
+			Name:    b.OvfName,
+			Size:    int64(len(ovfContent)),
+			Mode:    0600,
+			ModTime: modTime,
+			Reader:  bytes.NewReader(ovfContent),
+		},
+		{
+			Name:    b.IsoImageName,
+			Size:    isoSize,
+			Mode:    0600,
+			ModTime: modTime,
+			Reader:  isoReader,
+		},
+		{
+			Name:    "persistence-disk.vmdk",
+			Size:    int64(len(diskContent)),
+			Mode:    0600,
+			ModTime: modTime,
+			Reader:  bytes.NewReader(diskContent),
+		},
+	}
+
+	reader, total, err := NewSeekableTarReader(entries, isoReader)
+	if err != nil {
+		return nil, 0, err
+	}
+	success = true
+	return reader, total, nil
 }
 
 func (b *ImageBuilder) Validate() error {
@@ -335,7 +414,9 @@ func (b *ImageBuilder) computeSize(reader overlay.OverlayReader) (uint64, error)
 		return 0, fmt.Errorf("failed to comute persistent disk size: %s", err)
 	}
 
-	return isoSize + ovfSize + persistentDiskSize, nil
+	// 1024 bytes for the two 512-byte zero end-of-archive blocks
+	const endOfArchiveSize = 1024
+	return isoSize + ovfSize + persistentDiskSize + endOfArchiveSize, nil
 }
 
 func (b *ImageBuilder) WithImageInfra(imageInfra model.ImageInfra) *ImageBuilder {

@@ -19,4 +19,5 @@ type ImageInfra struct {
 	DefaultGateway   string
 	Dns              string
 	AgentVersion     *string
+	AgentToken       *string
 }
