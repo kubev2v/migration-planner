@@ -39,6 +39,12 @@ var _ = Describe("e2e-share", func() {
 					PowerStates:          map[string]int{"poweredOn": 1},
 					NotMigratableReasons: []v1alpha1.MigrationIssue{},
 					MigrationWarnings:    []v1alpha1.MigrationIssue{},
+					OsInfo: &map[string]v1alpha1.OsInfo{
+						"Red Hat Enterprise Linux 9": {Count: 1, Supported: true},
+					},
+					DiskComplexityTier: &map[string]v1alpha1.DiskSizeTierSummary{
+						"0-10TiB": {VmCount: 1, TotalSizeTB: 0.1},
+					},
 				},
 				Infra: v1alpha1.Infra{
 					TotalHosts:      1,
@@ -213,6 +219,52 @@ var _ = Describe("e2e-share", func() {
 			statusCode, err := customerSvc.UnshareAssessment(assessment.Id)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
+
+	Context("Partner estimation on shared assessment", func() {
+		const clusterID = "test-cluster"
+
+		It("partner calls complexity-estimation on shared assessment", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(statusCode).To(Equal(http.StatusOK))
+
+			code, err := partnerSvc.CalculateMigrationComplexity(assessment.Id, clusterID)
+			Expect(err).To(BeNil())
+			Expect(code).To(Equal(http.StatusOK))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("partner calls migration-estimation on shared assessment", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(statusCode).To(Equal(http.StatusOK))
+
+			code, err := partnerSvc.CalculateMigrationEstimation(assessment.Id, clusterID)
+			Expect(err).To(BeNil())
+			Expect(code).To(Equal(http.StatusOK))
+
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+
+		It("partner calls migration-estimation/by-complexity on shared assessment", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(statusCode).To(Equal(http.StatusOK))
+
+			code, err := partnerSvc.CalculateMigrationEstimationByComplexity(assessment.Id, clusterID)
+			Expect(err).To(BeNil())
+			Expect(code).To(Equal(http.StatusOK))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

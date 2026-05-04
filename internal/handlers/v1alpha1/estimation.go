@@ -117,22 +117,19 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		}
 	}
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
+	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimationByComplexity404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.CalculateMigrationEstimationByComplexity403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to get assessment"}, nil
 		}
-	}
-
-	if user.Username != assessment.Username || user.Organization != assessment.OrgID {
-		msg := fmt.Sprintf("forbidden to access assessment %s by user %s", assessmentID, user.Username)
-		logger.Error(fmt.Errorf("authorization failed: %s", msg)).Log()
-		return server.CalculateMigrationEstimationByComplexity403JSONResponse{Message: msg}, nil
 	}
 
 	osDiskResult, err := h.estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, clusterID)

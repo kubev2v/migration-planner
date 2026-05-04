@@ -13,6 +13,7 @@ type PlannerService interface {
 	jobApi
 	partnerApi
 	accountsApi
+	estimationApi
 }
 
 type sourceApi interface {
@@ -55,6 +56,12 @@ type partnerApi interface {
 	LeavePartner(uuid.UUID) error
 	ListCustomers() (*v1alpha1.CustomerList, error)
 	RemoveCustomer(string) error
+}
+
+type estimationApi interface {
+	CalculateMigrationComplexity(uuid.UUID, string) (int, error)
+	CalculateMigrationEstimation(uuid.UUID, string) (int, error)
+	CalculateMigrationEstimationByComplexity(uuid.UUID, string) (int, error)
 }
 
 type accountsApi interface {
