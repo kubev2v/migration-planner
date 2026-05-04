@@ -112,12 +112,12 @@ func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// Middleware to inject ResponseWriter and *http.Request into context.
-// The Request is needed by http.ServeContent for handling byte-range requests.
+// Middleware to inject ResponseWriter into context
 func WithResponseWriter(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add ResponseWriter to context
 		ctx := context.WithValue(r.Context(), image.ResponseWriterKey, w)
-		ctx = context.WithValue(ctx, image.RequestKey, r)
+		// Pass the modified context to the next handler
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

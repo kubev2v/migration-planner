@@ -1,10 +1,12 @@
 package v1alpha1
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -61,10 +63,6 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	if !ok {
 		return imageServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
 	}
-	httpReq, ok := ctx.Value(image.RequestKey).(*http.Request)
-	if !ok {
-		return imageServer.GetImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
-	}
 
 	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
 		return imageServer.GetImageByToken401JSONResponse{Message: err.Error()}, nil
@@ -82,34 +80,27 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	imageBuilder := image.NewImageBuilder(source.ID)
 	imageBuilder.WithImageInfra(source.ImageInfra)
 
-	// Use pre-generated agent token from DB (stored at download URL creation time).
-	// This ensures all pods produce byte-identical OVAs for Akamai LFO range requests.
-	if source.ImageInfra.AgentToken != nil && *source.ImageInfra.AgentToken != "" {
-		imageBuilder.WithAgentToken(*source.ImageInfra.AgentToken)
-	} else {
-		// Fallback for pre-migration sources: generate on the fly
-		if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
-			return imageServer.GetImageByToken500JSONResponse{}, nil
-		}
+	if err := generateAndSetAgentToken(ctx, source, h.store, imageBuilder); err != nil {
+		return imageServer.GetImageByToken500JSONResponse{}, nil
 	}
 
-	// Use source.CreatedAt as deterministic ModTime for TAR headers
-	modTime := source.CreatedAt
+	// Get image size
+	size, err := imageBuilder.Size()
+	if err != nil {
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to read image size %s", err)}, nil
+	}
 
-	reader, _, err := imageBuilder.OpenSeekableReader(modTime)
+	// Set proper headers of the OVA file:
+	writer.Header().Set("Content-Type", "application/ovf")
+	writer.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", req.Name))
+	writer.Header().Set("Content-Length", strconv.FormatUint(size, 10))
+
+	err = imageBuilder.Generate(ctx, writer)
 	if err != nil {
 		metrics.IncreaseOvaDownloadsTotalMetric("failed")
-		zap.S().Named("image_service").Errorw("failed to create seekable reader", "error", err)
-		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to create seekable reader: %s", err)}, nil
+		zap.S().Named("image_service").Errorw("failed to generate ova at GetImage", "error", err)
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to generate image %s", err)}, nil
 	}
-	defer func() { _ = reader.Close() }()
-
-	// Set headers before ServeContent
-	writer.Header().Set("Content-Type", "application/ovf")
-	writer.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, req.Name))
-
-	// http.ServeContent handles Range requests, Content-Length, Last-Modified, etc.
-	http.ServeContent(writer, httpReq, req.Name, modTime, reader)
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
@@ -117,9 +108,11 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
 		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName, "agent_git_commit", versionInfo.AgentGitCommit)
 	} else {
+		// Use detached context to ensure version persists even if client disconnects
 		persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
+		// Use atomic update to prevent race conditions during concurrent downloads
 		if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
 			zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
 		} else {
@@ -127,42 +120,31 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		}
 	}
 
-	// Return nil — http.ServeContent already wrote the response.
-	// Returning a response object would cause a duplicate WriteHeader.
-	return nil, nil
+	return imageServer.GetImageByToken200ApplicationovfResponse{Body: bytes.NewReader([]byte{})}, nil
 }
 
 func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {
 	// get the key associated with source orgID to generate agent token
-	var token string
 	key, err := storeInstance.PrivateKey().Get(ctx, source.OrgID)
 	if err != nil {
 		if !errors.Is(err, store.ErrRecordNotFound) {
 			return err
 		}
-		newKey, t, err := auth.GenerateAgentJWTAndKey(source)
+		newKey, token, err := auth.GenerateAgentJWTAndKey(source)
 		if err != nil {
 			return err
 		}
 		if _, err := storeInstance.PrivateKey().Create(ctx, *newKey); err != nil {
 			return err
 		}
-		token = t
+		imageBuilder.WithAgentToken(token)
 	} else {
-		t, err := auth.GenerateAgentJWT(key, source)
+		token, err := auth.GenerateAgentJWT(key, source)
 		if err != nil {
 			return err
 		}
-		token = t
+		imageBuilder.WithAgentToken(token)
 	}
-
-	imageBuilder.WithAgentToken(token)
-
-	// Persist so subsequent requests produce byte-identical OVAs (required for Akamai LFO)
-	if err := storeInstance.ImageInfra().UpdateAgentToken(ctx, source.ID.String(), token); err != nil {
-		zap.S().Named("image_service").Warnw("failed to persist fallback agent token", "error", err, "source_id", source.ID)
-	}
-
 	return nil
 }
 
@@ -179,7 +161,7 @@ func (h *ImageHandler) getSourceKey(token *jwt.Token) (interface{}, error) {
 
 	source, err := h.getSource(context.TODO(), sourceId)
 	if err != nil {
-		return nil, fmt.Errorf("invalid source ID: %w", err)
+		return imageServer.GetImageByToken500JSONResponse{Message: "invalid source ID"}, nil
 	}
 
 	return []byte(source.ImageInfra.ImageTokenKey), nil
