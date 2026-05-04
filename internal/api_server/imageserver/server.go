@@ -13,7 +13,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/cors"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/image"
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
@@ -76,12 +75,6 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		apiserver.WithResponseWriter,
-		cors.Handler(cors.Options{
-			AllowedOrigins: []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
-			AllowedMethods: []string{"GET", "OPTIONS"},
-			AllowedHeaders: []string{"*"},
-			MaxAge:         300,
-		}),
 	)
 
 	h := handlers.NewImageHandler(s.store, s.cfg)
