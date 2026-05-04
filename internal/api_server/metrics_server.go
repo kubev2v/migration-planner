@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net"
 	"net/http"
-	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
@@ -47,19 +46,19 @@ func (m *MetricServer) Run(ctx context.Context) error {
 		zap.S().Named("metrics_server").Info("metrics server terminated")
 	}()
 
-	ticker := time.NewTicker(7 * 24 * time.Hour)
-	go func() {
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ticker.C:
-				metrics.UniqueVisitsPerWeek.Reset()
-				zap.S().Named("metrics_server").Info("weekly unique visits metric reset")
-			case <-ctx.Done():
-				return
-			}
-		}
-	}()
+	//ticker := time.NewTicker(7 * 24 * time.Hour)
+	//go func() {
+	//	defer ticker.Stop()
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			metrics.UniqueVisitsPerWeek.Reset()
+	//			zap.S().Named("metrics_server").Info("weekly unique visits metric reset")
+	//		case <-ctx.Done():
+	//			return
+	//		}
+	//	}
+	//}()
 
 	zap.S().Named("metrics_server").Infof("serving metrics: %s", m.bindAddress)
 	if err := m.httpServer.Serve(m.listener); err != nil && !errors.Is(err, net.ErrClosed) {

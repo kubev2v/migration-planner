@@ -12,13 +12,11 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
-	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
-	"github.com/kubev2v/migration-planner/pkg/metrics"
-
-	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
@@ -110,7 +108,7 @@ var runCmd = &cobra.Command{
 		}()
 
 		// register metrics
-		metrics.RegisterMetrics(store)
+		//metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
 			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
