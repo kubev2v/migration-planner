@@ -265,7 +265,32 @@ var _ = Describe("e2e-share", func() {
 			code, err := partnerSvc.CalculateMigrationEstimationByComplexity(assessment.Id, clusterID)
 			Expect(err).To(BeNil())
 			Expect(code).To(Equal(http.StatusOK))
+			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
 
+	Context("Share revocation on leave", func() {
+		It("customer leaves partner, shared assessment is revoked", func() {
+			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
+
+			// Customer shares the assessment
+			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(statusCode).To(Equal(http.StatusOK))
+
+			// Partner can see the assessment
+			partnerAssessments, err := partnerSvc.GetAssessments()
+			Expect(err).To(BeNil())
+			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
+
+			// Customer leaves the partner
+			err = customerSvc.LeavePartner(group.Id)
+			Expect(err).To(BeNil())
+
+			// Partner can no longer see the assessment
+			partnerAssessments, err = partnerSvc.GetAssessments()
+			Expect(err).To(BeNil())
+			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 	})

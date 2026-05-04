@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -10,6 +11,21 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
+
+func revokeSharedAssessments(ctx context.Context, s store.Store, username, partnerID string) error {
+	assessments, err := s.Assessment().List(ctx, store.NewAssessmentQueryFilter().WithUsername(username))
+	if err != nil {
+		return fmt.Errorf("failed to list assessments for user %s: %w", username, err)
+	}
+	if len(assessments) == 0 {
+		return nil
+	}
+	builder := store.NewRelationshipBuilder()
+	for _, a := range assessments {
+		builder.Without(model.NewAssessmentResource(a.ID.String()), model.ViewerRelation, model.NewOrgSubject(partnerID))
+	}
+	return s.Authz().WriteRelationships(ctx, builder.Build())
+}
 
 type PartnerServicer interface {
 	// Regular user
@@ -159,12 +175,28 @@ func (s *PartnerService) LeavePartner(ctx context.Context, user auth.User, partn
 		}
 		return err
 	}
+	ctx, err = s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
 	now := time.Now()
-	_, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
-	})
+	}); err != nil {
+		return err
+	}
+
+	if err = revokeSharedAssessments(ctx, s.store, user.Username, partnerID); err != nil {
+		return err
+	}
+
+	_, err = store.Commit(ctx)
 	return err
 }
 
@@ -225,11 +257,27 @@ func (s *PartnerService) RemoveCustomer(ctx context.Context, user auth.User, use
 		}
 		return err
 	}
+	ctx, err = s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
 	now := time.Now()
-	_, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
-	})
+	}); err != nil {
+		return err
+	}
+
+	if err = revokeSharedAssessments(ctx, s.store, username, pc.PartnerID); err != nil {
+		return err
+	}
+
+	_, err = store.Commit(ctx)
 	return err
 }
