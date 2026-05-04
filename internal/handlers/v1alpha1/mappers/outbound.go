@@ -297,10 +297,10 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 			SharedWith: make([]api.SharingSubject, len(a.Sharing.SharedWith)),
 		}
 		for i, s := range a.Sharing.SharedWith {
-			sharing.SharedWith[i] = api.SharingSubject{Type: s.Type, Id: s.ID}
+			sharing.SharedWith[i] = api.SharingSubject{Type: s.Type, Id: s.ID, Name: s.Name}
 		}
 		if a.Sharing.SharedBy != nil {
-			sharing.SharedBy = &api.SharingSubject{Type: a.Sharing.SharedBy.Type, Id: a.Sharing.SharedBy.ID}
+			sharing.SharedBy = &api.SharingSubject{Type: a.Sharing.SharedBy.Type, Id: a.Sharing.SharedBy.ID, Name: a.Sharing.SharedBy.Name}
 		}
 		assessment.Sharing = &sharing
 	}

@@ -126,6 +126,7 @@ func NewOrgSubject(id string) Subject  { return Subject{Kind: OrgSubject, ID: id
 type SharingSubject struct {
 	Type string
 	ID   string
+	Name string
 }
 
 // Sharing captures the sharing state of an assessment for a given viewer.

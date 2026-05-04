@@ -77,7 +77,11 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *As
 
 	for i, assessment := range assessments {
 		if assessment.Username == user.Username {
-			assessments[i].Sharing = buildOwnerSharing(relsByID[assessment.ID.String()])
+			sharingM, err := a.buildOwnerSharing(ctx, relsByID[assessment.ID.String()])
+			if err != nil {
+				return nil, err
+			}
+			assessments[i].Sharing = sharingM
 			assessments[i].Permissions = slices.DeleteFunc(assessments[i].Permissions, func(s model.Permission) bool {
 				if identity.Kind == KindRegular || identity.Kind == KindPartner {
 					return s.String() == "share" || s.String() == "edit"
@@ -85,12 +89,15 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *As
 				return s.String() == "edit"
 			})
 		} else {
-			assessments[i].Sharing = buildViewerSharing(assessment.Username)
+			ownerName := ""
+			if assessment.OwnerFirstName != nil && assessment.OwnerLastName != nil {
+				ownerName = fmt.Sprintf("%s %s", *assessment.OwnerFirstName, *assessment.OwnerLastName)
+			}
+			assessments[i].Sharing = a.buildViewerSharing(ownerName, assessment.Username)
 		}
 	}
 
 	// per design, the regular user cannot share so remove the permission
-
 	return assessments, nil
 }
 
@@ -118,7 +125,11 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		if err != nil {
 			return nil, fmt.Errorf("authz: failed to list relationships: %w", err)
 		}
-		assessment.Sharing = buildOwnerSharing(rels)
+		sharingM, err := a.buildOwnerSharing(ctx, rels)
+		if err != nil {
+			return nil, err
+		}
+		assessment.Sharing = sharingM
 
 		identity, err := a.accountsSrv.GetIdentity(ctx, user)
 		if err != nil {
@@ -131,7 +142,11 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 			return s.String() == "edit"
 		})
 	} else {
-		assessment.Sharing = buildViewerSharing(assessment.Username)
+		ownerName := ""
+		if assessment.OwnerFirstName != nil && assessment.OwnerLastName != nil {
+			ownerName = fmt.Sprintf("%s %s", *assessment.OwnerFirstName, *assessment.OwnerLastName)
+		}
+		assessment.Sharing = a.buildViewerSharing(ownerName, assessment.Username)
 	}
 
 	return assessment, nil
@@ -271,28 +286,40 @@ func (a *AuthzAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	return a.inner.UnshareAssessment(ctx, id)
 }
 
-func buildOwnerSharing(rels []model.Relationship) *model.Sharing {
+func (a *AuthzAssessmentService) buildOwnerSharing(ctx context.Context, rels []model.Relationship) (*model.Sharing, error) {
 	shared := make([]model.SharingSubject, 0, len(rels))
 	for _, r := range rels {
 		if r.Relation == model.OwnerRelation {
 			continue
 		}
 		st := string(r.Subject.Kind)
+		name := r.Subject.ID
 		if r.Subject.Kind == model.OrgSubject {
 			st = "group"
+			groupID, err := uuid.Parse(r.Subject.ID)
+			if err != nil {
+				return nil, err
+			}
+
+			group, err := a.store.Accounts().GetGroup(ctx, groupID)
+			if err != nil {
+				return nil, err
+			}
+
+			name = group.Name
 		}
-		shared = append(shared, model.SharingSubject{Type: st, ID: r.Subject.ID})
+		shared = append(shared, model.SharingSubject{Type: st, ID: r.Subject.ID, Name: name})
 	}
 	return &model.Sharing{
 		IsShared:   len(shared) > 0,
 		SharedWith: shared,
-	}
+	}, nil
 }
 
-func buildViewerSharing(ownerUsername string) *model.Sharing {
+func (a *AuthzAssessmentService) buildViewerSharing(ownerName string, ownerUsername string) *model.Sharing {
 	return &model.Sharing{
 		IsShared:   true,
 		SharedWith: []model.SharingSubject{},
-		SharedBy:   &model.SharingSubject{Type: "username", ID: ownerUsername},
+		SharedBy:   &model.SharingSubject{Type: "username", ID: ownerUsername, Name: ownerName},
 	}
 }

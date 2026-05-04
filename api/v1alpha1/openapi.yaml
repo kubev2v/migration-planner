@@ -3645,6 +3645,9 @@ components:
           type: string
         id:
           type: string
+        name:
+          type: string
       required:
         - type
+        - name
         - id

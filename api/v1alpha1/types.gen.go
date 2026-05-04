@@ -791,6 +791,7 @@ type SchemaEstimationResult struct {
 // SharingSubject defines model for SharingSubject.
 type SharingSubject struct {
 	Id   string `json:"id"`
+	Name string `json:"name"`
 	Type string `json:"type"`
 }
 

@@ -184,14 +184,18 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		})
 
 		It("returns sharing state for owner and viewer", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Share Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
 			var resourceID string
-			tx := gormdb.Raw("SELECT resource_id FROM relations WHERE subject_id = 'user1' LIMIT 1").Scan(&resourceID)
+			tx = gormdb.Raw("SELECT resource_id FROM relations WHERE subject_id = 'user1' LIMIT 1").Scan(&resourceID)
 			Expect(tx.Error).To(BeNil())
 
-			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", resourceID, "viewer", "org", "partner-org"))
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", resourceID, "viewer", "org", partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
-			// Owner sees sharedWith
+			// Owner sees sharedWith with resolved group name
 			ctx := ctxWithUser("user1", "org1")
 			filter := service.NewAssessmentFilter("user1", "org1")
 			assessments, err := svc.ListAssessments(ctx, filter)
@@ -208,11 +212,12 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(shared.Sharing.IsShared).To(BeTrue())
 			Expect(shared.Sharing.SharedWith).To(HaveLen(1))
 			Expect(shared.Sharing.SharedWith[0].Type).To(Equal("group"))
-			Expect(shared.Sharing.SharedWith[0].ID).To(Equal("partner-org"))
+			Expect(shared.Sharing.SharedWith[0].ID).To(Equal(partnerGroupID.String()))
+			Expect(shared.Sharing.SharedWith[0].Name).To(Equal("Share Partner"))
 			Expect(shared.Sharing.SharedBy).To(BeNil())
 
-			// Viewer sees sharedBy
-			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "org", "partner-org", "member", "user", "partner-user"))
+			// Viewer sees sharedBy with owner name
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "org", partnerGroupID, "member", "user", "partner-user"))
 			Expect(tx.Error).To(BeNil())
 
 			ctx = ctxWithUser("partner-user", "org1")
@@ -226,6 +231,10 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessments[0].Sharing.SharedBy).ToNot(BeNil())
 			Expect(assessments[0].Sharing.SharedBy.Type).To(Equal("username"))
 			Expect(assessments[0].Sharing.SharedBy.ID).To(Equal("user1"))
+			Expect(assessments[0].Sharing.SharedBy.Name).To(Equal("John Doe"))
+
+			gormdb.Exec("DELETE FROM members")
+			gormdb.Exec("DELETE FROM groups")
 		})
 
 		AfterEach(func() {
@@ -334,14 +343,18 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		})
 
 		It("returns sharing state for owner and viewer", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Get Partner', 'desc', 'partner', 'icon', 'Acme', NULL);", partnerGroupID))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "org", "partner-org"))
+
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "org", partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "viewer-user"))
 			Expect(tx.Error).To(BeNil())
 
-			// Owner sees sharedWith (excluding own owner tuple)
+			// Owner sees sharedWith with resolved names
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
@@ -350,7 +363,13 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessment.Sharing.SharedWith).To(HaveLen(2))
 			Expect(assessment.Sharing.SharedBy).To(BeNil())
 
-			// Viewer sees sharedBy
+			for _, s := range assessment.Sharing.SharedWith {
+				if s.Type == "group" {
+					Expect(s.Name).To(Equal("Get Partner"))
+				}
+			}
+
+			// Viewer sees sharedBy with owner name
 			ctx = ctxWithUser("viewer-user", "org1")
 			assessment, err = svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
@@ -360,6 +379,10 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(assessment.Sharing.SharedBy).ToNot(BeNil())
 			Expect(assessment.Sharing.SharedBy.Type).To(Equal("username"))
 			Expect(assessment.Sharing.SharedBy.ID).To(Equal("user1"))
+			Expect(assessment.Sharing.SharedBy.Name).To(Equal("John Doe"))
+
+			gormdb.Exec("DELETE FROM members")
+			gormdb.Exec("DELETE FROM groups")
 		})
 
 		AfterEach(func() {
