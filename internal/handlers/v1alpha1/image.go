@@ -104,7 +104,11 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	}
 	defer func() { _ = reader.Close() }()
 
-	// Set headers before ServeContent
+	// Set headers before ServeContent.
+	// ETag derived from source ID + creation time — deterministic across pods.
+	// Must be strong (no W/ prefix) for Akamai LFO.
+	etag := fmt.Sprintf(`"%s-%d"`, source.ID, modTime.Unix())
+	writer.Header().Set("ETag", etag)
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, req.Name))
 
