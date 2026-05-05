@@ -29,6 +29,9 @@ type tokenOptions struct {
 	PrivateKey   string
 	Username     string
 	Organization string
+	FirstName    string
+	LastName     string
+	TTL          int
 	Agent        bool
 	SourceID     string
 	Kid          string
@@ -38,6 +41,9 @@ func (o *tokenOptions) Bind(fs *pflag.FlagSet) {
 	fs.StringVarP(&o.PrivateKey, "private-key", "", "", "private key used to sign the token")
 	fs.StringVarP(&o.Organization, "org", "", "", "organization name")
 	fs.StringVarP(&o.Username, "username", "", "", "username")
+	fs.StringVarP(&o.FirstName, "first-name", "", "", "first name (optional)")
+	fs.StringVarP(&o.LastName, "last-name", "", "", "last name (optional)")
+	fs.IntVarP(&o.TTL, "ttl", "", 24, "token validity duration in hours (default: 24)")
 	fs.BoolVarP(&o.Agent, "agent", "", false, "generate an agent token instead of a user token")
 	fs.StringVarP(&o.SourceID, "source-id", "", "", "source-id (required when --agent is set)")
 	fs.StringVarP(&o.Kid, "kid", "", "", "kid (required when --agent is set)")
@@ -70,7 +76,7 @@ func newTokenCmd() *cobra.Command {
 			if o.Username == "" || o.Organization == "" {
 				return fmt.Errorf("--username and --org are required for user tokens")
 			}
-			token, err = GenerateToken(o.Username, o.Organization, privateKey)
+			token, err = GenerateToken(o.Username, o.Organization, o.FirstName, o.LastName, o.TTL, privateKey)
 			if err != nil {
 				return err
 			}
@@ -116,25 +122,32 @@ func ParsePrivateKey(content string) (*rsa.PrivateKey, error) {
 	return key, nil
 }
 
-func GenerateToken(username, organization string, privateKey *rsa.PrivateKey) (string, error) {
+func GenerateToken(username, organization, firstName, lastName string, ttlHours int, privateKey *rsa.PrivateKey) (string, error) {
+	if ttlHours <= 0 {
+		return "", fmt.Errorf("ttl must be greater than 0 hours")
+	}
 	type TokenClaims struct {
-		Username string `json:"username"`
-		OrgID    string `json:"org_id"`
+		Username  string `json:"username"`
+		OrgID     string `json:"org_id"`
+		FirstName string `json:"first_name,omitempty"`
+		LastName  string `json:"last_name,omitempty"`
 		jwt.RegisteredClaims
 	}
 
 	// Create claims with multiple fields populated
 	claims := TokenClaims{
-		username,
-		organization,
-		jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		Username:  username,
+		OrgID:     organization,
+		FirstName: firstName,
+		LastName:  lastName,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(ttlHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
-			Issuer:    "test",
-			Subject:   "somebody",
-			ID:        "1",
-			Audience:  []string{"somebody_else"},
+			Issuer:    "migration-planner-local",
+			Subject:   fmt.Sprintf("user:%s@org:%s", username, organization),
+			ID:        fmt.Sprintf("%d", time.Now().UnixNano()),
+			Audience:  []string{"migration-planner-api"},
 		},
 	}
 

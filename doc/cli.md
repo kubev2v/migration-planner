@@ -24,6 +24,11 @@ $ make build-cli
 
 This is generating a binary `planner` in `bin` folder.
 
+**Note:** On Linux, the CLI is automatically built with libvirt support (enabling the `deploy` command). On macOS, libvirt support is disabled. To manually build with libvirt support:
+```bash
+$ go build -tags libvirt -o bin/planner ./cmd/planner
+```
+
 ## Commands
 
 The list of available commands is:
@@ -96,6 +101,8 @@ Image wrote to /tmp/image.iso
 ```
 
 #### deploy
+
+**Note:** The `deploy` command requires libvirt and is only available on Linux. On macOS, the command will display a help message but cannot be executed.
 
 Agents can be deployed on kvm only using `deploy` command.
 ```bash

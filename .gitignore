@@ -13,6 +13,7 @@ rhcos-live-iso.x86_64.iso
 # Sensitive files and directories
 staging-data/
 backups/
+.auth/
 *.bak
 *.log
 *.tmp

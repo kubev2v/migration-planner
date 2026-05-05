@@ -64,6 +64,14 @@ help:
 	@echo "    integration-test: run e2e integration tests"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
+# Set build tags conditionally based on OS (libvirt support only on Linux)
+ifeq ($(OS),linux)
+GO_TAGS := libvirt
+GO_BUILD_TAGS := -tags $(GO_TAGS)
+else
+GO_TAGS :=
+GO_BUILD_TAGS :=
+endif
 OC_VERSION ?= 4.17.9
 OC_BIN := $(shell command -v oc)
 oc: # Verify oc installed, in linux install it if not already installed
@@ -136,10 +144,10 @@ ifeq ($(DOWNLOAD_RHCOS), true)
 endif
 
 build: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
+	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/...
 
 build-api: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api
+	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api
 
 build-agent: bin submodules
 	@echo "Building agent from agent-v2 submodule..."
@@ -147,7 +155,7 @@ build-agent: bin submodules
 	@echo "Agent binary built at agent-v2/bin/agent"
 
 build-cli: bin
-	go build -buildvcs=false $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
+	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
 
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin submodules agent-v2/Containerfile
@@ -336,7 +344,7 @@ $(GOLANGCI_LINT):
 # Run linter
 lint: check-golangci-lint-version $(GOLANGCI_LINT)
 	@echo "🔍 Running golangci-lint..."
-	@$(GOLANGCI_LINT) run --timeout=5m
+	@$(GOLANGCI_LINT) run --timeout=5m $(if $(GO_TAGS),--build-tags $(GO_TAGS))
 	@echo "✅ Lint passed successfully!"
 ##################### "make lint" support end   ##########################
 
@@ -405,7 +413,7 @@ $(GINKGO):
 # Run unit tests using ginkgo
 test: $(GINKGO)
 	@echo "🧪 Running Unit tests..."
-	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
+	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(if $(GO_TAGS),--tags $(GO_TAGS)) $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
 	@echo "✅ All Unit tests passed successfully."
 
 # Run agent-v2 tests separately in its own module context

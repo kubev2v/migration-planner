@@ -1,69 +1,76 @@
-# Setup local authentication for OpenShift Migration Advisor
+# Local Authentication Setup
 
-In order to use local authentication, we must generate a RSA private key used to sign the jwt.
+Quick guide to configure local authentication for testing with different user types.
 
-### Generating a private key
+## Quick Start
 
-The private key can be generated using the cli:
-```
-bin/planner sso private-key
------BEGIN RSA PRIVATE KEY-----
-...
------END RSA PRIVATE KEY-----
-```
+```bash
+# 1. Generate private key and tokens
+./hack/create-tokens.sh
 
-In order to pass the private key to the `planner-api`, you need to set `MIGRATION_PLANNER_PRIVATE_KEY`.
-```
-MIGRATION_PLANNER_PRIVATE_KEY=`bin/planner sso private-key`
-```
+# 2. Start API with local auth
+export MIGRATION_PLANNER_PRIVATE_KEY="$(cat .auth/private-key.txt)"
+export MIGRATION_PLANNER_AUTH=local
+make deploy-db build-api run
 
-### Executing `planner-api`
+# 3. Create test groups (in another terminal)
+./hack/create-groups.sh
 
-Starting `planner-api` with local authentication can be done by setting the `MIGRATION_PLANNER_AUTH=local`:
-```
-MIGRATION_PLANNER_AUTH=local bin/planner-api run
+# 4. Test
+source .auth/tokens.env
+curl -H "X-Authorization: Bearer $REGULAR_TOKEN" http://localhost:3443/api/v1/identity
 ```
 
-### Generating an user token
+## User Types
 
-After setting up the `planner-api` to use local authentication, the user needs to generate a jwt using the same key that was provided to the `planner-api`.
-```
-bin/planner-api sso token --private-key $MIGRATION_PLANNER_PRIVATE_KEY --username some-user --org some-org
-```
-> The default expiration time for the generated jwt is 24h
+- **Regular User**: Basic user without special privileges
+- **Partner**: Member of a "partner" type group
+- **Customer**: User with an accepted partner-customer relationship
+- **Admin**: Member of an "admin" type group
 
-If you want to examine the jwt:
-```
-bin/planner sso token --private-key $MIGRATION_PLANNER_PRIVATE_KEY --username some-username --org some-org | jq -R 'split(".") | .[0],.[1] | @base64d | fromjson'
-{
-  "alg": "RS256",
-  "typ": "JWT"
-}
-{
-  "preferred_username": "some-username",
-  "org_id": "some-org",
-  "iss": "test",
-  "sub": "somebody",
-  "aud": [
-    "somebody_else"
-  ],
-  "exp": 1743503063,
-  "nbf": 1743416663,
-  "iat": 1743416663,
-  "jti": "1"
-}
+## Important Notes
+
+**⚠️ Use port 3443** for API requests
+
+**⚠️ Use header `X-Authorization`** (not `Authorization`)
+
+## Testing with Different Users
+
+Load tokens:
+```bash
+source .auth/tokens.env
 ```
 
-### Use the token
+Test each user:
+```bash
+# Regular user
+curl -H "X-Authorization: Bearer $REGULAR_TOKEN" \
+     http://localhost:3443/api/v1/identity
 
-The token can be used in any command by passing it to the flag `--token`.
-```
-bin/planner get --server-url localhost:3333 --token $token
+# Admin user
+curl -H "X-Authorization: Bearer $ADMIN_TOKEN" \
+     http://localhost:3443/api/v1/identity
+
+# Partner user
+curl -H "X-Authorization: Bearer $PARTNER_TOKEN" \
+     http://localhost:3443/api/v1/identity
+
+# Customer user
+curl -H "X-Authorization: Bearer $CUSTOMER_TOKEN" \
+     http://localhost:3443/api/v1/identity
 ```
 
-or if you prefer `curl`:
+## View Token Content
+
+```bash
+echo $REGULAR_TOKEN | python3 -c "import sys, base64, json; print(json.dumps(json.loads(base64.b64decode(sys.stdin.read().split('.')[1] + '==').decode('utf-8')), indent=2))"
 ```
-curl -H "Authorization: Bearer $token" http://localhost:3443/api/v1/sources
+
+## Cleanup
+
+```bash
+make kill-db
+rm -rf .auth/
 ```
 
 

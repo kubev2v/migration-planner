@@ -1,3 +1,5 @@
+//go:build libvirt
+
 package cli
 
 import (
