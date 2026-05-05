@@ -100,12 +100,63 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 		if err := p.populateComplexity(); err != nil {
 			return result, fmt.Errorf("populating complexity: %w", err)
 		}
+		if err := p.populateVCluster(ctx); err != nil {
+			return result, fmt.Errorf("populating vcluster: %w", err)
+		}
 		if err := p.validateVMs(ctx); err != nil {
 			return result, fmt.Errorf("validating VMs: %w", err)
 		}
 	}
 
 	return result, nil
+}
+
+// populateVCluster inserts a name→ID row into vcluster for each cluster, using the same
+// anonymous ID that BuildInventory assigns as the cluster's key. This lets vcluster serve
+// as a name→ID map for the agent without exposing real VMware moref IDs.
+// It is a no-op when vcluster already contains data (e.g. after RVTools ingestion).
+func (p *Parser) populateVCluster(ctx context.Context) error {
+	var count int
+	if err := p.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM vcluster`).Scan(&count); err != nil {
+		return fmt.Errorf("checking vcluster: %w", err)
+	}
+	if count > 0 {
+		return nil
+	}
+
+	vcenterID, err := p.VCenterID(ctx)
+	if err != nil {
+		zap.S().Named("duckdb_parser").Warnf("Failed to get vCenter ID: %v", err)
+		vcenterID = ""
+	}
+
+	clusterDatacenters, err := p.ClusterDatacenters(ctx)
+	if err != nil {
+		return fmt.Errorf("getting cluster datacenters: %w", err)
+	}
+
+	clusters, err := p.Clusters(ctx)
+	if err != nil {
+		return fmt.Errorf("getting clusters: %w", err)
+	}
+
+	values := make([]string, 0, len(clusters))
+	for _, clusterName := range clusters {
+		datacenter := clusterDatacenters[clusterName]
+		id := generateClusterID(clusterName, datacenter, vcenterID)
+		values = append(values, fmt.Sprintf("('%s', '%s')", escapeSQLString(clusterName), escapeSQLString(id)))
+	}
+	if len(values) == 0 {
+		return nil
+	}
+	query := fmt.Sprintf(
+		`INSERT INTO vcluster ("Name", "Object ID") VALUES %s`,
+		strings.Join(values, ", "),
+	)
+	if _, err := p.db.ExecContext(ctx, query); err != nil {
+		return fmt.Errorf("inserting vcluster rows: %w", err)
+	}
+	return nil
 }
 
 // dropVinfoRaw drops the temporary vinfo_raw table used during RVTools ingestion.
