@@ -583,6 +583,7 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 			&vm.Networks,
 			&vm.Concerns,
 			&vm.MigrationExcluded,
+			&vm.Labels,
 		); err != nil {
 			return nil, fmt.Errorf("scanning VM row: %w", err)
 		}

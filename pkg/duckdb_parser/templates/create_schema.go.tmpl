@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS vinfo (
     "Network #7" VARCHAR,
     "Network #8" VARCHAR,
     "OsDiskComplexity" INTEGER DEFAULT 0,
-    "migration_excluded" BOOLEAN DEFAULT false
+    "migration_excluded" BOOLEAN DEFAULT false,
+    "labels" VARCHAR DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS vcpu (

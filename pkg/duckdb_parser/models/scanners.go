@@ -121,6 +121,32 @@ func (n Networks) Value() (driver.Value, error) {
 	return n, nil
 }
 
+// Labels is a slice of strings that implements sql.Scanner for DuckDB LIST type.
+type Labels []string
+
+func (l *Labels) Scan(value interface{}) error {
+	if value == nil {
+		*l = nil
+		return nil
+	}
+	slice, ok := value.([]interface{})
+	if !ok {
+		return fmt.Errorf("Labels.Scan: expected []interface{}, got %T", value)
+	}
+	result := make([]string, 0, len(slice))
+	for _, item := range slice {
+		if s := toString(item); s != "" {
+			result = append(result, s)
+		}
+	}
+	*l = result
+	return nil
+}
+
+func (l Labels) Value() (driver.Value, error) {
+	return l, nil
+}
+
 // Concerns is a slice of Concern that implements sql.Scanner for DuckDB LIST type.
 type Concerns []Concern
 

@@ -45,6 +45,7 @@ type VM struct {
 	Concerns                 Concerns `json:"concerns"`
 	NumaNodeAffinity         []string `json:"numaNodeAffinity"` // Always empty for RVTools, included for OPA compatibility
 	MigrationExcluded        bool     `json:"migrationExcluded" db:"migration_excluded"`
+	Labels                   Labels   `json:"labels" db:"labels"`
 }
 
 // EffectiveGuestName returns the best available guest OS name.
