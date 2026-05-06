@@ -22,7 +22,7 @@ func GetToken(credentials *auth.User) (string, error) {
 		return "", fmt.Errorf("error with parsing the private key: %v", err)
 	}
 
-	token, err := cli.GenerateToken(credentials.Username, credentials.Organization, privateKey)
+	token, err := cli.GenerateToken(credentials.Username, credentials.Organization, credentials.FirstName, credentials.LastName, 24, privateKey)
 	if err != nil {
 		return "",
 			fmt.Errorf("error, unable to generate token: %v for user: %s, org: %s",
