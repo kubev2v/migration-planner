@@ -79,15 +79,8 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
-	// Ensure file cleanup on all exit paths
-	fileID := job.Args.FileID
-	defer func() {
-		if delErr := w.store.RVToolsFile().Delete(ctx, fileID); delErr != nil {
-			logger.Error(delErr).WithString("step", "delete_file").Log()
-		}
-	}()
-
 	// Read file content from rvtools_files table
+	fileID := job.Args.FileID
 	fileContent, err := w.store.RVToolsFile().Get(ctx, fileID)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "read_file", err, fmt.Sprintf("failed to read file from store: %v", err))
@@ -201,6 +194,11 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()
+	}
+
+	// Delete file from store after successful processing
+	if delErr := w.store.RVToolsFile().Delete(ctx, fileID); delErr != nil {
+		logger.Error(delErr).WithString("step", "delete_file").Log()
 	}
 
 	logger.Success().
