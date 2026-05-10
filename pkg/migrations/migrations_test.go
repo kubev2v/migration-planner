@@ -54,7 +54,7 @@ var _ = Describe("migrations", Ordered, func() {
 				return exists
 			}
 
-			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_cluster_sizing_inputs", "groups", "members"} {
+			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_cluster_sizing_inputs", "groups", "members", "rvtools_files"} {
 				Expect(tableExists(table)).To(BeTrue())
 			}
 		})
@@ -75,6 +75,7 @@ var _ = Describe("migrations", Ordered, func() {
 			gormdb.Exec("DROP TABLE IF EXISTS partners_customers;")
 			gormdb.Exec("DROP TYPE IF EXISTS request_status;")
 			gormdb.Exec("DROP TABLE IF EXISTS groups;")
+			gormdb.Exec("DROP TABLE IF EXISTS rvtools_files;")
 			gormdb.Exec("DROP TABLE IF EXISTS goose_db_version;")
 		})
 	})

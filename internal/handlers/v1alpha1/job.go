@@ -90,18 +90,17 @@ func (h *ServiceHandler) CreateRVToolsAssessment(ctx context.Context, request se
 
 	logger.Step("file_read").WithInt("file_size", len(fileContent)).Log()
 
-	// Create job args
+	// Create job args (file content is stored separately in rvtools_files table)
 	jobArgs := jobs.RVToolsJobArgs{
-		Name:        name,
-		FileContent: fileContent,
-		OrgID:       user.Organization,
-		Username:    user.Username,
-		FirstName:   user.FirstName,
-		LastName:    user.LastName,
+		Name:      name,
+		OrgID:     user.Organization,
+		Username:  user.Username,
+		FirstName: user.FirstName,
+		LastName:  user.LastName,
 	}
 
-	// Create the job
-	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
+	// Create the job (service stores file and sets FileID)
+	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs, fileContent)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.CreateRVToolsAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil

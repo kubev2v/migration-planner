@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/riverqueue/river"
 
@@ -19,22 +20,24 @@ import (
 
 // JobService handles job-related operations.
 type JobService struct {
-	riverClient *river.Client[pgx.Tx]
-	jobStore    store.Job
-	logger      *log.StructuredLogger
+	riverClient      *river.Client[pgx.Tx]
+	jobStore         store.Job
+	rvtoolsFileStore store.RVToolsFile
+	logger           *log.StructuredLogger
 }
 
 // NewJobService creates a new job service.
 func NewJobService(store store.Store, riverClient *river.Client[pgx.Tx]) *JobService {
 	return &JobService{
-		riverClient: riverClient,
-		jobStore:    store.Job(),
-		logger:      log.NewDebugLogger("job_service"),
+		riverClient:      riverClient,
+		jobStore:         store.Job(),
+		rvtoolsFileStore: store.RVToolsFile(),
+		logger:           log.NewDebugLogger("job_service"),
 	}
 }
 
-// CreateRVToolsJob creates a new RVTools processing job.
-func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobArgs) (*v1alpha1.Job, error) {
+// CreateRVToolsJob stores the file content in the rvtools_files table and creates a River job referencing it.
+func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobArgs, fileContent []byte) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("create_rvtools_job").
 		WithString("name", args.Name).
@@ -42,9 +45,19 @@ func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobA
 		WithString("username", args.Username).
 		Build()
 
-	// Insert job into River
+	// Store file content in dedicated bytea table
+	fileID := uuid.New()
+	if err := s.rvtoolsFileStore.Create(ctx, fileID, fileContent); err != nil {
+		tracer.Error(err).Log()
+		return nil, fmt.Errorf("storing rvtools file: %w", err)
+	}
+	args.FileID = fileID.String()
+
+	// Insert job into River (args now contains only the file reference, not the file content)
 	insertedJob, err := s.riverClient.Insert(ctx, args, nil)
 	if err != nil {
+		// Clean up stored file on job insert failure
+		_ = s.rvtoolsFileStore.Delete(ctx, fileID)
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("inserting job: %w", err)
 	}

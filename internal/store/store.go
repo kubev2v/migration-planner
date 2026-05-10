@@ -18,6 +18,7 @@ type Store interface {
 	Assessment() Assessment
 	ClusterSizingInput() ClusterSizingInput
 	Job() Job
+	RVToolsFile() RVToolsFile
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
 	Statistics(ctx context.Context) (model.InventoryStats, error)
@@ -35,6 +36,7 @@ type DataStore struct {
 	assessment      Assessment
 	cluster         ClusterSizingInput
 	job             Job
+	rvtoolsFile     RVToolsFile
 	accounts        Accounts
 	partnerCustomer PartnerCustomer
 }
@@ -49,6 +51,7 @@ func NewStore(db *gorm.DB) Store {
 		assessment:      NewAssessmentStore(db),
 		cluster:         NewClusterSizingInputStore(db),
 		job:             NewJobStore(db),
+		rvtoolsFile:     NewRVToolsFileStore(db),
 		authz:           NewAuthzStore(db),
 		accounts:        NewAccountsStore(db),
 		partnerCustomer: NewPartnerCustomerStore(db),
@@ -94,6 +97,10 @@ func (s *DataStore) ClusterSizingInput() ClusterSizingInput {
 
 func (s *DataStore) Job() Job {
 	return s.job
+}
+
+func (s *DataStore) RVToolsFile() RVToolsFile {
+	return s.rvtoolsFile
 }
 
 func (s *DataStore) Accounts() Accounts {

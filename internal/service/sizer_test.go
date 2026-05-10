@@ -59,6 +59,10 @@ func (m *MockStore) Job() store.Job {
 	return nil
 }
 
+func (m *MockStore) RVToolsFile() store.RVToolsFile {
+	return nil
+}
+
 func (m *MockStore) PartnerCustomer() store.PartnerCustomer {
 	return nil
 }
