@@ -23,15 +23,17 @@ import (
 // RVToolsWorker processes RVTools assessment jobs.
 type RVToolsWorker struct {
 	river.WorkerDefaults[RVToolsJobArgs]
-	store     store.Store
-	validator duckdb_parser.Validator // Shared, stateless
+	store        store.Store
+	rvtoolsFiles store.RVToolsFile
+	validator    duckdb_parser.Validator
 }
 
 // NewRVToolsWorker creates a new RVTools worker.
-func NewRVToolsWorker(store store.Store, validator duckdb_parser.Validator) *RVToolsWorker {
+func NewRVToolsWorker(store store.Store, rvtoolsFiles store.RVToolsFile, validator duckdb_parser.Validator) *RVToolsWorker {
 	return &RVToolsWorker{
-		store:     store,
-		validator: validator,
+		store:        store,
+		rvtoolsFiles: rvtoolsFiles,
+		validator:    validator,
 	}
 }
 
@@ -79,12 +81,22 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
-	// Read file content from rvtools_files table
 	fileID := job.Args.FileID
-	fileContent, err := w.store.RVToolsFile().Get(ctx, fileID)
+
+	// Delete file from store on all exit paths (MaxAttempts=1, no retries)
+	defer func() {
+		if delErr := w.rvtoolsFiles.Delete(context.Background(), fileID); delErr != nil {
+			logger.Error(delErr).WithString("step", "delete_file").Log()
+		}
+	}()
+
+	// Stream file content from PostgreSQL directly to a temp file,
+	// avoiding holding the full []byte in the worker's scope.
+	tempFilePath, err := w.rvtoolsFiles.CreateTmpFile(ctx, fileID)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "read_file", err, fmt.Sprintf("failed to read file from store: %v", err))
 	}
+	defer func() { _ = os.Remove(tempFilePath) }()
 
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
@@ -92,20 +104,6 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
 	}
 	defer func() { _ = duckDB.Close() }()
-
-	// Write file content to temp file for DuckDB ingestion
-	tempFile, err := os.CreateTemp("", "rvtools-*.xlsx")
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_temp_file", err, fmt.Sprintf("failed to create temp file: %v", err))
-	}
-	tempFilePath := tempFile.Name()
-	defer func() { _ = os.Remove(tempFilePath) }()
-
-	if _, err := tempFile.Write(fileContent); err != nil {
-		_ = tempFile.Close()
-		return w.failJob(ctx, logger, job.ID, "write_temp_file", err, fmt.Sprintf("failed to write temp file: %v", err))
-	}
-	_ = tempFile.Close()
 
 	// Update status to validating before ingestion (which includes OPA validation)
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {
@@ -175,7 +173,6 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	if err != nil {
 		var errMsg string
 		if errors.Is(err, store.ErrDuplicateKey) {
-			// Same format as service.NewErrAssessmentDuplicateName
 			errMsg = fmt.Sprintf("assessment with name '%s' already exists", assessment.Name)
 		} else {
 			errMsg = fmt.Sprintf("failed to create assessment: %v", err)
@@ -194,11 +191,6 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()
-	}
-
-	// Delete file from store after successful processing
-	if delErr := w.store.RVToolsFile().Delete(ctx, fileID); delErr != nil {
-		logger.Error(delErr).WithString("step", "delete_file").Log()
 	}
 
 	logger.Success().

@@ -23,15 +23,10 @@ type Client struct {
 }
 
 // NewClient creates a new River client with the RVTools worker registered.
-func NewClient(ctx context.Context, cfg *config.Config, s store.Store, opaValidator *opa.Validator) (*Client, error) {
-	pool, err := createPgxPool(ctx, cfg)
-	if err != nil {
-		return nil, fmt.Errorf("creating pgx pool: %w", err)
-	}
+func NewClient(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
+	rvtoolsFiles := store.NewRVToolsFileStore(pool)
 
-	// Create worker with store and OPA validator (each job creates its own DuckDB instance)
-	// opa.Validator now directly implements duckdb_parser.Validator
-	worker := NewRVToolsWorker(s, opaValidator)
+	worker := NewRVToolsWorker(s, rvtoolsFiles, opaValidator)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
@@ -43,7 +38,6 @@ func NewClient(ctx context.Context, cfg *config.Config, s store.Store, opaValida
 		Workers: workers,
 	})
 	if err != nil {
-		pool.Close()
 		return nil, fmt.Errorf("creating river client: %w", err)
 	}
 
@@ -63,8 +57,8 @@ func (c *Client) Stop(ctx context.Context) error {
 	return nil
 }
 
-// createPgxPool creates a pgx connection pool for River.
-func createPgxPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
+// CreatePgxPool creates a pgx connection pool for River and file storage.
+func CreatePgxPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 		cfg.Database.User,
 		cfg.Database.Password,

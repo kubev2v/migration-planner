@@ -93,10 +93,6 @@ func (m *MockStore) Job() store.Job {
 	panic("Job() not implemented in MockStore for this test")
 }
 
-func (m *MockStore) RVToolsFile() store.RVToolsFile {
-	panic("RVToolsFile() not implemented in MockStore for this test")
-}
-
 func (m *MockStore) PartnerCustomer() store.PartnerCustomer {
 	panic("PartnerCustomer() not implemented in MockStore for this test")
 }

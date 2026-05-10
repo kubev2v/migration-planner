@@ -88,9 +88,14 @@ var runCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
-		// Initialize River jobs client (required for RVTools processing)
+		// Create pgx pool for River and RVTools file storage
 		zap.S().Info("Initializing River jobs client...")
-		jobsClient, err := jobs.NewClient(ctx, cfg, store, opaValidator)
+		pool, err := jobs.CreatePgxPool(ctx, cfg)
+		if err != nil {
+			zap.S().Fatalw("creating pgx pool", "error", err)
+		}
+
+		jobsClient, err := jobs.NewClient(ctx, cfg, pool, store, opaValidator)
 		if err != nil {
 			zap.S().Fatalw("initializing River jobs client", "error", err)
 		}

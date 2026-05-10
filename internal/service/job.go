@@ -8,7 +8,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
@@ -20,23 +22,23 @@ import (
 
 // JobService handles job-related operations.
 type JobService struct {
-	riverClient      *river.Client[pgx.Tx]
-	jobStore         store.Job
-	rvtoolsFileStore store.RVToolsFile
-	logger           *log.StructuredLogger
+	riverClient *river.Client[pgx.Tx]
+	pool        *pgxpool.Pool
+	jobStore    store.Job
+	logger      *log.StructuredLogger
 }
 
 // NewJobService creates a new job service.
-func NewJobService(store store.Store, riverClient *river.Client[pgx.Tx]) *JobService {
+func NewJobService(s store.Store, riverClient *river.Client[pgx.Tx], pool *pgxpool.Pool) *JobService {
 	return &JobService{
-		riverClient:      riverClient,
-		jobStore:         store.Job(),
-		rvtoolsFileStore: store.RVToolsFile(),
-		logger:           log.NewDebugLogger("job_service"),
+		riverClient: riverClient,
+		pool:        pool,
+		jobStore:    s.Job(),
+		logger:      log.NewDebugLogger("job_service"),
 	}
 }
 
-// CreateRVToolsJob stores the file content in the rvtools_files table and creates a River job referencing it.
+// CreateRVToolsJob stores the file content and creates a River job atomically within a single transaction.
 func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobArgs, fileContent []byte) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("create_rvtools_job").
@@ -45,32 +47,29 @@ func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobA
 		WithString("username", args.Username).
 		Build()
 
-	// Store file content in dedicated bytea table
 	fileID := uuid.New()
-	if err := s.rvtoolsFileStore.Create(ctx, fileID, fileContent); err != nil {
-		tracer.Error(err).Log()
-		return nil, fmt.Errorf("storing rvtools file: %w", err)
-	}
-
-	// Ensure cleanup if job insertion fails or panics
-	jobInserted := false
-	defer func() {
-		if !jobInserted {
-			if delErr := s.rvtoolsFileStore.Delete(context.Background(), fileID); delErr != nil {
-				tracer.Error(delErr).WithString("step", "cleanup_orphaned_file").Log()
-			}
-		}
-	}()
-
 	args.FileID = fileID
 
-	// Insert job into River (args now contains only the file reference, not the file content)
-	insertedJob, err := s.riverClient.Insert(ctx, args, nil)
+	// Atomic: store file + insert River job in a single pgx transaction
+	var insertedJob *rivertype.JobInsertResult
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx,
+			"INSERT INTO rvtools_files (id, data, created_at) VALUES ($1, $2, now())",
+			fileID, fileContent); err != nil {
+			return fmt.Errorf("storing rvtools file: %w", err)
+		}
+
+		var err error
+		insertedJob, err = s.riverClient.InsertTx(ctx, tx, args, nil)
+		if err != nil {
+			return fmt.Errorf("inserting job: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
 		tracer.Error(err).Log()
-		return nil, fmt.Errorf("inserting job: %w", err)
+		return nil, err
 	}
-	jobInserted = true
 
 	tracer.Success().WithParam("job_id", insertedJob.Job.ID).Log()
 
@@ -114,7 +113,6 @@ func (s *JobService) GetJob(ctx context.Context, jobID int64, orgID, username st
 	// Parse metadata
 	var metadata model.RVToolsJobMetadata
 	if len(jobRow.MetadataJSON) > 0 {
-		// Ignore errors, use empty metadata if parsing fails
 		_ = json.Unmarshal(jobRow.MetadataJSON, &metadata)
 	}
 
@@ -136,25 +134,21 @@ func (s *JobService) CancelJob(ctx context.Context, jobID int64, orgID, username
 		WithParam("job_id", jobID).
 		Build()
 
-	// First verify ownership by getting the job
 	job, err := s.GetJob(ctx, jobID, orgID, username)
 	if err != nil {
 		return nil, err
 	}
 
-	// Check if job can be cancelled
 	if job.Status == v1alpha1.JobStatusCompleted || job.Status == v1alpha1.JobStatusFailed || job.Status == v1alpha1.JobStatusCancelled {
-		return job, nil // Already in terminal state
+		return job, nil
 	}
 
-	// Cancel the job using JobCancel
 	_, err = s.riverClient.JobCancel(ctx, jobID)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("cancelling job: %w", err)
 	}
 
-	// Update metadata to reflect cancelled status
 	metadata := model.RVToolsJobMetadata{
 		Status: model.JobStatusCancelled,
 	}
@@ -166,6 +160,5 @@ func (s *JobService) CancelJob(ctx context.Context, jobID int64, orgID, username
 
 	tracer.Success().Log()
 
-	// Return updated job
 	return s.GetJob(ctx, jobID, orgID, username)
 }

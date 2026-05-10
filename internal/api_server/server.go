@@ -189,7 +189,7 @@ func (s *Server) Run(ctx context.Context) error {
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
-		service.NewJobService(s.store, s.jobsClient.RiverClient),
+		service.NewJobService(s.store, s.jobsClient.RiverClient, s.jobsClient.Pool),
 		service.NewSizerService(sizerClient, s.store),
 		service.NewEstimationService(s.store),
 		accountsSvc,
