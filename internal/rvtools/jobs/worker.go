@@ -79,20 +79,18 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
-	// Read file content from rvtools_files table
-	fileID, err := uuid.Parse(job.Args.FileID)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "parse_file_id", err, fmt.Sprintf("invalid file ID: %v", err))
-	}
+	// Ensure file cleanup on all exit paths
+	fileID := job.Args.FileID
+	defer func() {
+		if delErr := w.store.RVToolsFile().Delete(ctx, fileID); delErr != nil {
+			logger.Error(delErr).WithString("step", "delete_file").Log()
+		}
+	}()
 
+	// Read file content from rvtools_files table
 	fileContent, err := w.store.RVToolsFile().Get(ctx, fileID)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "read_file", err, fmt.Sprintf("failed to read file from store: %v", err))
-	}
-
-	// Delete the file from store immediately after reading to free PostgreSQL storage
-	if err := w.store.RVToolsFile().Delete(ctx, fileID); err != nil {
-		logger.Error(err).WithString("step", "delete_file").Log()
 	}
 
 	// Create per-job DuckDB instance for isolation

@@ -51,16 +51,26 @@ func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobA
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("storing rvtools file: %w", err)
 	}
-	args.FileID = fileID.String()
+
+	// Ensure cleanup if job insertion fails or panics
+	jobInserted := false
+	defer func() {
+		if !jobInserted {
+			if delErr := s.rvtoolsFileStore.Delete(context.Background(), fileID); delErr != nil {
+				tracer.Error(delErr).WithString("step", "cleanup_orphaned_file").Log()
+			}
+		}
+	}()
+
+	args.FileID = fileID
 
 	// Insert job into River (args now contains only the file reference, not the file content)
 	insertedJob, err := s.riverClient.Insert(ctx, args, nil)
 	if err != nil {
-		// Clean up stored file on job insert failure
-		_ = s.rvtoolsFileStore.Delete(ctx, fileID)
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("inserting job: %w", err)
 	}
+	jobInserted = true
 
 	tracer.Success().WithParam("job_id", insertedJob.Job.ID).Log()
 
