@@ -1,4 +1,4 @@
-package image
+package image_server
 
 import (
 	"archive/tar"

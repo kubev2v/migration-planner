@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/service/image_server"
+
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
@@ -15,10 +17,10 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/image"
 	server "github.com/kubev2v/migration-planner/internal/api/server/image"
-	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store"
+	pmiddleware "github.com/kubev2v/migration-planner/pkg/middleware"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
 )
@@ -74,10 +76,10 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "image_server"),
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
-		apiserver.WithResponseWriter,
+		pmiddleware.RequestContext,
 	)
 
-	h := handlers.NewImageHandler(s.store, s.cfg)
+	h := handlers.NewImageHandler(image_server.NewImageService(s.store))
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

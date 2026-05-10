@@ -1,4 +1,4 @@
-package image
+package image_server
 
 import (
 	"archive/tar"
@@ -18,14 +18,6 @@ import (
 	"github.com/openshift/assisted-image-service/pkg/isoeditor"
 	"github.com/openshift/assisted-image-service/pkg/overlay"
 )
-
-type Key int
-
-// Key to store the ResponseWriter in the context of openapi
-const ResponseWriterKey Key = 0
-
-// Key to store the *http.Request in the context (needed for http.ServeContent)
-const RequestKey Key = 1
 
 type ImageType int
 

@@ -3980,6 +3980,15 @@ func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSourceDownloadURL500JSONResponse Error
+
+func (response GetSourceDownloadURL500JSONResponse) VisitGetSourceDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UpdateInventoryRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *UpdateInventoryJSONRequestBody

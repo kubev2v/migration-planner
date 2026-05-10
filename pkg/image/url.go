@@ -1,36 +1,40 @@
 package image
 
 import (
-	"context"
 	"crypto/rand"
-	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"path"
-	"regexp"
 	"time"
 
 	"github.com/go-openapi/strfmt"
-	"github.com/golang-jwt/jwt/v4"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 )
-
-var jwtPayloadRegexp = regexp.MustCompile(`^.+\.(.+)\..+`)
-
-type payload struct {
-	Sub string `json:"sub"` // used by OCM tokens
-}
 
 const (
 	// ImageExpirationTime define the expiration of the image download URL
 	ImageExpirationTime = 4 * time.Hour
 )
 
-func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
-	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String())
+// HMACKey generates a hex string representing n random bytes
+//
+// This string is intended to be used as a private key for signing and
+// verifying jwt tokens. Specifically ones used for downloading images
+// when using rhsso auth and the image service.
+func HMACKey(n int) (string, error) {
+	buf := make([]byte, n)
+	_, err := rand.Read(buf)
+	if err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(buf), nil
+}
+
+func GenerateDownloadURLByToken(baseURL, id, privateKey, name string) (string, *strfmt.DateTime, error) {
+	token, err := JWTForSymmetricKey([]byte(privateKey), ImageExpirationTime, id)
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to sign image URL")
 	}
@@ -40,8 +44,8 @@ func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *
 		return "", nil, err
 	}
 
-	path := fmt.Sprintf("%s/%s/%s.ova", "/api/v1/image/bytoken/", token, source.Name)
-	shortURL, err := buildURL(baseUrl, path, false, map[string]string{})
+	path := fmt.Sprintf("%s/%s/%s.ova", "/api/v1/image/bytoken/", token, name)
+	shortURL, err := buildURL(baseURL, path, false, map[string]string{})
 	if err != nil {
 		return "", nil, err
 	}
@@ -100,52 +104,20 @@ func buildURL(baseURL string, suffix string, insecure bool, params map[string]st
 	return downloadURL.String(), nil
 }
 
-// HMACKey generates a hex string representing n random bytes
-//
-// This string is intended to be used as a private key for signing and
-// verifying jwt tokens. Specifically ones used for downloading images
-// when using rhsso auth and the image service.
-func HMACKey(n int) (string, error) {
-	buf := make([]byte, n)
-	_, err := rand.Read(buf)
+// IsTokenNearExpiry parses a JWT without verification and checks if it expires within provided days.
+func IsTokenNearExpiry(tokenStr string, days int) bool {
+	parser := jwt.NewParser()
+	token, _, err := parser.ParseUnverified(tokenStr, jwt.MapClaims{})
 	if err != nil {
-		return "", err
+		return true // can't parse → treat as expired
 	}
-
-	return hex.EncodeToString(buf), nil
-}
-
-func ValidateToken(ctx context.Context, token string, keyFunc func(token *jwt.Token) (interface{}, error)) error {
-	parsedToken, err := jwt.Parse(token, keyFunc)
-	if err != nil {
-		return fmt.Errorf("unauthorized: %v", err)
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return true
 	}
-
-	return parsedToken.Claims.Valid()
-}
-
-func IdFromJWT(jwt string) (string, error) {
-	match := jwtPayloadRegexp.FindStringSubmatch(jwt)
-
-	if len(match) != 2 {
-		return "", fmt.Errorf("failed to parse JWT from URL")
+	exp, err := claims.GetExpirationTime()
+	if err != nil || exp == nil {
+		return true
 	}
-
-	decoded, err := base64.RawStdEncoding.DecodeString(match[1])
-	if err != nil {
-		return "", err
-	}
-
-	var p payload
-	err = json.Unmarshal(decoded, &p)
-	if err != nil {
-		return "", err
-	}
-
-	switch {
-	case p.Sub != "":
-		return p.Sub, nil
-	}
-
-	return "", fmt.Errorf("sub ID not found in token")
+	return time.Until(exp.Time) < time.Duration(days)*24*time.Hour
 }

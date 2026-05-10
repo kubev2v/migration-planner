@@ -61,8 +61,6 @@ parameters:
     value: "https://localhost:3443"
   - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
     value: "https://localhost:7443"
-  - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
-    value: "https://localhost:11443"
   - name: MIGRATION_PLANNER_LOG_LEVEL
     value: "info"
   # Auth Config values
@@ -616,8 +614,6 @@ objects:
                   value: ${MIGRATION_PLANNER_BASE_URL}
                 - name: MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL
                   value: ${MIGRATION_PLANNER_BASE_AGENT_ENDPOINT_URL}
-                - name: MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL
-                  value: ${MIGRATION_PLANNER_BASE_IMAGE_ENDPOINT_URL}
                 - name: MIGRATION_PLANNER_LOG_LEVEL
                   value: ${MIGRATION_PLANNER_LOG_LEVEL}
                 - name: RHCOS_PASSWORD

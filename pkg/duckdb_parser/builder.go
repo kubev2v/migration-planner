@@ -35,7 +35,7 @@ func mustGetTemplate(name string) string {
 // QueryBuilder builds SQL queries from templates.
 type QueryBuilder struct{}
 
-// NewBuilder creates a new Builder.
+// NewBuilder creates a new ImageReader.
 func NewBuilder() *QueryBuilder {
 	return &QueryBuilder{}
 }

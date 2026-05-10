@@ -65,7 +65,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithUsername("batman"), service.WithOrgID("batman")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(1))
@@ -84,7 +84,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			resp, err := srv.ListSources(context.TODO(), service.NewSourceFilter(service.WithUsername("admin"), service.WithOrgID("admin")))
 			Expect(err).To(BeNil())
 			Expect(resp).To(HaveLen(2))
@@ -105,7 +105,7 @@ var _ = Describe("source handler", Ordered, func() {
 
 	Context("create", func() {
 		It("successfully creates a source", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin"})
 			Expect(err).To(BeNil())
 			Expect(source.Name).To(Equal("test"))
@@ -117,7 +117,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with proxy paramters defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			httpUrl := "http"
 			httpsUrl := "https"
 			noProxy := "noproxy"
@@ -139,7 +139,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- with certificate chain defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{
 				Username:         "admin",
 				OrgID:            "admin",
@@ -156,7 +156,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		It("successfully creates a source -- email domain defined", func() {
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			source, err := srv.CreateSource(context.TODO(), mappers.SourceCreateForm{Name: "test", OrgID: "admin", Username: "admin", EmailDomain: "domain.com"})
 			Expect(err).To(BeNil())
 			Expect(source.Name).To(Equal("test"))
@@ -193,7 +193,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			source, err := srv.GetSource(ctx, firstSourceID)
 			Expect(err).To(BeNil())
 			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
@@ -211,7 +211,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			source, err := srv.GetSource(ctx, firstSourceID)
 			Expect(err).To(BeNil())
 			Expect(source.ID.String()).To(Equal(firstSourceID.String()))
@@ -233,7 +233,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			_, err := srv.GetSource(context.TODO(), uuid.New())
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrResourceNotFound)
@@ -263,7 +263,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			err := srv.DeleteSources(context.TODO())
 			Expect(err).To(BeNil())
 
@@ -281,7 +281,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			err := srv.DeleteSource(context.TODO(), firstSourceID)
 			Expect(err).To(BeNil())
 
@@ -314,7 +314,7 @@ var _ = Describe("source handler", Ordered, func() {
 				VcenterId: "vcenter",
 			})
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  firstSourceID,
 				AgentID:   uuid.New(),
@@ -349,7 +349,7 @@ var _ = Describe("source handler", Ordered, func() {
 				VcenterId: "vcenter",
 			})
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  firstSourceID,
 				AgentID:   uuid.New(),
@@ -386,7 +386,7 @@ var _ = Describe("source handler", Ordered, func() {
 				VcenterId: "vcenter",
 			})
 
-			srv := service.NewSourceService(s, nil)
+			srv := service.NewSourceService(s, nil, "")
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  firstSourceID,
 				AgentID:   uuid.New(),
@@ -437,7 +437,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 			newName := "updated-name"
 			newLabels := []v1alpha1.Label{
 				{Key: "env", Value: "prod"},
@@ -506,7 +506,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.New(),
 				Body: &v1alpha1.SourceUpdate{},
@@ -526,7 +526,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.MustParse(sourceID),
 				Body: &v1alpha1.SourceUpdate{},
@@ -553,7 +553,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 
 			// First set initial labels
 			initialLabels := []v1alpha1.Label{
@@ -626,7 +626,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 
 			newSshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCk83ddeteALlqCbO43E3ardbavFPboYIoFnlQZ3zVi+ls96c1x3P9DDWkNhuOgpQurull2y55Wm7HWLLK5hlk49s6tUuBDftH3XXfGMAmncBH9apGHxl0O+k/X1MrfhoEXHmmEwXTv+X6vC3BsZiazSOkKbIozHgnD7y1z83wuYWbbW0NYvgwhaoOtkWteKSJWwPxNaTwGCpj+RQ6xWygt5EbMSf7U3Ih2P1hcsa615zD5P2GSLxtLwWnHgWCylT/krdyIYlR1pqW9e/Iv2MKlGX6W1DSUxUz5BNxzCA8O53C0NSCeDFAhn9T8VE9U/RkGDtXBFJ8JVcmtM6S9buq5HZ12+0E0VCGFdmnvNT8XxdYrN0ff8f3DQI7ERgHEKQiqjrSPDv2+OMdv3nr3n5+tOBvQEn6aYDbnybILyrUP76UvLvjfgDTnnRxlkpw2Y43EtgtdeIUUo/VBSE9qfzRa21Pz3gBh6ZJE9xF+u6DstgvFigNJ7nMJoSktH5mzuBM= test@test"
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -667,7 +667,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 
 			initialLabels := []v1alpha1.Label{
 				{Key: "env", Value: "dev"},
@@ -717,7 +717,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 
 			enableProxy := false
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -757,7 +757,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil, ""), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
 
 			networkConfigType := v1alpha1.SourceUpdateNetworkConfigTypeDhcp
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{

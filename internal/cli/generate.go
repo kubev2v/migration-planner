@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/image"
+	image "github.com/kubev2v/migration-planner/internal/service/image_server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )

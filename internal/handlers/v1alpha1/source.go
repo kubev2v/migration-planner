@@ -266,11 +266,12 @@ func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImage
 func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
 	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
 	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
+		var errResourceNotFound *service.ErrResourceNotFound
+		switch {
+		case errors.As(err, &errResourceNotFound):
 			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
+			return server.GetSourceDownloadURL500JSONResponse{}, nil
 		}
 	}
 	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
