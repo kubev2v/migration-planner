@@ -49,7 +49,7 @@ func NewServiceHandler(
 func validateSourceData(data interface{}) error {
 	v := validator.NewValidator()
 	v.Register(validator.NewSourceValidationRules()...)
-	return v.Struct(data)
+	return validator.TransformValidationError(v.Struct(data))
 }
 
 // (GET /api/v1/sources)
