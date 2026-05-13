@@ -3385,12 +3385,12 @@ components:
 
     JobStatus:
       type: string
-      enum: [pending, parsing, validating, completed, failed, cancelled]
+      enum: [pending, validating, parsing, completed, failed, cancelled]
       description: >
         Job status:
          * `pending` - Job is queued
-         * `parsing` - Parsing RVTools Excel file
-         * `validating` - Running OPA VM validations
+         * `validating` - Ingesting and validating RVTools file
+         * `parsing` - Building inventory from validated data
          * `completed` - Assessment created successfully
          * `failed` - Job failed with error
          * `cancelled` - Job was cancelled
