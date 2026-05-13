@@ -4,7 +4,7 @@ import "github.com/google/uuid"
 
 // RVToolsJobMetadata is stored in river_job.metadata to track progress and results.
 type RVToolsJobMetadata struct {
-	Status       string     `json:"status,omitempty"`        // parsing, validating
+	Status       string     `json:"status,omitempty"`        // validating, parsing
 	Error        string     `json:"error,omitempty"`         // error message if failed
 	AssessmentID *uuid.UUID `json:"assessment_id,omitempty"` // set when completed
 }

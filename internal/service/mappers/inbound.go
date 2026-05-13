@@ -323,36 +323,38 @@ type InventoryTotalsForm struct {
 }
 
 func mapRiverStateToStatus(state rivertype.JobState, metadata model.RVToolsJobMetadata) v1alpha1.JobStatus {
+	var result v1alpha1.JobStatus
 	switch state {
 	case rivertype.JobStateRunning:
 		switch metadata.Status {
 		case model.JobStatusValidating:
-			return v1alpha1.JobStatusValidating
+			result = v1alpha1.JobStatusValidating
 		case model.JobStatusCompleted:
-			return v1alpha1.JobStatusCompleted
+			result = v1alpha1.JobStatusCompleted
 		case model.JobStatusFailed:
-			return v1alpha1.JobStatusFailed
+			result = v1alpha1.JobStatusFailed
 		case model.JobStatusCancelled:
-			return v1alpha1.JobStatusCancelled
+			result = v1alpha1.JobStatusCancelled
 		case model.JobStatusParsing:
-			return v1alpha1.JobStatusParsing
+			result = v1alpha1.JobStatusParsing
 		default:
-			return v1alpha1.JobStatusParsing
+			result = v1alpha1.JobStatusValidating
 		}
 
 	case rivertype.JobStateCompleted:
-		return v1alpha1.JobStatusCompleted
+		result = v1alpha1.JobStatusCompleted
 
 	case rivertype.JobStateCancelled:
-		return v1alpha1.JobStatusCancelled
+		result = v1alpha1.JobStatusCancelled
 
 	case rivertype.JobStateDiscarded, rivertype.JobStateRetryable:
-		return v1alpha1.JobStatusFailed
+		result = v1alpha1.JobStatusFailed
 
 	case rivertype.JobStateAvailable, rivertype.JobStateScheduled, rivertype.JobStatePending:
-		return v1alpha1.JobStatusPending
+		result = v1alpha1.JobStatusPending
 
 	default:
-		return v1alpha1.JobStatusPending
+		result = v1alpha1.JobStatusPending
 	}
+	return result
 }

@@ -593,8 +593,8 @@ type Job struct {
 
 	// Status Job status:
 	//  * `pending` - Job is queued
-	//  * `parsing` - Parsing RVTools Excel file
-	//  * `validating` - Running OPA VM validations
+	//  * `validating` - Ingesting and validating RVTools file
+	//  * `parsing` - Building inventory from validated data
 	//  * `completed` - Assessment created successfully
 	//  * `failed` - Job failed with error
 	//  * `cancelled` - Job was cancelled
@@ -603,8 +603,8 @@ type Job struct {
 
 // JobStatus Job status:
 //   - `pending` - Job is queued
-//   - `parsing` - Parsing RVTools Excel file
-//   - `validating` - Running OPA VM validations
+//   - `validating` - Ingesting and validating RVTools file
+//   - `parsing` - Building inventory from validated data
 //   - `completed` - Assessment created successfully
 //   - `failed` - Job failed with error
 //   - `cancelled` - Job was cancelled
