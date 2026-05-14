@@ -4,9 +4,11 @@ Used for memory overcommitment calculation.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT COALESCE(SUM("Memory"), 0)
 FROM vinfo
 WHERE "Powerstate" = 'poweredOn'
   AND COALESCE("migration_excluded", false) = false
-{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}};

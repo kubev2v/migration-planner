@@ -3,6 +3,7 @@ Memory Tier Query Template - Returns VM distribution by memory tier (in GB).
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT
     CASE
@@ -19,4 +20,5 @@ FROM vinfo
 WHERE 1=1
   AND COALESCE("migration_excluded", false) = false
 {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}}
 GROUP BY tier;

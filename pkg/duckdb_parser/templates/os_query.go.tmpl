@@ -14,6 +14,7 @@ upgrade recommendations are only shown for OSes that are also marked unsupported
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 WITH os_data AS (
     -- "VM" placeholder is filtered during ingestion (NULLIF in ingest_rvtools.go.tmpl)
@@ -32,6 +33,7 @@ WITH os_data AS (
         (v."OS according to the configuration file" IS NOT NULL AND v."OS according to the configuration file" != '')
     )
     {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
 ),
 unsupported_os AS (
     SELECT DISTINCT
@@ -45,6 +47,7 @@ unsupported_os AS (
     WHERE c."Concern_ID" = 'vmware.os.unsupported'
       AND COALESCE(v."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
 ),
 upgrade_recommendations AS (
     -- Only get upgrade recommendations for OSes that are also unsupported
@@ -61,6 +64,7 @@ upgrade_recommendations AS (
     WHERE c."Concern_ID" = 'vmware.os.upgrade.recommendation'
       AND COALESCE(v."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND v."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY 1
 )
 SELECT

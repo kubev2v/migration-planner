@@ -4,9 +4,11 @@ VM Count Query Template - Returns count of VMs with optional filters.
 Template Parameters:
   - ClusterFilter: filter by cluster name
   - PowerStateFilter: filter by power state
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT COUNT(*) FROM vinfo
 WHERE 1=1
   AND COALESCE("migration_excluded", false) = false
 {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
-{{- if .PowerStateFilter }} AND "Powerstate" = '{{.PowerStateFilter}}'{{end}};
+{{- if .PowerStateFilter }} AND "Powerstate" = '{{.PowerStateFilter}}'{{end}}
+{{- .VMListFilter}};

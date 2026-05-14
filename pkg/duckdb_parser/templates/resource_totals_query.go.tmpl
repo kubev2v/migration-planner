@@ -3,6 +3,7 @@ Resource Totals Query Template - Returns aggregated resource totals.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT
     COALESCE(SUM(i."CPUs"), 0)::integer AS total_cpu_cores,
@@ -23,4 +24,5 @@ LEFT JOIN (
 ) n ON i."VM ID" = n."VM ID"
 WHERE 1=1
   AND COALESCE(i."migration_excluded", false) = false
-{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}};
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}};

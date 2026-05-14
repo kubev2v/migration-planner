@@ -134,7 +134,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	// Build inventory from parsed data
 	logger.Step("building_inventory").Log()
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "build_inventory", err, fmt.Sprintf("error building inventory: %v", err))
 	}

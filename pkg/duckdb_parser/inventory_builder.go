@@ -13,7 +13,10 @@ import (
 
 // BuildInventory constructs domain inventory from parsed data.
 // It builds both vcenter-level and per-cluster inventories.
-func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, error) {
+// vmList is an optional list of VM IDs to include in the inventory.
+// If vmList is provided, only VMs in the list will be included in the inventory.
+// If vmList is nil or empty, all VMs will be included (existing behavior).
+func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventory.Inventory, error) {
 	// Get vCenter ID
 	vcenterID, err := p.VCenterID(ctx)
 	if err != nil {
@@ -21,8 +24,8 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 		vcenterID = ""
 	}
 
-	// Build vcenter-level inventory (no cluster filter)
-	vcenterData, err := p.buildInventoryData(ctx, Filters{})
+	// Build vcenter-level inventory (no cluster filter, optional VM list filter)
+	vcenterData, err := p.buildInventoryData(ctx, Filters{VMList: vmList})
 	if err != nil {
 		return nil, fmt.Errorf("building vcenter inventory: %w", err)
 	}
@@ -51,7 +54,7 @@ func (p *Parser) BuildInventory(ctx context.Context) (*inventory.Inventory, erro
 	// Build per-cluster inventories with cluster IDs from vCluster or generated
 	clusterInventories := make(map[string]inventory.InventoryData)
 	for _, clusterName := range clusters {
-		clusterFilters := Filters{Cluster: clusterName}
+		clusterFilters := Filters{Cluster: clusterName, VMList: vmList}
 		clusterInv, err := p.buildInventoryData(ctx, clusterFilters)
 		if err != nil {
 			zap.S().Named("duckdb_parser").Warnf("Failed to build inventory for cluster %s: %v", clusterName, err)

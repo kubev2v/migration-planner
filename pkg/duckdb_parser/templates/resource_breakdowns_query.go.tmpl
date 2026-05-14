@@ -12,6 +12,7 @@ resources for VMs that are fully migratable without any warnings.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 WITH vm_concerns AS (
     SELECT DISTINCT
@@ -23,6 +24,7 @@ WITH vm_concerns AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY i."VM ID"
 ),
 vm_resources AS (
@@ -37,6 +39,7 @@ vm_resources AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
 ),
 disk_resources AS (
     SELECT
@@ -48,6 +51,7 @@ disk_resources AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY d."VM ID"
 ),
 nic_resources AS (
@@ -59,6 +63,7 @@ nic_resources AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY n."VM ID"
 ),
 combined AS (

@@ -10,6 +10,7 @@ Matches the old implementation's nicCountKey function:
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 WITH nic_counts AS (
     SELECT
@@ -20,6 +21,7 @@ WITH nic_counts AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}}
     GROUP BY i."VM ID"
 )
 SELECT

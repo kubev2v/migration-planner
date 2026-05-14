@@ -10,6 +10,7 @@ Template Parameters:
   - ClusterFilter: filter by cluster name
   - OSFilter: filter by OS name
   - PowerStateFilter: filter by power state
+  - VMListFilter: filter by list of VM IDs
   - Limit: max results (0 = unlimited)
   - Offset: skip first N results
 */ -}}
@@ -119,5 +120,6 @@ WHERE 1=1
 {{- if .OSFilter }} AND i."OS according to the configuration file" LIKE '%{{.OSFilter}}%'{{end}}
 {{- if .VmIDFilter }} AND i."VM ID" = '{{.VmIDFilter}}'{{end}}
 {{- if .PowerStateFilter }} AND i."Powerstate" = '{{.PowerStateFilter}}'{{end}}
+{{- .VMListFilter}}
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};

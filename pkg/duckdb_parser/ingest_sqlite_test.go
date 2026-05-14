@@ -215,7 +215,7 @@ func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.IsValid())
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Collect vcluster Object IDs.

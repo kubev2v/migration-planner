@@ -10,6 +10,7 @@ Complexity levels:
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 
 NOTE: 4 decimal places (vs 2 in disk_size_tier_query) because complexity buckets
 can contain VMs with small total disk sizes (e.g., 2 GiB ≈ 0.002 TiB) that would
@@ -25,6 +26,7 @@ WITH vm_disk_totals AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY i."VM ID", i."OsDiskComplexity"
 )
 SELECT

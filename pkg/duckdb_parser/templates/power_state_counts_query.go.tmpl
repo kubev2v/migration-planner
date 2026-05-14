@@ -3,10 +3,12 @@ Power State Counts Query Template - Returns VM power state distribution.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT "Powerstate" AS state, COUNT(*) AS count
 FROM vinfo
 WHERE 1=1
   AND COALESCE("migration_excluded", false) = false
 {{- if .ClusterFilter }} AND "Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}}
 GROUP BY "Powerstate";

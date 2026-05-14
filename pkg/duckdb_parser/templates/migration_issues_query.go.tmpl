@@ -7,6 +7,7 @@ This means multiple disk-level warnings (e.g., scsi0:0, scsi0:1) are counted tog
 Template Parameters:
   - ClusterFilter: filter by cluster name
   - Category: concern category (e.g., "Critical", "Warning")
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 SELECT
     c."Concern_ID" AS id,
@@ -19,4 +20,5 @@ JOIN vinfo i ON c."VM_ID" = i."VM ID"
 WHERE c."Category" = '{{.Category}}'
   AND COALESCE(i."migration_excluded", false) = false
 {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}}
 GROUP BY c."Concern_ID";

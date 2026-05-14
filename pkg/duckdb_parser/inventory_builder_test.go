@@ -227,7 +227,7 @@ func TestBuildInventory_BasicStructure(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify basic structure
@@ -254,7 +254,7 @@ func TestBuildInventory_VMCounts(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// VCenter total should equal sum of VMs
@@ -287,7 +287,7 @@ func TestBuildInventory_PowerStates(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify power states
@@ -314,7 +314,7 @@ func TestBuildInventory_MigrationIssues(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify migration warnings are populated
@@ -341,7 +341,7 @@ func TestBuildInventory_ResourceBreakdowns(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify CPU cores total (4 + 2 = 6)
@@ -369,7 +369,7 @@ func TestBuildInventory_InfraData(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify hosts are populated
@@ -397,7 +397,7 @@ func TestBuildInventory_ClusterInventories(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Per-cluster inventories should have correct structure
@@ -431,7 +431,7 @@ func TestBuildInventory_EmptyData(t *testing.T) {
 	}
 
 	// If no errors, inventory should still be valid but empty
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, inv)
 	assert.Equal(t, 0, inv.VCenter.VMs.Total)
@@ -566,7 +566,7 @@ func TestBuildInventory_MultiCluster(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// VCenter should have all 4 VMs
@@ -701,7 +701,7 @@ func TestBuildInventory_Overcommitment(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// With hosts, overcommitment should be calculated
@@ -733,7 +733,7 @@ func TestBuildInventory_MigratableCounts(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// With critical concerns, VMs should not be migratable
@@ -763,7 +763,7 @@ func TestBuildInventory_MigratableWithWarnings(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// With warning concerns (no critical), VMs should be migratable but with warnings
@@ -793,7 +793,7 @@ func TestBuildInventory_MinimalSchema(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.IsValid(), "Minimal required schema should pass validation: %v", result.Errors)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 	assert.Equal(t, 3, inv.VCenter.VMs.Total, "Should have 3 VMs from minimal schema")
 	assert.Equal(t, vcUUID, inv.VCenterID, "VCenterID should be populated from VI SDK UUID column")
@@ -1008,7 +1008,7 @@ func TestBuildInventory_LegacyRVToolsColumnNames(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, result.IsValid(), "legacy headers should pass validation: %v", result.Errors)
 
-			inv, err := parser.BuildInventory(ctx)
+			inv, err := parser.BuildInventory(ctx, nil)
 			require.NoError(t, err)
 			assert.Equal(t, tc.expectVCenterID, inv.VCenterID, "VCenterID mismatch")
 			assert.Equal(t, 1, inv.VCenter.VMs.Total, "VM count mismatch")
@@ -1147,7 +1147,7 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 	_, err = parser.db.ExecContext(ctx, `UPDATE vinfo SET "OsDiskComplexity" = 2 WHERE "VM ID" = 'vm-2'`)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, inv.VCenter)
 
@@ -1211,7 +1211,7 @@ func TestBuildInventory_DiskSizeTiers(t *testing.T) {
 	_, err := parser.IngestRvTools(ctx, tmpFile)
 	require.NoError(t, err)
 
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 	require.NotNil(t, inv.VCenter)
 
@@ -1349,7 +1349,7 @@ func TestInventory_ExcludesMigrationExcludedVMs(t *testing.T) {
 	require.NoError(t, err)
 
 	// Build inventory
-	inv, err := parser.BuildInventory(ctx)
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
 	// Verify VM counts exclude the 3 excluded VMs
@@ -1380,4 +1380,97 @@ func TestInventory_ExcludesMigrationExcludedVMs(t *testing.T) {
 	// Included VMs: 4 + 2 + 8 = 14 CPUs, 8 + 4 + 16 = 28 GB RAM
 	assert.Equal(t, 14, inv.VCenter.VMs.CPUCores.Total, "TotalCPUCores should exclude excluded VMs")
 	assert.Equal(t, 28, inv.VCenter.VMs.RamGB.Total, "TotalRAMGb should exclude excluded VMs")
+}
+
+func TestBuildInventory_VMListFilter(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-001", "VM ID": "vm-001", "Powerstate": "poweredOn", "CPUs": "4", "Memory": "8192", "Cluster": "Cluster-A", "Datacenter": "DC1", "OS according to the configuration file": "CentOS 7 (64-bit)", "Total disk capacity MiB": "100000", "In Use MiB": "50000"},
+		{"VM": "vm-002", "VM ID": "vm-002", "Powerstate": "poweredOn", "CPUs": "2", "Memory": "4096", "Cluster": "Cluster-A", "Datacenter": "DC1", "OS according to the configuration file": "Ubuntu 20.04 (64-bit)", "Total disk capacity MiB": "50000", "In Use MiB": "25000"},
+		{"VM": "vm-003", "VM ID": "vm-003", "Powerstate": "poweredOn", "CPUs": "8", "Memory": "16384", "Cluster": "Cluster-B", "Datacenter": "DC1", "OS according to the configuration file": "Windows Server 2019 (64-bit)", "Total disk capacity MiB": "200000", "In Use MiB": "100000"},
+		{"VM": "vm-004", "VM ID": "vm-004", "Powerstate": "poweredOff", "CPUs": "4", "Memory": "8192", "Cluster": "Cluster-B", "Datacenter": "DC1", "OS according to the configuration file": "CentOS 8 (64-bit)", "Total disk capacity MiB": "100000", "In Use MiB": "50000"},
+		{"VM": "vm-005", "VM ID": "vm-005", "Powerstate": "poweredOn", "CPUs": "2", "Memory": "4096", "Cluster": "Cluster-A", "Datacenter": "DC1", "OS according to the configuration file": "Ubuntu 22.04 (64-bit)", "Total disk capacity MiB": "50000", "In Use MiB": "25000"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "DC1", "Cluster": "Cluster-A", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "DC1", "Cluster": "Cluster-B", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// Test 1: Filter by specific VM list (vm-001, vm-003, vm-005)
+	vmList := []string{"vm-001", "vm-003", "vm-005"}
+	inv, err := parser.BuildInventory(ctx, vmList)
+	require.NoError(t, err)
+
+	// Verify total count includes only the 3 VMs in the list
+	assert.Equal(t, 3, inv.VCenter.VMs.Total, "Total VMs should be 3 (filtered)")
+
+	// Verify power state counts (vm-001: poweredOn, vm-003: poweredOn, vm-005: poweredOn)
+	assert.Equal(t, 3, inv.VCenter.VMs.PowerStates["poweredOn"], "PoweredOn count should be 3")
+	assert.Equal(t, 0, inv.VCenter.VMs.PowerStates["poweredOff"], "PoweredOff count should be 0 (vm-004 is filtered out)")
+
+	// Verify OS distribution includes only filtered VMs
+	assert.Equal(t, 1, inv.VCenter.VMs.OSInfo["CentOS 7 (64-bit)"].Count, "CentOS 7 count should be 1 (vm-001)")
+	assert.Equal(t, 1, inv.VCenter.VMs.OSInfo["Windows Server 2019 (64-bit)"].Count, "Windows count should be 1 (vm-003)")
+	assert.Equal(t, 1, inv.VCenter.VMs.OSInfo["Ubuntu 22.04 (64-bit)"].Count, "Ubuntu 22.04 count should be 1 (vm-005)")
+	assert.NotContains(t, inv.VCenter.VMs.OSInfo, "Ubuntu 20.04 (64-bit)", "Ubuntu 20.04 should not appear (vm-002 filtered out)")
+	assert.NotContains(t, inv.VCenter.VMs.OSInfo, "CentOS 8 (64-bit)", "CentOS 8 should not appear (vm-004 filtered out)")
+
+	// Verify CPU totals: vm-001 (4) + vm-003 (8) + vm-005 (2) = 14
+	assert.Equal(t, 14, inv.VCenter.VMs.CPUCores.Total, "Total CPUs should be 14")
+
+	// Verify CPU tier distribution
+	// vm-001: 4 CPUs -> "0-4", vm-003: 8 CPUs -> "5-8", vm-005: 2 CPUs -> "0-4"
+	assert.Equal(t, 2, inv.VCenter.VMs.DistributionByCPUTier["0-4"], "CPU tier 0-4 should have 2 VMs (vm-001: 4, vm-005: 2)")
+	assert.Equal(t, 1, inv.VCenter.VMs.DistributionByCPUTier["5-8"], "CPU tier 5-8 should have 1 VM (vm-003: 8)")
+
+	// Verify memory totals: vm-001 (8 GB) + vm-003 (16 GB) + vm-005 (4 GB) = 28 GB
+	assert.Equal(t, 28, inv.VCenter.VMs.RamGB.Total, "Total RAM should be 28 GB")
+
+	// Verify per-cluster inventories also respect the VM list filter
+	// Cluster-A should have vm-001 and vm-005 (2 VMs)
+	// Cluster-B should have vm-003 (1 VM)
+	var clusterACount, clusterBCount int
+	for _, clusterInv := range inv.Clusters {
+		total := clusterInv.VMs.Total
+		switch total {
+		case 2:
+			clusterACount = total
+		case 1:
+			clusterBCount = total
+		}
+	}
+	assert.Equal(t, 2, clusterACount, "Cluster-A should have 2 VMs")
+	assert.Equal(t, 1, clusterBCount, "Cluster-B should have 1 VM")
+
+	// Test 2: Empty VM list should include all VMs
+	invAll, err := parser.BuildInventory(ctx, []string{})
+	require.NoError(t, err)
+	assert.Equal(t, 5, invAll.VCenter.VMs.Total, "Empty VM list should include all 5 VMs")
+
+	// Test 3: Nil VM list should include all VMs (backward compatibility)
+	invNil, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 5, invNil.VCenter.VMs.Total, "Nil VM list should include all 5 VMs")
+
+	// Test 4: Filter by single VM
+	singleVM := []string{"vm-002"}
+	invSingle, err := parser.BuildInventory(ctx, singleVM)
+	require.NoError(t, err)
+	assert.Equal(t, 1, invSingle.VCenter.VMs.Total, "Single VM filter should have 1 VM")
+	assert.Equal(t, 1, invSingle.VCenter.VMs.OSInfo["Ubuntu 20.04 (64-bit)"].Count, "Should be vm-002")
+	assert.Equal(t, 2, invSingle.VCenter.VMs.CPUCores.Total, "Should have 2 CPUs from vm-002")
+
+	// Test 5: Filter by non-existent VMs should return 0 VMs
+	nonExistent := []string{"vm-999", "vm-888"}
+	invNone, err := parser.BuildInventory(ctx, nonExistent)
+	require.NoError(t, err)
+	assert.Equal(t, 0, invNone.VCenter.VMs.Total, "Non-existent VMs should result in 0 count")
 }

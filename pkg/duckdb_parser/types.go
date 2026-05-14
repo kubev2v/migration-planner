@@ -4,10 +4,11 @@ import "github.com/kubev2v/migration-planner/pkg/inventory"
 
 // Filters for querying data.
 type Filters struct {
-	Cluster    string // filter by cluster name
-	VmId       string // filter by vm ID
-	OS         string // filter by OS name (for VMs)
-	PowerState string // filter by power state (for VMs)
+	Cluster    string   // filter by cluster name
+	VmId       string   // filter by vm ID
+	OS         string   // filter by OS name (for VMs)
+	PowerState string   // filter by power state (for VMs)
+	VMList     []string // filter by list of VM IDs (optional, only includes VMs in this list)
 }
 
 // Options for pagination.

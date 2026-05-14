@@ -5,6 +5,7 @@ in pkg/estimations/complexity/complexity.go.
 
 Template Parameters:
   - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
 */ -}}
 WITH vm_disk_totals AS (
     SELECT
@@ -15,6 +16,7 @@ WITH vm_disk_totals AS (
     WHERE 1=1
       AND COALESCE(i."migration_excluded", false) = false
     {{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+    {{- .VMListFilter}}
     GROUP BY i."VM ID"
 )
 SELECT
