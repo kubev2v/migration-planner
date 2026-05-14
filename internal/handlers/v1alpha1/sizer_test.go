@@ -903,7 +903,7 @@ var _ = Describe("sizer handler", func() {
 			It("returns 400 when CPU over-commit ratio is invalid", func() {
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:             clusterID,
-					CpuOverCommitRatio:    api.ClusterRequirementsRequestCpuOverCommitRatio("1:3"),
+					CpuOverCommitRatio:    api.CpuOverCommitRatio("1:3"),
 					MemoryOverCommitRatio: api.MemoryOneToTwo,
 					WorkerNodeCPU:         8,
 					WorkerNodeMemory:      16,
@@ -937,7 +937,7 @@ var _ = Describe("sizer handler", func() {
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:             clusterID,
 					CpuOverCommitRatio:    api.CpuOneToFour,
-					MemoryOverCommitRatio: api.ClusterRequirementsRequestMemoryOverCommitRatio("1:6"),
+					MemoryOverCommitRatio: api.MemoryOverCommitRatio("1:6"),
 					WorkerNodeCPU:         8,
 					WorkerNodeMemory:      16,
 				}
@@ -1382,6 +1382,165 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("failed to calculate cluster requirements"))
 			})
+		})
+	})
+
+	Describe("CalculateClusterRequirements", func() {
+		validStandaloneBody := func() *api.StandaloneClusterRequirementsRequest {
+			return &api.StandaloneClusterRequirementsRequest{
+				TotalVMs:              10,
+				TotalCPU:              40,
+				TotalMemory:           80,
+				CpuOverCommitRatio:    api.CpuOneToFour,
+				MemoryOverCommitRatio: api.MemoryOneToTwo,
+				WorkerNodeCPU:         8,
+				WorkerNodeMemory:      16,
+			}
+		}
+
+		Context("successful requests", func() {
+			It("returns 200 with valid standalone request", func() {
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+					nil,
+					nil,
+				)
+
+				resp, err := handler.CalculateClusterRequirements(ctx, server.CalculateClusterRequirementsRequestObject{
+					Body: validStandaloneBody(),
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(7))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(4))
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(successResp.ResourceConsumption.Cpu).To(Equal(100.0))
+				Expect(successResp.ResourceConsumption.Memory).To(Equal(200.0))
+			})
+		})
+
+		Context("validation errors", func() {
+			BeforeEach(func() {
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil,
+					service.NewAssessmentService(mockStore, nil, nil),
+					nil,
+					service.NewSizerService(sizerClient, mockStore),
+					nil,
+					nil,
+					nil,
+				)
+			})
+
+			DescribeTable("returns 400",
+				func(body *api.StandaloneClusterRequirementsRequest, exact, substr string) {
+					resp, err := handler.CalculateClusterRequirements(ctx, server.CalculateClusterRequirementsRequestObject{
+						Body: body,
+					})
+					Expect(err).To(BeNil())
+					errorResp, ok := resp.(server.CalculateClusterRequirements400JSONResponse)
+					Expect(ok).To(BeTrue())
+					if exact != "" {
+						Expect(errorResp.Message).To(Equal(exact))
+					} else {
+						Expect(errorResp.Message).To(ContainSubstring(substr))
+					}
+				},
+				Entry("nil body", nil, "empty body", ""),
+				Entry("zero total VMs", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					b.TotalVMs = 0
+					return &b
+				}(), "totalVMs must be greater than zero", ""),
+				Entry("invalid CPU over-commit ratio", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					b.CpuOverCommitRatio = api.CpuOverCommitRatio("1:3")
+					return &b
+				}(), "", "invalid CPU over-commit ratio"),
+				Entry("invalid memory over-commit ratio", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					b.MemoryOverCommitRatio = api.MemoryOverCommitRatio("1:6")
+					return &b
+				}(), "", "invalid memory over-commit ratio"),
+				Entry("hosted control plane with controlPlaneCPU set", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					hosted := true
+					cp := 6
+					b.HostedControlPlane = &hosted
+					b.ControlPlaneCPU = &cp
+					return &b
+				}(), "", "controlPlaneCPU cannot be specified when hostedControlPlane is true"),
+				Entry("single-node cluster without schedulable control plane", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					n1 := api.N1
+					b.ControlPlaneNodeCount = &n1
+					return &b
+				}(), "", "single-node clusters require schedulable control planes"),
+				Entry("workerNodeThreads below minimum", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					threads := 1
+					b.WorkerNodeThreads = &threads
+					return &b
+				}(), "", "workerNodeThreads must be at least 2"),
+				Entry("workerNodeThreads exceeds maximum", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					b.WorkerNodeCPU = 200
+					threads := 2001
+					b.WorkerNodeThreads = &threads
+					return &b
+				}(), "", "workerNodeThreads must be at most 2000"),
+				Entry("workerNodeThreads less than workerNodeCPU", func() *api.StandaloneClusterRequirementsRequest {
+					b := *validStandaloneBody()
+					b.WorkerNodeCPU = 16
+					threads := 8
+					b.WorkerNodeThreads = &threads
+					return &b
+				}(), "", "workerNodeThreads (8) must be >= workerNodeCPU (16)"),
+			)
+		})
+
+		Context("sizer dependency errors", func() {
+			DescribeTable("returns 503 or 500",
+				func(sizerResponse *client.SizerResponse, healthStatus int, healthError bool, expect503 bool) {
+					testServer = createTestSizerServer(sizerResponse, healthStatus, healthError)
+					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+					handler = handlers.NewServiceHandler(
+						nil,
+						service.NewAssessmentService(mockStore, nil, nil),
+						nil,
+						service.NewSizerService(sizerClient, mockStore),
+						nil,
+						nil,
+						nil,
+					)
+
+					resp, err := handler.CalculateClusterRequirements(ctx, server.CalculateClusterRequirementsRequestObject{
+						Body: validStandaloneBody(),
+					})
+					Expect(err).To(BeNil())
+					if expect503 {
+						errorResp, ok := resp.(server.CalculateClusterRequirements503JSONResponse)
+						Expect(ok).To(BeTrue())
+						Expect(errorResp.Message).To(ContainSubstring("sizer service unavailable"))
+					} else {
+						errorResp, ok := resp.(server.CalculateClusterRequirements500JSONResponse)
+						Expect(ok).To(BeTrue())
+						Expect(errorResp.Message).To(ContainSubstring("failed to calculate cluster requirements"))
+					}
+				},
+				Entry("when sizer health check fails", createTestSizerResponse(5, 2, 3, 40, 80), http.StatusServiceUnavailable, true, true),
+				Entry("when sizer sizing call fails", nil, http.StatusOK, false, false),
+			)
 		})
 	})
 

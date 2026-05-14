@@ -18,6 +18,47 @@ const (
 	workerNodeThreadsMax = 2000
 )
 
+var (
+	validCPUOverCommitRatios = map[string]struct{}{
+		"1:1": {}, "1:2": {}, "1:4": {}, "1:6": {},
+	}
+	validMemoryOverCommitRatios = map[string]struct{}{
+		"1:1": {}, "1:2": {}, "1:4": {},
+	}
+)
+
+func validateOverCommitRatios(cpu api.CpuOverCommitRatio, mem api.MemoryOverCommitRatio) error {
+	if _, ok := validCPUOverCommitRatios[string(cpu)]; !ok {
+		return fmt.Errorf(
+			"invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6",
+			cpu,
+		)
+	}
+	if _, ok := validMemoryOverCommitRatios[string(mem)]; !ok {
+		return fmt.Errorf(
+			"invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4",
+			mem,
+		)
+	}
+	return nil
+}
+
+func validateWorkerNodeThreads(threads *int, cpu int) error {
+	if threads == nil {
+		return nil
+	}
+	t := *threads
+	switch {
+	case t < workerNodeThreadsMin:
+		return fmt.Errorf("workerNodeThreads must be at least %d, got: %d", workerNodeThreadsMin, t)
+	case t > workerNodeThreadsMax:
+		return fmt.Errorf("workerNodeThreads must be at most %d, got: %d", workerNodeThreadsMax, t)
+	case t < cpu:
+		return fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", t, cpu)
+	}
+	return nil
+}
+
 // (GET /api/v1/assessments/{id}/cluster-requirements/stored-input)
 func (h *ServiceHandler) GetAssessmentClusterRequirementsStoredInput(ctx context.Context, request server.GetAssessmentClusterRequirementsStoredInputRequestObject) (server.GetAssessmentClusterRequirementsStoredInputResponseObject, error) {
 	logger := log.NewDebugLogger("sizer_handler").
@@ -91,28 +132,24 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "clusterId is required"}, nil
 	}
 
-	// Validate worker node sizes
 	if request.Body.WorkerNodeCPU <= 0 || request.Body.WorkerNodeMemory <= 0 {
 		logger.Error(fmt.Errorf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)).Log()
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)}, nil
 	}
 
-	// Validate CPU overcommit ratio
-	validCpuRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true, "1:6": true}
-	if !validCpuRatios[string(request.Body.CpuOverCommitRatio)] {
-		logger.Error(fmt.Errorf("invalid CPU over-commit ratio: %s", request.Body.CpuOverCommitRatio)).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6", request.Body.CpuOverCommitRatio)}, nil
-	}
-
-	// Validate memory overcommit ratio
-	validMemoryRatios := map[string]bool{"1:1": true, "1:2": true, "1:4": true}
-	if !validMemoryRatios[string(request.Body.MemoryOverCommitRatio)] {
-		logger.Error(fmt.Errorf("invalid memory over-commit ratio: %s", request.Body.MemoryOverCommitRatio)).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("invalid memory over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4", request.Body.MemoryOverCommitRatio)}, nil
+	if err := validateOverCommitRatios(request.Body.CpuOverCommitRatio, request.Body.MemoryOverCommitRatio); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
 	}
 
 	// Validate that control plane fields are not provided when hosted control plane is enabled
-	if err := validateNoControlPlaneFieldsWhenHosted(request.Body); err != nil {
+	if err := validateNoControlPlaneFieldsWhenHosted(
+		request.Body.HostedControlPlane,
+		request.Body.ControlPlaneNodeCount != nil,
+		request.Body.ControlPlaneCPU != nil,
+		request.Body.ControlPlaneMemory != nil,
+		request.Body.ControlPlaneSchedulable != nil,
+	); err != nil {
 		logger.Error(err).Log()
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
 	}
@@ -130,26 +167,9 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		}
 	}
 
-	if request.Body.WorkerNodeThreads != nil {
-		threads := *request.Body.WorkerNodeThreads
-		cpu := request.Body.WorkerNodeCPU
-		switch {
-		case threads < workerNodeThreadsMin:
-			logger.Error(fmt.Errorf("workerNodeThreads (%d) below minimum (%d)", threads, workerNodeThreadsMin)).Log()
-			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message: fmt.Sprintf("workerNodeThreads must be at least %d, got: %d", workerNodeThreadsMin, threads),
-			}, nil
-		case threads > workerNodeThreadsMax:
-			logger.Error(fmt.Errorf("workerNodeThreads (%d) exceeds maximum (%d)", threads, workerNodeThreadsMax)).Log()
-			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message: fmt.Sprintf("workerNodeThreads must be at most %d, got: %d", workerNodeThreadsMax, threads),
-			}, nil
-		case threads < cpu:
-			logger.Error(fmt.Errorf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, cpu)).Log()
-			return server.CalculateAssessmentClusterRequirements400JSONResponse{
-				Message: fmt.Sprintf("workerNodeThreads (%d) must be >= workerNodeCPU (%d)", threads, cpu),
-			}, nil
-		}
+	if err := validateWorkerNodeThreads(request.Body.WorkerNodeThreads, request.Body.WorkerNodeCPU); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
 	}
 
 	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
@@ -208,26 +228,157 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 	return server.CalculateAssessmentClusterRequirements200JSONResponse(apiResponse), nil
 }
 
-// validateNoControlPlaneFieldsWhenHosted checks that control plane fields are not provided
-// when hosted control plane mode is enabled. Returns an error if any control plane field is present.
-func validateNoControlPlaneFieldsWhenHosted(req *api.ClusterRequirementsRequest) error {
-	if req.HostedControlPlane == nil || !*req.HostedControlPlane {
+func validateNoControlPlaneFieldsWhenHosted(
+	hosted *bool,
+	hasNodeCount, hasCPU, hasMemory, hasSchedulable bool,
+) error {
+	if hosted == nil || !*hosted {
 		return nil
 	}
-
-	// Check each control plane field directly (not through interface{} to avoid nil pointer issues)
-	if req.ControlPlaneNodeCount != nil {
+	if hasNodeCount {
 		return fmt.Errorf("controlPlaneNodeCount cannot be specified when hostedControlPlane is true")
 	}
-	if req.ControlPlaneCPU != nil {
+	if hasCPU {
 		return fmt.Errorf("controlPlaneCPU cannot be specified when hostedControlPlane is true")
 	}
-	if req.ControlPlaneMemory != nil {
+	if hasMemory {
 		return fmt.Errorf("controlPlaneMemory cannot be specified when hostedControlPlane is true")
 	}
-	if req.ControlPlaneSchedulable != nil {
+	if hasSchedulable {
 		return fmt.Errorf("controlPlaneSchedulable cannot be specified when hostedControlPlane is true")
 	}
-
 	return nil
+}
+
+// (POST /api/v1/cluster-requirements)
+func (h *ServiceHandler) CalculateClusterRequirements(
+	ctx context.Context,
+	request server.CalculateClusterRequirementsRequestObject,
+) (server.CalculateClusterRequirementsResponseObject, error) {
+	logger := log.NewDebugLogger("sizer_handler").
+		WithContext(ctx).
+		Operation("calculate_cluster_requirements").
+		Build()
+
+	user := auth.MustHaveUser(ctx)
+	logger.Step("extract_user").
+		WithString("org_id", user.Organization).
+		WithString("username", user.Username).
+		Log()
+
+	if request.Body == nil {
+		logger.Error(fmt.Errorf("empty request body")).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: "empty body",
+		}, nil
+	}
+
+	if request.Body.TotalVMs <= 0 {
+		logger.Error(fmt.Errorf("totalVMs must be greater than zero")).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: "totalVMs must be greater than zero",
+		}, nil
+	}
+	if request.Body.TotalCPU <= 0 {
+		logger.Error(fmt.Errorf("totalCPU must be greater than zero")).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: "totalCPU must be greater than zero",
+		}, nil
+	}
+	if request.Body.TotalMemory <= 0 {
+		logger.Error(fmt.Errorf("totalMemory must be greater than zero")).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: "totalMemory must be greater than zero",
+		}, nil
+	}
+
+	if request.Body.WorkerNodeCPU <= 0 || request.Body.WorkerNodeMemory <= 0 {
+		logger.Error(fmt.Errorf("worker node size must be greater than zero")).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: fmt.Sprintf(
+				"worker node size must be greater than zero: CPU=%d, Memory=%d",
+				request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory,
+			),
+		}, nil
+	}
+
+	if err := validateOverCommitRatios(request.Body.CpuOverCommitRatio, request.Body.MemoryOverCommitRatio); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateClusterRequirements400JSONResponse{Message: err.Error()}, nil
+	}
+
+	if err := validateNoControlPlaneFieldsWhenHosted(
+		request.Body.HostedControlPlane,
+		request.Body.ControlPlaneNodeCount != nil,
+		request.Body.ControlPlaneCPU != nil,
+		request.Body.ControlPlaneMemory != nil,
+		request.Body.ControlPlaneSchedulable != nil,
+	); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateClusterRequirements400JSONResponse{
+			Message: err.Error(),
+		}, nil
+	}
+
+	if request.Body.HostedControlPlane == nil || !*request.Body.HostedControlPlane {
+		if request.Body.ControlPlaneNodeCount != nil {
+			count := int(*request.Body.ControlPlaneNodeCount)
+			if count != 1 && count != 3 {
+				logger.Error(fmt.Errorf("invalid controlPlaneNodeCount")).Log()
+				return server.CalculateClusterRequirements400JSONResponse{
+					Message: fmt.Sprintf("invalid controlPlaneNodeCount: %d", count),
+				}, nil
+			}
+		}
+	}
+
+	if err := validateWorkerNodeThreads(request.Body.WorkerNodeThreads, request.Body.WorkerNodeCPU); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateClusterRequirements400JSONResponse{Message: err.Error()}, nil
+	}
+
+	// Check sizer service health
+	if err := h.sizerSrv.Health(ctx); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateClusterRequirements503JSONResponse{
+			Message: fmt.Sprintf("sizer service unavailable: %v", err),
+		}, nil
+	}
+
+	logger.Step("cluster_requirements_calculation").
+		WithInt("total_vms", request.Body.TotalVMs).
+		WithInt("total_cpu", request.Body.TotalCPU).
+		WithInt("total_memory", request.Body.TotalMemory).
+		WithString("org_id", user.Organization).
+		WithString("username", user.Username).
+		Log()
+
+	// Convert API request to domain model
+	domainRequest := mappers.StandaloneClusterRequirementsRequestToForm(*request.Body)
+
+	// Calculate cluster requirements (no assessment context)
+	res, err := h.sizerSrv.CalculateStandaloneClusterRequirements(ctx, &domainRequest)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrInvalidRequest:
+			logger.Error(err).Log()
+			return server.CalculateClusterRequirements400JSONResponse{
+				Message: err.Error(),
+			}, nil
+		default:
+			logger.Error(err).Log()
+			return server.CalculateClusterRequirements500JSONResponse{
+				Message: fmt.Sprintf("failed to calculate cluster requirements: %v", err),
+			}, nil
+		}
+	}
+
+	logger.Success().
+		WithString("org_id", user.Organization).
+		WithString("username", user.Username).
+		WithInt("total_nodes", res.ClusterSizing.TotalNodes).
+		Log()
+
+	apiResponse := mappers.StandaloneClusterRequirementsResponseFormToAPI(*res)
+	return server.CalculateClusterRequirements200JSONResponse(apiResponse), nil
 }

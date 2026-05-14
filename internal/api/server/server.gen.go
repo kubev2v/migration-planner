@@ -65,6 +65,9 @@ type ServerInterface interface {
 	// (POST /api/v1/assessments/{id}/share)
 	ShareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (POST /api/v1/cluster-requirements)
+	CalculateClusterRequirements(w http.ResponseWriter, r *http.Request)
+
 	// (GET /api/v1/customers)
 	ListCustomers(w http.ResponseWriter, r *http.Request)
 
@@ -232,6 +235,11 @@ func (_ Unimplemented) UnshareAssessment(w http.ResponseWriter, r *http.Request,
 
 // (POST /api/v1/assessments/{id}/share)
 func (_ Unimplemented) ShareAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v1/cluster-requirements)
+func (_ Unimplemented) CalculateClusterRequirements(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -773,6 +781,21 @@ func (siw *ServerInterfaceWrapper) ShareAssessment(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ShareAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CalculateClusterRequirements operation middleware
+func (siw *ServerInterfaceWrapper) CalculateClusterRequirements(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CalculateClusterRequirements(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1645,6 +1668,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/assessments/{id}/share", wrapper.ShareAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v1/cluster-requirements", wrapper.CalculateClusterRequirements)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/customers", wrapper.ListCustomers)
@@ -2627,6 +2653,59 @@ type ShareAssessment500JSONResponse Error
 func (response ShareAssessment500JSONResponse) VisitShareAssessmentResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateClusterRequirementsRequestObject struct {
+	Body *CalculateClusterRequirementsJSONRequestBody
+}
+
+type CalculateClusterRequirementsResponseObject interface {
+	VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error
+}
+
+type CalculateClusterRequirements200JSONResponse StandaloneClusterRequirementsResponse
+
+func (response CalculateClusterRequirements200JSONResponse) VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateClusterRequirements400JSONResponse Error
+
+func (response CalculateClusterRequirements400JSONResponse) VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateClusterRequirements401JSONResponse Error
+
+func (response CalculateClusterRequirements401JSONResponse) VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateClusterRequirements500JSONResponse Error
+
+func (response CalculateClusterRequirements500JSONResponse) VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CalculateClusterRequirements503JSONResponse Error
+
+func (response CalculateClusterRequirements503JSONResponse) VisitCalculateClusterRequirementsResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -4187,6 +4266,9 @@ type StrictServerInterface interface {
 	// (POST /api/v1/assessments/{id}/share)
 	ShareAssessment(ctx context.Context, request ShareAssessmentRequestObject) (ShareAssessmentResponseObject, error)
 
+	// (POST /api/v1/cluster-requirements)
+	CalculateClusterRequirements(ctx context.Context, request CalculateClusterRequirementsRequestObject) (CalculateClusterRequirementsResponseObject, error)
+
 	// (GET /api/v1/customers)
 	ListCustomers(ctx context.Context, request ListCustomersRequestObject) (ListCustomersResponseObject, error)
 
@@ -4736,6 +4818,37 @@ func (sh *strictHandler) ShareAssessment(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ShareAssessmentResponseObject); ok {
 		if err := validResponse.VisitShareAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CalculateClusterRequirements operation middleware
+func (sh *strictHandler) CalculateClusterRequirements(w http.ResponseWriter, r *http.Request) {
+	var request CalculateClusterRequirementsRequestObject
+
+	var body CalculateClusterRequirementsJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CalculateClusterRequirements(ctx, request.(CalculateClusterRequirementsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CalculateClusterRequirements")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CalculateClusterRequirementsResponseObject); ok {
+		if err := validResponse.VisitCalculateClusterRequirementsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
