@@ -1086,6 +1086,111 @@ var _ = Describe("sizer service", func() {
 	// calculateMinimumNodeSize, formatNodeSizeError, buildSizerPayload, transformSizerResponse)
 	// are tested indirectly through CalculateClusterRequirements above.
 
+	Describe("CalculateStandaloneClusterRequirements", func() {
+		var request *mappers.StandaloneClusterRequirementsRequestForm
+
+		BeforeEach(func() {
+			request = &mappers.StandaloneClusterRequirementsRequestForm{
+				TotalVMs:              10,
+				TotalCPU:              40,
+				TotalMemory:           80,
+				CpuOverCommitRatio:    "1:4",
+				MemoryOverCommitRatio: "1:2",
+				WorkerNodeCPU:         8,
+				WorkerNodeMemory:      16,
+			}
+		})
+
+		It("returns error when sizer client is not configured", func() {
+			sizerService = service.NewSizerService(nil, mockStore)
+			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
+			Expect(result).To(BeNil())
+			Expect(err).NotTo(BeNil())
+			Expect(err.Error()).To(ContainSubstring("sizer client is not configured"))
+		})
+
+		DescribeTable("returns ErrInvalidRequest",
+			func(mutate func(*mappers.StandaloneClusterRequirementsRequestForm), sizerResp *client.SizerResponse, wantSubstr string) {
+				mutate(request)
+				testServer = createTestSizerServer(sizerResp, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring(wantSubstr))
+			},
+			Entry("when inventory totals are non-positive", func(r *mappers.StandaloneClusterRequirementsRequestForm) {
+				r.TotalVMs = 0
+			}, createTestSizerResponse(5, 2, 3, 40, 80), "inventory must have positive VMs, CPU, and Memory values"),
+			Entry("when single node requested with non-schedulable control plane", func(r *mappers.StandaloneClusterRequirementsRequestForm) {
+				r.ControlPlaneNodeCount = util.IntPtr(1)
+				r.ControlPlaneSchedulable = util.BoolPtr(false)
+			}, createTestSizerResponse(1, 0, 1, 40, 80), "single-node clusters require schedulable control planes"),
+			Entry("when worker node CPU is zero", func(r *mappers.StandaloneClusterRequirementsRequestForm) {
+				r.WorkerNodeCPU = 0
+			}, createTestSizerResponse(5, 2, 3, 40, 80), "worker node size must be greater than zero"),
+		)
+
+		It("successfully calculates cluster requirements from inline inventory", func() {
+			testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+			sizerService = service.NewSizerService(sizerClient, mockStore)
+
+			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
+
+			Expect(err).To(BeNil())
+			Expect(result).NotTo(BeNil())
+			Expect(result.ClusterSizing.TotalNodes).To(Equal(7))
+			Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
+			Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+			Expect(result.ResourceConsumption.CPU).To(Equal(100.0))
+			Expect(result.ResourceConsumption.Memory).To(Equal(200.0))
+			Expect(mockStore.clusterInputs).To(BeEmpty())
+		})
+
+		It("successfully handles hosted control plane (worker nodes only)", func() {
+			request.HostedControlPlane = util.BoolPtr(true)
+
+			var sizerPayload client.SizerRequest
+			testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+					Expect(json.NewDecoder(r.Body).Decode(&sizerPayload)).To(Succeed())
+				}
+				if r.URL.Path == "/health" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				if r.URL.Path == "/api/v1/size/custom" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(createTestSizerResponse(4, 4, 0, 40, 80))
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+			sizerService = service.NewSizerService(sizerClient, mockStore)
+
+			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
+
+			Expect(err).To(BeNil())
+			Expect(result).NotTo(BeNil())
+			Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(0))
+			Expect(result.ClusterSizing.WorkerNodes).To(Equal(6))
+			Expect(result.ClusterSizing.TotalNodes).To(Equal(6))
+			Expect(sizerPayload.MachineSets).To(HaveLen(1))
+			Expect(sizerPayload.MachineSets[0].Name).To(Equal("worker"))
+			Expect(sizerPayload.Workloads).To(HaveLen(1))
+			Expect(sizerPayload.Workloads[0].Name).To(Equal("vm-workload"))
+			Expect(mockStore.clusterInputs).To(BeEmpty())
+		})
+	})
+
 	Describe("VM Limit Enforcement", func() {
 		var (
 			assessmentID uuid.UUID

@@ -148,6 +148,11 @@ type ClientInterface interface {
 	// ShareAssessment request
 	ShareAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// CalculateClusterRequirementsWithBody request with any body
+	CalculateClusterRequirementsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	CalculateClusterRequirements(ctx context.Context, body CalculateClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListCustomers request
 	ListCustomers(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -499,6 +504,30 @@ func (c *Client) UnshareAssessment(ctx context.Context, id openapi_types.UUID, r
 
 func (c *Client) ShareAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewShareAssessmentRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateClusterRequirementsWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateClusterRequirementsRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) CalculateClusterRequirements(ctx context.Context, body CalculateClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCalculateClusterRequirementsRequest(c.Server, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1582,6 +1611,46 @@ func NewShareAssessmentRequest(server string, id openapi_types.UUID) (*http.Requ
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewCalculateClusterRequirementsRequest calls the generic CalculateClusterRequirements builder with application/json body
+func NewCalculateClusterRequirementsRequest(server string, body CalculateClusterRequirementsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCalculateClusterRequirementsRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCalculateClusterRequirementsRequestWithBody generates requests for CalculateClusterRequirements with any type of body
+func NewCalculateClusterRequirementsRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/cluster-requirements")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -2814,6 +2883,11 @@ type ClientWithResponsesInterface interface {
 	// ShareAssessmentWithResponse request
 	ShareAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*ShareAssessmentResponse, error)
 
+	// CalculateClusterRequirementsWithBodyWithResponse request with any body
+	CalculateClusterRequirementsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateClusterRequirementsResponse, error)
+
+	CalculateClusterRequirementsWithResponse(ctx context.Context, body CalculateClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateClusterRequirementsResponse, error)
+
 	// ListCustomersWithResponse request
 	ListCustomersWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListCustomersResponse, error)
 
@@ -3317,6 +3391,32 @@ func (r ShareAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r ShareAssessmentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type CalculateClusterRequirementsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *StandaloneClusterRequirementsResponse
+	JSON400      *Error
+	JSON401      *Error
+	JSON500      *Error
+	JSON503      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r CalculateClusterRequirementsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CalculateClusterRequirementsResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4265,6 +4365,23 @@ func (c *ClientWithResponses) ShareAssessmentWithResponse(ctx context.Context, i
 		return nil, err
 	}
 	return ParseShareAssessmentResponse(rsp)
+}
+
+// CalculateClusterRequirementsWithBodyWithResponse request with arbitrary body returning *CalculateClusterRequirementsResponse
+func (c *ClientWithResponses) CalculateClusterRequirementsWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateClusterRequirementsResponse, error) {
+	rsp, err := c.CalculateClusterRequirementsWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateClusterRequirementsResponse(rsp)
+}
+
+func (c *ClientWithResponses) CalculateClusterRequirementsWithResponse(ctx context.Context, body CalculateClusterRequirementsJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateClusterRequirementsResponse, error) {
+	rsp, err := c.CalculateClusterRequirements(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCalculateClusterRequirementsResponse(rsp)
 }
 
 // ListCustomersWithResponse request returning *ListCustomersResponse
@@ -5483,6 +5600,60 @@ func ParseShareAssessmentResponse(rsp *http.Response) (*ShareAssessmentResponse,
 			return nil, err
 		}
 		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCalculateClusterRequirementsResponse parses an HTTP response from a CalculateClusterRequirementsWithResponse call
+func ParseCalculateClusterRequirementsResponse(rsp *http.Response) (*CalculateClusterRequirementsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CalculateClusterRequirementsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest StandaloneClusterRequirementsResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 503:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON503 = &dest
 
 	}
 

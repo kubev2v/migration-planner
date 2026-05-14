@@ -812,6 +812,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/cluster-requirements:
+    post:
+      tags:
+        - sizing
+      description: Calculate cluster requirements for hypothetical workload with inline inventory data (no assessment required)
+      operationId: calculateClusterRequirements
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StandaloneClusterRequirementsRequest"
+            example:
+              totalVMs: 100
+              totalCPU: 400
+              totalMemory: 800
+              cpuOverCommitRatio: "1:4"
+              memoryOverCommitRatio: "1:2"
+              workerNodeCPU: 16
+              workerNodeMemory: 64
+        required: true
+      responses:
+        "200":
+          description: Cluster requirements calculation successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StandaloneClusterRequirementsResponse"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "503":
+          description: Service Unavailable
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/{id}/migration-estimation:
     post:
       tags:
@@ -2992,6 +3043,18 @@ components:
       items:
         $ref: "#/components/schemas/Member"
 
+    CpuOverCommitRatio:
+      type: string
+      enum: ["1:1", "1:2", "1:4", "1:6"]
+      x-enum-varnames: ["CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix"]
+      description: CPU over-commit ratio
+
+    MemoryOverCommitRatio:
+      type: string
+      enum: ["1:1", "1:2", "1:4"]
+      x-enum-varnames: ["MemoryOneToOne", "MemoryOneToTwo", "MemoryOneToFour"]
+      description: Memory over-commit ratio
+
     ClusterRequirementsRequest:
       type: object
       description: Request payload for calculating cluster requirements
@@ -3002,28 +3065,30 @@ components:
           x-oapi-codegen-extra-tags:
             validate: "required"
         cpuOverCommitRatio:
-          type: string
-          enum: ["1:1", "1:2", "1:4", "1:6"]
-          x-enum-varnames: ["CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix"]
+          allOf:
+            - $ref: "#/components/schemas/CpuOverCommitRatio"
           default: "1:4"
           description: CPU over-commit ratio (e.g., "1:4")
           x-oapi-codegen-extra-tags:
             validate: "required"
         memoryOverCommitRatio:
-          type: string
-          enum: ["1:1", "1:2", "1:4"]
-          x-enum-varnames: ["MemoryOneToOne", "MemoryOneToTwo", "MemoryOneToFour"]
+          allOf:
+            - $ref: "#/components/schemas/MemoryOverCommitRatio"
           default: "1:2"
           description: Memory over-commit ratio (e.g., "1:2")
           x-oapi-codegen-extra-tags:
             validate: "required"
         workerNodeCPU:
           type: integer
+          minimum: 2
+          maximum: 200
           description: CPU cores per worker node
           x-oapi-codegen-extra-tags:
             validate: "required,min=2,max=200"
         workerNodeMemory:
           type: integer
+          minimum: 4
+          maximum: 512
           description: Memory (GB) per worker node
           x-oapi-codegen-extra-tags:
             validate: "required,min=4,max=512"
@@ -3039,11 +3104,15 @@ components:
           description: "Allow workload scheduling on control plane nodes (default: false)"
         controlPlaneCPU:
           type: integer
+          minimum: 2
+          maximum: 200
           description: "CPU cores per control plane node (default: 6)"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,min=2,max=200"
         controlPlaneMemory:
           type: integer
+          minimum: 4
+          maximum: 512
           description: "Memory in GB per control plane node (default: 16)"
           x-oapi-codegen-extra-tags:
             validate: "omitempty,min=4,max=512"
@@ -3120,6 +3189,113 @@ components:
         - clusterSizing
         - resourceConsumption
         - inventoryTotals
+
+    StandaloneClusterRequirementsRequest:
+      type: object
+      description: Request payload for calculating cluster requirements with inline inventory data (no assessment required)
+      properties:
+        totalVMs:
+          type: integer
+          description: Total number of VMs to size for
+          minimum: 1
+          maximum: 10000
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=10000"
+        totalCPU:
+          type: integer
+          description: Total CPU cores across all VMs
+          minimum: 1
+          maximum: 100000
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=100000"
+        totalMemory:
+          type: integer
+          description: Total memory (GB) across all VMs
+          minimum: 1
+          maximum: 500000
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=1,max=500000"
+        cpuOverCommitRatio:
+          allOf:
+            - $ref: "#/components/schemas/CpuOverCommitRatio"
+          default: "1:4"
+          description: CPU over-commit ratio (e.g., "1:4")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        memoryOverCommitRatio:
+          allOf:
+            - $ref: "#/components/schemas/MemoryOverCommitRatio"
+          default: "1:2"
+          description: Memory over-commit ratio (e.g., "1:2")
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+        workerNodeCPU:
+          type: integer
+          minimum: 2
+          maximum: 200
+          description: CPU cores per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=2,max=200"
+        workerNodeMemory:
+          type: integer
+          minimum: 4
+          maximum: 512
+          description: Memory (GB) per worker node
+          x-oapi-codegen-extra-tags:
+            validate: "required,min=4,max=512"
+        workerNodeThreads:
+          type: integer
+          minimum: 2
+          maximum: 2000
+          description: Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2,max=2000"
+        controlPlaneSchedulable:
+          type: boolean
+          description: "Allow workload scheduling on control plane nodes (default: false)"
+        controlPlaneCPU:
+          type: integer
+          minimum: 2
+          maximum: 200
+          description: "CPU cores per control plane node (default: 6)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=2,max=200"
+        controlPlaneMemory:
+          type: integer
+          minimum: 4
+          maximum: 512
+          description: "Memory in GB per control plane node (default: 16)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=4,max=512"
+        controlPlaneNodeCount:
+          type: integer
+          enum: [1, 3]
+          description: "Number of control plane nodes: 1 or 3 (default: 3)"
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,oneof=1 3"
+        hostedControlPlane:
+          type: boolean
+          description: "If true, control plane is hosted externally. Incompatible with control plane fields (default: false)"
+      required:
+        - totalVMs
+        - totalCPU
+        - totalMemory
+        - cpuOverCommitRatio
+        - memoryOverCommitRatio
+        - workerNodeCPU
+        - workerNodeMemory
+
+    StandaloneClusterRequirementsResponse:
+      type: object
+      description: Sizing results; omits inventoryTotals (already in the request).
+      properties:
+        clusterSizing:
+          $ref: "#/components/schemas/ClusterSizing"
+        resourceConsumption:
+          $ref: "#/components/schemas/SizingResourceConsumption"
+      required:
+        - clusterSizing
+        - resourceConsumption
 
     InventoryTotals:
       type: object

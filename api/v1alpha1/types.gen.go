@@ -47,21 +47,6 @@ const (
 	ClusterRequirementsRequestControlPlaneNodeCountN3 ClusterRequirementsRequestControlPlaneNodeCount = 3
 )
 
-// Defines values for ClusterRequirementsRequestCpuOverCommitRatio.
-const (
-	CpuOneToFour ClusterRequirementsRequestCpuOverCommitRatio = "1:4"
-	CpuOneToOne  ClusterRequirementsRequestCpuOverCommitRatio = "1:1"
-	CpuOneToSix  ClusterRequirementsRequestCpuOverCommitRatio = "1:6"
-	CpuOneToTwo  ClusterRequirementsRequestCpuOverCommitRatio = "1:2"
-)
-
-// Defines values for ClusterRequirementsRequestMemoryOverCommitRatio.
-const (
-	MemoryOneToFour ClusterRequirementsRequestMemoryOverCommitRatio = "1:4"
-	MemoryOneToOne  ClusterRequirementsRequestMemoryOverCommitRatio = "1:1"
-	MemoryOneToTwo  ClusterRequirementsRequestMemoryOverCommitRatio = "1:2"
-)
-
 // Defines values for ClusterRequirementsStoredInputControlPlaneNodeCount.
 const (
 	ClusterRequirementsStoredInputControlPlaneNodeCountN1 ClusterRequirementsStoredInputControlPlaneNodeCount = 1
@@ -81,6 +66,14 @@ const (
 	ClusterRequirementsStoredInputMemoryOverCommitRatioN11 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:1"
 	ClusterRequirementsStoredInputMemoryOverCommitRatioN12 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:2"
 	ClusterRequirementsStoredInputMemoryOverCommitRatioN14 ClusterRequirementsStoredInputMemoryOverCommitRatio = "1:4"
+)
+
+// Defines values for CpuOverCommitRatio.
+const (
+	CpuOneToFour CpuOverCommitRatio = "1:4"
+	CpuOneToOne  CpuOverCommitRatio = "1:1"
+	CpuOneToSix  CpuOverCommitRatio = "1:6"
+	CpuOneToTwo  CpuOverCommitRatio = "1:2"
 )
 
 // Defines values for GroupKind.
@@ -113,6 +106,13 @@ const (
 	JobStatusValidating JobStatus = "validating"
 )
 
+// Defines values for MemoryOverCommitRatio.
+const (
+	MemoryOneToFour MemoryOverCommitRatio = "1:4"
+	MemoryOneToOne  MemoryOverCommitRatio = "1:1"
+	MemoryOneToTwo  MemoryOverCommitRatio = "1:2"
+)
+
 // Defines values for NetworkType.
 const (
 	Distributed NetworkType = "distributed"
@@ -139,6 +139,12 @@ const (
 const (
 	SourceUpdateNetworkConfigTypeDhcp   SourceUpdateNetworkConfigType = "dhcp"
 	SourceUpdateNetworkConfigTypeStatic SourceUpdateNetworkConfigType = "static"
+)
+
+// Defines values for StandaloneClusterRequirementsRequestControlPlaneNodeCount.
+const (
+	N1 StandaloneClusterRequirementsRequestControlPlaneNodeCount = 1
+	N3 StandaloneClusterRequirementsRequestControlPlaneNodeCount = 3
 )
 
 // Defines values for ListGroupsParamsKind.
@@ -262,13 +268,13 @@ type ClusterRequirementsRequest struct {
 	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
 
 	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
-	CpuOverCommitRatio ClusterRequirementsRequestCpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
+	CpuOverCommitRatio CpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
 
 	// HostedControlPlane If true, control plane is hosted externally. Incompatible with control plane fields (default: false)
 	HostedControlPlane *bool `json:"hostedControlPlane,omitempty"`
 
 	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
-	MemoryOverCommitRatio ClusterRequirementsRequestMemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
+	MemoryOverCommitRatio MemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
 
 	// WorkerNodeCPU CPU cores per worker node
 	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
@@ -282,12 +288,6 @@ type ClusterRequirementsRequest struct {
 
 // ClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
 type ClusterRequirementsRequestControlPlaneNodeCount int
-
-// ClusterRequirementsRequestCpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
-type ClusterRequirementsRequestCpuOverCommitRatio string
-
-// ClusterRequirementsRequestMemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
-type ClusterRequirementsRequestMemoryOverCommitRatio string
 
 // ClusterRequirementsResponse Cluster requirements calculation results
 type ClusterRequirementsResponse struct {
@@ -399,6 +399,9 @@ type ComplexityOSScoreEntry struct {
 	// VmCount Number of VMs at this complexity score
 	VmCount int `json:"vmCount"`
 }
+
+// CpuOverCommitRatio CPU over-commit ratio
+type CpuOverCommitRatio string
 
 // Customer defines model for Customer.
 type Customer struct {
@@ -666,6 +669,9 @@ type MemberUpdate struct {
 	Email *openapi_types.Email `json:"email,omitempty" validate:"omitempty,email"`
 }
 
+// MemoryOverCommitRatio Memory over-commit ratio
+type MemoryOverCommitRatio string
+
 // MigrationComplexityRequest Request payload for calculating migration complexity estimation
 type MigrationComplexityRequest struct {
 	// ClusterId ID of the cluster to calculate complexity estimation for
@@ -927,6 +933,60 @@ type SourceUpdate struct {
 // SourceUpdateNetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
 type SourceUpdateNetworkConfigType string
 
+// StandaloneClusterRequirementsRequest Request payload for calculating cluster requirements with inline inventory data (no assessment required)
+type StandaloneClusterRequirementsRequest struct {
+	// ControlPlaneCPU CPU cores per control plane node (default: 6)
+	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=200"`
+
+	// ControlPlaneMemory Memory in GB per control plane node (default: 16)
+	ControlPlaneMemory *int `json:"controlPlaneMemory,omitempty" validate:"omitempty,min=4,max=512"`
+
+	// ControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
+	ControlPlaneNodeCount *StandaloneClusterRequirementsRequestControlPlaneNodeCount `json:"controlPlaneNodeCount,omitempty" validate:"omitempty,oneof=1 3"`
+
+	// ControlPlaneSchedulable Allow workload scheduling on control plane nodes (default: false)
+	ControlPlaneSchedulable *bool `json:"controlPlaneSchedulable,omitempty"`
+
+	// CpuOverCommitRatio CPU over-commit ratio (e.g., "1:4")
+	CpuOverCommitRatio CpuOverCommitRatio `json:"cpuOverCommitRatio" validate:"required"`
+
+	// HostedControlPlane If true, control plane is hosted externally. Incompatible with control plane fields (default: false)
+	HostedControlPlane *bool `json:"hostedControlPlane,omitempty"`
+
+	// MemoryOverCommitRatio Memory over-commit ratio (e.g., "1:2")
+	MemoryOverCommitRatio MemoryOverCommitRatio `json:"memoryOverCommitRatio" validate:"required"`
+
+	// TotalCPU Total CPU cores across all VMs
+	TotalCPU int `json:"totalCPU" validate:"required,min=1,max=100000"`
+
+	// TotalMemory Total memory (GB) across all VMs
+	TotalMemory int `json:"totalMemory" validate:"required,min=1,max=500000"`
+
+	// TotalVMs Total number of VMs to size for
+	TotalVMs int `json:"totalVMs" validate:"required,min=1,max=10000"`
+
+	// WorkerNodeCPU CPU cores per worker node
+	WorkerNodeCPU int `json:"workerNodeCPU" validate:"required,min=2,max=200"`
+
+	// WorkerNodeMemory Memory (GB) per worker node
+	WorkerNodeMemory int `json:"workerNodeMemory" validate:"required,min=4,max=512"`
+
+	// WorkerNodeThreads Number of CPU threads per worker node (for SMT calculation). If not provided, assumes no SMT (threads = cores). Must be >= workerNodeCPU
+	WorkerNodeThreads *int `json:"workerNodeThreads,omitempty" validate:"omitempty,min=2,max=2000"`
+}
+
+// StandaloneClusterRequirementsRequestControlPlaneNodeCount Number of control plane nodes: 1 or 3 (default: 3)
+type StandaloneClusterRequirementsRequestControlPlaneNodeCount int
+
+// StandaloneClusterRequirementsResponse Sizing results; omits inventoryTotals (already in the request).
+type StandaloneClusterRequirementsResponse struct {
+	// ClusterSizing Overall cluster sizing summary
+	ClusterSizing ClusterSizing `json:"clusterSizing"`
+
+	// ResourceConsumption Resource consumption across the cluster
+	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
+}
+
 // Status Status is a return value for calls that don't return other objects.
 type Status struct {
 	// Message A human-readable description of the status of this operation.
@@ -1101,6 +1161,9 @@ type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
 
 // CalculateMigrationEstimationByComplexityJSONRequestBody defines body for CalculateMigrationEstimationByComplexity for application/json ContentType.
 type CalculateMigrationEstimationByComplexityJSONRequestBody = MigrationEstimationRequest
+
+// CalculateClusterRequirementsJSONRequestBody defines body for CalculateClusterRequirements for application/json ContentType.
+type CalculateClusterRequirementsJSONRequestBody = StandaloneClusterRequirementsRequest
 
 // CreateGroupJSONRequestBody defines body for CreateGroup for application/json ContentType.
 type CreateGroupJSONRequestBody = GroupCreate
