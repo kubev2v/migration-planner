@@ -518,6 +518,29 @@ func (p *Parser) ClustersPerDatacenter(ctx context.Context) ([]int, error) {
 	return counts, rows.Err()
 }
 
+// ClusterFeatures returns cluster features including DRS settings.
+func (p *Parser) ClusterFeatures(ctx context.Context, clusterName string) (*models.ClusterFeatures, error) {
+	q, err := p.builder.ClusterFeaturesQuery(clusterName)
+	if err != nil {
+		return nil, fmt.Errorf("building cluster features query: %w", err)
+	}
+
+	var cluster models.ClusterFeatures
+	err = p.db.QueryRowContext(ctx, q).Scan(
+		&cluster.DrsEnabled,
+		&cluster.DrsMode,
+		&cluster.StorageDrsEnabled,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, fmt.Errorf("cluster features not found for cluster %q: %w", clusterName, err)
+		}
+		return nil, fmt.Errorf("scanning cluster features: %w", err)
+	}
+
+	return &cluster, nil
+}
+
 // readStringIntMap is a helper for reading (string, int) result sets into a map.
 func (p *Parser) readStringIntMap(ctx context.Context, query string) (map[string]int, error) {
 	result := make(map[string]int)

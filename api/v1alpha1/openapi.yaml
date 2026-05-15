@@ -2079,6 +2079,23 @@ components:
           nullable: true
           minLength: 1
 
+    ClusterFeatures:
+      type: object
+      properties:
+        drsEnabled:
+          type: boolean
+          default: false
+          description: "Whether DRS (Distributed Resource Scheduler) is enabled for this cluster"
+        drsMode:
+          type: string
+          enum: ["Fully Automated", "Partially Automated", "Manual", "None"]
+          default: "None"
+          description: "DRS automation mode for the cluster"
+        storageDrsEnabled:
+          type: boolean
+          default: false
+          description: "Whether Storage DRS is enabled for this cluster"
+
     SourceCreate:
       type: object
       properties:
@@ -2210,6 +2227,8 @@ components:
           deprecated: true
           nullable: true
           $ref: "#/components/schemas/VCenter"
+        clusterFeatures:
+          $ref: "#/components/schemas/ClusterFeatures"
         vms:
           $ref: "#/components/schemas/VMs"
         infra:

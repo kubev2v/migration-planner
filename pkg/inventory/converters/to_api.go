@@ -27,10 +27,40 @@ func ToAPI(inv *inventory.Inventory) *api.Inventory {
 }
 
 func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
-	return api.InventoryData{
+	result := api.InventoryData{
 		Vms:   toAPIVMs(&d.VMs),
 		Infra: toAPIInfra(&d.Infra),
 	}
+
+	if d.ClusterFeatures != nil {
+		clusterFeatures := api.ClusterFeatures{
+			DrsEnabled:        d.ClusterFeatures.DrsEnabled,
+			StorageDrsEnabled: d.ClusterFeatures.StorageDrsEnabled,
+		}
+
+		// Map DrsMode string to enum type
+		if d.ClusterFeatures.DrsMode != nil {
+			normalized := strings.ToLower(strings.TrimSpace(*d.ClusterFeatures.DrsMode))
+			switch normalized {
+			case "fullyautomated", "fully automated":
+				mode := api.FullyAutomated
+				clusterFeatures.DrsMode = &mode
+			case "partiallyautomated", "partially automated":
+				mode := api.PartiallyAutomated
+				clusterFeatures.DrsMode = &mode
+			case "manual":
+				mode := api.Manual
+				clusterFeatures.DrsMode = &mode
+			default:
+				mode := api.None
+				clusterFeatures.DrsMode = &mode
+			}
+		}
+
+		result.ClusterFeatures = &clusterFeatures
+	}
+
+	return result
 }
 
 func toAPIVMs(v *inventory.VMsData) api.VMs {

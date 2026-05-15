@@ -45,8 +45,16 @@ type Network struct {
 
 // Cluster represents a VMware cluster with its resources.
 type Cluster struct {
-	Name       string      `json:"name"`
-	Datastores []Datastore `json:"datastores"`
-	Hosts      []Host      `json:"hosts"`
-	Networks   []Network   `json:"networks"`
+	Name            string           `json:"name"`
+	ClusterFeatures *ClusterFeatures `json:"clusterFeatures,omitempty"`
+	Datastores      []Datastore      `json:"datastores"`
+	Hosts           []Host           `json:"hosts"`
+	Networks        []Network        `json:"networks"`
+}
+
+// ClusterFeatures represents VMware cluster feature settings (DRS, etc).
+type ClusterFeatures struct {
+	DrsEnabled        *bool   `json:"drsEnabled,omitempty"`
+	DrsMode           *string `json:"drsMode,omitempty"`
+	StorageDrsEnabled *bool   `json:"storageDrsEnabled,omitempty"`
 }
