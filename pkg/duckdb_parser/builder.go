@@ -150,6 +150,12 @@ func (b *QueryBuilder) ClusterObjectIDsQuery() (string, error) {
 	return b.buildQuery("cluster_object_ids_query", mustGetTemplate("cluster_object_ids_query"), nil)
 }
 
+// ClusterFeaturesQuery builds query to get cluster features.
+func (b *QueryBuilder) ClusterFeaturesQuery(clusterName string) (string, error) {
+	params := struct{ ClusterName string }{ClusterName: escapeSQLString(clusterName)}
+	return b.buildQuery("cluster_features_query", mustGetTemplate("cluster_features_query"), params)
+}
+
 // VMCountQuery builds the VM count query with filters.
 func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 	params := queryParams{

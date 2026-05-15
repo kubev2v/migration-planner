@@ -8,6 +8,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/internal/util"
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
@@ -95,10 +96,56 @@ func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inve
 		return nil, fmt.Errorf("building infra: %w", err)
 	}
 
+	// Build Cluster section (only for cluster-scoped queries)
+	var cluster *models.Cluster
+	if filters.Cluster != "" {
+		clusterData, err := p.buildClusterData(ctx, filters.Cluster)
+		if err != nil {
+			// Treat cluster features enrichment as non-fatal - continue without cluster data
+			zap.S().Named("duckdb_parser").Warnf("Failed to build cluster data for %s, continuing without cluster features: %v", filters.Cluster, err)
+		} else {
+			cluster = clusterData
+		}
+	}
+
+	// Convert models.Cluster to inventory.ClusterFeatures if present
+	var clusterFeatures *inventory.ClusterFeatures
+	if cluster != nil && cluster.ClusterFeatures != nil {
+		clusterFeatures = &inventory.ClusterFeatures{
+			DrsEnabled:        cluster.ClusterFeatures.DrsEnabled,
+			DrsMode:           cluster.ClusterFeatures.DrsMode,
+			StorageDrsEnabled: cluster.ClusterFeatures.StorageDrsEnabled,
+		}
+	}
+
 	return &inventory.InventoryData{
-		VMs:   *vms,
-		Infra: *infra,
+		VMs:             *vms,
+		Infra:           *infra,
+		ClusterFeatures: clusterFeatures,
 	}, nil
+}
+
+// buildClusterData constructs cluster-level information.
+// Returns nil cluster data if cluster features are not available (for backward compatibility).
+func (p *Parser) buildClusterData(ctx context.Context, clusterName string) (*models.Cluster, error) {
+	clusterFeatures, err := p.ClusterFeatures(ctx, clusterName)
+	if err != nil {
+		// For backward compatibility, if cluster features aren't available,
+		// continue without them rather than failing the entire inventory
+		zap.S().Named("duckdb_parser").Debugf("Cluster features not available for %s: %v", clusterName, err)
+		return nil, nil
+	}
+
+	// Create a cluster with the features
+	cluster := &models.Cluster{
+		Name:            clusterName,
+		ClusterFeatures: clusterFeatures,
+		Datastores:      []models.Datastore{},
+		Hosts:           []models.Host{},
+		Networks:        []models.Network{},
+	}
+
+	return cluster, nil
 }
 
 // buildVMsData constructs the VMs section of InventoryData.

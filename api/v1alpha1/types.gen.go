@@ -33,6 +33,14 @@ const (
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
 )
 
+// Defines values for ClusterFeaturesDrsMode.
+const (
+	FullyAutomated     ClusterFeaturesDrsMode = "Fully Automated"
+	Manual             ClusterFeaturesDrsMode = "Manual"
+	None               ClusterFeaturesDrsMode = "None"
+	PartiallyAutomated ClusterFeaturesDrsMode = "Partially Automated"
+)
+
 // Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
 const (
 	ClusterRequirementsRequestControlPlaneNodeCountN1 ClusterRequirementsRequestControlPlaneNodeCount = 1
@@ -220,6 +228,21 @@ type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name"`
 }
+
+// ClusterFeatures defines model for ClusterFeatures.
+type ClusterFeatures struct {
+	// DrsEnabled Whether DRS (Distributed Resource Scheduler) is enabled for this cluster
+	DrsEnabled *bool `json:"drsEnabled,omitempty"`
+
+	// DrsMode DRS automation mode for the cluster
+	DrsMode *ClusterFeaturesDrsMode `json:"drsMode,omitempty"`
+
+	// StorageDrsEnabled Whether Storage DRS is enabled for this cluster
+	StorageDrsEnabled *bool `json:"storageDrsEnabled,omitempty"`
+}
+
+// ClusterFeaturesDrsMode DRS automation mode for the cluster
+type ClusterFeaturesDrsMode string
 
 // ClusterRequirementsRequest Request payload for calculating cluster requirements
 type ClusterRequirementsRequest struct {
@@ -558,9 +581,10 @@ type Inventory struct {
 
 // InventoryData defines model for InventoryData.
 type InventoryData struct {
-	Infra   Infra    `json:"infra"`
-	Vcenter *VCenter `json:"vcenter,omitempty"`
-	Vms     VMs      `json:"vms"`
+	ClusterFeatures *ClusterFeatures `json:"clusterFeatures,omitempty"`
+	Infra           Infra            `json:"infra"`
+	Vcenter         *VCenter         `json:"vcenter,omitempty"`
+	Vms             VMs              `json:"vms"`
 }
 
 // InventoryTotals Inventory totals for the cluster

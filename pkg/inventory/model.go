@@ -11,8 +11,16 @@ type Inventory struct {
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).
 type InventoryData struct {
-	VMs   VMsData
-	Infra InfraData
+	VMs             VMsData
+	Infra           InfraData
+	ClusterFeatures *ClusterFeatures
+}
+
+// ClusterFeatures contains cluster-level feature information.
+type ClusterFeatures struct {
+	DrsEnabled        *bool   `json:"drsEnabled,omitempty"`
+	DrsMode           *string `json:"drsMode,omitempty"`
+	StorageDrsEnabled *bool   `json:"storageDrsEnabled,omitempty"`
 }
 
 // VMsData contains aggregated VM statistics and distribution data.

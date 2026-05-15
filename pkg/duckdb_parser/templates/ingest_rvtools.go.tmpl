@@ -287,6 +287,22 @@ INSERT INTO dvswitch ("Name")
 SELECT DISTINCT "Name"
 FROM read_xlsx('{{.FilePath}}', sheet='dvSwitch', all_varchar=true);
 
-INSERT INTO vcluster ("Name", "Object ID")
-SELECT "Name", "Object ID"
-FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);
+CREATE TABLE vcluster_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);
+
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "drs" VARCHAR;
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "DrsDefaultVmBehavior" VARCHAR;
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "Storage DRS" VARCHAR;
+
+INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "StorageDrsEnabled")
+SELECT "Name", "Object ID",
+    CASE
+        WHEN LOWER(TRIM(COALESCE("drs", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
+        ELSE false
+    END as "DrsEnabled",
+    COALESCE(NULLIF(TRIM("DrsDefaultVmBehavior"), ''), 'None') as "DrsDefaultVmBehavior",
+    CASE
+        WHEN LOWER(TRIM(COALESCE("Storage DRS", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
+        ELSE false
+    END as "StorageDrsEnabled"
+FROM vcluster_raw;

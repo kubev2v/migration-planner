@@ -15,6 +15,7 @@ import (
 	"github.com/xuri/excelize/v2"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // testValidator returns no concerns for all VMs.
@@ -92,7 +93,7 @@ var (
 	}
 	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
 	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"}
-	vClusterHeaders   = []string{"Name", "Object ID"}
+	vClusterHeaders   = []string{"Name", "Object ID", "drs"}
 )
 
 // defaultStandardSheets returns vInfo, vHost, default vDatastore, and vCluster from hosts for createTestExcel.
@@ -105,7 +106,7 @@ func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 			continue
 		}
 		clustersSeen[cluster] = true
-		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1)})
+		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1), "drs": "false"})
 	}
 
 	vDatastoreRows := []map[string]string{
@@ -1473,6 +1474,219 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 	invNone, err := parser.BuildInventory(ctx, nonExistent)
 	require.NoError(t, err)
 	assert.Equal(t, 0, invNone.VCenter.VMs.Total, "Non-existent VMs should result in 0 count")
+}
+
+// TestBuildInventory_ClusterFeatures tests that cluster features including DrsEnabled
+// are properly parsed from vCluster sheet and populated in the inventory.
+func TestBuildInventory_ClusterFeatures(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster-drs-enabled", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-2", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster-drs-disabled", "Datacenter": "dc1"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-3", "CPUs": "8", "Memory": "16384", "Powerstate": "poweredOn", "Cluster": "cluster-no-drs-data", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster-drs-enabled", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster-drs-disabled", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster-no-drs-data", "# Cores": "12", "# CPU": "2", "Object ID": "host-003", "# Memory": "49152", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-3", "Config status": "green"},
+	}
+
+	// Custom vCluster data with specific DRS settings
+	vClustersRows := []map[string]string{
+		{"Name": "cluster-drs-enabled", "Object ID": "domain-c1", "drs": "true"},
+		{"Name": "cluster-drs-disabled", "Object ID": "domain-c2", "drs": "false"},
+		{"Name": "cluster-no-drs-data", "Object ID": "domain-c3", "drs": ""}, // Empty DRS value should default to false
+	}
+
+	vDatastoreRows := []map[string]string{
+		{"Hosts": "esxi-host-1", "Address": "10.0.0.1", "Name": "datastore1", "Object ID": "datastore-001", "Free MiB": "524288", "MHA": "false", "Capacity MiB": "1048576", "Type": "VMFS"},
+	}
+
+	sheets := []ExcelSheet{
+		NewExcelSheet("vInfo", vInfoHeaders, vms),
+		NewExcelSheet("vHost", vHostHeaders, hosts),
+		NewExcelSheet("vDatastore", vDatastoreHeaders, vDatastoreRows),
+		NewExcelSheet("vCluster", vClusterHeaders, vClustersRows),
+	}
+	tmpFile := createTestExcel(t, sheets...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+
+	// Should have 3 clusters
+	assert.Len(t, inv.Clusters, 3)
+
+	// Find each cluster and verify their DRS settings
+	var drsEnabledCluster, drsDisabledCluster, noDrsDataCluster *inventory.InventoryData
+	for clusterID, cluster := range inv.Clusters {
+		switch clusterID {
+		case "domain-c1": // cluster-drs-enabled
+			drsEnabledCluster = &cluster
+		case "domain-c2": // cluster-drs-disabled
+			drsDisabledCluster = &cluster
+		case "domain-c3": // cluster-no-drs-data
+			noDrsDataCluster = &cluster
+		}
+	}
+
+	// Verify cluster with DRS enabled
+	require.NotNil(t, drsEnabledCluster, "Should find cluster-drs-enabled")
+	require.NotNil(t, drsEnabledCluster.ClusterFeatures, "cluster-drs-enabled should have cluster features")
+	require.NotNil(t, drsEnabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-enabled should have DrsEnabled set")
+	assert.True(t, *drsEnabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-enabled should have DRS enabled")
+
+	// Verify cluster with DRS disabled
+	require.NotNil(t, drsDisabledCluster, "Should find cluster-drs-disabled")
+	require.NotNil(t, drsDisabledCluster.ClusterFeatures, "cluster-drs-disabled should have cluster features")
+	require.NotNil(t, drsDisabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-disabled should have DrsEnabled set")
+	assert.False(t, *drsDisabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-disabled should have DRS disabled")
+
+	// Verify cluster with missing DRS data (should default to false)
+	require.NotNil(t, noDrsDataCluster, "Should find cluster-no-drs-data")
+	require.NotNil(t, noDrsDataCluster.ClusterFeatures, "cluster-no-drs-data should have cluster features")
+	require.NotNil(t, noDrsDataCluster.ClusterFeatures.DrsEnabled, "cluster-no-drs-data should have DrsEnabled set")
+	assert.False(t, *noDrsDataCluster.ClusterFeatures.DrsEnabled, "cluster-no-drs-data should default to DRS disabled")
+}
+
+// TestBuildInventory_ClusterFeaturesFlexibleParsing tests that the DRS parsing
+// handles various input formats correctly.
+func TestBuildInventory_ClusterFeaturesFlexibleParsing(t *testing.T) {
+	testCases := []struct {
+		name            string
+		drsValue        string
+		expectedEnabled bool
+	}{
+		{"true lowercase", "true", true},
+		{"TRUE uppercase", "TRUE", true},
+		{"True mixed case", "True", true},
+		{"1 numeric", "1", true},
+		{"yes lowercase", "yes", true},
+		{"YES uppercase", "YES", true},
+		{"enabled lowercase", "enabled", true},
+		{"ENABLED uppercase", "ENABLED", true},
+		{"false lowercase", "false", false},
+		{"FALSE uppercase", "FALSE", false},
+		{"0 numeric", "0", false},
+		{"no lowercase", "no", false},
+		{"disabled", "disabled", false},
+		{"empty string", "", false},
+		{"whitespace only", "   ", false},
+		{"random text", "random", false},
+		{"null-like", "null", false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			vms := []map[string]string{
+				{"VM": "test-vm", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "test-cluster", "Datacenter": "dc1"},
+			}
+			hosts := []map[string]string{
+				{"Datacenter": "dc1", "Cluster": "test-cluster", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+			}
+			vClustersRows := []map[string]string{
+				{"Name": "test-cluster", "Object ID": "domain-c1", "drs": tc.drsValue},
+			}
+			vDatastoreRows := []map[string]string{
+				{"Hosts": "esxi-host-1", "Address": "10.0.0.1", "Name": "datastore1", "Object ID": "datastore-001", "Free MiB": "524288", "MHA": "false", "Capacity MiB": "1048576", "Type": "VMFS"},
+			}
+
+			sheets := []ExcelSheet{
+				NewExcelSheet("vInfo", vInfoHeaders, vms),
+				NewExcelSheet("vHost", vHostHeaders, hosts),
+				NewExcelSheet("vDatastore", vDatastoreHeaders, vDatastoreRows),
+				NewExcelSheet("vCluster", vClusterHeaders, vClustersRows),
+			}
+			tmpFile := createTestExcel(t, sheets...)
+
+			ctx := context.Background()
+			_, err := parser.IngestRvTools(ctx, tmpFile)
+			require.NoError(t, err)
+
+			inv, err := parser.BuildInventory(ctx, nil)
+			require.NoError(t, err)
+
+			// Should have 1 cluster
+			require.Len(t, inv.Clusters, 1)
+
+			// Find the cluster and verify DRS setting
+			var testCluster *inventory.InventoryData
+			for clusterID, cluster := range inv.Clusters {
+				if clusterID == "domain-c1" { // test-cluster
+					testCluster = &cluster
+					break
+				}
+			}
+
+			require.NotNil(t, testCluster, "Should find test-cluster")
+			require.NotNil(t, testCluster.ClusterFeatures, "test-cluster should have cluster features")
+			require.NotNil(t, testCluster.ClusterFeatures.DrsEnabled, "test-cluster should have DrsEnabled set")
+			assert.Equal(t, tc.expectedEnabled, *testCluster.ClusterFeatures.DrsEnabled, "DRS setting should match expected value for input: %q", tc.drsValue)
+		})
+	}
+}
+
+// TestBuildInventory_BackwardCompatibility_NoClusterFeatures tests that the system
+// works correctly when cluster features (vCluster sheet) don't exist at all.
+// This ensures backward compatibility with older RVTools exports.
+func TestBuildInventory_BackwardCompatibility_NoClusterFeatures(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "test-cluster", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "test-cluster", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "test-cluster", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	vDatastoreRows := []map[string]string{
+		{"Hosts": "esxi-host-1", "Address": "10.0.0.1", "Name": "datastore1", "Object ID": "datastore-001", "Free MiB": "524288", "MHA": "false", "Capacity MiB": "1048576", "Type": "VMFS"},
+	}
+
+	// Create sheets WITHOUT vCluster for backward compatibility test
+	sheets := []ExcelSheet{
+		NewExcelSheet("vInfo", vInfoHeaders, vms),
+		NewExcelSheet("vHost", vHostHeaders, hosts),
+		NewExcelSheet("vDatastore", vDatastoreHeaders, vDatastoreRows),
+		// NOTE: No vCluster sheet here - this tests backward compatibility
+	}
+	tmpFile := createTestExcel(t, sheets...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+
+	// Should have 1 cluster (generated from VM cluster assignments)
+	require.Len(t, inv.Clusters, 1)
+
+	// Find the cluster
+	var testCluster *inventory.InventoryData
+	for clusterID, cluster := range inv.Clusters {
+		t.Logf("Found cluster ID: %s", clusterID)
+		testCluster = &cluster
+		break
+	}
+
+	require.NotNil(t, testCluster, "Should find cluster")
+
+	// Cluster should exist but ClusterFeatures should be nil for backward compatibility
+	assert.Nil(t, testCluster.ClusterFeatures, "ClusterFeatures should be nil when vCluster sheet is missing (backward compatibility)")
+
+	// But VM and Infra data should still be populated
+	assert.Equal(t, 2, testCluster.VMs.Total, "VMs should be counted correctly")
+	assert.NotEmpty(t, testCluster.Infra.Hosts, "Hosts should be populated")
 }
 
 func TestVCenterVersion(t *testing.T) {
