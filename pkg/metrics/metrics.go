@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/prometheus/client_golang/prometheus"
 )
 
@@ -61,11 +62,11 @@ func UpdateAgentStateCounterMetric(state string, count int) {
 	agentStatusCountMetric.With(labels).Set(float64(count))
 }
 
-//func RegisterMetrics(s store.Store) {
-//	inventoryStatsCollector := newInventoryStatsCollector(s)
-//
-//	prometheus.MustRegister(inventoryStatsCollector)
-//	prometheus.MustRegister(ovaDownloadsTotalMetric)
-//	prometheus.MustRegister(agentStatusCountMetric)
-//	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)
-//}
+func RegisterMetrics(s store.Store) {
+	inventoryStatsCollector := newInventoryStatsCollector(s)
+
+	prometheus.MustRegister(inventoryStatsCollector)
+	prometheus.MustRegister(ovaDownloadsTotalMetric)
+	prometheus.MustRegister(agentStatusCountMetric)
+	prometheus.MustRegister(totalUniqueVisitPerWeekMetric)
+}
