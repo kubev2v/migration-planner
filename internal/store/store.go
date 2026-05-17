@@ -22,6 +22,7 @@ type Store interface {
 	PartnerCustomer() PartnerCustomer
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
+	RequestMetricsCacheRefresh()
 }
 
 type DataStore struct {
@@ -37,21 +38,25 @@ type DataStore struct {
 	job             Job
 	accounts        Accounts
 	partnerCustomer PartnerCustomer
+	metricCache     *MetricsCache
 }
 
 func NewStore(db *gorm.DB) Store {
+	assessment := NewAssessmentStore(db)
+
 	return &DataStore{
 		agent:           NewAgentSource(db),
 		source:          NewSource(db),
 		imageInfra:      NewImageInfraStore(db),
 		privateKey:      NewCacheKeyStore(NewPrivateKey(db)),
 		label:           NewLabelStore(db),
-		assessment:      NewAssessmentStore(db),
+		assessment:      assessment,
 		cluster:         NewClusterSizingInputStore(db),
 		job:             NewJobStore(db),
 		authz:           NewAuthzStore(db),
 		accounts:        NewAccountsStore(db),
 		partnerCustomer: NewPartnerCustomerStore(db),
+		metricCache:     NewMetricsCache(assessment),
 		db:              db,
 	}
 }
@@ -105,11 +110,11 @@ func (s *DataStore) PartnerCustomer() PartnerCustomer {
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
-	assessments, err := s.Assessment().List(ctx, NewAssessmentQueryFilter())
-	if err != nil {
-		return model.InventoryStats{}, err
-	}
-	return model.NewInventoryStats(assessments), nil
+	return s.metricCache.GetStats(ctx)
+}
+
+func (s *DataStore) RequestMetricsCacheRefresh() {
+	s.metricCache.RequestMetricsCacheRefresh()
 }
 
 func (s *DataStore) Close() error {

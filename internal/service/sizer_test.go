@@ -83,6 +83,8 @@ func (m *MockStore) Statistics(ctx context.Context) (model.InventoryStats, error
 	return model.InventoryStats{}, nil
 }
 
+func (m *MockStore) RequestMetricsCacheRefresh() {}
+
 func (m *MockStore) Accounts() store.Accounts {
 	return nil
 }

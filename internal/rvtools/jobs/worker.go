@@ -179,6 +179,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		}
 		return w.failJob(ctx, logger, job.ID, "create_assessment", err, errMsg)
 	}
+	w.store.RequestMetricsCacheRefresh()
 
 	updates := store.NewRelationshipBuilder().
 		With(model.NewAssessmentResource(assessment.ID.String()), model.OwnerRelation, model.NewUserSubject(job.Args.Username)).
