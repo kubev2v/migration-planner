@@ -2701,6 +2701,33 @@ components:
           type: string
           description: Identifier of the host where this datastore is attached
           nullable: true
+        storageIoConfiguration:
+          $ref: "#/components/schemas/StorageIoConfiguration"
+
+    StorageIoConfiguration:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+          default: false
+          description: "Whether Storage I/O Control is enabled for this datastore"
+        congestionThreshold:
+          type: integer
+          default: 30
+          minimum: 5
+          maximum: 100
+          description: "Latency threshold in milliseconds beyond which the storage array is considered congested"
+        congestionThresholdMode:
+          type: string
+          enum: ["automatic", "manual"]
+          default: "automatic"
+          description: "Mode for congestion threshold calculation"
+        percentOfPeakThroughput:
+          type: integer
+          default: 90
+          minimum: 0
+          maximum: 100
+          description: "Percent of peak throughput"
 
     VMResourceBreakdown:
       type: object
