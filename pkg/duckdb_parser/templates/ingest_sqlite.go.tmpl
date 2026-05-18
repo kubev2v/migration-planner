@@ -155,7 +155,8 @@ SELECT
 FROM src.Host h
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices")
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices",
+    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
 SELECT
     string_agg(DISTINCT h.ID, ','),
     ds.Name,
@@ -165,7 +166,11 @@ SELECT
     ds.MaintenanceMode = 'True',
     ds.Capacity / 1048576,
     ds.Type,
-    COALESCE(ds.BackingDevicesNames, '[]')
+    COALESCE(ds.BackingDevicesNames, '[]'),
+    false,
+    30,
+    'automatic',
+    90
 FROM src.Datastore ds
 LEFT JOIN (
     SELECT h.ID, h.Cluster, dsref->>'id' AS datastore_id

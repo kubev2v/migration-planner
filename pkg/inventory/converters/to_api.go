@@ -202,7 +202,15 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			hostId := d.HostId
 			ds.HostId = &hostId
 		}
-		// Anonymize NFS datastores
+		if d.StorageIoConfiguration != nil {
+			mode := api.StorageIoConfigurationCongestionThresholdMode(d.StorageIoConfiguration.CongestionThresholdMode)
+			ds.StorageIoConfiguration = &api.StorageIoConfiguration{
+				Enabled:                 &d.StorageIoConfiguration.Enabled,
+				CongestionThreshold:     &d.StorageIoConfiguration.CongestionThreshold,
+				CongestionThresholdMode: &mode,
+				PercentOfPeakThroughput: &d.StorageIoConfiguration.PercentOfPeakThroughput,
+			}
+		}
 		anonymizeNFSDatastore(&ds)
 		datastores = append(datastores, ds)
 	}

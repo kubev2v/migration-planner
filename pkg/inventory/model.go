@@ -100,16 +100,25 @@ type Host struct {
 	MemoryMB   int
 }
 
+// StorageIoConfiguration represents VMware Storage I/O Control settings for a datastore.
+type StorageIoConfiguration struct {
+	Enabled                 bool
+	CongestionThreshold     int
+	CongestionThresholdMode string
+	PercentOfPeakThroughput int
+}
+
 // Datastore represents a VMware datastore.
 type Datastore struct {
-	DiskId          string
-	FreeCapacityGB  float64
-	TotalCapacityGB float64
-	Type            string
-	HostId          string
-	Model           string
-	ProtocolType    string
-	Vendor          string
+	DiskId                 string
+	FreeCapacityGB         float64
+	TotalCapacityGB        float64
+	Type                   string
+	HostId                 string
+	Model                  string
+	ProtocolType           string
+	Vendor                 string
+	StorageIoConfiguration *StorageIoConfiguration
 }
 
 // Network represents a VMware network.
