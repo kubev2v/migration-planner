@@ -133,6 +133,12 @@ const (
 	SourceUpdateNetworkConfigTypeStatic SourceUpdateNetworkConfigType = "static"
 )
 
+// Defines values for StorageIoConfigurationCongestionThresholdMode.
+const (
+	Automatic StorageIoConfigurationCongestionThresholdMode = "automatic"
+	Manual    StorageIoConfigurationCongestionThresholdMode = "manual"
+)
+
 // Defines values for ListGroupsParamsKind.
 const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
@@ -397,12 +403,13 @@ type Datastore struct {
 	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
 
 	// HostId Identifier of the host where this datastore is attached
-	HostId          *string `json:"hostId"`
-	Model           string  `json:"model"`
-	ProtocolType    string  `json:"protocolType"`
-	TotalCapacityGB int     `json:"totalCapacityGB"`
-	Type            string  `json:"type"`
-	Vendor          string  `json:"vendor"`
+	HostId                 *string                 `json:"hostId"`
+	Model                  string                  `json:"model"`
+	ProtocolType           string                  `json:"protocolType"`
+	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
+	TotalCapacityGB        int                     `json:"totalCapacityGB"`
+	Type                   string                  `json:"type"`
+	Vendor                 string                  `json:"vendor"`
 }
 
 // Error defines model for Error.
@@ -914,6 +921,24 @@ type Status struct {
 	// Status Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *string `json:"status,omitempty"`
 }
+
+// StorageIoConfiguration defines model for StorageIoConfiguration.
+type StorageIoConfiguration struct {
+	// CongestionThreshold Congestion threshold percentage
+	CongestionThreshold *int `json:"congestionThreshold,omitempty"`
+
+	// CongestionThresholdMode Mode for congestion threshold calculation
+	CongestionThresholdMode *StorageIoConfigurationCongestionThresholdMode `json:"congestionThresholdMode,omitempty"`
+
+	// Enabled Whether Storage I/O Control is enabled for this datastore
+	Enabled *bool `json:"enabled,omitempty"`
+
+	// PercentOfPeakThroughput Percent of peak throughput
+	PercentOfPeakThroughput *int `json:"percentOfPeakThroughput,omitempty"`
+}
+
+// StorageIoConfigurationCongestionThresholdMode Mode for congestion threshold calculation
+type StorageIoConfigurationCongestionThresholdMode string
 
 // UpdateInventory defines model for UpdateInventory.
 type UpdateInventory struct {

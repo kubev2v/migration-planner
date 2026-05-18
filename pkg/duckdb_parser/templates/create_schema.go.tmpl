@@ -125,7 +125,11 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "MHA" BOOLEAN DEFAULT false,
     "Capacity MiB" DOUBLE DEFAULT 0.0,
     "Type" VARCHAR,
-    "Backing Devices" VARCHAR DEFAULT '[]'
+    "Backing Devices" VARCHAR DEFAULT '[]',
+    "SIOC Enabled" BOOLEAN DEFAULT false,
+    "SIOC Congestion Threshold" INTEGER DEFAULT 30,
+    "SIOC Congestion Threshold Mode" VARCHAR DEFAULT 'automatic',
+    "SIOC Percent Of Peak Throughput" INTEGER DEFAULT 90
 );
 
 CREATE TABLE IF NOT EXISTS vhba (

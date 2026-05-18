@@ -33,7 +33,11 @@ with_host AS (
         e."Type",
         e.ip,
         vh."Object ID",
-        e.hba_device
+        e.hba_device,
+        e."SIOC Enabled",
+        e."SIOC Congestion Threshold",
+        e."SIOC Congestion Threshold Mode",
+        e."SIOC Percent Of Peak Throughput"
     FROM expanded e
     JOIN vhost vh ON vh.Host = e.ip
     WHERE vh."Cluster" = '{{.ClusterFilter}}'
@@ -49,7 +53,11 @@ with_hba AS (
         w."Type",
         w.ip,
         w."Object ID",
-        FIRST(hba."Type") OVER (PARTITION BY w."Name") as hba_type
+        FIRST(hba."Type") OVER (PARTITION BY w."Name") as hba_type,
+        w."SIOC Enabled",
+        w."SIOC Congestion Threshold",
+        w."SIOC Congestion Threshold Mode",
+        w."SIOC Percent Of Peak Throughput"
     FROM with_host w
     LEFT JOIN vhba hba ON hba."Device" = w.hba_device
 )
@@ -68,9 +76,14 @@ SELECT
     END as "protocolType",
     ROUND(w."Capacity MiB"::double / 1024)::integer as "totalCapacityGB",
     COALESCE(w."Type", 'N/A') as "type",
-    'N/A' as "vendor"
+    'N/A' as "vendor",
+    COALESCE(w."SIOC Enabled", false) as "siocEnabled",
+    COALESCE(w."SIOC Congestion Threshold", 30) as "siocCongestionThreshold",
+    COALESCE(w."SIOC Congestion Threshold Mode", 'automatic') as "siocCongestionThresholdMode",
+    COALESCE(w."SIOC Percent Of Peak Throughput", 90) as "siocPercentOfPeakThroughput"
 FROM with_hba w
-GROUP BY w."Cluster", w."Address", w."Name", w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w.hba_type
+GROUP BY w."Cluster", w."Address", w."Name", w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w.hba_type,
+    w."SIOC Enabled", w."SIOC Congestion Threshold", w."SIOC Congestion Threshold Mode", w."SIOC Percent Of Peak Throughput"
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
 {{- else }}
@@ -103,7 +116,11 @@ SELECT
     END as "protocolType",
     COALESCE(ROUND(d."Capacity MiB"::double / 1024)::integer, 0) as "totalCapacityGB",
     COALESCE(d."Type", 'N/A') as "type",
-    'N/A' as "vendor"
+    'N/A' as "vendor",
+    COALESCE(d."SIOC Enabled", false) as "siocEnabled",
+    COALESCE(d."SIOC Congestion Threshold", 30) as "siocCongestionThreshold",
+    COALESCE(d."SIOC Congestion Threshold Mode", 'automatic') as "siocCongestionThresholdMode",
+    COALESCE(d."SIOC Percent Of Peak Throughput", 90) as "siocPercentOfPeakThroughput"
 FROM vdatastore d
 LEFT JOIN host_ids h ON h.ds_name = d."Name"
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}

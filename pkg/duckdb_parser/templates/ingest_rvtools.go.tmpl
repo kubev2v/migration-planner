@@ -216,6 +216,10 @@ ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Free MB" VARCHAR;
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Capacity MB" VARCHAR;
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Free MiB" VARCHAR;
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Capacity MiB" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "SIOC Enabled" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "SIOC Congestion Threshold" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "SIOC Congestion Threshold Mode" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "SIOC Percent Of Peak Throughput" VARCHAR;
 
 UPDATE vdatastore_raw SET
   "Free MiB" = COALESCE(
@@ -227,7 +231,8 @@ UPDATE vdatastore_raw SET
     NULLIF(TRIM("Capacity MB"), '')
   );
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type")
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
+    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
 SELECT
     "Hosts",
     "Address",
@@ -236,7 +241,11 @@ SELECT
     TRY_CAST("Free MiB" AS DOUBLE),
     CASE WHEN LOWER("MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     TRY_CAST("Capacity MiB" AS DOUBLE),
-    "Type"
+    "Type",
+    CASE WHEN LOWER(TRIM(COALESCE("SIOC Enabled", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    COALESCE(TRY_CAST("SIOC Congestion Threshold" AS INTEGER), 30),
+    COALESCE(NULLIF(TRIM("SIOC Congestion Threshold Mode"), ''), 'automatic'),
+    COALESCE(TRY_CAST("SIOC Percent Of Peak Throughput" AS INTEGER), 90)
 FROM vdatastore_raw;
 
 DROP TABLE vdatastore_raw;
