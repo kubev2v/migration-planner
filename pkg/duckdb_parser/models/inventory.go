@@ -12,6 +12,10 @@ type Datastore struct {
 	TotalCapacityGB         float64 `db:"totalCapacityGB" json:"totalCapacityGB"`
 	Type                    string  `db:"type" json:"type"`
 	Vendor                  string  `db:"vendor" json:"vendor"`
+	SiocEnabled             bool    `db:"siocEnabled" json:"siocEnabled"`
+	SiocThreshold           int     `db:"siocCongestionThreshold" json:"siocCongestionThreshold"`
+	SiocMode                string  `db:"siocCongestionThresholdMode" json:"siocCongestionThresholdMode"`
+	SiocPercent             int     `db:"siocPercentOfPeakThroughput" json:"siocPercentOfPeakThroughput"`
 }
 
 // Os represents an operating system summary.

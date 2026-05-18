@@ -112,8 +112,9 @@ var (
 		"VM UUID", "Total disk capacity MiB", "migration_excluded",
 	}
 	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
-	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"}
-	vClusterHeaders   = []string{"Name", "Object ID", "drs"}
+	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
+		"SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"}
+	vClusterHeaders = []string{"Name", "Object ID", "drs"}
 )
 
 // defaultStandardSheets returns vInfo, vHost, default vDatastore, and vCluster from hosts for createTestExcel.
@@ -131,14 +132,18 @@ func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 
 	vDatastoreRows := []map[string]string{
 		{
-			"Hosts":        "esxi-host-1",
-			"Address":      "10.0.0.1",
-			"Name":         "datastore1",
-			"Object ID":    "datastore-001",
-			"Free MiB":     "524288",
-			"MHA":          "false",
-			"Capacity MiB": "1048576",
-			"Type":         "VMFS",
+			"Hosts":                           "esxi-host-1",
+			"Address":                         "10.0.0.1",
+			"Name":                            "datastore1",
+			"Object ID":                       "datastore-001",
+			"Free MiB":                        "524288",
+			"MHA":                             "false",
+			"Capacity MiB":                    "1048576",
+			"Type":                            "VMFS",
+			"SIOC Enabled":                    "false",
+			"SIOC Congestion Threshold":       "30",
+			"SIOC Congestion Threshold Mode":  "automatic",
+			"SIOC Percent Of Peak Throughput": "90",
 		},
 	}
 
@@ -1757,6 +1762,240 @@ func TestBuildInventory_BackwardCompatibility_NoClusterFeatures(t *testing.T) {
 	// But VM and Infra data should still be populated
 	assert.Equal(t, 2, testCluster.VMs.Total, "VMs should be counted correctly")
 	assert.NotEmpty(t, testCluster.Infra.Hosts, "Hosts should be populated")
+}
+
+func buildSiocDatastore(name, objectID, enabled, threshold, mode, percent string) map[string]string {
+	return map[string]string{
+		"Hosts":                           "esxi-host-1",
+		"Address":                         "10.0.0.1",
+		"Name":                            name,
+		"Object ID":                       objectID,
+		"Free MiB":                        "524288",
+		"MHA":                             "false",
+		"Capacity MiB":                    "1048576",
+		"Type":                            "VMFS",
+		"SIOC Enabled":                    enabled,
+		"SIOC Congestion Threshold":       threshold,
+		"SIOC Congestion Threshold Mode":  mode,
+		"SIOC Percent Of Peak Throughput": percent,
+	}
+}
+
+// TestBuildInventory_StorageIoConfiguration verifies that SIOC fields are correctly
+// populated in the inventory datastores, both when explicit SIOC values are provided
+// and when SIOC columns are missing (defaults should apply).
+func TestBuildInventory_StorageIoConfiguration(t *testing.T) {
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	clustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1"}}
+
+	t.Run("explicit SIOC values", func(t *testing.T) {
+		parser, _, cleanup := setupTestParser(t, &testValidator{})
+		defer cleanup()
+
+		datastoreRows := []map[string]string{
+			buildSiocDatastore("ds-sioc-on", "datastore-001", "true", "50", "manual", "80"),
+			func() map[string]string {
+				ds := buildSiocDatastore("ds-sioc-off", "datastore-002", "false", "30", "automatic", "90")
+				ds["Free MiB"] = "262144"
+				ds["Capacity MiB"] = "524288"
+				ds["Type"] = "NFS"
+				return ds
+			}(),
+		}
+
+		sheets := []ExcelSheet{
+			NewExcelSheet("vInfo", vInfoHeaders, vms),
+			NewExcelSheet("vHost", vHostHeaders, hosts),
+			NewExcelSheet("vDatastore", vDatastoreHeaders, datastoreRows),
+			NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+		}
+		tmpFile := createTestExcel(t, sheets...)
+
+		ctx := context.Background()
+		_, err := parser.IngestRvTools(ctx, tmpFile)
+		require.NoError(t, err)
+
+		inv, err := parser.BuildInventory(ctx, nil)
+		require.NoError(t, err)
+
+		require.Len(t, inv.VCenter.Infra.Datastores, 2, "should have 2 datastores")
+
+		// Build a map by datastore ID for easier assertion
+		dsMap := make(map[string]inventory.Datastore)
+		for _, ds := range inv.VCenter.Infra.Datastores {
+			dsMap[ds.DiskId] = ds
+		}
+
+		// Datastore with SIOC enabled (diskId is the datastore Name)
+		dsOn, ok := dsMap["ds-sioc-on"]
+		require.True(t, ok, "ds-sioc-on should exist")
+		require.NotNil(t, dsOn.StorageIoConfiguration, "StorageIoConfiguration should be populated")
+		assert.True(t, dsOn.StorageIoConfiguration.Enabled, "SIOC should be enabled")
+		assert.Equal(t, 50, dsOn.StorageIoConfiguration.CongestionThreshold, "Congestion threshold should be 50")
+		assert.Equal(t, "manual", dsOn.StorageIoConfiguration.CongestionThresholdMode, "Congestion threshold mode should be manual")
+		assert.Equal(t, 80, dsOn.StorageIoConfiguration.PercentOfPeakThroughput, "Percent of peak throughput should be 80")
+
+		// Datastore with SIOC disabled (diskId is the datastore Name)
+		dsOff, ok := dsMap["ds-sioc-off"]
+		require.True(t, ok, "ds-sioc-off should exist")
+		require.NotNil(t, dsOff.StorageIoConfiguration, "StorageIoConfiguration should be populated")
+		assert.False(t, dsOff.StorageIoConfiguration.Enabled, "SIOC should be disabled")
+		assert.Equal(t, 30, dsOff.StorageIoConfiguration.CongestionThreshold, "Congestion threshold should be 30")
+		assert.Equal(t, "automatic", dsOff.StorageIoConfiguration.CongestionThresholdMode, "Congestion threshold mode should be automatic")
+		assert.Equal(t, 90, dsOff.StorageIoConfiguration.PercentOfPeakThroughput, "Percent of peak throughput should be 90")
+	})
+
+	t.Run("missing SIOC columns default gracefully", func(t *testing.T) {
+		parser, _, cleanup := setupTestParser(t, &testValidator{})
+		defer cleanup()
+
+		// vDatastore headers WITHOUT any SIOC columns
+		noSiocHeaders := []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type"}
+		datastoreRows := []map[string]string{
+			{
+				"Hosts":        "esxi-host-1",
+				"Address":      "10.0.0.1",
+				"Name":         "ds-no-sioc",
+				"Object ID":    "datastore-010",
+				"Free MiB":     "524288",
+				"MHA":          "false",
+				"Capacity MiB": "1048576",
+				"Type":         "VMFS",
+			},
+		}
+
+		sheets := []ExcelSheet{
+			NewExcelSheet("vInfo", vInfoHeaders, vms),
+			NewExcelSheet("vHost", vHostHeaders, hosts),
+			NewExcelSheet("vDatastore", noSiocHeaders, datastoreRows),
+			NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+		}
+		tmpFile := createTestExcel(t, sheets...)
+
+		ctx := context.Background()
+		_, err := parser.IngestRvTools(ctx, tmpFile)
+		require.NoError(t, err)
+
+		inv, err := parser.BuildInventory(ctx, nil)
+		require.NoError(t, err)
+
+		require.Len(t, inv.VCenter.Infra.Datastores, 1, "should have 1 datastore")
+		ds := inv.VCenter.Infra.Datastores[0]
+
+		require.NotNil(t, ds.StorageIoConfiguration, "StorageIoConfiguration should be populated even without SIOC columns")
+		assert.False(t, ds.StorageIoConfiguration.Enabled, "SIOC should default to disabled")
+		assert.Equal(t, 30, ds.StorageIoConfiguration.CongestionThreshold, "Congestion threshold should default to 30")
+		assert.Equal(t, "automatic", ds.StorageIoConfiguration.CongestionThresholdMode, "Congestion threshold mode should default to automatic")
+		assert.Equal(t, 90, ds.StorageIoConfiguration.PercentOfPeakThroughput, "Percent of peak throughput should default to 90")
+	})
+}
+
+// TestSIOCCongestionThresholdModeNormalization specifically tests that the SQL CASE statement
+// in ingest_rvtools.go.tmpl line 247 correctly normalizes SIOC congestion threshold mode values.
+func TestSIOCCongestionThresholdModeNormalization(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "test-vm", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "4", "# CPU": "1", "Object ID": "host-001", "# Memory": "8192", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	clustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1"}}
+
+	testCases := []struct {
+		name           string
+		inputMode      string
+		expectedOutput string
+	}{
+		{"Manual capitalized", "Manual", "manual"},
+		{"MANUAL uppercase", "MANUAL", "manual"},
+		{"automatic already correct", "automatic", "automatic"},
+		{"Automatic capitalized", "Automatic", "automatic"},
+		{"empty string", "", "automatic"},
+		{"invalid value", "invalid_value", "automatic"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Cleanup(func() {
+				ctx := context.Background()
+				_, err := parser.db.ExecContext(ctx, `DELETE FROM vdatastore`)
+				require.NoError(t, err, "Failed to clean up for test case: %s", tc.name)
+			})
+
+			// Create a datastore with the test mode value
+			ds := buildSiocDatastore("test-datastore", "datastore-001", "true", "30", tc.inputMode, "90")
+			ds["Free MiB"] = "1024"
+			ds["Capacity MiB"] = "2048"
+			datastoreRows := []map[string]string{ds}
+
+			sheets := []ExcelSheet{
+				NewExcelSheet("vInfo", vInfoHeaders, vms),
+				NewExcelSheet("vHost", vHostHeaders, hosts),
+				NewExcelSheet("vDatastore", vDatastoreHeaders, datastoreRows),
+				NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+			}
+			tmpFile := createTestExcel(t, sheets...)
+
+			ctx := context.Background()
+			_, err := parser.IngestRvTools(ctx, tmpFile)
+			require.NoError(t, err, "Failed to ingest RVTools data for test case: %s", tc.name)
+
+			// Query the normalized value directly from the database
+			var normalizedMode string
+			err = parser.db.QueryRowContext(ctx, `SELECT "SIOC Congestion Threshold Mode" FROM vdatastore WHERE "Name" = 'test-datastore'`).Scan(&normalizedMode)
+			require.NoError(t, err, "Failed to query normalized mode for test case: %s", tc.name)
+
+			// Verify the normalization worked correctly
+			assert.Equal(t, tc.expectedOutput, normalizedMode, "Test case '%s': input '%s'", tc.name, tc.inputMode)
+		})
+	}
+
+	// Test case 7: null/missing column
+	t.Run("null/missing column", func(t *testing.T) {
+		// Create Excel without the SIOC Congestion Threshold Mode column
+		datastoreHeadersWithoutMode := []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Percent Of Peak Throughput"}
+		datastoreRows := []map[string]string{
+			{
+				"Hosts":                           "esxi-host-1",
+				"Address":                         "10.0.0.1",
+				"Name":                            "test-datastore-null",
+				"Object ID":                       "datastore-null",
+				"Free MiB":                        "1024",
+				"MHA":                             "false",
+				"Capacity MiB":                    "2048",
+				"Type":                            "VMFS",
+				"SIOC Enabled":                    "true",
+				"SIOC Congestion Threshold":       "30",
+				"SIOC Percent Of Peak Throughput": "90",
+			},
+		}
+
+		sheets := []ExcelSheet{
+			NewExcelSheet("vInfo", vInfoHeaders, vms),
+			NewExcelSheet("vHost", vHostHeaders, hosts),
+			NewExcelSheet("vDatastore", datastoreHeadersWithoutMode, datastoreRows),
+			NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+		}
+		tmpFile := createTestExcel(t, sheets...)
+
+		ctx := context.Background()
+		_, err := parser.IngestRvTools(ctx, tmpFile)
+		require.NoError(t, err, "Failed to ingest RVTools data for null/missing column test")
+
+		var normalizedMode string
+		err = parser.db.QueryRowContext(ctx, `SELECT "SIOC Congestion Threshold Mode" FROM vdatastore WHERE "Name" = 'test-datastore-null'`).Scan(&normalizedMode)
+		require.NoError(t, err, "Failed to query normalized mode for null/missing column test")
+
+		assert.Equal(t, "automatic", normalizedMode, "Missing/null column should default to 'automatic'")
+	})
 }
 
 func TestVCenterVersion(t *testing.T) {

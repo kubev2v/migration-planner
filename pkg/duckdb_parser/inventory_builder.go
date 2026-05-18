@@ -374,6 +374,12 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 				Model:           d.Model,
 				ProtocolType:    d.ProtocolType,
 				Vendor:          d.Vendor,
+				StorageIoConfiguration: &inventory.StorageIoConfiguration{
+					Enabled:                 d.SiocEnabled,
+					CongestionThreshold:     d.SiocThreshold,
+					CongestionThresholdMode: d.SiocMode,
+					PercentOfPeakThroughput: d.SiocPercent,
+				},
 			})
 		}
 		infraData.Datastores = datastores
