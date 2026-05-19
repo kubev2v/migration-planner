@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	insertAccountsGroupStm  = "INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertAccountsMemberStm = "INSERT INTO members (id, username, email, group_id) VALUES ('%s', '%s', '%s', '%s');"
+	insertAccountsGroupStm           = "INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', %s);"
+	insertAccountsMemberStm          = "INSERT INTO members (id, username, email, group_id) VALUES ('%s', '%s', '%s', '%s');"
+	insertAccountsPartnerCustomerStm = "INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
 )
 
 var _ = Describe("accounts service", Ordered, func() {
@@ -331,7 +332,73 @@ var _ = Describe("accounts service", Ordered, func() {
 				Expect(err.Error()).To(ContainSubstring("already belongs to another group"))
 			})
 
+			It("returns ErrActiveRequestExists when user has an accepted partner customer request", func() {
+				partnerGroupID := uuid.New()
+				targetGroupID := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, targetGroupID, "Admin Org", "desc", "admin", "icon", "Red Hat", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(insertAccountsPartnerCustomerStm, uuid.New(), "customeruser", partnerGroupID, "accepted", "Cust", "Contact", "555", "c@e.com", "Loc")
+				Expect(tx.Error).To(BeNil())
+
+				member := model.Member{
+					Username: "customeruser",
+					Email:    "c@e.com",
+					GroupID:  targetGroupID,
+				}
+				_, err := svc.CreateMember(context.TODO(), member)
+				Expect(err).ToNot(BeNil())
+				var activeReq *service.ErrActiveRequestExists
+				Expect(err).To(BeAssignableToTypeOf(activeReq))
+			})
+
+			It("returns ErrActiveRequestExists when user has a pending partner customer request", func() {
+				partnerGroupID := uuid.New()
+				targetGroupID := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, targetGroupID, "Admin Org", "desc", "admin", "icon", "Red Hat", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(insertAccountsPartnerCustomerStm, uuid.New(), "pendinguser", partnerGroupID, "pending", "Cust", "Contact", "555", "p@e.com", "Loc")
+				Expect(tx.Error).To(BeNil())
+
+				member := model.Member{
+					Username: "pendinguser",
+					Email:    "p@e.com",
+					GroupID:  targetGroupID,
+				}
+				_, err := svc.CreateMember(context.TODO(), member)
+				Expect(err).ToNot(BeNil())
+				var activeReq *service.ErrActiveRequestExists
+				Expect(err).To(BeAssignableToTypeOf(activeReq))
+			})
+
+			It("allows creating a member when user has only rejected/cancelled requests", func() {
+				partnerGroupID := uuid.New()
+				targetGroupID := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, targetGroupID, "Admin Org", "desc", "admin", "icon", "Red Hat", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(insertAccountsPartnerCustomerStm, uuid.New(), "rejecteduser", partnerGroupID, "rejected", "Cust", "Contact", "555", "r@e.com", "Loc")
+				Expect(tx.Error).To(BeNil())
+
+				member := model.Member{
+					Username: "rejecteduser",
+					Email:    "r@e.com",
+					GroupID:  targetGroupID,
+				}
+				created, err := svc.CreateMember(context.TODO(), member)
+				Expect(err).To(BeNil())
+				Expect(created.Username).To(Equal("rejecteduser"))
+			})
+
 			AfterEach(func() {
+				gormdb.Exec("DELETE FROM partners_customers;")
 				gormdb.Exec("DELETE FROM members;")
 				gormdb.Exec("DELETE FROM groups;")
 			})

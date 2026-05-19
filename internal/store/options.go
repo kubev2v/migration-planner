@@ -116,6 +116,13 @@ func (f *PartnerQueryFilter) ByStatus(status model.RequestStatus) *PartnerQueryF
 	return f
 }
 
+func (f *PartnerQueryFilter) ByActiveStatus() *PartnerQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("request_status IN ?", []model.RequestStatus{model.RequestStatusPending, model.RequestStatusAccepted})
+	})
+	return f
+}
+
 type AssessmentQueryFilter struct {
 	QueryFn []func(*gorm.DB) *gorm.DB
 }
