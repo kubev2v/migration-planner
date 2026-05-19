@@ -257,6 +257,29 @@ var _ = Describe("accounts store", Ordered, func() {
 				Expect(updated.UpdatedAt).ToNot(BeNil())
 			})
 
+			It("successfully clears description with empty string", func() {
+				orgID := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertGroupStm, orgID, "Name", "Some desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+
+				org := model.Group{
+					ID:          orgID,
+					Name:        "Name",
+					Description: "",
+					Kind:        "partner",
+					Icon:        "icon",
+					Company:     "Acme",
+				}
+				updated, err := s.Accounts().UpdateGroup(context.TODO(), org)
+				Expect(err).To(BeNil())
+				Expect(updated.Description).To(BeEmpty())
+
+				var persisted model.Group
+				Expect(gormdb.First(&persisted, "id = ?", orgID).Error).To(BeNil())
+				Expect(persisted.Description).To(BeEmpty())
+			})
+
 			It("fails to update non-existent group", func() {
 				org := model.Group{
 					ID:   uuid.New(),

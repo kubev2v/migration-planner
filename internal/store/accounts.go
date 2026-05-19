@@ -88,7 +88,7 @@ func (s *AccountsStore) UpdateGroup(ctx context.Context, group model.Group) (mod
 
 	now := time.Now()
 	group.UpdatedAt = &now
-	if err := s.getDB(ctx).Model(&group).Updates(&group).Error; err != nil {
+	if err := s.getDB(ctx).Model(&group).Select("name", "description", "icon", "company", "updated_at").Updates(&group).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
 			return model.Group{}, ErrDuplicateKey
 		}
