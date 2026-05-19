@@ -353,6 +353,22 @@ var _ = Describe("accounts handler", Ordered, func() {
 				Expect(updated.Company).To(Equal("Acme"))
 			})
 
+			It("clears description and includes it in response", func() {
+				orgID := uuid.New()
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, orgID, "Org", "old desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+
+				empty := ""
+				body := v1alpha1.GroupUpdate{Description: &empty}
+				resp, err := srv.UpdateGroup(context.TODO(), server.UpdateGroupRequestObject{Id: orgID, Body: &body})
+				Expect(err).To(BeNil())
+				Expect(reflect.TypeOf(resp)).To(Equal(reflect.TypeOf(server.UpdateGroup200JSONResponse{})))
+
+				updated := resp.(server.UpdateGroup200JSONResponse)
+				Expect(updated.Description).ToNot(BeNil())
+				Expect(*updated.Description).To(BeEmpty())
+			})
+
 			It("returns 400 for empty company", func() {
 				orgID := uuid.New()
 				tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, orgID, "Org", "desc", "partner", "icon", "Acme", "NULL"))

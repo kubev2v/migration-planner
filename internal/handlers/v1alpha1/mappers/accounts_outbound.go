@@ -17,9 +17,7 @@ func GroupToApi(group model.Group) api.Group {
 		CreatedAt: group.CreatedAt,
 	}
 
-	if group.Description != "" {
-		result.Description = &group.Description
-	}
+	result.Description = &group.Description
 	if group.UpdatedAt != nil {
 		result.UpdatedAt = *group.UpdatedAt
 	}
