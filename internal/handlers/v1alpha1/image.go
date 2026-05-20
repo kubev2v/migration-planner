@@ -13,16 +13,19 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
 
 type ImageHandler struct {
-	store store.Store
-	cfg   *config.Config
+	store  store.Store
+	cfg    *config.Config
+	outbox *eventwrap.OutboxService
 }
 
 // Make sure we conform to servers Service interface
@@ -30,8 +33,9 @@ var _ imageServer.Service = (*ImageHandler)(nil)
 
 func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
 	return &ImageHandler{
-		store: store,
-		cfg:   cfg,
+		store:  store,
+		cfg:    cfg,
+		outbox: eventwrap.NewOutboxService(store),
 	}
 }
 
@@ -116,6 +120,19 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	http.ServeContent(writer, httpReq, req.Name, modTime, reader)
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
+
+	sourceIDStr := source.ID.String()
+	payload := events.NewUserActionPayload(events.UserActionData{
+		Username:  source.Username,
+		SourceID:  &sourceIDStr,
+		Timestamp: time.Now().UTC(),
+	})
+	ceBytes, err := events.BuildCloudEvent(events.DownloadOVAEventType, payload)
+	if err != nil {
+		zap.S().Warnw("failed to build download event", "source_id", source.ID, "error", err)
+	} else if err := h.outbox.Insert(ctx, events.DownloadOVAEventType, ceBytes); err != nil {
+		zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "error", err)
+	}
 
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {

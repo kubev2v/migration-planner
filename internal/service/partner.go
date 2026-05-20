@@ -49,8 +49,11 @@ type PartnerService struct {
 	accountsSvc *AccountsService
 }
 
-func NewPartnerService(store store.Store, accounts *AccountsService) PartnerServicer {
-	return &PartnerService{store: store, accountsSvc: accounts}
+func NewPartnerService(store store.Store, accounts *AccountsService) *PartnerService {
+	return &PartnerService{
+		store:       store,
+		accountsSvc: accounts,
+	}
 }
 
 // ListPartners returns all partner groups.
@@ -184,7 +187,7 @@ func (s *PartnerService) LeavePartner(ctx context.Context, user auth.User, partn
 	}()
 
 	now := time.Now()
-	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	if _, err := s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,
@@ -266,7 +269,7 @@ func (s *PartnerService) RemoveCustomer(ctx context.Context, user auth.User, use
 	}()
 
 	now := time.Now()
-	if _, err = s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
+	if _, err := s.store.PartnerCustomer().Update(ctx, model.PartnerCustomer{
 		ID:            pc.ID,
 		RequestStatus: model.RequestStatusCancelled,
 		TerminatedAt:  &now,

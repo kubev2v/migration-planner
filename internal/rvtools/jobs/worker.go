@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
@@ -194,6 +195,25 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()
+	}
+
+	cePayload := events.NewAssessmentCreatedPayload(events.AssessmentData{
+		ID:         createdAssessment.ID.String(),
+		SnapshotID: createdAssessment.Snapshots[0].ID,
+		Inventory:  createdAssessment.Snapshots[0].Inventory,
+		Name:       createdAssessment.Name,
+		OrgID:      createdAssessment.OrgID,
+		Username:   createdAssessment.Username,
+		SourceType: createdAssessment.SourceType,
+		CreatedAt:  createdAssessment.CreatedAt,
+		UpdatedAt:  createdAssessment.UpdatedAt,
+	})
+	ceBytes, err := events.BuildCloudEvent(events.AssessmentCreatedEventType, cePayload)
+	if err != nil {
+		return fmt.Errorf("failed to build outbox event: %w", err)
+	}
+	if err := w.store.Outbox().Insert(ctx, model.OutboxEvent{EventType: events.AssessmentCreatedEventType, Payload: ceBytes}); err != nil {
+		return fmt.Errorf("failed to write outbox event: %w", err)
 	}
 
 	logger.Success().

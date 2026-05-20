@@ -23,7 +23,7 @@ type Client struct {
 }
 
 // NewClient creates a new River client with the RVTools worker registered.
-func NewClient(ctx context.Context, cfg *config.Config, pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
+func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
 	rvtoolsFiles := store.NewRVToolsFileStore(pool)
 
 	worker := NewRVToolsWorker(s, rvtoolsFiles, opaValidator)

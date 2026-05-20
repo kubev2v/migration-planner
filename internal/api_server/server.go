@@ -26,6 +26,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/middleware"
@@ -190,8 +191,8 @@ func (s *Server) Run(ctx context.Context) error {
 		assessmentSvc service.AssessmentServicer
 		accountsSvc   service.AccountsServicer
 	)
-	partnerSvc = service.NewPartnerService(s.store, innerAccountsSvc)
-	assessmentSvc = service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc)
+	partnerSvc = eventwrap.NewEventPartnerService(service.NewPartnerService(s.store, innerAccountsSvc), s.store)
+	assessmentSvc = eventwrap.NewEventAssessmentService(service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc), s.store)
 	accountsSvc = innerAccountsSvc
 
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
@@ -204,8 +205,8 @@ func (s *Server) Run(ctx context.Context) error {
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
 		service.NewJobService(s.store, s.jobsClient.RiverClient, s.jobsClient.Pool),
-		service.NewSizerService(sizerClient, s.store),
-		service.NewEstimationService(s.store),
+		eventwrap.NewEventSizerService(service.NewSizerService(sizerClient, s.store), s.store),
+		eventwrap.NewEventEstimationService(service.NewEstimationService(s.store), s.store),
 		partnerSvc,
 		accountsSvc,
 	)

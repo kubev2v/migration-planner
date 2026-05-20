@@ -6,8 +6,8 @@ type ServiceHandler struct {
 	sourceSrv     *service.SourceService
 	assessmentSrv service.AssessmentServicer
 	jobSrv        *service.JobService
-	sizerSrv      *service.SizerService
-	estimationSrv *service.EstimationService
+	sizerSrv      service.SizerServicer
+	estimationSrv service.EstimationServicer
 	partnerSrv    service.PartnerServicer
 	accountsSrv   service.AccountsServicer
 }
@@ -16,8 +16,8 @@ func NewServiceHandler(
 	sourceService *service.SourceService,
 	a service.AssessmentServicer,
 	j *service.JobService,
-	sizer *service.SizerService,
-	estimation *service.EstimationService,
+	sizer service.SizerServicer,
+	estimation service.EstimationServicer,
 	partner service.PartnerServicer,
 	accounts service.AccountsServicer,
 ) *ServiceHandler {

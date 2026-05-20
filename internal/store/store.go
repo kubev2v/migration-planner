@@ -20,6 +20,7 @@ type Store interface {
 	Job() Job
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
+	Outbox() Outbox
 	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
 	RequestMetricsCacheRefresh()
@@ -38,6 +39,7 @@ type DataStore struct {
 	job             Job
 	accounts        Accounts
 	partnerCustomer PartnerCustomer
+	outbox          Outbox
 	metricCache     *MetricsCache
 }
 
@@ -56,6 +58,7 @@ func NewStore(db *gorm.DB) Store {
 		authz:           NewAuthzStore(db),
 		accounts:        NewAccountsStore(db),
 		partnerCustomer: NewPartnerCustomerStore(db),
+		outbox:          NewOutboxStore(db),
 		metricCache:     NewMetricsCache(assessment),
 		db:              db,
 	}
@@ -107,6 +110,10 @@ func (s *DataStore) Accounts() Accounts {
 
 func (s *DataStore) PartnerCustomer() PartnerCustomer {
 	return s.partnerCustomer
+}
+
+func (s *DataStore) Outbox() Outbox {
+	return s.outbox
 }
 
 func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {

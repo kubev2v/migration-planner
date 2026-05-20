@@ -46,6 +46,28 @@ parameters:
     description: The name of the OpenShift Secret used for the database.
     displayName: Database Secret Name
     value: migration-planner-db
+  # Kafka Config values
+  - name: KAFKA_ENABLED
+    description: Enable Kafka event publishing
+    value: "false"
+  - name: KAFKA_USE_TLS
+    description: Enable TLS for Kafka connections
+    value: "true"
+  - name: KAFKA_BROKERS_SECRET_NAME
+    description: Kubernetes secret containing MSK bootstrap brokers
+    value: "assisted-migration-msk"
+  - name: KAFKA_BROKERS_SECRET_KEY
+    description: Key in the MSK secret for SASL/SCRAM broker addresses
+    value: "bootstrap_brokers_sasl_scram"
+  - name: KAFKA_CREDENTIALS_SECRET_NAME
+    description: Kubernetes secret containing Kafka SASL credentials
+    value: "assisted-migration-msk-credentials"
+  - name: KAFKA_USERNAME_SECRET_KEY
+    description: Key in the credentials secret for the username
+    value: "username"
+  - name: KAFKA_PASSWORD_SECRET_KEY
+    description: Key in the credentials secret for the password
+    value: "password"
   - name: PERSISTENT_DISK_DEVICE
     value: /dev/sda
   - name: INSECURE_REGISTRY
@@ -677,6 +699,29 @@ objects:
                     secretKeyRef:
                       name: ${DB_SECRET_NAME}
                       key: db.user
+                # Kafka Config values
+                - name: KAFKA_ENABLED
+                  value: "${KAFKA_ENABLED}"
+                - name: KAFKA_USE_TLS
+                  value: "${KAFKA_USE_TLS}"
+                - name: KAFKA_BROKERS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_BROKERS_SECRET_NAME}
+                      key: ${KAFKA_BROKERS_SECRET_KEY}
+                      optional: true
+                - name: KAFKA_SASL_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_CREDENTIALS_SECRET_NAME}
+                      key: ${KAFKA_USERNAME_SECRET_KEY}
+                      optional: true
+                - name: KAFKA_SASL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_CREDENTIALS_SECRET_NAME}
+                      key: ${KAFKA_PASSWORD_SECRET_KEY}
+                      optional: true
               volumeMounts:
                 - name: migration-planner-dir
                   mountPath: "/.migration-planner"

@@ -89,6 +89,10 @@ func (m *MockStore) Accounts() store.Accounts {
 	return nil
 }
 
+func (m *MockStore) Outbox() store.Outbox {
+	return nil
+}
+
 func (m *MockStore) Close() error {
 	return nil
 }

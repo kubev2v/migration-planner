@@ -35,6 +35,16 @@ type MigrationAssessmentResult struct {
 	Breakdown        map[string]estimation.Estimation
 }
 
+type EstimationServicer interface {
+	CalculateMigrationEstimation(ctx context.Context, assessmentID uuid.UUID, clusterID string, schemas []engines.Schema, userParams []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error)
+	CalculateMigrationComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*MigrationComplexityResult, error)
+	CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*OsDiskComplexityResult, error)
+	ValidateParams(userParams []estimation.Param) error
+	BuildBaseParams(userParams []estimation.Param) []estimation.Param
+	BuildBucketParams(baseParams []estimation.Param, vmCount int, diskGB float64) []estimation.Param
+	RunEstimation(schemas []engines.Schema, params []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error)
+}
+
 // EstimationService orchestrates the migration time estimation workflow.
 // It retrieves assessment and inventory data from the store and runs them
 // through the estimation Engine to produce a MigrationAssessmentResult.
