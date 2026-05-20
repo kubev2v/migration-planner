@@ -9,6 +9,7 @@ var singleConfig *Config = nil
 type Config struct {
 	Database *dbConfig
 	Service  *svcConfig
+	Kafka    *Kafka
 }
 
 type dbConfig struct {
@@ -46,6 +47,14 @@ type Auth struct {
 type Sizer struct {
 	ServiceURL string `envconfig:"SIZER_SERVICE_URL" default:"http://migration-planner-sizer:9200"`
 	Timeout    string `envconfig:"SIZER_SERVICE_TIMEOUT" default:"60s"`
+}
+
+type Kafka struct {
+	Enabled      bool   `envconfig:"KAFKA_ENABLED" default:"false"`
+	Brokers      string `envconfig:"KAFKA_BROKERS" default:"127.0.0.1:9092"`
+	SASLUsername string `envconfig:"KAFKA_SASL_USERNAME" default:""`
+	SASLPassword string `envconfig:"KAFKA_SASL_PASSWORD" default:""`
+	UseTLS       bool   `envconfig:"KAFKA_USE_TLS" default:"false"`
 }
 
 func New() (*Config, error) {

@@ -123,6 +123,10 @@ func (m *MockStore) Accounts() store.Accounts {
 	panic("Accounts() not implemented in MockStore for this test")
 }
 
+func (m *MockStore) Outbox() store.Outbox {
+	panic("Outbox() not implemented in MockStore for this test")
+}
+
 func (m *MockStore) Close() error {
 	return nil
 }

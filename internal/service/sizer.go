@@ -75,6 +75,13 @@ const (
 	defaultWorkerNodeThreads       = 0
 )
 
+type SizerServicer interface {
+	CalculateClusterRequirements(ctx context.Context, assessmentID uuid.UUID, req *mappers.ClusterRequirementsRequestForm) (*mappers.ClusterRequirementsResponseForm, error)
+	CalculateStandaloneClusterRequirements(ctx context.Context, req *mappers.StandaloneClusterRequirementsRequestForm) (*mappers.StandaloneClusterRequirementsResponseForm, error)
+	GetClusterRequirementsInput(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*mappers.ClusterRequirementsInputForm, error)
+	Health(ctx context.Context) error
+}
+
 // SizerService handles cluster sizing calculations
 type SizerService struct {
 	sizerClient *client.SizerClient

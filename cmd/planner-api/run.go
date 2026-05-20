@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 
 	"github.com/kubev2v/migration-planner/internal/api_server/agentserver"
 	"github.com/kubev2v/migration-planner/internal/api_server/imageserver"
@@ -19,7 +24,9 @@ import (
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
@@ -90,6 +97,23 @@ var runCmd = &cobra.Command{
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGQUIT)
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
+		// Create Kafka producer and event writer
+		writer, producerCleanup, err := createEventWriter(ctx, cfg)
+		if err != nil {
+			zap.S().Warnw("failed to create kafka producer", "error", err)
+		}
+		defer producerCleanup()
+		zap.S().Info("Kafka writer initialized")
+
+		// Start outbox dispatcher
+		dispatcher := eventwrap.NewOutboxDispatcher(store, writer, 5*time.Second)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			dispatcher.Run(ctx)
+		}()
+		zap.S().Info("Outbox dispatcher started")
+
 		// Create pgx pool for River and RVTools file storage
 		zap.S().Info("Initializing River jobs client...")
 		pool, err := jobs.CreatePgxPool(ctx, cfg)
@@ -97,7 +121,7 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("creating pgx pool", "error", err)
 		}
 
-		jobsClient, err := jobs.NewClient(ctx, cfg, pool, store, opaValidator)
+		jobsClient, err := jobs.NewClient(pool, store, opaValidator)
 		if err != nil {
 			zap.S().Fatalw("initializing River jobs client", "error", err)
 		}
@@ -147,6 +171,46 @@ func newListener(address string) (net.Listener, error) {
 		address = "localhost:0"
 	}
 	return net.Listen("tcp", address)
+}
+
+func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, func(), error) {
+	noop := func() {}
+
+	if !cfg.Kafka.Enabled {
+		return events.NewNoOpWriter(), noop, nil
+	}
+
+	brokers := strings.Split(cfg.Kafka.Brokers, ",")
+	var kafkaOpts []kgo.Opt
+
+	if cfg.Kafka.UseTLS {
+		kafkaOpts = append(kafkaOpts, kgo.DialTLSConfig(new(tls.Config)))
+	}
+
+	if cfg.Kafka.SASLUsername != "" {
+		mechanism := scram.Auth{
+			User: cfg.Kafka.SASLUsername,
+			Pass: cfg.Kafka.SASLPassword,
+		}
+		kafkaOpts = append(kafkaOpts, kgo.SASL(mechanism.AsSha512Mechanism()))
+	}
+
+	producer, err := events.NewKafkaProducer(brokers, kafkaOpts...)
+	if err != nil {
+		return events.NewNoOpWriter(), noop, err
+	}
+
+	pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer pingCancel()
+
+	if err := producer.Ping(pingCtx); err != nil {
+		producer.Close()
+		return events.NewNoOpWriter(), noop, fmt.Errorf("kafka broker unreachable: %w", err)
+	}
+
+	zap.S().Infow("kafka producer connected", "brokers", cfg.Kafka.Brokers)
+
+	return producer, producer.Close, nil
 }
 
 func ensureIsoExist(path string) error {

@@ -14,21 +14,25 @@ import (
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 )
 
 const (
-	insertSourceStm     = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
-	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertSnapshotStm   = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
+	insertSourceStm      = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
+	insertAssessmentStm  = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
+	insertSnapshotStm    = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
+	countOutboxByTypeStm = "SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;"
+	countOutboxEventsStm = "SELECT COUNT(*) FROM outbox_events;"
 )
 
 var _ = Describe("assessment service", Ordered, func() {
 	var (
 		s      store.Store
 		gormdb *gorm.DB
-		svc    *service.AssessmentService
+		svc    service.AssessmentServicer
 	)
 
 	BeforeAll(func() {
@@ -39,7 +43,8 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAssessmentService(s, nil, service.NewAccountsService(s))
+		inner := service.NewAssessmentService(s, nil, service.NewAccountsService(s))
+		svc = eventwrap.NewEventAssessmentService(inner, s)
 	})
 
 	AfterAll(func() {
@@ -69,6 +74,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			for _, assessment := range assessments {
 				Expect(assessment.Username).To(Equal("user1"))
 			}
+
+			var count int64
+			gormdb.Raw(countOutboxByTypeStm, events.VisitorEventType).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
 		})
 
 		It("filters assessments by source", func() {
@@ -135,6 +144,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -166,6 +176,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -212,6 +223,10 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
 				Expect(assessment.OwnerLastName).ToNot(BeNil())
 				Expect(*assessment.OwnerLastName).To(Equal("Johnson"))
+
+				var count int64
+				gormdb.Raw(countOutboxByTypeStm, events.AssessmentCreatedEventType).Scan(&count)
+				Expect(count).To(Equal(int64(1)))
 			})
 
 			It("successfully creates assessment without owner fields (nil values)", func() {
@@ -276,6 +291,10 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(secondAssessment).To(BeNil())
 				var dupErr *service.ErrDuplicateKey
 				Expect(errors.As(secondErr, &dupErr)).To(BeTrue(), "expected ErrDuplicateKey error type")
+
+				var count int64
+				gormdb.Raw(countOutboxEventsStm).Scan(&count)
+				Expect(count).To(Equal(int64(0)))
 			})
 		})
 
@@ -442,6 +461,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -703,6 +723,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -724,6 +745,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			tx = gormdb.Raw("SELECT COUNT(*) FROM assessments WHERE id = ?", assessmentID).Scan(&count)
 			Expect(tx.Error).To(BeNil())
 			Expect(count).To(Equal(0))
+
+			var outboxCount int64
+			gormdb.Raw(countOutboxByTypeStm, events.AssessmentDeletedEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
 		It("fails when assessment does not exist", func() {
@@ -733,9 +758,14 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring(fmt.Sprintf("assessment %s not found", nonExistentID)))
+
+			var outboxCount int64
+			gormdb.Raw(countOutboxEventsStm).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(0)))
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -764,6 +794,7 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("Transaction rollback tests", func() {
 		BeforeEach(func() {
 			// Clean up any existing data
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -816,6 +847,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				// Verify source still exists (wasn't affected)
 				gormdb.Table("sources").Count(&sourceCount)
 				Expect(sourceCount).To(Equal(int64(1)))
+
+				// Verify no outbox events were created (transaction rolled back)
+				var outboxCount int64
+				gormdb.Raw(countOutboxEventsStm).Scan(&outboxCount)
+				Expect(outboxCount).To(Equal(int64(0)))
 			})
 
 			It("rolls back database when assessment creation fails with missing inventory", func() {
@@ -907,6 +943,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -944,6 +981,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			var count int64
 			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org' AND subject_id = ?", assessmentID.String(), partnerGroupID.String()).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
+
+			var outboxCount int64
+			gormdb.Raw(countOutboxByTypeStm, events.ShareAssessmentEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
 		It("is idempotent — sharing twice does not error", func() {
@@ -985,6 +1026,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
@@ -1029,6 +1071,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			var count int64
 			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org'", assessmentID.String()).Scan(&count)
 			Expect(count).To(Equal(int64(0)))
+
+			var outboxCount int64
+			gormdb.Raw(countOutboxByTypeStm, events.UnshareAssessmentEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
 		It("is idempotent — unsharing when not shared does not error", func() {
@@ -1057,6 +1103,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
