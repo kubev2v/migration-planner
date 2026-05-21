@@ -23,6 +23,7 @@ func ToAPI(inv *inventory.Inventory) *api.Inventory {
 		vcenter := toAPIInventoryData(inv.VCenter)
 		result.Vcenter = &vcenter
 	}
+
 	return result
 }
 
@@ -58,6 +59,19 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 		}
 
 		result.ClusterFeatures = &clusterFeatures
+	}
+
+	if d.ClusterUtilization != nil {
+		util := api.ClusterUtilization{
+			CpuAvg:     d.ClusterUtilization.CpuAvg,
+			CpuP95:     d.ClusterUtilization.CpuP95,
+			CpuMax:     d.ClusterUtilization.CpuMax,
+			MemAvg:     d.ClusterUtilization.MemAvg,
+			MemP95:     d.ClusterUtilization.MemP95,
+			MemMax:     d.ClusterUtilization.MemMax,
+			Confidence: d.ClusterUtilization.Confidence,
+		}
+		result.ClusterUtilization = &util
 	}
 
 	return result

@@ -367,6 +367,30 @@ type ClusterSizing struct {
 	WorkerNodes int `json:"workerNodes"`
 }
 
+// ClusterUtilization defines model for ClusterUtilization.
+type ClusterUtilization struct {
+	// Confidence Data coverage confidence percentage (0-100), calculated as vCPU-weighted coverage
+	Confidence float64 `json:"confidence"`
+
+	// CpuAvg Average CPU utilization percentage (0-100)
+	CpuAvg float64 `json:"cpu_avg"`
+
+	// CpuMax Maximum CPU utilization percentage (0-100)
+	CpuMax float64 `json:"cpu_max"`
+
+	// CpuP95 95th percentile CPU utilization percentage (0-100)
+	CpuP95 float64 `json:"cpu_p95"`
+
+	// MemAvg Average memory utilization percentage (0-100)
+	MemAvg float64 `json:"mem_avg"`
+
+	// MemMax Maximum memory utilization percentage (0-100)
+	MemMax float64 `json:"mem_max"`
+
+	// MemP95 95th percentile memory utilization percentage (0-100)
+	MemP95 float64 `json:"mem_p95"`
+}
+
 // ComplexityDiskScoreEntry One entry in the disk complexity breakdown
 type ComplexityDiskScoreEntry struct {
 	// Score Complexity score from 1 to 4, where 1 is the least complex disk footprint and 4 is the most complex. Score 1: <=10 TB provisioned; score 2: <=20 TB; score 3: <=50 TB; score 4: >50 TB.
@@ -584,10 +608,11 @@ type Inventory struct {
 
 // InventoryData defines model for InventoryData.
 type InventoryData struct {
-	ClusterFeatures *ClusterFeatures `json:"clusterFeatures,omitempty"`
-	Infra           Infra            `json:"infra"`
-	Vcenter         *VCenter         `json:"vcenter,omitempty"`
-	Vms             VMs              `json:"vms"`
+	ClusterFeatures    *ClusterFeatures    `json:"clusterFeatures,omitempty"`
+	ClusterUtilization *ClusterUtilization `json:"clusterUtilization,omitempty"`
+	Infra              Infra               `json:"infra"`
+	Vcenter            *VCenter            `json:"vcenter,omitempty"`
+	Vms                VMs                 `json:"vms"`
 }
 
 // InventoryTotals Inventory totals for the cluster

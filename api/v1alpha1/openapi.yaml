@@ -2322,6 +2322,60 @@ components:
           $ref: "#/components/schemas/InventoryData"
           description: vCenter-level inventory data
 
+    ClusterUtilization:
+      type: object
+      required:
+        - cpu_avg
+        - cpu_p95
+        - cpu_max
+        - mem_avg
+        - mem_p95
+        - mem_max
+        - confidence
+      properties:
+        cpu_avg:
+          type: number
+          format: double
+          description: Average CPU utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        cpu_p95:
+          type: number
+          format: double
+          description: 95th percentile CPU utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        cpu_max:
+          type: number
+          format: double
+          description: Maximum CPU utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        mem_avg:
+          type: number
+          format: double
+          description: Average memory utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        mem_p95:
+          type: number
+          format: double
+          description: 95th percentile memory utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        mem_max:
+          type: number
+          format: double
+          description: Maximum memory utilization percentage (0-100)
+          minimum: 0
+          maximum: 100
+        confidence:
+          type: number
+          format: double
+          description: Data coverage confidence percentage (0-100), calculated as vCPU-weighted coverage
+          minimum: 0
+          maximum: 100
+
     InventoryData:
       type: object
       required:
@@ -2334,6 +2388,8 @@ components:
           $ref: "#/components/schemas/VCenter"
         clusterFeatures:
           $ref: "#/components/schemas/ClusterFeatures"
+        clusterUtilization:
+          $ref: "#/components/schemas/ClusterUtilization"
         vms:
           $ref: "#/components/schemas/VMs"
         infra:
