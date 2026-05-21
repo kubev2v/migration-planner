@@ -11,9 +11,23 @@ type Inventory struct {
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).
 type InventoryData struct {
-	VMs             VMsData
-	Infra           InfraData
-	ClusterFeatures *ClusterFeatures
+	VMs                VMsData
+	Infra              InfraData
+	ClusterFeatures    *ClusterFeatures
+	ClusterUtilization *ClusterUtilization
+}
+
+// ClusterUtilization contains rightsizing utilization metrics for a cluster.
+// Nested in InventoryData; ClusterID/ClusterName omitted as redundant (cluster ID is the map key).
+// Contains only utilization percentages (0-100) needed for rightsizing-based sizing calculations.
+type ClusterUtilization struct {
+	CpuAvg     float64
+	CpuP95     float64
+	CpuMax     float64
+	MemAvg     float64
+	MemP95     float64
+	MemMax     float64
+	Confidence float64
 }
 
 // ClusterFeatures contains cluster-level feature information.

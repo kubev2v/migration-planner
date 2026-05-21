@@ -808,3 +808,90 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 		assert.Equal(t, expected.TotalSizeTB, actual.TotalSizeTB)
 	}
 }
+
+func TestToAPI_ClusterUtilization(t *testing.T) {
+	t.Run("with cluster utilization data", func(t *testing.T) {
+		domainInv := &inventory.Inventory{
+			VCenterID: "test-vcenter",
+			Clusters: map[string]inventory.InventoryData{
+				"cluster-1": {
+					VMs:   inventory.VMsData{Total: 10},
+					Infra: inventory.InfraData{TotalHosts: 3},
+					ClusterUtilization: &inventory.ClusterUtilization{
+						CpuAvg:     35.5,
+						CpuP95:     45.2,
+						CpuMax:     78.3,
+						MemAvg:     52.1,
+						MemP95:     62.3,
+						MemMax:     85.7,
+						Confidence: 87.5,
+					},
+				},
+			},
+		}
+
+		apiInv := ToAPI(domainInv)
+
+		require.Contains(t, apiInv.Clusters, "cluster-1")
+		clusterData := apiInv.Clusters["cluster-1"]
+		require.NotNil(t, clusterData.ClusterUtilization)
+
+		util := clusterData.ClusterUtilization
+		assert.Equal(t, 35.5, util.CpuAvg)
+		assert.Equal(t, 45.2, util.CpuP95)
+		assert.Equal(t, 78.3, util.CpuMax)
+		assert.Equal(t, 52.1, util.MemAvg)
+		assert.Equal(t, 62.3, util.MemP95)
+		assert.Equal(t, 85.7, util.MemMax)
+		assert.Equal(t, 87.5, util.Confidence)
+	})
+
+	t.Run("without cluster utilization data", func(t *testing.T) {
+		domainInv := &inventory.Inventory{
+			VCenterID: "test-vcenter",
+			Clusters: map[string]inventory.InventoryData{
+				"cluster-1": {
+					VMs:   inventory.VMsData{Total: 10},
+					Infra: inventory.InfraData{TotalHosts: 3},
+				},
+			},
+		}
+
+		apiInv := ToAPI(domainInv)
+
+		require.Contains(t, apiInv.Clusters, "cluster-1")
+		assert.Nil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)
+	})
+
+	t.Run("with multiple clusters", func(t *testing.T) {
+		domainInv := &inventory.Inventory{
+			VCenterID: "test-vcenter",
+			Clusters: map[string]inventory.InventoryData{
+				"cluster-1": {
+					VMs: inventory.VMsData{Total: 10},
+					ClusterUtilization: &inventory.ClusterUtilization{
+						CpuP95:     45.2,
+						MemP95:     62.3,
+						Confidence: 87.5,
+					},
+				},
+				"cluster-2": {
+					VMs: inventory.VMsData{Total: 20},
+					ClusterUtilization: &inventory.ClusterUtilization{
+						CpuP95:     38.7,
+						MemP95:     55.1,
+						Confidence: 92.0,
+					},
+				},
+			},
+		}
+
+		apiInv := ToAPI(domainInv)
+
+		assert.Len(t, apiInv.Clusters, 2)
+		assert.NotNil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)
+		assert.NotNil(t, apiInv.Clusters["cluster-2"].ClusterUtilization)
+		assert.Equal(t, 45.2, apiInv.Clusters["cluster-1"].ClusterUtilization.CpuP95)
+		assert.Equal(t, 38.7, apiInv.Clusters["cluster-2"].ClusterUtilization.CpuP95)
+	})
+}
