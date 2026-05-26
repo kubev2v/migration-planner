@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 )
 
@@ -145,6 +146,34 @@ func (l *Labels) Scan(value interface{}) error {
 
 func (l Labels) Value() (driver.Value, error) {
 	return l, nil
+}
+
+// GuestApps is a slice of GuestApp that implements sql.Scanner for JSON string parsing.
+type GuestApps []GuestApp
+
+func (g *GuestApps) Scan(value interface{}) error {
+	if value == nil {
+		*g = nil
+		return nil
+	}
+	s, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("GuestApps.Scan: expected string, got %T", value)
+	}
+	if s == "" || s == "[]" {
+		*g = nil
+		return nil
+	}
+	var result []GuestApp
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		return fmt.Errorf("GuestApps.Scan: failed to unmarshal JSON: %w", err)
+	}
+	*g = result
+	return nil
+}
+
+func (g GuestApps) Value() (driver.Value, error) {
+	return g, nil
 }
 
 // Concerns is a slice of Concern that implements sql.Scanner for DuckDB LIST type.
