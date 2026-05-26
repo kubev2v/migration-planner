@@ -67,7 +67,8 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			ChangeTrackingEnabled INTEGER, DiskEnableUuid INTEGER,
 			Disks VARCHAR, NICs VARCHAR,
 			CpuHotAddEnabled INTEGER, CpuHotRemoveEnabled INTEGER, CoresPerSocket INTEGER,
-			MemoryHotAddEnabled INTEGER, BalloonedMemory INTEGER
+			MemoryHotAddEnabled INTEGER, BalloonedMemory INTEGER,
+			GuestApps VARCHAR DEFAULT '[]'
 		)`,
 
 		// Network (referenced by ingest template; empty is fine for these tests)
@@ -132,7 +133,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 					'%s', 'bios', 'poweredOn', 'connected',
 					0, 4, 8192, 'rhel', 'rhel', '', '',
 					10737418240, 0, 0, 0, '[]', '[]',
-					0, 0, 2, 0, 0
+					0, 0, 2, 0, 0, '[]'
 				)`,
 				escapeSQLString(vm.id),
 				escapeSQLString(vm.name),

@@ -26,7 +26,7 @@ INSERT INTO vinfo (
     "Template", "CBT", "EnableUUID",
     "Datacenter", "Cluster", "HW version",
     "Total disk capacity MiB", "Provisioned MiB", "Resource pool", "VI SDK UUID",
-    "migration_excluded", "labels"
+    "migration_excluded", "labels", "guest_apps"
 )
 SELECT
     v.ID,
@@ -58,7 +58,8 @@ SELECT
     '',
     about.InstanceUuid,
     false,
-    '[]'
+    '[]',
+    COALESCE(v.GuestApps, '[]')
 FROM src.VM v
 LEFT JOIN src.Host h ON v.Host = h.ID
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID

@@ -7,45 +7,52 @@ type Ref struct {
 
 // VM represents a virtual machine from VMware inventory.
 type VM struct {
-	ID                       string   `json:"id" db:"VM ID"`
-	Name                     string   `json:"name" db:"VM"`
-	Folder                   string   `json:"folder" db:"Folder ID"`
-	Host                     string   `json:"host" db:"Host"`
-	UUID                     string   `json:"uuid" db:"SMBIOS UUID"`
-	Firmware                 string   `json:"firmware" db:"Firmware"`
-	PowerState               string   `json:"powerState" db:"Powerstate"`
-	ConnectionState          string   `json:"connectionState" db:"Connection state"`
-	CpuHotAddEnabled         bool     `json:"cpuHotAddEnabled" db:"Hot Add"`       // vcpu
-	CpuHotRemoveEnabled      bool     `json:"cpuHotRemoveEnabled" db:"Hot Remove"` // vcpu
-	MemoryHotAddEnabled      bool     `json:"memoryHotAddEnabled" db:"Hot Add"`    // vmemory
-	FaultToleranceEnabled    bool     `json:"faultToleranceEnabled" db:"FT State"` // vinfo
-	CpuCount                 int32    `json:"cpuCount" db:"CPUs"`                  // vinfo
-	CpuSockets               int32    `json:"cpuSockets" db:"Sockets"`             // vcpu
-	CoresPerSocket           int32    `json:"coresPerSocket" db:"Cores p/s"`       // vcpu
-	MemoryMB                 int32    `json:"memoryMB" db:"Memory"`                // vinfo
-	GuestName                string   `json:"guestName" db:"OS according to the configuration file"`
-	GuestNameFromVmwareTools string   `json:"guestNameFromVmwareTools" db:"OS according to the VMware Tools"`
-	HostName                 string   `json:"hostName" db:"DNS Name"`
-	BalloonedMemory          int32    `json:"balloonedMemory" db:"Ballooned"` // vmemory
-	IpAddress                string   `json:"ipAddress" db:"Primary IP Address"`
-	StorageUsed              int64    `json:"storageUsed" db:"In Use MiB"` // SQL returns bytes
-	IsTemplate               bool     `json:"isTemplate" db:"Template"`
-	ChangeTrackingEnabled    bool     `json:"changeTrackingEnabled" db:"CBT"`
-	NICs                     NICs     `json:"nics"`
-	Disks                    Disks    `json:"disks"`
-	Networks                 Networks `json:"networks" db:"network_object_id"`
-	DiskEnableUuid           bool     `json:"diskEnableUuid" db:"EnableUUID"`
-	Datacenter               string   `json:"datacenter" db:"Datacenter"`
-	Cluster                  string   `json:"cluster" db:"Cluster"`
-	HWVersion                string   `json:"hwVersion" db:"HW version"`
-	TotalDiskCapacityMiB     int32    `json:"totalDiskCapacityMiB" db:"Total disk capacity MiB"`
-	ProvisionedMiB           int32    `json:"provisionedMiB" db:"Provisioned MiB"`
-	ResourcePool             string   `json:"resourcePool" db:"Resource pool"`
-	OsDiskComplexity         int32    `json:"osDiskComplexity" db:"OsDiskComplexity"`
-	Concerns                 Concerns `json:"concerns"`
-	NumaNodeAffinity         []string `json:"numaNodeAffinity"` // Always empty for RVTools, included for OPA compatibility
-	MigrationExcluded        bool     `json:"migrationExcluded" db:"migration_excluded"`
-	Labels                   Labels   `json:"labels" db:"labels"`
+	ID                       string    `json:"id" db:"VM ID"`
+	Name                     string    `json:"name" db:"VM"`
+	Folder                   string    `json:"folder" db:"Folder ID"`
+	Host                     string    `json:"host" db:"Host"`
+	UUID                     string    `json:"uuid" db:"SMBIOS UUID"`
+	Firmware                 string    `json:"firmware" db:"Firmware"`
+	PowerState               string    `json:"powerState" db:"Powerstate"`
+	ConnectionState          string    `json:"connectionState" db:"Connection state"`
+	CpuHotAddEnabled         bool      `json:"cpuHotAddEnabled" db:"Hot Add"`       // vcpu
+	CpuHotRemoveEnabled      bool      `json:"cpuHotRemoveEnabled" db:"Hot Remove"` // vcpu
+	MemoryHotAddEnabled      bool      `json:"memoryHotAddEnabled" db:"Hot Add"`    // vmemory
+	FaultToleranceEnabled    bool      `json:"faultToleranceEnabled" db:"FT State"` // vinfo
+	CpuCount                 int32     `json:"cpuCount" db:"CPUs"`                  // vinfo
+	CpuSockets               int32     `json:"cpuSockets" db:"Sockets"`             // vcpu
+	CoresPerSocket           int32     `json:"coresPerSocket" db:"Cores p/s"`       // vcpu
+	MemoryMB                 int32     `json:"memoryMB" db:"Memory"`                // vinfo
+	GuestName                string    `json:"guestName" db:"OS according to the configuration file"`
+	GuestNameFromVmwareTools string    `json:"guestNameFromVmwareTools" db:"OS according to the VMware Tools"`
+	HostName                 string    `json:"hostName" db:"DNS Name"`
+	BalloonedMemory          int32     `json:"balloonedMemory" db:"Ballooned"` // vmemory
+	IpAddress                string    `json:"ipAddress" db:"Primary IP Address"`
+	StorageUsed              int64     `json:"storageUsed" db:"In Use MiB"` // SQL returns bytes
+	IsTemplate               bool      `json:"isTemplate" db:"Template"`
+	ChangeTrackingEnabled    bool      `json:"changeTrackingEnabled" db:"CBT"`
+	NICs                     NICs      `json:"nics"`
+	Disks                    Disks     `json:"disks"`
+	Networks                 Networks  `json:"networks" db:"network_object_id"`
+	DiskEnableUuid           bool      `json:"diskEnableUuid" db:"EnableUUID"`
+	Datacenter               string    `json:"datacenter" db:"Datacenter"`
+	Cluster                  string    `json:"cluster" db:"Cluster"`
+	HWVersion                string    `json:"hwVersion" db:"HW version"`
+	TotalDiskCapacityMiB     int32     `json:"totalDiskCapacityMiB" db:"Total disk capacity MiB"`
+	ProvisionedMiB           int32     `json:"provisionedMiB" db:"Provisioned MiB"`
+	ResourcePool             string    `json:"resourcePool" db:"Resource pool"`
+	OsDiskComplexity         int32     `json:"osDiskComplexity" db:"OsDiskComplexity"`
+	Concerns                 Concerns  `json:"concerns"`
+	NumaNodeAffinity         []string  `json:"numaNodeAffinity"` // Always empty for RVTools, included for OPA compatibility
+	MigrationExcluded        bool      `json:"migrationExcluded" db:"migration_excluded"`
+	Labels                   Labels    `json:"labels" db:"labels"`
+	GuestApps                GuestApps `json:"guestApps" db:"guest_apps"`
+}
+
+// GuestApp represents a guest application installed on a VM.
+type GuestApp struct {
+	Name    string `json:"name"`
+	Version string `json:"version,omitempty"`
 }
 
 // EffectiveGuestName returns the best available guest OS name.

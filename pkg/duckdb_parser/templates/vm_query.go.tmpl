@@ -108,7 +108,8 @@ SELECT
     ) AS "Networks",
     COALESCE(con.concerns, []) AS "Concerns",
     COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
-    COALESCE(CAST(i."labels" AS VARCHAR[]), []) AS "Labels"
+    COALESCE(CAST(i."labels" AS VARCHAR[]), []) AS "Labels",
+    COALESCE(i."guest_apps", '[]') AS "GuestApps"
 FROM vinfo i
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
