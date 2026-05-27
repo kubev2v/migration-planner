@@ -618,4 +618,79 @@ var _ = Describe("accounts service", Ordered, func() {
 			})
 		})
 	})
+
+	Context("Initialize - Member Reconciliation", func() {
+		It("creates admin group and adds members", func() {
+			ag := service.AdminGroup{
+				Name: "reconciliation-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "admin1", Email: "admin1@example.com"},
+					{Username: "admin2", Email: "admin2@example.com"},
+					{Username: "admin3", Email: "admin3@example.com"},
+				},
+			}
+
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			groups, err := svc.ListGroups(context.TODO(), store.NewGroupQueryFilter().ByName("reconciliation-admins"))
+			Expect(err).To(BeNil())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Kind).To(Equal("admin"))
+			Expect(groups[0].Members).To(HaveLen(3))
+
+			member1, err := svc.GetMember(context.TODO(), "admin1")
+			Expect(err).To(BeNil())
+			Expect(member1.Email).To(Equal("admin1@example.com"))
+			Expect(member1.GroupID).To(Equal(groups[0].ID))
+
+			member2, err := svc.GetMember(context.TODO(), "admin2")
+			Expect(err).To(BeNil())
+			Expect(member2.Email).To(Equal("admin2@example.com"))
+
+			member3, err := svc.GetMember(context.TODO(), "admin3")
+			Expect(err).To(BeNil())
+			Expect(member3.Email).To(Equal("admin3@example.com"))
+		})
+
+		It("reconciles existing members from other groups", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAccountsMemberStm, uuid.New(), "existinguser", "old@acme.com", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ag := service.AdminGroup{
+				Name: "reconcile-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "existinguser", Email: "new@redhat.com"},
+					{Username: "newuser", Email: "newuser@redhat.com"},
+				},
+			}
+
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			member, err := svc.GetMember(context.TODO(), "existinguser")
+			Expect(err).To(BeNil())
+			Expect(member.Email).To(Equal("new@redhat.com"))
+
+			adminGroups, err := svc.ListGroups(context.TODO(), store.NewGroupQueryFilter().ByName("reconcile-admins"))
+			Expect(err).To(BeNil())
+			Expect(adminGroups).To(HaveLen(1))
+			Expect(member.GroupID).To(Equal(adminGroups[0].ID))
+			Expect(member.Group.Kind).To(Equal("admin"))
+			Expect(member.Group.Name).To(Equal("reconcile-admins"))
+
+			newMember, err := svc.GetMember(context.TODO(), "newuser")
+			Expect(err).To(BeNil())
+			Expect(newMember.Email).To(Equal("newuser@redhat.com"))
+			Expect(newMember.GroupID).To(Equal(member.GroupID))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+		})
+	})
 })

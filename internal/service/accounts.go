@@ -190,12 +190,24 @@ func (s *AccountsService) Initialize(ctx context.Context, adminGroup AdminGroup)
 	}
 
 	for _, m := range adminGroup.Members {
+		// Try to get existing member
+		existingMember, err := s.store.Accounts().GetMember(ctx, m.Username)
+		if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
+			return fmt.Errorf("looking up admin member %s: %w", m.Username, err)
+		}
+		if err == nil {
+			// Member exists, delete before recreation
+			if err := s.store.Accounts().DeleteMember(ctx, existingMember.ID); err != nil {
+				return fmt.Errorf("deleting existing admin member %s: %w", m.Username, err)
+			}
+		}
+		// At this point we sure member doesn't exist, create new one
 		if _, err := s.store.Accounts().CreateMember(ctx, model.Member{
 			Username: m.Username,
 			Email:    m.Email,
 			GroupID:  group.ID,
-		}); err != nil {
-			return fmt.Errorf("adding admin member %s: %w", m.Username, err)
+		}); err != nil && !errors.Is(err, store.ErrDuplicateKey) {
+			return fmt.Errorf("creating admin member %s: %w", m.Username, err)
 		}
 	}
 
