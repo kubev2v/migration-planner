@@ -320,42 +320,9 @@ func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, er
 	return assessmentList, nil
 }
 
-func ClusterRequirementsResponseFormToAPI(form mappers.ClusterRequirementsResponseForm) api.ClusterRequirementsResponse {
-	resourceConsumption := api.SizingResourceConsumption{
-		Cpu:    form.ResourceConsumption.CPU,
-		Memory: form.ResourceConsumption.Memory,
-	}
-
-	if form.ResourceConsumption.Limits.CPU != 0.0 || form.ResourceConsumption.Limits.Memory != 0.0 {
-		resourceConsumption.Limits = &api.SizingResourceLimits{
-			Cpu:    form.ResourceConsumption.Limits.CPU,
-			Memory: form.ResourceConsumption.Limits.Memory,
-		}
-	}
-
-	if form.ResourceConsumption.OverCommitRatio.CPU != 0.0 || form.ResourceConsumption.OverCommitRatio.Memory != 0.0 {
-		resourceConsumption.OverCommitRatio = &api.SizingOverCommitRatio{
-			Cpu:    form.ResourceConsumption.OverCommitRatio.CPU,
-			Memory: form.ResourceConsumption.OverCommitRatio.Memory,
-		}
-	}
-
-	return api.ClusterRequirementsResponse{
-		ClusterSizing: api.ClusterSizing{
-			TotalNodes:        form.ClusterSizing.TotalNodes,
-			ControlPlaneNodes: form.ClusterSizing.ControlPlaneNodes,
-			WorkerNodes:       form.ClusterSizing.WorkerNodes,
-			FailoverNodes:     form.ClusterSizing.FailoverNodes,
-			TotalCPU:          form.ClusterSizing.TotalCPU,
-			TotalMemory:       form.ClusterSizing.TotalMemory,
-		},
-		ResourceConsumption: resourceConsumption,
-		InventoryTotals: api.InventoryTotals{
-			TotalVMs:    form.InventoryTotals.TotalVMs,
-			TotalCPU:    form.InventoryTotals.TotalCPU,
-			TotalMemory: form.InventoryTotals.TotalMemory,
-		},
-	}
+func ClusterRequirementsResponseFormToAPI(form api.ClusterRequirementsResponse) api.ClusterRequirementsResponse {
+	// The form is already the API type, just return it directly
+	return form
 }
 
 func ClusterRequirementsInputFormToAPI(form mappers.ClusterRequirementsInputForm) api.ClusterRequirementsStoredInput {

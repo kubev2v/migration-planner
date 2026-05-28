@@ -121,6 +121,14 @@ const (
 	Unsupported NetworkType = "unsupported"
 )
 
+// Defines values for OptimizationStatusReason.
+const (
+	CalculationError  OptimizationStatusReason = "calculation_error"
+	LowConfidence     OptimizationStatusReason = "low_confidence"
+	NoUtilizationData OptimizationStatusReason = "no_utilization_data"
+	Success           OptimizationStatusReason = "success"
+)
+
 // Defines values for PartnerRequestStatus.
 const (
 	PartnerRequestStatusAccepted  PartnerRequestStatus = "accepted"
@@ -297,8 +305,17 @@ type ClusterRequirementsResponse struct {
 	// InventoryTotals Inventory totals for the cluster
 	InventoryTotals InventoryTotals `json:"inventoryTotals"`
 
+	// OptimizationStatus Status of utilization-based optimization attempt
+	OptimizationStatus *OptimizationStatus `json:"optimizationStatus,omitempty"`
+
+	// OptimizedSizing Overall cluster sizing summary
+	OptimizedSizing *ClusterSizing `json:"optimizedSizing,omitempty"`
+
 	// ResourceConsumption Resource consumption across the cluster
 	ResourceConsumption SizingResourceConsumption `json:"resourceConsumption"`
+
+	// Savings Infrastructure savings comparison
+	Savings *Savings `json:"savings,omitempty"`
 }
 
 // ClusterRequirementsStoredInput Stored cluster requirements payload for a cluster
@@ -348,11 +365,20 @@ type ClusterRequirementsStoredInputMemoryOverCommitRatio string
 
 // ClusterSizing Overall cluster sizing summary
 type ClusterSizing struct {
+	// Confidence Data coverage confidence 0-100 (only in optimized_sizing)
+	Confidence *float64 `json:"confidence,omitempty"`
+
 	// ControlPlaneNodes Number of control plane nodes
 	ControlPlaneNodes int `json:"controlPlaneNodes"`
 
+	// CpuUtilizationMax CPU utilization maximum percentage (only in optimized_sizing)
+	CpuUtilizationMax *float64 `json:"cpuUtilizationMax,omitempty"`
+
 	// FailoverNodes Number of failover nodes added for availability
 	FailoverNodes int `json:"failoverNodes"`
+
+	// MemoryUtilizationMax Memory utilization maximum percentage (only in optimized_sizing)
+	MemoryUtilizationMax *float64 `json:"memoryUtilizationMax,omitempty"`
 
 	// TotalCPU Total CPU cores across all nodes
 	TotalCPU int `json:"totalCPU"`
@@ -773,6 +799,18 @@ type Network struct {
 // NetworkType defines model for Network.Type.
 type NetworkType string
 
+// OptimizationStatus Status of utilization-based optimization attempt
+type OptimizationStatus struct {
+	// Attempted Whether optimization was attempted based on available utilization data
+	Attempted bool `json:"attempted"`
+
+	// Reason Reason for optimization result
+	Reason OptimizationStatusReason `json:"reason"`
+}
+
+// OptimizationStatusReason Reason for optimization result
+type OptimizationStatusReason string
+
 // OsDiskEstimationEntry defines model for OsDiskEstimationEntry.
 type OsDiskEstimationEntry struct {
 	// Estimation Full estimation breakdown keyed by schema name. Absent for empty buckets (vmCount == 0).
@@ -832,6 +870,18 @@ type PartnerSummary struct {
 	Icon    string             `json:"icon"`
 	Id      openapi_types.UUID `json:"id"`
 	Name    string             `json:"name"`
+}
+
+// Savings Infrastructure savings comparison
+type Savings struct {
+	// Description Human-readable description of savings source
+	Description string `json:"description"`
+
+	// NodesSaved Number of nodes saved compared to baseline
+	NodesSaved int `json:"nodesSaved"`
+
+	// PercentageReduction Percentage reduction in nodes
+	PercentageReduction float64 `json:"percentageReduction"`
 }
 
 // SchemaEstimationResult Estimation results for a single schema
