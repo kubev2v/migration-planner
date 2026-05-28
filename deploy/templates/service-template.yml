@@ -426,6 +426,15 @@ objects:
                                 regex: "^${SERVICE_API_PATH}/api/v1/image"
                               substitution: "/api/v1/image"
                         - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/cluster-requirements"
+                          route:
+                            cluster: backend-api
+                            timeout: 30s
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/cluster-requirements"
+                              substitution: "/api/v1/cluster-requirements"
+                        - match:
                             prefix: "${SERVICE_API_PATH}/api/v1/assessments"
                           route:
                             cluster: backend-api
