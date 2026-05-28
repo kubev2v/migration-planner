@@ -3225,6 +3225,16 @@ components:
       properties:
         clusterSizing:
           $ref: "#/components/schemas/ClusterSizing"
+          description: Baseline sizing with 100% resource allocation
+        optimizedSizing:
+          $ref: "#/components/schemas/ClusterSizing"
+          description: Sizing calculated with actual utilization data (if available)
+        savings:
+          $ref: "#/components/schemas/Savings"
+          description: Potential infrastructure savings (only present if optimizedSizing exists)
+        optimizationStatus:
+          $ref: "#/components/schemas/OptimizationStatus"
+          description: Status of optimization attempt
         resourceConsumption:
           $ref: "#/components/schemas/SizingResourceConsumption"
         inventoryTotals:
@@ -3598,6 +3608,18 @@ components:
         totalMemory:
           type: integer
           description: Total memory (GB) across all nodes
+        cpuUtilizationMax:
+          type: number
+          format: double
+          description: CPU utilization maximum percentage (only in optimized_sizing)
+        memoryUtilizationMax:
+          type: number
+          format: double
+          description: Memory utilization maximum percentage (only in optimized_sizing)
+        confidence:
+          type: number
+          format: double
+          description: Data coverage confidence 0-100 (only in optimized_sizing)
       required:
         - totalNodes
         - workerNodes
@@ -3605,6 +3627,44 @@ components:
         - failoverNodes
         - totalCPU
         - totalMemory
+
+    Savings:
+      type: object
+      description: Infrastructure savings comparison
+      properties:
+        nodesSaved:
+          type: integer
+          description: Number of nodes saved compared to baseline
+        percentageReduction:
+          type: number
+          format: double
+          description: Percentage reduction in nodes
+        description:
+          type: string
+          description: Human-readable description of savings source
+      required:
+        - nodesSaved
+        - percentageReduction
+        - description
+
+    OptimizationStatus:
+      type: object
+      description: Status of utilization-based optimization attempt
+      properties:
+        attempted:
+          type: boolean
+          description: Whether optimization was attempted based on available utilization data
+        reason:
+          type: string
+          description: Reason for optimization result
+          enum:
+            - "no_utilization_data"
+            - "low_confidence"
+            - "calculation_error"
+            - "success"
+      required:
+        - attempted
+        - reason
 
     SizingResourceConsumption:
       type: object

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -25,7 +26,7 @@ func (e *EventSizerService) CalculateClusterRequirements(
 	ctx context.Context,
 	assessmentID uuid.UUID,
 	req *mappers.ClusterRequirementsRequestForm,
-) (*mappers.ClusterRequirementsResponseForm, error) {
+) (*api.ClusterRequirementsResponse, error) {
 	result, err := e.inner.CalculateClusterRequirements(ctx, assessmentID, req)
 	if err != nil {
 		return nil, err

@@ -284,12 +284,6 @@ type ClusterRequirementsInputForm struct {
 	HostedControlPlane      *bool
 }
 
-type ClusterRequirementsResponseForm struct {
-	ClusterSizing       ClusterSizingForm
-	ResourceConsumption ResourceConsumptionForm
-	InventoryTotals     InventoryTotalsForm
-}
-
 type ClusterSizingForm struct {
 	TotalNodes        int
 	ControlPlaneNodes int
@@ -357,4 +351,137 @@ func mapRiverStateToStatus(state rivertype.JobState, metadata model.RVToolsJobMe
 		result = v1alpha1.JobStatusPending
 	}
 	return result
+}
+
+type Mapper struct{}
+
+func (m *Mapper) ToClusterRequirementsResponse(
+	baselineResult SizingResult,
+	optimizedResult *SizingResult,
+	utilizationCtx UtilizationContext,
+	baselineFailoverNodes int,
+	optimizedFailoverNodes int,
+	totalVMs int,
+	totalCPU int,
+	totalMemory int,
+	optimizationStatus v1alpha1.OptimizationStatus,
+) *v1alpha1.ClusterRequirementsResponse {
+	baselineControlPlaneNodes := baselineResult.TotalNodes - baselineResult.WorkerNodes
+	baselineTotalWorkers := baselineResult.WorkerNodes + baselineFailoverNodes
+	baselineTotalNodes := baselineControlPlaneNodes + baselineTotalWorkers
+
+	baseline := v1alpha1.ClusterSizing{
+		TotalNodes:        baselineTotalNodes,
+		WorkerNodes:       baselineTotalWorkers,
+		ControlPlaneNodes: baselineControlPlaneNodes,
+		FailoverNodes:     baselineFailoverNodes,
+		TotalCPU:          baselineResult.TotalCPU,
+		TotalMemory:       baselineResult.TotalMemory,
+	}
+
+	var optimized *v1alpha1.ClusterSizing
+	var savings *v1alpha1.Savings
+	if optimizedResult != nil {
+		optimizedControlPlaneNodes := optimizedResult.TotalNodes - optimizedResult.WorkerNodes
+		optimizedTotalWorkers := optimizedResult.WorkerNodes + optimizedFailoverNodes
+		optimizedTotalNodes := optimizedControlPlaneNodes + optimizedTotalWorkers
+
+		optimized = &v1alpha1.ClusterSizing{
+			TotalNodes:           optimizedTotalNodes,
+			WorkerNodes:          optimizedTotalWorkers,
+			ControlPlaneNodes:    optimizedControlPlaneNodes,
+			FailoverNodes:        optimizedFailoverNodes,
+			TotalCPU:             optimizedResult.TotalCPU,
+			TotalMemory:          optimizedResult.TotalMemory,
+			CpuUtilizationMax:    &utilizationCtx.CpuPercent,
+			MemoryUtilizationMax: &utilizationCtx.MemoryPercent,
+			Confidence:           &utilizationCtx.Confidence,
+		}
+
+		nodesSaved := baselineTotalNodes - optimizedTotalNodes
+		if nodesSaved > 0 {
+			var percentageReduction float64
+			if baselineTotalNodes > 0 {
+				percentageReduction = (float64(nodesSaved) / float64(baselineTotalNodes)) * 100
+			}
+
+			savings = &v1alpha1.Savings{
+				NodesSaved:          nodesSaved,
+				PercentageReduction: percentageReduction,
+				Description:         "Based on actual workload performance data",
+			}
+		}
+	}
+
+	resourceConsumption := v1alpha1.SizingResourceConsumption{
+		Limits:          &v1alpha1.SizingResourceLimits{},
+		OverCommitRatio: &v1alpha1.SizingOverCommitRatio{},
+	}
+	if baselineResult.ResourceConsumption != nil {
+		resourceConsumption.Cpu = baselineResult.ResourceConsumption.CPU
+		resourceConsumption.Memory = baselineResult.ResourceConsumption.Memory
+
+		if baselineResult.ResourceConsumption.Limits != nil {
+			resourceConsumption.Limits = &v1alpha1.SizingResourceLimits{
+				Cpu:    baselineResult.ResourceConsumption.Limits.CPU,
+				Memory: baselineResult.ResourceConsumption.Limits.Memory,
+			}
+		}
+
+		if baselineResult.ResourceConsumption.OverCommitRatio != nil {
+			resourceConsumption.OverCommitRatio = &v1alpha1.SizingOverCommitRatio{
+				Cpu:    baselineResult.ResourceConsumption.OverCommitRatio.CPU,
+				Memory: baselineResult.ResourceConsumption.OverCommitRatio.Memory,
+			}
+		}
+	}
+
+	return &v1alpha1.ClusterRequirementsResponse{
+		ClusterSizing:       baseline,
+		OptimizedSizing:     optimized,
+		Savings:             savings,
+		OptimizationStatus:  &optimizationStatus,
+		ResourceConsumption: resourceConsumption,
+		InventoryTotals: v1alpha1.InventoryTotals{
+			TotalVMs:    totalVMs,
+			TotalCPU:    totalCPU,
+			TotalMemory: totalMemory,
+		},
+	}
+}
+
+type SizingResult struct {
+	TotalNodes          int
+	WorkerNodes         int
+	TotalCPU            int
+	TotalMemory         int
+	EffectiveCPU        float64
+	EffectiveMemory     float64
+	ResourceConsumption *ResourceConsumption
+}
+
+type ResourceConsumption struct {
+	CPU             float64
+	Memory          float64
+	Limits          *ResourceLimits
+	OverCommitRatio *OverCommitRatio
+}
+
+type ResourceLimits struct {
+	CPU    float64
+	Memory float64
+}
+
+type OverCommitRatio struct {
+	CPU    float64
+	Memory float64
+}
+
+type UtilizationContext struct {
+	CpuMultiplier    float64
+	MemoryMultiplier float64
+	CpuPercent       float64
+	MemoryPercent    float64
+	Confidence       float64
+	HasData          bool
 }

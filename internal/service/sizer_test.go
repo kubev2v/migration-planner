@@ -333,7 +333,7 @@ var _ = Describe("sizer service", func() {
 				Expect(result.ClusterSizing.WorkerNodes).To(Equal(4))
 				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
 				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
-				Expect(result.ResourceConsumption.CPU).To(Equal(100.0))
+				Expect(result.ResourceConsumption.Cpu).To(Equal(100.0))
 				Expect(result.ResourceConsumption.Memory).To(Equal(200.0))
 			})
 
@@ -437,9 +437,9 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				Expect(result.ResourceConsumption.Limits.CPU).To(Equal(0.0))
+				Expect(result.ResourceConsumption.Limits.Cpu).To(Equal(0.0))
 				Expect(result.ResourceConsumption.Limits.Memory).To(Equal(0.0))
-				Expect(result.ResourceConsumption.OverCommitRatio.CPU).To(Equal(0.0))
+				Expect(result.ResourceConsumption.OverCommitRatio.Cpu).To(Equal(0.0))
 				Expect(result.ResourceConsumption.OverCommitRatio.Memory).To(Equal(0.0))
 			})
 
@@ -470,9 +470,9 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				Expect(result.ResourceConsumption.Limits.CPU).To(Equal(150.0))
+				Expect(result.ResourceConsumption.Limits.Cpu).To(Equal(150.0))
 				Expect(result.ResourceConsumption.Limits.Memory).To(Equal(300.0))
-				Expect(result.ResourceConsumption.OverCommitRatio.CPU).To(Equal(0.0))
+				Expect(result.ResourceConsumption.OverCommitRatio.Cpu).To(Equal(0.0))
 				Expect(result.ResourceConsumption.OverCommitRatio.Memory).To(Equal(0.0))
 			})
 
@@ -503,9 +503,9 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
-				Expect(result.ResourceConsumption.Limits.CPU).To(Equal(0.0))
+				Expect(result.ResourceConsumption.Limits.Cpu).To(Equal(0.0))
 				Expect(result.ResourceConsumption.Limits.Memory).To(Equal(0.0))
-				Expect(result.ResourceConsumption.OverCommitRatio.CPU).To(Equal(1.5))
+				Expect(result.ResourceConsumption.OverCommitRatio.Cpu).To(Equal(1.5))
 				Expect(result.ResourceConsumption.OverCommitRatio.Memory).To(Equal(1.5))
 			})
 
@@ -1702,4 +1702,467 @@ var _ = Describe("sizer service", func() {
 		Entry("single core with SMT (1C/2T)", 1, 2, 1.5),
 		Entry("minimum cores (2C/4T)", 2, 4, 3.0),
 	)
+
+	Describe("Cluster Utilization Based Sizing", func() {
+		var callCount int
+
+		BeforeEach(func() {
+			callCount = 0
+			sizerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/health" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+					callCount++
+
+					var nodes []client.Node
+					nodeCount := 7
+					respCPU := 100
+					respMemory := 200
+
+					if callCount > 1 {
+						nodeCount = 4
+						respCPU = 50
+						respMemory = 100
+						nodes = []client.Node{
+							{IsControlPlane: true},
+							{IsControlPlane: true},
+							{IsControlPlane: true},
+							{IsControlPlane: false},
+						}
+					} else {
+						nodes = []client.Node{
+							{IsControlPlane: true},
+							{IsControlPlane: true},
+							{IsControlPlane: true},
+							{IsControlPlane: false},
+							{IsControlPlane: false},
+							{IsControlPlane: false},
+							{IsControlPlane: false},
+						}
+					}
+
+					response := client.SizerResponse{
+						Success: true,
+						Data: client.SizerData{
+							NodeCount:   nodeCount,
+							TotalCPU:    respCPU,
+							TotalMemory: respMemory,
+							ResourceConsumption: client.ResourceConsumption{
+								CPU:    100.0,
+								Memory: 200.0,
+							},
+							Advanced: []client.Zone{
+								{
+									Nodes: nodes,
+								},
+							},
+						},
+					}
+					w.Header().Set("Content-Type", "application/json")
+					_ = json.NewEncoder(w).Encode(response)
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			DeferCleanup(sizerServer.Close)
+
+			sizerClient = client.NewSizerClient(sizerServer.URL, 30*time.Second)
+			sizerService = service.NewSizerService(sizerClient, mockStore)
+		})
+
+		Context("with valid utilization data", func() {
+			It("calculates both baseline and optimized sizing", func() {
+				clusterID := "test-cluster-1"
+				cpuMax := 45.2
+				memMax := 62.3
+				confidence := 87.5
+
+				inventory := createInventoryWithUtilization(clusterID, cpuMax, memMax, confidence)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response).NotTo(BeNil())
+
+				Expect(response.ClusterSizing).NotTo(BeNil())
+				Expect(response.ClusterSizing.TotalNodes).To(BeNumerically(">", 0))
+
+				Expect(response.OptimizedSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing.CpuUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.CpuUtilizationMax).To(Equal(cpuMax))
+				Expect(response.OptimizedSizing.MemoryUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.MemoryUtilizationMax).To(Equal(memMax))
+				Expect(response.OptimizedSizing.Confidence).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.Confidence).To(Equal(confidence))
+
+				Expect(response.OptimizedSizing.TotalNodes).To(BeNumerically("<", response.ClusterSizing.TotalNodes))
+
+				Expect(response.Savings).NotTo(BeNil())
+				Expect(response.Savings.NodesSaved).To(BeNumerically(">", 0))
+				Expect(response.Savings.PercentageReduction).To(BeNumerically(">", 0))
+				Expect(response.Savings.Description).To(Equal("Based on actual workload performance data"))
+			})
+
+			It("applies utilization multipliers correctly", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 50.0, 50.0, 90.0)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:1",
+					MemoryOverCommitRatio: "1:1",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response.OptimizedSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing.CpuUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.CpuUtilizationMax).To(Equal(50.0))
+				Expect(response.OptimizedSizing.MemoryUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.MemoryUtilizationMax).To(Equal(50.0))
+			})
+
+			It("uses actual utilization values without floor clamping", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 5.0, 3.0, 90.0)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:1",
+					MemoryOverCommitRatio: "1:1",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response.OptimizedSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing.CpuUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.CpuUtilizationMax).To(Equal(5.0))
+				Expect(response.OptimizedSizing.MemoryUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.MemoryUtilizationMax).To(Equal(3.0))
+			})
+
+			It("returns success status when optimization succeeds", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 45.2, 62.3, 87.5)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response.OptimizationStatus).NotTo(BeNil())
+				Expect(response.OptimizationStatus.Attempted).To(BeTrue())
+				Expect(response.OptimizationStatus.Reason).To(Equal(api.Success))
+			})
+		})
+
+		Context("with low confidence utilization data", func() {
+			It("returns low_confidence status when confidence < 50%", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 45.0, 60.0, 30.0) // confidence < 50
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response.OptimizedSizing).To(BeNil())
+				Expect(response.OptimizationStatus).NotTo(BeNil())
+				Expect(response.OptimizationStatus.Attempted).To(BeFalse())
+				Expect(response.OptimizationStatus.Reason).To(Equal(api.LowConfidence))
+				Expect(callCount).To(Equal(1)) // Only baseline call, skipped optimized
+			})
+
+			It("returns optimized sizing when confidence >= 50%", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 45.0, 60.0, 50.0)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response.ClusterSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing.CpuUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.CpuUtilizationMax).To(Equal(45.0))
+				Expect(response.OptimizedSizing.MemoryUtilizationMax).NotTo(BeNil())
+				Expect(*response.OptimizedSizing.MemoryUtilizationMax).To(Equal(60.0))
+			})
+		})
+
+		Context("without utilization data", func() {
+			It("returns baseline only when cluster has no utilization", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithoutUtilization(clusterID)
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				Expect(response.ClusterSizing).NotTo(BeNil())
+				Expect(response.OptimizedSizing).To(BeNil())
+				Expect(response.Savings).To(BeNil())
+				Expect(response.OptimizationStatus).NotTo(BeNil())
+				Expect(response.OptimizationStatus.Attempted).To(BeFalse())
+				Expect(response.OptimizationStatus.Reason).To(Equal(api.NoUtilizationData))
+				Expect(callCount).To(Equal(1)) // Only baseline call, skipped optimized
+			})
+
+			It("returns baseline only when cluster not in inventory", func() {
+				inventory := createInventoryWithoutUtilization("other-cluster")
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             "test-cluster-1",
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).To(HaveOccurred())
+			})
+		})
+
+		Context("when optimized sizing calculation fails", func() {
+			var callCount int
+
+			BeforeEach(func() {
+				callCount = 0
+				sizerServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+						callCount++
+
+						// First call (baseline) succeeds
+						if callCount == 1 {
+							nodes := []client.Node{
+								{IsControlPlane: true},
+								{IsControlPlane: true},
+								{IsControlPlane: true},
+								{IsControlPlane: false},
+								{IsControlPlane: false},
+								{IsControlPlane: false},
+								{IsControlPlane: false},
+							}
+							response := client.SizerResponse{
+								Success: true,
+								Data: client.SizerData{
+									NodeCount:   7,
+									TotalCPU:    100,
+									TotalMemory: 200,
+									ResourceConsumption: client.ResourceConsumption{
+										CPU:    100.0,
+										Memory: 200.0,
+									},
+									Advanced: []client.Zone{
+										{Nodes: nodes},
+									},
+								},
+							}
+							w.Header().Set("Content-Type", "application/json")
+							_ = json.NewEncoder(w).Encode(response)
+							return
+						}
+
+						// Second call (optimized) fails
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				DeferCleanup(sizerServer.Close)
+
+				sizerClient = client.NewSizerClient(sizerServer.URL, 30*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+			})
+
+			It("returns baseline with calculation_error when optimized sizing fails", func() {
+				clusterID := "test-cluster-1"
+				inventory := createInventoryWithUtilization(clusterID, 45.0, 60.0, 87.5) // valid utilization data
+				assessmentID := uuid.New()
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+
+				req := &mappers.ClusterRequirementsRequestForm{
+					ClusterID:             clusterID,
+					CpuOverCommitRatio:    "1:4",
+					MemoryOverCommitRatio: "1:2",
+					WorkerNodeCPU:         16,
+					WorkerNodeMemory:      64,
+				}
+
+				response, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, req)
+				Expect(err).NotTo(HaveOccurred())
+
+				// Baseline sizing should be present
+				// Sizer returned 7 nodes (3 control plane + 4 worker)
+				// With 4 worker nodes, failover calculation is: max(2, ceil(4 * 10 / 100)) = max(2, 1) = 2
+				// Total nodes = 3 control plane + 4 worker + 2 failover = 9
+				Expect(response.ClusterSizing).NotTo(BeNil())
+				Expect(response.ClusterSizing.TotalNodes).To(Equal(9))
+				Expect(response.ClusterSizing.WorkerNodes).To(Equal(6))   // 4 worker + 2 failover
+				Expect(response.ClusterSizing.FailoverNodes).To(Equal(2)) // failover nodes
+
+				// Optimized sizing should be nil due to failure
+				Expect(response.OptimizedSizing).To(BeNil())
+				Expect(response.Savings).To(BeNil())
+
+				// OptimizationStatus should indicate attempt and failure
+				Expect(response.OptimizationStatus).NotTo(BeNil())
+				Expect(response.OptimizationStatus.Attempted).To(BeTrue())
+				Expect(response.OptimizationStatus.Reason).To(Equal(api.CalculationError))
+
+				// Both baseline and optimized calls should have been made
+				Expect(callCount).To(Equal(2))
+			})
+		})
+	})
 })
+
+func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) api.Inventory {
+	return api.Inventory{
+		VcenterId: "test-vcenter",
+		Clusters: map[string]api.InventoryData{
+			clusterID: {
+				Vms: api.VMs{
+					Total: 10,
+					CpuCores: api.VMResourceBreakdown{
+						Total: 100,
+					},
+					RamGB: api.VMResourceBreakdown{
+						Total: 200,
+					},
+					PowerStates:          map[string]int{},
+					MigrationWarnings:    []api.MigrationIssue{},
+					NotMigratableReasons: []api.MigrationIssue{},
+					DiskCount: api.VMResourceBreakdown{
+						Total: 10,
+					},
+					DiskGB: api.VMResourceBreakdown{
+						Total: 1000,
+					},
+				},
+				ClusterUtilization: &api.ClusterUtilization{
+					CpuMax:     cpuMax,
+					MemMax:     memMax,
+					Confidence: confidence,
+				},
+				Infra: api.Infra{
+					TotalHosts:      0,
+					Datastores:      []api.Datastore{},
+					Networks:        []api.Network{},
+					HostPowerStates: map[string]int{},
+				},
+			},
+		},
+	}
+}
+
+func createInventoryWithoutUtilization(clusterID string) api.Inventory {
+	return api.Inventory{
+		VcenterId: "test-vcenter",
+		Clusters: map[string]api.InventoryData{
+			clusterID: {
+				Vms: api.VMs{
+					Total: 10,
+					CpuCores: api.VMResourceBreakdown{
+						Total: 100,
+					},
+					RamGB: api.VMResourceBreakdown{
+						Total: 200,
+					},
+					PowerStates:          map[string]int{},
+					MigrationWarnings:    []api.MigrationIssue{},
+					NotMigratableReasons: []api.MigrationIssue{},
+					DiskCount: api.VMResourceBreakdown{
+						Total: 10,
+					},
+					DiskGB: api.VMResourceBreakdown{
+						Total: 1000,
+					},
+				},
+				Infra: api.Infra{
+					TotalHosts:      0,
+					Datastores:      []api.Datastore{},
+					Networks:        []api.Network{},
+					HostPowerStates: map[string]int{},
+				},
+			},
+		},
+	}
+}
+
+func createAssessmentWithInventory(id uuid.UUID, inventory api.Inventory) *model.Assessment {
+	inventoryJSON, err := json.Marshal(inventory)
+	Expect(err).NotTo(HaveOccurred())
+	return &model.Assessment{
+		ID: id,
+		Snapshots: []model.Snapshot{
+			{
+				ID:           1,
+				AssessmentID: id,
+				Inventory:    inventoryJSON,
+				CreatedAt:    time.Now(),
+			},
+		},
+	}
+}
