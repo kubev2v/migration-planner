@@ -78,7 +78,8 @@ an active clone of those repos and ask the user either to clone them, or give yo
      HEAD SHA: <sha>
      ```
 5. Prepare an MR for app-interface to update the stable environments with the new tag SHAs:
-   - In the app-interface repository, locate the files named `saas-service.yaml` and `saas-ui.yaml` that are related to assisted-migration
+   - In the app-interface repository, pull the latest master branch from downstream remote: `git pull <downstream-remote> master`
+   - Locate the files named `saas-service.yaml` and `saas-ui.yaml` that are related to assisted-migration
    - Review the git log and last merged MRs for these files to understand the pattern used in previous releases
    - **Important**: The number of environments and their configuration may vary between releases, so always check the latest MRs to identify all environments that need updating
    - Update the SHA values for stable environments to match the HEAD sha of the newly created tags
