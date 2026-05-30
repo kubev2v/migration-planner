@@ -40,6 +40,7 @@ require (
 	github.com/thoas/go-funk v0.9.3
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
@@ -164,9 +165,8 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
-	golang.org/x/telemetry v0.0.0-20260519152614-eab6ae52b5e2 // indirect
+	golang.org/x/telemetry v0.0.0-20260527142108-59979362b252 // indirect
 	golang.org/x/text v0.36.0 // indirect
 	golang.org/x/time v0.13.0 // indirect
 	golang.org/x/tools v0.44.0 // indirect
