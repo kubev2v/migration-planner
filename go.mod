@@ -40,6 +40,7 @@ require (
 	github.com/thoas/go-funk v0.9.3
 	github.com/xuri/excelize/v2 v2.9.1
 	go.uber.org/zap v1.27.0
+	golang.org/x/sync v0.20.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
@@ -51,6 +52,7 @@ require (
 
 require (
 	github.com/agnivade/levenshtein v1.2.1 // indirect
+	github.com/anchore/go-lzo v0.1.0 // indirect
 	github.com/apache/arrow-go/v18 v18.4.1 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2 v1.40.0 // indirect
@@ -64,7 +66,7 @@ require (
 	github.com/coreos/ignition/v2 v2.24.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20260306102053-7a68b5426c74 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/diskfs/go-diskfs v1.7.0 // indirect
+	github.com/diskfs/go-diskfs v1.9.3 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.1.21 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
@@ -133,7 +135,7 @@ require (
 	github.com/riverqueue/river/rivershared v0.27.0 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
-	github.com/sirupsen/logrus v1.9.4-0.20251023124752-b61f268f75b6 // indirect
+	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/tchap/go-patricia/v2 v2.3.3 // indirect
 	github.com/tidwall/gjson v1.18.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
@@ -164,7 +166,6 @@ require (
 	golang.org/x/exp v0.0.0-20260410095643-746e56fc9e2f // indirect
 	golang.org/x/mod v0.36.0 // indirect
 	golang.org/x/net v0.53.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260519152614-eab6ae52b5e2 // indirect
 	golang.org/x/text v0.36.0 // indirect
@@ -175,7 +176,7 @@ require (
 )
 
 replace (
-	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.4.1
+	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.9.3
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
