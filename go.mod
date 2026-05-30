@@ -144,7 +144,7 @@ require (
 	github.com/tinylib/msgp v1.5.0 // indirect
 	github.com/ugorji/go/codec v1.3.1 // indirect
 	github.com/ulikunitz/xz v0.5.15 // indirect
-	github.com/vektah/gqlparser/v2 v2.5.31 // indirect
+	github.com/vektah/gqlparser/v2 v2.5.33 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/woodsbury/decimal128 v1.4.0 // indirect
 	github.com/xeipuuv/gojsonpointer v0.0.0-20190905194746-02993c407bfb // indirect
