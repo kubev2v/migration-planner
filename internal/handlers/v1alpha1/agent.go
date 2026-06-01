@@ -7,6 +7,7 @@ import (
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	apiMappers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -29,6 +30,13 @@ func NewAgentHandler(srv *service.AgentService) *AgentHandler {
 func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentServer.UpdateSourceInventoryRequestObject) (agentServer.UpdateSourceInventoryResponseObject, error) {
 	if request.Body == nil {
 		return agentServer.UpdateSourceInventory400JSONResponse{Message: "empty body"}, nil
+	}
+
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Id.String() {
+		return agentServer.UpdateSourceInventory403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to update source %s", request.Id),
+		}, nil
 	}
 
 	data, err := json.Marshal(request.Body.Inventory)
@@ -72,6 +80,13 @@ func (h *AgentHandler) UpdateAgentStatus(ctx context.Context, request agentServe
 	v.Register(validator.NewAgentValidationRules()...)
 	if err := v.Struct(form); err != nil {
 		return agentServer.UpdateAgentStatus400JSONResponse{Message: err.Error()}, nil
+	}
+
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Body.SourceId.String() {
+		return agentServer.UpdateAgentStatus403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to update source %s", request.Body.SourceId),
+		}, nil
 	}
 
 	_, created, err := h.srv.UpdateAgentStatus(ctx, mappers.AgentUpdateForm{
