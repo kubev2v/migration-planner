@@ -47,11 +47,11 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			agentID := uuid.New()
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: sourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
@@ -94,11 +94,11 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 			agentID := uuid.New()
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: sourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
@@ -128,11 +128,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: sourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
@@ -174,11 +174,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "batman",
-				Organization: "wayne_enterprises",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "wayne_enterprises",
+				SourceID: sourceID,
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
@@ -192,6 +192,41 @@ var _ = Describe("agent service", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateAgentStatus400JSONResponse{}).String()))
+		})
+
+		It("rejects update when JWT source_id does not match target source", func() {
+			sourceID := uuid.New()
+			differentSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			agentID := uuid.New()
+
+			// JWT has a different source_id than the one being updated
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: differentSourceID.String(),
+			}
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
+				Id: agentID,
+				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
+					Status:        string(v1alpha1.AgentStatusWaitingForCredentials),
+					StatusInfo:    "waiting-for-credentials",
+					CredentialUrl: "http://agent.com",
+					Version:       "version-1",
+					SourceId:      sourceID,
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateAgentStatus403JSONResponse{}).String()))
+
+			// Verify no agent was created
+			count := -1
+			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
 		})
 
 		AfterEach(func() {
@@ -209,11 +244,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: sourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
@@ -251,11 +286,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: sourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			// first agent request
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
@@ -308,11 +343,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: firstSourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
@@ -334,11 +369,11 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: firstSourceID.String(),
 			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			srv := handlers.NewAgentHandler(service.NewAgentService(s))
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
@@ -365,6 +400,41 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory400JSONResponse{}).String()))
 
+		})
+
+		It("rejects inventory update when JWT source_id does not match target source", func() {
+			sourceID := uuid.New()
+			differentSourceID := uuid.New()
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// JWT has a different source_id than the one being updated
+			agentJWT := auth.AgentJWT{
+				OrgID:    "admin",
+				SourceID: differentSourceID.String(),
+			}
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
+				Id: sourceID,
+				Body: &apiAgent.SourceStatusUpdate{
+					AgentId: agentID,
+					Inventory: v1alpha1.Inventory{
+						VcenterId: "vcenter",
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSourceInventory403JSONResponse{}).String()))
+
+			// Verify inventory was not updated
+			source, err := s.Source().Get(ctx, sourceID)
+			Expect(err).To(BeNil())
+			Expect(source.Inventory).To(BeNil())
 		})
 
 		AfterEach(func() {

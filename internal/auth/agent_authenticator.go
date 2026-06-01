@@ -76,7 +76,17 @@ type AgentAuthenticator struct {
 	store store.Store
 }
 
-func NewAgentAuthenticator(store store.Store) *AgentAuthenticator {
+func NewAgentAuthenticator(enabled bool, store store.Store) Authenticator {
+	if enabled {
+		zap.S().Named("auth").Info("agent authentication enabled")
+		return newProductionAgentAuthenticator(store)
+	}
+
+	zap.S().Named("auth").Info("agent authentication disabled, using none authenticator")
+	return NewNoneAgentAuthenticator()
+}
+
+func newProductionAgentAuthenticator(store store.Store) *AgentAuthenticator {
 	return &AgentAuthenticator{store: store}
 }
 

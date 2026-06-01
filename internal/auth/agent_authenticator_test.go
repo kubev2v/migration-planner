@@ -1,9 +1,11 @@
 package auth_test
 
 import (
+	"bytes"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"net/http"
@@ -60,7 +62,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 			token := generateAgentToken("kid", "my_source", "GothamCity", privateKey)
 
-			agentAuthenticator := auth.NewAgentAuthenticator(s)
+			agentAuthenticator := auth.NewAgentAuthenticator(true, s).(*auth.AgentAuthenticator)
 
 			agentJwt, err := agentAuthenticator.Authenticate(token)
 			Expect(err).To(BeNil())
@@ -87,7 +89,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 			token := generateAgentToken("missing-key-kid", "my_source", "GothamCity", privateKey)
 
-			agentAuthenticator := auth.NewAgentAuthenticator(s)
+			agentAuthenticator := auth.NewAgentAuthenticator(true, s).(*auth.AgentAuthenticator)
 
 			_, err = agentAuthenticator.Authenticate(token)
 			Expect(err).ToNot(BeNil())
@@ -112,7 +114,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 			token := generateAgentToken("kid", "my_source", "GothamCity", signingKey)
 
-			agentAuthenticator := auth.NewAgentAuthenticator(s)
+			agentAuthenticator := auth.NewAgentAuthenticator(true, s).(*auth.AgentAuthenticator)
 
 			_, err = agentAuthenticator.Authenticate(token)
 			Expect(err).ToNot(BeNil())
@@ -140,7 +142,7 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 			token := generateAgentToken("1234_kid", "my_source", "org_id", privateKey)
 
-			agentAuthenticator := auth.NewAgentAuthenticator(s)
+			agentAuthenticator := auth.NewAgentAuthenticator(true, s)
 			h := &handler{}
 			ts := httptest.NewServer(agentAuthenticator.Authenticator(h))
 			defer ts.Close()
@@ -156,6 +158,36 @@ var _ = Describe("agent authentication", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE from keys;")
+		})
+	})
+
+	Context("none authenticator middleware", func() {
+		It("successfully extracts sourceId from request body", func() {
+			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				// Verify AgentJWT is in context
+				agentJWT := auth.MustHaveAgent(r.Context())
+				Expect(agentJWT.SourceID).To(Equal("test-source-123"))
+
+				// Verify body is still readable for downstream
+				var body map[string]interface{}
+				err := json.NewDecoder(r.Body).Decode(&body)
+				Expect(err).To(BeNil(), "Body should be readable by downstream handler")
+				Expect(body["sourceId"]).To(Equal("test-source-123"))
+
+				w.WriteHeader(200)
+			})
+
+			noneAuthenticator := auth.NewNoneAgentAuthenticator()
+			ts := httptest.NewServer(noneAuthenticator.Authenticator(innerHandler))
+			defer ts.Close()
+
+			body := `{"sourceId":"test-source-123"}`
+			req, err := http.NewRequest(http.MethodPost, ts.URL, bytes.NewBufferString(body))
+			Expect(err).To(BeNil())
+
+			resp, rerr := http.DefaultClient.Do(req)
+			Expect(rerr).To(BeNil())
+			Expect(resp.StatusCode).To(Equal(200))
 		})
 	})
 
