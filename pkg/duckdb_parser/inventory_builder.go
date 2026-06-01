@@ -381,19 +381,18 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 	// Get VM count by network for enrichment
 	vmCountByNetwork, err := p.VMCountByNetwork(ctx, filters)
 	if err == nil && networkModels != nil {
-		networks := make([]inventory.Network, 0, len(networkModels))
+		networks := make([]inventory.Network, 0, len(vmCountByNetwork))
 		for _, n := range networkModels {
-			vmsCount := 0
+			// Only include networks that have VMs in the filtered set
 			if count, ok := vmCountByNetwork[n.Name]; ok {
-				vmsCount = count
+				networks = append(networks, inventory.Network{
+					Name:     n.Name,
+					Type:     n.Type,
+					Dvswitch: n.Dvswitch,
+					VlanId:   n.VlanId,
+					VmsCount: count,
+				})
 			}
-			networks = append(networks, inventory.Network{
-				Name:     n.Name,
-				Type:     n.Type,
-				Dvswitch: n.Dvswitch,
-				VlanId:   n.VlanId,
-				VmsCount: vmsCount,
-			})
 		}
 		infraData.Networks = networks
 	} else {

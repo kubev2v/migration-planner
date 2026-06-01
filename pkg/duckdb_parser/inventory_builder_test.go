@@ -1399,7 +1399,32 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 		{"Datacenter": "DC1", "Cluster": "Cluster-B", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
 	}
 
-	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+	// Add vNetwork data to test network filtering
+	// - vm-001 and vm-002 on "VM Network"
+	// - vm-003 on "Storage Network"
+	// - vm-004 on "VM Network"
+	// - vm-005 on "Management Network"
+	vnetwork := []map[string]string{
+		{"VM ID": "vm-001", "Network": "VM Network", "Mac Address": "00:50:56:00:00:01", "Connected": "true", "NIC label": "Network adapter 1", "Adapter": "VMXNET3", "Switch": "vSwitch0", "Starts Connected": "true", "Type": "VirtualVmxnet3", "IPv4 Address": "", "IPv6 Address": "", "Cluster": "Cluster-A"},
+		{"VM ID": "vm-002", "Network": "VM Network", "Mac Address": "00:50:56:00:00:02", "Connected": "true", "NIC label": "Network adapter 1", "Adapter": "VMXNET3", "Switch": "vSwitch0", "Starts Connected": "true", "Type": "VirtualVmxnet3", "IPv4 Address": "", "IPv6 Address": "", "Cluster": "Cluster-A"},
+		{"VM ID": "vm-003", "Network": "Storage Network", "Mac Address": "00:50:56:00:00:03", "Connected": "true", "NIC label": "Network adapter 1", "Adapter": "VMXNET3", "Switch": "vSwitch1", "Starts Connected": "true", "Type": "VirtualVmxnet3", "IPv4 Address": "", "IPv6 Address": "", "Cluster": "Cluster-B"},
+		{"VM ID": "vm-004", "Network": "VM Network", "Mac Address": "00:50:56:00:00:04", "Connected": "true", "NIC label": "Network adapter 1", "Adapter": "VMXNET3", "Switch": "vSwitch0", "Starts Connected": "true", "Type": "VirtualVmxnet3", "IPv4 Address": "", "IPv6 Address": "", "Cluster": "Cluster-B"},
+		{"VM ID": "vm-005", "Network": "Management Network", "Mac Address": "00:50:56:00:00:05", "Connected": "true", "NIC label": "Network adapter 1", "Adapter": "VMXNET3", "Switch": "vSwitch2", "Starts Connected": "true", "Type": "VirtualVmxnet3", "IPv4 Address": "", "IPv6 Address": "", "Cluster": "Cluster-A"},
+	}
+	vnetworkHeaders := []string{"VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch", "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"}
+
+	// Add dvPort data (network ports) - this is what the Networks() query reads
+	dvport := []map[string]string{
+		{"Port": "VM Network", "VLAN": "100", "Switch": "vSwitch0"},
+		{"Port": "Storage Network", "VLAN": "200", "Switch": "vSwitch1"},
+		{"Port": "Management Network", "VLAN": "300", "Switch": "vSwitch2"},
+	}
+	dvportHeaders := []string{"Port", "VLAN", "Switch"}
+
+	sheets := append(defaultStandardSheets(vms, hosts),
+		NewExcelSheet("vNetwork", vnetworkHeaders, vnetwork),
+		NewExcelSheet("dvPort", dvportHeaders, dvport))
+	tmpFile := createTestExcel(t, sheets...)
 
 	ctx := context.Background()
 	_, err := parser.IngestRvTools(ctx, tmpFile)
@@ -1474,6 +1499,31 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 	invNone, err := parser.BuildInventory(ctx, nonExistent)
 	require.NoError(t, err)
 	assert.Equal(t, 0, invNone.VCenter.VMs.Total, "Non-existent VMs should result in 0 count")
+
+	// Test 6: Verify networks are filtered - all networks should have VmsCount > 0
+	// This validates the fix for networks with zero VMs being excluded from filtered inventories
+	// Filter is: vm-001, vm-003, vm-005
+	// Expected networks: VM Network (vm-001), Storage Network (vm-003), Management Network (vm-005)
+	assert.Len(t, inv.VCenter.Infra.Networks, 3, "Filtered inventory should have 3 networks")
+
+	networkCounts := make(map[string]int)
+	for _, network := range inv.VCenter.Infra.Networks {
+		networkCounts[network.Name] = network.VmsCount
+		assert.Greater(t, network.VmsCount, 0,
+			"Network %s in filtered inventory should have VmsCount > 0 (no zero-count networks allowed)",
+			network.Name)
+	}
+	assert.Equal(t, 1, networkCounts["VM Network"], "VM Network should have 1 VM (vm-001)")
+	assert.Equal(t, 1, networkCounts["Storage Network"], "Storage Network should have 1 VM (vm-003)")
+	assert.Equal(t, 1, networkCounts["Management Network"], "Management Network should have 1 VM (vm-005)")
+
+	for clusterID, clusterInv := range inv.Clusters {
+		for _, network := range clusterInv.Infra.Networks {
+			assert.Greater(t, network.VmsCount, 0,
+				"Network %s in cluster %s filtered inventory should have VmsCount > 0",
+				network.Name, clusterID)
+		}
+	}
 }
 
 // TestBuildInventory_ClusterFeatures tests that cluster features including DrsEnabled
