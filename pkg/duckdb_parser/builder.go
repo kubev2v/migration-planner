@@ -293,7 +293,7 @@ func (b *QueryBuilder) TotalHostMemoryQuery(filters Filters) (string, error) {
 func (b *QueryBuilder) VMCountByNetworkQuery(filters Filters) (string, error) {
 	params := queryParams{
 		ClusterFilter: filters.Cluster,
-		VMListFilter:  buildVMListFilter(filters.VMList, ""),
+		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("vm_count_by_network_query", mustGetTemplate("vm_count_by_network_query"), params)
 }
