@@ -4131,11 +4131,29 @@ func (response GetSourceDownloadURL401JSONResponse) VisitGetSourceDownloadURLRes
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetSourceDownloadURL403JSONResponse Error
+
+func (response GetSourceDownloadURL403JSONResponse) VisitGetSourceDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetSourceDownloadURL404JSONResponse Error
 
 func (response GetSourceDownloadURL404JSONResponse) VisitGetSourceDownloadURLResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetSourceDownloadURL500JSONResponse Error
+
+func (response GetSourceDownloadURL500JSONResponse) VisitGetSourceDownloadURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
