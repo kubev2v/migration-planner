@@ -234,14 +234,25 @@ func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImage
 
 // (GET /api/v1/sources/{id}/image-url)
 func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
-	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
+	source, err := s.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			return server.GetSourceDownloadURL404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.GetSourceDownloadURL400JSONResponse{}, nil // FIX: should be 500
+			return server.GetSourceDownloadURL500JSONResponse{Message: fmt.Sprintf("failed to load source %s: %v", request.Id, err)}, nil
 		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Username != source.Username || user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to access source %s by user with org_id %s", request.Id, user.Organization)
+		return server.GetSourceDownloadURL403JSONResponse{Message: message}, nil
+	}
+
+	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
+	if err != nil {
+		return server.GetSourceDownloadURL500JSONResponse{Message: fmt.Sprintf("failed to get download URL for source %s: %v", request.Id, err)}, nil
 	}
 	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
 }

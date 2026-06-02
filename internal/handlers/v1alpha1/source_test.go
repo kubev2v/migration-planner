@@ -1091,4 +1091,125 @@ var _ = Describe("source handler", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
+
+	Context("GetSourceDownloadURL", func() {
+		It("successfully returns image URL for owned source", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Insert image_infra record (required for URL generation)
+			insertImageInfraStm := `INSERT INTO image_infras (source_id) VALUES ('%s');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL200JSONResponse{}).String()))
+
+			result := resp.(server.GetSourceDownloadURL200JSONResponse)
+			Expect(result.Url).NotTo(BeEmpty())
+			Expect(result.ExpiresAt).NotTo(BeNil())
+		})
+
+		It("returns 403 when trying to access another org's source", func() {
+			// Create source owned by "batman" org
+			victimSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, victimSourceID, "batman", "batman"))
+			Expect(tx.Error).To(BeNil())
+
+			insertImageInfraStm := `INSERT INTO image_infras (source_id) VALUES ('%s');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, victimSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Attempt to access with "joker" credentials
+			attackerUser := auth.User{
+				Username:     "joker",
+				Organization: "joker",
+				EmailDomain:  "joker.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: victimSourceID})
+
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL403JSONResponse{}).String()))
+		})
+
+		It("returns 403 when accessing with same username but different org", func() {
+			// Create source owned by "batman" user in "batman-org"
+			victimSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, victimSourceID, "batman", "batman-org"))
+			Expect(tx.Error).To(BeNil())
+
+			insertImageInfraStm := `INSERT INTO image_infras (source_id) VALUES ('%s');`
+			tx = gormdb.Exec(fmt.Sprintf(insertImageInfraStm, victimSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Attempt to access with same username but different organization
+			attackerUser := auth.User{
+				Username:     "batman",
+				Organization: "evil-org",
+				EmailDomain:  "evil.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: victimSourceID})
+
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL403JSONResponse{}).String()))
+		})
+
+		It("returns 404 for non-existent source", func() {
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: uuid.New()})
+
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL404JSONResponse{}).String()))
+		})
+
+		It("returns 500 when URL generation fails after auth succeeds", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// NOTE: Deliberately NOT inserting image_infra record
+			// This passes auth (user owns source) but fails during URL generation
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+				EmailDomain:  "admin.example.com",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: sourceID})
+
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL500JSONResponse{}).String()))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM image_infras;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
 })

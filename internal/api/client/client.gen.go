@@ -4117,7 +4117,9 @@ type GetSourceDownloadURLResponse struct {
 	JSON200      *PresignedUrl
 	JSON400      *Error
 	JSON401      *Error
+	JSON403      *Error
 	JSON404      *Error
+	JSON500      *Error
 }
 
 // Status returns HTTPResponse.Status
@@ -7052,12 +7054,26 @@ func ParseGetSourceDownloadURLResponse(rsp *http.Response) (*GetSourceDownloadUR
 		}
 		response.JSON401 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
 		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
 
 	}
 
