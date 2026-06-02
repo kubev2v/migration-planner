@@ -15,15 +15,16 @@ import (
 )
 
 var (
+	// Use ( [^\r\n]*)? instead of (\s.*)? to prevent newline injection in SSH keys.
 	sshRegex = []*regexp.Regexp{
-		regexp.MustCompile(`^ssh-rsa AAAAB3NzaC1yc2[0-9A-Za-z+/]+[=]{0,3}(\s.*)?$`),
-		regexp.MustCompile(`^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5[0-9A-Za-z+/]+[=]{0,3}(\s.*)?$`),
-		regexp.MustCompile(`^ssh-dss AAAAB3NzaC1kc3[0-9A-Za-z+/]+[=]{0,3}(\s.*)?$`),
-		regexp.MustCompile(`^ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT[0-9A-Za-z+/]+[=]{0,3}(\\s.*)?$`),
+		regexp.MustCompile(`\Assh-rsa AAAAB3NzaC1yc2[0-9A-Za-z+/]+[=]{0,3}( [^\r\n]*)?\z`),
+		regexp.MustCompile(`\Assh-ed25519 AAAAC3NzaC1lZDI1NTE5[0-9A-Za-z+/]+[=]{0,3}( [^\r\n]*)?\z`),
+		regexp.MustCompile(`\Assh-dss AAAAB3NzaC1kc3[0-9A-Za-z+/]+[=]{0,3}( [^\r\n]*)?\z`),
+		regexp.MustCompile(`\Aecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNT[0-9A-Za-z+/]+[=]{0,3}( [^\r\n]*)?\z`),
 	}
 
-	nameValidRegex = regexp.MustCompile(`^[a-zA-Z0-9_.-]{1,100}$`)
-	labelRegex     = regexp.MustCompile(`^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$`)
+	nameValidRegex = regexp.MustCompile(`\A[a-zA-Z0-9_.-]{1,100}\z`)
+	labelRegex     = regexp.MustCompile(`\A[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?\z`)
 	xlsxMagicBytes = []byte{0x50, 0x4B, 0x03, 0x04}
 )
 

@@ -71,6 +71,22 @@ func TestSourceCreateFormValidators(t *testing.T) {
 			shouldFail: true,
 		},
 		{
+			name: "validation ko -- name with newline injection (security)",
+			form: v1alpha1.SourceCreate{
+				Name: "validname\n",
+			},
+			message:    "name with trailing newline should be rejected",
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- name with CRLF injection (security)",
+			form: v1alpha1.SourceCreate{
+				Name: "validname\r\n",
+			},
+			message:    "name with CRLF should be rejected",
+			shouldFail: true,
+		},
+		{
 			name: "validation ok -- with rsa sshKey",
 			form: v1alpha1.SourceCreate{
 				Name:         "test",
@@ -101,6 +117,33 @@ func TestSourceCreateFormValidators(t *testing.T) {
 				SshPublicKey: ptr(invalidKey),
 			},
 			message:    "invalid ssh key",
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- ssh key with newline injection (security)",
+			form: v1alpha1.SourceCreate{
+				Name:         "test",
+				SshPublicKey: ptr("ssh-rsa AAAAB3NzaC1yc2AAAA\n"),
+			},
+			message:    "ssh key with trailing newline should be rejected",
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- ssh key with embedded newline injection (security)",
+			form: v1alpha1.SourceCreate{
+				Name:         "test",
+				SshPublicKey: ptr("ssh-rsa AAAAB3NzaC1yc2AAAA comment\npassword_hash: evil"),
+			},
+			message:    "ssh key with embedded newline should be rejected",
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- ssh ed25519 key with newline (security)",
+			form: v1alpha1.SourceCreate{
+				Name:         "test",
+				SshPublicKey: ptr("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAILzKjzTWXASL\n"),
+			},
+			message:    "ed25519 key with trailing newline should be rejected",
 			shouldFail: true,
 		},
 		{
@@ -393,6 +436,16 @@ func TestLabelValidator(t *testing.T) {
 		{
 			name:       "invalid only special characters",
 			label:      "---",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid label with newline (security)",
+			label:      "valid\n",
+			shouldPass: false,
+		},
+		{
+			name:       "invalid label with CRLF (security)",
+			label:      "valid\r\n",
 			shouldPass: false,
 		},
 	}
