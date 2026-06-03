@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"time"
 )
 
@@ -14,6 +15,8 @@ type NoneAgentAuthenticator struct{}
 func NewNoneAgentAuthenticator() *NoneAgentAuthenticator {
 	return &NoneAgentAuthenticator{}
 }
+
+var sourcePathRe = regexp.MustCompile(`/api/v1/sources/([^/]+)/`)
 
 func (n *NoneAgentAuthenticator) Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -28,9 +31,12 @@ func (n *NoneAgentAuthenticator) Authenticator(next http.Handler) http.Handler {
 			SourceID string `json:"sourceId"`
 		}
 
-		if err := json.Unmarshal(bodyBytes, &req); err != nil {
-			http.Error(w, fmt.Sprintf("missing source id from request body: %v", err), http.StatusBadRequest)
-			return
+		_ = json.Unmarshal(bodyBytes, &req)
+
+		if req.SourceID == "" {
+			if matches := sourcePathRe.FindStringSubmatch(r.URL.Path); len(matches) > 1 {
+				req.SourceID = matches[1]
+			}
 		}
 
 		r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
