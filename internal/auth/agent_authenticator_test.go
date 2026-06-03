@@ -164,11 +164,9 @@ var _ = Describe("agent authentication", Ordered, func() {
 	Context("none authenticator middleware", func() {
 		It("successfully extracts sourceId from request body", func() {
 			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				// Verify AgentJWT is in context
 				agentJWT := auth.MustHaveAgent(r.Context())
 				Expect(agentJWT.SourceID).To(Equal("test-source-123"))
 
-				// Verify body is still readable for downstream
 				var body map[string]interface{}
 				err := json.NewDecoder(r.Body).Decode(&body)
 				Expect(err).To(BeNil(), "Body should be readable by downstream handler")
@@ -188,6 +186,24 @@ var _ = Describe("agent authentication", Ordered, func() {
 			resp, rerr := http.DefaultClient.Do(req)
 			Expect(rerr).To(BeNil())
 			Expect(resp.StatusCode).To(Equal(200))
+		})
+
+		It("successfully extracts sourceId from URL path when not in body", func() {
+			innerHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				agentJWT := auth.MustHaveAgent(r.Context())
+				Expect(agentJWT.SourceID).To(Equal("140a9854-acf1-402a-8761-7de90a20bde4"))
+				w.WriteHeader(200)
+			})
+
+			noneAuthenticator := auth.NewNoneAgentAuthenticator()
+			handler := noneAuthenticator.Authenticator(innerHandler)
+
+			body := `{"agentId":"some-agent-id","inventory":{}}`
+			req := httptest.NewRequest(http.MethodPut, "/api/v1/sources/140a9854-acf1-402a-8761-7de90a20bde4/status", bytes.NewBufferString(body))
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+			Expect(rr.Code).To(Equal(200))
 		})
 	})
 
