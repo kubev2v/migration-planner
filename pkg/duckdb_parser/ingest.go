@@ -56,7 +56,7 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
-	if err := p.executeStatements(query); err != nil {
+	if err := p.executeStatements(ctx, query); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
 	}
 
@@ -64,11 +64,13 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	result := p.ValidateSchema(ctx, "vinfo_raw")
 
 	// Drop vinfo_raw now that validation is complete
-	p.dropVinfoRaw()
+	if err := p.dropVinfoRaw(ctx); err != nil {
+		return result, fmt.Errorf("dropping vinfo_raw: %w", err)
+	}
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
-		if err := p.populateComplexity(); err != nil {
+		if err := p.populateComplexity(ctx); err != nil {
 			return result, fmt.Errorf("populating complexity: %w", err)
 		}
 		if err := p.validateVMs(ctx); err != nil {
@@ -88,7 +90,7 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
 	}
-	if err := p.executeStatements(query); err != nil {
+	if err := p.executeStatements(ctx, query); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting sqlite data: %w", err)
 	}
 
@@ -97,7 +99,7 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
-		if err := p.populateComplexity(); err != nil {
+		if err := p.populateComplexity(ctx); err != nil {
 			return result, fmt.Errorf("populating complexity: %w", err)
 		}
 		if err := p.populateVCluster(ctx); err != nil {
@@ -161,21 +163,22 @@ func (p *Parser) populateVCluster(ctx context.Context) error {
 
 // dropVinfoRaw drops the temporary vinfo_raw table used during RVTools ingestion.
 // This table holds unfiltered data from the Excel file and is only needed for validation.
-func (p *Parser) dropVinfoRaw() {
-	_, _ = p.db.Exec("DROP TABLE IF EXISTS vinfo_raw")
+func (p *Parser) dropVinfoRaw(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS vinfo_raw")
+	return err
 }
 
 // executeStatements executes a multi-statement SQL string.
 // Critical statements (INSTALL, LOAD, CREATE TABLE vinfo) must succeed or an error is returned.
 // Non-critical statements (INSERT for optional sheets, ALTER for optional columns) are logged but don't fail.
-func (p *Parser) executeStatements(query string) error {
+func (p *Parser) executeStatements(ctx context.Context, query string) error {
 	stmts := stmtRegex.FindAllString(query, -1)
 	for _, stmt := range stmts {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
 		}
-		if _, err := p.db.Exec(stmt); err != nil {
+		if _, err := p.db.ExecContext(ctx, stmt); err != nil {
 			if isCriticalStatement(stmt) {
 				return translateXLSXError(err)
 			}
@@ -187,12 +190,12 @@ func (p *Parser) executeStatements(query string) error {
 }
 
 // populateComplexity computes and stores per-VM migration complexity based on OS type and disk size.
-func (p *Parser) populateComplexity() error {
+func (p *Parser) populateComplexity(ctx context.Context) error {
 	query, err := p.builder.PopulateComplexityQuery()
 	if err != nil {
 		return fmt.Errorf("building complexity query: %w", err)
 	}
-	if _, err := p.db.Exec(query); err != nil {
+	if _, err := p.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("executing complexity query: %w", err)
 	}
 	return nil

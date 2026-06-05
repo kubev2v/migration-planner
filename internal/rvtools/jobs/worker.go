@@ -18,6 +18,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // RVToolsWorker processes RVTools assessment jobs.
@@ -49,7 +50,8 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("setting duckdb extension directory: %w", err)
 	}
-	parser := duckdb_parser.New(db, w.validator)
+	qi := pkgstore.NewQueryInterceptor(db)
+	parser := duckdb_parser.New(qi, w.validator)
 	if err := parser.Init(); err != nil {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("initializing duckdb schema: %w", err)

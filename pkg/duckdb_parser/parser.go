@@ -2,10 +2,10 @@ package duckdb_parser
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // Validator interface for OPA validation.
@@ -16,13 +16,13 @@ type Validator interface {
 
 // Parser provides methods for parsing and querying VMware inventory data.
 type Parser struct {
-	db        *sql.DB
+	db        store.QueryInterceptor
 	builder   *QueryBuilder
 	validator Validator
 }
 
 // New creates a new Parser with optional validator.
-func New(db *sql.DB, validator Validator) *Parser {
+func New(db store.QueryInterceptor, validator Validator) *Parser {
 	return &Parser{
 		db:        db,
 		builder:   NewBuilder(),
@@ -43,6 +43,7 @@ func (p *Parser) createSchema() error {
 	if err != nil {
 		return err
 	}
-	_, err = p.db.Exec(q)
+	// Use background context for schema creation (not transactional)
+	_, err = p.db.ExecContext(context.Background(), q)
 	return err
 }

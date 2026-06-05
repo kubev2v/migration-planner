@@ -2,11 +2,11 @@ package duckdb_parser
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
+	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // ConcernValuesBuilder builds SQL VALUES for bulk inserting concerns.
@@ -48,7 +48,7 @@ func (cb *ConcernValuesBuilder) IsEmpty() bool {
 }
 
 // InsertConcerns executes the bulk insert of concerns into the database.
-func InsertConcerns(ctx context.Context, db *sql.DB, builder *ConcernValuesBuilder) error {
+func InsertConcerns(ctx context.Context, db store.QueryInterceptor, builder *ConcernValuesBuilder) error {
 	valuesStr := builder.Build()
 	if valuesStr == "" {
 		return nil
