@@ -70,15 +70,6 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 	return server.CreateSource201JSONResponse(response), nil
 }
 
-// (DELETE /api/v1/sources)
-func (s *ServiceHandler) DeleteSources(ctx context.Context, request server.DeleteSourcesRequestObject) (server.DeleteSourcesResponseObject, error) {
-	err := s.sourceSrv.DeleteSources(ctx)
-	if err != nil {
-		return server.DeleteSources500JSONResponse{}, nil
-	}
-	return server.DeleteSources200JSONResponse{}, nil
-}
-
 // (DELETE /api/v1/sources/{id})
 func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
 	source, err := s.sourceSrv.GetSource(ctx, request.Id)

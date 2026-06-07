@@ -808,30 +808,6 @@ var _ = Describe("source handler", Ordered, func() {
 	})
 
 	Context("delete", func() {
-		It("successfully deletes all the sources", func() {
-			firstSourceID := uuid.New()
-			firstAgentID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			secondSourceID := uuid.New()
-			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
-			Expect(tx.Error).To(BeNil())
-
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
-			_, err := srv.DeleteSources(context.TODO(), server.DeleteSourcesRequestObject{})
-			Expect(err).To(BeNil())
-
-			count := 1
-			tx = gormdb.Raw("SELECT COUNT(*) FROM SOURCES;").Scan(&count)
-			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(0))
-		})
-
 		It("successfully deletes a source", func() {
 			firstSourceID := uuid.New()
 			firstAgentID := uuid.New()

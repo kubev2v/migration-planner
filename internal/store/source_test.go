@@ -233,31 +233,6 @@ var _ = Describe("source store", Ordered, func() {
 				Expect(count).To(Equal(1))
 			})
 
-			It("successfully delete all sources", func() {
-				id := uuid.New()
-				agentID := uuid.New()
-				tx := gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "source1", "user1", "org_id_1"))
-				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", id))
-
-				Expect(tx.Error).To(BeNil())
-				tx = gormdb.Exec(fmt.Sprintf(insertSourceStm, uuid.NewString(), "source2", "user1", "org_id_1"))
-				Expect(tx.Error).To(BeNil())
-
-				err := s.Source().DeleteAll(context.TODO())
-				Expect(err).To(BeNil())
-
-				count := 2
-				tx = gormdb.Raw("SELECT COUNT(*) FROM sources;").Scan(&count)
-				Expect(tx.Error).To(BeNil())
-				Expect(count).To(Equal(0))
-
-				count = 1
-				tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
-				Expect(tx.Error).To(BeNil())
-				Expect(count).To(Equal(0))
-			})
-
 			AfterEach(func() {
 				gormdb.Exec("DELETE from agents;")
 				gormdb.Exec("DELETE from sources;")

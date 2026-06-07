@@ -225,9 +225,6 @@ type ClientInterface interface {
 
 	CreatePartnerRequest(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteSources request
-	DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// ListSources request
 	ListSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -840,18 +837,6 @@ func (c *Client) CreatePartnerRequestWithBody(ctx context.Context, id openapi_ty
 
 func (c *Client) CreatePartnerRequest(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCreatePartnerRequestRequest(c.Server, id, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) DeleteSources(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewDeleteSourcesRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -2432,33 +2417,6 @@ func NewCreatePartnerRequestRequestWithBody(server string, id openapi_types.UUID
 	return req, nil
 }
 
-// NewDeleteSourcesRequest generates requests for DeleteSources
-func NewDeleteSourcesRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/sources")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
 // NewListSourcesRequest generates requests for ListSources
 func NewListSourcesRequest(server string) (*http.Request, error) {
 	var err error
@@ -2959,9 +2917,6 @@ type ClientWithResponsesInterface interface {
 	CreatePartnerRequestWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error)
 
 	CreatePartnerRequestWithResponse(ctx context.Context, id openapi_types.UUID, body CreatePartnerRequestJSONRequestBody, reqEditors ...RequestEditorFn) (*CreatePartnerRequestResponse, error)
-
-	// DeleteSourcesWithResponse request
-	DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error)
 
 	// ListSourcesWithResponse request
 	ListSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSourcesResponse, error)
@@ -3936,30 +3891,6 @@ func (r CreatePartnerRequestResponse) StatusCode() int {
 	return 0
 }
 
-type DeleteSourcesResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Status
-	JSON401      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r DeleteSourcesResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r DeleteSourcesResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type ListSourcesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4612,15 +4543,6 @@ func (c *ClientWithResponses) CreatePartnerRequestWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseCreatePartnerRequestResponse(rsp)
-}
-
-// DeleteSourcesWithResponse request returning *DeleteSourcesResponse
-func (c *ClientWithResponses) DeleteSourcesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*DeleteSourcesResponse, error) {
-	rsp, err := c.DeleteSources(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseDeleteSourcesResponse(rsp)
 }
 
 // ListSourcesWithResponse request returning *ListSourcesResponse
@@ -6680,46 +6602,6 @@ func ParseCreatePartnerRequestResponse(rsp *http.Response) (*CreatePartnerReques
 			return nil, err
 		}
 		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseDeleteSourcesResponse parses an HTTP response from a DeleteSourcesWithResponse call
-func ParseDeleteSourcesResponse(rsp *http.Response) (*DeleteSourcesResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &DeleteSourcesResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Status
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest Error

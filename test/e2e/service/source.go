@@ -136,25 +136,27 @@ func (s *plannerService) RemoveSource(uuid uuid.UUID) error {
 	return err
 }
 
-// RemoveSources deletes all existing sources
+// RemoveSources lists all sources for the current user and deletes each one individually
 func (s *plannerService) RemoveSources() error {
 	zap.S().Infof("[PlannerService] Delete sources [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
-	res, err := s.api.DeleteRequest(apiV1SourcesPath)
+
+	sources, err := s.GetSources()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to list sources for deletion: %v", err)
 	}
 
-	removeSourcesRes, err := internalclient.ParseDeleteSourcesResponse(res)
-	if err != nil {
-		return fmt.Errorf("failed to parse res: %v", err)
+	if sources == nil {
+		return nil
 	}
 
-	if res.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to delete sources. response status code: %d. response error: %s", res.StatusCode, string(removeSourcesRes.Body))
+	for _, source := range *sources {
+		if err := s.RemoveSource(source.Id); err != nil {
+			return fmt.Errorf("failed to delete source %s: %v", source.Id, err)
+		}
 	}
 
-	return err
+	return nil
 }
 
 // UpdateSource updates the inventory of a specific source
