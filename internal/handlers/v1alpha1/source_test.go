@@ -1208,6 +1208,7 @@ var _ = Describe("source handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM keys;")
 			gormdb.Exec("DELETE FROM image_infras;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
