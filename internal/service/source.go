@@ -165,14 +165,6 @@ func (s *SourceService) CreateSource(ctx context.Context, sourceForm mappers.Sou
 	return *result, nil
 }
 
-func (s *SourceService) DeleteSources(ctx context.Context) error {
-	if err := s.store.Source().DeleteAll(ctx); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func (s *SourceService) DeleteSource(ctx context.Context, id uuid.UUID) error {
 	if err := s.store.Source().Delete(ctx, id); err != nil {
 		return err

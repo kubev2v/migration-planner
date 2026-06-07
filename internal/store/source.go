@@ -14,7 +14,6 @@ import (
 type Source interface {
 	List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error)
 	Create(ctx context.Context, source model.Source) (*model.Source, error)
-	DeleteAll(ctx context.Context) error
 	Get(ctx context.Context, id uuid.UUID) (*model.Source, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 	Update(ctx context.Context, source model.Source) (*model.Source, error)
@@ -59,11 +58,6 @@ func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.S
 	}
 
 	return &source, nil
-}
-
-func (s *SourceStore) DeleteAll(ctx context.Context) error {
-	result := s.getDB(ctx).Unscoped().Exec("DELETE FROM sources")
-	return result.Error
 }
 
 func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, error) {

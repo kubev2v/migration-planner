@@ -75,19 +75,14 @@ func (o *DeleteOptions) Run(ctx context.Context, args []string) error {
 	}
 	switch kind {
 	case SourceKind:
-		if id != nil {
-			response, err := c.DeleteSourceWithResponse(ctx, *id)
-			if err != nil {
-				return fmt.Errorf("deleting %s/%s: %w", kind, id, err)
-			}
-			fmt.Printf("%s\n", response.Status())
-		} else {
-			response, err := c.DeleteSourcesWithResponse(ctx)
-			if err != nil {
-				return fmt.Errorf("deleting %s: %w", plural(kind), err)
-			}
-			fmt.Printf("%s\n", response.Status())
+		if id == nil {
+			return fmt.Errorf("source ID is required: use delete source/<id>")
 		}
+		response, err := c.DeleteSourceWithResponse(ctx, *id)
+		if err != nil {
+			return fmt.Errorf("deleting %s/%s: %w", kind, id, err)
+		}
+		fmt.Printf("%s\n", response.Status())
 	default:
 		return fmt.Errorf("unsupported resource kind: %s", kind)
 	}

@@ -128,9 +128,6 @@ type ServerInterface interface {
 	// (POST /api/v1/partners/{id}/request)
 	CreatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (DELETE /api/v1/sources)
-	DeleteSources(w http.ResponseWriter, r *http.Request)
-
 	// (GET /api/v1/sources)
 	ListSources(w http.ResponseWriter, r *http.Request)
 
@@ -340,11 +337,6 @@ func (_ Unimplemented) GetPartner(w http.ResponseWriter, r *http.Request, id ope
 
 // (POST /api/v1/partners/{id}/request)
 func (_ Unimplemented) CreatePartnerRequest(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	w.WriteHeader(http.StatusNotImplemented)
-}
-
-// (DELETE /api/v1/sources)
-func (_ Unimplemented) DeleteSources(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1295,21 +1287,6 @@ func (siw *ServerInterfaceWrapper) CreatePartnerRequest(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// DeleteSources operation middleware
-func (siw *ServerInterfaceWrapper) DeleteSources(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-
-	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.DeleteSources(w, r)
-	}))
-
-	for _, middleware := range siw.HandlerMiddlewares {
-		handler = middleware(handler)
-	}
-
-	handler.ServeHTTP(w, r.WithContext(ctx))
-}
-
 // ListSources operation middleware
 func (siw *ServerInterfaceWrapper) ListSources(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1731,9 +1708,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/v1/partners/{id}/request", wrapper.CreatePartnerRequest)
-	})
-	r.Group(func(r chi.Router) {
-		r.Delete(options.BaseURL+"/api/v1/sources", wrapper.DeleteSources)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/sources", wrapper.ListSources)
@@ -3741,40 +3715,6 @@ func (response CreatePartnerRequest500JSONResponse) VisitCreatePartnerRequestRes
 	return json.NewEncoder(w).Encode(response)
 }
 
-type DeleteSourcesRequestObject struct {
-}
-
-type DeleteSourcesResponseObject interface {
-	VisitDeleteSourcesResponse(w http.ResponseWriter) error
-}
-
-type DeleteSources200JSONResponse Status
-
-func (response DeleteSources200JSONResponse) VisitDeleteSourcesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DeleteSources401JSONResponse Error
-
-func (response DeleteSources401JSONResponse) VisitDeleteSourcesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type DeleteSources500JSONResponse Error
-
-func (response DeleteSources500JSONResponse) VisitDeleteSourcesResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 type ListSourcesRequestObject struct {
 }
 
@@ -4346,9 +4286,6 @@ type StrictServerInterface interface {
 
 	// (POST /api/v1/partners/{id}/request)
 	CreatePartnerRequest(ctx context.Context, request CreatePartnerRequestRequestObject) (CreatePartnerRequestResponseObject, error)
-
-	// (DELETE /api/v1/sources)
-	DeleteSources(ctx context.Context, request DeleteSourcesRequestObject) (DeleteSourcesResponseObject, error)
 
 	// (GET /api/v1/sources)
 	ListSources(ctx context.Context, request ListSourcesRequestObject) (ListSourcesResponseObject, error)
@@ -5419,30 +5356,6 @@ func (sh *strictHandler) CreatePartnerRequest(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreatePartnerRequestResponseObject); ok {
 		if err := validResponse.VisitCreatePartnerRequestResponse(w); err != nil {
-			sh.options.ResponseErrorHandlerFunc(w, r, err)
-		}
-	} else if response != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
-	}
-}
-
-// DeleteSources operation middleware
-func (sh *strictHandler) DeleteSources(w http.ResponseWriter, r *http.Request) {
-	var request DeleteSourcesRequestObject
-
-	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.DeleteSources(ctx, request.(DeleteSourcesRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "DeleteSources")
-	}
-
-	response, err := handler(r.Context(), w, r, request)
-
-	if err != nil {
-		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(DeleteSourcesResponseObject); ok {
-		if err := validResponse.VisitDeleteSourcesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
