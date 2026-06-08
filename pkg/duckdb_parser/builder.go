@@ -85,10 +85,10 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 
 	params := queryParams{
 		NetworkColumns:   networkColumns,
-		ClusterFilter:    filters.Cluster,
-		OSFilter:         filters.OS,
-		PowerStateFilter: filters.PowerState,
-		VmIDFilter:       filters.VmId,
+		ClusterFilter:    escapeSQLString(filters.Cluster),
+		OSFilter:         escapeSQLString(filters.OS),
+		PowerStateFilter: escapeSQLString(filters.PowerState),
+		VmIDFilter:       escapeSQLString(filters.VmId),
 		VMListFilter:     buildVMListFilter(filters.VMList, "i"),
 		Limit:            options.Limit,
 		Offset:           options.Offset,
@@ -99,7 +99,7 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 // DatastoreQuery builds the datastore query with filters and pagination.
 func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -109,7 +109,7 @@ func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string,
 // NetworkQuery builds the network query with filters and pagination.
 func (b *QueryBuilder) NetworkQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -119,7 +119,7 @@ func (b *QueryBuilder) NetworkQuery(filters Filters, options Options) (string, e
 // HostQuery builds the host query with filters and pagination.
 func (b *QueryBuilder) HostQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		Limit:         options.Limit,
 		Offset:        options.Offset,
 	}
@@ -129,7 +129,7 @@ func (b *QueryBuilder) HostQuery(filters Filters, options Options) (string, erro
 // OsQuery builds the OS summary query with filters.
 func (b *QueryBuilder) OsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "v"),
 	}
 	return b.buildQuery("os_query", mustGetTemplate("os_query"), params)
@@ -159,8 +159,8 @@ func (b *QueryBuilder) ClusterFeaturesQuery(clusterName string) (string, error) 
 // VMCountQuery builds the VM count query with filters.
 func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter:    filters.Cluster,
-		PowerStateFilter: filters.PowerState,
+		ClusterFilter:    escapeSQLString(filters.Cluster),
+		PowerStateFilter: escapeSQLString(filters.PowerState),
 		VMListFilter:     buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("vm_count_query", mustGetTemplate("vm_count_query"), params)
@@ -169,7 +169,7 @@ func (b *QueryBuilder) VMCountQuery(filters Filters) (string, error) {
 // PowerStateCountsQuery builds the power state counts query.
 func (b *QueryBuilder) PowerStateCountsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("power_state_counts_query", mustGetTemplate("power_state_counts_query"), params)
@@ -178,7 +178,7 @@ func (b *QueryBuilder) PowerStateCountsQuery(filters Filters) (string, error) {
 // HostPowerStateCountsQuery builds the host power state counts query.
 func (b *QueryBuilder) HostPowerStateCountsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 	}
 	return b.buildQuery("host_power_state_counts_query", mustGetTemplate("host_power_state_counts_query"), params)
 }
@@ -186,7 +186,7 @@ func (b *QueryBuilder) HostPowerStateCountsQuery(filters Filters) (string, error
 // CPUTierQuery builds the CPU tier distribution query.
 func (b *QueryBuilder) CPUTierQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("cpu_tier_query", mustGetTemplate("cpu_tier_query"), params)
@@ -195,7 +195,7 @@ func (b *QueryBuilder) CPUTierQuery(filters Filters) (string, error) {
 // MemoryTierQuery builds the memory tier distribution query.
 func (b *QueryBuilder) MemoryTierQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("memory_tier_query", mustGetTemplate("memory_tier_query"), params)
@@ -204,7 +204,7 @@ func (b *QueryBuilder) MemoryTierQuery(filters Filters) (string, error) {
 // NicTierQuery builds the NIC count tier distribution query.
 func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("nic_tier_query", mustGetTemplate("nic_tier_query"), params)
@@ -213,7 +213,7 @@ func (b *QueryBuilder) NicTierQuery(filters Filters) (string, error) {
 // ComplexityDistributionQuery builds the complexity distribution query.
 func (b *QueryBuilder) ComplexityDistributionQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("complexity_distribution_query", mustGetTemplate("complexity_distribution_query"), params)
@@ -222,7 +222,7 @@ func (b *QueryBuilder) ComplexityDistributionQuery(filters Filters) (string, err
 // DiskSizeTierQuery builds the disk size tier distribution query.
 func (b *QueryBuilder) DiskSizeTierQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("disk_size_tier_query", mustGetTemplate("disk_size_tier_query"), params)
@@ -231,7 +231,7 @@ func (b *QueryBuilder) DiskSizeTierQuery(filters Filters) (string, error) {
 // DiskComplexityTierQuery builds the disk complexity tier distribution query.
 func (b *QueryBuilder) DiskComplexityTierQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("disk_complexity_tier_query", mustGetTemplate("disk_complexity_tier_query"), params)
@@ -240,7 +240,7 @@ func (b *QueryBuilder) DiskComplexityTierQuery(filters Filters) (string, error) 
 // DiskTypeSummaryQuery builds the disk type summary query.
 func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("disk_type_summary_query", mustGetTemplate("disk_type_summary_query"), params)
@@ -249,7 +249,7 @@ func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 // ResourceTotalsQuery builds the resource totals query.
 func (b *QueryBuilder) ResourceTotalsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("resource_totals_query", mustGetTemplate("resource_totals_query"), params)
@@ -258,7 +258,7 @@ func (b *QueryBuilder) ResourceTotalsQuery(filters Filters) (string, error) {
 // AllocatedVCPUsQuery builds the allocated vCPUs query.
 func (b *QueryBuilder) AllocatedVCPUsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("allocated_vcpus_query", mustGetTemplate("allocated_vcpus_query"), params)
@@ -267,7 +267,7 @@ func (b *QueryBuilder) AllocatedVCPUsQuery(filters Filters) (string, error) {
 // AllocatedMemoryQuery builds the allocated memory query.
 func (b *QueryBuilder) AllocatedMemoryQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, ""),
 	}
 	return b.buildQuery("allocated_memory_query", mustGetTemplate("allocated_memory_query"), params)
@@ -276,7 +276,7 @@ func (b *QueryBuilder) AllocatedMemoryQuery(filters Filters) (string, error) {
 // TotalHostCPUsQuery builds the total host CPUs query.
 func (b *QueryBuilder) TotalHostCPUsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 	}
 	return b.buildQuery("total_host_cpus_query", mustGetTemplate("total_host_cpus_query"), params)
 }
@@ -284,7 +284,7 @@ func (b *QueryBuilder) TotalHostCPUsQuery(filters Filters) (string, error) {
 // TotalHostMemoryQuery builds the total host memory query.
 func (b *QueryBuilder) TotalHostMemoryQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 	}
 	return b.buildQuery("total_host_memory_query", mustGetTemplate("total_host_memory_query"), params)
 }
@@ -292,7 +292,7 @@ func (b *QueryBuilder) TotalHostMemoryQuery(filters Filters) (string, error) {
 // VMCountByNetworkQuery builds the VM count by network query.
 func (b *QueryBuilder) VMCountByNetworkQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("vm_count_by_network_query", mustGetTemplate("vm_count_by_network_query"), params)
@@ -311,7 +311,7 @@ func (b *QueryBuilder) ClustersPerDatacenterQuery() (string, error) {
 // MigratableCountQuery builds the migratable VMs count query.
 func (b *QueryBuilder) MigratableCountQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("migratable_count_query", mustGetTemplate("migratable_count_query"), params)
@@ -320,7 +320,7 @@ func (b *QueryBuilder) MigratableCountQuery(filters Filters) (string, error) {
 // MigratableWithWarningsCountQuery builds the migratable with warnings count query.
 func (b *QueryBuilder) MigratableWithWarningsCountQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("migratable_with_warnings_count_query", mustGetTemplate("migratable_with_warnings_count_query"), params)
@@ -329,7 +329,7 @@ func (b *QueryBuilder) MigratableWithWarningsCountQuery(filters Filters) (string
 // NotMigratableCountQuery builds the not migratable VMs count query.
 func (b *QueryBuilder) NotMigratableCountQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("not_migratable_count_query", mustGetTemplate("not_migratable_count_query"), params)
@@ -338,8 +338,8 @@ func (b *QueryBuilder) NotMigratableCountQuery(filters Filters) (string, error) 
 // MigrationIssuesQuery builds the migration issues query.
 func (b *QueryBuilder) MigrationIssuesQuery(filters Filters, category string) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
-		Category:      category,
+		ClusterFilter: escapeSQLString(filters.Cluster),
+		Category:      escapeSQLString(category),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("migration_issues_query", mustGetTemplate("migration_issues_query"), params)
@@ -348,7 +348,7 @@ func (b *QueryBuilder) MigrationIssuesQuery(filters Filters, category string) (s
 // ResourceBreakdownsQuery builds the resource breakdowns query.
 func (b *QueryBuilder) ResourceBreakdownsQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("resource_breakdowns_query", mustGetTemplate("resource_breakdowns_query"), params)
@@ -362,7 +362,7 @@ func (b *QueryBuilder) AboutQuery() (string, error) {
 // VMsWithSharedDisksCountQuery builds the VMs with shared disks count query.
 func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: filters.Cluster,
+		ClusterFilter: escapeSQLString(filters.Cluster),
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("vms_with_shared_disks_count_query", mustGetTemplate("vms_with_shared_disks_count_query"), params)
