@@ -22,20 +22,16 @@ import (
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
 
-// RVToolsWorker processes RVTools assessment jobs.
 type RVToolsWorker struct {
 	river.WorkerDefaults[RVToolsJobArgs]
-	store        store.Store
-	rvtoolsFiles store.RVToolsFile
-	validator    duckdb_parser.Validator
+	store     store.Store
+	validator duckdb_parser.Validator
 }
 
-// NewRVToolsWorker creates a new RVTools worker.
-func NewRVToolsWorker(store store.Store, rvtoolsFiles store.RVToolsFile, validator duckdb_parser.Validator) *RVToolsWorker {
+func NewRVToolsWorker(store store.Store, validator duckdb_parser.Validator) *RVToolsWorker {
 	return &RVToolsWorker{
-		store:        store,
-		rvtoolsFiles: rvtoolsFiles,
-		validator:    validator,
+		store:     store,
+		validator: validator,
 	}
 }
 
@@ -84,22 +80,8 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("job_started").Log()
 
-	fileID := job.Args.FileID
-
-	// Delete file from store on all exit paths (MaxAttempts=1, no retries)
-	defer func() {
-		if delErr := w.rvtoolsFiles.Delete(context.Background(), fileID); delErr != nil {
-			logger.Error(delErr).WithString("step", "delete_file").Log()
-		}
-	}()
-
-	// Stream file content from PostgreSQL directly to a temp file,
-	// avoiding holding the full []byte in the worker's scope.
-	tempFilePath, err := w.rvtoolsFiles.CreateTmpFile(ctx, fileID)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "read_file", err, fmt.Sprintf("failed to read file from store: %v", err))
-	}
-	defer func() { _ = os.Remove(tempFilePath) }()
+	filePath := job.Args.FilePath
+	defer func() { _ = os.Remove(filePath) }()
 
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
@@ -114,7 +96,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	}
 
 	// Ingest RVTools file using duckdb_parser
-	validationResult, err := parser.IngestRvTools(ctx, tempFilePath)
+	validationResult, err := parser.IngestRvTools(ctx, filePath)
 	if err != nil {
 		return w.failJob(ctx, logger, job.ID, "ingest_rvtools", err, fmt.Sprintf("error ingesting RVTools file: %v", err))
 	}
