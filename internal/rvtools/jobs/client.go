@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -15,25 +16,24 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/opa"
 )
 
-// Client wraps the River client and provides job management functionality.
 type Client struct {
 	RiverClient *river.Client[pgx.Tx]
 	Pool        *pgxpool.Pool
+	Queue       string
 	Worker      *RVToolsWorker
 }
 
-// NewClient creates a new River client with the RVTools worker registered.
 func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
-	rvtoolsFiles := store.NewRVToolsFileStore(pool)
-
-	worker := NewRVToolsWorker(s, rvtoolsFiles, opaValidator)
+	worker := NewRVToolsWorker(s, opaValidator)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)
 
+	queue := podQueueName()
+
 	riverClient, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Queues: map[string]river.QueueConfig{
-			river.QueueDefault: {MaxWorkers: 5, FetchPollInterval: 1 * time.Second},
+			queue: {MaxWorkers: 5, FetchPollInterval: 1 * time.Second},
 		},
 		Workers: workers,
 	})
@@ -44,11 +44,18 @@ func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (
 	return &Client{
 		RiverClient: riverClient,
 		Pool:        pool,
+		Queue:       queue,
 		Worker:      worker,
 	}, nil
 }
 
-// Stop gracefully shuts down the job processor.
+func podQueueName() string {
+	if hostname, err := os.Hostname(); err == nil && hostname != "" {
+		return fmt.Sprintf("rvtools-%s", hostname)
+	}
+	return river.QueueDefault
+}
+
 func (c *Client) Stop(ctx context.Context) error {
 	if err := c.RiverClient.Stop(ctx); err != nil {
 		return err
@@ -57,7 +64,6 @@ func (c *Client) Stop(ctx context.Context) error {
 	return nil
 }
 
-// CreatePgxPool creates a pgx connection pool for River and file storage.
 func CreatePgxPool(ctx context.Context, cfg *config.Config) (*pgxpool.Pool, error) {
 	dsn := fmt.Sprintf("postgres://%s:%s@%s:%s/%s",
 		cfg.Database.User,

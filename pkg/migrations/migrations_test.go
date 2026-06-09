@@ -54,7 +54,7 @@ var _ = Describe("migrations", Ordered, func() {
 				return exists
 			}
 
-			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_cluster_sizing_inputs", "groups", "members", "rvtools_files"} {
+			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_cluster_sizing_inputs", "groups", "members"} {
 				Expect(tableExists(table)).To(BeTrue())
 			}
 		})

@@ -63,7 +63,7 @@ var _ = Describe("job handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, nil), service.NewSizerService(sizerClient, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, ""), service.NewSizerService(sizerClient, s), nil, nil, nil)
 			resp, err := srv.GetJob(ctx, server.GetJobRequestObject{Id: 123})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetJob404JSONResponse{}).String()))
@@ -78,7 +78,7 @@ var _ = Describe("job handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, nil), service.NewSizerService(sizerClient, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, ""), service.NewSizerService(sizerClient, s), nil, nil, nil)
 			resp, err := srv.CancelJob(ctx, server.CancelJobRequestObject{Id: 123})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CancelJob404JSONResponse{}).String()))
@@ -90,7 +90,8 @@ var _ = Describe("job handler", Ordered, func() {
 		var ctx context.Context
 		var srv *handlers.ServiceHandler
 
-		// Helper function to create a multipart reader for testing
+		// Helper function to create a multipart reader for testing.
+		// File content is prefixed with XLSX/ZIP magic bytes for validation.
 		createMultipartReader := func(name string, fileContent string) *multipart.Reader {
 			var b bytes.Buffer
 			w := multipart.NewWriter(&b)
@@ -99,8 +100,9 @@ var _ = Describe("job handler", Ordered, func() {
 			namePart, _ := w.CreateFormField("name")
 			_, _ = io.WriteString(namePart, name)
 
-			// Add file field
+			// Add file field with XLSX magic bytes prefix
 			filePart, _ := w.CreateFormFile("file", "test.xlsx")
+			_, _ = filePart.Write([]byte{0x50, 0x4B, 0x03, 0x04})
 			_, _ = io.WriteString(filePart, fileContent)
 
 			_ = w.Close()
@@ -116,7 +118,7 @@ var _ = Describe("job handler", Ordered, func() {
 				LastName:     "User",
 			}
 			ctx = auth.NewTokenContext(context.TODO(), user)
-			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, nil), service.NewSizerService(sizerClient, s), nil, nil, nil)
+			srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), service.NewJobService(s, nil, ""), service.NewSizerService(sizerClient, s), nil, nil, nil)
 		})
 
 		It("returns 400 when name is empty", func() {

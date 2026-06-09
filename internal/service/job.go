@@ -6,40 +6,33 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
-
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/riverqueue/river"
 )
 
-// JobService handles job-related operations.
 type JobService struct {
 	riverClient *river.Client[pgx.Tx]
-	pool        *pgxpool.Pool
 	jobStore    store.Job
+	queue       string
 	logger      *log.StructuredLogger
 }
 
-// NewJobService creates a new job service.
-func NewJobService(s store.Store, riverClient *river.Client[pgx.Tx], pool *pgxpool.Pool) *JobService {
+func NewJobService(s store.Store, riverClient *river.Client[pgx.Tx], queue string) *JobService {
 	return &JobService{
 		riverClient: riverClient,
-		pool:        pool,
 		jobStore:    s.Job(),
+		queue:       queue,
 		logger:      log.NewDebugLogger("job_service"),
 	}
 }
 
-// CreateRVToolsJob stores the file content and creates a River job atomically within a single transaction.
-func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobArgs, fileContent []byte) (*v1alpha1.Job, error) {
+func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobArgs) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("create_rvtools_job").
 		WithString("name", args.Name).
@@ -47,28 +40,10 @@ func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobA
 		WithString("username", args.Username).
 		Build()
 
-	fileID := uuid.New()
-	args.FileID = fileID
-
-	// Atomic: store file + insert River job in a single pgx transaction
-	var insertedJob *rivertype.JobInsertResult
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx,
-			"INSERT INTO rvtools_files (id, data, created_at) VALUES ($1, $2, now())",
-			fileID, fileContent); err != nil {
-			return fmt.Errorf("storing rvtools file: %w", err)
-		}
-
-		var err error
-		insertedJob, err = s.riverClient.InsertTx(ctx, tx, args, nil)
-		if err != nil {
-			return fmt.Errorf("inserting job: %w", err)
-		}
-		return nil
-	})
+	insertedJob, err := s.riverClient.Insert(ctx, args, &river.InsertOpts{Queue: s.queue, MaxAttempts: 1})
 	if err != nil {
 		tracer.Error(err).Log()
-		return nil, err
+		return nil, fmt.Errorf("inserting job: %w", err)
 	}
 
 	tracer.Success().WithParam("job_id", insertedJob.Job.ID).Log()
@@ -81,14 +56,12 @@ func (s *JobService) CreateRVToolsJob(ctx context.Context, args jobs.RVToolsJobA
 	return jobForm.ToAPIJob(), nil
 }
 
-// GetJob retrieves a job by ID.
 func (s *JobService) GetJob(ctx context.Context, jobID int64, orgID, username string) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("get_job").
 		WithParam("job_id", jobID).
 		Build()
 
-	// Query job from store
 	jobRow, err := s.jobStore.Get(ctx, jobID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -98,19 +71,16 @@ func (s *JobService) GetJob(ctx context.Context, jobID int64, orgID, username st
 		return nil, fmt.Errorf("querying job: %w", err)
 	}
 
-	// Parse args to verify ownership
 	var args jobs.RVToolsJobArgs
 	if err := json.Unmarshal(jobRow.ArgsJSON, &args); err != nil {
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("parsing job args: %w", err)
 	}
 
-	// Verify ownership
 	if args.OrgID != orgID || args.Username != username {
 		return nil, NewErrJobForbidden(jobID)
 	}
 
-	// Parse metadata
 	var metadata model.RVToolsJobMetadata
 	if len(jobRow.MetadataJSON) > 0 {
 		_ = json.Unmarshal(jobRow.MetadataJSON, &metadata)
@@ -127,7 +97,6 @@ func (s *JobService) GetJob(ctx context.Context, jobID int64, orgID, username st
 	return job, nil
 }
 
-// CancelJob cancels a job by ID.
 func (s *JobService) CancelJob(ctx context.Context, jobID int64, orgID, username string) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("cancel_job").

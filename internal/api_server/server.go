@@ -204,7 +204,7 @@ func (s *Server) Run(ctx context.Context) error {
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
-		service.NewJobService(s.store, s.jobsClient.RiverClient, s.jobsClient.Pool),
+		service.NewJobService(s.store, s.jobsClient.RiverClient, s.jobsClient.Queue),
 		eventwrap.NewEventSizerService(service.NewSizerService(sizerClient, s.store), s.store),
 		eventwrap.NewEventEstimationService(service.NewEstimationService(s.store), s.store),
 		partnerSvc,
