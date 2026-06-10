@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -13,6 +14,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // normalizeInventoryData ensures all nil maps and slices are initialized to empty ones
@@ -205,6 +207,40 @@ func SourceListToApi(sources ...model.SourceList) api.SourceList {
 		}
 	}
 	return sourceList
+}
+
+func SourceInventoryToApi(si model.SourceSubsetInventory) (agentAPI.SourceSubset, error) {
+	// Convert UUIDs to openapi_types.UUID pointers
+	id := openapi_types.UUID(si.ID)
+	sourceId := openapi_types.UUID(si.SourceID)
+	name := si.Name
+	vcenterId := si.VCenterID
+	vmsCount := si.VMsCount
+
+	subset := agentAPI.SourceSubset{
+		Id:        &id,
+		Name:      &name,
+		SourceId:  &sourceId,
+		VcenterId: &vcenterId,
+		VmsCount:  &vmsCount,
+		CreatedAt: &si.CreatedAt,
+		UpdatedAt: &si.UpdatedAt,
+	}
+
+	// Set updateType
+	updateType := agentAPI.SourceSubsetUpdateType(si.UpdateType)
+	subset.UpdateType = &updateType
+
+	// Unmarshal inventory
+	if len(si.Inventory) > 0 {
+		var inventory api.Inventory
+		if err := json.Unmarshal(si.Inventory, &inventory); err != nil {
+			return agentAPI.SourceSubset{}, fmt.Errorf("failed to unmarshal inventory: %w", err)
+		}
+		subset.Inventory = &inventory
+	}
+
+	return subset, nil
 }
 
 func AgentToApi(a model.Agent) api.Agent {

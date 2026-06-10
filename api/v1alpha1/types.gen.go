@@ -35,10 +35,10 @@ const (
 
 // Defines values for ClusterFeaturesDrsMode.
 const (
-	FullyAutomated     ClusterFeaturesDrsMode = "Fully Automated"
-	Manual             ClusterFeaturesDrsMode = "Manual"
-	None               ClusterFeaturesDrsMode = "None"
-	PartiallyAutomated ClusterFeaturesDrsMode = "Partially Automated"
+	ClusterFeaturesDrsModeFullyAutomated     ClusterFeaturesDrsMode = "Fully Automated"
+	ClusterFeaturesDrsModeManual             ClusterFeaturesDrsMode = "Manual"
+	ClusterFeaturesDrsModeNone               ClusterFeaturesDrsMode = "None"
+	ClusterFeaturesDrsModePartiallyAutomated ClusterFeaturesDrsMode = "Partially Automated"
 )
 
 // Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
@@ -137,6 +137,12 @@ const (
 	PartnerRequestStatusCancelled PartnerRequestStatus = "cancelled"
 	PartnerRequestStatusPending   PartnerRequestStatus = "pending"
 	PartnerRequestStatusRejected  PartnerRequestStatus = "rejected"
+)
+
+// Defines values for SourceUpdateType.
+const (
+	SourceUpdateTypeAuto   SourceUpdateType = "auto"
+	SourceUpdateTypeManual SourceUpdateType = "manual"
 )
 
 // Defines values for SourceCreateNetworkConfigType.
@@ -964,8 +970,14 @@ type Source struct {
 	Labels     *[]Label   `json:"labels,omitempty"`
 	Name       string     `json:"name"`
 	OnPremises bool       `json:"onPremises"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+
+	// UpdateType Indicates whether the inventory was updated automatically by an agent or manually by a user
+	UpdateType *SourceUpdateType `json:"updateType,omitempty"`
+	UpdatedAt  time.Time         `json:"updatedAt"`
 }
+
+// SourceUpdateType Indicates whether the inventory was updated automatically by an agent or manually by a user
+type SourceUpdateType string
 
 // SourceCreate defines model for SourceCreate.
 type SourceCreate struct {

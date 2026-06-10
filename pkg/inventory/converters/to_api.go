@@ -44,16 +44,16 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 			normalized := strings.ToLower(strings.TrimSpace(*d.ClusterFeatures.DrsMode))
 			switch normalized {
 			case "fullyautomated", "fully automated":
-				mode := api.FullyAutomated
+				mode := api.ClusterFeaturesDrsModeFullyAutomated
 				clusterFeatures.DrsMode = &mode
 			case "partiallyautomated", "partially automated":
-				mode := api.PartiallyAutomated
+				mode := api.ClusterFeaturesDrsModePartiallyAutomated
 				clusterFeatures.DrsMode = &mode
 			case "manual":
-				mode := api.Manual
+				mode := api.ClusterFeaturesDrsModeManual
 				clusterFeatures.DrsMode = &mode
 			default:
-				mode := api.None
+				mode := api.ClusterFeaturesDrsModeNone
 				clusterFeatures.DrsMode = &mode
 			}
 		}

@@ -314,6 +314,12 @@ var _ = Describe("source handler", Ordered, func() {
 			tx = gormdb.Raw(fmt.Sprintf("SELECT on_premises FROM SOURCES where id = '%s';", firstSourceID)).Scan(&onPrem)
 			Expect(tx.Error).To(BeNil())
 			Expect(onPrem).To(BeTrue())
+
+			// Verify update_type is set to 'manual' for user updates
+			updateType := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT update_type FROM sources WHERE id = '%s';", firstSourceID)).Scan(&updateType)
+			Expect(tx.Error).To(BeNil())
+			Expect(updateType).To(Equal("manual"))
 		})
 
 		It("successfully update source on prem -- same vcenter", func() {

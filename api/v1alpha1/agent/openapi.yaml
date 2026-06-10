@@ -10,9 +10,10 @@ servers:
 paths:
   /api/v1/sources/{id}/status:
     put:
+      deprecated: true
       tags:
         - source
-      description: Updates the inventory of a source
+      description: "DEPRECATED: Use PUT /api/v1/sources/{id} instead. This endpoint will be removed in a future version. Updates the inventory of a source."
       operationId: updateSourceInventory
       parameters:
         - name: id
@@ -37,6 +38,186 @@ paths:
                 $ref: '../openapi.yaml#/components/schemas/Source'
         "400":
           description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/sources/{id}:
+    put:
+      tags:
+        - source
+      description: Updates the complete inventory for a source (replaces deprecated /status endpoint)
+      operationId: updateSource
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceUpdate'
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Source'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/sources/{id}/subset/{subsetId}:
+    put:
+      tags:
+        - source
+      description: Creates or updates a subset inventory for a source
+      operationId: updateSourceSubset
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: subsetId
+          in: path
+          description: ID of the subset
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SourceSubsetUpdate'
+        required: true
+      responses:
+        "200":
+          description: Subset updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSubset'
+        "201":
+          description: Subset created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SourceSubset'
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+    delete:
+      tags:
+        - source
+      description: Deletes a subset inventory from a source
+      operationId: deleteSourceSubset
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: subsetId
+          in: path
+          description: ID of the subset to delete
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Subset deleted successfully
+        "400":
+          description: Bad Request - Invalid UUID format for id or subsetId
           content:
             application/json:
               schema:
@@ -132,6 +313,58 @@ components:
       required:
         - inventory
         - agentId
+
+    SourceUpdate:
+      type: object
+      properties:
+        vcenterId:
+          type: string
+        inventory:
+          $ref: '../openapi.yaml#/components/schemas/Inventory'
+      required:
+        - inventory
+
+    SourceSubsetUpdate:
+      type: object
+      properties:
+        vcenterId:
+          type: string
+        name:
+          type: string
+        vmsCount:
+          type: integer
+        inventory:
+          $ref: '../openapi.yaml#/components/schemas/Inventory'
+      required:
+        - inventory
+        - name
+
+    SourceSubset:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        vcenterId:
+          type: string
+        vmsCount:
+          type: integer
+        inventory:
+          $ref: '../openapi.yaml#/components/schemas/Inventory'
+        updateType:
+          type: string
+          enum: [auto, manual]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
 
     AgentStatusUpdate:
       type: object

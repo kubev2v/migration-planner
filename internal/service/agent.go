@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -73,6 +74,148 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 	}
 
 	return updatedSource, nil
+}
+
+/*
+UpdateSource updates source inventory (replaces deprecated UpdateSourceInventory)
+
+This implements the same logic as UpdateSourceInventory but sets update_type to 'auto':
+- Only updates for a single vCenterID are allowed
+- allow two agents trying to update the source with same vCenterID
+- don't allow updates from agents not belonging to the source
+- don't allow updates if source is missing
+- if the source has no inventory yet, set the vCenterID
+*/
+func (as *AgentService) UpdateSource(ctx context.Context, updateForm mappers.SourceInventoryUpdateForm) (*model.Source, error) {
+	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(updateForm.SourceID)
+		}
+		return nil, fmt.Errorf("failed to fetch source: %w", err)
+	}
+
+	// if source has already a vCenter check if it's the same
+	if source.VCenterID != "" && source.VCenterID != updateForm.VCenterID {
+		return nil, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.VCenterID)
+	}
+
+	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
+	source.UpdateType = "auto" // Set update_type to auto for agent updates
+
+	updatedSource, err := as.store.Source().Update(ctx, *source)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update source: %w", err)
+	}
+
+	return updatedSource, nil
+}
+
+/*
+UpdateSourceSubset creates or updates a subset inventory for a source
+
+Validates:
+- source exists
+- agent is associated with source
+- vCenterID matches source vCenterID (if set)
+Sets update_type to 'auto' for agent updates
+*/
+func (as *AgentService) UpdateSourceSubset(ctx context.Context, updateForm mappers.SourceSubsetUpdateForm) (*model.SourceSubsetInventory, bool, error) {
+	// Validate source exists
+	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, false, NewErrSourceNotFound(updateForm.SourceID)
+		}
+		return nil, false, fmt.Errorf("failed to fetch source: %w", err)
+	}
+
+	// Validate source has main inventory before allowing subsets
+	// Enforces ordering: main inventory must be created first, then subsets
+	if len(source.Inventory) == 0 {
+		return nil, false, NewErrSourceInventoryRequired(updateForm.SourceID)
+	}
+
+	// Validate vCenterID matches source vCenterID (if source has one set)
+	if source.VCenterID != "" && source.VCenterID != updateForm.VCenterID {
+		return nil, false, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.VCenterID)
+	}
+
+	// Check if subset already exists (upsert logic)
+	existingSubset, err := as.store.SourceSubsetInventory().Get(ctx, updateForm.ID)
+	if err != nil && !errors.Is(err, store.ErrRecordNotFound) {
+		return nil, false, fmt.Errorf("failed to fetch source inventory: %w", err)
+	}
+
+	subset := model.SourceSubsetInventory{
+		ID:         updateForm.ID,
+		Name:       updateForm.Name,
+		SourceID:   updateForm.SourceID,
+		VCenterID:  updateForm.VCenterID,
+		VMsCount:   updateForm.VMsCount,
+		Inventory:  updateForm.Inventory,
+		UpdateType: "auto", // Set update_type to auto for agent updates
+	}
+
+	var result *model.SourceSubsetInventory
+	var wasCreated bool
+	if existingSubset != nil {
+		// Update existing subset
+		result, err = as.store.SourceSubsetInventory().Update(ctx, subset)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to update source inventory: %w", err)
+		}
+		wasCreated = false
+	} else {
+		// Create new subset
+		result, err = as.store.SourceSubsetInventory().Create(ctx, subset)
+		if err != nil {
+			return nil, false, fmt.Errorf("failed to create source inventory: %w", err)
+		}
+		wasCreated = true
+	}
+
+	return result, wasCreated, nil
+}
+
+/*
+DeleteSourceSubset deletes a subset inventory from a source
+
+Validates:
+- source exists
+- subset exists and belongs to the source
+*/
+func (as *AgentService) DeleteSourceSubset(ctx context.Context, sourceID, subsetID uuid.UUID) error {
+	// Validate source exists
+	_, err := as.store.Source().Get(ctx, sourceID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrSourceNotFound(sourceID)
+		}
+		return fmt.Errorf("failed to fetch source: %w", err)
+	}
+
+	// Validate subset exists
+	subset, err := as.store.SourceSubsetInventory().Get(ctx, subsetID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrResourceNotFoundByStr(subsetID.String(), "source_subset_inventory")
+		}
+		return fmt.Errorf("failed to fetch source inventory: %w", err)
+	}
+
+	// Validate subset belongs to the source
+	if subset.SourceID != sourceID {
+		return NewErrResourceNotFoundByStr(subsetID.String(), "source_subset_inventory")
+	}
+
+	// Delete the subset
+	err = as.store.SourceSubsetInventory().Delete(ctx, subsetID)
+	if err != nil {
+		return fmt.Errorf("failed to delete source inventory: %w", err)
+	}
+
+	return nil
 }
 
 // UpdateAgentStatus updates or creates a new agent resource

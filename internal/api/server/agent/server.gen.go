@@ -23,8 +23,17 @@ type ServerInterface interface {
 	// (PUT /api/v1/agents/{id}/status)
 	UpdateAgentStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (PUT /api/v1/sources/{id})
+	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (DELETE /api/v1/sources/{id}/subset/{subsetId})
+	DeleteSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID)
+
+	// (PUT /api/v1/sources/{id}/subset/{subsetId})
+	UpdateSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -36,8 +45,23 @@ func (_ Unimplemented) UpdateAgentStatus(w http.ResponseWriter, r *http.Request,
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// (PUT /api/v1/sources/{id})
+func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // (PUT /api/v1/sources/{id}/status)
 func (_ Unimplemented) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v1/sources/{id}/subset/{subsetId})
+func (_ Unimplemented) DeleteSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/sources/{id}/subset/{subsetId})
+func (_ Unimplemented) UpdateSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -76,6 +100,32 @@ func (siw *ServerInterfaceWrapper) UpdateAgentStatus(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// UpdateSource operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // UpdateSourceInventory operation middleware
 func (siw *ServerInterfaceWrapper) UpdateSourceInventory(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -93,6 +143,76 @@ func (siw *ServerInterfaceWrapper) UpdateSourceInventory(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateSourceInventory(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// DeleteSourceSubset operation middleware
+func (siw *ServerInterfaceWrapper) DeleteSourceSubset(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subsetId" -------------
+	var subsetId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subsetId", chi.URLParam(r, "subsetId"), &subsetId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subsetId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteSourceSubset(w, r, id, subsetId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdateSourceSubset operation middleware
+func (siw *ServerInterfaceWrapper) UpdateSourceSubset(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "subsetId" -------------
+	var subsetId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subsetId", chi.URLParam(r, "subsetId"), &subsetId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subsetId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateSourceSubset(w, r, id, subsetId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -219,7 +339,16 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/agents/{id}/status", wrapper.UpdateAgentStatus)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSource)
+	})
+	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.UpdateSourceInventory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v1/sources/{id}/subset/{subsetId}", wrapper.DeleteSourceSubset)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/subset/{subsetId}", wrapper.UpdateSourceSubset)
 	})
 
 	return r
@@ -295,6 +424,69 @@ func (response UpdateAgentStatus500JSONResponse) VisitUpdateAgentStatusResponse(
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UpdateSourceRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateSourceJSONRequestBody
+}
+
+type UpdateSourceResponseObject interface {
+	VisitUpdateSourceResponse(w http.ResponseWriter) error
+}
+
+type UpdateSource200JSONResponse externalRef0.Source
+
+func (response UpdateSource200JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSource400JSONResponse externalRef0.Error
+
+func (response UpdateSource400JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSource401JSONResponse externalRef0.Error
+
+func (response UpdateSource401JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSource403JSONResponse externalRef0.Error
+
+func (response UpdateSource403JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSource404JSONResponse externalRef0.Error
+
+func (response UpdateSource404JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSource500JSONResponse externalRef0.Error
+
+func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UpdateSourceInventoryRequestObject struct {
 	Id   openapi_types.UUID `json:"id"`
 	Body *UpdateSourceInventoryJSONRequestBody
@@ -358,14 +550,158 @@ func (response UpdateSourceInventory500JSONResponse) VisitUpdateSourceInventoryR
 	return json.NewEncoder(w).Encode(response)
 }
 
+type DeleteSourceSubsetRequestObject struct {
+	Id       openapi_types.UUID `json:"id"`
+	SubsetId openapi_types.UUID `json:"subsetId"`
+}
+
+type DeleteSourceSubsetResponseObject interface {
+	VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error
+}
+
+type DeleteSourceSubset204Response struct {
+}
+
+func (response DeleteSourceSubset204Response) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteSourceSubset400JSONResponse externalRef0.Error
+
+func (response DeleteSourceSubset400JSONResponse) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteSourceSubset401JSONResponse externalRef0.Error
+
+func (response DeleteSourceSubset401JSONResponse) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteSourceSubset403JSONResponse externalRef0.Error
+
+func (response DeleteSourceSubset403JSONResponse) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteSourceSubset404JSONResponse externalRef0.Error
+
+func (response DeleteSourceSubset404JSONResponse) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteSourceSubset500JSONResponse externalRef0.Error
+
+func (response DeleteSourceSubset500JSONResponse) VisitDeleteSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubsetRequestObject struct {
+	Id       openapi_types.UUID `json:"id"`
+	SubsetId openapi_types.UUID `json:"subsetId"`
+	Body     *UpdateSourceSubsetJSONRequestBody
+}
+
+type UpdateSourceSubsetResponseObject interface {
+	VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error
+}
+
+type UpdateSourceSubset200JSONResponse SourceSubset
+
+func (response UpdateSourceSubset200JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset201JSONResponse SourceSubset
+
+func (response UpdateSourceSubset201JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset400JSONResponse externalRef0.Error
+
+func (response UpdateSourceSubset400JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset401JSONResponse externalRef0.Error
+
+func (response UpdateSourceSubset401JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset403JSONResponse externalRef0.Error
+
+func (response UpdateSourceSubset403JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset404JSONResponse externalRef0.Error
+
+func (response UpdateSourceSubset404JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateSourceSubset500JSONResponse externalRef0.Error
+
+func (response UpdateSourceSubset500JSONResponse) VisitUpdateSourceSubsetResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
 	// (PUT /api/v1/agents/{id}/status)
 	UpdateAgentStatus(ctx context.Context, request UpdateAgentStatusRequestObject) (UpdateAgentStatusResponseObject, error)
 
+	// (PUT /api/v1/sources/{id})
+	UpdateSource(ctx context.Context, request UpdateSourceRequestObject) (UpdateSourceResponseObject, error)
+
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(ctx context.Context, request UpdateSourceInventoryRequestObject) (UpdateSourceInventoryResponseObject, error)
+
+	// (DELETE /api/v1/sources/{id}/subset/{subsetId})
+	DeleteSourceSubset(ctx context.Context, request DeleteSourceSubsetRequestObject) (DeleteSourceSubsetResponseObject, error)
+
+	// (PUT /api/v1/sources/{id}/subset/{subsetId})
+	UpdateSourceSubset(ctx context.Context, request UpdateSourceSubsetRequestObject) (UpdateSourceSubsetResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -430,6 +766,39 @@ func (sh *strictHandler) UpdateAgentStatus(w http.ResponseWriter, r *http.Reques
 	}
 }
 
+// UpdateSource operation middleware
+func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateSourceRequestObject
+
+	request.Id = id
+
+	var body UpdateSourceJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSource(ctx, request.(UpdateSourceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSource")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSourceResponseObject); ok {
+		if err := validResponse.VisitUpdateSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // UpdateSourceInventory operation middleware
 func (sh *strictHandler) UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	var request UpdateSourceInventoryRequestObject
@@ -456,6 +825,67 @@ func (sh *strictHandler) UpdateSourceInventory(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateSourceInventoryResponseObject); ok {
 		if err := validResponse.VisitUpdateSourceInventoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteSourceSubset operation middleware
+func (sh *strictHandler) DeleteSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID) {
+	var request DeleteSourceSubsetRequestObject
+
+	request.Id = id
+	request.SubsetId = subsetId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteSourceSubset(ctx, request.(DeleteSourceSubsetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteSourceSubset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteSourceSubsetResponseObject); ok {
+		if err := validResponse.VisitDeleteSourceSubsetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateSourceSubset operation middleware
+func (sh *strictHandler) UpdateSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID) {
+	var request UpdateSourceSubsetRequestObject
+
+	request.Id = id
+	request.SubsetId = subsetId
+
+	var body UpdateSourceSubsetJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateSourceSubset(ctx, request.(UpdateSourceSubsetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateSourceSubset")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateSourceSubsetResponseObject); ok {
+		if err := validResponse.VisitUpdateSourceSubsetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

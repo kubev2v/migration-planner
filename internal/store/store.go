@@ -12,6 +12,7 @@ type Store interface {
 	Agent() Agent
 	Authz() Authz
 	Source() Source
+	SourceSubsetInventory() SourceSubsetInventory
 	ImageInfra() ImageInfra
 	PrivateKey() PrivateKey
 	Label() Label
@@ -31,6 +32,7 @@ type DataStore struct {
 	authz           Authz
 	db              *gorm.DB
 	source          Source
+	sourceInventory SourceSubsetInventory
 	imageInfra      ImageInfra
 	privateKey      PrivateKey
 	label           Label
@@ -49,6 +51,7 @@ func NewStore(db *gorm.DB) Store {
 	return &DataStore{
 		agent:           NewAgentSource(db),
 		source:          NewSource(db),
+		sourceInventory: NewSourceSubsetInventory(db),
 		imageInfra:      NewImageInfraStore(db),
 		privateKey:      NewCacheKeyStore(NewPrivateKey(db)),
 		label:           NewLabelStore(db),
@@ -74,6 +77,10 @@ func (s *DataStore) Authz() Authz {
 
 func (s *DataStore) Source() Source {
 	return s.source
+}
+
+func (s *DataStore) SourceSubsetInventory() SourceSubsetInventory {
+	return s.sourceInventory
 }
 
 func (s *DataStore) Agent() Agent {

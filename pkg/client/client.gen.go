@@ -97,10 +97,23 @@ type ClientInterface interface {
 
 	UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UpdateSourceWithBody request with any body
+	UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// UpdateSourceInventoryWithBody request with any body
 	UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSourceSubset request
+	DeleteSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSourceSubsetWithBody request with any body
+	UpdateSourceSubsetWithBody(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) UpdateAgentStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -127,6 +140,30 @@ func (c *Client) UpdateAgentStatus(ctx context.Context, id openapi_types.UUID, b
 	return c.Client.Do(req)
 }
 
+func (c *Client) UpdateSourceWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 func (c *Client) UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSourceInventoryRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
@@ -141,6 +178,42 @@ func (c *Client) UpdateSourceInventoryWithBody(ctx context.Context, id openapi_t
 
 func (c *Client) UpdateSourceInventory(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSourceInventoryRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSourceSubsetRequest(c.Server, id, subsetId)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSourceSubsetWithBody(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceSubsetRequestWithBody(c.Server, id, subsetId, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSourceSubsetRequest(c.Server, id, subsetId, body)
 	if err != nil {
 		return nil, err
 	}
@@ -198,6 +271,53 @@ func NewUpdateAgentStatusRequestWithBody(server string, id openapi_types.UUID, c
 	return req, nil
 }
 
+// NewUpdateSourceRequest calls the generic UpdateSource builder with application/json body
+func NewUpdateSourceRequest(server string, id openapi_types.UUID, body UpdateSourceJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSourceRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateSourceRequestWithBody generates requests for UpdateSource with any type of body
+func NewUpdateSourceRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewUpdateSourceInventoryRequest calls the generic UpdateSourceInventory builder with application/json body
 func NewUpdateSourceInventoryRequest(server string, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -226,6 +346,101 @@ func NewUpdateSourceInventoryRequestWithBody(server string, id openapi_types.UUI
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/sources/%s/status", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSourceSubsetRequest generates requests for DeleteSourceSubset
+func NewDeleteSourceSubsetRequest(server string, id openapi_types.UUID, subsetId openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "subsetId", runtime.ParamLocationPath, subsetId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/subset/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSourceSubsetRequest calls the generic UpdateSourceSubset builder with application/json body
+func NewUpdateSourceSubsetRequest(server string, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSourceSubsetRequestWithBody(server, id, subsetId, "application/json", bodyReader)
+}
+
+// NewUpdateSourceSubsetRequestWithBody generates requests for UpdateSourceSubset with any type of body
+func NewUpdateSourceSubsetRequestWithBody(server string, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "subsetId", runtime.ParamLocationPath, subsetId)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/subset/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -293,10 +508,23 @@ type ClientWithResponsesInterface interface {
 
 	UpdateAgentStatusWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAgentStatusJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAgentStatusResponse, error)
 
+	// UpdateSourceWithBodyWithResponse request with any body
+	UpdateSourceWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
+
+	UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
+
 	// UpdateSourceInventoryWithBodyWithResponse request with any body
 	UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
 
 	UpdateSourceInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
+
+	// DeleteSourceSubsetWithResponse request
+	DeleteSourceSubsetWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSourceSubsetResponse, error)
+
+	// UpdateSourceSubsetWithBodyWithResponse request with any body
+	UpdateSourceSubsetWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error)
+
+	UpdateSourceSubsetWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error)
 }
 
 type UpdateAgentStatusResponse struct {
@@ -319,6 +547,33 @@ func (r UpdateAgentStatusResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r UpdateAgentStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateSourceResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *externalRef0.Source
+	JSON400      *externalRef0.Error
+	JSON401      *externalRef0.Error
+	JSON403      *externalRef0.Error
+	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSourceResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSourceResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -352,6 +607,60 @@ func (r UpdateSourceInventoryResponse) StatusCode() int {
 	return 0
 }
 
+type DeleteSourceSubsetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON400      *externalRef0.Error
+	JSON401      *externalRef0.Error
+	JSON403      *externalRef0.Error
+	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSourceSubsetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSourceSubsetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type UpdateSourceSubsetResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *SourceSubset
+	JSON201      *SourceSubset
+	JSON400      *externalRef0.Error
+	JSON401      *externalRef0.Error
+	JSON403      *externalRef0.Error
+	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSourceSubsetResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSourceSubsetResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // UpdateAgentStatusWithBodyWithResponse request with arbitrary body returning *UpdateAgentStatusResponse
 func (c *ClientWithResponses) UpdateAgentStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentStatusResponse, error) {
 	rsp, err := c.UpdateAgentStatusWithBody(ctx, id, contentType, body, reqEditors...)
@@ -367,6 +676,23 @@ func (c *ClientWithResponses) UpdateAgentStatusWithResponse(ctx context.Context,
 		return nil, err
 	}
 	return ParseUpdateAgentStatusResponse(rsp)
+}
+
+// UpdateSourceWithBodyWithResponse request with arbitrary body returning *UpdateSourceResponse
+func (c *ClientWithResponses) UpdateSourceWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error) {
+	rsp, err := c.UpdateSourceWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error) {
+	rsp, err := c.UpdateSource(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceResponse(rsp)
 }
 
 // UpdateSourceInventoryWithBodyWithResponse request with arbitrary body returning *UpdateSourceInventoryResponse
@@ -386,6 +712,32 @@ func (c *ClientWithResponses) UpdateSourceInventoryWithResponse(ctx context.Cont
 	return ParseUpdateSourceInventoryResponse(rsp)
 }
 
+// DeleteSourceSubsetWithResponse request returning *DeleteSourceSubsetResponse
+func (c *ClientWithResponses) DeleteSourceSubsetWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteSourceSubsetResponse, error) {
+	rsp, err := c.DeleteSourceSubset(ctx, id, subsetId, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSourceSubsetResponse(rsp)
+}
+
+// UpdateSourceSubsetWithBodyWithResponse request with arbitrary body returning *UpdateSourceSubsetResponse
+func (c *ClientWithResponses) UpdateSourceSubsetWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error) {
+	rsp, err := c.UpdateSourceSubsetWithBody(ctx, id, subsetId, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceSubsetResponse(rsp)
+}
+
+func (c *ClientWithResponses) UpdateSourceSubsetWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error) {
+	rsp, err := c.UpdateSourceSubset(ctx, id, subsetId, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSourceSubsetResponse(rsp)
+}
+
 // ParseUpdateAgentStatusResponse parses an HTTP response from a UpdateAgentStatusWithResponse call
 func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -400,6 +752,67 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSourceResponse parses an HTTP response from a UpdateSourceWithResponse call
+func ParseUpdateSourceResponse(rsp *http.Response) (*UpdateSourceResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSourceResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.Source
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -460,6 +873,128 @@ func ParseUpdateSourceInventoryResponse(rsp *http.Response) (*UpdateSourceInvent
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSourceSubsetResponse parses an HTTP response from a DeleteSourceSubsetWithResponse call
+func ParseDeleteSourceSubsetResponse(rsp *http.Response) (*DeleteSourceSubsetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSourceSubsetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSourceSubsetResponse parses an HTTP response from a UpdateSourceSubsetWithResponse call
+func ParseUpdateSourceSubsetResponse(rsp *http.Response) (*UpdateSourceSubsetResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSourceSubsetResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SourceSubset
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SourceSubset
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest externalRef0.Error
