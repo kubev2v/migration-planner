@@ -2143,6 +2143,10 @@ components:
           type: string
           nullable: true
           description: Warning message if stored agent version differs from current agent version
+        updateType:
+          type: string
+          enum: [auto, manual]
+          description: Indicates whether the inventory was updated automatically by an agent or manually by a user
       required:
         - id
         - name

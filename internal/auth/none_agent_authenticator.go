@@ -16,7 +16,7 @@ func NewNoneAgentAuthenticator() *NoneAgentAuthenticator {
 	return &NoneAgentAuthenticator{}
 }
 
-var sourcePathRe = regexp.MustCompile(`/api/v1/sources/([^/]+)/`)
+var sourcePathRe = regexp.MustCompile(`/api/v1/sources/([^/]+)`)
 
 func (n *NoneAgentAuthenticator) Authenticator(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

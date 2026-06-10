@@ -86,6 +86,21 @@ type InventoryUpdateForm struct {
 	Inventory []byte
 }
 
+type SourceInventoryUpdateForm struct {
+	SourceID  uuid.UUID
+	VCenterID string
+	Inventory []byte
+}
+
+type SourceSubsetUpdateForm struct {
+	ID        uuid.UUID
+	Name      string
+	SourceID  uuid.UUID
+	VCenterID string
+	VMsCount  int
+	Inventory []byte
+}
+
 type AgentUpdateForm struct {
 	ID         uuid.UUID
 	Status     string

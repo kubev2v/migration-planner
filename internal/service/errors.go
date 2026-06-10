@@ -67,6 +67,14 @@ func NewErrAgentUpdateForbidden(sourceID, agentID uuid.UUID) *ErrAgentUpdateForb
 	return &ErrAgentUpdateForbidden{fmt.Errorf("agent %s is not associated with source %s", agentID, sourceID)}
 }
 
+type ErrSourceInventoryRequired struct {
+	error
+}
+
+func NewErrSourceInventoryRequired(sourceID uuid.UUID) *ErrSourceInventoryRequired {
+	return &ErrSourceInventoryRequired{fmt.Errorf("source %s must have main inventory before subsets can be created", sourceID)}
+}
+
 func NewErrAssessmentNotFound(id uuid.UUID) *ErrResourceNotFound {
 	return NewErrResourceNotFound(id, "assessment")
 }

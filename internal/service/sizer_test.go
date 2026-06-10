@@ -40,35 +40,39 @@ func (m *MockStore) Assessment() store.Assessment {
 }
 
 func (m *MockStore) Authz() store.Authz {
-	return nil
+	panic("MockStore.Authz() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) Source() store.Source {
-	return nil
+	panic("MockStore.Source() called unexpectedly - not implemented for this test")
+}
+
+func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
+	panic("MockStore.SourceSubsetInventory() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) Agent() store.Agent {
-	return nil
+	panic("MockStore.Agent() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) ImageInfra() store.ImageInfra {
-	return nil
+	panic("MockStore.ImageInfra() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) Job() store.Job {
-	return nil
+	panic("MockStore.Job() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) PartnerCustomer() store.PartnerCustomer {
-	return nil
+	panic("MockStore.PartnerCustomer() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) PrivateKey() store.PrivateKey {
-	return nil
+	panic("MockStore.PrivateKey() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) Label() store.Label {
-	return nil
+	panic("MockStore.Label() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) ClusterSizingInput() store.ClusterSizingInput {

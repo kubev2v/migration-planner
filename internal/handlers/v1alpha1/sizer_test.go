@@ -81,6 +81,10 @@ func (m *MockStore) Source() store.Source {
 	panic("Source() not implemented in MockStore for this test")
 }
 
+func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
+	panic("SourceSubsetInventory() not implemented in MockStore for this test")
+}
+
 func (m *MockStore) Agent() store.Agent {
 	panic("Agent() not implemented in MockStore for this test")
 }

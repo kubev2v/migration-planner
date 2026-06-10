@@ -4,8 +4,16 @@
 package v1alpha1
 
 import (
+	"time"
+
 	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	openapi_types "github.com/oapi-codegen/runtime/types"
+)
+
+// Defines values for SourceSubsetUpdateType.
+const (
+	Auto   SourceSubsetUpdateType = "auto"
+	Manual SourceSubsetUpdateType = "manual"
 )
 
 // AgentStatusUpdate defines model for AgentStatusUpdate.
@@ -23,8 +31,44 @@ type SourceStatusUpdate struct {
 	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
+// SourceSubset defines model for SourceSubset.
+type SourceSubset struct {
+	CreatedAt  *time.Time              `json:"createdAt,omitempty"`
+	Id         *openapi_types.UUID     `json:"id,omitempty"`
+	Inventory  *externalRef0.Inventory `json:"inventory,omitempty"`
+	Name       *string                 `json:"name,omitempty"`
+	SourceId   *openapi_types.UUID     `json:"sourceId,omitempty"`
+	UpdateType *SourceSubsetUpdateType `json:"updateType,omitempty"`
+	UpdatedAt  *time.Time              `json:"updatedAt,omitempty"`
+	VcenterId  *string                 `json:"vcenterId,omitempty"`
+	VmsCount   *int                    `json:"vmsCount,omitempty"`
+}
+
+// SourceSubsetUpdateType defines model for SourceSubset.UpdateType.
+type SourceSubsetUpdateType string
+
+// SourceSubsetUpdate defines model for SourceSubsetUpdate.
+type SourceSubsetUpdate struct {
+	Inventory externalRef0.Inventory `json:"inventory"`
+	Name      string                 `json:"name"`
+	VcenterId *string                `json:"vcenterId,omitempty"`
+	VmsCount  *int                   `json:"vmsCount,omitempty"`
+}
+
+// SourceUpdate defines model for SourceUpdate.
+type SourceUpdate struct {
+	Inventory externalRef0.Inventory `json:"inventory"`
+	VcenterId *string                `json:"vcenterId,omitempty"`
+}
+
 // UpdateAgentStatusJSONRequestBody defines body for UpdateAgentStatus for application/json ContentType.
 type UpdateAgentStatusJSONRequestBody = AgentStatusUpdate
 
+// UpdateSourceJSONRequestBody defines body for UpdateSource for application/json ContentType.
+type UpdateSourceJSONRequestBody = SourceUpdate
+
 // UpdateSourceInventoryJSONRequestBody defines body for UpdateSourceInventory for application/json ContentType.
 type UpdateSourceInventoryJSONRequestBody = SourceStatusUpdate
+
+// UpdateSourceSubsetJSONRequestBody defines body for UpdateSourceSubset for application/json ContentType.
+type UpdateSourceSubsetJSONRequestBody = SourceSubsetUpdate

@@ -82,6 +82,19 @@ func (qf *SourceQueryFilter) ByOnPremises(isOnPremises bool) *SourceQueryFilter 
 	return qf
 }
 
+type SourceSubsetInventoryQueryFilter BaseQuerier
+
+func NewSourceSubsetInventoryQueryFilter() *SourceSubsetInventoryQueryFilter {
+	return &SourceSubsetInventoryQueryFilter{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
+}
+
+func (f *SourceSubsetInventoryQueryFilter) BySourceID(sourceID uuid.UUID) *SourceSubsetInventoryQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("source_id = ?", sourceID)
+	})
+	return f
+}
+
 type PartnerQueryFilter BaseQuerier
 
 func NewPartnerQueryFilter() *PartnerQueryFilter {

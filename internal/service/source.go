@@ -260,6 +260,7 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 	source.OnPremises = true
 	source.VCenterID = form.VCenterID
 	source.Inventory = form.Inventory
+	source.UpdateType = "manual" // Set update_type to manual for user updates
 
 	if _, err = s.store.Source().Update(ctx, *source); err != nil {
 		_, _ = store.Rollback(ctx)

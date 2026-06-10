@@ -178,7 +178,6 @@ var _ = Describe("agent service", Ordered, func() {
 			srv := service.NewAgentService(s)
 			_, err := srv.UpdateSourceInventory(ctx, mappers.InventoryUpdateForm{
 				SourceID:  sourceID,
-				AgentID:   agentID,
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
 			})
@@ -215,7 +214,6 @@ var _ = Describe("agent service", Ordered, func() {
 			srv := service.NewAgentService(s)
 			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  sourceID,
-				AgentID:   agentID,
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
 			})
@@ -233,7 +231,6 @@ var _ = Describe("agent service", Ordered, func() {
 			// second agent request
 			_, err = srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  sourceID,
-				AgentID:   secondAgentID,
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
 			})
@@ -251,15 +248,17 @@ var _ = Describe("agent service", Ordered, func() {
 			secondSourceID := uuid.New()
 			tx = gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, secondSourceID, "batman", "batman"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
+			secondAgentID := uuid.New()
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
 			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
 
 			srv := service.NewAgentService(s)
+			// Try to update secondSource with firstAgent (not associated)
 			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  secondSourceID,
-				AgentID:   firstAgentID,
+				AgentID:   firstAgentID, // firstAgent is not associated with secondSource
 				Inventory: inventoryJSON,
 			})
 			Expect(err).ToNot(BeNil())
@@ -282,7 +281,6 @@ var _ = Describe("agent service", Ordered, func() {
 			srv := service.NewAgentService(s)
 			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  firstSourceID,
-				AgentID:   firstAgentID,
 				VCenterID: "vcenter",
 				Inventory: inventory1JSON,
 			})
@@ -294,7 +292,6 @@ var _ = Describe("agent service", Ordered, func() {
 
 			_, err = srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  firstSourceID,
-				AgentID:   firstAgentID,
 				VCenterID: "anotherVCenterID",
 				Inventory: inventory2JSON,
 			})
@@ -318,7 +315,6 @@ var _ = Describe("agent service", Ordered, func() {
 			srv := service.NewAgentService(s)
 			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
 				SourceID:  sourceID,
-				AgentID:   uuid.New(), // no agent was inserted for this id
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
 			})
@@ -328,6 +324,276 @@ var _ = Describe("agent service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("UpdateSource (new endpoint)", func() {
+		It("successfully updates the source with update_type=auto", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vcenter",
+			})
+
+			srv := service.NewAgentService(s)
+			source, err := srv.UpdateSource(context.TODO(), mappers.SourceInventoryUpdateForm{
+				SourceID:  sourceID,
+				VCenterID: "vcenter",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+			Expect(source.UpdateType).To(Equal("auto"))
+
+			// Verify in database
+			updateType := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT update_type FROM sources WHERE id = '%s';", sourceID)).Scan(&updateType)
+			Expect(tx.Error).To(BeNil())
+			Expect(updateType).To(Equal("auto"))
+		})
+
+		It("returns error when source doesn't exist", func() {
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
+
+			srv := service.NewAgentService(s)
+			_, err := srv.UpdateSource(context.TODO(), mappers.SourceInventoryUpdateForm{
+				SourceID:  uuid.New(), // Non-existent
+				Inventory: inventoryJSON,
+			})
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns error for vCenterID mismatch", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// First update with vcenter-1
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter-1"})
+			srv := service.NewAgentService(s)
+			_, err := srv.UpdateSource(context.TODO(), mappers.SourceInventoryUpdateForm{
+				SourceID:  sourceID,
+				VCenterID: "vcenter-1",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+
+			// Second update with different vCenter
+			_, err = srv.UpdateSource(context.TODO(), mappers.SourceInventoryUpdateForm{
+				SourceID:  sourceID,
+				VCenterID: "vcenter-2",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrInvalidVCenterID)
+			Expect(ok).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("UpdateSourceSubset", func() {
+		It("successfully creates a new subset with update_type=auto", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			subsetID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Add main inventory to source (required before creating subsets)
+			mainInventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter"})
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s'", mainInventoryJSON, sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter"})
+
+			srv := service.NewAgentService(s)
+			subset, wasCreated, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        subsetID,
+				Name:      "Test Subset",
+				SourceID:  sourceID,
+				VCenterID: "vcenter",
+				VMsCount:  10,
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+			Expect(subset).NotTo(BeNil())
+			Expect(wasCreated).To(BeTrue())
+			Expect(subset.ID).To(Equal(subsetID))
+			Expect(subset.Name).To(Equal("Test Subset"))
+			Expect(subset.VMsCount).To(Equal(10))
+			Expect(subset.UpdateType).To(Equal("auto"))
+		})
+
+		It("successfully updates an existing subset", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			subsetID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Add main inventory to source (required before creating subsets)
+			mainInventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter"})
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s'", mainInventoryJSON, sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter"})
+
+			srv := service.NewAgentService(s)
+			// Create first
+			_, wasCreated, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        subsetID,
+				Name:      "Original Name",
+				SourceID:  sourceID,
+				VCenterID: "vcenter",
+				VMsCount:  5,
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+			Expect(wasCreated).To(BeTrue())
+
+			// Update
+			subset, wasCreated, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        subsetID,
+				Name:      "Updated Name",
+				SourceID:  sourceID,
+				VCenterID: "vcenter",
+				VMsCount:  15,
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+			Expect(wasCreated).To(BeFalse())
+			Expect(subset.Name).To(Equal("Updated Name"))
+			Expect(subset.VMsCount).To(Equal(15))
+		})
+
+		It("returns error when source doesn't exist", func() {
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
+
+			srv := service.NewAgentService(s)
+			_, _, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        uuid.New(),
+				Name:      "Test",
+				SourceID:  uuid.New(), // Non-existent
+				Inventory: inventoryJSON,
+			})
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns error when source has no main inventory", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			// Create source WITHOUT inventory
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{VcenterId: "vcenter"})
+
+			srv := service.NewAgentService(s)
+			_, _, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        uuid.New(),
+				Name:      "Test Subset",
+				SourceID:  sourceID,
+				VCenterID: "vcenter",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrSourceInventoryRequired)
+			Expect(ok).To(BeTrue())
+			Expect(err.Error()).To(ContainSubstring("must have main inventory before subsets"))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM source_subset_inventories;")
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("DeleteSourceSubset", func() {
+		It("successfully deletes a subset", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			subsetID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			// Add main inventory to source (required before creating subsets)
+			mainInventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET inventory = '%s' WHERE id = '%s'", mainInventoryJSON, sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
+			srv := service.NewAgentService(s)
+			_, _, err := srv.UpdateSourceSubset(context.TODO(), mappers.SourceSubsetUpdateForm{
+				ID:        subsetID,
+				Name:      "Test Subset",
+				SourceID:  sourceID,
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+
+			// Delete
+			err = srv.DeleteSourceSubset(context.TODO(), sourceID, subsetID)
+			Expect(err).To(BeNil())
+
+			// Verify deleted
+			count := 0
+			tx = gormdb.Raw("SELECT COUNT(*) FROM source_subset_inventories WHERE id = ?", subsetID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(0))
+		})
+
+		It("returns error when subset doesn't exist", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			srv := service.NewAgentService(s)
+			err := srv.DeleteSourceSubset(context.TODO(), sourceID, uuid.New())
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
+		})
+
+		It("returns error when source doesn't exist", func() {
+			srv := service.NewAgentService(s)
+			err := srv.DeleteSourceSubset(context.TODO(), uuid.New(), uuid.New())
+			Expect(err).ToNot(BeNil())
+			_, ok := err.(*service.ErrResourceNotFound)
+			Expect(ok).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM source_subset_inventories;")
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})

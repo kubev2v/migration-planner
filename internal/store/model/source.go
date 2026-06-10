@@ -22,6 +22,7 @@ type Source struct {
 	OrgID       string `gorm:"uniqueIndex:sources_org_id_user_name;not null"`
 	Inventory   []byte `gorm:"type:jsonb"`
 	OnPremises  bool
+	UpdateType  string     `gorm:"type:VARCHAR(10);default:auto"`
 	Agents      []Agent    `gorm:"constraint:OnDelete:CASCADE;"`
 	ImageInfra  ImageInfra `gorm:"constraint:OnDelete:CASCADE;"`
 	Labels      []Label    `gorm:"foreignKey:SourceID;references:ID;constraint:OnDelete:CASCADE;"`
