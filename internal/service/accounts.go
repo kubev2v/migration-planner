@@ -274,6 +274,17 @@ func (s *AccountsService) CreateMember(ctx context.Context, member model.Member)
 		return model.Member{}, err
 	}
 
+	existing, lookupErr := s.store.Accounts().GetMember(ctx, member.Username)
+	if lookupErr == nil {
+		if existing.GroupID != member.GroupID {
+			return model.Member{}, NewErrMemberExistsInAnotherGroup(member.Username)
+		}
+		return model.Member{}, NewErrDuplicateKey("member", member.Username)
+	}
+	if !errors.Is(lookupErr, store.ErrRecordNotFound) {
+		return model.Member{}, fmt.Errorf("failed to check existing member: %w", lookupErr)
+	}
+
 	ctx, err := s.store.NewTransactionContext(ctx)
 	if err != nil {
 		return model.Member{}, err

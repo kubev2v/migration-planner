@@ -308,6 +308,29 @@ var _ = Describe("accounts service", Ordered, func() {
 				Expect(err).To(BeAssignableToTypeOf(dupKey))
 			})
 
+			It("returns descriptive error when member already belongs to another group", func() {
+				groupA := uuid.New()
+				groupB := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, groupA, "Group A", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, groupB, "Group B", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsMemberStm, uuid.New(), "shareduser", "shared@acme.com", groupA))
+				Expect(tx.Error).To(BeNil())
+
+				member := model.Member{
+					Username: "shareduser",
+					Email:    "shared@acme.com",
+					GroupID:  groupB,
+				}
+				_, err := svc.CreateMember(context.TODO(), member)
+				Expect(err).ToNot(BeNil())
+				var dupKey *service.ErrDuplicateKey
+				Expect(err).To(BeAssignableToTypeOf(dupKey))
+				Expect(err.Error()).To(ContainSubstring("already belongs to another group"))
+			})
+
 			AfterEach(func() {
 				gormdb.Exec("DELETE FROM members;")
 				gormdb.Exec("DELETE FROM groups;")
