@@ -119,6 +119,10 @@ func NewErrDuplicateKey(resourceType, name string) *ErrDuplicateKey {
 	return &ErrDuplicateKey{fmt.Errorf("%s with name %q already exists", resourceType, name)}
 }
 
+func NewErrMemberExistsInAnotherGroup(username string) *ErrDuplicateKey {
+	return &ErrDuplicateKey{fmt.Errorf("member %q already belongs to another group", username)}
+}
+
 func NewErrAssessmentDuplicateName(name string) *ErrDuplicateKey {
 	return NewErrDuplicateKey("assessment", name)
 }

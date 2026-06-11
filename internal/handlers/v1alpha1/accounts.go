@@ -346,7 +346,7 @@ func (h *ServiceHandler) CreateGroupMember(ctx context.Context, request server.C
 		case *service.ErrResourceNotFound:
 			return server.CreateGroupMember404JSONResponse{Message: "group not found"}, nil
 		case *service.ErrDuplicateKey:
-			return server.CreateGroupMember409JSONResponse{Message: "member already exists"}, nil
+			return server.CreateGroupMember409JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
 			return server.CreateGroupMember500JSONResponse{Message: fmt.Sprintf("failed to create member: %v", err)}, nil
