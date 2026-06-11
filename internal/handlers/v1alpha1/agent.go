@@ -78,6 +78,7 @@ func (h *AgentHandler) UpdateAgentStatus(ctx context.Context, request agentServe
 
 	v := validator.NewValidator()
 	v.Register(validator.NewAgentValidationRules()...)
+	v.RegisterStructValidation(validator.AgentStatusUpdateValidator(), v1alpha1.AgentStatusUpdate{})
 	if err := v.Struct(form); err != nil {
 		return agentServer.UpdateAgentStatus400JSONResponse{Message: err.Error()}, nil
 	}
