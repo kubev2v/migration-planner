@@ -141,6 +141,13 @@ parameters:
   - name: SIZER_IMAGE_PULL_POLICY
     description: Image pull policy for the sizer service
     value: Always
+  # OMA Lightspeed Config values
+  - name: OMA_LIGHTSPEED_HOST
+    description: Hostname of the oma-lightspeed service (FQDN for cross-namespace, e.g. oma-lightspeed.my-namespace.svc.cluster.local)
+    value: oma-lightspeed
+  - name: OMA_LIGHTSPEED_PORT
+    description: Port for the oma-lightspeed service
+    value: "8080"
 
 objects:
   - kind: ServiceAccount
@@ -319,6 +326,21 @@ objects:
                       socket_address:
                         address: cost-estimation
                         port_value: 9205
+
+          # This cluster is used to send requests to the oma-lightspeed service.
+          - name: backend-oma-lightspeed
+            connect_timeout: 1s
+            type: STRICT_DNS
+            lb_policy: ROUND_ROBIN
+            load_assignment:
+              cluster_name: backend-oma-lightspeed
+              endpoints:
+              - lb_endpoints:
+                - endpoint:
+                    address:
+                      socket_address:
+                        address: ${OMA_LIGHTSPEED_HOST}
+                        port_value: ${OMA_LIGHTSPEED_PORT}
 
           listeners:
 
@@ -514,6 +536,20 @@ objects:
                               pattern:
                                 regex: "^${SERVICE_API_PATH}/api/v1/cost-estimation"
                               substitution: "/api/v1/cost-estimation"
+                        - match:
+                            prefix: "${SERVICE_API_PATH}/api/v1/oma-lightspeed"
+                          route:
+                            cluster: backend-oma-lightspeed
+                            timeout: 300s
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/oma-lightspeed"
+                              substitution: "/v1"
+                          request_headers_to_add:
+                            - header:
+                                key: "Authorization"
+                                value: "%REQ(X-Authorization)%"
+                              append_action: OVERWRITE_IF_EXISTS_OR_ADD
                     http_filters:
                     - name: envoy.filters.http.router
                       typed_config:
