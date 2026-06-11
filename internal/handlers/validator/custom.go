@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	agentV1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 )
 
 var (
@@ -231,6 +233,16 @@ func AssessmentFormValidator() validator.StructLevelFunc {
 		// If sourceType is "agent", validate that sourceId is provided
 		if val.SourceType == "agent" && val.SourceId == nil {
 			sl.ReportError("SourceType", "SourceType", "sourceType", "agent", "")
+		}
+	}
+}
+
+func AgentStatusUpdateValidator() validator.StructLevelFunc {
+	return func(sl validator.StructLevel) {
+		val, _ := sl.Current().Interface().(agentV1alpha1.AgentStatusUpdate)
+		u, err := url.Parse(val.CredentialUrl)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+			sl.ReportError(val.CredentialUrl, "credentialUrl", "CredentialUrl", "credential_url", "")
 		}
 	}
 }

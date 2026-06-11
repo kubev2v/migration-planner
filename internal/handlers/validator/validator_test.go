@@ -282,6 +282,50 @@ func TestAgentUpdateFormValidators(t *testing.T) {
 			shouldFail: true,
 		},
 		{
+			name: "validation ko -- javascript: URL is an XSS vector",
+			form: agentApi.AgentStatusUpdate{
+				SourceId:      uuid.New(),
+				Status:        "waiting-for-credentials",
+				StatusInfo:    "someinfo",
+				CredentialUrl: "javascript:alert(document.cookie)",
+				Version:       "someversion",
+			},
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- data: URL is an XSS vector",
+			form: agentApi.AgentStatusUpdate{
+				SourceId:      uuid.New(),
+				Status:        "waiting-for-credentials",
+				StatusInfo:    "someinfo",
+				CredentialUrl: "data:text/html,<script>alert(1)</script>",
+				Version:       "someversion",
+			},
+			shouldFail: true,
+		},
+		{
+			name: "validation ko -- ftp: URL is not an allowed scheme",
+			form: agentApi.AgentStatusUpdate{
+				SourceId:      uuid.New(),
+				Status:        "waiting-for-credentials",
+				StatusInfo:    "someinfo",
+				CredentialUrl: "ftp://agent.com/credentials",
+				Version:       "someversion",
+			},
+			shouldFail: true,
+		},
+		{
+			name: "validation ok -- https URL passes",
+			form: agentApi.AgentStatusUpdate{
+				SourceId:      uuid.New(),
+				Status:        "waiting-for-credentials",
+				StatusInfo:    "someinfo",
+				CredentialUrl: "https://agent.com",
+				Version:       "someversion",
+			},
+			shouldFail: false,
+		},
+		{
 			name: "validation ko -- version has more than 20 characters",
 			form: agentApi.AgentStatusUpdate{
 				SourceId:      uuid.New(),
@@ -357,6 +401,7 @@ func TestAgentUpdateFormValidators(t *testing.T) {
 
 	v := NewValidator()
 	v.Register(NewAgentValidationRules()...)
+	v.RegisterStructValidation(AgentStatusUpdateValidator(), agentApi.AgentStatusUpdate{})
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
