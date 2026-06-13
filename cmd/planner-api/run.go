@@ -98,12 +98,17 @@ var runCmd = &cobra.Command{
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
 		// Create Kafka producer and event writer
-		writer, producerCleanup, err := createEventWriter(ctx, cfg)
-		if err != nil {
-			zap.S().Warnw("failed to create kafka producer", "error", err)
+		var writer events.Writer = events.NewNoOpWriter()
+
+		if cfg.Kafka.Enabled {
+			var cleanup func()
+			writer, cleanup, err = createEventWriter(ctx, cfg)
+			if err != nil {
+				zap.S().Warnw("failed to create kafka producer", "error", err)
+			}
+			defer cleanup()
+			zap.S().Info("Kafka writer initialized")
 		}
-		defer producerCleanup()
-		zap.S().Info("Kafka writer initialized")
 
 		// Start outbox dispatcher
 		dispatcher := eventwrap.NewOutboxDispatcher(store, writer, 5*time.Second)
@@ -174,12 +179,6 @@ func newListener(address string) (net.Listener, error) {
 }
 
 func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, func(), error) {
-	noop := func() {}
-
-	if !cfg.Kafka.Enabled {
-		return events.NewNoOpWriter(), noop, nil
-	}
-
 	brokers := strings.Split(cfg.Kafka.Brokers, ",")
 	var kafkaOpts []kgo.Opt
 
@@ -194,6 +193,8 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, 
 		}
 		kafkaOpts = append(kafkaOpts, kgo.SASL(mechanism.AsSha512Mechanism()))
 	}
+
+	noop := func() {}
 
 	producer, err := events.NewKafkaProducer(brokers, kafkaOpts...)
 	if err != nil {
