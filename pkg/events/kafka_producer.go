@@ -15,6 +15,8 @@ type Writer interface {
 	Write(ctx context.Context, topic string, data []byte) error
 }
 
+const maxProducerBatchBytes = 10 * 1024 * 1024 // 10 MiB
+
 type KafkaProducer struct {
 	cl *kgo.Client
 }
@@ -29,6 +31,7 @@ func NewKafkaProducer(brokers []string, opts ...kgo.Opt) (*KafkaProducer, error)
 		kgo.SeedBrokers(brokers...),
 		kgo.ClientID(clientID),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
+		kgo.ProducerBatchMaxBytes(maxProducerBatchBytes),
 		kgo.WithHooks(kprom.NewMetrics("kafka_producer")),
 	}
 
