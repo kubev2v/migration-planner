@@ -130,10 +130,13 @@ When an agent or backend change has a corresponding UI change in the same releas
 
 ## Output Format
 
-Present the release notes grouped by type:
+Start with a summary header showing the comparison scope, then present notes grouped by type:
 
 ```markdown
 ## Release Notes for <version>
+
+**Compare:** <previous-tag> → <target-tag>
+**Changes:** <total number of commits across all repos>
 
 ### Enhancements
 - <note>
