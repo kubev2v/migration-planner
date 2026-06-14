@@ -1,98 +1,153 @@
+---
+name: release-notes
+description: Use when drafting customer-facing release notes for OpenShift Migration Advisor releases, comparing GitHub release tags across migration-planner and related repos
+---
+
 # Skill: Release Notes Drafting
 
 ## Overview
 
-Draft customer-facing release notes from Jira tickets for OpenShift Migration Advisor releases. Converts technical ticket content into clear, user-friendly text.
-
-## Use Cases
-
-- Drafting release note text from ECOPROJECT Jira tickets
-- Converting technical changes into customer-facing language
-
-## Requirements
-
-- Access to ticket via Jira MCP tool, cli or user-provided details
-- Clone of the repositories of assisted-migration-agent, migration-planner, migration planner-ui-app.
+Draft customer-facing release notes from GitHub changes between two release tags. Everything is GitHub-based — no Jira CLI or MCP tools needed. Jira ticket IDs are extracted from commit messages only.
 
 ## Inputs
 
-- GitHub release tag to generate the release notes for. 
-- Previous GitHub release tag to compare with
+- **Target release tag** — the release to generate notes for (e.g., `v0.13.6`)
+- **Previous release tag** — the tag to compare against (e.g., `v0.13.5`)
 
-## Data Sources to Analyze
+## Repositories
 
-1. **Ticket Description** - Primary context for what changed and why
-2. **Linked PRs/Commits** - Look for conventional commit types (`feat:`, `fix:`, etc.)
-3. **Technical Comments** - Implementation details to translate (not copy verbatim)
+The release spans 4 repositories, all under `kubev2v`:
+
+| Repository | Role | How Included in Release |
+|---|---|---|
+| `migration-planner` | Backend, API, orchestration | Main repo — release tagged here |
+| `assisted-migration-agent` | Discovery/assessment agent | Git submodule at `agent-v2/` |
+| `migration-planner-agent-ui` | Agent UI (credential collection, status) | SHA pinned in `build/migration-planner-iso/config` as `AGENT_UI_IMAGE_TAG` |
+| `migration-planner-ui-app` | SaaS web UI | Tagged with the same version as migration-planner |
+
+### Source of Truth: migration-planner
+
+The `migration-planner` repo is the **source of truth** for what's included in a release:
+
+- **Agent changes**: Only included if the submodule SHA at `agent-v2/` was updated between the two release tags. To find the range of agent commits in a release:
+  ```
+  git ls-tree <previous-tag> agent-v2   # → old SHA
+  git ls-tree <target-tag> agent-v2     # → new SHA
+  ```
+  Then compare those SHAs in the `assisted-migration-agent` repo.
+
+- **Agent UI changes**: Only included if `AGENT_UI_IMAGE_TAG` in `build/migration-planner-iso/config` changed between tags:
+  ```
+  git show <previous-tag>:build/migration-planner-iso/config
+  git show <target-tag>:build/migration-planner-iso/config
+  ```
+  Then compare those SHAs in the `migration-planner-agent-ui` repo.
+
+- **UI App changes**: Compare the same version tags on the `migration-planner-ui-app` repo:
+  ```
+  gh api repos/kubev2v/migration-planner-ui-app/compare/<previous-tag>...<target-tag>
+  ```
+
+## Flow
+
+1. **Determine SHA ranges for each repo:**
+   - `migration-planner`: `git log --oneline --no-merges <prev-tag>..<target-tag>`
+   - `assisted-migration-agent`: Compare submodule SHAs (see above)
+   - `migration-planner-agent-ui`: Compare `AGENT_UI_IMAGE_TAG` values (see above)
+   - `migration-planner-ui-app`: Compare same version tags
+
+2. **Fetch commits for each repo** using `gh` CLI or `git log`.
+
+3. **Filter for user-facing changes only.** This is the critical step — see the filtering rules below.
+
+4. **Classify each change** by release note type.
+
+5. **Draft customer-facing text** following the writing guidelines.
+
+## User-Facing Filtering Rules
+
+**Only include changes that are visible to the user.** The release notes are for end users, not engineers.
+
+### Include
+- UI changes (new screens, modified workflows, new buttons, visual changes)
+- Changes that affect what users see or interact with (new features, changed behavior)
+- Fixes for bugs that users could encounter
+- Agent UI changes that affect the credential collection or status display
+
+### Exclude
+- Backend-only changes (API refactors, internal error handling, database changes) **unless** they result in a visible behavior change
+- Agent-only changes (data collection, internal processing) **unless** they affect what shows up in the UI
+- Dependency updates, CI/CD changes, build system changes
+- Internal refactors, code cleanup, test changes
+- Submodule/SHA bump commits themselves (e.g., "Update submodule to reflect the SHA: ...")
+- Commits with `NO-JIRA` prefix that are purely infrastructure
+- Renovate/Dependabot automated commits
+
+### Cross-Reference Rule
+When an agent or backend change has a corresponding UI change in the same release, **describe it from the user's perspective** — what they see changed, not what was changed internally.
 
 ## Release Note Types
 
-| Type               | Use When                   | Maps From Commit         |
-|--------------------|----------------------------|--------------------------|
-| Bug Fix            | Patches a defect           | `fix`                    |
-| Enhancement        | New feature or improvement | `feat`, `perf`           |
-| Technology Preview | Experimental feature       | `feat` + preview context |
-| Deprecated         | Feature marked for removal | N/A                      |
-| Removed            | Feature removed            | N/A                      |
-| Known Issue        | Documented limitation      | N/A                      |
+| Type | Use When | Commit Prefix |
+|---|---|---|
+| Enhancement | New feature or improvement visible to users | `feat` |
+| Bug Fix | Fix for a user-visible defect | `fix` |
+| Known Issue | Documented limitation users should know about | N/A |
 
 ## Writing Guidelines
 
 ### Structure
 ```
-[What changed] + [Why it matters] + [Optional: How to use]
+[What changed for the user] + [Why it matters]
 ```
 
 ### Do
 - Use "you can now" / "this fixes" / "this adds"
 - Focus on user benefits and outcomes
 - Keep it 2-3 sentences max
-- Use product names customers recognize
+- Use product names customers recognize (Migration Advisor, not "the planner")
 
 ### Don't
 - Expose internal implementation details
-- Use undefined jargon or acronyms
-- Include code snippets or API details
-- Reference internal components users don't see
+- Use internal acronyms or code references
+- Reference internal component names (chi router, envoy, cbor, etc.)
+- Include Jira ticket IDs in the note text
+- Mention backend/agent internals
 
-### Security - Never Include
+### Never Include
 - Internal URLs or paths
-- Customer-specific details
 - Security vulnerability details
-- Debugging information or stack traces
-
-## Flow / Logic
-
-1. Fetch Jira ticket data (MCP tool, cli or ask user for details) compare and analyze the actual GitHub changes
-2. Extract key information:
-   - What problem was solved?
-   - What capability was added?
-   - User-facing impact (not implementation)
-3. Identify Release Note Type from commit types/context
-4. Draft customer-facing text following writing guidelines
-5. Present draft with suggested Jira field values
-
-## Outputs
-
-| Name              | Type   | Description                                  |
-|-------------------|--------|----------------------------------------------|
-| release_note_type | string | Bug Fix, Enhancement, etc.                   |
-| draft_text        | string | Customer-facing release note (2-3 sentences) |
-
-## Common Mistakes to Avoid
-
-| Wrong ❌                                         | Right ✅                                           |
-|-------------------------------------------------|---------------------------------------------------|
-| "Refactored the auth module to use new library" | "Authentication is now more reliable"             |
-| "Fixed NPE in VMwareClient.java line 42"        | "Fixed crash when connecting to VMware source"    |
-| "Updated to use v2 API endpoints"               | "Improved compatibility with latest OpenShift"    |
-| "Implements RFC-9999 compliance"                | "Supports industry-standard configuration format" |
+- Stack traces or debugging information
+- Customer-specific details
 
 ## Example
 
-### Input
-**Tag:** Release noted for V0.10.0
+### Wrong
+"Refactored credentialUrl validator to reject javascript: protocol URLs in source configuration"
 
-### Notes
+### Right
+"Fixed a security issue where certain URL formats were incorrectly accepted when configuring migration sources."
 
-- Engineers manually update Jira fields. Claude does not modify Jira tickets.
+## Output Format
+
+Present the release notes grouped by type:
+
+```markdown
+## Release Notes for <version>
+
+### Enhancements
+- <note>
+
+### Bug Fixes
+- <note>
+
+### Known Issues
+- <note>
+```
+
+If a release has no user-facing changes, state that explicitly rather than inventing notes.
+
+## Notes
+
+- Engineers review and may edit the generated notes before publishing
+- When in doubt about whether a change is user-facing, err on the side of excluding it
