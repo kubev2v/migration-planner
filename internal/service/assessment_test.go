@@ -43,8 +43,9 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		inner := service.NewAssessmentService(s, nil, service.NewAccountsService(s))
-		svc = eventwrap.NewEventAssessmentService(inner, s)
+		accountsSvc := service.NewAccountsService(s)
+		inner := service.NewAssessmentService(s, nil, accountsSvc)
+		svc = eventwrap.NewEventAssessmentService(inner, s, accountsSvc)
 	})
 
 	AfterAll(func() {

@@ -192,7 +192,7 @@ func (s *Server) Run(ctx context.Context) error {
 		accountsSvc   service.AccountsServicer
 	)
 	partnerSvc = eventwrap.NewEventPartnerService(service.NewPartnerService(s.store, innerAccountsSvc), s.store)
-	assessmentSvc = eventwrap.NewEventAssessmentService(service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc), s.store)
+	assessmentSvc = eventwrap.NewEventAssessmentService(service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc), s.store, innerAccountsSvc)
 	accountsSvc = innerAccountsSvc
 
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
