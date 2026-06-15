@@ -121,12 +121,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
-	sourceIDStr := source.ID.String()
-	payload := events.NewUserActionPayload(events.UserActionData{
-		Username:  source.Username,
-		SourceID:  &sourceIDStr,
-		Timestamp: time.Now().UTC(),
-	})
+	payload := events.NewOVADownloadPayload(source.Username, source.ID.String())
 	ceBytes, err := events.BuildCloudEvent(events.DownloadOVAEventType, payload)
 	if err != nil {
 		zap.S().Warnw("failed to build download event", "source_id", source.ID, "error", err)

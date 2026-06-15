@@ -2,7 +2,6 @@ package eventwrap
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -81,12 +80,7 @@ func (e *EventEstimationService) publishUserAction(ctx context.Context, assessme
 	if err != nil {
 		return err
 	}
-	assessmentIDStr := assessmentID.String()
-	payload := events.NewUserActionPayload(events.UserActionData{
-		Username:     assessment.Username,
-		AssessmentID: &assessmentIDStr,
-		Timestamp:    time.Now().UTC(),
-	})
+	payload := events.NewComplexityPayload(assessment.Username, assessmentID.String())
 	ceBytes, err := events.BuildCloudEvent(eventType, payload)
 	if err != nil {
 		return err

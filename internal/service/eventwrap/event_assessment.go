@@ -2,7 +2,6 @@ package eventwrap
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -14,13 +13,14 @@ import (
 )
 
 type EventAssessmentService struct {
-	inner  service.AssessmentServicer
-	store  store.Store
-	outbox *OutboxService
+	inner       service.AssessmentServicer
+	store       store.Store
+	outbox      *OutboxService
+	accountsSvc service.AccountsServicer
 }
 
-func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store) service.AssessmentServicer {
-	return &EventAssessmentService{inner: inner, store: s, outbox: NewOutboxService(s)}
+func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store, accountsSvc service.AccountsServicer) service.AssessmentServicer {
+	return &EventAssessmentService{inner: inner, store: s, outbox: NewOutboxService(s), accountsSvc: accountsSvc}
 }
 
 func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]model.Assessment, error) {
@@ -133,21 +133,16 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		_, _ = store.Rollback(ctx)
 	}()
 
-	assessment, err := e.inner.GetAssessment(ctx, id)
-	if err != nil {
-		return err
-	}
-
 	if err := e.inner.ShareAssessment(ctx, id); err != nil {
 		return err
 	}
 
-	assessmentID := assessment.ID.String()
-	payload := events.NewUserActionPayload(events.UserActionData{
-		Username:     user.Username,
-		AssessmentID: &assessmentID,
-		Timestamp:    time.Now().UTC(),
-	})
+	identity, err := e.accountsSvc.GetIdentity(ctx, user)
+	if err != nil {
+		return err
+	}
+
+	payload := events.NewShareAssessmentPayload(user.Username, id.String(), *identity.PartnerID)
 	ceBytes, err := events.BuildCloudEvent(events.ShareAssessmentEventType, payload)
 	if err != nil {
 		return err
@@ -174,21 +169,11 @@ func (e *EventAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 		_, _ = store.Rollback(ctx)
 	}()
 
-	assessment, err := e.inner.GetAssessment(ctx, id)
-	if err != nil {
-		return err
-	}
-
 	if err := e.inner.UnshareAssessment(ctx, id); err != nil {
 		return err
 	}
 
-	assessmentIDStr := assessment.ID.String()
-	payload := events.NewUserActionPayload(events.UserActionData{
-		Username:     user.Username,
-		AssessmentID: &assessmentIDStr,
-		Timestamp:    time.Now().UTC(),
-	})
+	payload := events.NewUnshareAssessmentPayload(user.Username, id.String())
 	ceBytes, err := events.BuildCloudEvent(events.UnshareAssessmentEventType, payload)
 	if err != nil {
 		return err

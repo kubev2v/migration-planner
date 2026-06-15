@@ -2,7 +2,6 @@ package eventwrap
 
 import (
 	"context"
-	"time"
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -37,12 +36,7 @@ func (e *EventSizerService) CalculateClusterRequirements(
 		return nil, err
 	}
 
-	assessmentIDStr := assessmentID.String()
-	payload := events.NewUserActionPayload(events.UserActionData{
-		Username:     assessment.Username,
-		AssessmentID: &assessmentIDStr,
-		Timestamp:    time.Now().UTC(),
-	})
+	payload := events.NewSizingPayload(assessment.Username, assessmentID.String())
 	ceBytes, err := events.BuildCloudEvent(events.SizingEventType, payload)
 	if err != nil {
 		return nil, err
