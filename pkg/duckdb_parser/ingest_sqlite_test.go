@@ -21,9 +21,12 @@ type sqliteCluster struct {
 
 // sqliteVM describes a VM for createTestSQLite.
 type sqliteVM struct {
-	id          string
-	name        string
-	clusterName string // must match a sqliteCluster.name
+	id            string
+	name          string
+	clusterName   string // must match a sqliteCluster.name
+	ipAddress     string // primary IP; defaults to "" when empty
+	nics          string // JSON array; defaults to "[]" when empty
+	guestNetworks string // JSON array; defaults to "[]" when empty
 }
 
 // createTestSQLite builds a minimal forklift SQLite database at a temp path and returns
@@ -68,7 +71,8 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			Disks VARCHAR, NICs VARCHAR,
 			CpuHotAddEnabled INTEGER, CpuHotRemoveEnabled INTEGER, CoresPerSocket INTEGER,
 			MemoryHotAddEnabled INTEGER, BalloonedMemory INTEGER,
-			GuestApps VARCHAR DEFAULT '[]'
+			GuestApps VARCHAR DEFAULT '[]',
+			GuestNetworks VARCHAR DEFAULT '[]'
 		)`,
 
 		// Network (referenced by ingest template; empty is fine for these tests)
@@ -127,18 +131,35 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			if vm.clusterName != c.name {
 				continue
 			}
+			nics := vm.nics
+			if nics == "" {
+				nics = "[]"
+			}
+			guestNetworks := vm.guestNetworks
+			if guestNetworks == "" {
+				guestNetworks = "[]"
+			}
 			_, err = db.Exec(fmt.Sprintf(
-				`INSERT INTO dst.VM VALUES (
+				`INSERT INTO dst.VM (
+					ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
+					FaultToleranceEnabled, CpuCount, MemoryMB, GuestName, GuestNameFromVmwareTools,
+					HostName, IpAddress, StorageUsed, IsTemplate, ChangeTrackingEnabled, DiskEnableUuid,
+					Disks, NICs, CpuHotAddEnabled, CpuHotRemoveEnabled, CoresPerSocket,
+					MemoryHotAddEnabled, BalloonedMemory, GuestApps, GuestNetworks
+				) VALUES (
 					'%s', '%s', 'folder-1', '%s',
 					'%s', 'bios', 'poweredOn', 'connected',
-					0, 4, 8192, 'rhel', 'rhel', '', '',
-					10737418240, 0, 0, 0, '[]', '[]',
-					0, 0, 2, 0, 0, '[]'
+					0, 4, 8192, 'rhel', 'rhel', '', '%s',
+					10737418240, 0, 0, 0, '[]', '%s',
+					0, 0, 2, 0, 0, '[]', '%s'
 				)`,
 				escapeSQLString(vm.id),
 				escapeSQLString(vm.name),
 				escapeSQLString(hostID),
 				escapeSQLString(vm.id+"-uuid"),
+				escapeSQLString(vm.ipAddress),
+				escapeSQLString(nics),
+				escapeSQLString(guestNetworks),
 			))
 			require.NoError(t, err)
 		}
@@ -241,6 +262,101 @@ func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {
 	// vcluster must not contain IDs absent from Inventory.Clusters.
 	assert.Len(t, vclusterIDs, len(inv.Clusters),
 		"vcluster row count should match Inventory.Clusters count")
+}
+
+func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{
+			id:          "vm-001",
+			name:        "vm-1",
+			clusterName: "cluster1",
+			ipAddress:   "10.0.0.1",
+			nics: `[` +
+				`{"network":{"kind":"Network","id":"net-1"},"mac":"aa:bb:cc:dd:ee:01","order":0,"deviceKey":100},` +
+				`{"network":{"kind":"Network","id":"net-1"},"mac":"aa:bb:cc:dd:ee:02","order":1,"deviceKey":101}` +
+				`]`,
+			guestNetworks: `[` +
+				`{"mac":"aa:bb:cc:dd:ee:01","ip":"10.0.0.1","prefix":24,"device":"eth0","network":"VM Network","origin":"","deviceConfigId":100},` +
+				`{"mac":"aa:bb:cc:dd:ee:02","ip":"10.0.0.2","prefix":24,"device":"eth1","network":"VM Network","origin":"","deviceConfigId":101}` +
+				`]`,
+		},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx,
+		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-001' ORDER BY "Mac Address"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	type nicRow struct{ mac, ipv4 string }
+	var nics []nicRow
+	for rows.Next() {
+		var r nicRow
+		require.NoError(t, rows.Scan(&r.mac, &r.ipv4))
+		nics = append(nics, r)
+	}
+	require.NoError(t, rows.Err())
+
+	require.Len(t, nics, 2)
+	assert.Equal(t, "10.0.0.1", nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
+	assert.Equal(t, "10.0.0.2", nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
+}
+
+func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{
+			id:          "vm-002",
+			name:        "vm-2",
+			clusterName: "cluster1",
+			ipAddress:   "192.168.1.50",
+			nics: `[` +
+				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:01","order":0,"deviceKey":200},` +
+				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:02","order":1,"deviceKey":201}` +
+				`]`,
+			// guestNetworks intentionally empty — should fall back to v.IpAddress
+		},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx,
+		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-002' ORDER BY "Mac Address"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	type nicRow struct{ mac, ipv4 string }
+	var nics []nicRow
+	for rows.Next() {
+		var r nicRow
+		require.NoError(t, rows.Scan(&r.mac, &r.ipv4))
+		nics = append(nics, r)
+	}
+	require.NoError(t, rows.Err())
+
+	require.Len(t, nics, 2)
+	assert.Equal(t, "192.168.1.50", nics[0].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
+	assert.Equal(t, "192.168.1.50", nics[1].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
 }
 
 func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {
