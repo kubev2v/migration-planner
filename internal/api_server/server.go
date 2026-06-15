@@ -65,7 +65,46 @@ func New(
 
 const oldSchemaErrorMessage = "The uploaded file is using an old schema version and cannot be parsed. Generate a new OVA file, import to your vSphere environment and then try to upload it again."
 
+var standaloneFieldNames = map[string]string{
+	"totalVMs":                "Total VMs",
+	"totalCPU":                "Total CPU cores",
+	"totalMemory":             "Total memory (GB)",
+	"workerNodeCPU":           "Worker node CPU (cores)",
+	"workerNodeMemory":        "Worker node memory (GB)",
+	"workerNodeThreads":       "Worker node threads",
+	"controlPlaneCPU":         "Control plane CPU (cores)",
+	"controlPlaneMemory":      "Control plane memory (GB)",
+	"controlPlaneNodeCount":   "Control plane node count",
+	"controlPlaneSchedulable": "Control plane schedulable",
+	"hostedControlPlane":      "Hosted control plane",
+	"cpuOverCommitRatio":      "CPU over-commit ratio",
+	"memoryOverCommitRatio":   "Memory over-commit ratio",
+}
+
+func parseStandaloneValidationError(message string) (string, bool) {
+	for fieldName, friendlyName := range standaloneFieldNames {
+		fieldPattern := fmt.Sprintf(`Error at "/%s":`, fieldName)
+		idx := strings.Index(message, fieldPattern)
+		if idx == -1 {
+			continue
+		}
+
+		constraint := strings.TrimSpace(message[idx+len(fieldPattern):])
+		constraint = strings.TrimPrefix(constraint, "number ")
+		constraint = strings.TrimPrefix(constraint, "value ")
+
+		return fmt.Sprintf("%s %s", friendlyName, constraint), true
+	}
+
+	return "", false
+}
+
 func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
+	if friendlyMsg, ok := parseStandaloneValidationError(message); ok {
+		http.Error(w, friendlyMsg, statusCode)
+		return
+	}
+
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
