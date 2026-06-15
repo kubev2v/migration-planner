@@ -174,6 +174,7 @@ var cpuOverCommitMultipliers = map[string]float64{
 	"1:2": 2.0,
 	"1:4": 4.0,
 	"1:6": 6.0,
+	"1:8": 8.0,
 }
 
 var memoryOverCommitMultipliers = map[string]float64{

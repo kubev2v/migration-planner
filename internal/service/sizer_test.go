@@ -392,7 +392,7 @@ var _ = Describe("sizer service", func() {
 			})
 
 			It("successfully handles different over-commit ratios", func() {
-				cpuRatios := []string{"1:1", "1:2", "1:4", "1:6"}
+				cpuRatios := []string{"1:1", "1:2", "1:4", "1:6", "1:8"}
 				memoryRatios := []string{"1:1", "1:2", "1:4"}
 
 				for _, cpuRatio := range cpuRatios {
@@ -507,6 +507,57 @@ var _ = Describe("sizer service", func() {
 				Expect(result.ResourceConsumption.Limits.Memory).To(Equal(0.0))
 				Expect(result.ResourceConsumption.OverCommitRatio.Cpu).To(Equal(1.5))
 				Expect(result.ResourceConsumption.OverCommitRatio.Memory).To(Equal(1.5))
+			})
+
+			It("successfully calculates with 1:8 CPU overcommit ratio", func() {
+				request.CpuOverCommitRatio = "1:8"
+				request.MemoryOverCommitRatio = "1:2"
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 800, 160) // 800 limit CPU
+				mockStore.assessments[assessmentID] = assessment
+
+				var sizerPayload client.SizerRequest
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+						Expect(json.NewDecoder(r.Body).Decode(&sizerPayload)).To(Succeed())
+					}
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						_ = json.NewEncoder(w).Encode(createTestSizerResponse(3, 1, 2, 100, 80))
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+
+				// Verify 1:8 ratio calculation: find the vm-workload and check that
+				// RequiredCPU = LimitCPU / 8.0 for at least one of its services
+				var vmWorkload *client.Workload
+				for i := range sizerPayload.Workloads {
+					if sizerPayload.Workloads[i].Name == "vm-workload" {
+						vmWorkload = &sizerPayload.Workloads[i]
+						break
+					}
+				}
+				Expect(vmWorkload).NotTo(BeNil(), "Expected to find vm-workload in payload")
+				Expect(vmWorkload.Services).NotTo(BeEmpty(), "Expected vm-workload to have services")
+
+				// Verify the first service applies the 1:8 ratio correctly
+				firstService := vmWorkload.Services[0]
+				Expect(firstService.LimitCPU).To(BeNumerically(">", 0), "Expected LimitCPU to be set")
+				expectedRequired := firstService.LimitCPU / 8.0
+				Expect(firstService.RequiredCPU).To(Equal(expectedRequired),
+					"Expected RequiredCPU = %v (limit) / 8.0 (multiplier) = %v", firstService.LimitCPU, expectedRequired)
 			})
 
 			It("successfully handles fallback node counting when Advanced data is missing", func() {
@@ -1157,6 +1208,55 @@ var _ = Describe("sizer service", func() {
 			Expect(result.ResourceConsumption.CPU).To(Equal(100.0))
 			Expect(result.ResourceConsumption.Memory).To(Equal(200.0))
 			Expect(mockStore.clusterInputs).To(BeEmpty())
+		})
+
+		It("successfully calculates with 1:8 CPU overcommit ratio", func() {
+			request.CpuOverCommitRatio = "1:8"
+			request.TotalCPU = 800 // 800 limit CPU with 1:8 ratio = 100 required CPU
+
+			var sizerPayload client.SizerRequest
+			testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/api/v1/size/custom" && r.Method == http.MethodPost {
+					Expect(json.NewDecoder(r.Body).Decode(&sizerPayload)).To(Succeed())
+				}
+				if r.URL.Path == "/health" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				if r.URL.Path == "/api/v1/size/custom" {
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_ = json.NewEncoder(w).Encode(createTestSizerResponse(5, 2, 3, 100, 80))
+					return
+				}
+				w.WriteHeader(http.StatusNotFound)
+			}))
+			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+			sizerService = service.NewSizerService(sizerClient, mockStore)
+
+			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
+
+			Expect(err).To(BeNil())
+			Expect(result).NotTo(BeNil())
+
+			// Verify 1:8 ratio calculation: find the vm-workload and check that
+			// RequiredCPU = LimitCPU / 8.0 for at least one of its services
+			var vmWorkload *client.Workload
+			for i := range sizerPayload.Workloads {
+				if sizerPayload.Workloads[i].Name == "vm-workload" {
+					vmWorkload = &sizerPayload.Workloads[i]
+					break
+				}
+			}
+			Expect(vmWorkload).NotTo(BeNil(), "Expected to find vm-workload in payload")
+			Expect(vmWorkload.Services).NotTo(BeEmpty(), "Expected vm-workload to have services")
+
+			// Verify the first service applies the 1:8 ratio correctly
+			firstService := vmWorkload.Services[0]
+			Expect(firstService.LimitCPU).To(BeNumerically(">", 0), "Expected LimitCPU to be set")
+			expectedRequired := firstService.LimitCPU / 8.0
+			Expect(firstService.RequiredCPU).To(Equal(expectedRequired),
+				"Expected RequiredCPU = %v (limit) / 8.0 (multiplier) = %v", firstService.LimitCPU, expectedRequired)
 		})
 
 		It("successfully handles hosted control plane (worker nodes only)", func() {

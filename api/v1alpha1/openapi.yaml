@@ -3089,8 +3089,8 @@ components:
 
     CpuOverCommitRatio:
       type: string
-      enum: ["1:1", "1:2", "1:4", "1:6"]
-      x-enum-varnames: ["CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix"]
+      enum: ["1:1", "1:2", "1:4", "1:6", "1:8"]
+      x-enum-varnames: ["CpuOneToOne", "CpuOneToTwo", "CpuOneToFour", "CpuOneToSix", "CpuOneToEight"]
       description: CPU over-commit ratio
 
     MemoryOverCommitRatio:
@@ -3185,7 +3185,7 @@ components:
           description: ID of the cluster
         cpuOverCommitRatio:
           type: string
-          enum: ["1:1", "1:2", "1:4", "1:6"]
+          enum: ["1:1", "1:2", "1:4", "1:6", "1:8"]
           description: CPU over-commit ratio (e.g., "1:4")
         memoryOverCommitRatio:
           type: string
