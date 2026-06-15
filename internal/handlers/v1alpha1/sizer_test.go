@@ -383,6 +383,39 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 			})
 
+			It("successfully accepts 1:8 CPU over-commit ratio", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOverCommitRatio("1:8"),
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+				}
+
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil, // sourceService
+					service.NewAssessmentService(mockStore, nil, nil),
+					nil, // jobService
+					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
+					nil,
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue(), "Expected 200 response, handler should accept 1:8 ratio")
+				Expect(successResp).NotTo(BeNil())
+			})
+
 			It("returns response with all required fields", func() {
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:             clusterID,
@@ -970,6 +1003,40 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 				Expect(errorResp.Message).To(ContainSubstring("invalid memory over-commit ratio"))
 				Expect(errorResp.Message).To(ContainSubstring("1:6"))
+			})
+
+			It("returns 400 when CPU over-commit ratio 1:10 is used", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOverCommitRatio("1:10"),
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+				}
+
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				handler = handlers.NewServiceHandler(
+					nil, // sourceService
+					service.NewAssessmentService(mockStore, nil, nil),
+					nil, // jobService
+					service.NewSizerService(sizerClient, mockStore),
+					nil, // estimationService
+					nil,
+					nil,
+				)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(errorResp.Message).To(ContainSubstring("invalid CPU over-commit ratio"))
+				Expect(errorResp.Message).To(ContainSubstring("1:10"))
+				Expect(errorResp.Message).To(ContainSubstring("Valid values are: 1:1, 1:2, 1:4, 1:6, 1:8"))
 			})
 
 			It("returns 400 when workerNodeThreads is less than workerNodeCPU", func() {

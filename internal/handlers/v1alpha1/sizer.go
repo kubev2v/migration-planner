@@ -20,7 +20,7 @@ const (
 
 var (
 	validCPUOverCommitRatios = map[string]struct{}{
-		"1:1": {}, "1:2": {}, "1:4": {}, "1:6": {},
+		"1:1": {}, "1:2": {}, "1:4": {}, "1:6": {}, "1:8": {},
 	}
 	validMemoryOverCommitRatios = map[string]struct{}{
 		"1:1": {}, "1:2": {}, "1:4": {},
@@ -30,7 +30,7 @@ var (
 func validateOverCommitRatios(cpu api.CpuOverCommitRatio, mem api.MemoryOverCommitRatio) error {
 	if _, ok := validCPUOverCommitRatios[string(cpu)]; !ok {
 		return fmt.Errorf(
-			"invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6",
+			"invalid CPU over-commit ratio: %s. Valid values are: 1:1, 1:2, 1:4, 1:6, 1:8",
 			cpu,
 		)
 	}

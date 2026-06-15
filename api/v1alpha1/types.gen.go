@@ -59,6 +59,7 @@ const (
 	ClusterRequirementsStoredInputCpuOverCommitRatioN12 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:2"
 	ClusterRequirementsStoredInputCpuOverCommitRatioN14 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:4"
 	ClusterRequirementsStoredInputCpuOverCommitRatioN16 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:6"
+	ClusterRequirementsStoredInputCpuOverCommitRatioN18 ClusterRequirementsStoredInputCpuOverCommitRatio = "1:8"
 )
 
 // Defines values for ClusterRequirementsStoredInputMemoryOverCommitRatio.
@@ -70,10 +71,11 @@ const (
 
 // Defines values for CpuOverCommitRatio.
 const (
-	CpuOneToFour CpuOverCommitRatio = "1:4"
-	CpuOneToOne  CpuOverCommitRatio = "1:1"
-	CpuOneToSix  CpuOverCommitRatio = "1:6"
-	CpuOneToTwo  CpuOverCommitRatio = "1:2"
+	CpuOneToEight CpuOverCommitRatio = "1:8"
+	CpuOneToFour  CpuOverCommitRatio = "1:4"
+	CpuOneToOne   CpuOverCommitRatio = "1:1"
+	CpuOneToSix   CpuOverCommitRatio = "1:6"
+	CpuOneToTwo   CpuOverCommitRatio = "1:2"
 )
 
 // Defines values for GroupKind.
