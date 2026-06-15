@@ -6,6 +6,7 @@ package v1alpha1
 import (
 	"time"
 
+	externalRef0 "github.com/kubev2v/migration-planner-common/api/inventory"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -31,14 +32,6 @@ const (
 	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
 	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
-)
-
-// Defines values for ClusterFeaturesDrsMode.
-const (
-	FullyAutomated     ClusterFeaturesDrsMode = "Fully Automated"
-	Manual             ClusterFeaturesDrsMode = "Manual"
-	None               ClusterFeaturesDrsMode = "None"
-	PartiallyAutomated ClusterFeaturesDrsMode = "Partially Automated"
 )
 
 // Defines values for ClusterRequirementsRequestControlPlaneNodeCount.
@@ -111,14 +104,6 @@ const (
 	MemoryOneToFour MemoryOverCommitRatio = "1:4"
 	MemoryOneToOne  MemoryOverCommitRatio = "1:1"
 	MemoryOneToTwo  MemoryOverCommitRatio = "1:2"
-)
-
-// Defines values for NetworkType.
-const (
-	Distributed NetworkType = "distributed"
-	Dvswitch    NetworkType = "dvswitch"
-	Standard    NetworkType = "standard"
-	Unsupported NetworkType = "unsupported"
 )
 
 // Defines values for OptimizationStatusReason.
@@ -208,9 +193,9 @@ type AssessmentSourceType string
 
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
-	Inventory *Inventory          `json:"inventory,omitempty"`
-	Name      string              `json:"name" validate:"required,assessment_name"`
-	SourceId  *openapi_types.UUID `json:"sourceId,omitempty"`
+	Inventory *externalRef0.Inventory `json:"inventory,omitempty"`
+	Name      string                  `json:"name" validate:"required,assessment_name"`
+	SourceId  *openapi_types.UUID     `json:"sourceId,omitempty"`
 
 	// SourceType Source of the assessment data:
 	//  * `inventory` - Manual inventory upload via JSON
@@ -242,21 +227,6 @@ type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name"`
 }
-
-// ClusterFeatures defines model for ClusterFeatures.
-type ClusterFeatures struct {
-	// DrsEnabled Whether DRS (Distributed Resource Scheduler) is enabled for this cluster
-	DrsEnabled *bool `json:"drsEnabled,omitempty"`
-
-	// DrsMode DRS automation mode for the cluster
-	DrsMode *ClusterFeaturesDrsMode `json:"drsMode,omitempty"`
-
-	// StorageDrsEnabled Whether Storage DRS is enabled for this cluster
-	StorageDrsEnabled *bool `json:"storageDrsEnabled,omitempty"`
-}
-
-// ClusterFeaturesDrsMode DRS automation mode for the cluster
-type ClusterFeaturesDrsMode string
 
 // ClusterRequirementsRequest Request payload for calculating cluster requirements
 type ClusterRequirementsRequest struct {
@@ -393,30 +363,6 @@ type ClusterSizing struct {
 	WorkerNodes int `json:"workerNodes"`
 }
 
-// ClusterUtilization defines model for ClusterUtilization.
-type ClusterUtilization struct {
-	// Confidence Data coverage confidence percentage (0-100), calculated as vCPU-weighted coverage
-	Confidence float64 `json:"confidence"`
-
-	// CpuAvg Average CPU utilization percentage (0-100)
-	CpuAvg float64 `json:"cpu_avg"`
-
-	// CpuMax Maximum CPU utilization percentage (0-100)
-	CpuMax float64 `json:"cpu_max"`
-
-	// CpuP95 95th percentile CPU utilization percentage (0-100)
-	CpuP95 float64 `json:"cpu_p95"`
-
-	// MemAvg Average memory utilization percentage (0-100)
-	MemAvg float64 `json:"mem_avg"`
-
-	// MemMax Maximum memory utilization percentage (0-100)
-	MemMax float64 `json:"mem_max"`
-
-	// MemP95 95th percentile memory utilization percentage (0-100)
-	MemP95 float64 `json:"mem_p95"`
-}
-
 // ComplexityDiskScoreEntry One entry in the disk complexity breakdown
 type ComplexityDiskScoreEntry struct {
 	// Score Complexity score from 1 to 4, where 1 is the least complex disk footprint and 4 is the most complex. Score 1: <=10 TB provisioned; score 2: <=20 TB; score 3: <=50 TB; score 4: >50 TB.
@@ -465,21 +411,6 @@ type Customer struct {
 
 // CustomerList defines model for CustomerList.
 type CustomerList = []Customer
-
-// Datastore defines model for Datastore.
-type Datastore struct {
-	DiskId                  string `json:"diskId"`
-	FreeCapacityGB          int    `json:"freeCapacityGB"`
-	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
-
-	// HostId Identifier of the host where this datastore is attached
-	HostId          *string `json:"hostId"`
-	Model           string  `json:"model"`
-	ProtocolType    string  `json:"protocolType"`
-	TotalCapacityGB int     `json:"totalCapacityGB"`
-	Type            string  `json:"type"`
-	Vendor          string  `json:"vendor"`
-}
 
 // Error defines model for Error.
 type Error struct {
@@ -553,23 +484,6 @@ type Histogram struct {
 	Step     int   `json:"step"`
 }
 
-// Host defines model for Host.
-type Host struct {
-	// CpuCores Number of CPU cores
-	CpuCores *int `json:"cpuCores"`
-
-	// CpuSockets Number of CPU sockets
-	CpuSockets *int `json:"cpuSockets"`
-
-	// Id Unique identifier for this host
-	Id *string `json:"id,omitempty"`
-
-	// MemoryMB Host memory in MB
-	MemoryMB *int64 `json:"memoryMB"`
-	Model    string `json:"model"`
-	Vendor   string `json:"vendor"`
-}
-
 // Identity defines model for Identity.
 type Identity struct {
 	GroupId   *string      `json:"groupId"`
@@ -594,51 +508,6 @@ type Info struct {
 
 	// VersionName Version name, based on git tag
 	VersionName string `json:"versionName"`
-}
-
-// Infra defines model for Infra.
-type Infra struct {
-	ClustersPerDatacenter *[]int `json:"clustersPerDatacenter,omitempty"`
-
-	// CpuOverCommitment CPU Overcommitment Ratio. Calculated as total Allocated vCPUs / Total Physical Cores
-	CpuOverCommitment *float64       `json:"cpuOverCommitment,omitempty"`
-	Datastores        []Datastore    `json:"datastores"`
-	HostPowerStates   map[string]int `json:"hostPowerStates"`
-	Hosts             *[]Host        `json:"hosts,omitempty"`
-	// Deprecated:
-	HostsPerCluster *[]int `json:"hostsPerCluster,omitempty"`
-
-	// MemoryOverCommitment RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
-	MemoryOverCommitment *float64  `json:"memoryOverCommitment,omitempty"`
-	Networks             []Network `json:"networks"`
-	// Deprecated:
-	TotalClusters    *int `json:"totalClusters,omitempty"`
-	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
-	TotalHosts       int  `json:"totalHosts"`
-	// Deprecated:
-	VmsPerCluster *[]int `json:"vmsPerCluster,omitempty"`
-}
-
-// Inventory defines model for Inventory.
-type Inventory struct {
-	// Clusters Map of cluster names to their inventory data
-	Clusters map[string]InventoryData `json:"clusters"`
-	Vcenter  *InventoryData           `json:"vcenter,omitempty"`
-
-	// VcenterId ID of the vCenter
-	VcenterId string `json:"vcenter_id"`
-
-	// VcenterVersion Version of the vCenter api. For example "8.0.3.0"
-	VcenterVersion *string `json:"vcenter_version,omitempty"`
-}
-
-// InventoryData defines model for InventoryData.
-type InventoryData struct {
-	ClusterFeatures    *ClusterFeatures    `json:"clusterFeatures,omitempty"`
-	ClusterUtilization *ClusterUtilization `json:"clusterUtilization,omitempty"`
-	Infra              Infra               `json:"infra"`
-	Vcenter            *VCenter            `json:"vcenter,omitempty"`
-	Vms                VMs                 `json:"vms"`
 }
 
 // InventoryTotals Inventory totals for the cluster
@@ -775,29 +644,6 @@ type MigrationEstimationResponse struct {
 	Estimation        map[string]SchemaEstimationResult `json:"estimation"`
 	EstimationContext EstimationContext                 `json:"estimationContext"`
 }
-
-// MigrationIssue defines model for MigrationIssue.
-type MigrationIssue struct {
-	Assessment string  `json:"assessment"`
-	Count      int     `json:"count"`
-	Id         *string `json:"id,omitempty"`
-	Label      string  `json:"label"`
-}
-
-// MigrationIssues defines model for MigrationIssues.
-type MigrationIssues = []MigrationIssue
-
-// Network defines model for Network.
-type Network struct {
-	Dvswitch *string     `json:"dvswitch,omitempty"`
-	Name     string      `json:"name"`
-	Type     NetworkType `json:"type"`
-	VlanId   *string     `json:"vlanId,omitempty"`
-	VmsCount *int        `json:"vmsCount,omitempty"`
-}
-
-// NetworkType defines model for Network.Type.
-type NetworkType string
 
 // OptimizationStatus Status of utilization-based optimization attempt
 type OptimizationStatus struct {
@@ -938,8 +784,8 @@ type SizingResourceLimits struct {
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
-	CreatedAt time.Time `json:"createdAt"`
-	Inventory Inventory `json:"inventory"`
+	CreatedAt time.Time              `json:"createdAt"`
+	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
 // Source defines model for Source.
@@ -958,11 +804,11 @@ type Source struct {
 		SshPublicKey *ValidatedSSHPublicKey `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 		VmNetwork    *VmNetwork             `json:"vmNetwork,omitempty"`
 	} `json:"infra,omitempty"`
-	Inventory  *Inventory `json:"inventory,omitempty"`
-	Labels     *[]Label   `json:"labels,omitempty"`
-	Name       string     `json:"name"`
-	OnPremises bool       `json:"onPremises"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	Inventory  *externalRef0.Inventory `json:"inventory,omitempty"`
+	Labels     *[]Label                `json:"labels,omitempty"`
+	Name       string                  `json:"name"`
+	OnPremises bool                    `json:"onPremises"`
+	UpdatedAt  time.Time               `json:"updatedAt"`
 }
 
 // SourceCreate defines model for SourceCreate.
@@ -1076,64 +922,8 @@ type Status struct {
 
 // UpdateInventory defines model for UpdateInventory.
 type UpdateInventory struct {
-	AgentId   openapi_types.UUID `json:"agentId"`
-	Inventory Inventory          `json:"inventory"`
-}
-
-// VCenter defines model for VCenter.
-type VCenter struct {
-	Id string `json:"id"`
-}
-
-// VMResourceBreakdown defines model for VMResourceBreakdown.
-type VMResourceBreakdown struct {
-	// Deprecated:
-	Histogram                      *Histogram `json:"histogram,omitempty"`
-	Total                          int        `json:"total"`
-	TotalForMigratable             int        `json:"totalForMigratable"`
-	TotalForMigratableWithWarnings int        `json:"totalForMigratableWithWarnings"`
-	TotalForNotMigratable          int        `json:"totalForNotMigratable"`
-}
-
-// VMs defines model for VMs.
-type VMs struct {
-	// ComplexityDistribution Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
-	ComplexityDistribution *map[string]DiskSizeTierSummary `json:"complexityDistribution,omitempty"`
-	CpuCores               VMResourceBreakdown             `json:"cpuCores"`
-
-	// DiskComplexityTier Distribution of VMs across disk-complexity tiers used by the estimation engine (0-10TiB, 10-20TiB, 20-50TiB, 50+TiB).
-	DiskComplexityTier *map[string]DiskSizeTierSummary `json:"diskComplexityTier,omitempty"`
-	DiskCount          VMResourceBreakdown             `json:"diskCount"`
-	DiskGB             VMResourceBreakdown             `json:"diskGB"`
-	DiskSizeTier       *map[string]DiskSizeTierSummary `json:"diskSizeTier,omitempty"`
-	DiskTypes          *map[string]DiskTypeSummary     `json:"diskTypes,omitempty"`
-
-	// DistributionByComplexity Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
-	// Deprecated:
-	DistributionByComplexity *map[string]int `json:"distributionByComplexity,omitempty"`
-
-	// DistributionByCpuTier Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
-	DistributionByCpuTier *map[string]int `json:"distributionByCpuTier,omitempty"`
-
-	// DistributionByMemoryTier Distribution of VMs across Memory tier buckets (e.g., "0-4", "5-16", "17-32", "33-64", "65-128", "129-256", "256+")
-	DistributionByMemoryTier *map[string]int `json:"distributionByMemoryTier,omitempty"`
-
-	// DistributionByNicCount Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
-	DistributionByNicCount *map[string]int      `json:"distributionByNicCount,omitempty"`
-	MigrationWarnings      []MigrationIssue     `json:"migrationWarnings"`
-	NicCount               *VMResourceBreakdown `json:"nicCount,omitempty"`
-	NotMigratableReasons   []MigrationIssue     `json:"notMigratableReasons"`
-	// Deprecated:
-	Os                          *map[string]int     `json:"os,omitempty"`
-	OsInfo                      *map[string]OsInfo  `json:"osInfo,omitempty"`
-	PowerStates                 map[string]int      `json:"powerStates"`
-	RamGB                       VMResourceBreakdown `json:"ramGB"`
-	Total                       int                 `json:"total"`
-	TotalMigratable             int                 `json:"totalMigratable"`
-	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
-
-	// TotalWithSharedDisks Number of VMs that have at least one shared disk
-	TotalWithSharedDisks *int `json:"totalWithSharedDisks,omitempty"`
+	AgentId   openapi_types.UUID     `json:"agentId"`
+	Inventory externalRef0.Inventory `json:"inventory"`
 }
 
 // ValidatedCertificateChain defines model for ValidatedCertificateChain.
@@ -1151,33 +941,6 @@ type ValidatedSourceName = string
 // VmNetwork defines model for VmNetwork.
 type VmNetwork struct {
 	Ipv4 *Ipv4Config `json:"ipv4,omitempty"`
-}
-
-// DiskSizeTierSummary defines model for diskSizeTierSummary.
-type DiskSizeTierSummary struct {
-	// TotalSizeTB Total disk size in TB for this tier
-	TotalSizeTB float64 `json:"totalSizeTB"`
-
-	// VmCount Number of VMs in this tier
-	VmCount int `json:"vmCount"`
-}
-
-// DiskTypeSummary defines model for diskTypeSummary.
-type DiskTypeSummary struct {
-	// TotalSizeTB Total disk size in TB for this disk type
-	TotalSizeTB float64 `json:"totalSizeTB"`
-
-	// VmCount Number of VMs that have at least one disk of this type
-	VmCount int `json:"vmCount"`
-}
-
-// OsInfo defines model for osInfo.
-type OsInfo struct {
-	Count     int  `json:"count"`
-	Supported bool `json:"supported"`
-
-	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
-	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
 
 // PresignedUrl defines model for presigned-url.

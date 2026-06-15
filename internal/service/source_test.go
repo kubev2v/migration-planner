@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -286,7 +287,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -321,7 +322,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -358,7 +359,7 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory1JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory1JSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -371,7 +372,7 @@ var _ = Describe("source handler", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 
-			inventory2JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory2JSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "another-vcenter-id",
 			})
 

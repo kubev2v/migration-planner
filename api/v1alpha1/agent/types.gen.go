@@ -4,7 +4,7 @@
 package v1alpha1
 
 import (
-	externalRef0 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	externalRef0 "github.com/kubev2v/migration-planner-common/api/inventory"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 

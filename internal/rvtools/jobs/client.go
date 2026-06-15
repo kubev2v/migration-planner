@@ -10,9 +10,9 @@ import (
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
+	"github.com/kubev2v/migration-planner-common/pkg/opa"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/opa"
 )
 
 // Client wraps the River client and provides job management functionality.

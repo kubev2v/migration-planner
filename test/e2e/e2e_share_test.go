@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
@@ -25,32 +26,32 @@ var _ = Describe("e2e-share", func() {
 		startTime   time.Time
 	)
 
-	inventory := &v1alpha1.Inventory{
+	inventory := &inventoryapi.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]v1alpha1.InventoryData{
+		Clusters: map[string]inventoryapi.InventoryData{
 			"test-cluster": {
-				Vms: v1alpha1.VMs{
+				Vms: inventoryapi.VMs{
 					Total:                1,
 					TotalMigratable:      1,
-					CpuCores:             v1alpha1.VMResourceBreakdown{Total: 4},
-					RamGB:                v1alpha1.VMResourceBreakdown{Total: 8},
-					DiskGB:               v1alpha1.VMResourceBreakdown{Total: 100},
-					DiskCount:            v1alpha1.VMResourceBreakdown{Total: 1},
+					CpuCores:             inventoryapi.VMResourceBreakdown{Total: 4},
+					RamGB:                inventoryapi.VMResourceBreakdown{Total: 8},
+					DiskGB:               inventoryapi.VMResourceBreakdown{Total: 100},
+					DiskCount:            inventoryapi.VMResourceBreakdown{Total: 1},
 					PowerStates:          map[string]int{"poweredOn": 1},
-					NotMigratableReasons: []v1alpha1.MigrationIssue{},
-					MigrationWarnings:    []v1alpha1.MigrationIssue{},
-					OsInfo: &map[string]v1alpha1.OsInfo{
+					NotMigratableReasons: []inventoryapi.MigrationIssue{},
+					MigrationWarnings:    []inventoryapi.MigrationIssue{},
+					OsInfo: &map[string]inventoryapi.OsInfo{
 						"Red Hat Enterprise Linux 9": {Count: 1, Supported: true},
 					},
-					DiskComplexityTier: &map[string]v1alpha1.DiskSizeTierSummary{
+					DiskComplexityTier: &map[string]inventoryapi.DiskSizeTierSummary{
 						"0-10TiB": {VmCount: 1, TotalSizeTB: 0.1},
 					},
 				},
-				Infra: v1alpha1.Infra{
+				Infra: inventoryapi.Infra{
 					TotalHosts:      1,
 					HostPowerStates: map[string]int{"poweredOn": 1},
-					Networks:        []v1alpha1.Network{},
-					Datastores:      []v1alpha1.Datastore{},
+					Networks:        []inventoryapi.Network{},
+					Datastores:      []inventoryapi.Datastore{},
 				},
 			},
 		},

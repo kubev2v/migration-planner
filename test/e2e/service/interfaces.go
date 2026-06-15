@@ -2,6 +2,7 @@ package service
 
 import (
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
@@ -22,7 +23,7 @@ type sourceApi interface {
 	GetSources() (*v1alpha1.SourceList, error)
 	RemoveSource(uuid.UUID) error
 	RemoveSources() error
-	UpdateSource(uuid.UUID, *v1alpha1.Inventory) error
+	UpdateSource(uuid.UUID, *inventoryapi.Inventory) error
 }
 
 type imageApi interface {
@@ -30,7 +31,7 @@ type imageApi interface {
 }
 
 type assessmentApi interface {
-	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
+	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *inventoryapi.Inventory) (*v1alpha1.Assessment, error)
 	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error)
 	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
 	GetAssessments() (*v1alpha1.AssessmentList, error)

@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentV1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 )
@@ -183,7 +184,7 @@ func startsNotWithValidator(fl validator.FieldLevel) bool {
 }
 
 func inventoryNotEmptyValidator(fl validator.FieldLevel) bool {
-	val, ok := fl.Field().Addr().Interface().(*v1alpha1.Inventory)
+	val, ok := fl.Field().Addr().Interface().(*inventory.Inventory)
 	if !ok {
 		return false
 	}

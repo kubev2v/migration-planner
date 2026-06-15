@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/complexity"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation/calculators"
@@ -99,7 +99,7 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		return nil, err
 	}
 
-	var inventory api.Inventory
+	var inventory inventoryapi.Inventory
 	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("failed to parse inventory: %w", err)
@@ -174,7 +174,7 @@ func (es *EstimationService) CalculateMigrationComplexity(
 		return nil, err
 	}
 
-	var inventory api.Inventory
+	var inventory inventoryapi.Inventory
 	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("failed to parse inventory: %w", err)
@@ -204,7 +204,7 @@ func (es *EstimationService) CalculateMigrationComplexity(
 }
 
 // buildComplexityResult converts cluster inventory data into complexity breakdowns.
-func (es *EstimationService) buildComplexityResult(clusterInventory api.InventoryData) (*MigrationComplexityResult, error) {
+func (es *EstimationService) buildComplexityResult(clusterInventory inventoryapi.InventoryData) (*MigrationComplexityResult, error) {
 	if clusterInventory.Vms.OsInfo == nil {
 		return nil, fmt.Errorf("inventory has no osInfo data")
 	}
@@ -243,7 +243,7 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 
 // buildComplexityByOsDisk converts the sparse ComplexityDistribution map (string score → DiskSizeTierSummary)
 // into a []OSDiskEntry in canonical score order (0–4). Absent scores carry VMCount == 0 and TotalSizeTB == 0.
-func buildComplexityByOsDisk(dist *map[string]api.DiskSizeTierSummary) []complexity.OSDiskEntry {
+func buildComplexityByOsDisk(dist *map[string]inventoryapi.DiskSizeTierSummary) []complexity.OSDiskEntry {
 	result := make([]complexity.OSDiskEntry, len(complexity.OSScores))
 	for i, s := range complexity.OSScores {
 		var vmCount int
@@ -352,7 +352,7 @@ func mergeParams(layers ...[]estimation.Param) []estimation.Param {
 }
 
 // mapClusterToParams converts cluster inventory data to estimation parameters
-func (es *EstimationService) mapClusterToParams(clusterInventory api.InventoryData) []estimation.Param {
+func (es *EstimationService) mapClusterToParams(clusterInventory inventoryapi.InventoryData) []estimation.Param {
 	return []estimation.Param{
 		{Key: calculators.ParamTotalDiskGB, Value: float64(clusterInventory.Vms.DiskGB.Total)},
 		{Key: calculators.ParamVMCount, Value: clusterInventory.Vms.Total},
@@ -394,7 +394,7 @@ func (es *EstimationService) CalculateOsDiskComplexity(
 		return nil, fmt.Errorf("latest snapshot has empty inventory")
 	}
 
-	var inventory api.Inventory
+	var inventory inventoryapi.Inventory
 	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
 		return nil, fmt.Errorf("failed to parse inventory: %w", err)
 	}

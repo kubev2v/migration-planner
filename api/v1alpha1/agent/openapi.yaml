@@ -128,7 +128,7 @@ components:
           type: string
           format: uuid
         inventory:
-          $ref: '../openapi.yaml#/components/schemas/Inventory'
+          $ref: '../../../../migration-planner-common/api/inventory/openapi.yaml#/components/schemas/Inventory'
       required:
         - inventory
         - agentId

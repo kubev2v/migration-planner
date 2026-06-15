@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -191,7 +192,7 @@ func NewSizerService(sizerClient *client.SizerClient, store store.Store) *SizerS
 }
 
 func (s *SizerService) extractUtilizationFromInventory(
-	inventory *api.Inventory,
+	inventory *inventoryapi.Inventory,
 	clusterID string,
 ) UtilizationContext {
 	if inventory == nil {
@@ -492,7 +493,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("latest snapshot has empty inventory")
 	}
 
-	var inventory api.Inventory
+	var inventory inventoryapi.Inventory
 	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
 		return nil, fmt.Errorf("failed to parse inventory: %w", err)
 	}

@@ -2,6 +2,7 @@ package mappers
 
 import (
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/riverqueue/river/rivertype"
@@ -214,7 +215,7 @@ func (f *AssessmentCreateForm) ToModel() model.Assessment {
 }
 
 type InventoryForm struct {
-	Data v1alpha1.Inventory
+	Data inventory.Inventory
 }
 
 type AssessmentUpdateForm struct {

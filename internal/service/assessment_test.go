@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
 
-	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
@@ -186,11 +186,11 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("CreateAssessment", func() {
 		Context("with inventory source", func() {
 			It("successfully creates assessment with inventory", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &inventoryapi.InventoryData{
+						Vms:   inventoryapi.VMs{Total: 10},
+						Infra: inventoryapi.Infra{TotalHosts: 5},
 					},
 				})
 
@@ -230,11 +230,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("successfully creates assessment without owner fields (nil values)", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &inventoryapi.InventoryData{
+						Vms:   inventoryapi.VMs{Total: 10},
+						Infra: inventoryapi.Infra{TotalHosts: 5},
 					},
 				})
 
@@ -262,11 +262,11 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &inventoryapi.InventoryData{
+						Vms:   inventoryapi.VMs{Total: 10},
+						Infra: inventoryapi.Infra{TotalHosts: 5},
 					},
 				})
 

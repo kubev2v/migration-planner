@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner-common/pkg/complexity"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/log"

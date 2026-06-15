@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -189,7 +190,7 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 	return form
 }
 
-func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
+func InventoryToForm(inventory inventoryapi.Inventory) mappers.InventoryForm {
 	return mappers.InventoryForm{
 		Data: inventory,
 	}

@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"strings"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner-common/api/inventory"
 )
 
 const (
@@ -51,7 +51,7 @@ type InventoryStats struct {
 }
 
 type domainInventory struct {
-	Inventory api.InventoryData
+	Inventory inventory.InventoryData
 	OrgID     string
 }
 
@@ -67,7 +67,7 @@ func NewInventoryStats(assessments []Assessment) InventoryStats {
 			orgID = domain
 		}
 
-		inventory := &api.Inventory{}
+		inventory := &inventory.Inventory{}
 
 		if err := json.Unmarshal(latesSnapshot.Inventory, &inventory); err != nil {
 			continue
@@ -174,7 +174,7 @@ func computeStorageStats(domainInventories []domainInventory) []StorageCustomerS
 	return stats
 }
 
-func computeInventoryStorageStats(inventory api.InventoryData) map[string]int {
+func computeInventoryStorageStats(inventory inventory.InventoryData) map[string]int {
 	totalByProvider := make(map[string]int)
 
 	for _, storage := range inventory.Infra.Datastores {

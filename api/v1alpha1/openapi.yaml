@@ -2111,7 +2111,7 @@ components:
         name:
           type: string
         inventory:
-          $ref: "#/components/schemas/Inventory"
+          $ref: 'https://raw.githubusercontent.com/nirarg/migration-planner-common/9d3e72cf0b64c84f4f974fb45dd0c2fd0e6732bc/api/inventory/openapi.yaml#/components/schemas/Inventory'
         createdAt:
           type: string
           format: date-time
@@ -2171,23 +2171,6 @@ components:
             validate: "omitnil,max=1000"
           nullable: true
           minLength: 1
-
-    ClusterFeatures:
-      type: object
-      properties:
-        drsEnabled:
-          type: boolean
-          default: false
-          description: "Whether DRS (Distributed Resource Scheduler) is enabled for this cluster"
-        drsMode:
-          type: string
-          enum: ["Fully Automated", "Partially Automated", "Manual", "None"]
-          default: "None"
-          description: "DRS automation mode for the cluster"
-        storageDrsEnabled:
-          type: boolean
-          default: false
-          description: "Whether Storage DRS is enabled for this cluster"
 
     SourceCreate:
       type: object
@@ -2289,399 +2272,6 @@ components:
           description: 'Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status'
       description: Status is a return value for calls that don't return other objects.
 
-    Inventory:
-      type: object
-      required:
-        - vcenter_id
-        - clusters
-      properties:
-        vcenter_id:
-          type: string
-          description: ID of the vCenter
-        vcenter_version:
-          type: string
-          description: Version of the vCenter api. For example "8.0.3.0"
-        clusters:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/InventoryData"
-          description: Map of cluster names to their inventory data
-        vcenter:
-          $ref: "#/components/schemas/InventoryData"
-          description: vCenter-level inventory data
-
-    ClusterUtilization:
-      type: object
-      required:
-        - cpu_avg
-        - cpu_p95
-        - cpu_max
-        - mem_avg
-        - mem_p95
-        - mem_max
-        - confidence
-      properties:
-        cpu_avg:
-          type: number
-          format: double
-          description: Average CPU utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        cpu_p95:
-          type: number
-          format: double
-          description: 95th percentile CPU utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        cpu_max:
-          type: number
-          format: double
-          description: Maximum CPU utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        mem_avg:
-          type: number
-          format: double
-          description: Average memory utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        mem_p95:
-          type: number
-          format: double
-          description: 95th percentile memory utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        mem_max:
-          type: number
-          format: double
-          description: Maximum memory utilization percentage (0-100)
-          minimum: 0
-          maximum: 100
-        confidence:
-          type: number
-          format: double
-          description: Data coverage confidence percentage (0-100), calculated as vCPU-weighted coverage
-          minimum: 0
-          maximum: 100
-
-    InventoryData:
-      type: object
-      required:
-        - vms
-        - infra
-      properties:
-        vcenter:
-          deprecated: true
-          nullable: true
-          $ref: "#/components/schemas/VCenter"
-        clusterFeatures:
-          $ref: "#/components/schemas/ClusterFeatures"
-        clusterUtilization:
-          $ref: "#/components/schemas/ClusterUtilization"
-        vms:
-          $ref: "#/components/schemas/VMs"
-        infra:
-          $ref: "#/components/schemas/Infra"
-
-    VCenter:
-      type: object
-      required:
-        - id
-      properties:
-        id:
-          type: string
-    VMs:
-      type: object
-      required:
-        - total
-        - totalMigratable
-        - cpuCores
-        - ramGB
-        - diskGB
-        - diskCount
-        - powerStates
-        - notMigratableReasons
-        - migrationWarnings
-      properties:
-        total:
-          type: integer
-        totalMigratable:
-          type: integer
-        totalMigratableWithWarnings:
-          type: integer
-        totalWithSharedDisks:
-          type: integer
-          description: Number of VMs that have at least one shared disk
-        cpuCores:
-          $ref: "#/components/schemas/VMResourceBreakdown"
-        diskSizeTier:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/diskSizeTierSummary"
-        diskComplexityTier:
-          type: object
-          description: >
-            Distribution of VMs across disk-complexity tiers used by the estimation engine
-            (0-10TiB, 10-20TiB, 20-50TiB, 50+TiB).
-          additionalProperties:
-            $ref: '#/components/schemas/diskSizeTierSummary'
-        diskTypes:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/diskTypeSummary"
-        distributionByCpuTier:
-          type: object
-          description: Distribution of VMs across CPU tier buckets (e.g., "0-4", "5-8", "9-16", "17-32", "32+")
-          additionalProperties:
-            type: integer
-        distributionByMemoryTier:
-          type: object
-          description: Distribution of VMs across Memory tier buckets (e.g., "0-4", "5-16", "17-32", "33-64", "65-128", "129-256", "256+")
-          additionalProperties:
-            type: integer
-        distributionByNicCount:
-          type: object
-          description: Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
-          additionalProperties:
-            type: integer
-        distributionByComplexity:
-          deprecated: true
-          type: object
-          description: Distribution of VMs by migration complexity level (0=Unsupported, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove)
-          additionalProperties:
-            type: integer
-        complexityDistribution:
-          type: object
-          description: Distribution of VMs by migration complexity level, enriched with total disk size per level. Supersedes distributionByComplexity.
-          additionalProperties:
-            $ref: "#/components/schemas/diskSizeTierSummary"
-        ramGB:
-          $ref: "#/components/schemas/VMResourceBreakdown"
-        diskGB:
-          $ref: "#/components/schemas/VMResourceBreakdown"
-        diskCount:
-          $ref: "#/components/schemas/VMResourceBreakdown"
-        nicCount:
-          $ref: "#/components/schemas/VMResourceBreakdown"
-          deprecated: true
-          nullable: false
-          x-oapi-codegen-extra-tags:
-            json: "nicCount,omitempty"
-        powerStates:
-          type: object
-          additionalProperties:
-            type: integer
-        os:
-          deprecated: true
-          type: object
-          additionalProperties:
-            type: integer
-        osInfo:
-          type: object
-          additionalProperties:
-            $ref: "#/components/schemas/osInfo"
-        notMigratableReasons:
-          type: array
-          items:
-            $ref: "#/components/schemas/MigrationIssue"
-        migrationWarnings:
-          type: array
-          items:
-            $ref: "#/components/schemas/MigrationIssue"
-
-    diskSizeTierSummary:
-      type: object
-      required:
-        - totalSizeTB
-        - vmCount
-      properties:
-        totalSizeTB:
-          type: number
-          format: double
-          description: Total disk size in TB for this tier
-        vmCount:
-          type: integer
-          description: Number of VMs in this tier
-
-    diskTypeSummary:
-      type: object
-      required:
-        - vmCount
-        - totalSizeTB
-      properties:
-        vmCount:
-          type: integer
-          description: Number of VMs that have at least one disk of this type
-        totalSizeTB:
-          type: number
-          format: double
-          description: Total disk size in TB for this disk type
-
-    osInfo:
-      type: object
-      required:
-        - count
-        - supported
-      properties:
-        count:
-          type: integer
-        supported:
-          type: boolean
-        upgradeRecommendation:
-          type: string
-          description: Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
-
-    Infra:
-      type: object
-      required:
-        - totalHosts
-        - hostPowerStates
-        - networks
-        - datastores
-      properties:
-        totalHosts:
-          type: integer
-        totalDatacenters:
-          type: integer
-        totalClusters:
-          type: integer
-          deprecated: true
-        clustersPerDatacenter:
-          type: array
-          items:
-            type: integer
-        cpuOverCommitment:
-          type: number
-          format: double
-          description: CPU Overcommitment Ratio. Calculated as total Allocated vCPUs / Total Physical Cores
-        memoryOverCommitment:
-          type: number
-          format: double
-          description: RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
-        hosts:
-          type: array
-          items:
-            $ref: "#/components/schemas/Host"
-        hostsPerCluster:
-          type: array
-          items:
-            type: integer
-          deprecated: true
-        vmsPerCluster:
-          type: array
-          items:
-            type: integer
-          deprecated: true
-        hostPowerStates:
-          type: object
-          additionalProperties:
-            type: integer
-        networks:
-          type: array
-          items:
-            $ref: "#/components/schemas/Network"
-        datastores:
-          type: array
-          items:
-            $ref: "#/components/schemas/Datastore"
-
-    Host:
-      type: object
-      required:
-        - vendor
-        - model
-      properties:
-        id:
-          type: string
-          description: Unique identifier for this host
-        vendor:
-          type: string
-        model:
-          type: string
-        cpuCores:
-          type: integer
-          description: Number of CPU cores
-          nullable: true
-        cpuSockets:
-          type: integer
-          description: Number of CPU sockets
-          nullable: true
-        memoryMB:
-          type: integer
-          format: int64
-          description: Host memory in MB
-          nullable: true
-
-    Network:
-      type: object
-      required:
-        - type
-        - name
-      properties:
-        type:
-          type: string
-          enum: [standard, distributed, dvswitch, unsupported]
-        name:
-          type: string
-        vlanId:
-          type: string
-        dvswitch:
-          type: string
-        vmsCount:
-          type: integer
-
-    Datastore:
-      type: object
-      required:
-        - type
-        - totalCapacityGB
-        - freeCapacityGB
-        - vendor
-        - diskId
-        - hardwareAcceleratedMove
-        - protocolType
-        - model
-      properties:
-        type:
-          type: string
-        totalCapacityGB:
-          type: integer
-        freeCapacityGB:
-          type: integer
-        vendor:
-          type: string
-        diskId:
-          type: string
-        hardwareAcceleratedMove:
-          type: boolean
-        protocolType:
-          type: string
-        model:
-          type: string
-        hostId:
-          type: string
-          description: Identifier of the host where this datastore is attached
-          nullable: true
-
-    VMResourceBreakdown:
-      type: object
-      required:
-        - total
-        - totalForMigratable
-        - totalForMigratableWithWarnings
-        - totalForNotMigratable
-      properties:
-        total:
-          type: integer
-        totalForMigratable:
-          type: integer
-        totalForMigratableWithWarnings:
-          type: integer
-        totalForNotMigratable:
-          type: integer
-        histogram: # deprecated
-          $ref: "#/components/schemas/Histogram"
-
     Histogram:
       type: object
       deprecated: true
@@ -2698,27 +2288,6 @@ components:
           type: array
           items:
             type: integer
-
-    MigrationIssues:
-      type: array
-      items:
-        $ref: "#/components/schemas/MigrationIssue"
-
-    MigrationIssue:
-      type: object
-      required:
-        - label
-        - assessment
-        - count
-      properties:
-        id:
-          type: string
-        label:
-          type: string
-        assessment:
-          type: string
-        count:
-          type: integer
 
     Agent:
       type: object
@@ -2800,7 +2369,7 @@ components:
           type: string
           format: uuid
         inventory:
-          $ref: "#/components/schemas/Inventory"
+          $ref: 'https://raw.githubusercontent.com/nirarg/migration-planner-common/9d3e72cf0b64c84f4f974fb45dd0c2fd0e6732bc/api/inventory/openapi.yaml#/components/schemas/Inventory'
       required:
         - inventory
         - agentId
@@ -2824,7 +2393,7 @@ components:
       type: object
       properties:
         inventory:
-          $ref: "#/components/schemas/Inventory"
+          $ref: 'https://raw.githubusercontent.com/nirarg/migration-planner-common/9d3e72cf0b64c84f4f974fb45dd0c2fd0e6732bc/api/inventory/openapi.yaml#/components/schemas/Inventory'
         createdAt:
           type: string
           format: date-time
@@ -2892,7 +2461,7 @@ components:
           type: string
           format: uuid
         inventory:
-          $ref: "#/components/schemas/Inventory"
+          $ref: 'https://raw.githubusercontent.com/nirarg/migration-planner-common/9d3e72cf0b64c84f4f974fb45dd0c2fd0e6732bc/api/inventory/openapi.yaml#/components/schemas/Inventory'
       required:
         - name
         - sourceType

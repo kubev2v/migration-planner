@@ -11,7 +11,7 @@ import (
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
 
-	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -394,11 +394,11 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 	Context("CreateAssessment", func() {
 		It("creates assessment and writes owner relation atomically", func() {
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "test-vcenter",
-				Vcenter: &v1alpha1.InventoryData{
-					Vms:   v1alpha1.VMs{Total: 10},
-					Infra: v1alpha1.Infra{TotalHosts: 5},
+				Vcenter: &inventoryapi.InventoryData{
+					Vms:   inventoryapi.VMs{Total: 10},
+					Infra: inventoryapi.Infra{TotalHosts: 5},
 				},
 			})
 
@@ -426,11 +426,11 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		})
 
 		It("the created assessment is visible via ListAssessments", func() {
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "test-vcenter",
-				Vcenter: &v1alpha1.InventoryData{
-					Vms:   v1alpha1.VMs{Total: 10},
-					Infra: v1alpha1.Infra{TotalHosts: 5},
+				Vcenter: &inventoryapi.InventoryData{
+					Vms:   inventoryapi.VMs{Total: 10},
+					Infra: inventoryapi.Infra{TotalHosts: 5},
 				},
 			})
 

@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -208,7 +208,7 @@ func ValidateInventoryHasVMs(inventory []byte) error {
 	version := GetInventoryVersion(inventory)
 	switch version {
 	case model.SnapshotVersionV1:
-		var invData v1alpha1.InventoryData
+		var invData inventoryapi.InventoryData
 		if err := json.Unmarshal(inventory, &invData); err != nil {
 			return &ErrInventoryUnmarshalError{fmt.Errorf("failed to unmarshal v1 inventory: %w", err)}
 		}
@@ -216,7 +216,7 @@ func ValidateInventoryHasVMs(inventory []byte) error {
 			return &ErrNoVMsInInventory{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
 		}
 	default:
-		var inv v1alpha1.Inventory
+		var inv inventoryapi.Inventory
 		if err := json.Unmarshal(inventory, &inv); err != nil {
 			return &ErrInventoryUnmarshalError{fmt.Errorf("failed to unmarshal v2 inventory: %w", err)}
 		}

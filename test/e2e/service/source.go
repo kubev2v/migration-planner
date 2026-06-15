@@ -8,6 +8,7 @@ import (
 	"path"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	internalclient "github.com/kubev2v/migration-planner/internal/api/client"
 	"go.uber.org/zap"
@@ -160,7 +161,7 @@ func (s *plannerService) RemoveSources() error {
 }
 
 // UpdateSource updates the inventory of a specific source
-func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *api.Inventory) error {
+func (s *plannerService) UpdateSource(uuid uuid.UUID, inventory *inventoryapi.Inventory) error {
 	zap.S().Infof("[PlannerService] Update source [user: %s, organization: %s]",
 		s.credentials.Username, s.credentials.Organization)
 	update := api.UpdateInventoryJSONRequestBody{

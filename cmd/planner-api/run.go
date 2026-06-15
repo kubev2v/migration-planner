@@ -13,7 +13,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/kubev2v/migration-planner-common/pkg/opa"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
 

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -171,7 +172,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -188,7 +189,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
+			var inventory inventoryapi.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
@@ -207,7 +208,7 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, secondAgentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -225,7 +226,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(context.TODO(), sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
+			var inventory inventoryapi.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
@@ -254,7 +255,7 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, uuid.New(), "not-connected", "status-info-1", "cred_url-1", secondSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{})
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{})
 
 			srv := service.NewAgentService(s)
 			_, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -275,7 +276,7 @@ var _ = Describe("agent service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, firstAgentID, "not-connected", "status-info-1", "cred_url-1", firstSourceID))
 			Expect(tx.Error).To(BeNil())
 
-			inventory1JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory1JSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 
@@ -288,7 +289,7 @@ var _ = Describe("agent service", Ordered, func() {
 			})
 			Expect(err).To(BeNil())
 
-			inventory2JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory2JSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "anotherVCenterID",
 			})
 
@@ -311,7 +312,7 @@ var _ = Describe("agent service", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON, _ := json.Marshal(inventoryapi.Inventory{
 				VcenterId: "vcenter",
 			})
 

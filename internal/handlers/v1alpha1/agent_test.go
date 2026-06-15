@@ -7,6 +7,7 @@ import (
 	"reflect"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	apiAgent "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
@@ -255,7 +256,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: agentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -267,7 +268,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
+			var inventory inventoryapi.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
@@ -298,7 +299,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: agentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -310,7 +311,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
+			var inventory inventoryapi.Inventory
 			err = json.Unmarshal(source.Inventory, &inventory)
 			Expect(err).To(BeNil())
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
@@ -320,7 +321,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: secondAgentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -354,7 +355,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: secondSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId:   firstAgentID,
-					Inventory: v1alpha1.Inventory{},
+					Inventory: inventoryapi.Inventory{},
 				},
 			})
 			Expect(err).To(BeNil())
@@ -380,7 +381,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: firstAgentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -392,7 +393,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: firstAgentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "anotherVCenterID",
 					},
 				},
@@ -423,7 +424,7 @@ var _ = Describe("agent service", Ordered, func() {
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
 					AgentId: agentID,
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},

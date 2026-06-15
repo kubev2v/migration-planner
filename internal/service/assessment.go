@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/kubev2v/migration-planner-common/pkg/opa"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"

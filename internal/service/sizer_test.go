@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -183,15 +184,15 @@ func createTestSizerServerWithRequestCapture(response *client.SizerResponse, hea
 }
 
 func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: totalVMs,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: totalCPU,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: totalMemory,
 					},
 				},
@@ -2078,38 +2079,38 @@ var _ = Describe("sizer service", func() {
 	})
 })
 
-func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) api.Inventory {
-	return api.Inventory{
+func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) inventoryapi.Inventory {
+	return inventoryapi.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []inventoryapi.MigrationIssue{},
+					NotMigratableReasons: []inventoryapi.MigrationIssue{},
+					DiskCount: inventoryapi.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: inventoryapi.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				ClusterUtilization: &api.ClusterUtilization{
+				ClusterUtilization: &inventoryapi.ClusterUtilization{
 					CpuMax:     cpuMax,
 					MemMax:     memMax,
 					Confidence: confidence,
 				},
-				Infra: api.Infra{
+				Infra: inventoryapi.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []inventoryapi.Datastore{},
+					Networks:        []inventoryapi.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2117,33 +2118,33 @@ func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence
 	}
 }
 
-func createInventoryWithoutUtilization(clusterID string) api.Inventory {
-	return api.Inventory{
+func createInventoryWithoutUtilization(clusterID string) inventoryapi.Inventory {
+	return inventoryapi.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []inventoryapi.MigrationIssue{},
+					NotMigratableReasons: []inventoryapi.MigrationIssue{},
+					DiskCount: inventoryapi.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: inventoryapi.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				Infra: api.Infra{
+				Infra: inventoryapi.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []inventoryapi.Datastore{},
+					Networks:        []inventoryapi.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2151,7 +2152,7 @@ func createInventoryWithoutUtilization(clusterID string) api.Inventory {
 	}
 }
 
-func createAssessmentWithInventory(id uuid.UUID, inventory api.Inventory) *model.Assessment {
+func createAssessmentWithInventory(id uuid.UUID, inventory inventoryapi.Inventory) *model.Assessment {
 	inventoryJSON, err := json.Marshal(inventory)
 	Expect(err).NotTo(HaveOccurred())
 	return &model.Assessment{

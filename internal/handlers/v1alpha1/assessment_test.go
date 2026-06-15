@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -26,11 +27,11 @@ const (
 
 // createMinimalInventory returns a minimal valid inventory for testing
 // with a single VM to satisfy validation requirements
-func createMinimalInventory() v1alpha1.Inventory {
-	return v1alpha1.Inventory{
+func createMinimalInventory() inventoryapi.Inventory {
+	return inventoryapi.Inventory{
 		VcenterId: "test-vcenter",
-		Vcenter: &v1alpha1.InventoryData{
-			Vms: v1alpha1.VMs{
+		Vcenter: &inventoryapi.InventoryData{
+			Vms: inventoryapi.VMs{
 				Total: 1,
 			},
 		},
@@ -588,7 +589,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			})
 
 			It("fails when sourceType is 'inventory' but inventory has no vCenter ID", func() {
-				emptyInventory := v1alpha1.Inventory{
+				emptyInventory := inventoryapi.Inventory{
 					VcenterId: "", // Empty vCenter ID
 				}
 
@@ -608,7 +609,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails when sourceType is 'inventory' but inventory has empty vCenter", func() {
 				// Inventory with empty vcenter (no meaningful data)
-				emptyVCenterInventory := v1alpha1.Inventory{
+				emptyVCenterInventory := inventoryapi.Inventory{
 					VcenterId: "", // No ID provided
 				}
 
@@ -628,10 +629,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			It("fails when sourceType is 'inventory' but inventory has no VMs", func() {
 				// Inventory with vcenter but no VMs
-				inventoryNoVMs := v1alpha1.Inventory{
+				inventoryNoVMs := inventoryapi.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms: v1alpha1.VMs{
+					Vcenter: &inventoryapi.InventoryData{
+						Vms: inventoryapi.VMs{
 							Total: 0, // No VMs
 						},
 					},

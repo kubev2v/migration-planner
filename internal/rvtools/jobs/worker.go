@@ -13,13 +13,13 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
 	"github.com/riverqueue/river"
 
+	"github.com/kubev2v/migration-planner-common/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner-common/pkg/inventory/converters"
+	pkgstore "github.com/kubev2v/migration-planner-common/pkg/store"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
 	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
-	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // RVToolsWorker processes RVTools assessment jobs.

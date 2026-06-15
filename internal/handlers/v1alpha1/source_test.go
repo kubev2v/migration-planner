@@ -6,6 +6,7 @@ import (
 	"reflect"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -755,8 +756,8 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(source.Inventory.Vcenter.Vms.Total).To(Equal(100))
 			Expect(source.Inventory.Vcenter.Vms.TotalMigratable).To(Equal(80))
 			Expect(source.Inventory.Vcenter.Infra.TotalHosts).To(Equal(10))
-			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil())
-			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(2))
+			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil()) //nolint:staticcheck // Testing deprecated field for backward compatibility
+			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(2))  //nolint:staticcheck // Testing deprecated field for backward compatibility
 			// V2 format should have empty clusters map
 			Expect(source.Inventory.Clusters).To(BeEmpty())
 		})
@@ -793,8 +794,8 @@ var _ = Describe("source handler", Ordered, func() {
 			Expect(source.Inventory.Vcenter.Vms.Total).To(Equal(200))
 			Expect(source.Inventory.Vcenter.Vms.TotalMigratable).To(Equal(150))
 			Expect(source.Inventory.Vcenter.Infra.TotalHosts).To(Equal(20))
-			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil())
-			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(5))
+			Expect(source.Inventory.Vcenter.Infra.TotalClusters).NotTo(BeNil()) //nolint:staticcheck // Testing deprecated field for backward compatibility
+			Expect(*source.Inventory.Vcenter.Infra.TotalClusters).To(Equal(5))  //nolint:staticcheck // Testing deprecated field for backward compatibility
 			Expect(source.Inventory.Clusters).To(HaveLen(1))
 			Expect(source.Inventory.Clusters["cluster-1"].Vms.Total).To(Equal(50))
 		})
@@ -941,7 +942,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -983,7 +984,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -1005,7 +1006,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -1031,7 +1032,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "vcenter",
 					},
 				},
@@ -1053,7 +1054,7 @@ var _ = Describe("source handler", Ordered, func() {
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
-					Inventory: v1alpha1.Inventory{
+					Inventory: inventoryapi.Inventory{
 						VcenterId: "another-vcenter-id",
 					},
 				},

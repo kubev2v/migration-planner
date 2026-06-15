@@ -1,7 +1,0 @@
-{{- /*
-Clusters Query Template - Returns distinct cluster names.
-*/ -}}
-SELECT DISTINCT "Cluster"
-FROM vinfo
-WHERE "Cluster" IS NOT NULL AND "Cluster" != ''
-ORDER BY "Cluster";

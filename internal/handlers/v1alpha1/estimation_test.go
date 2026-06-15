@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -18,28 +19,28 @@ import (
 )
 
 func createTestInventoryForComplexityHandler(clusterID string) []byte {
-	osInfo := map[string]api.OsInfo{
+	osInfo := map[string]inventoryapi.OsInfo{
 		"Red Hat Enterprise Linux 9 (64-bit)": {Count: 50, Supported: true},
 		"CentOS 7 (64-bit)":                   {Count: 10, Supported: false},
 		"FreeBSD (64-bit)":                    {Count: 3, Supported: false},
 	}
-	diskSizeTier := map[string]api.DiskSizeTierSummary{
+	diskSizeTier := map[string]inventoryapi.DiskSizeTierSummary{
 		"0-100GiB": {VmCount: 63, TotalSizeTB: 5.5},
 	}
-	diskComplexityTier := map[string]api.DiskSizeTierSummary{
+	diskComplexityTier := map[string]inventoryapi.DiskSizeTierSummary{
 		"0-10TiB": {VmCount: 63, TotalSizeTB: 5.5},
 	}
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total:              63,
 					OsInfo:             &osInfo,
 					DiskSizeTier:       &diskSizeTier,
 					DiskComplexityTier: &diskComplexityTier,
-					DiskGB:             api.VMResourceBreakdown{Total: 5632},
-					CpuCores:           api.VMResourceBreakdown{Total: 200},
-					RamGB:              api.VMResourceBreakdown{Total: 400},
+					DiskGB:             inventoryapi.VMResourceBreakdown{Total: 5632},
+					CpuCores:           inventoryapi.VMResourceBreakdown{Total: 200},
+					RamGB:              inventoryapi.VMResourceBreakdown{Total: 400},
 				},
 			},
 		},
@@ -68,18 +69,18 @@ func createTestAssessmentForComplexityHandler(id uuid.UUID, username, orgID, clu
 }
 
 func createTestInventoryForEstimationHandler(clusterID string, totalVMs, totalDiskGB int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: totalVMs,
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: inventoryapi.VMResourceBreakdown{
 						Total: totalDiskGB,
 					},
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: 40,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: 80,
 					},
 				},
@@ -110,34 +111,34 @@ func createTestAssessmentForEstimationHandler(id uuid.UUID, username, orgID, clu
 }
 
 func createTestAssessmentForByComplexityHandler(id uuid.UUID, username, orgID, clusterID string) *model.Assessment {
-	dist := map[string]api.DiskSizeTierSummary{
+	dist := map[string]inventoryapi.DiskSizeTierSummary{
 		"1": {VmCount: 30, TotalSizeTB: 5.0},
 		"2": {VmCount: 10, TotalSizeTB: 12.0},
 	}
-	osInfo := map[string]api.OsInfo{
+	osInfo := map[string]inventoryapi.OsInfo{
 		"Red Hat Enterprise Linux 9 (64-bit)": {Count: 30},
 		"Windows Server 2019":                 {Count: 10},
 	}
-	diskTier := map[string]api.DiskSizeTierSummary{
+	diskTier := map[string]inventoryapi.DiskSizeTierSummary{
 		"0-100GiB": {VmCount: 30, TotalSizeTB: 5.0},
 		"1-2TiB":   {VmCount: 10, TotalSizeTB: 12.0},
 	}
-	diskComplexityTierOsDisk := map[string]api.DiskSizeTierSummary{
+	diskComplexityTierOsDisk := map[string]inventoryapi.DiskSizeTierSummary{
 		"0-10TiB":  {VmCount: 30, TotalSizeTB: 5.0},
 		"10-20TiB": {VmCount: 10, TotalSizeTB: 12.0},
 	}
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total:                  40,
 					OsInfo:                 &osInfo,
 					DiskSizeTier:           &diskTier,
 					DiskComplexityTier:     &diskComplexityTierOsDisk,
 					ComplexityDistribution: &dist,
-					DiskGB:                 api.VMResourceBreakdown{Total: 17000},
-					CpuCores:               api.VMResourceBreakdown{Total: 160},
-					RamGB:                  api.VMResourceBreakdown{Total: 320},
+					DiskGB:                 inventoryapi.VMResourceBreakdown{Total: 17000},
+					CpuCores:               inventoryapi.VMResourceBreakdown{Total: 160},
+					RamGB:                  inventoryapi.VMResourceBreakdown{Total: 320},
 				},
 			},
 		},

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -211,15 +212,15 @@ func createTestSizerServer(response *client.SizerResponse, healthStatus int, hea
 }
 
 func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: totalVMs,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: totalCPU,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: totalMemory,
 					},
 				},

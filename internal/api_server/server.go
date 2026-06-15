@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kubev2v/migration-planner/pkg/opa"
+	"github.com/kubev2v/migration-planner-common/pkg/opa"
 
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"

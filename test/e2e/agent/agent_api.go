@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"go.uber.org/zap"
 )
 
@@ -99,8 +99,8 @@ func (a *AgentApi) Status() (*AgentStatus, error) {
 }
 
 // Inventory retrieves the inventory data collected by the agent
-func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
-	var inv v1alpha1.Inventory
+func (a *AgentApi) Inventory() (*inventoryapi.Inventory, error) {
+	var inv inventoryapi.Inventory
 
 	res, err := a.request(http.MethodGet, "inventory", nil, &inv)
 	if err != nil {

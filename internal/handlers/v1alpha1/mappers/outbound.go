@@ -5,29 +5,30 @@ import (
 	"fmt"
 	"slices"
 
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
+	"github.com/kubev2v/migration-planner-common/pkg/complexity"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 // normalizeInventoryData ensures all nil maps and slices are initialized to empty ones
 // This prevents null values in JSON that can cause UI crashes when reading data from database
-func normalizeInventoryData(data *api.InventoryData) {
+func normalizeInventoryData(data *inventoryapi.InventoryData) {
 	if data == nil {
 		return
 	}
 
 	// Normalize Infra fields
 	if data.Infra.Datastores == nil {
-		data.Infra.Datastores = []api.Datastore{}
+		data.Infra.Datastores = []inventoryapi.Datastore{}
 	}
 	if data.Infra.Networks == nil {
-		data.Infra.Networks = []api.Network{}
+		data.Infra.Networks = []inventoryapi.Network{}
 	}
 	if data.Infra.HostPowerStates == nil {
 		data.Infra.HostPowerStates = map[string]int{}
@@ -38,19 +39,19 @@ func normalizeInventoryData(data *api.InventoryData) {
 		data.Vms.PowerStates = map[string]int{}
 	}
 	if data.Vms.MigrationWarnings == nil {
-		data.Vms.MigrationWarnings = api.MigrationIssues{}
+		data.Vms.MigrationWarnings = []inventoryapi.MigrationIssue{}
 	}
 	if data.Vms.NotMigratableReasons == nil {
-		data.Vms.NotMigratableReasons = api.MigrationIssues{}
+		data.Vms.NotMigratableReasons = []inventoryapi.MigrationIssue{}
 	}
 	if data.Vms.OsInfo == nil {
-		data.Vms.OsInfo = &map[string]api.OsInfo{}
+		data.Vms.OsInfo = &map[string]inventoryapi.OsInfo{}
 	}
 	if data.Vms.DiskSizeTier == nil {
-		data.Vms.DiskSizeTier = &map[string]api.DiskSizeTierSummary{}
+		data.Vms.DiskSizeTier = &map[string]inventoryapi.DiskSizeTierSummary{}
 	}
 	if data.Vms.DiskTypes == nil {
-		data.Vms.DiskTypes = &map[string]api.DiskTypeSummary{}
+		data.Vms.DiskTypes = &map[string]inventoryapi.DiskTypeSummary{}
 	}
 	if data.Vms.DistributionByCpuTier == nil {
 		data.Vms.DistributionByCpuTier = &map[string]int{}
@@ -80,7 +81,7 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		v := util.GetInventoryVersion(s.Inventory)
 		switch v {
 		case model.SnapshotVersionV1:
-			i := api.InventoryData{}
+			i := inventoryapi.InventoryData{}
 			if err := json.Unmarshal(s.Inventory, &i); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 			}
@@ -89,19 +90,19 @@ func SourceToApi(s model.Source) (api.Source, error) {
 			}
 			// Normalize to prevent null values from database
 			normalizeInventoryData(&i)
-			source.Inventory = &api.Inventory{
+			source.Inventory = &inventoryapi.Inventory{
 				Vcenter:   &i,
 				VcenterId: i.Vcenter.Id,
-				Clusters:  map[string]api.InventoryData{},
+				Clusters:  map[string]inventoryapi.InventoryData{},
 			}
 		default:
-			v2 := api.Inventory{}
+			v2 := inventoryapi.Inventory{}
 			if err := json.Unmarshal(s.Inventory, &v2); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
 			}
 			// Ensure clusters map is never nil (fix for null values from database)
 			if v2.Clusters == nil {
-				v2.Clusters = make(map[string]api.InventoryData)
+				v2.Clusters = make(map[string]inventoryapi.InventoryData)
 			}
 			// Normalize vcenter and all cluster inventories to prevent null values
 			if v2.Vcenter != nil {
@@ -235,10 +236,10 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 			CreatedAt: snapshot.CreatedAt,
 		}
 		if len(snapshot.Inventory) > 0 {
-			inventory := api.Inventory{}
+			inventory := inventoryapi.Inventory{}
 			switch snapshot.Version {
 			case 1:
-				invV1 := api.InventoryData{}
+				invV1 := inventoryapi.InventoryData{}
 				if err := json.Unmarshal(snapshot.Inventory, &invV1); err != nil {
 					return api.Assessment{}, err
 				}
@@ -248,7 +249,7 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 				inventory.VcenterId = invV1.Vcenter.Id
 				// Ensure clusters is initialized
 				if inventory.Clusters == nil {
-					inventory.Clusters = make(map[string]api.InventoryData)
+					inventory.Clusters = make(map[string]inventoryapi.InventoryData)
 				}
 			case 2:
 				if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
@@ -256,7 +257,7 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 				}
 				// Ensure clusters map is never nil (fix for null values from database)
 				if inventory.Clusters == nil {
-					inventory.Clusters = make(map[string]api.InventoryData)
+					inventory.Clusters = make(map[string]inventoryapi.InventoryData)
 				}
 				// Normalize vcenter and all cluster inventories to prevent null values
 				if inventory.Vcenter != nil {
@@ -272,8 +273,8 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 			assessment.Snapshots[i].Inventory = inventory
 		} else {
 			// Initialize empty inventory with non-nil Clusters
-			assessment.Snapshots[i].Inventory = api.Inventory{
-				Clusters: make(map[string]api.InventoryData),
+			assessment.Snapshots[i].Inventory = inventoryapi.Inventory{
+				Clusters: make(map[string]inventoryapi.InventoryData),
 			}
 		}
 	}

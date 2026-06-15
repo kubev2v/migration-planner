@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	inventoryapi "github.com/kubev2v/migration-planner-common/api/inventory"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -18,33 +18,33 @@ import (
 
 // helpers for complexity tests
 
-func buildOsInfo(entries map[string]int) *map[string]api.OsInfo {
-	m := make(map[string]api.OsInfo, len(entries))
+func buildOsInfo(entries map[string]int) *map[string]inventoryapi.OsInfo {
+	m := make(map[string]inventoryapi.OsInfo, len(entries))
 	for name, count := range entries {
-		m[name] = api.OsInfo{Count: count}
+		m[name] = inventoryapi.OsInfo{Count: count}
 	}
 	return &m
 }
 
-func buildDiskSizeTier(entries map[string]api.DiskSizeTierSummary) *map[string]api.DiskSizeTierSummary {
+func buildDiskSizeTier(entries map[string]inventoryapi.DiskSizeTierSummary) *map[string]inventoryapi.DiskSizeTierSummary {
 	return &entries
 }
 
-func createTestInventoryForComplexity(clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) []byte {
-	diskComplexityTier := map[string]api.DiskSizeTierSummary{
+func createTestInventoryForComplexity(clusterID string, osInfo *map[string]inventoryapi.OsInfo, diskSizeTier *map[string]inventoryapi.DiskSizeTierSummary) []byte {
+	diskComplexityTier := map[string]inventoryapi.DiskSizeTierSummary{
 		"0-10TiB": {VmCount: 125, TotalSizeTB: 8.5},
 	}
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total:              10,
 					OsInfo:             osInfo,
 					DiskSizeTier:       diskSizeTier,
 					DiskComplexityTier: &diskComplexityTier,
-					DiskGB:             api.VMResourceBreakdown{Total: 100},
-					CpuCores:           api.VMResourceBreakdown{Total: 40},
-					RamGB:              api.VMResourceBreakdown{Total: 80},
+					DiskGB:             inventoryapi.VMResourceBreakdown{Total: 100},
+					CpuCores:           inventoryapi.VMResourceBreakdown{Total: 40},
+					RamGB:              inventoryapi.VMResourceBreakdown{Total: 80},
 				},
 			},
 		},
@@ -54,27 +54,27 @@ func createTestInventoryForComplexity(clusterID string, osInfo *map[string]api.O
 	return data
 }
 
-func buildComplexityDistribution(entries map[string]api.DiskSizeTierSummary) *map[string]api.DiskSizeTierSummary {
+func buildComplexityDistribution(entries map[string]inventoryapi.DiskSizeTierSummary) *map[string]inventoryapi.DiskSizeTierSummary {
 	return &entries
 }
 
 func createTestInventoryWithComplexityDistribution(
 	clusterID string,
-	osInfo *map[string]api.OsInfo,
-	diskSizeTier *map[string]api.DiskSizeTierSummary,
-	dist *map[string]api.DiskSizeTierSummary,
+	osInfo *map[string]inventoryapi.OsInfo,
+	diskSizeTier *map[string]inventoryapi.DiskSizeTierSummary,
+	dist *map[string]inventoryapi.DiskSizeTierSummary,
 ) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total:                  10,
 					OsInfo:                 osInfo,
 					DiskSizeTier:           diskSizeTier,
 					ComplexityDistribution: dist,
-					DiskGB:                 api.VMResourceBreakdown{Total: 100},
-					CpuCores:               api.VMResourceBreakdown{Total: 40},
-					RamGB:                  api.VMResourceBreakdown{Total: 80},
+					DiskGB:                 inventoryapi.VMResourceBreakdown{Total: 100},
+					CpuCores:               inventoryapi.VMResourceBreakdown{Total: 40},
+					RamGB:                  inventoryapi.VMResourceBreakdown{Total: 80},
 				},
 			},
 		},
@@ -87,9 +87,9 @@ func createTestInventoryWithComplexityDistribution(
 func createTestAssessmentWithComplexityDistribution(
 	id uuid.UUID,
 	username, orgID, clusterID string,
-	osInfo *map[string]api.OsInfo,
-	diskSizeTier *map[string]api.DiskSizeTierSummary,
-	dist *map[string]api.DiskSizeTierSummary,
+	osInfo *map[string]inventoryapi.OsInfo,
+	diskSizeTier *map[string]inventoryapi.DiskSizeTierSummary,
+	dist *map[string]inventoryapi.DiskSizeTierSummary,
 ) *model.Assessment {
 	return &model.Assessment{
 		ID:       id,
@@ -108,7 +108,7 @@ func createTestAssessmentWithComplexityDistribution(
 	}
 }
 
-func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID string, osInfo *map[string]api.OsInfo, diskSizeTier *map[string]api.DiskSizeTierSummary) *model.Assessment {
+func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID string, osInfo *map[string]inventoryapi.OsInfo, diskSizeTier *map[string]inventoryapi.DiskSizeTierSummary) *model.Assessment {
 	return &model.Assessment{
 		ID:       id,
 		Name:     "test-assessment",
@@ -145,18 +145,18 @@ func createTestAssessmentFromRawInventory(id uuid.UUID, username, orgID string, 
 }
 
 func createTestInventoryForEstimation(clusterID string, totalVMs, totalDiskGB int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := inventoryapi.Inventory{
+		Clusters: map[string]inventoryapi.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: inventoryapi.VMs{
 					Total: totalVMs,
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: inventoryapi.VMResourceBreakdown{
 						Total: totalDiskGB,
 					},
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: inventoryapi.VMResourceBreakdown{
 						Total: 40,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: inventoryapi.VMResourceBreakdown{
 						Total: 80,
 					},
 				},
@@ -208,8 +208,8 @@ var _ = Describe("EstimationService", func() {
 	})
 
 	Describe("CalculateMigrationComplexity", func() {
-		var defaultOsInfo *map[string]api.OsInfo
-		var defaultDiskTier *map[string]api.DiskSizeTierSummary
+		var defaultOsInfo *map[string]inventoryapi.OsInfo
+		var defaultDiskTier *map[string]inventoryapi.DiskSizeTierSummary
 
 		BeforeEach(func() {
 			defaultOsInfo = buildOsInfo(map[string]int{
@@ -217,7 +217,7 @@ var _ = Describe("EstimationService", func() {
 				"CentOS 7 (64-bit)":                   20,
 				"FreeBSD (64-bit)":                    5,
 			})
-			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+			defaultDiskTier = buildDiskSizeTier(map[string]inventoryapi.DiskSizeTierSummary{
 				"0-100GiB": {VmCount: 125, TotalSizeTB: 8.5},
 			})
 		})
@@ -259,7 +259,7 @@ var _ = Describe("EstimationService", func() {
 			})
 
 			It("maps disk tier labels to correct scores with correct size values", func() {
-				diskTier := buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+				diskTier := buildDiskSizeTier(map[string]inventoryapi.DiskSizeTierSummary{
 					"0-100GiB":    {VmCount: 80, TotalSizeTB: 5.0},
 					"100-500GiB":  {VmCount: 10, TotalSizeTB: 15.0},
 					"500GiB-1TiB": {VmCount: 5, TotalSizeTB: 30.0},
@@ -391,22 +391,22 @@ var _ = Describe("EstimationService", func() {
 
 			It("falls back to DiskSizeTier when DiskComplexityTier is absent (old snapshot)", func() {
 				// Build inventory with only the old-style DiskSizeTier (no DiskComplexityTier)
-				oldStyleTier := buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+				oldStyleTier := buildDiskSizeTier(map[string]inventoryapi.DiskSizeTierSummary{
 					"Easy (0-10TB)": {VmCount: 50, TotalSizeTB: 3.0},
 				})
 				oldInventory := createTestInventoryForComplexity(clusterID, defaultOsInfo, oldStyleTier)
 				// Override: strip out DiskComplexityTier to simulate old snapshot
-				var inv api.Inventory
+				var inv inventoryapi.Inventory
 				Expect(json.Unmarshal(oldInventory, &inv)).To(Succeed())
-				inv.Clusters[clusterID] = api.InventoryData{
-					Vms: api.VMs{
+				inv.Clusters[clusterID] = inventoryapi.InventoryData{
+					Vms: inventoryapi.VMs{
 						Total:        10,
 						OsInfo:       defaultOsInfo,
 						DiskSizeTier: oldStyleTier,
 						// DiskComplexityTier intentionally absent (nil)
-						DiskGB:   api.VMResourceBreakdown{Total: 100},
-						CpuCores: api.VMResourceBreakdown{Total: 40},
-						RamGB:    api.VMResourceBreakdown{Total: 80},
+						DiskGB:   inventoryapi.VMResourceBreakdown{Total: 100},
+						CpuCores: inventoryapi.VMResourceBreakdown{Total: 40},
+						RamGB:    inventoryapi.VMResourceBreakdown{Total: 80},
 					},
 				}
 				data, err := json.Marshal(inv)
@@ -506,15 +506,15 @@ var _ = Describe("EstimationService", func() {
 
 			It("returns error when both diskSizeTier and diskComplexityTier are nil", func() {
 				// Build inventory with no disk tier data at all (both fields absent)
-				noDiskInventory := api.Inventory{
-					Clusters: map[string]api.InventoryData{
+				noDiskInventory := inventoryapi.Inventory{
+					Clusters: map[string]inventoryapi.InventoryData{
 						clusterID: {
-							Vms: api.VMs{
+							Vms: inventoryapi.VMs{
 								Total:    10,
 								OsInfo:   defaultOsInfo,
-								DiskGB:   api.VMResourceBreakdown{Total: 100},
-								CpuCores: api.VMResourceBreakdown{Total: 40},
-								RamGB:    api.VMResourceBreakdown{Total: 80},
+								DiskGB:   inventoryapi.VMResourceBreakdown{Total: 100},
+								CpuCores: inventoryapi.VMResourceBreakdown{Total: 40},
+								RamGB:    inventoryapi.VMResourceBreakdown{Total: 80},
 								// DiskSizeTier and DiskComplexityTier intentionally nil
 							},
 						},
@@ -534,16 +534,16 @@ var _ = Describe("EstimationService", func() {
 			It("returns error when both diskSizeTier and diskComplexityTier are empty maps", func() {
 				// An external client could send {} for either field; empty maps must also
 				// trigger the fallback and ultimately the error, not silently return zeros.
-				emptyTier := map[string]api.DiskSizeTierSummary{}
-				noDiskInventory := api.Inventory{
-					Clusters: map[string]api.InventoryData{
+				emptyTier := map[string]inventoryapi.DiskSizeTierSummary{}
+				noDiskInventory := inventoryapi.Inventory{
+					Clusters: map[string]inventoryapi.InventoryData{
 						clusterID: {
-							Vms: api.VMs{
+							Vms: inventoryapi.VMs{
 								Total:              10,
 								OsInfo:             defaultOsInfo,
-								DiskGB:             api.VMResourceBreakdown{Total: 100},
-								CpuCores:           api.VMResourceBreakdown{Total: 40},
-								RamGB:              api.VMResourceBreakdown{Total: 80},
+								DiskGB:             inventoryapi.VMResourceBreakdown{Total: 100},
+								CpuCores:           inventoryapi.VMResourceBreakdown{Total: 40},
+								RamGB:              inventoryapi.VMResourceBreakdown{Total: 80},
 								DiskSizeTier:       &emptyTier,
 								DiskComplexityTier: &emptyTier,
 							},
@@ -728,8 +728,8 @@ var _ = Describe("EstimationService", func() {
 			})
 
 			It("returns error when inventory has no clusters", func() {
-				emptyInventory := api.Inventory{
-					Clusters: map[string]api.InventoryData{}, // Empty clusters
+				emptyInventory := inventoryapi.Inventory{
+					Clusters: map[string]inventoryapi.InventoryData{}, // Empty clusters
 				}
 				data, _ := json.Marshal(emptyInventory)
 
@@ -843,20 +843,20 @@ var _ = Describe("EstimationService", func() {
 	})
 
 	Describe("CalculateOsDiskComplexity", func() {
-		var defaultOsInfo *map[string]api.OsInfo
-		var defaultDiskTier *map[string]api.DiskSizeTierSummary
+		var defaultOsInfo *map[string]inventoryapi.OsInfo
+		var defaultDiskTier *map[string]inventoryapi.DiskSizeTierSummary
 
 		BeforeEach(func() {
 			defaultOsInfo = buildOsInfo(map[string]int{
 				"Red Hat Enterprise Linux 9 (64-bit)": 100,
 			})
-			defaultDiskTier = buildDiskSizeTier(map[string]api.DiskSizeTierSummary{
+			defaultDiskTier = buildDiskSizeTier(map[string]inventoryapi.DiskSizeTierSummary{
 				"0-100GiB": {VmCount: 100, TotalSizeTB: 5.0},
 			})
 		})
 
 		It("returns 5 buckets with VMCount and TotalSizeTB", func() {
-			dist := buildComplexityDistribution(map[string]api.DiskSizeTierSummary{
+			dist := buildComplexityDistribution(map[string]inventoryapi.DiskSizeTierSummary{
 				"1": {VmCount: 30, TotalSizeTB: 5.0},
 				"2": {VmCount: 15, TotalSizeTB: 12.0},
 			})
