@@ -2180,6 +2180,286 @@ var _ = Describe("sizer service", func() {
 			})
 		})
 	})
+
+	Describe("Compact Mode", func() {
+		var (
+			assessmentID uuid.UUID
+			clusterID    string
+			request      *mappers.ClusterRequirementsRequestForm
+		)
+
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			clusterID = "cluster-compact-test"
+			request = &mappers.ClusterRequirementsRequestForm{
+				ClusterID:               clusterID,
+				CpuOverCommitRatio:      "1:4",
+				MemoryOverCommitRatio:   "1:2",
+				WorkerNodeCPU:           8,
+				WorkerNodeMemory:        16,
+				CompactMode:             util.BoolPtr(true),
+				ControlPlaneNodeCount:   util.IntPtr(3),
+				ControlPlaneSchedulable: util.BoolPtr(true),
+			}
+		})
+
+		Context("successful calculation", func() {
+			It("returns 3-node cluster with no worker nodes", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(3))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
+
+				// Assessment-scoped requests should persist to database
+				Expect(mockStore.clusterInputs).NotTo(BeEmpty())
+			})
+
+			It("assigns both vm-workload and control-plane-services to controlPlane machine set", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+
+				var sizerPayload client.SizerRequest
+				testServer = createTestSizerServerWithRequestCapture(
+					createTestSizerResponse(3, 0, 3, 40, 80),
+					http.StatusOK,
+					false,
+					&sizerPayload,
+				)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+
+				Expect(sizerPayload.MachineSets).To(HaveLen(1))
+				Expect(sizerPayload.MachineSets[0].Name).To(Equal("controlPlane"))
+				Expect(sizerPayload.MachineSets[0].AllowWorkloadScheduling).NotTo(BeNil())
+				Expect(*sizerPayload.MachineSets[0].AllowWorkloadScheduling).To(BeTrue())
+
+				Expect(sizerPayload.Workloads).To(HaveLen(2))
+				var vmWorkload, cpWorkload *client.Workload
+				for i := range sizerPayload.Workloads {
+					switch sizerPayload.Workloads[i].Name {
+					case "vm-workload":
+						vmWorkload = &sizerPayload.Workloads[i]
+					case "control-plane-services":
+						cpWorkload = &sizerPayload.Workloads[i]
+					}
+				}
+				Expect(vmWorkload).NotTo(BeNil())
+				Expect(vmWorkload.UsesMachines).To(ConsistOf("controlPlane"))
+				Expect(cpWorkload).NotTo(BeNil())
+				Expect(cpWorkload.UsesMachines).To(ConsistOf("controlPlane"))
+			})
+
+			It("applies over-commit ratios correctly in compact mode", func() {
+				request.CpuOverCommitRatio = "1:8"
+				request.MemoryOverCommitRatio = "1:4"
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 800, 400)
+				mockStore.assessments[assessmentID] = assessment
+
+				var sizerPayload client.SizerRequest
+				testServer = createTestSizerServerWithRequestCapture(
+					createTestSizerResponse(3, 0, 3, 100, 100),
+					http.StatusOK,
+					false,
+					&sizerPayload,
+				)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+
+				var vmWorkload *client.Workload
+				for i := range sizerPayload.Workloads {
+					if sizerPayload.Workloads[i].Name == "vm-workload" {
+						vmWorkload = &sizerPayload.Workloads[i]
+						break
+					}
+				}
+				Expect(vmWorkload).NotTo(BeNil())
+				Expect(vmWorkload.Services).NotTo(BeEmpty())
+
+				firstService := vmWorkload.Services[0]
+				Expect(firstService.LimitCPU).To(BeNumerically(">", 0))
+				expectedRequired := firstService.LimitCPU / 8.0
+				Expect(firstService.RequiredCPU).To(Equal(expectedRequired))
+
+				Expect(firstService.LimitMemory).To(BeNumerically(">", 0))
+				expectedMemoryRequired := firstService.LimitMemory / 4.0
+				Expect(firstService.RequiredMemory).To(Equal(expectedMemoryRequired))
+			})
+		})
+
+		Context("validation errors", func() {
+			It("returns error when compact mode with non-schedulable control plane", func() {
+				request.ControlPlaneSchedulable = util.BoolPtr(false)
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("compact mode clusters require schedulable control planes"))
+				Expect(err.Error()).To(ContainSubstring("Set ControlPlaneSchedulable to true"))
+			})
+
+			It("returns error when compact mode with hosted control plane", func() {
+				request.HostedControlPlane = util.BoolPtr(true)
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(Equal("compact mode clusters cannot use hosted control planes"))
+			})
+
+			It("returns error when compact mode with controlPlaneNodeCount != 3", func() {
+				request.ControlPlaneNodeCount = util.IntPtr(1)
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(Equal("compact mode clusters require exactly 3 control plane nodes"))
+			})
+
+			It("returns error when compact mode with nil ControlPlaneSchedulable", func() {
+				request.ControlPlaneSchedulable = nil
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("compact mode clusters require schedulable control planes"))
+			})
+		})
+
+		Context("fit errors", func() {
+			It("succeeds even when sizer returns more than 3 nodes (current behavior)", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(3))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+			})
+
+			It("handles sizer schedulability error for compact mode", func() {
+				assessment := createTestAssessment(assessmentID, clusterID, 10, 100, 200)
+				mockStore.assessments[assessmentID] = assessment
+				testServer = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					if r.URL.Path == "/health" {
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+					if r.URL.Path == "/api/v1/size/custom" {
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusInternalServerError)
+						_ = json.NewEncoder(w).Encode(map[string]interface{}{
+							"success": false,
+							"error":   "Workload \"vm-workload\" is not schedulable. All available MachineSets are too small to run this workload. Minimum required: at least 200 CPU and 512 GB memory.",
+						})
+						return
+					}
+					w.WriteHeader(http.StatusNotFound)
+				}))
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("control plane nodes"))
+				Expect(err.Error()).To(ContainSubstring("are too small for compact mode"))
+			})
+		})
+
+		Context("standalone request", func() {
+			It("successfully calculates compact mode and does not persist to database", func() {
+				standaloneReq := &mappers.StandaloneClusterRequirementsRequestForm{
+					TotalVMs:                10,
+					TotalCPU:                40,
+					TotalMemory:             80,
+					CpuOverCommitRatio:      "1:4",
+					MemoryOverCommitRatio:   "1:2",
+					WorkerNodeCPU:           8,
+					WorkerNodeMemory:        16,
+					CompactMode:             util.BoolPtr(true),
+					ControlPlaneNodeCount:   util.IntPtr(3),
+					ControlPlaneSchedulable: util.BoolPtr(true),
+				}
+
+				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, standaloneReq)
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ClusterSizing.TotalNodes).To(Equal(3))
+				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(result.ClusterSizing.FailoverNodes).To(Equal(0))
+
+				// Standalone requests should not persist to database
+				Expect(mockStore.clusterInputs).To(BeEmpty())
+			})
+		})
+	})
 })
 
 func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) api.Inventory {

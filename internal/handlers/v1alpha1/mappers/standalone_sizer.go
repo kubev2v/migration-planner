@@ -21,6 +21,7 @@ func StandaloneClusterRequirementsRequestToForm(
 		ControlPlaneSchedulable: apiReq.ControlPlaneSchedulable,
 		ControlPlaneCPU:         apiReq.ControlPlaneCPU,
 		ControlPlaneMemory:      apiReq.ControlPlaneMemory,
+		CompactMode:             apiReq.CompactMode,
 	}
 
 	if apiReq.ControlPlaneNodeCount != nil {

@@ -283,6 +283,7 @@ type ClusterRequirementsRequestForm struct {
 	ControlPlaneCPU         *int
 	ControlPlaneMemory      *int
 	HostedControlPlane      *bool
+	CompactMode             *bool
 }
 
 type ClusterRequirementsInputForm struct {
@@ -297,6 +298,7 @@ type ClusterRequirementsInputForm struct {
 	ControlPlaneCPU         *int
 	ControlPlaneMemory      *int
 	HostedControlPlane      *bool
+	CompactMode             *bool
 }
 
 type ClusterSizingForm struct {
