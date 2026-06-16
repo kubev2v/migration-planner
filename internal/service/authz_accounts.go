@@ -37,9 +37,19 @@ func (a *AuthzAccountsService) ListGroups(ctx context.Context, filter *store.Gro
 }
 
 func (a *AuthzAccountsService) GetGroup(ctx context.Context, id uuid.UUID) (model.Group, error) {
-	if err := a.requireAdmin(ctx, "groups"); err != nil {
-		return model.Group{}, err
+	user := auth.MustHaveUser(ctx)
+	identity, err := a.inner.GetIdentity(ctx, user)
+	if err != nil {
+		return model.Group{}, fmt.Errorf("authz: failed to get identity: %w", err)
 	}
+
+	switch {
+	case identity.Kind == KindAdmin:
+	case identity.Kind == KindCustomer && identity.PartnerID != nil && *identity.PartnerID == id.String():
+	default:
+		return model.Group{}, NewErrForbidden("groups", user.Username)
+	}
+
 	return a.inner.GetGroup(ctx, id)
 }
 
