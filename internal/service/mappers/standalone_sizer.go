@@ -16,6 +16,7 @@ type StandaloneClusterRequirementsRequestForm struct {
 	ControlPlaneCPU         *int
 	ControlPlaneMemory      *int
 	HostedControlPlane      *bool
+	CompactMode             *bool
 }
 
 // StandaloneClusterRequirementsResponseForm omits inventory totals (already in request).

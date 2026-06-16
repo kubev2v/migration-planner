@@ -154,6 +154,22 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
 	}
 
+	// Validate compact mode requirements
+	var cpNodeCount *int
+	if request.Body.ControlPlaneNodeCount != nil {
+		count := int(*request.Body.ControlPlaneNodeCount)
+		cpNodeCount = &count
+	}
+	if err := validateCompactMode(
+		request.Body.CompactMode,
+		request.Body.HostedControlPlane,
+		cpNodeCount,
+		request.Body.ControlPlaneSchedulable,
+	); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: err.Error()}, nil
+	}
+
 	// Validate controlPlaneNodeCount (API enum handles this in production, but tests bypass middleware)
 	if request.Body.HostedControlPlane == nil || !*request.Body.HostedControlPlane {
 		if request.Body.ControlPlaneNodeCount != nil {
@@ -250,6 +266,34 @@ func validateNoControlPlaneFieldsWhenHosted(
 	return nil
 }
 
+func validateCompactMode(
+	compactMode *bool,
+	hostedControlPlane *bool,
+	controlPlaneNodeCount *int,
+	controlPlaneSchedulable *bool,
+) error {
+	if compactMode == nil || !*compactMode {
+		return nil
+	}
+
+	// Compact mode is incompatible with hosted control plane
+	if hostedControlPlane != nil && *hostedControlPlane {
+		return fmt.Errorf("compactMode cannot be true when hostedControlPlane is true")
+	}
+
+	// Compact mode requires 3 control plane nodes
+	if controlPlaneNodeCount == nil || *controlPlaneNodeCount != 3 {
+		return fmt.Errorf("compactMode requires controlPlaneNodeCount to be 3")
+	}
+
+	// Compact mode requires schedulable control plane
+	if controlPlaneSchedulable == nil || !*controlPlaneSchedulable {
+		return fmt.Errorf("compactMode requires controlPlaneSchedulable to be true")
+	}
+
+	return nil
+}
+
 // (POST /api/v1/cluster-requirements)
 func (h *ServiceHandler) CalculateClusterRequirements(
 	ctx context.Context,
@@ -318,6 +362,22 @@ func (h *ServiceHandler) CalculateClusterRequirements(
 		return server.CalculateClusterRequirements400JSONResponse{
 			Message: err.Error(),
 		}, nil
+	}
+
+	// Validate compact mode requirements
+	var cpNodeCount *int
+	if request.Body.ControlPlaneNodeCount != nil {
+		count := int(*request.Body.ControlPlaneNodeCount)
+		cpNodeCount = &count
+	}
+	if err := validateCompactMode(
+		request.Body.CompactMode,
+		request.Body.HostedControlPlane,
+		cpNodeCount,
+		request.Body.ControlPlaneSchedulable,
+	); err != nil {
+		logger.Error(err).Log()
+		return server.CalculateClusterRequirements400JSONResponse{Message: err.Error()}, nil
 	}
 
 	if request.Body.HostedControlPlane == nil || !*request.Body.HostedControlPlane {

@@ -3173,6 +3173,9 @@ components:
         hostedControlPlane:
           type: boolean
           description: "If true, control plane is hosted externally. Incompatible with control plane fields (default: false)"
+        compactMode:
+          type: boolean
+          description: "If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true"
       required:
         - clusterId
         - cpuOverCommitRatio
@@ -3220,6 +3223,9 @@ components:
         hostedControlPlane:
           type: boolean
           description: If true, control plane is hosted externally
+        compactMode:
+          type: boolean
+          description: If true, creates a 3-node compact cluster with no dedicated workers
       required:
         - clusterId
 
@@ -3334,6 +3340,9 @@ components:
         hostedControlPlane:
           type: boolean
           description: "If true, control plane is hosted externally. Incompatible with control plane fields (default: false)"
+        compactMode:
+          type: boolean
+          description: "If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true"
       required:
         - totalVMs
         - totalCPU

@@ -51,6 +51,7 @@ func (s *ClusterSizingInputStore) Upsert(ctx context.Context, input model.Assess
 			"control_plane_cpu",
 			"control_plane_memory",
 			"hosted_control_plane",
+			"compact_mode",
 			"updated_at",
 		}),
 	}).Create(&input)

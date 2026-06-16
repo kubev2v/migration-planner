@@ -147,6 +147,7 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 		ControlPlaneSchedulable: apiReq.ControlPlaneSchedulable,
 		ControlPlaneCPU:         apiReq.ControlPlaneCPU,
 		ControlPlaneMemory:      apiReq.ControlPlaneMemory,
+		CompactMode:             apiReq.CompactMode,
 	}
 
 	// Convert ControlPlaneNodeCount from API type to int pointer

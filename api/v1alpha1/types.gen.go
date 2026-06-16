@@ -271,6 +271,9 @@ type ClusterRequirementsRequest struct {
 	// ClusterId ID of the cluster to calculate requirements for
 	ClusterId string `json:"clusterId" validate:"required"`
 
+	// CompactMode If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true
+	CompactMode *bool `json:"compactMode,omitempty"`
+
 	// ControlPlaneCPU CPU cores per control plane node (default: 6)
 	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=384"`
 
@@ -330,6 +333,9 @@ type ClusterRequirementsResponse struct {
 type ClusterRequirementsStoredInput struct {
 	// ClusterId ID of the cluster
 	ClusterId string `json:"clusterId"`
+
+	// CompactMode If true, creates a 3-node compact cluster with no dedicated workers
+	CompactMode *bool `json:"compactMode,omitempty"`
 
 	// ControlPlaneCPU CPU cores per control plane node
 	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty"`
@@ -1024,6 +1030,9 @@ type SourceUpdateNetworkConfigType string
 
 // StandaloneClusterRequirementsRequest Request payload for calculating cluster requirements with inline inventory data (no assessment required)
 type StandaloneClusterRequirementsRequest struct {
+	// CompactMode If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true
+	CompactMode *bool `json:"compactMode,omitempty"`
+
 	// ControlPlaneCPU CPU cores per control plane node (default: 6)
 	ControlPlaneCPU *int `json:"controlPlaneCPU,omitempty" validate:"omitempty,min=2,max=384"`
 

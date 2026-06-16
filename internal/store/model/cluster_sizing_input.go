@@ -19,5 +19,6 @@ type AssessmentClusterSizingInput struct {
 	ControlPlaneCPU         *int       `gorm:"column:control_plane_cpu"`
 	ControlPlaneMemory      *int       `gorm:"column:control_plane_memory"`
 	HostedControlPlane      *bool      `gorm:"column:hosted_control_plane"`
+	CompactMode             *bool      `gorm:"column:compact_mode;default:false"`
 	UpdatedAt               *time.Time `gorm:"column:updated_at;type:timestamptz;not null;default:now()"`
 }

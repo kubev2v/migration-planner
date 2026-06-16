@@ -789,6 +789,175 @@ var _ = Describe("sizer handler", func() {
 
 		})
 
+		Context("compact mode validation", func() {
+			It("successfully accepts compact mode with valid configuration", func() {
+				compactTrue := true
+				three := api.ClusterRequirementsRequestControlPlaneNodeCountN3
+				schedulableTrue := true
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:               clusterID,
+					CpuOverCommitRatio:      api.CpuOneToFour,
+					MemoryOverCommitRatio:   api.MemoryOneToTwo,
+					WorkerNodeCPU:           8,
+					WorkerNodeMemory:        16,
+					CompactMode:             &compactTrue,
+					ControlPlaneNodeCount:   &three,
+					ControlPlaneSchedulable: &schedulableTrue,
+				}
+
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				sizerResponse := createTestSizerResponse(3, 0, 3, 40, 80)
+				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(3))
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(successResp.ClusterSizing.FailoverNodes).To(Equal(0))
+			})
+
+			DescribeTable("returns 400 for invalid compact mode configurations",
+				func(setupRequest func(*api.ClusterRequirementsRequest), expectedError string) {
+					request := &api.ClusterRequirementsRequest{
+						ClusterId:             clusterID,
+						CpuOverCommitRatio:    api.CpuOneToFour,
+						MemoryOverCommitRatio: api.MemoryOneToTwo,
+						WorkerNodeCPU:         8,
+						WorkerNodeMemory:      16,
+					}
+					setupRequest(request)
+
+					handler = handlers.NewServiceHandler(
+						nil,
+						service.NewAssessmentService(mockStore, nil, nil),
+						nil,
+						nil,
+						nil,
+						nil,
+						nil,
+					)
+
+					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+						Id:   assessmentID,
+						Body: request,
+					})
+
+					Expect(err).To(BeNil())
+					errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+					Expect(ok).To(BeTrue())
+					Expect(errorResp.Message).To(Equal(expectedError))
+				},
+				Entry("compact mode and hosted control plane are both true",
+					func(req *api.ClusterRequirementsRequest) {
+						compactTrue := true
+						hostedTrue := true
+						req.CompactMode = &compactTrue
+						req.HostedControlPlane = &hostedTrue
+					},
+					"compactMode cannot be true when hostedControlPlane is true",
+				),
+				Entry("compact mode with controlPlaneNodeCount != 3 (test with 1)",
+					func(req *api.ClusterRequirementsRequest) {
+						compactTrue := true
+						one := api.ClusterRequirementsRequestControlPlaneNodeCountN1
+						schedulableTrue := true
+						req.CompactMode = &compactTrue
+						req.ControlPlaneNodeCount = &one
+						req.ControlPlaneSchedulable = &schedulableTrue
+					},
+					"compactMode requires controlPlaneNodeCount to be 3",
+				),
+				Entry("compact mode with controlPlaneSchedulable=false",
+					func(req *api.ClusterRequirementsRequest) {
+						compactTrue := true
+						three := api.ClusterRequirementsRequestControlPlaneNodeCountN3
+						schedulableFalse := false
+						req.CompactMode = &compactTrue
+						req.ControlPlaneNodeCount = &three
+						req.ControlPlaneSchedulable = &schedulableFalse
+					},
+					"compactMode requires controlPlaneSchedulable to be true",
+				),
+				Entry("compact mode with controlPlaneSchedulable=nil",
+					func(req *api.ClusterRequirementsRequest) {
+						compactTrue := true
+						three := api.ClusterRequirementsRequestControlPlaneNodeCountN3
+						req.CompactMode = &compactTrue
+						req.ControlPlaneNodeCount = &three
+						// ControlPlaneSchedulable is nil
+					},
+					"compactMode requires controlPlaneSchedulable to be true",
+				),
+			)
+		})
+
+		Context("backward compatibility", func() {
+			It("SNO mode still works when compactMode not specified", func() {
+				one := api.ClusterRequirementsRequestControlPlaneNodeCountN1
+				schedulableTrue := true
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:               clusterID,
+					CpuOverCommitRatio:      api.CpuOneToFour,
+					MemoryOverCommitRatio:   api.MemoryOneToTwo,
+					WorkerNodeCPU:           8,
+					WorkerNodeMemory:        16,
+					ControlPlaneNodeCount:   &one,
+					ControlPlaneSchedulable: &schedulableTrue,
+					// CompactMode is nil
+				}
+
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				sizerResponse := createTestSizerResponse(1, 0, 1, 40, 80)
+				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.TotalNodes).To(Equal(1))
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(1))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(Equal(0))
+			})
+
+			It("HA mode still works when compactMode not specified", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+					// CompactMode is nil
+					// ControlPlaneNodeCount defaults to 3
+				}
+
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
+				sizerResponse := createTestSizerResponse(5, 2, 3, 40, 80)
+				handler, testServer = setupTestHandler(mockStore, sizerResponse, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				successResp, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+				Expect(successResp.ClusterSizing.ControlPlaneNodes).To(Equal(3))
+				Expect(successResp.ClusterSizing.WorkerNodes).To(BeNumerically(">", 0))
+			})
+		})
+
 		Context("validation errors", func() {
 			It("returns 400 when request body is nil", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
