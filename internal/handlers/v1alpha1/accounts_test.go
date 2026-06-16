@@ -698,10 +698,46 @@ var _ = Describe("accounts handler", Ordered, func() {
 			Expect(resp).To(BeAssignableToTypeOf(server.CreateGroup403JSONResponse{}))
 		})
 
-		It("GetGroup returns 403 for non-admin", func() {
+		It("GetGroup returns 403 for regular user", func() {
 			resp, err := authzSrv.GetGroup(nonAdminCtx(), server.GetGroupRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(resp).To(BeAssignableToTypeOf(server.GetGroup403JSONResponse{}))
+		})
+
+		It("GetGroup returns 200 for customer requesting their partner group", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, partnerGroupID, "My Partner", "desc", "partner", "icon", "PartnerCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'custuser', '%s', 'accepted', 'Cust', 'Contact', '555-0001', 'c@example.com', 'Loc')", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := auth.NewTokenContext(context.TODO(), auth.User{Username: "custuser", Organization: "org"})
+			resp, err := authzSrv.GetGroup(ctx, server.GetGroupRequestObject{Id: partnerGroupID})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.GetGroup200JSONResponse{}))
+			Expect(resp.(server.GetGroup200JSONResponse).Name).To(Equal("My Partner"))
+
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
+		})
+
+		It("GetGroup returns 403 for customer requesting a different group", func() {
+			partnerGroupID := uuid.New()
+			otherGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, partnerGroupID, "My Partner", "desc", "partner", "icon", "PartnerCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAccountsHandlerGroupStm, otherGroupID, "Other Group", "desc", "partner", "icon", "OtherCo", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'custuser2', '%s', 'accepted', 'Cust', 'Contact', '555-0001', 'c2@example.com', 'Loc')", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := auth.NewTokenContext(context.TODO(), auth.User{Username: "custuser2", Organization: "org"})
+			resp, err := authzSrv.GetGroup(ctx, server.GetGroupRequestObject{Id: otherGroupID})
+			Expect(err).To(BeNil())
+			Expect(resp).To(BeAssignableToTypeOf(server.GetGroup403JSONResponse{}))
+
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM groups;")
 		})
 
 		It("UpdateGroup returns 403 for non-admin", func() {
