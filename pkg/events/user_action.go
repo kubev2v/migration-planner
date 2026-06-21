@@ -29,6 +29,10 @@ type ComplexityActionData struct {
 	AssessmentID string `json:"assessment_id"`
 }
 
+type TimeEstimationActionData struct {
+	AssessmentID string `json:"assessment_id"`
+}
+
 type OVADownloadActionData struct {
 	SourceID string `json:"source_id"`
 }
@@ -80,6 +84,18 @@ func NewComplexityPayload(username, assessmentID string) UserActionEventPayload 
 			Username:  username,
 			Timestamp: time.Now().UTC(),
 			Data: ComplexityActionData{
+				AssessmentID: assessmentID,
+			},
+		},
+	}
+}
+
+func NewTimeEstimationPayload(username, assessmentID string) UserActionEventPayload {
+	return UserActionEventPayload{
+		UserAction: UserActionData{
+			Username:  username,
+			Timestamp: time.Now().UTC(),
+			Data: TimeEstimationActionData{
 				AssessmentID: assessmentID,
 			},
 		},

@@ -8,13 +8,25 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
+
+func countOutboxEventsByType(outboxEvents []model.OutboxEvent, eventType string) int {
+	count := 0
+	for _, e := range outboxEvents {
+		if e.EventType == eventType {
+			count++
+		}
+	}
+	return count
+}
 
 // helpers for complexity tests
 
@@ -189,7 +201,7 @@ func createTestAssessmentForEstimation(id uuid.UUID, username, orgID, clusterID 
 var _ = Describe("EstimationService", func() {
 	var (
 		mockStore     *MockStore
-		estimationSrv *service.EstimationService
+		estimationSrv service.EstimationServicer
 		ctx           context.Context
 		assessmentID  uuid.UUID
 		clusterID     string
@@ -199,7 +211,8 @@ var _ = Describe("EstimationService", func() {
 
 	BeforeEach(func() {
 		mockStore = NewMockStore()
-		estimationSrv = service.NewEstimationService(mockStore)
+		inner := service.NewEstimationService(mockStore)
+		estimationSrv = eventwrap.NewEventEstimationService(inner, mockStore)
 		ctx = context.Background()
 		assessmentID = uuid.New()
 		clusterID = "cluster-test-123"
@@ -234,6 +247,9 @@ var _ = Describe("EstimationService", func() {
 				Expect(result).NotTo(BeNil())
 				Expect(result.ComplexityByOS).To(HaveLen(5))
 				Expect(result.ComplexityByDisk).To(HaveLen(4))
+
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.MigrationComplexityEventType)
+				Expect(outboxCount).To(Equal(1))
 			})
 
 			It("places OS names into the correct score buckets", func() {
@@ -580,6 +596,9 @@ var _ = Describe("EstimationService", func() {
 				Expect(results[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
 				Expect(results[engines.SchemaNetworkBased].MaxTotalDuration).To(BeNumerically(">=", results[engines.SchemaNetworkBased].MinTotalDuration))
 				Expect(results[engines.SchemaNetworkBased].Breakdown).NotTo(BeEmpty())
+
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.MigrationTimeEstimationEventType)
+				Expect(outboxCount).To(Equal(1))
 			})
 
 			It("returns breakdown with all registered calculators", func() {
@@ -944,6 +963,28 @@ var _ = Describe("EstimationService", func() {
 			}
 			Expect(keys["vm_count"]).To(Equal(50))
 			Expect(keys["total_disk_gb"]).To(Equal(5000.0))
+		})
+	})
+
+	Describe("EventEstimationService event publishing", func() {
+		Context("CalculateMigrationComplexity", func() {
+			It("does not publish an event when the inner service fails", func() {
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), clusterID)
+
+				Expect(err).NotTo(BeNil())
+				Expect(result).To(BeNil())
+				Expect(mockStore.outboxEvents).To(BeEmpty())
+			})
+		})
+
+		Context("CalculateMigrationEstimation", func() {
+			It("does not publish an event when the inner service fails", func() {
+				results, err := estimationSrv.CalculateMigrationEstimation(ctx, uuid.New(), clusterID, nil, nil)
+
+				Expect(err).NotTo(BeNil())
+				Expect(results).To(BeNil())
+				Expect(mockStore.outboxEvents).To(BeEmpty())
+			})
 		})
 	})
 

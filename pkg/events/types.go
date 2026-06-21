@@ -16,10 +16,11 @@ const (
 	PartnerCustomerEventType = "assisted.migration.partner_customer.updated"
 
 	// User action event types track discrete user actions (share, unshare, sizing, OVA download, etc.)
-	ShareAssessmentEventType     = "assisted.migration.user_action.assessment_shared"
-	UnshareAssessmentEventType   = "assisted.migration.user_action.assessment_unshared"
-	SizingEventType              = "assisted.migration.user_action.sizing_requested"
-	MigrationComplexityEventType = "assisted.migration.user_action.complexity_estimated"
-	DownloadOVAEventType         = "assisted.migration.user_action.ova_downloaded"
-	VisitorEventType             = "assisted.migration.user_action.visited"
+	ShareAssessmentEventType         = "assisted.migration.user_action.assessment_shared"
+	UnshareAssessmentEventType       = "assisted.migration.user_action.assessment_unshared"
+	SizingEventType                  = "assisted.migration.user_action.sizing_requested"
+	MigrationComplexityEventType     = "assisted.migration.user_action.complexity_estimated"
+	MigrationTimeEstimationEventType = "assisted.migration.user_action.time_estimated"
+	DownloadOVAEventType             = "assisted.migration.user_action.ova_downloaded"
+	VisitorEventType                 = "assisted.migration.user_action.visited"
 )

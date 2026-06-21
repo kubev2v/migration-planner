@@ -26,6 +26,7 @@ type MockStore struct {
 	assessments   map[uuid.UUID]*model.Assessment
 	clusterInputs map[string]*model.AssessmentClusterSizingInput
 	getError      error
+	outboxEvents  []model.OutboxEvent
 }
 
 func NewMockStore() *MockStore {
@@ -94,7 +95,7 @@ func (m *MockStore) Accounts() store.Accounts {
 }
 
 func (m *MockStore) Outbox() store.Outbox {
-	return nil
+	return &MockOutboxStore{store: m}
 }
 
 func (m *MockStore) Close() error {
@@ -151,6 +152,23 @@ func (m *MockClusterSizingInputStore) Get(ctx context.Context, assessmentID uuid
 	}
 	copied := *input
 	return &copied, nil
+}
+
+type MockOutboxStore struct {
+	store *MockStore
+}
+
+func (m *MockOutboxStore) Insert(ctx context.Context, event model.OutboxEvent) error {
+	m.store.outboxEvents = append(m.store.outboxEvents, event)
+	return nil
+}
+
+func (m *MockOutboxStore) List(ctx context.Context) ([]model.OutboxEvent, error) {
+	return m.store.outboxEvents, nil
+}
+
+func (m *MockOutboxStore) Delete(ctx context.Context, ids ...int) error {
+	return nil
 }
 
 // createTestSizerServer creates an HTTP test server that mocks the sizer service
