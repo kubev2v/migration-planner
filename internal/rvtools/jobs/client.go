@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -49,11 +51,21 @@ func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (
 	}, nil
 }
 
+var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+
 func podQueueName() string {
 	if hostname, err := os.Hostname(); err == nil && hostname != "" {
-		return fmt.Sprintf("rvtools-%s", hostname)
+		return sanitizeQueueName(hostname)
 	}
 	return river.QueueDefault
+}
+
+func sanitizeQueueName(hostname string) string {
+	s := strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(hostname), "-"), "-")
+	if s == "" {
+		return river.QueueDefault
+	}
+	return "rvtools-" + s
 }
 
 func (c *Client) Stop(ctx context.Context) error {
