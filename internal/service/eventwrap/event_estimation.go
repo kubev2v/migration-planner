@@ -2,6 +2,7 @@ package eventwrap
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -33,7 +34,7 @@ func (e *EventEstimationService) CalculateMigrationEstimation(
 		return nil, err
 	}
 
-	if err := e.publishUserAction(ctx, assessmentID, events.MigrationComplexityEventType); err != nil {
+	if err := e.publishUserAction(ctx, assessmentID, events.MigrationTimeEstimationEventType); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -80,10 +81,24 @@ func (e *EventEstimationService) publishUserAction(ctx context.Context, assessme
 	if err != nil {
 		return err
 	}
-	payload := events.NewComplexityPayload(assessment.Username, assessmentID.String())
+	payload, err := buildEstimationPayload(eventType, assessment.Username, assessmentID.String())
+	if err != nil {
+		return err
+	}
 	ceBytes, err := events.BuildCloudEvent(eventType, payload)
 	if err != nil {
 		return err
 	}
 	return e.outbox.Insert(ctx, eventType, ceBytes)
+}
+
+func buildEstimationPayload(eventType, username, assessmentID string) (events.UserActionEventPayload, error) {
+	switch eventType {
+	case events.MigrationComplexityEventType:
+		return events.NewComplexityPayload(username, assessmentID), nil
+	case events.MigrationTimeEstimationEventType:
+		return events.NewTimeEstimationPayload(username, assessmentID), nil
+	default:
+		return events.UserActionEventPayload{}, fmt.Errorf("unknown estimation event type: %s", eventType)
+	}
 }
