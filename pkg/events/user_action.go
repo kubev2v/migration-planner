@@ -33,6 +33,10 @@ type OVADownloadActionData struct {
 	SourceID string `json:"source_id"`
 }
 
+type VisitorActionData struct {
+	OrgID string `json:"org_id"`
+}
+
 func NewShareAssessmentPayload(username, assessmentID, partnerID string) UserActionEventPayload {
 	return UserActionEventPayload{
 		UserAction: UserActionData{
@@ -89,6 +93,18 @@ func NewOVADownloadPayload(username, sourceID string) UserActionEventPayload {
 			Timestamp: time.Now().UTC(),
 			Data: OVADownloadActionData{
 				SourceID: sourceID,
+			},
+		},
+	}
+}
+
+func NewVisitorPayload(username, orgID string) UserActionEventPayload {
+	return UserActionEventPayload{
+		UserAction: UserActionData{
+			Username:  username,
+			Timestamp: time.Now().UTC(),
+			Data: VisitorActionData{
+				OrgID: orgID,
 			},
 		},
 	}
