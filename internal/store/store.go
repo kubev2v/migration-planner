@@ -17,6 +17,7 @@ type Store interface {
 	PrivateKey() PrivateKey
 	Label() Label
 	Assessment() Assessment
+	AssessmentSubsetInventory() AssessmentSubsetInventory
 	ClusterSizingInput() ClusterSizingInput
 	Job() Job
 	Accounts() Accounts
@@ -28,42 +29,44 @@ type Store interface {
 }
 
 type DataStore struct {
-	agent           Agent
-	authz           Authz
-	db              *gorm.DB
-	source          Source
-	sourceInventory SourceSubsetInventory
-	imageInfra      ImageInfra
-	privateKey      PrivateKey
-	label           Label
-	assessment      Assessment
-	cluster         ClusterSizingInput
-	job             Job
-	accounts        Accounts
-	partnerCustomer PartnerCustomer
-	outbox          Outbox
-	metricCache     *MetricsCache
+	agent                     Agent
+	authz                     Authz
+	db                        *gorm.DB
+	source                    Source
+	sourceInventory           SourceSubsetInventory
+	imageInfra                ImageInfra
+	privateKey                PrivateKey
+	label                     Label
+	assessment                Assessment
+	assessmentSubsetInventory AssessmentSubsetInventory
+	cluster                   ClusterSizingInput
+	job                       Job
+	accounts                  Accounts
+	partnerCustomer           PartnerCustomer
+	outbox                    Outbox
+	metricCache               *MetricsCache
 }
 
 func NewStore(db *gorm.DB) Store {
 	assessment := NewAssessmentStore(db)
 
 	return &DataStore{
-		agent:           NewAgentSource(db),
-		source:          NewSource(db),
-		sourceInventory: NewSourceSubsetInventory(db),
-		imageInfra:      NewImageInfraStore(db),
-		privateKey:      NewCacheKeyStore(NewPrivateKey(db)),
-		label:           NewLabelStore(db),
-		assessment:      assessment,
-		cluster:         NewClusterSizingInputStore(db),
-		job:             NewJobStore(db),
-		authz:           NewAuthzStore(db),
-		accounts:        NewAccountsStore(db),
-		partnerCustomer: NewPartnerCustomerStore(db),
-		outbox:          NewOutboxStore(db),
-		metricCache:     NewMetricsCache(assessment),
-		db:              db,
+		agent:                     NewAgentSource(db),
+		source:                    NewSource(db),
+		sourceInventory:           NewSourceSubsetInventory(db),
+		imageInfra:                NewImageInfraStore(db),
+		privateKey:                NewCacheKeyStore(NewPrivateKey(db)),
+		label:                     NewLabelStore(db),
+		assessment:                assessment,
+		assessmentSubsetInventory: NewAssessmentSubsetInventory(db),
+		cluster:                   NewClusterSizingInputStore(db),
+		job:                       NewJobStore(db),
+		authz:                     NewAuthzStore(db),
+		accounts:                  NewAccountsStore(db),
+		partnerCustomer:           NewPartnerCustomerStore(db),
+		outbox:                    NewOutboxStore(db),
+		metricCache:               NewMetricsCache(assessment),
+		db:                        db,
 	}
 }
 
@@ -101,6 +104,10 @@ func (s *DataStore) Label() Label {
 
 func (s *DataStore) Assessment() Assessment {
 	return s.assessment
+}
+
+func (s *DataStore) AssessmentSubsetInventory() AssessmentSubsetInventory {
+	return s.assessmentSubsetInventory
 }
 
 func (s *DataStore) ClusterSizingInput() ClusterSizingInput {

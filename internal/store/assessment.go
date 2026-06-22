@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,7 +17,7 @@ import (
 type Assessment interface {
 	List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error)
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
-	Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error)
+	Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error)
 	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
@@ -53,9 +54,14 @@ func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilte
 
 func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
 	var assessment model.Assessment
-	result := a.getDB(ctx).Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
-		return db.Order("snapshots.created_at DESC")
-	}).First(&assessment, "id = ?", id)
+	result := a.getDB(ctx).
+		Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
+			return db.Order("snapshots.created_at DESC")
+		}).
+		Preload("Snapshots.SubsetInventories", func(db *gorm.DB) *gorm.DB {
+			return db.Order("name ASC, id ASC")
+		}).
+		First(&assessment, "id = ?", id)
 
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -66,7 +72,7 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 	return &assessment, nil
 }
 
-func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {
+func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error) {
 	// Create the assessment first
 	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
 	if result.Error != nil {
@@ -83,8 +89,18 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 		Version:      uint(util.GetInventoryVersion(inventory)),
 	}
 
-	if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
-		return nil, err
+	if err := a.getDB(ctx).Clauses(clause.Returning{}).Create(&snapshot).Error; err != nil {
+		return nil, fmt.Errorf("failed to create snapshot: %w", err)
+	}
+
+	// Create subset inventories linked to the snapshot
+	if len(subsetInventories) > 0 {
+		for i := range subsetInventories {
+			subsetInventories[i].SnapshotID = snapshot.ID
+		}
+		if err := a.getDB(ctx).Create(&subsetInventories).Error; err != nil {
+			return nil, fmt.Errorf("failed to create subset inventories: %w", err)
+		}
 	}
 
 	// Return the assessment with snapshots loaded

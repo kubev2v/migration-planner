@@ -154,7 +154,8 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 		assessment.OwnerLastName = &job.Args.LastName
 	}
 
-	createdAssessment, err := w.store.Assessment().Create(ctx, assessment, inventoryJSON)
+	// RVTools assessments don't have subset inventories
+	createdAssessment, err := w.store.Assessment().Create(ctx, assessment, inventoryJSON, nil)
 	if err != nil {
 		var errMsg string
 		if errors.Is(err, store.ErrDuplicateKey) {

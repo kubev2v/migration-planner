@@ -124,9 +124,37 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
+	// Validate inventory source before transaction
 	var inventory []byte
-	switch assessment.SourceType {
-	case SourceTypeAgent:
+	if assessment.SourceType == SourceTypeInventory {
+		tracer.Step("process_inventory_source").Log()
+		inventory = createForm.Inventory
+		// Validate inventory has VMs before creating assessment
+		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
+			switch err.(type) {
+			case *util.ErrNoVMsInInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			case *util.ErrInventoryUnmarshalError:
+				return nil, fmt.Errorf("inventory data corruption: %w", err)
+			case *util.ErrEmptyInventory:
+				return nil, NewErrInventoryHasNoVMs()
+			default:
+				return nil, fmt.Errorf("inventory validation failed: %w", err)
+			}
+		}
+	}
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	// If creating from agent source, fetch source data within transaction for consistency
+	var subsetInventories []model.AssessmentSubsetInventory
+	if assessment.SourceType == SourceTypeAgent && assessment.SourceID != nil {
 		tracer.Step("process_agent_source").Log()
 		// We are sure to have a sourceID here. it has been validaded in handler's layer.
 		source, err := as.store.Source().Get(ctx, *assessment.SourceID)
@@ -153,36 +181,38 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 				return nil, fmt.Errorf("inventory validation failed: %w", err)
 			}
 		}
-	case SourceTypeInventory:
-		tracer.Step("process_inventory_source").Log()
-		inventory = createForm.Inventory
-		// Validate inventory has VMs before creating assessment
-		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
-			switch err.(type) {
-			case *util.ErrNoVMsInInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			case *util.ErrInventoryUnmarshalError:
-				return nil, fmt.Errorf("inventory data corruption: %w", err)
-			case *util.ErrEmptyInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			default:
-				return nil, fmt.Errorf("inventory validation failed: %w", err)
+
+		tracer.Step("fetch_source_subset_inventories").Log()
+
+		// List all source subset inventories for this source (same transaction snapshot)
+		sourceSubsetFilter := store.NewSourceSubsetInventoryQueryFilter().BySourceID(*assessment.SourceID)
+		sourceSubsets, err := as.store.SourceSubsetInventory().List(ctx, sourceSubsetFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch source subset inventories: %w", err)
+		}
+
+		tracer.Step("found_source_subsets").WithInt("count", len(sourceSubsets)).Log()
+
+		// Prepare subset inventories to be created (linked to snapshot in store layer)
+		subsetInventories = make([]model.AssessmentSubsetInventory, len(sourceSubsets))
+		for i, sourceSubset := range sourceSubsets {
+			// Deep-copy inventory bytes to prevent aliasing between source and assessment records
+			inventoryCopy := make([]byte, len(sourceSubset.Inventory))
+			copy(inventoryCopy, sourceSubset.Inventory)
+
+			subsetInventories[i] = model.AssessmentSubsetInventory{
+				ID:        uuid.New(), // New ID for assessment subset
+				Name:      sourceSubset.Name,
+				VCenterID: sourceSubset.VCenterID,
+				VMsCount:  sourceSubset.VMsCount,
+				Inventory: inventoryCopy,
+				// SnapshotID will be set in the store layer after snapshot creation
 			}
 		}
 	}
 
-	ctx, err := as.store.NewTransactionContext(ctx)
+	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory, subsetInventories)
 	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_, _ = store.Rollback(ctx)
-	}()
-
-	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory)
-	if err != nil {
-		_, _ = store.Rollback(ctx)
-
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return nil, NewErrAssessmentDuplicateName(assessment.Name)
 		}
@@ -190,7 +220,10 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		return nil, fmt.Errorf("failed to create assessment: %w", err)
 	}
 
-	tracer.Step("assessment_created_in_db").WithUUID("created_assessment_id", createdAssessment.ID).Log()
+	tracer.Step("assessment_created_in_db").
+		WithUUID("created_assessment_id", createdAssessment.ID).
+		WithInt("subset_count", len(subsetInventories)).
+		Log()
 
 	if _, err := store.Commit(ctx); err != nil {
 		return nil, err

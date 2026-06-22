@@ -200,7 +200,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -234,7 +234,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType:     "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -272,12 +272,72 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
+		})
+
+		It("successfully creates an assessment with subset inventories", func() {
+			assessmentID := uuid.New()
+			inventoryJSON := []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
+
+			subsetInventories := []model.AssessmentSubsetInventory{
+				{
+					ID:        uuid.New(),
+					Name:      "subset-a",
+					VCenterID: "test-vcenter",
+					VMsCount:  3,
+					Inventory: []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":3}}`),
+				},
+				{
+					ID:        uuid.New(),
+					Name:      "subset-b",
+					VCenterID: "test-vcenter",
+					VMsCount:  7,
+					Inventory: []byte(`{"vcenter":{"id":"test-vcenter"},"vms":{"total":7}}`),
+				},
+			}
+
+			assessment := model.Assessment{
+				ID:         assessmentID,
+				Name:       "test-assessment-with-subsets",
+				OrgID:      "org1",
+				Username:   "user1",
+				SourceType: "agent",
+			}
+
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, subsetInventories)
+			Expect(err).To(BeNil())
+			Expect(created).ToNot(BeNil())
+			Expect(created.ID).To(Equal(assessmentID))
+			Expect(created.Snapshots).To(HaveLen(1))
+
+			// Verify subset inventories are linked to the snapshot
+			snapshot := created.Snapshots[0]
+			Expect(snapshot.SubsetInventories).To(HaveLen(2))
+			Expect(snapshot.SubsetInventories[0].SnapshotID).To(Equal(snapshot.ID))
+			Expect(snapshot.SubsetInventories[0].Name).To(Equal("subset-a"))
+			Expect(snapshot.SubsetInventories[0].VMsCount).To(Equal(3))
+			Expect(snapshot.SubsetInventories[1].SnapshotID).To(Equal(snapshot.ID))
+			Expect(snapshot.SubsetInventories[1].Name).To(Equal("subset-b"))
+			Expect(snapshot.SubsetInventories[1].VMsCount).To(Equal(7))
+
+			// Verify in database
+			var count int
+			tx := gormdb.Raw("SELECT COUNT(*) FROM assessment_subset_inventories WHERE snapshot_id = ?", snapshot.ID).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Retrieve from database and verify linkage
+			retrieved, err := s.Assessment().Get(context.TODO(), assessmentID)
+			Expect(err).To(BeNil())
+			Expect(retrieved.Snapshots).To(HaveLen(1))
+			Expect(retrieved.Snapshots[0].SubsetInventories).To(HaveLen(2))
+			Expect(retrieved.Snapshots[0].SubsetInventories[0].Name).To(Equal("subset-a"))
+			Expect(retrieved.Snapshots[0].SubsetInventories[1].Name).To(Equal("subset-b"))
 		})
 
 		It("fails to create assessment with non-existent source_id", func() {
@@ -293,7 +353,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &nonExistentSourceID,
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("foreign key constraint"))
 		})
@@ -310,7 +370,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 
 			// Try to create another assessment with same name in same org
@@ -321,7 +381,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON)
+			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON, nil)
 			Expect(err).ToNot(BeNil())
 		})
 
@@ -338,7 +398,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 
 			// Create assessment with same name but different org
@@ -350,7 +410,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "rvtools",
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON)
+			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 
 			var count int
@@ -385,7 +445,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
@@ -419,7 +479,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 
 			newName := "updated-name"
@@ -441,7 +501,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON)
+			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON, nil)
 			Expect(err).To(BeNil())
 			Expect(created.Snapshots).To(HaveLen(1))
 
@@ -470,7 +530,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON, nil)
 			Expect(err).To(BeNil())
 
 			// Update both name and add snapshot
@@ -518,7 +578,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON)
+			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
 			Expect(err).To(BeNil())
 
 			// Verify assessment and snapshot exist
