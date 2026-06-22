@@ -12,8 +12,6 @@ const (
 
 	AssessmentCreatedEventType = "assisted.migration.assessment.created"
 	AssessmentDeletedEventType = "assisted.migration.assessment.deleted"
-	// VisitorEventType tracks user visits to the assessment list
-	VisitorEventType = "assisted.migration.visitor.visited"
 	// PartnerCustomerEventType covers partner-customer relationship changes (request, accept, cancel, etc.)
 	PartnerCustomerEventType = "assisted.migration.partner_customer.updated"
 
@@ -23,4 +21,5 @@ const (
 	SizingEventType              = "assisted.migration.user_action.sizing_requested"
 	MigrationComplexityEventType = "assisted.migration.user_action.complexity_estimated"
 	DownloadOVAEventType         = "assisted.migration.user_action.ova_downloaded"
+	VisitorEventType             = "assisted.migration.user_action.visited"
 )
