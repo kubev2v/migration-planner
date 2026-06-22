@@ -63,19 +63,20 @@ func (m *mockStore) NewTransactionContext(ctx context.Context) (context.Context,
 	return ctx, nil
 }
 
-func (m *mockStore) Outbox() store.Outbox                               { return m.outbox }
-func (m *mockStore) Agent() store.Agent                                 { return nil }
-func (m *mockStore) Authz() store.Authz                                 { return nil }
-func (m *mockStore) Source() store.Source                               { return nil }
-func (m *mockStore) SourceSubsetInventory() store.SourceSubsetInventory { return nil }
-func (m *mockStore) ImageInfra() store.ImageInfra                       { return nil }
-func (m *mockStore) PrivateKey() store.PrivateKey                       { return nil }
-func (m *mockStore) Label() store.Label                                 { return nil }
-func (m *mockStore) Assessment() store.Assessment                       { return nil }
-func (m *mockStore) ClusterSizingInput() store.ClusterSizingInput       { return nil }
-func (m *mockStore) Job() store.Job                                     { return nil }
-func (m *mockStore) Accounts() store.Accounts                           { return nil }
-func (m *mockStore) PartnerCustomer() store.PartnerCustomer             { return nil }
+func (m *mockStore) Outbox() store.Outbox                                       { return m.outbox }
+func (m *mockStore) Agent() store.Agent                                         { return nil }
+func (m *mockStore) Authz() store.Authz                                         { return nil }
+func (m *mockStore) Source() store.Source                                       { return nil }
+func (m *mockStore) SourceSubsetInventory() store.SourceSubsetInventory         { return nil }
+func (m *mockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory { return nil }
+func (m *mockStore) ImageInfra() store.ImageInfra                               { return nil }
+func (m *mockStore) PrivateKey() store.PrivateKey                               { return nil }
+func (m *mockStore) Label() store.Label                                         { return nil }
+func (m *mockStore) Assessment() store.Assessment                               { return nil }
+func (m *mockStore) ClusterSizingInput() store.ClusterSizingInput               { return nil }
+func (m *mockStore) Job() store.Job                                             { return nil }
+func (m *mockStore) Accounts() store.Accounts                                   { return nil }
+func (m *mockStore) PartnerCustomer() store.PartnerCustomer                     { return nil }
 func (m *mockStore) Statistics(_ context.Context) (model.InventoryStats, error) {
 	return model.InventoryStats{}, nil
 }

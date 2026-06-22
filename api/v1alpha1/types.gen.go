@@ -245,6 +245,16 @@ type AssessmentSharing struct {
 	SharedWith []SharingSubject `json:"sharedWith"`
 }
 
+// AssessmentSubsetInventory defines model for AssessmentSubsetInventory.
+type AssessmentSubsetInventory struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	Inventory Inventory          `json:"inventory"`
+	Name      string             `json:"name"`
+	VcenterId string             `json:"vcenterId"`
+	VmsCount  int                `json:"vmsCount"`
+}
+
 // AssessmentUpdate Update form of the assessment.
 type AssessmentUpdate struct {
 	// Name Name of the assessment
@@ -952,8 +962,9 @@ type SizingResourceLimits struct {
 
 // Snapshot defines model for Snapshot.
 type Snapshot struct {
-	CreatedAt time.Time `json:"createdAt"`
-	Inventory Inventory `json:"inventory"`
+	CreatedAt         time.Time                    `json:"createdAt"`
+	Inventory         Inventory                    `json:"inventory"`
+	SubsetInventories *[]AssessmentSubsetInventory `json:"subsetInventories"`
 }
 
 // Source defines model for Source.

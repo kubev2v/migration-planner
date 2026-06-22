@@ -95,6 +95,49 @@ func (f *SourceSubsetInventoryQueryFilter) BySourceID(sourceID uuid.UUID) *Sourc
 	return f
 }
 
+type AssessmentSubsetInventoryQueryFilter BaseQuerier
+
+func NewAssessmentSubsetInventoryQueryFilter() *AssessmentSubsetInventoryQueryFilter {
+	return &AssessmentSubsetInventoryQueryFilter{QueryFn: make([]func(tx *gorm.DB) *gorm.DB, 0)}
+}
+
+func (f *AssessmentSubsetInventoryQueryFilter) BySnapshotID(snapshotID uint) *AssessmentSubsetInventoryQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("snapshot_id = ?", snapshotID)
+	})
+	return f
+}
+
+func (f *AssessmentSubsetInventoryQueryFilter) OrderByName(asc bool) *AssessmentSubsetInventoryQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		if asc {
+			return tx.Order("name ASC")
+		}
+		return tx.Order("name DESC")
+	})
+	return f
+}
+
+func (f *AssessmentSubsetInventoryQueryFilter) OrderBySize(asc bool) *AssessmentSubsetInventoryQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		if asc {
+			return tx.Order("vms_count ASC")
+		}
+		return tx.Order("vms_count DESC")
+	})
+	return f
+}
+
+func (f *AssessmentSubsetInventoryQueryFilter) OrderByCreatedAt(asc bool) *AssessmentSubsetInventoryQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		if asc {
+			return tx.Order("created_at ASC")
+		}
+		return tx.Order("created_at DESC")
+	})
+	return f
+}
+
 type PartnerQueryFilter BaseQuerier
 
 func NewPartnerQueryFilter() *PartnerQueryFilter {

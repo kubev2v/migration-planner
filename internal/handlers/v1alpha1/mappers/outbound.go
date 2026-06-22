@@ -312,6 +312,47 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 				Clusters: make(map[string]api.InventoryData),
 			}
 		}
+
+		// Convert subset inventories for this snapshot
+		if len(snapshot.SubsetInventories) > 0 {
+			subsets := make([]api.AssessmentSubsetInventory, len(snapshot.SubsetInventories))
+			for j := range snapshot.SubsetInventories {
+				subset := snapshot.SubsetInventories[j] // Create local copy to avoid pointer aliasing
+
+				// Unmarshal inventory (required field)
+				var subsetInv api.Inventory
+				if len(subset.Inventory) > 0 {
+					if err := json.Unmarshal(subset.Inventory, &subsetInv); err != nil {
+						return api.Assessment{}, fmt.Errorf("failed to unmarshal subset inventory: %w", err)
+					}
+					// Ensure clusters map is never nil
+					if subsetInv.Clusters == nil {
+						subsetInv.Clusters = make(map[string]api.InventoryData)
+					}
+					// Normalize vcenter and all cluster inventories
+					if subsetInv.Vcenter != nil {
+						normalizeInventoryData(subsetInv.Vcenter)
+					}
+					for clusterID, clusterData := range subsetInv.Clusters {
+						normalizeInventoryData(&clusterData)
+						subsetInv.Clusters[clusterID] = clusterData
+					}
+				} else {
+					// Empty inventory with non-nil Clusters
+					subsetInv.Clusters = make(map[string]api.InventoryData)
+				}
+
+				subsets[j] = api.AssessmentSubsetInventory{
+					Id:        subset.ID,
+					Name:      subset.Name,
+					VcenterId: subset.VCenterID,
+					VmsCount:  subset.VMsCount,
+					CreatedAt: subset.CreatedAt,
+					Inventory: subsetInv,
+				}
+			}
+			assessment.Snapshots[i].SubsetInventories = &subsets
+		}
 	}
 
 	// Set source type based on source field

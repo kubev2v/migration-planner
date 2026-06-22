@@ -2832,9 +2832,39 @@ components:
         createdAt:
           type: string
           format: date-time
+        subsetInventories:
+          type: array
+          nullable: true
+          items:
+            $ref: "#/components/schemas/AssessmentSubsetInventory"
       required:
         - inventory
         - createdAt
+
+    AssessmentSubsetInventory:
+      type: object
+      required:
+        - id
+        - name
+        - vcenterId
+        - vmsCount
+        - inventory
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        vcenterId:
+          type: string
+        vmsCount:
+          type: integer
+        inventory:
+          $ref: "#/components/schemas/Inventory"
+        createdAt:
+          type: string
+          format: date-time
 
     Assessment:
       type: object

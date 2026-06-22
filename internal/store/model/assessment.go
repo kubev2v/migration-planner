@@ -29,11 +29,12 @@ type Assessment struct {
 }
 
 type Snapshot struct {
-	ID           uint      `gorm:"primaryKey;autoIncrement"`
-	CreatedAt    time.Time `gorm:"not null;default:now()"`
-	Inventory    []byte    `gorm:"type:jsonb;not null"`
-	AssessmentID uuid.UUID `gorm:"not null;type:VARCHAR(255);"`
-	Version      uint      `gorm:"type:smallint;not null;default:1"`
+	ID                uint                        `gorm:"primaryKey;autoIncrement"`
+	CreatedAt         time.Time                   `gorm:"not null;default:now()"`
+	Inventory         []byte                      `gorm:"type:jsonb;not null"`
+	AssessmentID      uuid.UUID                   `gorm:"not null;type:VARCHAR(255);"`
+	Version           uint                        `gorm:"type:smallint;not null;default:1"`
+	SubsetInventories []AssessmentSubsetInventory `gorm:"foreignKey:SnapshotID;references:ID;constraint:OnDelete:CASCADE;"`
 }
 
 type AssessmentList []Assessment

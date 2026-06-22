@@ -52,6 +52,10 @@ func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("MockStore.SourceSubsetInventory() called unexpectedly - not implemented for this test")
 }
 
+func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
+	panic("MockStore.AssessmentSubsetInventory() called unexpectedly - not implemented for this test")
+}
+
 func (m *MockStore) Agent() store.Agent {
 	panic("MockStore.Agent() called unexpectedly - not implemented for this test")
 }
@@ -125,7 +129,7 @@ func (m *MockAssessmentStore) List(ctx context.Context, filter *store.Assessment
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error) {
 	return nil, nil
 }
 

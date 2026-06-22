@@ -85,6 +85,10 @@ func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("SourceSubsetInventory() not implemented in MockStore for this test")
 }
 
+func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
+	panic("AssessmentSubsetInventory() not implemented in MockStore for this test")
+}
+
 func (m *MockStore) Agent() store.Agent {
 	panic("Agent() not implemented in MockStore for this test")
 }
@@ -158,7 +162,7 @@ func (m *MockAssessmentStore) List(ctx context.Context, filter *store.Assessment
 	panic("List() not implemented in MockAssessmentStore for this test")
 }
 
-func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error) {
 	panic("Create() not implemented in MockAssessmentStore for this test")
 }
 
