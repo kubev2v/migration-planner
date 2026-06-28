@@ -1,0 +1,16 @@
+name: Sync Release Branch
+
+on:
+  push:
+    branches:
+      - main
+      - stable
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    name: Sync Release Branch
+    uses: kubev2v/migration-planner-workflows/.github/workflows/sync-release-branch.yml@main
+    secrets: inherit
