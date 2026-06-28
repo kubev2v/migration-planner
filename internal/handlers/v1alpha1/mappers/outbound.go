@@ -383,6 +383,7 @@ func ClusterRequirementsInputFormToAPI(form mappers.ClusterRequirementsInputForm
 		response.ControlPlaneNodeCount = &count
 	}
 	response.HostedControlPlane = form.HostedControlPlane
+	response.CompactMode = form.CompactMode
 
 	return response
 }
