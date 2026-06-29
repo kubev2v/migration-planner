@@ -718,6 +718,51 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			Expect(updatedSource.ImageInfra.NoProxyDomains).To(BeEmpty())
 		})
 
+		It("null proxy fields clear existing values", func() {
+			sourceID := uuid.NewString()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			initialImageInfra := model.ImageInfra{
+				SourceID:       uuid.MustParse(sourceID),
+				HttpProxyUrl:   "http://proxy.example.com",
+				HttpsProxyUrl:  "https://proxy.example.com",
+				NoProxyDomains: "test.example.com",
+			}
+			_, err := s.ImageInfra().Create(context.TODO(), initialImageInfra)
+			Expect(err).To(BeNil())
+
+			user := auth.User{
+				Username:     "admin",
+				Organization: "admin",
+			}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+
+			enableProxy := true
+			httpUrl := "http://proxy.example.com"
+			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
+				Id: uuid.MustParse(sourceID),
+				Body: &v1alpha1.SourceUpdate{
+					EnableProxy: &enableProxy,
+					Proxy: &v1alpha1.AgentProxy{
+						HttpUrl:  &httpUrl,
+						HttpsUrl: nil,
+						NoProxy:  nil,
+					},
+				},
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateSource200JSONResponse{}).String()))
+
+			updatedSource, err := s.Source().Get(ctx, uuid.MustParse(sourceID))
+			Expect(err).To(BeNil())
+			Expect(updatedSource.ImageInfra.HttpProxyUrl).To(Equal(httpUrl))
+			Expect(updatedSource.ImageInfra.HttpsProxyUrl).To(BeEmpty())
+			Expect(updatedSource.ImageInfra.NoProxyDomains).To(BeEmpty())
+		})
+
 		It("networkConfigType dhcp clears network fields", func() {
 			sourceID := uuid.NewString()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
