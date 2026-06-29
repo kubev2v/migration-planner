@@ -34,12 +34,16 @@ func mapProxyFields(proxy *v1alpha1.AgentProxy) (httpUrl, httpsUrl, noProxy stri
 		util.DerefString(proxy.NoProxy)
 }
 
-// mapProxyFieldsForUpdate extracts proxy fields for update form (returns pointers)
+// mapProxyFieldsForUpdate extracts proxy fields for update form (returns pointers).
+// When proxy is present, nil fields mean "clear" (not "skip"), matching create-path semantics.
 func mapProxyFieldsForUpdate(proxy *v1alpha1.AgentProxy) (httpUrl, httpsUrl, noProxy *string) {
 	if proxy == nil {
 		return nil, nil, nil
 	}
-	return proxy.HttpUrl, proxy.HttpsUrl, proxy.NoProxy
+	h := util.DerefString(proxy.HttpUrl)
+	hs := util.DerefString(proxy.HttpsUrl)
+	np := util.DerefString(proxy.NoProxy)
+	return &h, &hs, &np
 }
 
 func mapIpv4Fields(vmnetwork *v1alpha1.VmNetwork) (ipAddress, subnetMask, defaultGateway, dns string) {
