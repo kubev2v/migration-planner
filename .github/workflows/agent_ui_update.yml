@@ -11,26 +11,34 @@ jobs:
   update-agent-ui:
     if: github.event.client_payload.repo == 'kubev2v/migration-planner-agent-ui'
     concurrency:
-      group: agent-ui-update
+      group: agent-ui-update-${{ github.event.client_payload.target_branch }}
       cancel-in-progress: true
     runs-on: ubuntu-latest
     env:
-      BRANCH_NAME: "update-agent-ui"
       CONFIG_FILE: "build/migration-planner-iso/config"
 
     steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - name: Read payload
+      - name: Read and validate payload
         id: payload
         env:
           SHA: ${{ github.event.client_payload.sha }}
           REPO: ${{ github.event.client_payload.repo }}
+          TARGET_BRANCH: ${{ github.event.client_payload.target_branch }}
         run: |
           echo "new_sha=$SHA" >> $GITHUB_OUTPUT
           echo "repo=$REPO" >> $GITHUB_OUTPUT
+          echo "target_branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
+
+          # Set branch name for PR
+          echo "pr_branch=update-agent-ui-${TARGET_BRANCH}" >> $GITHUB_OUTPUT
+
+          echo "Processing update for branch $TARGET_BRANCH (SHA: $SHA)"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ steps.payload.outputs.target_branch }}
+          submodules: true
+          persist-credentials: false
 
       - name: Update config file
         id: update
@@ -52,12 +60,15 @@ jobs:
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ steps.app-token.outputs.token }}
-          branch: ${{ env.BRANCH_NAME }}
+          branch: ${{ steps.payload.outputs.pr_branch }}
+          base: ${{ steps.payload.outputs.target_branch }}
           commit-message: |
-            NO-JIRA | feat: Agent-UI repository changes have been detected. 
+            NO-JIRA | feat: Agent-UI repository changes have been detected.
             Update Agent-UI to SHA: ${{ steps.payload.outputs.new_sha }}.
-          title: "[AUTOMATION] Update Agent-UI image tag"
+            Branch: ${{ steps.payload.outputs.target_branch }}
+          title: "[AUTOMATION] Update Agent-UI image tag (${{ steps.payload.outputs.target_branch }})"
           body: |
             Auto update triggered by ${{ steps.payload.outputs.repo }}.
-            SHA: ${{ steps.payload.outputs.new_sha }}.
+            - **Branch**: ${{ steps.payload.outputs.target_branch }}
+            - **SHA**: ${{ steps.payload.outputs.new_sha }}
           delete-branch: true
