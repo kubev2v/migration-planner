@@ -1,0 +1,143 @@
+name: Generate Release Notes
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  notify-docs:
+    runs-on: ubuntu-latest
+    env:
+      NEW_TAG: ${{ github.ref_name }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - name: Determine previous tag
+        id: tags
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep -E '^v[0-9]' | sed -n '2p')
+          if [ -z "$PREV_TAG" ]; then
+            echo "No previous tag found"
+            exit 1
+          fi
+          echo "prev_tag=$PREV_TAG" >> "$GITHUB_OUTPUT"
+          echo "Comparing $PREV_TAG → $NEW_TAG"
+
+      - name: Gather migration-planner commits
+        id: planner-commits
+        env:
+          PREV_TAG: ${{ steps.tags.outputs.prev_tag }}
+        run: |
+          COMMITS=$(git log --oneline --no-merges "$PREV_TAG".."$NEW_TAG" || echo "")
+          {
+            echo "commits<<COMMITS_EOF"
+            echo "$COMMITS"
+            echo "COMMITS_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Gather agent commits
+        id: agent-commits
+        env:
+          PREV_TAG: ${{ steps.tags.outputs.prev_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OLD_SHA=$(git ls-tree "$PREV_TAG" agent-v2 2>/dev/null | awk '{print $3}')
+          NEW_SHA=$(git ls-tree "$NEW_TAG" agent-v2 2>/dev/null | awk '{print $3}')
+
+          if [ -z "$OLD_SHA" ] || [ -z "$NEW_SHA" ] || [ "$OLD_SHA" = "$NEW_SHA" ]; then
+            echo "commits=No agent changes in this release" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS=$(gh api "repos/kubev2v/assisted-migration-agent/compare/${OLD_SHA}...${NEW_SHA}" \
+            --jq '.commits[] | "\(.sha[:7]) \(.commit.message | split("\n")[0])"' 2>/dev/null || echo "Could not fetch agent commits")
+
+          {
+            echo "commits<<AGENT_EOF"
+            echo "$COMMITS"
+            echo "AGENT_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Gather agent-ui commits
+        id: agent-ui-commits
+        env:
+          PREV_TAG: ${{ steps.tags.outputs.prev_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          OLD_SHA=$(git show "$PREV_TAG":build/migration-planner-iso/config 2>/dev/null | grep '^AGENT_UI_IMAGE_TAG=' | cut -d= -f2)
+          NEW_SHA=$(git show "$NEW_TAG":build/migration-planner-iso/config 2>/dev/null | grep '^AGENT_UI_IMAGE_TAG=' | cut -d= -f2)
+
+          if [ -z "$OLD_SHA" ] || [ -z "$NEW_SHA" ] || [ "$OLD_SHA" = "$NEW_SHA" ]; then
+            echo "commits=No agent-ui changes in this release" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          COMMITS=$(gh api "repos/kubev2v/migration-planner-agent-ui/compare/${OLD_SHA}...${NEW_SHA}" \
+            --jq '.commits[] | "\(.sha[:7]) \(.commit.message | split("\n")[0])"' 2>/dev/null || echo "Could not fetch agent-ui commits")
+
+          {
+            echo "commits<<AGENTUI_EOF"
+            echo "$COMMITS"
+            echo "AGENTUI_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Gather ui-app commits
+        id: ui-app-commits
+        env:
+          PREV_TAG: ${{ steps.tags.outputs.prev_tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          COMMITS=$(gh api "repos/kubev2v/migration-planner-ui-app/compare/${PREV_TAG}...${NEW_TAG}" \
+            --jq '.commits[] | "\(.sha[:7]) \(.commit.message | split("\n")[0])"' 2>/dev/null || echo "No ui-app changes found for this tag range")
+
+          {
+            echo "commits<<UIAPP_EOF"
+            echo "$COMMITS"
+            echo "UIAPP_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+          private-key: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
+          owner: kubev2v
+
+      - name: Dispatch to docs repo
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          PLANNER_COMMITS: ${{ steps.planner-commits.outputs.commits }}
+          AGENT_COMMITS: ${{ steps.agent-commits.outputs.commits }}
+          AGENT_UI_COMMITS: ${{ steps.agent-ui-commits.outputs.commits }}
+          UI_APP_COMMITS: ${{ steps.ui-app-commits.outputs.commits }}
+          PREV_TAG: ${{ steps.tags.outputs.prev_tag }}
+        run: |
+          jq -n \
+            --arg tag "$NEW_TAG" \
+            --arg prev_tag "$PREV_TAG" \
+            --arg repo "kubev2v/migration-planner" \
+            --arg planner_commits "$PLANNER_COMMITS" \
+            --arg agent_commits "$AGENT_COMMITS" \
+            --arg agent_ui_commits "$AGENT_UI_COMMITS" \
+            --arg ui_app_commits "$UI_APP_COMMITS" \
+            '{
+              event_type: "release_notes_update",
+              client_payload: {
+                tag: $tag,
+                prev_tag: $prev_tag,
+                repo: $repo,
+                planner_commits: $planner_commits,
+                agent_commits: $agent_commits,
+                agent_ui_commits: $agent_ui_commits,
+                ui_app_commits: $ui_app_commits
+              }
+            }' | gh api repos/kubev2v/assisted-migration-docs/dispatches --input -
