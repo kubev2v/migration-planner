@@ -3,9 +3,9 @@ name: Run e2e test
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, stable]
   pull_request:
-    branches: [main, 'release-*']
+    branches: [main, stable]
 
 jobs:
   test:

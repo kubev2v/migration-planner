@@ -64,7 +64,7 @@ jobs:
           branch: ${{ steps.payload.outputs.pr_branch }}
           base: ${{ steps.payload.outputs.target_branch }}
           commit-message: |
-            NO-JIRA | feat: Agent repository changes have been detected.
+            chore: Agent repository changes have been detected. 
             Update submodule to reflect the SHA: ${{ steps.payload.outputs.new_sha }}.
             Branch: ${{ steps.payload.outputs.target_branch }}
           title: "[AUTOMATION] Update Agent submodule (${{ steps.payload.outputs.target_branch }})"
