@@ -63,7 +63,7 @@ jobs:
           branch: ${{ steps.payload.outputs.pr_branch }}
           base: ${{ steps.payload.outputs.target_branch }}
           commit-message: |
-            NO-JIRA | feat: Agent-UI repository changes have been detected.
+            chore: Agent-UI repository changes have been detected. 
             Update Agent-UI to SHA: ${{ steps.payload.outputs.new_sha }}.
             Branch: ${{ steps.payload.outputs.target_branch }}
           title: "[AUTOMATION] Update Agent-UI image tag (${{ steps.payload.outputs.target_branch }})"

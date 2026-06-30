@@ -1,14 +1,55 @@
 ---
-name: Go
+name: PR Validations
+
 on:  # yamllint disable-line rule:truthy
-  push:
-    branches: [main]
   pull_request:
-    branches: [main, 'release-*']
+    types: [opened, synchronize, reopened, edited]
+    branches: [main, stable]
+
+permissions:
+  pull-requests: read
+  contents: read
 
 jobs:
+  # Configuration job - define all shared values once
+  config:
+    runs-on: ubuntu-latest
+    outputs:
+      allowed-types: ${{ steps.set-config.outputs.allowed-types }}
+      jira-pattern: ${{ steps.set-config.outputs.jira-pattern }}
+      jira-required-types: ${{ steps.set-config.outputs.jira-required-types }}
+      bot-authors: ${{ steps.set-config.outputs.bot-authors }}
+    steps:
+      - id: set-config
+        run: |
+          echo 'allowed-types=["feat","fix","ci","build","chore","docs","refactor","test","style","perf"]' >> $GITHUB_OUTPUT
+          echo 'jira-pattern=ECOPROJECT-[0-9]+' >> $GITHUB_OUTPUT
+          echo 'jira-required-types=["feat","fix"]' >> $GITHUB_OUTPUT
+          echo 'bot-authors=["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]' >> $GITHUB_OUTPUT
+
+  # Validate commit messages
+  validate-commits:
+    needs: config
+    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-commit-messages.yml@main
+    with:
+      types: ${{ needs.config.outputs.allowed-types }}
+      jira-pattern: ${{ needs.config.outputs.jira-pattern }}
+      jira-required-types: ${{ needs.config.outputs.jira-required-types }}
+      skip-authors: ${{ needs.config.outputs.bot-authors }}
+
+  # Validate PR title and description
+  validate-pr-title:
+    needs: config
+    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-pr-title-description.yml@main
+    with:
+      allowed-types: ${{ needs.config.outputs.allowed-types }}
+      jira-pattern: ${{ needs.config.outputs.jira-pattern }}
+      jira-required-types: ${{ needs.config.outputs.jira-required-types }}
+      skip-authors: ${{ needs.config.outputs.bot-authors }}
+
   lint:
     runs-on: ubuntu-latest
+    needs: [validate-commits, validate-pr-title]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -34,6 +75,7 @@ jobs:
 
   check-generate:
     runs-on: ubuntu-latest
+    needs: [validate-commits, validate-pr-title]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -57,6 +99,7 @@ jobs:
 
   check-format:
     runs-on: ubuntu-latest
+    needs: [validate-commits, validate-pr-title]
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -76,6 +119,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
+    needs: [validate-commits, validate-pr-title]
     steps:
     - name: Check out code
       uses: actions/checkout@v4

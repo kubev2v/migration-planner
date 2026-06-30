@@ -53,14 +53,25 @@ Use your git commits to provide context for the folks who will review PRs. We st
 The commit message should follow this template:
 
 ```shell
-[JIRA-TICKET] | [TYPE]: 
+[JIRA-TICKET |] [TYPE]: <message>
 
 [optional BODY]
 
 [optional FOOTER(s)]
 ```
 
-For example:
+**Important Rules:**
+* **JIRA Ticket Requirement:** 
+  - **feat** and **fix** commits **MUST** include a JIRA ticket reference (either in subject or body)
+  - Other commit types (ci, chore, docs, etc.) do **NOT** require a JIRA ticket
+* **Format:** The subject line must follow: `[TICKET |] type: message`
+  - The JIRA ticket prefix is optional for non-feat/fix commits
+  - The pipe `|` separator is required when including a ticket
+  - Message must not be empty
+
+**Examples:**
+
+With JIRA ticket in subject (required for feat/fix):
 ```shell
 ECOPROJECT-1234 | feat: add new network configuration options
 
@@ -70,10 +81,29 @@ The existing IPv4 logic remains unchanged.
 Signed-off-by: Your Name <your-email@redhat.com>
 ```
 
-The commit contains the following structural types, to communicate your intent:
+With JIRA ticket in body (alternative for feat/fix):
+```shell
+feat: add new network configuration options
 
-* **fix:** A commit of the type `fix` patches a bug in your codebase (this correlates with `PATCH` in Semantic Versioning).
-* **feat:** A commit of the type `feat` introduces a new feature to the codebase (this correlates with `MINOR` in Semantic Versioning).
+The feature adds new settings to the network configuration to support IPv6.
+The existing IPv4 logic remains unchanged.
+
+Fixes: ECOPROJECT-1234
+
+Signed-off-by: Your Name <your-email@redhat.com>
+```
+
+Without JIRA ticket (allowed for chore, ci, docs, etc.):
+```shell
+chore: update dependencies
+
+Signed-off-by: Your Name <your-email@redhat.com>
+```
+
+**Allowed Commit Types:**
+
+* **feat:** A commit that introduces a new feature to the codebase (this correlates with `MINOR` in Semantic Versioning). **Requires JIRA ticket.**
+* **fix:** A commit that patches a bug in your codebase (this correlates with `PATCH` in Semantic Versioning). **Requires JIRA ticket.**
 * **build:** Changes that affect the build system or external dependencies
 * **chore:** Routine tasks, maintenance, or minor changes that don't modify source or test files
 * **ci:** Changes to our CI configuration files and scripts
@@ -99,12 +129,25 @@ It includes:
 ### Create a Pull Request (PR)
 
 1. Create a new pull request from your branch to the main branch.
-2. Provide a clear and detailed description of your changes in the pull request description. Include:
+2. **PR Title Format:** The PR title must follow the same format as commit messages:
+   ```
+   [JIRA-TICKET |] type: description
+   ```
+   **Examples:**
+   * `ECOPROJECT-1234 | feat: add login flow`
+   * `feat: add user authentication` (JIRA can be in description instead)
+   * `chore: update dependencies` (no JIRA needed for chore)
+   
+   **Requirements:**
+   * **feat** and **fix** PR titles **MUST** include a JIRA ticket (either in title or description)
+   * Other types (ci, chore, docs, etc.) do **NOT** require a JIRA ticket
+   
+3. Provide a clear and detailed description of your changes in the pull request description. Include:
    * What problem does this PR solve?
    * How was it solved?
    * Any relevant issue numbers (e.g., `Closes ECOPROJECT-XXX`, `Fixes ECOPROJECT-XXX`).
    * Screenshots or GIFs if your changes involve UI updates.
-3. Request a review from one of the project maintainers.
+4. Request a review from one of the project maintainers.
 
 ### Additional Resources
 
