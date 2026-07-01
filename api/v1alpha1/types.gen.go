@@ -163,6 +163,14 @@ const (
 	N3 StandaloneClusterRequirementsRequestControlPlaneNodeCount = 3
 )
 
+// Defines values for OsInfoSupportTier.
+const (
+	Certified          OsInfoSupportTier = "certified"
+	CommunitySupported OsInfoSupportTier = "community_supported"
+	SpecialHandling    OsInfoSupportTier = "special_handling"
+	VendorSupported    OsInfoSupportTier = "vendor_supported"
+)
+
 // Defines values for ListGroupsParamsKind.
 const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
@@ -1207,12 +1215,18 @@ type DiskTypeSummary struct {
 
 // OsInfo defines model for osInfo.
 type OsInfo struct {
-	Count     int  `json:"count"`
-	Supported bool `json:"supported"`
+	Count int `json:"count"`
+
+	// SupportTier OS support tier per Red Hat KCS article 4234591
+	SupportTier OsInfoSupportTier `json:"supportTier"`
+	Supported   bool              `json:"supported"`
 
 	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
+
+// OsInfoSupportTier OS support tier per Red Hat KCS article 4234591
+type OsInfoSupportTier string
 
 // PresignedUrl defines model for presigned-url.
 type PresignedUrl struct {
