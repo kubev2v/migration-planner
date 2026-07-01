@@ -2526,11 +2526,20 @@ components:
       required:
         - count
         - supported
+        - supportTier
       properties:
         count:
           type: integer
         supported:
           type: boolean
+        supportTier:
+          type: string
+          enum:
+            - certified
+            - vendor_supported
+            - community_supported
+            - special_handling
+          description: OS support tier per Red Hat KCS article 4234591
         upgradeRecommendation:
           type: string
           description: Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS

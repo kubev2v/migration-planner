@@ -87,6 +87,7 @@ type ResourceBreakdown struct {
 type OSInfo struct {
 	Count                 int
 	IsSupported           bool
+	SupportTier           string
 	UpgradeRecommendation string
 }
 

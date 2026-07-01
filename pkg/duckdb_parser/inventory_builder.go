@@ -191,6 +191,7 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 			vmsData.OSInfo[os.Name] = inventory.OSInfo{
 				Count:                 os.Count,
 				IsSupported:           os.Supported,
+				SupportTier:           inventory.ClassifyOSTier(os.Name),
 				UpgradeRecommendation: upgradeRec,
 			}
 		}
