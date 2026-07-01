@@ -231,7 +231,8 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 				require.True(t, exists, "OS %s should exist in result", name)
 				assert.Equal(t, expected.Count, actual.Count)
 				assert.Equal(t, expected.IsSupported, actual.Supported)
-				assert.Equal(t, api.OsInfoSupportTier(expected.SupportTier), actual.SupportTier)
+				expectedTier := api.OsInfoSupportTier(expected.SupportTier)
+				assert.Equal(t, &expectedTier, actual.SupportTier)
 
 				if expected.UpgradeRecommendation != "" {
 					require.NotNil(t, actual.UpgradeRecommendation)

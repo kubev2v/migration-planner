@@ -1218,8 +1218,8 @@ type OsInfo struct {
 	Count int `json:"count"`
 
 	// SupportTier OS support tier per Red Hat KCS article 4234591
-	SupportTier OsInfoSupportTier `json:"supportTier"`
-	Supported   bool              `json:"supported"`
+	SupportTier *OsInfoSupportTier `json:"supportTier,omitempty"`
+	Supported   bool               `json:"supported"`
 
 	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
