@@ -1,0 +1,4 @@
+name: Red Hat
+members:
+  - username: admin-user
+    email: admin-user@admin-org.com
