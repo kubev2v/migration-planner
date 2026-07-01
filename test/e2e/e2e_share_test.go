@@ -40,7 +40,7 @@ var _ = Describe("e2e-share", func() {
 					NotMigratableReasons: []v1alpha1.MigrationIssue{},
 					MigrationWarnings:    []v1alpha1.MigrationIssue{},
 					OsInfo: &map[string]v1alpha1.OsInfo{
-						"Red Hat Enterprise Linux 9": {Count: 1, Supported: true, SupportTier: v1alpha1.Certified},
+						"Red Hat Enterprise Linux 9": {Count: 1, Supported: true},
 					},
 					DiskComplexityTier: &map[string]v1alpha1.DiskSizeTierSummary{
 						"0-10TiB": {VmCount: 1, TotalSizeTB: 0.1},
