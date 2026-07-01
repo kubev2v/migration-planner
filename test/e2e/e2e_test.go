@@ -119,32 +119,19 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusBadRequest))
 
+			// Invalid credentials are now validated eagerly by Store() and rejected synchronously
 			_, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port),
 				"invalid", "cred")
 			Expect(err).To(BeNil())
-			Expect(resCode).To(Equal(http.StatusAccepted))
+			Expect(resCode).To(Equal(http.StatusBadRequest))
 
-			var s *CollectorStatus
-			Eventually(func() string {
-				s, err = e2eAgent.Api.GetCollectorStatus()
-				if err != nil {
-					return ""
-				}
-				return s.Status
-			}, "30s", "2s").Should(Equal(string(CollectorStatusError)))
-
-			s, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
+			// Bad URL is also rejected synchronously during credential verification
+			_, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/badUrl", SystemIP, Vsphere1Port),
 				"user", "pass")
 			Expect(err).To(BeNil())
-			Expect(resCode).To(Equal(http.StatusAccepted))
-			Eventually(func() string {
-				s, err = e2eAgent.Api.GetCollectorStatus()
-				if err != nil {
-					return ""
-				}
-				return s.Status
-			}, "30s", "2s").Should(Equal(string(CollectorStatusError)))
+			Expect(resCode).To(Equal(http.StatusBadRequest))
 
+			var s *CollectorStatus
 			s, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", SystemIP, Vsphere1Port), "core", "123456")
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
