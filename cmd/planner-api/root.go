@@ -13,6 +13,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(migrateCmd)
 	rootCmd.AddCommand(runCmd)
+	rootCmd.AddCommand(backfillCmd)
 
 	rootCmd.PersistentFlags().StringVarP(&configFile, "config", "c", "", "Path to configuration file")
 }
