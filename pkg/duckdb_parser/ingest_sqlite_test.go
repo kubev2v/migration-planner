@@ -2,6 +2,7 @@ package duckdb_parser
 
 import (
 	"context"
+	"crypto/md5"
 	"database/sql"
 	"fmt"
 	"path/filepath"
@@ -388,4 +389,135 @@ func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {
 	var objectID string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT "Object ID" FROM vcluster WHERE "Name" = 'existing-cluster'`).Scan(&objectID))
 	assert.Equal(t, "sentinel-id", objectID, "pre-existing row must not be overwritten")
+}
+
+// addCollectionColumns adds vmmoid and collection_id columns to vinfo so that
+// IngestSqliteWithCollection can write to them. In production these columns are
+// added by agent migration 026; in tests we add them manually.
+func addCollectionColumns(t *testing.T, db *sql.DB) {
+	t.Helper()
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, `ALTER TABLE vinfo ADD COLUMN IF NOT EXISTS vmmoid VARCHAR`)
+	require.NoError(t, err, "adding vmmoid column to vinfo")
+	_, err = db.ExecContext(ctx, `ALTER TABLE vinfo ADD COLUMN IF NOT EXISTS collection_id BIGINT`)
+	require.NoError(t, err, "adding collection_id column to vinfo")
+}
+
+func TestIngestSqliteWithCollection_HashesVMIDsAndSetsVmmoid(t *testing.T) {
+	const collectionID = int64(7)
+	ctx := context.Background()
+
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	addCollectionColumns(t, db)
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	result, err := parser.IngestSqliteWithCollection(ctx, sqlitePath, collectionID)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx, `SELECT "VM ID", vmmoid, collection_id FROM vinfo`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	rowCount := 0
+	for rows.Next() {
+		rowCount++
+		var vmID, vmmoid string
+		var colID int64
+		require.NoError(t, rows.Scan(&vmID, &vmmoid, &colID))
+
+		// "VM ID" must be a 32-char lowercase hex md5 string.
+		assert.Len(t, vmID, 32, "VM ID should be a 32-char md5 hex string")
+		assert.Regexp(t, `^[0-9a-f]{32}$`, vmID, "VM ID should be a lowercase hex string")
+
+		// vmmoid is the original MOID (non-empty, not itself a 32-char hash).
+		assert.NotEmpty(t, vmmoid, "vmmoid should be the original MOID")
+		assert.NotEqual(t, 32, len(vmmoid), "vmmoid should not look like an md5 hash (original MOIDs are shorter)")
+
+		// collection_id must be set correctly.
+		assert.Equal(t, collectionID, colID, "collection_id should match the supplied collectionID")
+
+		// Hash must be deterministic: md5("{collectionID}_{vmmoid}") == vmID
+		expectedHash := fmt.Sprintf("%x", md5.Sum(fmt.Appendf(nil, "%d_%s", collectionID, vmmoid)))
+		assert.Equal(t, expectedHash, vmID, "VM ID should equal md5('%d_%s', collectionID, vmmoid)")
+	}
+	require.NoError(t, rows.Err())
+	assert.Equal(t, len(vms), rowCount, "vinfo should have one row per non-template VM")
+}
+
+func TestIngestSqliteWithCollection_RelationalTablesMatchVinfoIDs(t *testing.T) {
+	const collectionID = int64(7)
+	ctx := context.Background()
+
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	addCollectionColumns(t, db)
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	_, err := parser.IngestSqliteWithCollection(ctx, sqlitePath, collectionID)
+	require.NoError(t, err)
+
+	// Every vcpu "VM ID" must exist in vinfo "VM ID" — no orphaned rows.
+	var orphans int
+	err = db.QueryRowContext(ctx, `
+		SELECT COUNT(*) FROM vcpu
+		WHERE "VM ID" NOT IN (SELECT "VM ID" FROM vinfo)
+	`).Scan(&orphans)
+	require.NoError(t, err)
+	assert.Equal(t, 0, orphans, "all vcpu rows should reference a valid vinfo VM ID")
+}
+
+func TestIngestSqliteWithCollection_ZeroCollectionIDMatchesIngestSqlite(t *testing.T) {
+	ctx := context.Background()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster1"},
+	}
+
+	// Parser A uses IngestSqlite (the zero-collection-ID path).
+	parserA, dbA, cleanupA := setupTestParser(t, &testValidator{})
+	defer cleanupA()
+
+	// Parser B uses IngestSqliteWithCollection with collectionID=0.
+	parserB, dbB, cleanupB := setupTestParser(t, &testValidator{})
+	defer cleanupB()
+
+	sqlitePathA := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+	sqlitePathB := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	resultA, err := parserA.IngestSqlite(ctx, sqlitePathA)
+	require.NoError(t, err)
+
+	resultB, err := parserB.IngestSqliteWithCollection(ctx, sqlitePathB, 0)
+	require.NoError(t, err)
+
+	assert.Equal(t, resultA.IsValid(), resultB.IsValid(), "validity should match between IngestSqlite and IngestSqliteWithCollection(0)")
+
+	var countA, countB int
+	require.NoError(t, dbA.QueryRowContext(ctx, `SELECT COUNT(*) FROM vinfo`).Scan(&countA))
+	require.NoError(t, dbB.QueryRowContext(ctx, `SELECT COUNT(*) FROM vinfo`).Scan(&countB))
+	assert.Equal(t, countA, countB, "VM count should match between IngestSqlite and IngestSqliteWithCollection(0)")
 }
