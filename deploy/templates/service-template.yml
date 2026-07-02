@@ -445,6 +445,15 @@ objects:
                                 regex: "^${SERVICE_API_PATH}/api/v1/sources/([0-9a-f-]+)/status$"
                               substitution: "/api/v1/sources/\\1/status"
                         - match:
+                            safe_regex:
+                              regex: "^${SERVICE_API_PATH}/api/v1/sources/([0-9a-f-]+)/subset/([0-9a-f-]+)$"
+                          route:
+                            cluster: backend-agent-api
+                            regex_rewrite:
+                              pattern:
+                                regex: "^${SERVICE_API_PATH}/api/v1/sources/([0-9a-f-]+)/subset/([0-9a-f-]+)$"
+                              substitution: "/api/v1/sources/\\1/subset/\\2"
+                        - match:
                             prefix: "${SERVICE_API_PATH}/api/v1/agents"
                           route:
                             cluster: backend-agent-api
