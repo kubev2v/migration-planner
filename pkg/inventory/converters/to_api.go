@@ -80,9 +80,11 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 func toAPIVMs(v *inventory.VMsData) api.VMs {
 	osInfo := make(map[string]api.OsInfo)
 	for name, os := range v.OSInfo {
+		tier := api.OsInfoSupportTier(os.SupportTier)
 		info := api.OsInfo{
-			Count:     os.Count,
-			Supported: os.IsSupported,
+			Count:       os.Count,
+			Supported:   os.IsSupported,
+			SupportTier: &tier,
 		}
 		if os.UpgradeRecommendation != "" {
 			rec := os.UpgradeRecommendation

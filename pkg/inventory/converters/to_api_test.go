@@ -192,6 +192,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 					"Red Hat Enterprise Linux 7": {
 						Count:                 10,
 						IsSupported:           true,
+						SupportTier:           inventory.TierCertified,
 						UpgradeRecommendation: "Consider upgrading to RHEL 8 or 9",
 					},
 				},
@@ -204,6 +205,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 					"Red Hat Enterprise Linux 9": {
 						Count:                 5,
 						IsSupported:           true,
+						SupportTier:           inventory.TierCertified,
 						UpgradeRecommendation: "",
 					},
 				},
@@ -229,6 +231,8 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 				require.True(t, exists, "OS %s should exist in result", name)
 				assert.Equal(t, expected.Count, actual.Count)
 				assert.Equal(t, expected.IsSupported, actual.Supported)
+				expectedTier := api.OsInfoSupportTier(expected.SupportTier)
+				assert.Equal(t, &expectedTier, actual.SupportTier)
 
 				if expected.UpgradeRecommendation != "" {
 					require.NotNil(t, actual.UpgradeRecommendation)
