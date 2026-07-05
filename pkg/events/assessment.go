@@ -28,6 +28,6 @@ func NewAssessmentCreatedPayload(data AssessmentData) AssessmentEventPayload {
 	return AssessmentEventPayload{Assessment: data}
 }
 
-func NewAssessmentDeletedPayload(assessmentID string) AssessmentEventPayload {
-	return AssessmentEventPayload{Assessment: AssessmentData{ID: assessmentID}}
+func NewAssessmentDeletedPayload(assessmentID string, deletedAt time.Time) AssessmentEventPayload {
+	return AssessmentEventPayload{Assessment: AssessmentData{ID: assessmentID, DeletedAt: &deletedAt}}
 }
