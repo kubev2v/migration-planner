@@ -2,6 +2,7 @@ package eventwrap
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -102,11 +103,13 @@ func (e *EventAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 		return err
 	}
 
+	deletedAt := time.Now().UTC()
+
 	if err := e.inner.DeleteAssessment(ctx, id); err != nil {
 		return err
 	}
 
-	payload := events.NewAssessmentDeletedPayload(assessment.ID.String())
+	payload := events.NewAssessmentDeletedPayload(assessment.ID.String(), deletedAt)
 	ceBytes, err := events.BuildCloudEvent(events.AssessmentDeletedEventType, payload)
 	if err != nil {
 		return err
