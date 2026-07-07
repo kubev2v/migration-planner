@@ -419,6 +419,17 @@ func (s *SizerService) calculateSizingWithMultipliers(
 		return SizingResult{}, fmt.Errorf("sizer service returned empty response")
 	}
 
+	// Validate compact mode fit using raw sizer response (before transformation)
+	if compactMode {
+		smtMultiplier := 1.0
+		if params.WorkerNodeCPU > 0 && workerNodeThreads > 0 && workerNodeThreads > params.WorkerNodeCPU {
+			smtMultiplier = effectiveCPU / float64(params.WorkerNodeCPU)
+		}
+		if err := s.validateCompactModeFit(sizerResponse.Data.NodeCount, totalCPU, totalMemory, smtMultiplier, params.CpuOverCommitRatio, params.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory); err != nil {
+			return SizingResult{}, err
+		}
+	}
+
 	_, err = s.validateVMDistribution(sizerResponse, services, singleNode)
 	if err != nil {
 		return SizingResult{}, err
@@ -678,13 +689,8 @@ func (s *SizerService) CalculateClusterRequirements(
 		}
 	}
 
-	if compactMode {
-		controlPlaneCPU := extractControlPlaneCPU(&params)
-		controlPlaneMemory := extractControlPlaneMemory(&params)
-		if err := s.validateCompactModeFit(baselineResult.TotalNodes, totalCPU, totalMemory, smtMultiplier, params.CpuOverCommitRatio, params.MemoryOverCommitRatio, controlPlaneCPU, controlPlaneMemory); err != nil {
-			return nil, err
-		}
-	}
+	// Note: compact mode validation is now done inside calculateSizingWithMultipliers
+	// using the raw sizer response before transformation, so it's removed from here
 
 	logger.Operation("calculate_baseline").
 		WithString("cluster_id", calcReq.ClusterID).

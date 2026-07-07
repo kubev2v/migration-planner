@@ -2400,20 +2400,21 @@ var _ = Describe("sizer service", func() {
 		})
 
 		Context("fit errors", func() {
-			It("succeeds even when sizer returns more than 3 nodes (current behavior)", func() {
+			It("fails when sizer returns more than 3 nodes (workload doesn't fit)", func() {
 				assessment := createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				mockStore.assessments[assessmentID] = assessment
+				// Sizer returns 5 nodes - workload is too large for compact mode
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				sizerService = service.NewSizerService(sizerClient, mockStore)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
-				Expect(err).To(BeNil())
-				Expect(result).NotTo(BeNil())
-				Expect(result.ClusterSizing.TotalNodes).To(Equal(3))
-				Expect(result.ClusterSizing.ControlPlaneNodes).To(Equal(3))
-				Expect(result.ClusterSizing.WorkerNodes).To(Equal(0))
+				Expect(err).NotTo(BeNil())
+				_, ok := err.(*service.ErrInvalidRequest)
+				Expect(ok).To(BeTrue())
+				Expect(err.Error()).To(ContainSubstring("workload does not fit in compact mode"))
+				Expect(result).To(BeNil())
 			})
 
 			It("handles sizer schedulability error for compact mode", func() {
