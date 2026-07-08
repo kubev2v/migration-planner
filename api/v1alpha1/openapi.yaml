@@ -2492,6 +2492,33 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/MigrationIssue"
+        issuesBreakdown:
+          $ref: "#/components/schemas/IssuesBreakdown"
+
+    IssuesBreakdown:
+      type: object
+      required:
+        - critical
+        - warning
+        - information
+        - advisory
+        - error
+      properties:
+        critical:
+          type: integer
+          description: Number of VMs with at least one Critical issue
+        warning:
+          type: integer
+          description: Number of VMs with at least one Warning issue
+        information:
+          type: integer
+          description: Number of VMs with at least one Information issue
+        advisory:
+          type: integer
+          description: Number of VMs with at least one Advisory issue
+        error:
+          type: integer
+          description: Number of VMs with at least one Error issue
 
     diskSizeTierSummary:
       type: object

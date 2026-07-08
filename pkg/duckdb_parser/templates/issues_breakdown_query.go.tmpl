@@ -1,0 +1,20 @@
+{{- /*
+Issues Breakdown Query Template - Returns count of distinct VMs per concern category.
+A VM with multiple issues of the same category is counted once per category.
+A VM can appear in multiple categories.
+
+Template Parameters:
+  - ClusterFilter: filter by cluster name
+  - VMListFilter: filter by list of VM IDs
+*/ -}}
+SELECT
+    COUNT(DISTINCT CASE WHEN c."Category" = 'Critical' THEN i."VM ID" END) AS critical,
+    COUNT(DISTINCT CASE WHEN c."Category" = 'Warning' THEN i."VM ID" END) AS warning,
+    COUNT(DISTINCT CASE WHEN c."Category" = 'Information' THEN i."VM ID" END) AS information,
+    COUNT(DISTINCT CASE WHEN c."Category" = 'Advisory' THEN i."VM ID" END) AS advisory,
+    COUNT(DISTINCT CASE WHEN c."Category" = 'Error' THEN i."VM ID" END) AS error
+FROM vinfo i
+JOIN concerns c ON i."VM ID" = c."VM_ID"
+WHERE COALESCE(i."migration_excluded", false) = false
+{{- if .ClusterFilter }} AND i."Cluster" = '{{.ClusterFilter}}'{{end}}
+{{- .VMListFilter}};

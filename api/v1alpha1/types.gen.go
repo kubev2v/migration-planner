@@ -693,6 +693,24 @@ type Ipv4Config struct {
 	SubnetMask     string `json:"subnetMask" validate:"required,subnet_mask,max=2"`
 }
 
+// IssuesBreakdown defines model for IssuesBreakdown.
+type IssuesBreakdown struct {
+	// Advisory Number of VMs with at least one Advisory issue
+	Advisory int `json:"advisory"`
+
+	// Critical Number of VMs with at least one Critical issue
+	Critical int `json:"critical"`
+
+	// Error Number of VMs with at least one Error issue
+	Error int `json:"error"`
+
+	// Information Number of VMs with at least one Information issue
+	Information int `json:"information"`
+
+	// Warning Number of VMs with at least one Warning issue
+	Warning int `json:"warning"`
+}
+
 // Job Background job for async assessment creation
 type Job struct {
 	// AssessmentId Assessment ID when job completed successfully
@@ -1162,6 +1180,7 @@ type VMs struct {
 
 	// DistributionByNicCount Distribution of VMs by NIC count (e.g., "0", "1", "2", "3", "4+")
 	DistributionByNicCount *map[string]int      `json:"distributionByNicCount,omitempty"`
+	IssuesBreakdown        *IssuesBreakdown     `json:"issuesBreakdown,omitempty"`
 	MigrationWarnings      []MigrationIssue     `json:"migrationWarnings"`
 	NicCount               *VMResourceBreakdown `json:"nicCount,omitempty"`
 	NotMigratableReasons   []MigrationIssue     `json:"notMigratableReasons"`

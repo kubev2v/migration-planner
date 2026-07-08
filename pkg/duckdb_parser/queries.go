@@ -426,6 +426,21 @@ func (p *Parser) MigrationIssues(ctx context.Context, filters Filters, category 
 	return results, rows.Err()
 }
 
+// IssuesBreakdown returns the count of distinct VMs per concern category.
+func (p *Parser) IssuesBreakdown(ctx context.Context, filters Filters) (inventory.IssuesBreakdown, error) {
+	q, err := p.builder.IssuesBreakdownQuery(filters)
+	if err != nil {
+		return inventory.IssuesBreakdown{}, fmt.Errorf("building issues breakdown query: %w", err)
+	}
+	var result inventory.IssuesBreakdown
+	if err := p.db.QueryRowContext(ctx, q).Scan(
+		&result.Critical, &result.Warning, &result.Information, &result.Advisory, &result.Error,
+	); err != nil {
+		return inventory.IssuesBreakdown{}, fmt.Errorf("scanning issues breakdown: %w", err)
+	}
+	return result, nil
+}
+
 // ResourceBreakdowns returns all resource breakdowns by migrability status.
 func (p *Parser) ResourceBreakdowns(ctx context.Context, filters Filters) (AllResourceBreakdowns, error) {
 	q, err := p.builder.ResourceBreakdownsQuery(filters)

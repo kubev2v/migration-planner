@@ -345,6 +345,15 @@ func (b *QueryBuilder) MigrationIssuesQuery(filters Filters, category string) (s
 	return b.buildQuery("migration_issues_query", mustGetTemplate("migration_issues_query"), params)
 }
 
+// IssuesBreakdownQuery builds the issues breakdown query.
+func (b *QueryBuilder) IssuesBreakdownQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: escapeSQLString(filters.Cluster),
+		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
+	}
+	return b.buildQuery("issues_breakdown_query", mustGetTemplate("issues_breakdown_query"), params)
+}
+
 // ResourceBreakdownsQuery builds the resource breakdowns query.
 func (b *QueryBuilder) ResourceBreakdownsQuery(filters Filters) (string, error) {
 	params := queryParams{

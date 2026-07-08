@@ -39,6 +39,26 @@ func (v *testWarningValidator) Validate(ctx context.Context, vm models.VM) ([]mo
 	}, nil
 }
 
+// testMultiCategoryValidator returns concerns of multiple categories per VM.
+// vm-001 gets Critical + Warning, vm-002 gets Warning + Information.
+type testMultiCategoryValidator struct{}
+
+func (v *testMultiCategoryValidator) Validate(ctx context.Context, vm models.VM) ([]models.Concern, error) {
+	if vm.ID == "vm-001" {
+		return []models.Concern{
+			{Id: "critical.1", Label: "Critical issue", Category: "Critical", Assessment: "Critical."},
+			{Id: "warning.1", Label: "Warning issue", Category: "Warning", Assessment: "Warning."},
+		}, nil
+	}
+	if vm.ID == "vm-002" {
+		return []models.Concern{
+			{Id: "warning.2", Label: "Another warning", Category: "Warning", Assessment: "Warning."},
+			{Id: "info.1", Label: "Info issue", Category: "Information", Assessment: "Info."},
+		}, nil
+	}
+	return nil, nil
+}
+
 // testCriticalValidator returns critical concerns for all VMs.
 type testCriticalValidator struct{}
 
@@ -1811,4 +1831,39 @@ func TestVCenterVersion(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "", inv.VCenterVersion)
 	})
+}
+
+func TestBuildInventory_IssuesBreakdown(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testMultiCategoryValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+
+	breakdown := inv.VCenter.VMs.IssuesBreakdown
+
+	// vm-001 has Critical, vm-002 does not → 1 VM with Critical
+	assert.Equal(t, 1, breakdown.Critical)
+	// vm-001 and vm-002 both have Warning → 2 VMs with Warning
+	assert.Equal(t, 2, breakdown.Warning)
+	// vm-002 has Information → 1 VM with Information
+	assert.Equal(t, 1, breakdown.Information)
+	// No VMs have Advisory or Error
+	assert.Equal(t, 0, breakdown.Advisory)
+	assert.Equal(t, 0, breakdown.Error)
 }

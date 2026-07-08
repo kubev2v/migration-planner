@@ -60,6 +60,17 @@ type VMsData struct {
 	DiskTypes                   map[string]DiskTypeSummary
 	MigrationWarnings           []MigrationIssue
 	NotMigratableReasons        []MigrationIssue
+	IssuesBreakdown             IssuesBreakdown
+}
+
+// IssuesBreakdown holds the number of VMs affected per issue severity category.
+// A VM with multiple issues of the same category is counted once per category.
+type IssuesBreakdown struct {
+	Critical    int
+	Warning     int
+	Information int
+	Advisory    int
+	Error       int
 }
 
 // InfraData contains infrastructure-level data (hosts, datastores, networks).

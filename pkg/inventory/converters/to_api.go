@@ -203,6 +203,13 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		DiskTypes:                &diskTypes,
 		MigrationWarnings:        migrationWarnings,
 		NotMigratableReasons:     notMigratableReasons,
+		IssuesBreakdown: &api.IssuesBreakdown{
+			Critical:    v.IssuesBreakdown.Critical,
+			Warning:     v.IssuesBreakdown.Warning,
+			Information: v.IssuesBreakdown.Information,
+			Advisory:    v.IssuesBreakdown.Advisory,
+			Error:       v.IssuesBreakdown.Error,
+		},
 	}
 }
 
