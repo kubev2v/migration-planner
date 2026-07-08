@@ -311,6 +311,14 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		zap.S().Named("duckdb_parser").Warnf("Failed to get critical migration issues: %v", err)
 	}
 
+	// Get issues breakdown by category
+	issuesBreakdown, err := p.IssuesBreakdown(ctx, filters)
+	if err == nil {
+		vmsData.IssuesBreakdown = issuesBreakdown
+	} else {
+		zap.S().Named("duckdb_parser").Warnf("Failed to get issues breakdown: %v", err)
+	}
+
 	return vmsData, nil
 }
 
