@@ -8,67 +8,19 @@ permissions:
   contents: read
 
 jobs:
-  update-agent-ui:
+  update:
     if: github.event.client_payload.repo == 'kubev2v/migration-planner-agent-ui'
-    concurrency:
-      group: agent-ui-update-${{ github.event.client_payload.target_branch }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-    env:
-      CONFIG_FILE: "build/migration-planner-iso/config"
-
-    steps:
-      - name: Read and validate payload
-        id: payload
-        env:
-          SHA: ${{ github.event.client_payload.sha }}
-          REPO: ${{ github.event.client_payload.repo }}
-          TARGET_BRANCH: ${{ github.event.client_payload.target_branch }}
-        run: |
-          echo "new_sha=$SHA" >> $GITHUB_OUTPUT
-          echo "repo=$REPO" >> $GITHUB_OUTPUT
-          echo "target_branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
-
-          # Set branch name for PR
-          echo "pr_branch=update-agent-ui-${TARGET_BRANCH}" >> $GITHUB_OUTPUT
-
-          echo "Processing update for branch $TARGET_BRANCH (SHA: $SHA)"
-
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          ref: ${{ steps.payload.outputs.target_branch }}
-          submodules: true
-          persist-credentials: false
-
-      - name: Update config file
-        id: update
-        env:
-          NEW_SHA: ${{ steps.payload.outputs.new_sha }}
-        run: |
-          sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$NEW_SHA/" "$CONFIG_FILE"
-          grep -q "^AGENT_UI_IMAGE_TAG=$NEW_SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
-
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
-          private-key: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
-          owner: kubev2v
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          branch: ${{ steps.payload.outputs.pr_branch }}
-          base: ${{ steps.payload.outputs.target_branch }}
-          commit-message: |
-            chore: Agent-UI repository changes have been detected. 
-            Update Agent-UI to SHA: ${{ steps.payload.outputs.new_sha }}.
-            Branch: ${{ steps.payload.outputs.target_branch }}
-          title: "[AUTOMATION] Update Agent-UI image tag (${{ steps.payload.outputs.target_branch }})"
-          body: |
-            Auto update triggered by ${{ steps.payload.outputs.repo }}.
-            - **Branch**: ${{ steps.payload.outputs.target_branch }}
-            - **SHA**: ${{ steps.payload.outputs.new_sha }}
-          delete-branch: true
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@main
+    with:
+      sha: ${{ github.event.client_payload.sha }}
+      target-branch: ${{ github.event.client_payload.target_branch }}
+      source-repo: ${{ github.event.client_payload.repo }}
+      component-name: Agent-UI image tag
+      pr-branch-prefix: update-agent-ui
+      update-command: |
+        CONFIG_FILE="build/migration-planner-iso/config"
+        sed -i "s/^AGENT_UI_IMAGE_TAG=.*/AGENT_UI_IMAGE_TAG=$SHA/" "$CONFIG_FILE"
+        grep -q "^AGENT_UI_IMAGE_TAG=$SHA" "$CONFIG_FILE" || { echo "ERROR: sed substitution failed"; exit 1; }
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
