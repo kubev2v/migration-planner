@@ -8,68 +8,21 @@ permissions:
   contents: read
 
 jobs:
-  update-agent-submodule:
+  update:
     if: github.event.client_payload.repo == 'kubev2v/assisted-migration-agent'
-    concurrency:
-      group: agent-submodule-update-${{ github.event.client_payload.target_branch }}
-      cancel-in-progress: true
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Read and validate payload
-        id: payload
-        env:
-          SHA: ${{ github.event.client_payload.sha }}
-          REPO: ${{ github.event.client_payload.repo }}
-          TARGET_BRANCH: ${{ github.event.client_payload.target_branch }}
-        run: |
-          echo "new_sha=$SHA" >> $GITHUB_OUTPUT
-          echo "repo=$REPO" >> $GITHUB_OUTPUT
-          echo "target_branch=$TARGET_BRANCH" >> $GITHUB_OUTPUT
-
-          # Set branch name for PR
-          echo "pr_branch=update-agent-submodule-${TARGET_BRANCH}" >> $GITHUB_OUTPUT
-
-          echo "Processing update for branch $TARGET_BRANCH (SHA: $SHA)"
-
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          ref: ${{ steps.payload.outputs.target_branch }}
-          submodules: true
-          persist-credentials: false
-
-      - name: Update agent submodule
-        id: update-submodule
-        env:
-          NEW_SHA: ${{ steps.payload.outputs.new_sha }}
-        run: |
-          echo "Updating agent submodule to ${NEW_SHA}"
-          git submodule update --init agent-v2
-          git -C agent-v2 fetch origin "${NEW_SHA}"
-          git -C agent-v2 checkout --detach "${NEW_SHA}"
-          git add agent-v2
-
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@v1
-        with:
-          app-id: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
-          private-key: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
-          owner: kubev2v
-
-      - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          branch: ${{ steps.payload.outputs.pr_branch }}
-          base: ${{ steps.payload.outputs.target_branch }}
-          commit-message: |
-            chore: Agent repository changes have been detected. 
-            Update submodule to reflect the SHA: ${{ steps.payload.outputs.new_sha }}.
-            Branch: ${{ steps.payload.outputs.target_branch }}
-          title: "[AUTOMATION] Update Agent submodule (${{ steps.payload.outputs.target_branch }})"
-          body: |
-            Auto update triggered by ${{ steps.payload.outputs.repo }}.
-            - **Branch**: ${{ steps.payload.outputs.target_branch }}
-            - **SHA**: ${{ steps.payload.outputs.new_sha }}
-          delete-branch: true
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@main
+    with:
+      sha: ${{ github.event.client_payload.sha }}
+      target-branch: ${{ github.event.client_payload.target_branch }}
+      source-repo: ${{ github.event.client_payload.repo }}
+      component-name: Agent submodule
+      pr-branch-prefix: update-agent-submodule
+      update-command: |
+        echo "Updating agent submodule to ${SHA}"
+        git submodule update --init agent-v2
+        git -C agent-v2 fetch origin "${SHA}"
+        git -C agent-v2 checkout --detach "${SHA}"
+        git add agent-v2
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
