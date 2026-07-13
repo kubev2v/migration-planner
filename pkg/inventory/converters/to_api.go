@@ -236,6 +236,8 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			mem := int64(h.MemoryMB)
 			host.MemoryMB = &mem
 		}
+		host.VmotionSupported = h.VMotionSupported
+		host.StorageVmotionSupported = h.StorageVMotionSupported
 		hosts = append(hosts, host)
 	}
 

@@ -58,7 +58,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR)`,
 
 		// Host
-		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR)`,
+		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
 
 		// VM
 		`CREATE TABLE dst.VM (
@@ -121,7 +121,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		// Insert one host per cluster so Host→Cluster join resolves.
 		hostID := fmt.Sprintf("host-%d", i+1)
 		_, err = db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Host VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]')`,
+			`INSERT INTO dst.Host VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
 			escapeSQLString(hostID), escapeSQLString(c.id),
 		))
 		require.NoError(t, err)
@@ -357,6 +357,32 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 	require.Len(t, nics, 2)
 	assert.Equal(t, "192.168.1.50", nics[0].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
 	assert.Equal(t, "192.168.1.50", nics[1].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
+}
+
+func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var vmotionSupport, storageVmotionSupport bool
+	err = db.QueryRowContext(ctx,
+		`SELECT "VMotion support", "Storage VMotion support" FROM vhost LIMIT 1`).
+		Scan(&vmotionSupport, &storageVmotionSupport)
+	require.NoError(t, err)
+	assert.True(t, vmotionSupport, "VMotion support should be true, not hard-coded false")
+	assert.True(t, storageVmotionSupport, "Storage VMotion support should be true, not hard-coded false")
 }
 
 func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {

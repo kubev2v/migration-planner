@@ -338,12 +338,14 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 		hosts := make([]inventory.Host, 0, len(hostModels))
 		for _, h := range hostModels {
 			hosts = append(hosts, inventory.Host{
-				ID:         h.Id,
-				Vendor:     h.Vendor,
-				Model:      h.Model,
-				CpuCores:   h.CpuCores,
-				CpuSockets: h.CpuSockets,
-				MemoryMB:   h.MemoryMB,
+				ID:                      h.Id,
+				Vendor:                  h.Vendor,
+				Model:                   h.Model,
+				CpuCores:                h.CpuCores,
+				CpuSockets:              h.CpuSockets,
+				MemoryMB:                h.MemoryMB,
+				VMotionSupported:        h.VMotionSupported,
+				StorageVMotionSupported: h.StorageVMotionSupported,
 			})
 		}
 		infraData.Hosts = hosts
