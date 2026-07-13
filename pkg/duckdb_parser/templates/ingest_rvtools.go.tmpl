@@ -250,7 +250,8 @@ FROM vdatastore_raw;
 
 DROP TABLE vdatastore_raw;
 
-INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
+    "VMotion support", "Storage VMotion support")
 SELECT
     "Datacenter",
     "Cluster",
@@ -261,7 +262,9 @@ SELECT
     "Model",
     "Vendor",
     "Host",
-    COALESCE(NULLIF("Config status", ''), 'green')
+    COALESCE(NULLIF("Config status", ''), 'green'),
+    CASE WHEN LOWER(TRIM(COALESCE("VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    CASE WHEN LOWER(TRIM(COALESCE("Storage VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END
 FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
 
 INSERT INTO vhba ("Device", "Type")

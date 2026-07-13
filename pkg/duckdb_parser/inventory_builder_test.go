@@ -111,7 +111,7 @@ var (
 		"OS according to the configuration file", "OS according to the VMware Tools",
 		"VM UUID", "Total disk capacity MiB", "migration_excluded",
 	}
-	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
+	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status", "VMotion support", "Storage VMotion support"}
 	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
 		"SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"}
 	vClusterHeaders = []string{"Name", "Object ID", "drs"}
@@ -2105,4 +2105,74 @@ func TestBuildInventory_IssuesBreakdown(t *testing.T) {
 	// No VMs have Advisory or Error
 	assert.Equal(t, 0, breakdown.Advisory)
 	assert.Equal(t, 0, breakdown.Error)
+}
+
+func TestBuildInventory_VMotionSupport(t *testing.T) {
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green",
+			"VMotion support": "true", "Storage VMotion support": "false"},
+	}
+
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	sheets := defaultStandardSheets(vms, hosts)
+	filePath := createTestExcel(t, sheets...)
+	_, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	inv, err := parser.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+
+	require.NotNil(t, inv.VCenter)
+	require.NotEmpty(t, inv.VCenter.Infra.Hosts)
+	host := inv.VCenter.Infra.Hosts[0]
+	assert.True(t, host.VMotionSupported, "VMotion should be true")
+	assert.False(t, host.StorageVMotionSupported, "Storage VMotion should be false")
+
+	// Also check cluster-level
+	require.Len(t, inv.Clusters, 1)
+	for _, clusterData := range inv.Clusters {
+		require.NotEmpty(t, clusterData.Infra.Hosts)
+		clusterHost := clusterData.Infra.Hosts[0]
+		assert.True(t, clusterHost.VMotionSupported)
+		assert.False(t, clusterHost.StorageVMotionSupported)
+	}
+}
+
+func TestBuildInventory_VMotionSupport_DefaultWhenMissing(t *testing.T) {
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hostsOld := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	oldHeaders := []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status"}
+
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// Use old headers (without vMotion columns) to simulate old RVTools format
+	vClustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1", "drs": "false"}}
+	sheets := []ExcelSheet{
+		NewExcelSheet("vInfo", vInfoHeaders, vms),
+		NewExcelSheet("vHost", oldHeaders, hostsOld),
+		NewExcelSheet("vDatastore", vDatastoreHeaders, []map[string]string{
+			{"Hosts": "esxi-host-1", "Address": "10.0.0.1", "Name": "datastore1", "Object ID": "datastore-001", "Free MiB": "524288", "MHA": "false", "Capacity MiB": "1048576", "Type": "VMFS"},
+		}),
+		NewExcelSheet("vCluster", vClusterHeaders, vClustersRows),
+	}
+	filePath := createTestExcel(t, sheets...)
+	_, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	inv, err := parser.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+
+	require.NotNil(t, inv.VCenter)
+	require.NotEmpty(t, inv.VCenter.Infra.Hosts)
+	host := inv.VCenter.Infra.Hosts[0]
+	assert.False(t, host.VMotionSupported, "should default to false when column missing")
+	assert.False(t, host.StorageVMotionSupported, "should default to false when column missing")
 }

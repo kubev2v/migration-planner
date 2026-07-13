@@ -175,7 +175,8 @@ SELECT
     a.InstanceUuid
 FROM src.About a;
 
-INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status")
+INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
+    "VMotion support", "Storage VMotion support")
 SELECT
     c.Name,
     h.CpuCores,
@@ -185,7 +186,9 @@ SELECT
     h.Model,
     h.Vendor,
     h.ID,
-    'green'
+    'green',
+    false,
+    false
 FROM src.Host h
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
 
