@@ -1,0 +1,133 @@
+---
+kind: Template
+apiVersion: template.openshift.io/v1
+metadata:
+  name: assisted-migration-backfill-job
+parameters:
+  - name: IMAGE
+    description: The container image for the migration planner API
+    required: true
+  - name: IMAGE_TAG
+    description: The image tag (ensures job name uniqueness per run)
+    required: true
+  - name: JOB_NAME
+    description: Descriptive name prefix for the job
+    value: "kafka/ES-backfill"
+  - name: BACKOFF_LIMIT
+    description: Number of retries before marking the job as failed
+    value: "0"
+  - name: ACTIVE_DEADLINE_SECONDS
+    description: Maximum time in seconds the job is allowed to run
+    value: "3600"
+  - name: DB_SECRET_NAME
+    description: The name of the OpenShift Secret used for the database
+    value: migration-planner-db
+  - name: KAFKA_ENABLED
+    description: Enable Kafka event publishing
+    value: "true"
+  - name: KAFKA_USE_TLS
+    description: Enable TLS for Kafka connections
+    value: "true"
+  - name: KAFKA_BROKERS_SECRET_NAME
+    description: Kubernetes secret containing MSK bootstrap brokers
+    value: "assisted-migration-msk"
+  - name: KAFKA_BROKERS_SECRET_KEY
+    description: Key in the MSK secret for SASL/SCRAM broker addresses
+    value: "bootstrap_brokers_sasl_scram"
+  - name: KAFKA_CREDENTIALS_SECRET_NAME
+    description: Kubernetes secret containing Kafka SASL credentials
+    value: "assisted-migration-msk-credentials"
+  - name: KAFKA_USERNAME_SECRET_KEY
+    description: Key in the credentials secret for the username
+    value: "username"
+  - name: KAFKA_PASSWORD_SECRET_KEY
+    description: Key in the credentials secret for the password
+    value: "password"
+  - name: CPU_REQUEST
+    description: CPU request for the job pod
+    value: "200m"
+  - name: CPU_LIMIT
+    description: CPU limit for the job pod
+    value: "1"
+  - name: MEMORY_REQUEST
+    description: Memory request for the job pod
+    value: "256Mi"
+  - name: MEMORY_LIMIT
+    description: Memory limit for the job pod
+    value: "1Gi"
+
+objects:
+  - apiVersion: batch/v1
+    kind: Job
+    metadata:
+      name: "${JOB_NAME}-${IMAGE_TAG}"
+      labels:
+        component: backfill
+    spec:
+      backoffLimit: ${{BACKOFF_LIMIT}}
+      activeDeadlineSeconds: ${{ACTIVE_DEADLINE_SECONDS}}
+      template:
+        metadata:
+          labels:
+            component: backfill
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: backfill
+              image: "${IMAGE}:${IMAGE_TAG}"
+              imagePullPolicy: IfNotPresent
+              command:
+                - /app/planner-api
+                - backfill
+              env:
+                - name: DB_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.host
+                - name: DB_NAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.name
+                - name: DB_PASS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.password
+                - name: DB_PORT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.port
+                - name: DB_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${DB_SECRET_NAME}
+                      key: db.user
+                - name: KAFKA_ENABLED
+                  value: "${KAFKA_ENABLED}"
+                - name: KAFKA_USE_TLS
+                  value: "${KAFKA_USE_TLS}"
+                - name: KAFKA_BROKERS
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_BROKERS_SECRET_NAME}
+                      key: ${KAFKA_BROKERS_SECRET_KEY}
+                - name: KAFKA_SASL_USERNAME
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_CREDENTIALS_SECRET_NAME}
+                      key: ${KAFKA_USERNAME_SECRET_KEY}
+                - name: KAFKA_SASL_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${KAFKA_CREDENTIALS_SECRET_NAME}
+                      key: ${KAFKA_PASSWORD_SECRET_KEY}
+              resources:
+                requests:
+                  cpu: ${CPU_REQUEST}
+                  memory: ${MEMORY_REQUEST}
+                limits:
+                  cpu: ${CPU_LIMIT}
+                  memory: ${MEMORY_LIMIT}
