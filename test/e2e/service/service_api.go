@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
-	e2e "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/kubev2v/migration-planner/test/e2e/config"
 	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"go.uber.org/zap"
 )
@@ -30,7 +30,7 @@ func NewServiceApi(cred *auth.User) (*ServiceApi, error) {
 		return nil, fmt.Errorf("error getting token: %v", err)
 	}
 	return &ServiceApi{
-		baseURL:    e2e.DefaultServiceUrl,
+		baseURL:    config.Cfg.ServiceUrl(),
 		httpClient: &http.Client{},
 		jwtToken:   token,
 	}, nil

@@ -10,42 +10,76 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      MIGRATION_PLANNER_API_IMAGE: "custom/migration-planner-api"
-      MIGRATION_PLANNER_ISO_IMAGE: "custom/migration-planner-iso"
-      MIGRATION_PLANNER_IMAGE_PULL_POLICY: "Never"
-      PODMAN: "docker"
 
     steps:
       - name: Checkout the code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Set env variables
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Install system dependencies
         run: |
-          export "REGISTRY_IP=$(ip addr show eth0 | grep -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+')"
-          echo "REGISTRY_IP=${REGISTRY_IP}" >> $GITHUB_ENV
-          echo "MIGRATION_PLANNER_AGENT_IMAGE=${REGISTRY_IP}:5000/agent" >> $GITHUB_ENV
-          echo "INSECURE_REGISTRY=${REGISTRY_IP}:5000" >> $GITHUB_ENV
+          sudo apt update
+          sudo apt install -y qemu-utils sshpass libvirt-dev \
+            libvirt-daemon libvirt-daemon-system
+          sudo systemctl restart libvirtd
 
-      - name: Prepare e2e test environment
-        run: make deploy-e2e-environment
-
-      - name: Run test
+      - name: Generate private key for planner local auth method
         run: |
-          sudo make integration-test PLANNER_IP=${REGISTRY_IP}
-          
+          sudo mkdir -p /etc/planner/e2e
+          sudo chown -R $(whoami):$(whoami) /etc/planner/e2e
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+            -out /etc/planner/e2e/private-key
+          openssl rsa -in /etc/planner/e2e/private-key \
+            -out /etc/planner/e2e/private-key -traditional
+          echo "E2E_PRIVATE_KEY_FOLDER_PATH=/etc/planner/e2e" >> $GITHUB_ENV
+
+      - name: Build e2e binary
+        run: make build-e2e
+
+      - name: Determine image tag
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAG="on-pr-${{ github.event.pull_request.head.sha }}"
+          else
+            TAG="${{ github.sha }}"
+          fi
+          echo "IMAGE_TAG=${TAG}" >> $GITHUB_ENV
+
+          REGISTRY="quay.io/redhat-user-workloads/assisted-migration-tenant"
+          echo "E2E_API_IMAGE=${REGISTRY}/migration-planner-api:${TAG}" >> $GITHUB_ENV
+          echo "E2E_ISO_IMAGE=${REGISTRY}/migration-planner-rhcos-iso:${TAG}" >> $GITHUB_ENV    
+
+      - name: Wait for Konflux images
+        timeout-minutes: 60
+        run: |
+          for image in "$E2E_API_IMAGE" "$E2E_ISO_IMAGE"; do
+            echo "Waiting for ${image}..."
+            until skopeo inspect --no-tags "docker://${image}" > /dev/null 2>&1; do
+              echo "  Not ready yet, retrying in 30s..."
+              sleep 30
+            done
+            echo "  Found: ${image}"
+          done
+
+      - name: Run e2e tests
+        run: |
+          sudo -E ./bin/e2e \
+            --api-image="${E2E_API_IMAGE}" \
+            --iso-image="${E2E_ISO_IMAGE}" 
+
       - name: Collect logs
         if: always()
         run: |
-          oc get deploy -o yaml
-          for pod in $(oc get pods -o name); do
+          kubectl get deploy -o yaml 2>/dev/null || true
+          kubectl get pods -o wide 2>/dev/null || true
+          for pod in $(kubectl get pods -o name 2>/dev/null); do
             echo "=== Logs for ${pod} ==="
-            oc logs ${pod} || echo "Failed to get logs for ${pod}"
-            
-            # Collect logs for migration-planner container if pod starts with migration-planner but exclude postgres
-            if [[ ${pod} == *"migration-planner"* && ${pod} != *"postgres"* ]]; then
-              echo "=== Logs for ${pod} migration-planner container ==="
-              oc logs ${pod} -c migration-planner || echo "Failed to get logs for migration-planner container in ${pod}"
-            fi
+            kubectl logs ${pod} --all-containers 2>/dev/null || true
+            echo "=== Describe ${pod} ==="
+            kubectl describe ${pod} 2>/dev/null || true
             echo "======================="
           done

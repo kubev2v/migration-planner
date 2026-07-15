@@ -257,51 +257,6 @@ delete-from-openshift: oc
 	oc delete route planner-agent planner-image; \
 	echo "*** OpenShift Migration Advisor has been deleted successfully from OpenShift ***"
 
-deploy-on-kind: oc
-	@inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-		echo "*** Deploy OpenShift Migration Advisor on Kind. Namespace: $${MIGRATION_PLANNER_NAMESPACE}, inet_ip: $${inet_ip}, PERSISTENT_DISK_DEVICE: $${PERSISTENT_DISK_DEVICE} ***"; \
-	oc process --local -f  deploy/templates/pk-secret-template.yml \
-		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
-		| oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f  deploy/templates/postgres-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/s3-secret-template.yml | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/service-template.yml \
-	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
-	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
-	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:7443$(SERVICE_API_PATH) \
-	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
-	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
-	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
-	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
-	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
-	   -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
-	   -p MIGRATION_PLANNER_ADMIN_GROUP_FILE=$(MIGRATION_PLANNER_ADMIN_GROUP_FILE) \
-	   -p RHCOS_PASSWORD=${RHCOS_PASSWORD} \
-	   | oc apply -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	echo "*** OpenShift Migration Advisor has been deployed successfully on Kind ***"
-
-delete-from-kind: oc
-	inet_ip=$$(ip addr show ${IFACE} | $(GREP) -oP '(?<=inet\s)\d+\.\d+\.\d+\.\d+'); \
-	oc process --local -f deploy/templates/service-template.yml \
-	   -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
-	   -p MIGRATION_PLANNER_URL=http://$${inet_ip}:7443 \
-	   -p MIGRATION_PLANNER_UI_URL=http://$${inet_ip}:3333 \
-	   -p MIGRATION_PLANNER_IMAGE_URL=http://$${inet_ip}:11443 \
-	   -p MIGRATION_PLANNER_IMAGE_PULL_POLICY=Never \
-	   -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
-	   -p MIGRATION_PLANNER_ISO_IMAGE=$(MIGRATION_PLANNER_ISO_IMAGE) \
-	   -p MIGRATION_PLANNER_REPLICAS=$(MIGRATION_PLANNER_REPLICAS) \
-	   -p PERSISTENT_DISK_DEVICE=$(PERSISTENT_DISK_DEVICE) \
-	   -p INSECURE_REGISTRY=$(INSECURE_REGISTRY) \
-	   | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f  deploy/templates/postgres-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/pk-secret-template.yml \
-		-p E2E_PRIVATE_KEY_BASE64=$(shell base64 -w 0 $(E2E_PRIVATE_KEY_FOLDER_PATH)/private-key) \
-		| oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-	oc process --local -f deploy/templates/s3-secret-template.yml | oc delete -n "${MIGRATION_PLANNER_NAMESPACE}" -f -; \
-
 deploy-local-obs:
 	@podman play kube --network host deploy/observability.yml
 
@@ -427,6 +382,12 @@ test-agent-v2: submodules
 # Full unit test cycle: build, prepare DB, run tests, and clean up
 unit-test: build kill-db deploy-db migrate test test-agent-v2 kill-db
 
+# Build standalone e2e test binary
+build-e2e:
+	@echo "Building e2e test binary..."
+	go build -o bin/e2e github.com/kubev2v/migration-planner/test/e2e
+	@echo "e2e binary built at bin/e2e"
+
 # Run integration tests using ginkgo
 integration-test: $(GINKGO)
 	@echo "🧪 Running integration tests..."
@@ -468,7 +429,6 @@ clean-opa-policies:
 
 # include the deployment targets
 include deploy/deploy.mk
-include deploy/e2e.mk
 
 ################################################################################
 # Emoji Legend for Makefile Targets

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
-	e2e "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/kubev2v/migration-planner/test/e2e/config"
 	e2eutils "github.com/kubev2v/migration-planner/test/e2e/utils"
 	"github.com/libvirt/libvirt-go"
 	"go.uber.org/zap"
@@ -51,7 +51,7 @@ func (p *plannerAgentLibvirt) prepareImage() error {
 	}
 	defer func() { _ = os.Remove(ovaFile.Name()) }()
 
-	if err = os.Mkdir(e2e.DefaultBasePath, os.ModePerm); err != nil {
+	if err = os.Mkdir(config.Cfg.Test.DefaultBasePath, os.ModePerm); err != nil {
 		if !os.IsExist(err) {
 			return fmt.Errorf("creating default base path: %w", err)
 		}
@@ -139,22 +139,22 @@ func (p *plannerAgentLibvirt) ovaValidateAndExtract(ovaFile *os.File) error {
 
 // ovaFilePath returns the expected file path of the agent OVA,
 func (p *plannerAgentLibvirt) ovaFilePath() string {
-	return filepath.Join(e2e.Home, fmt.Sprintf("%s.ova", p.name))
+	return filepath.Join(config.Cfg.Test.Home, fmt.Sprintf("%s.ova", p.name))
 }
 
 // isoFilePath returns the expected file path of the agent ISO,
 func (p *plannerAgentLibvirt) isoFilePath() string {
-	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.iso", p.name))
+	return filepath.Join(config.Cfg.Test.DefaultBasePath, fmt.Sprintf("%s.iso", p.name))
 }
 
 // vmdkDiskFilePath returns the expected path of the VMDK disk image,
 func (p *plannerAgentLibvirt) vmdkDiskFilePath() string {
-	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.vmdk", p.name))
+	return filepath.Join(config.Cfg.Test.DefaultBasePath, fmt.Sprintf("%s.vmdk", p.name))
 }
 
 // qcowDiskFilePath returns the expected path of the QCOW2 disk image,
 func (p *plannerAgentLibvirt) qcowDiskFilePath() string {
-	return filepath.Join(e2e.DefaultBasePath, fmt.Sprintf("%s.qcow2", p.name))
+	return filepath.Join(config.Cfg.Test.DefaultBasePath, fmt.Sprintf("%s.qcow2", p.name))
 }
 
 // WaitForDomainState polls the libvirt domain state until the desired state is reached

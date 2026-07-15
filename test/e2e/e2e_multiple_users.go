@@ -1,11 +1,12 @@
-package e2e_test
+package main
 
 import (
 	"fmt"
 	"strings"
 	"time"
 
-	. "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/kubev2v/migration-planner/test/e2e/config"
+
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
@@ -29,7 +30,7 @@ var _ = Describe("e2e-multiple-users", func() {
 		for _, org := range organizations {
 			for _, user := range users {
 				key := fmt.Sprintf("%s|%s", org, user)
-				serviceInstances[key], err = NewPlannerService(UserAuth(user, org, DefaultEmailDomain))
+				serviceInstances[key], err = NewPlannerService(UserAuth(user, org, config.Cfg.Test.DefaultEmailDomain))
 				Expect(err).To(BeNil())
 				_, err = serviceInstances[key].CreateSource(fmt.Sprintf("%s-%s", org, user))
 				Expect(err).To(BeNil())
@@ -49,7 +50,7 @@ var _ = Describe("e2e-multiple-users", func() {
 		}
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		config.Cfg.Test.TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	Context("Multiple Users", func() {

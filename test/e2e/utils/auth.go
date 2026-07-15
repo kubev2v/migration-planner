@@ -6,13 +6,13 @@ import (
 
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/cli"
-	e2e "github.com/kubev2v/migration-planner/test/e2e"
+	"github.com/kubev2v/migration-planner/test/e2e/config"
 )
 
 // GetToken retrieves the private key from the specified path, parses it, and then generates a token
 // for the given credentials using the private key. Returns the token or an error.
 func GetToken(credentials *auth.User) (string, error) {
-	privateKeyString, err := os.ReadFile(e2e.PrivateKeyPath)
+	privateKeyString, err := os.ReadFile(config.Cfg.PrivateKeyFilePath())
 	if err != nil {
 		return "", fmt.Errorf("error, unable to read the private key: %v", err)
 	}
@@ -43,5 +43,5 @@ func UserAuth(user string, org string, emailDomain string) *auth.User {
 
 // DefaultUserAuth returns an auth.User object with the default username and organization.
 func DefaultUserAuth() *auth.User {
-	return UserAuth(e2e.DefaultUsername, e2e.DefaultOrganization, e2e.DefaultEmailDomain)
+	return UserAuth(config.Cfg.Test.DefaultUsername, config.Cfg.Test.DefaultOrganization, config.Cfg.Test.DefaultEmailDomain)
 }

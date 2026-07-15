@@ -1,4 +1,4 @@
-package e2e_test
+package main
 
 import (
 	"fmt"
@@ -6,8 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/migration-planner/test/e2e/config"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
@@ -39,7 +40,7 @@ var _ = Describe("e2e-rvtools", func() {
 		//zap.S().Info("Cleaning up after test...")
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		config.Cfg.Test.TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	Context("rvtools", func() {

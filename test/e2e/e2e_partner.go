@@ -1,11 +1,12 @@
-package e2e_test
+package main
 
 import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/test/e2e/config"
+
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
@@ -56,11 +57,11 @@ var _ = Describe("e2e-partner", func() {
 		Expect(err).To(BeNil())
 
 		// Partner service
-		partnerSvc, err = NewPlannerService(UserAuth("partneruser", "acme", DefaultEmailDomain))
+		partnerSvc, err = NewPlannerService(UserAuth("partneruser", "acme", config.Cfg.Test.DefaultEmailDomain))
 		Expect(err).To(BeNil())
 
 		// Regular user service
-		userSvc, err = NewPlannerService(UserAuth("regularuser", "userorg", DefaultEmailDomain))
+		userSvc, err = NewPlannerService(UserAuth("regularuser", "userorg", config.Cfg.Test.DefaultEmailDomain))
 		Expect(err).To(BeNil())
 	})
 
@@ -80,7 +81,7 @@ var _ = Describe("e2e-partner", func() {
 		_ = adminSvc.DeleteGroup(group.Id)
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		config.Cfg.Test.TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	Context("Partner Request Lifecycle", func() {
@@ -300,7 +301,7 @@ var _ = Describe("e2e-partner", func() {
 			})
 			Expect(err).To(BeNil())
 
-			partnerSvc2, err := NewPlannerService(UserAuth("otherpartner", "otherco", DefaultEmailDomain))
+			partnerSvc2, err := NewPlannerService(UserAuth("otherpartner", "otherco", config.Cfg.Test.DefaultEmailDomain))
 			Expect(err).To(BeNil())
 
 			// User creates request for group1

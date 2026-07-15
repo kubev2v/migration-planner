@@ -30,7 +30,6 @@ func NewPlannerCtlCommand() *cobra.Command {
 	cmd.AddCommand(cli.NewCmdGenerate())
 	cmd.AddCommand(cli.NewCmdDeploy())
 	cmd.AddCommand(cli.NewCmdSSO())
-	cmd.AddCommand(cli.NewCmdE2E())
 	cmd.AddCommand(cli.NewCmdRelease())
 
 	return cmd
