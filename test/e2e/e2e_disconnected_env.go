@@ -1,14 +1,15 @@
-package e2e_test
+package main
 
 import (
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/test/e2e/config"
+
 	"github.com/kubev2v/migration-planner/test/e2e/model"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/agent"
 	. "github.com/kubev2v/migration-planner/test/e2e/helpers"
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
@@ -77,7 +78,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		Expect(err).To(BeNil(), "Failed to remove vm and iso")
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		config.Cfg.Test.TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	AfterFailed(func() {
@@ -92,10 +93,10 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			_, err := RunSSHCommand(agentIP, fmt.Sprintf("podman exec "+
 				"--user root "+
 				"planner-agent "+
-				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", SystemIP))
+				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", config.Cfg.Infra.HostIP))
 			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
 
-			s, resCode, err := e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%s/sdk", "vcenter.com", Vsphere1Port), "core", "123456")
+			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL("vcenter.com"), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))

@@ -1,12 +1,13 @@
-package e2e_test
+package main
 
 import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/test/e2e/config"
+
 	"github.com/google/uuid"
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
-	. "github.com/kubev2v/migration-planner/test/e2e"
 	. "github.com/kubev2v/migration-planner/test/e2e/service"
 	. "github.com/kubev2v/migration-planner/test/e2e/utils"
 	. "github.com/onsi/ginkgo/v2"
@@ -81,11 +82,11 @@ var _ = Describe("e2e-share", func() {
 		Expect(err).To(BeNil())
 
 		// Partner service
-		partnerSvc, err = NewPlannerService(UserAuth("sharepartner", "shareco", DefaultEmailDomain))
+		partnerSvc, err = NewPlannerService(UserAuth("sharepartner", "shareco", config.Cfg.Test.DefaultEmailDomain))
 		Expect(err).To(BeNil())
 
 		// Customer service — regular user who will become a customer
-		customerSvc, err = NewPlannerService(UserAuth("sharecustomer", "custorg", DefaultEmailDomain))
+		customerSvc, err = NewPlannerService(UserAuth("sharecustomer", "custorg", config.Cfg.Test.DefaultEmailDomain))
 		Expect(err).To(BeNil())
 
 		// Make user a customer: create request + partner accepts
@@ -138,7 +139,7 @@ var _ = Describe("e2e-share", func() {
 
 		testDuration := time.Since(startTime)
 		zap.S().Infof("Test completed in: %s\n", testDuration.String())
-		TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
+		config.Cfg.Test.TestsExecutionTime[CurrentSpecReport().LeafNodeText] = testDuration
 	})
 
 	Context("Share lifecycle", func() {
@@ -300,7 +301,7 @@ var _ = Describe("e2e-share", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Create a regular user (not a customer)
-			regularSvc, err := NewPlannerService(UserAuth("regularshareuser", "regorg", DefaultEmailDomain))
+			regularSvc, err := NewPlannerService(UserAuth("regularshareuser", "regorg", config.Cfg.Test.DefaultEmailDomain))
 			Expect(err).To(BeNil())
 
 			// Regular user creates their own assessment
