@@ -340,12 +340,25 @@ func (s *SizerService) calculateSizingWithMultipliers(
 	workerNodeThreads := extractWorkerNodeThreads(&params)
 	effectiveCPU := CalculateEffectiveCPU(params.WorkerNodeCPU, workerNodeThreads)
 
+	controlPlaneSchedulable := extractControlPlaneSchedulable(&params)
+	controlPlaneCPU := extractControlPlaneCPU(&params)
+	controlPlaneMemory := extractControlPlaneMemory(&params)
+
+	batchingNodeCPU, batchingNodeMemory, err := s.compactModeBatchingNodeSize(
+		params.CompactMode, effectiveCPU, params.WorkerNodeMemory,
+		controlPlaneCPU, controlPlaneMemory,
+		params.CpuOverCommitRatio, params.MemoryOverCommitRatio,
+	)
+	if err != nil {
+		return SizingResult{}, err
+	}
+
 	services, err := s.aggregateVMsIntoServices(
 		effectiveTotalCPU,
 		effectiveTotalMemory,
 		totalVMs,
-		effectiveCPU,
-		params.WorkerNodeMemory,
+		batchingNodeCPU,
+		batchingNodeMemory,
 		params.CpuOverCommitRatio,
 		params.MemoryOverCommitRatio,
 		CapacityMultiplier,
@@ -353,10 +366,6 @@ func (s *SizerService) calculateSizingWithMultipliers(
 	if err != nil {
 		return SizingResult{}, fmt.Errorf("aggregating services: %w", err)
 	}
-
-	controlPlaneSchedulable := extractControlPlaneSchedulable(&params)
-	controlPlaneCPU := extractControlPlaneCPU(&params)
-	controlPlaneMemory := extractControlPlaneMemory(&params)
 
 	includeControlPlane := !params.HostedControlPlane
 	singleNode := params.ControlPlaneNodeCount == 1
@@ -905,12 +914,21 @@ func (s *SizerService) calculateClusterRequirementsInternal(
 		}
 	}
 
+	batchingNodeCPU, batchingNodeMemory, err := s.compactModeBatchingNodeSize(
+		compactMode, effectiveCPU, params.WorkerNodeMemory,
+		controlPlaneCPU, controlPlaneMemory,
+		params.CpuOverCommitRatio, params.MemoryOverCommitRatio,
+	)
+	if err != nil {
+		return TransformedSizerResponse{}, err
+	}
+
 	services, err := s.aggregateVMsIntoServices(
 		float64(params.TotalCPU),
 		float64(params.TotalMemory),
 		params.TotalVMs,
-		effectiveCPU,
-		params.WorkerNodeMemory,
+		batchingNodeCPU,
+		batchingNodeMemory,
 		params.CpuOverCommitRatio,
 		params.MemoryOverCommitRatio,
 		CapacityMultiplier,
@@ -1856,6 +1874,37 @@ func convertResourceConsumption(rc *client.ResourceConsumption) *mappers.Resourc
 	}
 
 	return result
+}
+
+// compactModeBatchingNodeSize returns the effective node CPU and memory to use for
+// batching. In compact mode, it uses control plane capacity (with overcommit) instead
+// of worker node specs since there are no workers.
+func (s *SizerService) compactModeBatchingNodeSize(
+	compactMode bool, defaultCPU float64, defaultMemory int,
+	controlPlaneCPU, controlPlaneMemory int,
+	cpuOverCommitRatio, memoryOverCommitRatio string,
+) (float64, int, error) {
+	if !compactMode || controlPlaneCPU <= 0 || controlPlaneMemory <= 0 {
+		return defaultCPU, defaultMemory, nil
+	}
+	if float64(controlPlaneCPU) <= ControlPlaneReservedCPU || float64(controlPlaneMemory) <= ControlPlaneReservedMemory {
+		return 0, 0, NewErrInvalidRequest(fmt.Sprintf(
+			"control plane nodes (%d CPU / %d GB) are too small for compact mode. Control plane services require at least %d CPU and %d GB memory per node.",
+			controlPlaneCPU, controlPlaneMemory,
+			int(math.Ceil(ControlPlaneReservedCPU))+1, int(math.Ceil(ControlPlaneReservedMemory))+1,
+		))
+	}
+	cpuMult, err := s.getCpuOverCommitMultiplier(cpuOverCommitRatio)
+	if err != nil {
+		return 0, 0, fmt.Errorf("compact mode batching: %w", err)
+	}
+	memMult, err := s.getMemoryOverCommitMultiplier(memoryOverCommitRatio)
+	if err != nil {
+		return 0, 0, fmt.Errorf("compact mode batching: %w", err)
+	}
+	cpu := (float64(controlPlaneCPU) - ControlPlaneReservedCPU) * cpuMult
+	mem := int(float64(controlPlaneMemory-int(math.Ceil(ControlPlaneReservedMemory))) * memMult)
+	return cpu, mem, nil
 }
 
 // validateSingleNodeFit checks if workload fits on a single node
