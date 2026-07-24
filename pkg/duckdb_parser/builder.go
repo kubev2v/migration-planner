@@ -41,7 +41,8 @@ func NewBuilder() *QueryBuilder {
 }
 
 type ingestParams struct {
-	FilePath string
+	FilePath     string
+	CollectionID int64
 }
 
 // CreateSchemaQuery returns queries to create all RVTools tables with proper schema.
@@ -55,8 +56,20 @@ func (b *QueryBuilder) IngestRvtoolsQuery(filePath string) (string, error) {
 }
 
 // IngestSqliteQuery returns a query that creates RVTools-shaped tables from a forklift SQLite database.
+// Use IngestSqliteQueryWithCollection to hash VM IDs and stamp collection_id.
 func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
-	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"), ingestParams{FilePath: filePath})
+	return b.IngestSqliteQueryWithCollection(filePath, 0)
+}
+
+// IngestSqliteQueryWithCollection returns the same query as IngestSqliteQuery but, when
+// collectionID > 0, hashes each VM's "VM ID" to md5('{collectionID}_{vSphere_MOID}'),
+// stores the original MOID in the vmmoid column, and writes collection_id.
+func (b *QueryBuilder) IngestSqliteQueryWithCollection(filePath string, collectionID int64) (string, error) {
+	if collectionID < 0 {
+		return "", fmt.Errorf("collectionID must be non-negative, got %d", collectionID)
+	}
+	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"),
+		ingestParams{FilePath: filePath, CollectionID: collectionID})
 }
 
 // queryParams holds all template parameters for queries.
