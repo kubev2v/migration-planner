@@ -114,7 +114,9 @@ CREATE TABLE IF NOT EXISTS vhost (
     "Model" VARCHAR,
     "Vendor" VARCHAR,
     "Host" VARCHAR,
-    "Config status" VARCHAR DEFAULT 'green'
+    "Config status" VARCHAR DEFAULT 'green',
+    "VMotion support" BOOLEAN DEFAULT false,
+    "Storage VMotion support" BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS vdatastore (

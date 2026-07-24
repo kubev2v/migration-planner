@@ -606,7 +606,13 @@ type Host struct {
 	// MemoryMB Host memory in MB
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`
-	Vendor   string `json:"vendor"`
+
+	// StorageVmotionSupported Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)
+	StorageVmotionSupported *bool  `json:"storageVmotionSupported,omitempty"`
+	Vendor                  string `json:"vendor"`
+
+	// VmotionSupported Whether vMotion is supported on this host (HostSystem.capability.vmotionSupported)
+	VmotionSupported *bool `json:"vmotionSupported,omitempty"`
 }
 
 // Identity defines model for Identity.

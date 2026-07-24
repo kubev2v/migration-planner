@@ -2650,6 +2650,14 @@ components:
           format: int64
           description: Host memory in MB
           nullable: true
+        vmotionSupported:
+          type: boolean
+          default: false
+          description: "Whether vMotion is supported on this host (HostSystem.capability.vmotionSupported)"
+        storageVmotionSupported:
+          type: boolean
+          default: false
+          description: "Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)"
 
     Network:
       type: object

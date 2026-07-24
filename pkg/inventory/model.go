@@ -126,12 +126,14 @@ type DiskTypeSummary struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
-	ID         string
-	Vendor     string
-	Model      string
-	CpuCores   int
-	CpuSockets int
-	MemoryMB   int
+	ID                      string
+	Vendor                  string
+	Model                   string
+	CpuCores                int
+	CpuSockets              int
+	MemoryMB                int
+	VMotionSupported        bool
+	StorageVMotionSupported bool
 }
 
 // StorageIoConfiguration represents VMware Storage I/O Control settings for a datastore.
