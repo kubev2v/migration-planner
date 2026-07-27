@@ -68,6 +68,7 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 	}
 
 	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
+	source.UpdateType = "auto"
 	updatedSource, err := as.store.Source().Update(ctx, *source)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update source: %w", err)
@@ -221,7 +222,7 @@ func (as *AgentService) DeleteSourceSubset(ctx context.Context, sourceID, subset
 // UpdateAgentStatus updates or creates a new agent resource
 // If the source has not agent than the agent is created.
 func (as *AgentService) UpdateAgentStatus(ctx context.Context, updateForm mappers.AgentUpdateForm) (*model.Agent, bool, error) {
-	_, err := as.store.Source().Get(ctx, updateForm.SourceID)
+	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
 			return nil, false, NewErrSourceNotFound(updateForm.SourceID)
@@ -235,6 +236,17 @@ func (as *AgentService) UpdateAgentStatus(ctx context.Context, updateForm mapper
 	}
 
 	if agent == nil {
+		// Delete only placeholder agents for this source (created during manual
+		// inventory upload with empty Status); preserve already-connected agents.
+		for _, existing := range source.Agents {
+			if existing.Status != "" {
+				continue
+			}
+			if err := as.store.Agent().Delete(ctx, existing.ID); err != nil {
+				return nil, false, fmt.Errorf("failed to delete placeholder agent: %w", err)
+			}
+		}
+
 		a, err := as.store.Agent().Create(ctx, updateForm.ToModel())
 		if err != nil {
 			return nil, false, fmt.Errorf("failed to create the agent: %w", err)

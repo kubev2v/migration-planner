@@ -24,6 +24,7 @@ type Agent interface {
 	Get(ctx context.Context, id uuid.UUID) (*model.Agent, error)
 	Update(ctx context.Context, agent model.Agent) (*model.Agent, error)
 	Create(ctx context.Context, agent model.Agent) (*model.Agent, error)
+	Delete(ctx context.Context, id uuid.UUID) error
 }
 
 type AgentStore struct {
@@ -92,6 +93,16 @@ func (a *AgentStore) Get(ctx context.Context, id uuid.UUID) (*model.Agent, error
 	}
 
 	return agent, nil
+}
+
+// Delete deletes an agent by its id.
+func (a *AgentStore) Delete(ctx context.Context, id uuid.UUID) error {
+	agent := model.Agent{ID: id}
+	result := a.getDB(ctx).Unscoped().Delete(&agent)
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return result.Error
+	}
+	return nil
 }
 
 func (a *AgentStore) getDB(ctx context.Context) *gorm.DB {

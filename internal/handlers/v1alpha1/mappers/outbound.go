@@ -78,6 +78,11 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		Name:       s.Name,
 	}
 
+	if s.UpdateType != "" {
+		ut := api.SourceUpdateType(s.UpdateType)
+		source.UpdateType = &ut
+	}
+
 	if len(s.Inventory) > 0 {
 		v := util.GetInventoryVersion(s.Inventory)
 		switch v {
