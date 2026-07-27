@@ -125,6 +125,53 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(credsUrl).To(Equal("creds-url"))
 		})
 
+		It("replaces placeholder agent but preserves connected agents", func() {
+			sourceID := uuid.New()
+			placeholderAgentID := uuid.New()
+			connectedAgentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			// Insert a placeholder agent (empty status, as created by manual inventory upload)
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', '', '', '', '%s', '');", placeholderAgentID, sourceID))
+			Expect(tx.Error).To(BeNil())
+			// Insert an already-connected agent (non-empty status)
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO agents (id, status, status_info, cred_url, source_id, version) VALUES ('%s', 'up-to-date', 'running', 'url', '%s', 'v1');", connectedAgentID, sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			realAgentID := uuid.New()
+			srv := service.NewAgentService(s)
+			agent, created, err := srv.UpdateAgentStatus(context.TODO(), mappers.AgentUpdateForm{
+				ID:         realAgentID,
+				Status:     "waiting-for-credentials",
+				StatusInfo: "waiting-for-credentials",
+				CredUrl:    "creds-url",
+				Version:    "version-1",
+				SourceID:   sourceID,
+			})
+			Expect(err).To(BeNil())
+			Expect(created).To(BeTrue())
+			Expect(agent).ToNot(BeNil())
+			Expect(agent.ID).To(Equal(realAgentID))
+
+			// Verify placeholder was deleted but connected agent was preserved
+			count := -1
+			tx = gormdb.Raw(fmt.Sprintf("SELECT COUNT(*) FROM agents WHERE source_id = '%s';", sourceID)).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
+
+			// Verify the placeholder is gone
+			var placeholderCount int
+			tx = gormdb.Raw(fmt.Sprintf("SELECT COUNT(*) FROM agents WHERE id = '%s';", placeholderAgentID)).Scan(&placeholderCount)
+			Expect(tx.Error).To(BeNil())
+			Expect(placeholderCount).To(Equal(0))
+
+			// Verify the connected agent is still there
+			var connectedCount int
+			tx = gormdb.Raw(fmt.Sprintf("SELECT COUNT(*) FROM agents WHERE id = '%s';", connectedAgentID)).Scan(&connectedCount)
+			Expect(tx.Error).To(BeNil())
+			Expect(connectedCount).To(Equal(1))
+		})
+
 		It("failed to update agent -- source is missing", func() {
 			sourceID := uuid.NewString()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
@@ -321,6 +368,47 @@ var _ = Describe("agent service", Ordered, func() {
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrResourceNotFound)
 			Expect(ok).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
+
+	Context("UpdateSourceInventory sets update_type", func() {
+		It("sets update_type to auto", func() {
+			sourceID := uuid.New()
+			agentID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAgentStm, agentID, "not-connected", "status-info-1", "cred_url-1", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			// Set update_type to manual first (simulate manual upload)
+			tx = gormdb.Exec(fmt.Sprintf("UPDATE sources SET update_type = 'manual' WHERE id = '%s';", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vcenter",
+			})
+
+			srv := service.NewAgentService(s)
+			source, err := srv.UpdateSourceInventory(context.TODO(), mappers.InventoryUpdateForm{
+				SourceID:  sourceID,
+				AgentID:   agentID,
+				VCenterID: "vcenter",
+				Inventory: inventoryJSON,
+			})
+			Expect(err).To(BeNil())
+			Expect(source).NotTo(BeNil())
+			Expect(source.UpdateType).To(Equal("auto"))
+
+			// Verify in database
+			updateType := ""
+			tx = gormdb.Raw(fmt.Sprintf("SELECT update_type FROM sources WHERE id = '%s';", sourceID)).Scan(&updateType)
+			Expect(tx.Error).To(BeNil())
+			Expect(updateType).To(Equal("auto"))
 		})
 
 		AfterEach(func() {

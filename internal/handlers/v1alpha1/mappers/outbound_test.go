@@ -4,8 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
@@ -17,6 +20,31 @@ func TestMappers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Mappers Suite")
 }
+
+var _ = Describe("SourceToApi", func() {
+	It("maps UpdateType when set", func() {
+		source := model.Source{
+			ID:         uuid.New(),
+			Name:       "test-source",
+			UpdateType: "auto",
+		}
+		result, err := mappers.SourceToApi(source)
+		Expect(err).To(BeNil())
+		Expect(result.UpdateType).NotTo(BeNil())
+		Expect(*result.UpdateType).To(Equal(api.SourceUpdateType("auto")))
+	})
+
+	It("omits UpdateType when empty", func() {
+		source := model.Source{
+			ID:         uuid.New(),
+			Name:       "test-source",
+			UpdateType: "",
+		}
+		result, err := mappers.SourceToApi(source)
+		Expect(err).To(BeNil())
+		Expect(result.UpdateType).To(BeNil())
+	})
+})
 
 var _ = Describe("MigrationComplexityResultToAPI", func() {
 	It("maps complexityByDisk, complexityByOS, complexityByOSName, diskSizeRatings, osRatings", func() {
