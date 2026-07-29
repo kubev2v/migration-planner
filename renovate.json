@@ -6,5 +6,8 @@
   ],
   "schedule": [
     "on Saturday"
+  ],
+  "postUpdateOptions": [
+    "gomodTidy"
   ]
 }
