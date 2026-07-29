@@ -79,7 +79,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR)`,
 
 		// Datastore
-		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR)`,
+		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
 	}
 
 	for _, stmt := range stmts {
@@ -388,4 +388,43 @@ func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {
 	var objectID string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT "Object ID" FROM vcluster WHERE "Name" = 'existing-cluster'`).Scan(&objectID))
 	assert.Equal(t, "sentinel-id", objectID, "pre-existing row must not be overwritten")
+}
+
+func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
+
+	// Insert a datastore with non-default IORM values into the SQLite file.
+	srcDB, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	_, err = srcDB.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+	require.NoError(t, err)
+	_, err = srcDB.Exec(`INSERT INTO dst.Datastore (ID, Name, Free, Capacity, MaintenanceMode, Type, BackingDevicesNames, IORMEnabled, IORMCongestionThreshold) VALUES ('ds-1', 'datastore-1', 1073741824, 2147483648, 'False', 'VMFS', '[]', true, 50)`)
+	require.NoError(t, err)
+	_, err = srcDB.Exec("DETACH dst")
+	require.NoError(t, err)
+	require.NoError(t, srcDB.Close())
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var siocEnabled bool
+	var congestionThreshold int
+	err = db.QueryRowContext(ctx,
+		`SELECT "SIOC Enabled", "SIOC Congestion Threshold" FROM vdatastore WHERE "Object ID" = 'ds-1'`).
+		Scan(&siocEnabled, &congestionThreshold)
+	require.NoError(t, err)
+
+	assert.True(t, siocEnabled, "SIOC Enabled should be true")
+	assert.Equal(t, 50, congestionThreshold, "SIOC Congestion Threshold should be 50, not the default 30")
 }

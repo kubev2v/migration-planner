@@ -201,17 +201,19 @@ SELECT
     ds.Capacity / 1048576,
     ds.Type,
     COALESCE(ds.BackingDevicesNames, '[]'),
-    false,
-    30,
-    'automatic',
-    90
+    COALESCE(ds.IORMEnabled, false),
+    COALESCE(ds.IORMCongestionThreshold, 30),
+    COALESCE(ds.IORMCongestionThresholdMode, 'automatic'),
+    COALESCE(ds.IORMPercentOfPeakThroughput, 90)
 FROM src.Datastore ds
 LEFT JOIN (
     SELECT h.ID, h.Cluster, dsref->>'id' AS datastore_id
     FROM src.Host h,
     LATERAL unnest(from_json(h.Datastores, '[{"kind":"VARCHAR","id":"VARCHAR"}]')) AS t(dsref)
 ) h ON h.datastore_id = ds.ID
-GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.BackingDevicesNames;
+GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.BackingDevicesNames,
+    COALESCE(ds.IORMEnabled, false), COALESCE(ds.IORMCongestionThreshold, 30),
+    COALESCE(ds.IORMCongestionThresholdMode, 'automatic'), COALESCE(ds.IORMPercentOfPeakThroughput, 90);
 
 INSERT INTO dvport ("Port", "VLAN")
 SELECT
