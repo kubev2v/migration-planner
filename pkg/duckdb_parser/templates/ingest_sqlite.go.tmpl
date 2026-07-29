@@ -18,7 +18,7 @@ Key transformations:
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
 
 INSERT INTO vinfo (
-    "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
+    "VM ID", {{if .CollectionID}}"vmmoid", "collection_id", {{end}}"VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
     "CPUs", "Memory",
     "OS according to the configuration file", "OS according to the VMware Tools",
@@ -29,7 +29,7 @@ INSERT INTO vinfo (
     "migration_excluded", "labels", "guest_apps"
 )
 SELECT
-    v.ID,
+    {{if .CollectionID}}md5(CAST({{.CollectionID}} AS VARCHAR) || '_' || v.ID), v.ID, {{.CollectionID}},{{else}}v.ID,{{end}}
     v.Name,
     v.Folder,
     v.Folder,
@@ -70,21 +70,21 @@ WHERE v.IsTemplate = 0;
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
 SELECT
-    v.ID,
+    {{if .CollectionID}}md5(CAST({{.CollectionID}} AS VARCHAR) || '_' || v.ID){{else}}v.ID{{end}},
     v.CpuHotAddEnabled = 1,
     v.CpuHotRemoveEnabled = 1,
     v.CpuCount / NULLIF(v.CoresPerSocket, 0),
     v.CoresPerSocket
 FROM src.VM v
-WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
+WHERE v.ID IN (SELECT {{if .CollectionID}}vmmoid{{else}}"VM ID"{{end}} FROM vinfo{{if .CollectionID}} WHERE vmmoid IS NOT NULL{{end}});
 
 INSERT INTO vmemory ("VM ID", "Hot Add", "Ballooned")
 SELECT
-    v.ID,
+    {{if .CollectionID}}md5(CAST({{.CollectionID}} AS VARCHAR) || '_' || v.ID){{else}}v.ID{{end}},
     v.MemoryHotAddEnabled = 1,
     v.BalloonedMemory
 FROM src.VM v
-WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
+WHERE v.ID IN (SELECT {{if .CollectionID}}vmmoid{{else}}"VM ID"{{end}} FROM vinfo{{if .CollectionID}} WHERE vmmoid IS NOT NULL{{end}});
 
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
@@ -92,7 +92,7 @@ INSERT INTO vdisk (
     "Thin", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
-    v.ID,
+    {{if .CollectionID}}md5(CAST({{.CollectionID}} AS VARCHAR) || '_' || v.ID){{else}}v.ID{{end}},
     disk->>'key',
     disk->>'unitNumber',
     disk->>'file',
@@ -109,11 +109,11 @@ SELECT
     disk->>'unitNumber'
 FROM src.VM v,
 LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR"}]')) AS t(disk)
-WHERE v.Disks != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
+WHERE v.Disks != '[]' AND v.ID IN (SELECT {{if .CollectionID}}vmmoid{{else}}"VM ID"{{end}} FROM vinfo{{if .CollectionID}} WHERE vmmoid IS NOT NULL{{end}});
 
 WITH nic_flat AS (
     SELECT
-        v.ID AS vm_id,
+        {{if .CollectionID}}md5(CAST({{.CollectionID}} AS VARCHAR) || '_' || v.ID){{else}}v.ID{{end}} AS vm_id,
         v.IpAddress,
         v.GuestNetworks,
         nic.mac AS mac_addr,
@@ -122,7 +122,7 @@ WITH nic_flat AS (
     FROM src.VM v
     LEFT JOIN src.Host h ON v.Host = h.ID,
     LATERAL unnest(from_json(v.NICs, '[{"network":{"kind":"VARCHAR","id":"VARCHAR"},"mac":"VARCHAR","order":"INTEGER","deviceKey":"INTEGER"}]')) AS t(nic)
-    WHERE v.NICs != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo)
+    WHERE v.NICs != '[]' AND v.ID IN (SELECT {{if .CollectionID}}vmmoid{{else}}"VM ID"{{end}} FROM vinfo{{if .CollectionID}} WHERE vmmoid IS NOT NULL{{end}})
 ),
 gn_flat AS (
     SELECT

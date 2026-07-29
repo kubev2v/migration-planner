@@ -27,6 +27,12 @@ func isCriticalStatement(stmt string) bool {
 			return true
 		}
 	}
+	// INSERT INTO vinfo is critical only when it carries collection_id/vmmoid columns
+	// (SQLite collection path). The RVTools INSERT INTO vinfo does not include these columns
+	// and may legitimately fail when the source Excel is malformed.
+	if strings.Contains(upperStmt, "INSERT INTO VINFO") && strings.Contains(upperStmt, "VMMOID") {
+		return true
+	}
 	return false
 }
 
@@ -81,12 +87,23 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	return result, nil
 }
 
-// IngestSqlite ingests data from a forklift SQLite database, runs VM validation if a validator
-// is configured, and validates the schema for required tables/columns.
-// Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
-// If ValidationResult.HasErrors() is true, the inventory cannot be built.
+// IngestSqlite ingests data from a forklift SQLite database with no collection context.
+// Existing behaviour is preserved exactly. Use IngestSqliteWithCollection when the
+// agent has an active collection and wants hashed VM IDs.
 func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (ValidationResult, error) {
-	query, err := p.builder.IngestSqliteQuery(sqliteFile)
+	return p.IngestSqliteWithCollection(ctx, sqliteFile, 0)
+}
+
+// IngestSqliteWithCollection ingests from a forklift SQLite database.
+// When collectionID > 0 every "VM ID" in vinfo and relational tables is replaced
+// with md5('{collectionID}_{original_moid}'); the original MOID is written to
+// the vmmoid column and collection_id is set. When collectionID = 0 the
+// behaviour is identical to IngestSqlite (no hashing, no extra columns written).
+func (p *Parser) IngestSqliteWithCollection(ctx context.Context, sqliteFile string, collectionID int64) (ValidationResult, error) {
+	if collectionID < 0 {
+		return ValidationResult{}, fmt.Errorf("collectionID must be non-negative, got %d", collectionID)
+	}
+	query, err := p.builder.IngestSqliteQueryWithCollection(sqliteFile, collectionID)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
 	}
@@ -94,10 +111,8 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 		return ValidationResult{}, fmt.Errorf("ingesting sqlite data: %w", err)
 	}
 
-	// Validate schema against vinfo (SQLite inserts directly into vinfo, no vinfo_raw)
 	result := p.ValidateSchema(ctx, "vinfo")
 
-	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
 		if err := p.populateComplexity(ctx); err != nil {
 			return result, fmt.Errorf("populating complexity: %w", err)
