@@ -2,6 +2,7 @@ package converters
 
 import (
 	"testing"
+	"time"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
@@ -83,6 +84,28 @@ func TestToAPI(t *testing.T) {
 				assert.Equal(t, "vcenter-789", result.VcenterId)
 				require.NotNil(t, result.Vcenter)
 				assert.Len(t, result.Clusters, 0)
+			},
+		},
+		{
+			name: "with createdAt set",
+			input: &inventory.Inventory{
+				VCenterID: "vcenter-time",
+				Clusters:  map[string]inventory.InventoryData{},
+				CreatedAt: timePtr(time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)),
+			},
+			validate: func(t *testing.T, result *api.Inventory) {
+				require.NotNil(t, result.CreatedAt)
+				assert.Equal(t, time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC), *result.CreatedAt)
+			},
+		},
+		{
+			name: "without createdAt",
+			input: &inventory.Inventory{
+				VCenterID: "vcenter-no-time",
+				Clusters:  map[string]inventory.InventoryData{},
+			},
+			validate: func(t *testing.T, result *api.Inventory) {
+				assert.Nil(t, result.CreatedAt)
 			},
 		},
 	}
@@ -899,3 +922,5 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 		assert.Equal(t, 38.7, apiInv.Clusters["cluster-2"].ClusterUtilization.CpuP95)
 	})
 }
+
+func timePtr(t time.Time) *time.Time { return &t }

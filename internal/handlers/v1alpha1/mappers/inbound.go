@@ -2,6 +2,7 @@ package mappers
 
 import (
 	"encoding/json"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -187,6 +188,10 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 
 	// Set inventory if provided
 	if resource.Inventory != nil {
+		if resource.Inventory.CreatedAt == nil {
+			now := time.Now().UTC()
+			resource.Inventory.CreatedAt = &now
+		}
 		data, _ := json.Marshal(resource.Inventory) // cannot fail. it has been already validated
 		form.Inventory = data
 	}

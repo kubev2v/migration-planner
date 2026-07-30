@@ -2313,6 +2313,10 @@ components:
         vcenter:
           $ref: "#/components/schemas/InventoryData"
           description: vCenter-level inventory data
+        created_at:
+          type: string
+          format: date-time
+          description: Timestamp when the inventory data was created or collected
 
     ClusterUtilization:
       type: object
