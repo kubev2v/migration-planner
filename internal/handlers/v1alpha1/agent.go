@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
@@ -37,6 +38,11 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		return agentServer.UpdateSourceInventory403JSONResponse{
 			Message: fmt.Sprintf("agent is not authorized to update source %s", request.Id),
 		}, nil
+	}
+
+	if request.Body.Inventory.CreatedAt == nil {
+		now := time.Now().UTC()
+		request.Body.Inventory.CreatedAt = &now
 	}
 
 	data, err := json.Marshal(request.Body.Inventory)
@@ -90,6 +96,11 @@ func (h *AgentHandler) UpdateSource(ctx context.Context, request agentServer.Upd
 		inventory.VcenterId = *request.Body.VcenterId
 	}
 
+	if inventory.CreatedAt == nil {
+		now := time.Now().UTC()
+		inventory.CreatedAt = &now
+	}
+
 	data, err := json.Marshal(inventory)
 	if err != nil {
 		return agentServer.UpdateSource500JSONResponse{Message: err.Error()}, nil
@@ -138,6 +149,11 @@ func (h *AgentHandler) UpdateSourceSubset(ctx context.Context, request agentServ
 	inventory := request.Body.Inventory
 	if request.Body.VcenterId != nil {
 		inventory.VcenterId = *request.Body.VcenterId
+	}
+
+	if inventory.CreatedAt == nil {
+		now := time.Now().UTC()
+		inventory.CreatedAt = &now
 	}
 
 	data, err := json.Marshal(inventory)
