@@ -1,5 +1,7 @@
 package inventory
 
+import "time"
+
 // Inventory is the domain representation of infrastructure inventory.
 // It contains vCenter-level data and per-cluster inventories.
 type Inventory struct {
@@ -7,6 +9,7 @@ type Inventory struct {
 	VCenter        *InventoryData
 	Clusters       map[string]InventoryData
 	VCenterVersion string
+	CreatedAt      *time.Time
 }
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).

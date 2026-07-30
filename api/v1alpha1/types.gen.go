@@ -662,7 +662,10 @@ type Infra struct {
 type Inventory struct {
 	// Clusters Map of cluster names to their inventory data
 	Clusters map[string]InventoryData `json:"clusters"`
-	Vcenter  *InventoryData           `json:"vcenter,omitempty"`
+
+	// CreatedAt Timestamp when the inventory data was created or collected
+	CreatedAt *time.Time     `json:"created_at,omitempty"`
+	Vcenter   *InventoryData `json:"vcenter,omitempty"`
 
 	// VcenterId ID of the vCenter
 	VcenterId string `json:"vcenter_id"`

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -74,11 +75,13 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		clusterInventories[clusterID] = *clusterInv
 	}
 
+	now := time.Now().UTC()
 	return &inventory.Inventory{
 		VCenterID:      vcenterID,
 		VCenter:        vcenterData,
 		Clusters:       clusterInventories,
 		VCenterVersion: vcenterVersion,
+		CreatedAt:      &now,
 	}, nil
 }
 
