@@ -219,7 +219,7 @@ require (
 
 replace (
 	github.com/diskfs/go-diskfs => github.com/diskfs/go-diskfs v1.4.1
-	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.1
+	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
