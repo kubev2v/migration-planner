@@ -50,7 +50,7 @@ var _ = Describe("e2e", func() {
 		}, "3m", "2s").Should(BeNil())
 		zap.S().Infof("agent ip is: %s", agentIP)
 
-		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v2/", agentIP)
 		e2eAgent.Api = DefaultAgentApi(agentApiBaseUrl)
 		zap.S().Infof("agent Api base url: %s", agentApiBaseUrl)
 
@@ -73,7 +73,7 @@ var _ = Describe("e2e", func() {
 			if err != nil {
 				return ""
 			}
-			return s.ConsoleConnection
+			return s.ConsoleConnection.Status
 		}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
 
 		Eventually(func() v1alpha1.AgentStatus {
@@ -281,7 +281,7 @@ var _ = Describe("e2e", func() {
 				return nil
 			}, "3m", "2s").Should(BeNil())
 
-			agent2ApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP2)
+			agent2ApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v2/", agentIP2)
 			agent2.Api = DefaultAgentApi(agent2ApiBaseUrl)
 			zap.S().Infof("Agent2 Api base url: %s", agent2ApiBaseUrl)
 
@@ -303,7 +303,7 @@ var _ = Describe("e2e", func() {
 				if err != nil {
 					return ""
 				}
-				return agent2Status.ConsoleConnection
+				return agent2Status.ConsoleConnection.Status
 			}, "1m", "2s").Should(Equal(string(AgentModeConnected)))
 
 			Eventually(func() v1alpha1.AgentStatus {
@@ -400,7 +400,7 @@ var _ = Describe("e2e", func() {
 
 			// wait for the agent API to be up
 			var agentStatus *AgentStatus
-			agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+			agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v2/", agentIP)
 			e2eAgent.Api = DefaultAgentApi(agentApiBaseUrl)
 
 			zap.S().Info("Wait for planner-agent to be running...")
@@ -423,7 +423,7 @@ var _ = Describe("e2e", func() {
 				if err != nil {
 					return ""
 				}
-				return agentStatus.ConsoleConnection
+				return agentStatus.ConsoleConnection.Status
 			}, "3m", "2s").Should(Equal(string(AgentModeConnected)))
 
 			// Restart VM should keep the inventory
