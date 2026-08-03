@@ -95,7 +95,7 @@ func (a *AgentApi) Status() (*AgentStatus, error) {
 		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
 	}
 
-	zap.S().Infof("mode: %s. Console connection: %s", result.Mode, result.ConsoleConnection)
+	zap.S().Infof("mode: %s. Console connection: %s", result.Mode, result.ConsoleConnection.Status)
 	return result, nil
 }
 
