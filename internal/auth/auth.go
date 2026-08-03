@@ -40,7 +40,10 @@ func NewAuthenticator(authConfig config.Auth) (Authenticator, error) {
 			}
 			return key.Public(), nil
 		})
-	default:
+	case NoneAuthentication:
+		zap.S().Named("auth").Warn("authentication is disabled (type=none)")
 		return NewNoneAuthenticator()
+	default:
+		return nil, fmt.Errorf("unrecognised auth type: %q", authConfig.AuthenticationType)
 	}
 }
