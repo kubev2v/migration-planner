@@ -53,7 +53,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 		}, "3m", "2s").Should(BeNil())
 		zap.S().Infof("agent ip is: %s", agentIP)
 
-		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v1/", agentIP)
+		agentApiBaseUrl := fmt.Sprintf("https://%s:3333/api/v2/", agentIP)
 		e2eAgent.Api = DefaultAgentApi(agentApiBaseUrl)
 		zap.S().Infof("agent Api base url: %s", agentApiBaseUrl)
 
@@ -113,7 +113,7 @@ var _ = Describe("e2e-disconnected-environment", func() {
 
 			statusReply, err := e2eAgent.Api.Status()
 			Expect(err).To(BeNil())
-			Expect(statusReply.ConsoleConnection).To(Equal("disconnected"))
+			Expect(statusReply.ConsoleConnection.Status).To(Equal("disconnected"))
 
 			// agent shouldn't be created in the api
 			so, err := svc.GetSource(source.Id)

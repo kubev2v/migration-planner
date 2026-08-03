@@ -4,10 +4,14 @@ type AgentModeRequest struct {
 	Mode string `json:"mode"`
 }
 
+type ConsoleConnectionStatus struct {
+	Status string `json:"status"`
+	Error  string `json:"error,omitempty"`
+}
+
 type AgentStatus struct {
-	Mode              string `json:"mode"`
-	ConsoleConnection string `json:"console_connection"`
-	Error             string `json:"error,omitempty"`
+	Mode              string                  `json:"mode"`
+	ConsoleConnection ConsoleConnectionStatus `json:"consoleConnection"`
 }
 
 type CollectorStartRequest struct {
