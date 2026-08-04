@@ -247,6 +247,7 @@ storage:
         inline: |
           AGENT_SERVER_HTTP_PORT=3333
           AGENT_SERVER_MODE=prod
+          AGENT_API=v2
           AGENT_AUTHENTICATION_ENABLED=true
           AGENT_AUTHENTICATION_JWT_FILEPATH=/app/jwt.json
           AGENT_OPA_POLICIES_FOLDER=/app/policies
