@@ -96,7 +96,11 @@ var _ = Describe("e2e-disconnected-environment", func() {
 				"bash -c 'echo \"%s vcenter.com\" >> /etc/hosts'", config.Cfg.Infra.HostIP))
 			Expect(err).To(BeNil(), "Failed to enable connection to Vsphere")
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL("vcenter.com"), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL("vcenter.com"), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))

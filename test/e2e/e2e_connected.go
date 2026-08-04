@@ -110,30 +110,34 @@ var _ = Describe("e2e", func() {
 		It("start collecting only when credentials are valid", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			_, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				"", "pass")
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusBadRequest))
 
-			_, resCode, err = e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err = e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				"user", "")
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusBadRequest))
 
 			// Invalid credentials are now validated eagerly by Store() and rejected synchronously
-			_, resCode, err = e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err = e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				"invalid", "cred")
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusBadRequest))
 
 			// Bad URL is also rejected synchronously during credential verification
-			_, resCode, err = e2eAgent.Api.StartCollector(fmt.Sprintf("https://%s:%d/badUrl", config.Cfg.Infra.HostIP, config.Cfg.Infra.Vcsim[0].Port),
+			resCode, err = e2eAgent.Api.PutCredentials(fmt.Sprintf("https://%s:%d/badUrl", config.Cfg.Infra.HostIP, config.Cfg.Infra.Vcsim[0].Port),
 				"user", "pass")
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusBadRequest))
 
+			resCode, err = e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
 			var s *CollectorStatus
-			s, resCode, err = e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			s, resCode, err = e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -157,7 +161,11 @@ var _ = Describe("e2e", func() {
 		It("Up to date", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP), config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -186,8 +194,12 @@ var _ = Describe("e2e", func() {
 		It("Source removal", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -223,8 +235,12 @@ var _ = Describe("e2e", func() {
 		It("Two agents, Two VSphere's", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -303,8 +319,12 @@ var _ = Describe("e2e", func() {
 				Should(Equal(v1alpha1.AgentStatusWaitingForCredentials))
 
 			// Start collector for Vcsim2
-			s, resCode, err = agent2.Api.StartCollector(config.Cfg.Infra.Vcsim[1].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err = agent2.Api.PutCredentials(config.Cfg.Infra.Vcsim[1].SdkURL(config.Cfg.Infra.HostIP),
 				config.Cfg.Infra.Vcsim[1].Username, config.Cfg.Infra.Vcsim[1].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err = agent2.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -339,8 +359,12 @@ var _ = Describe("e2e", func() {
 		It("VM reboot", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
@@ -424,8 +448,12 @@ var _ = Describe("e2e", func() {
 		It("Test Assessment Endpoints With inventory", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			s, resCode, err := e2eAgent.Api.StartCollector(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
+			resCode, err := e2eAgent.Api.PutCredentials(config.Cfg.Infra.Vcsim[0].SdkURL(config.Cfg.Infra.HostIP),
 				config.Cfg.Infra.Vcsim[0].Username, config.Cfg.Infra.Vcsim[0].Password)
+			Expect(err).To(BeNil())
+			Expect(resCode).To(Equal(http.StatusOK))
+
+			s, resCode, err := e2eAgent.Api.StartCollector()
 			Expect(err).To(BeNil())
 			Expect(resCode).To(Equal(http.StatusAccepted))
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))

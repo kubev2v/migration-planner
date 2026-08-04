@@ -10,7 +10,7 @@ type AgentStatus struct {
 	Error             string `json:"error,omitempty"`
 }
 
-type CollectorStartRequest struct {
+type CredentialsRequest struct {
 	URL      string `json:"url"`
 	Username string `json:"username"`
 	Password string `json:"password"`
