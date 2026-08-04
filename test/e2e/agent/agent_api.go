@@ -44,13 +44,14 @@ func (a *AgentApi) request(method string, path string, body []byte, result any) 
 
 	queryPath := a.baseURL + path
 
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = bytes.NewReader(body)
+	}
+
 	switch method {
-	case http.MethodGet:
-		req, err = http.NewRequest(http.MethodGet, queryPath, nil)
-	case http.MethodPost:
-		req, err = http.NewRequest(http.MethodPost, queryPath, bytes.NewReader(body))
-	case http.MethodPut:
-		req, err = http.NewRequest(http.MethodPut, queryPath, bytes.NewReader(body))
+	case http.MethodGet, http.MethodPost, http.MethodPut:
+		req, err = http.NewRequest(method, queryPath, bodyReader)
 	default:
 		return nil, fmt.Errorf("unsupported method: %s", method)
 	}
@@ -135,22 +136,31 @@ func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
 	return &status, nil
 }
 
-func (a *AgentApi) StartCollector(vcenterURL, username, password string) (*CollectorStatus, int, error) {
-	body := CollectorStartRequest{
+func (a *AgentApi) PutCredentials(vcenterURL, username, password string) (int, error) {
+	body := CredentialsRequest{
 		URL:      vcenterURL,
 		Username: username,
 		Password: password,
 	}
 	data, err := json.Marshal(body)
 	if err != nil {
-		return nil, 1, fmt.Errorf("marshaling request: %w", err)
+		return 0, fmt.Errorf("marshaling request: %w", err)
 	}
 
+	res, err := a.request(http.MethodPut, "credentials", data, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to put credentials: %v", err)
+	}
+
+	return res.StatusCode, nil
+}
+
+func (a *AgentApi) StartCollector() (*CollectorStatus, int, error) {
 	var status CollectorStatus
 
-	res, err := a.request(http.MethodPost, "collector", data, &status)
+	res, err := a.request(http.MethodPost, "collector", nil, &status)
 	if err != nil {
-		return nil, 1, fmt.Errorf("failed to start collector: %v", err)
+		return nil, 0, fmt.Errorf("failed to start collector: %v", err)
 	}
 
 	return &status, res.StatusCode, nil
