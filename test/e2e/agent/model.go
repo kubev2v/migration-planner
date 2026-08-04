@@ -14,7 +14,7 @@ type AgentStatus struct {
 	ConsoleConnection ConsoleConnectionStatus `json:"consoleConnection"`
 }
 
-type CollectorStartRequest struct {
+type CredentialsRequest struct {
 	URL      string `json:"url"`
 	Username string `json:"username"`
 	Password string `json:"password"`
