@@ -57,7 +57,7 @@ func (a *AgentApi) request(method string, path string, body []byte, result any) 
 	}
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %v", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -65,18 +65,18 @@ func (a *AgentApi) request(method string, path string, body []byte, result any) 
 	zap.S().Infof("[Agent-API] %s [Method: %s]", req.URL.String(), req.Method)
 	res, err := a.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("error getting response from local server: %v", err)
+		return nil, fmt.Errorf("error getting response from local server: %w", err)
 	}
 	defer func() { _ = res.Body.Close() }()
 
 	resBody, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %v", err)
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
 	if result != nil {
 		if err := json.Unmarshal(resBody, &result); err != nil {
-			return nil, fmt.Errorf("error decoding JSON: %v", err)
+			return nil, fmt.Errorf("error decoding JSON: %w", err)
 		}
 	}
 
@@ -88,7 +88,7 @@ func (a *AgentApi) Status() (*AgentStatus, error) {
 	result := &AgentStatus{}
 	res, err := a.request(http.MethodGet, "agent", nil, result)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get status: %v", err)
+		return nil, fmt.Errorf("failed to get status: %w", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
@@ -105,7 +105,7 @@ func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
 
 	res, err := a.request(http.MethodGet, "inventory", nil, &inv)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get inventory: %v", err)
+		return nil, fmt.Errorf("failed to get inventory: %w", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
@@ -126,7 +126,7 @@ func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
 
 	res, err := a.request(http.MethodPost, "agent", data, &status)
 	if err != nil {
-		return nil, fmt.Errorf("failed to set agent mode: %v", err)
+		return nil, fmt.Errorf("failed to set agent mode: %w", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
@@ -149,7 +149,7 @@ func (a *AgentApi) PutCredentials(vcenterURL, username, password string) (int, e
 
 	res, err := a.request(http.MethodPut, "credentials", data, nil)
 	if err != nil {
-		return 0, fmt.Errorf("failed to put credentials: %v", err)
+		return 0, fmt.Errorf("failed to put credentials: %w", err)
 	}
 
 	return res.StatusCode, nil
@@ -160,7 +160,7 @@ func (a *AgentApi) StartCollector() (*CollectorStatus, int, error) {
 
 	res, err := a.request(http.MethodPost, "collector", nil, &status)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to start collector: %v", err)
+		return nil, 0, fmt.Errorf("failed to start collector: %w", err)
 	}
 
 	return &status, res.StatusCode, nil
@@ -171,7 +171,7 @@ func (a *AgentApi) GetCollectorStatus() (*CollectorStatus, error) {
 
 	res, err := a.request(http.MethodGet, "collector", nil, &status)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get collector status: %v", err)
+		return nil, fmt.Errorf("failed to get collector status: %w", err)
 	}
 
 	if res.StatusCode != http.StatusOK {
