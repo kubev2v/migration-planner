@@ -330,7 +330,7 @@ var _ = Describe("e2e", func() {
 			Expect(s.Status).ToNot(Equal(CollectorStatusError))
 
 			Eventually(func() string {
-				s, err = e2eAgent.Api.GetCollectorStatus()
+				s, err = agent2.Api.GetCollectorStatus()
 				if err != nil {
 					return ""
 				}
