@@ -157,6 +157,37 @@ build-agent: bin submodules
 build-cli: bin
 	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
 
+.PHONY: build-local run-local stop-local
+
+build-local:
+	@$(MAKE) build
+	@if [ ! -d "$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)" ] || [ -z "$$(find "$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER)" -name '*.rego' 2>/dev/null)" ]; then \
+		echo "📥 Setting up OPA policies..."; \
+		$(MAKE) setup-opa-policies; \
+	fi
+
+run-local: $(AIR)
+	@if [ ! -f "$(CURDIR)/rhcos-live-iso.x86_64.iso" ]; then \
+		echo "📀 Creating dummy RHCOS ISO for local development..."; \
+		touch "$(CURDIR)/rhcos-live-iso.x86_64.iso"; \
+	fi
+	@$(MAKE) deploy-db
+	@$(MAKE) migrate
+	@echo ""
+	@echo "Planner API: https://localhost:3443"
+	@echo ""
+	MIGRATION_PLANNER_AGENT_AUTH_ENABLED=false \
+	MIGRATION_PLANNER_AUTH=none \
+	DOWNLOAD_RHCOS=false \
+	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql \
+	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
+	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
+
+stop-local:
+	@$(MAKE) kill-db
+	@$(PODMAN) volume rm podman_planner-db 2>/dev/null || true
+	@echo "✅ Database stopped and volume cleaned"
+
 # rebuild container only on source changes
 bin/.migration-planner-agent-container: bin submodules agent-v2/Containerfile
 	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f agent-v2/Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
