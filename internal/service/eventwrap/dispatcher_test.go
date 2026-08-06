@@ -74,6 +74,7 @@ func (m *mockStore) PrivateKey() store.PrivateKey                               
 func (m *mockStore) Label() store.Label                                         { return nil }
 func (m *mockStore) Assessment() store.Assessment                               { return nil }
 func (m *mockStore) ClusterSizingInput() store.ClusterSizingInput               { return nil }
+func (m *mockStore) AssessmentEnhancementData() store.AssessmentEnhancementData { return nil }
 func (m *mockStore) Job() store.Job                                             { return nil }
 func (m *mockStore) Accounts() store.Accounts                                   { return nil }
 func (m *mockStore) PartnerCustomer() store.PartnerCustomer                     { return nil }
