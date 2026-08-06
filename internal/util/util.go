@@ -151,6 +151,9 @@ func BoolPtr(b bool) *bool {
 	return &b
 }
 
+// Ptr returns a pointer to the given value
+func Ptr[T any](v T) *T { return &v }
+
 // AnyToFloat32 converts a numeric value of unknown type to float32.
 // Returns (value, true) for float64, float32, int, and int64 inputs; (0, false) otherwise.
 func AnyToFloat32(v any) (float32, bool) {

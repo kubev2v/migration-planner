@@ -25,15 +25,17 @@ import (
 
 // MockStore is a mock implementation of store.Store
 type MockStore struct {
-	assessments   map[uuid.UUID]*model.Assessment
-	clusterInputs map[string]*model.AssessmentClusterSizingInput
-	getError      error
+	assessments     map[uuid.UUID]*model.Assessment
+	clusterInputs   map[string]*model.AssessmentClusterSizingInput
+	enhancementData map[string]*model.AssessmentEnhancementData
+	getError        error
 }
 
 func NewMockStore() *MockStore {
 	return &MockStore{
-		assessments:   make(map[uuid.UUID]*model.Assessment),
-		clusterInputs: make(map[string]*model.AssessmentClusterSizingInput),
+		assessments:     make(map[uuid.UUID]*model.Assessment),
+		clusterInputs:   make(map[string]*model.AssessmentClusterSizingInput),
+		enhancementData: make(map[string]*model.AssessmentEnhancementData),
 	}
 }
 
@@ -117,6 +119,10 @@ func (m *MockStore) ClusterSizingInput() store.ClusterSizingInput {
 	return &MockClusterSizingInputStore{store: m}
 }
 
+func (m *MockStore) AssessmentEnhancementData() store.AssessmentEnhancementData {
+	return &MockAssessmentEnhancementDataStore{store: m}
+}
+
 func (m *MockStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
@@ -184,6 +190,24 @@ func (m *MockClusterSizingInputStore) Upsert(ctx context.Context, input model.As
 func (m *MockClusterSizingInputStore) Get(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*model.AssessmentClusterSizingInput, error) {
 	key := fmt.Sprintf("%s/%s", assessmentID, clusterID)
 	input, exists := m.store.clusterInputs[key]
+	if !exists {
+		return nil, store.ErrRecordNotFound
+	}
+	copied := *input
+	return &copied, nil
+}
+
+type MockAssessmentEnhancementDataStore struct {
+	store *MockStore
+}
+
+func (m *MockAssessmentEnhancementDataStore) Upsert(ctx context.Context, input model.AssessmentEnhancementData) (*model.AssessmentEnhancementData, error) {
+	m.store.enhancementData[input.AssessmentID.String()] = &input
+	return &input, nil
+}
+
+func (m *MockAssessmentEnhancementDataStore) Get(ctx context.Context, assessmentID uuid.UUID) (*model.AssessmentEnhancementData, error) {
+	input, exists := m.store.enhancementData[assessmentID.String()]
 	if !exists {
 		return nil, store.ErrRecordNotFound
 	}
@@ -271,6 +295,7 @@ func setupTestHandler(store *MockStore, sizerResponse *client.SizerResponse, ass
 		service.NewAssessmentService(store, nil, nil),
 		nil,
 		service.NewSizerService(sizerClient, store),
+		nil,
 		nil,
 		nil,
 		nil,
@@ -377,6 +402,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -411,6 +437,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -441,6 +468,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -499,6 +527,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -582,6 +611,7 @@ var _ = Describe("sizer handler", func() {
 						nil,
 						nil,
 						nil,
+						nil,
 					)
 
 					resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -629,6 +659,7 @@ var _ = Describe("sizer handler", func() {
 						service.NewAssessmentService(mockStore, nil, nil),
 						nil,
 						service.NewSizerService(sizerClient, mockStore),
+						nil,
 						nil,
 						nil,
 						nil,
@@ -778,6 +809,7 @@ var _ = Describe("sizer handler", func() {
 					nil,
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -841,6 +873,7 @@ var _ = Describe("sizer handler", func() {
 					handler = handlers.NewServiceHandler(
 						nil,
 						service.NewAssessmentService(mockStore, nil, nil),
+						nil,
 						nil,
 						nil,
 						nil,
@@ -974,6 +1007,7 @@ var _ = Describe("sizer handler", func() {
 					nil,
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1002,6 +1036,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -1038,6 +1073,7 @@ var _ = Describe("sizer handler", func() {
 					nil,
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1067,6 +1103,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -1103,6 +1140,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1133,6 +1171,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1168,6 +1207,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1199,6 +1239,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1238,6 +1279,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1270,6 +1312,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -1308,6 +1351,7 @@ var _ = Describe("sizer handler", func() {
 					nil,
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1341,6 +1385,7 @@ var _ = Describe("sizer handler", func() {
 						service.NewAssessmentService(mockStore, nil, nil),
 						nil,
 						service.NewSizerService(sizerClient, mockStore),
+						nil,
 						nil,
 						nil,
 						nil,
@@ -1381,6 +1426,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1415,6 +1461,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1445,6 +1492,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1478,6 +1526,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1514,6 +1563,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1548,6 +1598,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1587,6 +1638,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // estimationService
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
@@ -1618,6 +1670,7 @@ var _ = Describe("sizer handler", func() {
 					nil, // jobService
 					service.NewSizerService(sizerClient, mockStore),
 					nil, // estimationService
+					nil,
 					nil,
 					nil,
 				)
@@ -1660,6 +1713,7 @@ var _ = Describe("sizer handler", func() {
 					nil,
 					nil,
 					nil,
+					nil,
 				)
 
 				resp, err := handler.CalculateClusterRequirements(ctx, server.CalculateClusterRequirementsRequestObject{
@@ -1686,6 +1740,7 @@ var _ = Describe("sizer handler", func() {
 					service.NewAssessmentService(mockStore, nil, nil),
 					nil,
 					service.NewSizerService(sizerClient, mockStore),
+					nil,
 					nil,
 					nil,
 					nil,
@@ -1772,6 +1827,7 @@ var _ = Describe("sizer handler", func() {
 						nil,
 						nil,
 						nil,
+						nil,
 					)
 
 					resp, err := handler.CalculateClusterRequirements(ctx, server.CalculateClusterRequirementsRequestObject{
@@ -1804,6 +1860,7 @@ var _ = Describe("sizer handler", func() {
 				service.NewAssessmentService(mockStore, nil, nil),
 				nil,
 				service.NewSizerService(sizerClient, mockStore),
+				nil,
 				nil,
 				nil,
 				nil,

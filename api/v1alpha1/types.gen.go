@@ -9,6 +9,15 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActiveEnvironmentsInputEnvironments.
+const (
+	ActiveEnvironmentsInputEnvironmentsDev         ActiveEnvironmentsInputEnvironments = "dev"
+	ActiveEnvironmentsInputEnvironmentsNotAssessed ActiveEnvironmentsInputEnvironments = "not_assessed"
+	ActiveEnvironmentsInputEnvironmentsOther       ActiveEnvironmentsInputEnvironments = "other"
+	ActiveEnvironmentsInputEnvironmentsProduction  ActiveEnvironmentsInputEnvironments = "production"
+	ActiveEnvironmentsInputEnvironmentsQa          ActiveEnvironmentsInputEnvironments = "qa"
+)
+
 // Defines values for AgentStatus.
 const (
 	AgentStatusError                     AgentStatus = "error"
@@ -17,6 +26,51 @@ const (
 	AgentStatusSourceGone                AgentStatus = "source-gone"
 	AgentStatusUpToDate                  AgentStatus = "up-to-date"
 	AgentStatusWaitingForCredentials     AgentStatus = "waiting-for-credentials"
+)
+
+// Defines values for AriaAutomationInputFeatures.
+const (
+	AriaAutomationInputFeaturesBlueprints        AriaAutomationInputFeatures = "blueprints"
+	AriaAutomationInputFeaturesCloudAssembly     AriaAutomationInputFeatures = "cloud_assembly"
+	AriaAutomationInputFeaturesConfigMgmt        AriaAutomationInputFeatures = "config_mgmt"
+	AriaAutomationInputFeaturesDsm               AriaAutomationInputFeatures = "dsm"
+	AriaAutomationInputFeaturesHcx               AriaAutomationInputFeatures = "hcx"
+	AriaAutomationInputFeaturesInfraProvisioning AriaAutomationInputFeatures = "infra_provisioning"
+	AriaAutomationInputFeaturesK8sNamespaces     AriaAutomationInputFeatures = "k8s_namespaces"
+	AriaAutomationInputFeaturesNotAssessed       AriaAutomationInputFeatures = "not_assessed"
+	AriaAutomationInputFeaturesNotAvailable      AriaAutomationInputFeatures = "not_available"
+	AriaAutomationInputFeaturesNotInUse          AriaAutomationInputFeatures = "not_in_use"
+	AriaAutomationInputFeaturesOrchestrator      AriaAutomationInputFeatures = "orchestrator"
+	AriaAutomationInputFeaturesServiceCatalog    AriaAutomationInputFeatures = "service_catalog"
+	AriaAutomationInputFeaturesTanzuApp          AriaAutomationInputFeatures = "tanzu_app"
+	AriaAutomationInputFeaturesTanzuK8s          AriaAutomationInputFeatures = "tanzu_k8s"
+	AriaAutomationInputFeaturesTerraform         AriaAutomationInputFeatures = "terraform"
+)
+
+// Defines values for AriaOpsInputFeatures.
+const (
+	AriaOpsInputFeaturesAlerting             AriaOpsInputFeatures = "alerting"
+	AriaOpsInputFeaturesAnomalyDetection     AriaOpsInputFeatures = "anomaly_detection"
+	AriaOpsInputFeaturesAutoOptimization     AriaOpsInputFeatures = "auto_optimization"
+	AriaOpsInputFeaturesCapacityPlanning     AriaOpsInputFeatures = "capacity_planning"
+	AriaOpsInputFeaturesHealthScore          AriaOpsInputFeatures = "health_score"
+	AriaOpsInputFeaturesItsmIntegration      AriaOpsInputFeatures = "itsm_integration"
+	AriaOpsInputFeaturesLogInsight           AriaOpsInputFeatures = "log_insight"
+	AriaOpsInputFeaturesNotAssessed          AriaOpsInputFeatures = "not_assessed"
+	AriaOpsInputFeaturesNotAvailable         AriaOpsInputFeatures = "not_available"
+	AriaOpsInputFeaturesNotInUse             AriaOpsInputFeatures = "not_in_use"
+	AriaOpsInputFeaturesPerformanceAnalytics AriaOpsInputFeatures = "performance_analytics"
+	AriaOpsInputFeaturesRightsizing          AriaOpsInputFeatures = "rightsizing"
+	AriaOpsInputFeaturesTrueVisibility       AriaOpsInputFeatures = "true_visibility"
+)
+
+// Defines values for AriaSecureInputFeatures.
+const (
+	AriaSecureInputFeaturesComplianceMonitoring AriaSecureInputFeatures = "compliance_monitoring"
+	AriaSecureInputFeaturesNotAssessed          AriaSecureInputFeatures = "not_assessed"
+	AriaSecureInputFeaturesNotAvailable         AriaSecureInputFeatures = "not_available"
+	AriaSecureInputFeaturesNotInUse             AriaSecureInputFeatures = "not_in_use"
+	AriaSecureInputFeaturesPolicyGovernance     AriaSecureInputFeatures = "policy_governance"
 )
 
 // Defines values for AssessmentPermissions.
@@ -78,6 +132,14 @@ const (
 	CpuOneToTwo   CpuOverCommitRatio = "1:2"
 )
 
+// Defines values for DeployedEnvironmentInputEnvironment.
+const (
+	DeployedEnvironmentInputEnvironmentManagedServices DeployedEnvironmentInputEnvironment = "managed_services"
+	DeployedEnvironmentInputEnvironmentNotAssessed     DeployedEnvironmentInputEnvironment = "not_assessed"
+	DeployedEnvironmentInputEnvironmentOnCloud         DeployedEnvironmentInputEnvironment = "on_cloud"
+	DeployedEnvironmentInputEnvironmentOnPremises      DeployedEnvironmentInputEnvironment = "on_premises"
+)
+
 // Defines values for GroupKind.
 const (
 	GroupKindAdmin   GroupKind = "admin"
@@ -121,6 +183,20 @@ const (
 	Dvswitch    NetworkType = "dvswitch"
 	Standard    NetworkType = "standard"
 	Unsupported NetworkType = "unsupported"
+)
+
+// Defines values for NsxInputFeatures.
+const (
+	NsxInputFeaturesCentralMgmt       NsxInputFeatures = "central_mgmt"
+	NsxInputFeaturesDynamicRouting    NsxInputFeatures = "dynamic_routing"
+	NsxInputFeaturesMicrosegmentation NsxInputFeatures = "microsegmentation"
+	NsxInputFeaturesMpls              NsxInputFeatures = "mpls"
+	NsxInputFeaturesMultiCloud        NsxInputFeatures = "multi_cloud"
+	NsxInputFeaturesNotAssessed       NsxInputFeatures = "not_assessed"
+	NsxInputFeaturesNotAvailable      NsxInputFeatures = "not_available"
+	NsxInputFeaturesNotInUse          NsxInputFeatures = "not_in_use"
+	NsxInputFeaturesQos               NsxInputFeatures = "qos"
+	NsxInputFeaturesTunnels           NsxInputFeatures = "tunnels"
 )
 
 // Defines values for OptimizationStatusReason.
@@ -169,6 +245,16 @@ const (
 	Manual    StorageIoConfigurationCongestionThresholdMode = "manual"
 )
 
+// Defines values for VMwareSubscriptionInputLevel.
+const (
+	NotAssessed VMwareSubscriptionInputLevel = "not_assessed"
+	Vcf         VMwareSubscriptionInputLevel = "vcf"
+	Vsphere     VMwareSubscriptionInputLevel = "vsphere"
+	Vvep        VMwareSubscriptionInputLevel = "vvep"
+	Vvf         VMwareSubscriptionInputLevel = "vvf"
+	Vvs         VMwareSubscriptionInputLevel = "vvs"
+)
+
 // Defines values for OsInfoSupportTier.
 const (
 	Certified          OsInfoSupportTier = "certified"
@@ -182,6 +268,14 @@ const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
 	ListGroupsParamsKindPartner ListGroupsParamsKind = "partner"
 )
+
+// ActiveEnvironmentsInput defines model for ActiveEnvironmentsInput.
+type ActiveEnvironmentsInput struct {
+	Environments *[]ActiveEnvironmentsInputEnvironments `json:"environments,omitempty" validate:"omitempty,unique,dive,oneof=production qa dev other not_assessed"`
+}
+
+// ActiveEnvironmentsInputEnvironments defines model for ActiveEnvironmentsInput.Environments.
+type ActiveEnvironmentsInputEnvironments string
 
 // Agent defines model for Agent.
 type Agent struct {
@@ -203,6 +297,30 @@ type AgentProxy struct {
 	HttpsUrl *string `json:"httpsUrl" validate:"omitnil,url,startswith=https"`
 	NoProxy  *string `json:"noProxy" validate:"omitnil,max=1000"`
 }
+
+// AriaAutomationInput defines model for AriaAutomationInput.
+type AriaAutomationInput struct {
+	Features *[]AriaAutomationInputFeatures `json:"features,omitempty" validate:"omitempty,unique,dive,oneof=infra_provisioning cloud_assembly service_catalog blueprints config_mgmt hcx orchestrator terraform dsm tanzu_k8s tanzu_app k8s_namespaces not_assessed not_available not_in_use"`
+}
+
+// AriaAutomationInputFeatures defines model for AriaAutomationInput.Features.
+type AriaAutomationInputFeatures string
+
+// AriaOpsInput defines model for AriaOpsInput.
+type AriaOpsInput struct {
+	Features *[]AriaOpsInputFeatures `json:"features,omitempty" validate:"omitempty,unique,dive,oneof=performance_analytics health_score alerting log_insight itsm_integration rightsizing auto_optimization true_visibility capacity_planning anomaly_detection not_assessed not_available not_in_use"`
+}
+
+// AriaOpsInputFeatures defines model for AriaOpsInput.Features.
+type AriaOpsInputFeatures string
+
+// AriaSecureInput defines model for AriaSecureInput.
+type AriaSecureInput struct {
+	Features *[]AriaSecureInputFeatures `json:"features,omitempty" validate:"omitempty,unique,dive,oneof=policy_governance compliance_monitoring not_assessed not_available not_in_use"`
+}
+
+// AriaSecureInputFeatures defines model for AriaSecureInput.Features.
+type AriaSecureInputFeatures string
 
 // Assessment defines model for Assessment.
 type Assessment struct {
@@ -501,6 +619,12 @@ type Customer struct {
 	Username     string `json:"username"`
 }
 
+// CustomerDetailsInput defines model for CustomerDetailsInput.
+type CustomerDetailsInput struct {
+	PhysicalLocationsCount *int    `json:"physicalLocationsCount,omitempty" validate:"omitempty,min=0"`
+	TargetHardware         *string `json:"targetHardware,omitempty" validate:"omitempty,max=1000"`
+}
+
 // CustomerList defines model for CustomerList.
 type CustomerList = []Customer
 
@@ -518,6 +642,28 @@ type Datastore struct {
 	TotalCapacityGB        int                     `json:"totalCapacityGB"`
 	Type                   string                  `json:"type"`
 	Vendor                 string                  `json:"vendor"`
+}
+
+// DeployedEnvironmentInput defines model for DeployedEnvironmentInput.
+type DeployedEnvironmentInput struct {
+	Environment *DeployedEnvironmentInputEnvironment `json:"environment,omitempty" validate:"omitempty,oneof=on_premises on_cloud managed_services not_assessed"`
+}
+
+// DeployedEnvironmentInputEnvironment defines model for DeployedEnvironmentInput.Environment.
+type DeployedEnvironmentInputEnvironment string
+
+// EnhancementData VMA enhancement data — fields that cannot be auto-collected by Agent or RVTools
+type EnhancementData struct {
+	ActiveEnvironments  *ActiveEnvironmentsInput  `json:"activeEnvironments,omitempty"`
+	AriaAutomation      *AriaAutomationInput      `json:"ariaAutomation,omitempty"`
+	AriaOps             *AriaOpsInput             `json:"ariaOps,omitempty"`
+	AriaSecure          *AriaSecureInput          `json:"ariaSecure,omitempty"`
+	CustomerDetails     *CustomerDetailsInput     `json:"customerDetails,omitempty"`
+	DeployedEnvironment *DeployedEnvironmentInput `json:"deployedEnvironment,omitempty"`
+	Nsx                 *NsxInput                 `json:"nsx,omitempty"`
+	VmwareSubscription  *VMwareSubscriptionInput  `json:"vmwareSubscription,omitempty"`
+	VmwareVersionCounts *VMwareVersionCountsInput `json:"vmwareVersionCounts,omitempty"`
+	VsphereCore         *VsphereCoreInput         `json:"vsphereCore,omitempty"`
 }
 
 // Error defines model for Error.
@@ -864,6 +1010,14 @@ type Network struct {
 
 // NetworkType defines model for Network.Type.
 type NetworkType string
+
+// NsxInput defines model for NsxInput.
+type NsxInput struct {
+	Features *[]NsxInputFeatures `json:"features,omitempty" validate:"omitempty,unique,dive,oneof=microsegmentation multi_cloud tunnels dynamic_routing central_mgmt mpls qos not_assessed not_available not_in_use"`
+}
+
+// NsxInputFeatures defines model for NsxInput.Features.
+type NsxInputFeatures string
 
 // OptimizationStatus Status of utilization-based optimization attempt
 type OptimizationStatus struct {
@@ -1231,6 +1385,22 @@ type VMs struct {
 	TotalWithSharedDisks *int `json:"totalWithSharedDisks,omitempty"`
 }
 
+// VMwareSubscriptionInput defines model for VMwareSubscriptionInput.
+type VMwareSubscriptionInput struct {
+	Level *[]VMwareSubscriptionInputLevel `json:"level,omitempty" validate:"omitempty,unique,dive,oneof=vcf vvf vvs vvep vsphere not_assessed"`
+}
+
+// VMwareSubscriptionInputLevel defines model for VMwareSubscriptionInput.Level.
+type VMwareSubscriptionInputLevel string
+
+// VMwareVersionCountsInput defines model for VMwareVersionCountsInput.
+type VMwareVersionCountsInput struct {
+	CoresLicensingCount    *int `json:"coresLicensingCount,omitempty" validate:"omitempty,min=0"`
+	EnvironmentCount       *int `json:"environmentCount,omitempty" validate:"omitempty,min=0"`
+	OtherNodesCount        *int `json:"otherNodesCount,omitempty" validate:"omitempty,min=0"`
+	PerpetualLicensesCount *int `json:"perpetualLicensesCount,omitempty" validate:"omitempty,min=0"`
+}
+
 // ValidatedCertificateChain defines model for ValidatedCertificateChain.
 type ValidatedCertificateChain = string
 
@@ -1246,6 +1416,13 @@ type ValidatedSourceName = string
 // VmNetwork defines model for VmNetwork.
 type VmNetwork struct {
 	Ipv4 *Ipv4Config `json:"ipv4,omitempty"`
+}
+
+// VsphereCoreInput defines model for VsphereCoreInput.
+type VsphereCoreInput struct {
+	SrmEnabled          *bool   `json:"srmEnabled,omitempty"`
+	VmEncryptionEnabled *bool   `json:"vmEncryptionEnabled,omitempty"`
+	VmEncryptionPolicy  *string `json:"vmEncryptionPolicy,omitempty" validate:"omitempty,max=1000"`
 }
 
 // DiskSizeTierSummary defines model for diskSizeTierSummary.
@@ -1331,6 +1508,9 @@ type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirements
 
 // CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
 type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
+
+// SaveAssessmentEnhancementDataJSONRequestBody defines body for SaveAssessmentEnhancementData for application/json ContentType.
+type SaveAssessmentEnhancementDataJSONRequestBody = EnhancementData
 
 // CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
 type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest

@@ -40,7 +40,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 		s = store.NewStore(db)
 		gormdb = db
 		accountsSvc := service.NewAccountsService(s)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), accountsSvc)
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), accountsSvc, nil)
 	})
 
 	AfterAll(func() {
@@ -678,7 +678,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 		BeforeAll(func() {
 			accountsSvc := service.NewAccountsService(s)
 			authzAccountsSvc := service.NewAuthzAccountsService(accountsSvc)
-			authzSrv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), authzAccountsSvc)
+			authzSrv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), authzAccountsSvc, nil)
 		})
 
 		nonAdminCtx := func() context.Context {

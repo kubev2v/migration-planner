@@ -23,16 +23,18 @@ import (
 
 // MockStore is a mock implementation of store.Store
 type MockStore struct {
-	assessments   map[uuid.UUID]*model.Assessment
-	clusterInputs map[string]*model.AssessmentClusterSizingInput
-	getError      error
-	outboxEvents  []model.OutboxEvent
+	assessments     map[uuid.UUID]*model.Assessment
+	clusterInputs   map[string]*model.AssessmentClusterSizingInput
+	enhancementData map[uuid.UUID]*model.AssessmentEnhancementData
+	getError        error
+	outboxEvents    []model.OutboxEvent
 }
 
 func NewMockStore() *MockStore {
 	return &MockStore{
-		assessments:   make(map[uuid.UUID]*model.Assessment),
-		clusterInputs: make(map[string]*model.AssessmentClusterSizingInput),
+		assessments:     make(map[uuid.UUID]*model.Assessment),
+		clusterInputs:   make(map[string]*model.AssessmentClusterSizingInput),
+		enhancementData: make(map[uuid.UUID]*model.AssessmentEnhancementData),
 	}
 }
 
@@ -82,6 +84,10 @@ func (m *MockStore) Label() store.Label {
 
 func (m *MockStore) ClusterSizingInput() store.ClusterSizingInput {
 	return &MockClusterSizingInputStore{store: m}
+}
+
+func (m *MockStore) AssessmentEnhancementData() store.AssessmentEnhancementData {
+	return &MockAssessmentEnhancementDataStore{store: m}
 }
 
 func (m *MockStore) NewTransactionContext(ctx context.Context) (context.Context, error) {
@@ -151,6 +157,25 @@ func (m *MockClusterSizingInputStore) Upsert(ctx context.Context, input model.As
 func (m *MockClusterSizingInputStore) Get(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*model.AssessmentClusterSizingInput, error) {
 	key := fmt.Sprintf("%s/%s", assessmentID, clusterID)
 	input, exists := m.store.clusterInputs[key]
+	if !exists {
+		return nil, store.ErrRecordNotFound
+	}
+	copied := *input
+	return &copied, nil
+}
+
+type MockAssessmentEnhancementDataStore struct {
+	store *MockStore
+}
+
+func (m *MockAssessmentEnhancementDataStore) Upsert(ctx context.Context, input model.AssessmentEnhancementData) (*model.AssessmentEnhancementData, error) {
+	copied := input
+	m.store.enhancementData[input.AssessmentID] = &copied
+	return &copied, nil
+}
+
+func (m *MockAssessmentEnhancementDataStore) Get(ctx context.Context, assessmentID uuid.UUID) (*model.AssessmentEnhancementData, error) {
+	input, exists := m.store.enhancementData[assessmentID]
 	if !exists {
 		return nil, store.ErrRecordNotFound
 	}

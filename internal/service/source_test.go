@@ -419,7 +419,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			newName := "updated-name"
 			newLabels := []v1alpha1.Label{
 				{Key: "env", Value: "prod"},
@@ -488,7 +488,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.New(),
 				Body: &v1alpha1.SourceUpdate{},
@@ -508,7 +508,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.MustParse(sourceID),
 				Body: &v1alpha1.SourceUpdate{},
@@ -535,7 +535,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			// First set initial labels
 			initialLabels := []v1alpha1.Label{
@@ -608,7 +608,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			newSshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCk83ddeteALlqCbO43E3ardbavFPboYIoFnlQZ3zVi+ls96c1x3P9DDWkNhuOgpQurull2y55Wm7HWLLK5hlk49s6tUuBDftH3XXfGMAmncBH9apGHxl0O+k/X1MrfhoEXHmmEwXTv+X6vC3BsZiazSOkKbIozHgnD7y1z83wuYWbbW0NYvgwhaoOtkWteKSJWwPxNaTwGCpj+RQ6xWygt5EbMSf7U3Ih2P1hcsa615zD5P2GSLxtLwWnHgWCylT/krdyIYlR1pqW9e/Iv2MKlGX6W1DSUxUz5BNxzCA8O53C0NSCeDFAhn9T8VE9U/RkGDtXBFJ8JVcmtM6S9buq5HZ12+0E0VCGFdmnvNT8XxdYrN0ff8f3DQI7ERgHEKQiqjrSPDv2+OMdv3nr3n5+tOBvQEn6aYDbnybILyrUP76UvLvjfgDTnnRxlkpw2Y43EtgtdeIUUo/VBSE9qfzRa21Pz3gBh6ZJE9xF+u6DstgvFigNJ7nMJoSktH5mzuBM= test@test"
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -649,7 +649,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			initialLabels := []v1alpha1.Label{
 				{Key: "env", Value: "dev"},
@@ -699,7 +699,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			enableProxy := false
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -738,7 +738,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			enableProxy := true
 			httpUrl := "http://proxy.example.com"
@@ -784,7 +784,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			networkConfigType := v1alpha1.SourceUpdateNetworkConfigTypeDhcp
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{

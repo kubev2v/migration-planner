@@ -680,6 +680,107 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/assessments/{id}/enhancement-data:
+    post:
+      tags:
+        - assessment
+      description: Save enhancement data for an assessment
+      operationId: saveAssessmentEnhancementData
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnhancementData"
+        required: true
+      responses:
+        "200":
+          description: User inputs saved successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnhancementData"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    get:
+      tags:
+        - assessment
+      description: Get stored enhancement data for an assessment
+      operationId: getAssessmentEnhancementData
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User inputs found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnhancementData"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Assessment not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/assessments/{id}/cluster-requirements:
     post:
       tags:
@@ -3330,6 +3431,163 @@ components:
           description: If true, creates a 3-node compact cluster with no dedicated workers
       required:
         - clusterId
+
+    EnhancementData:
+      type: object
+      description: VMA enhancement data — fields that cannot be auto-collected by Agent or RVTools
+      properties:
+        deployedEnvironment:
+          $ref: "#/components/schemas/DeployedEnvironmentInput"
+        vmwareVersionCounts:
+          $ref: "#/components/schemas/VMwareVersionCountsInput"
+        activeEnvironments:
+          $ref: "#/components/schemas/ActiveEnvironmentsInput"
+        vmwareSubscription:
+          $ref: "#/components/schemas/VMwareSubscriptionInput"
+        vsphereCore:
+          $ref: "#/components/schemas/VsphereCoreInput"
+        nsx:
+          $ref: "#/components/schemas/NsxInput"
+        ariaOps:
+          $ref: "#/components/schemas/AriaOpsInput"
+        ariaAutomation:
+          $ref: "#/components/schemas/AriaAutomationInput"
+        ariaSecure:
+          $ref: "#/components/schemas/AriaSecureInput"
+        customerDetails:
+          $ref: "#/components/schemas/CustomerDetailsInput"
+
+    DeployedEnvironmentInput:
+      type: object
+      properties:
+        environment:
+          type: string
+          enum: [on_premises, on_cloud, managed_services, not_assessed]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,oneof=on_premises on_cloud managed_services not_assessed"
+
+    VMwareVersionCountsInput:
+      type: object
+      properties:
+        perpetualLicensesCount:
+          type: integer
+          minimum: 0
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=0"
+        coresLicensingCount:
+          type: integer
+          minimum: 0
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=0"
+        environmentCount:
+          type: integer
+          minimum: 0
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=0"
+        otherNodesCount:
+          type: integer
+          minimum: 0
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=0"
+
+    ActiveEnvironmentsInput:
+      type: object
+      properties:
+        environments:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [production, qa, dev, other, not_assessed]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=production qa dev other not_assessed"
+
+    VMwareSubscriptionInput:
+      type: object
+      properties:
+        level:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [vcf, vvf, vvs, vvep, vsphere, not_assessed]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=vcf vvf vvs vvep vsphere not_assessed"
+
+    VsphereCoreInput:
+      type: object
+      properties:
+        vmEncryptionEnabled:
+          type: boolean
+        vmEncryptionPolicy:
+          type: string
+          maxLength: 1000
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,max=1000"
+        srmEnabled:
+          type: boolean
+
+    NsxInput:
+      type: object
+      properties:
+        features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [microsegmentation, multi_cloud, tunnels, dynamic_routing, central_mgmt, mpls, qos, not_assessed, not_available, not_in_use]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=microsegmentation multi_cloud tunnels dynamic_routing central_mgmt mpls qos not_assessed not_available not_in_use"
+
+    AriaOpsInput:
+      type: object
+      properties:
+        features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [performance_analytics, health_score, alerting, log_insight, itsm_integration, rightsizing, auto_optimization, true_visibility, capacity_planning, anomaly_detection, not_assessed, not_available, not_in_use]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=performance_analytics health_score alerting log_insight itsm_integration rightsizing auto_optimization true_visibility capacity_planning anomaly_detection not_assessed not_available not_in_use"
+
+    AriaAutomationInput:
+      type: object
+      properties:
+        features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [infra_provisioning, cloud_assembly, service_catalog, blueprints, config_mgmt, hcx, orchestrator, terraform, dsm, tanzu_k8s, tanzu_app, k8s_namespaces, not_assessed, not_available, not_in_use]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=infra_provisioning cloud_assembly service_catalog blueprints config_mgmt hcx orchestrator terraform dsm tanzu_k8s tanzu_app k8s_namespaces not_assessed not_available not_in_use"
+
+    AriaSecureInput:
+      type: object
+      properties:
+        features:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [policy_governance, compliance_monitoring, not_assessed, not_available, not_in_use]
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,unique,dive,oneof=policy_governance compliance_monitoring not_assessed not_available not_in_use"
+
+    CustomerDetailsInput:
+      type: object
+      properties:
+        physicalLocationsCount:
+          type: integer
+          minimum: 0
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,min=0"
+        targetHardware:
+          type: string
+          maxLength: 1000
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,max=1000"
 
     ClusterRequirementsResponse:
       type: object
