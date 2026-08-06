@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"database/sql"
-	"sync"
 
 	"go.uber.org/zap"
 )
@@ -26,7 +25,6 @@ type QueryInterceptor interface {
 type queryInterceptor struct {
 	db     *sql.DB
 	logger *zap.SugaredLogger
-	mu     sync.Mutex
 }
 
 func NewQueryInterceptor(db *sql.DB) QueryInterceptor {
@@ -59,13 +57,6 @@ func (q *queryInterceptor) QueryContext(ctx context.Context, query string, args 
 }
 
 func (q *queryInterceptor) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
-	// Serialize all exec calls to satisfy DuckDB's single-connection constraint.
-	// DuckDB only allows one write operation at a time on a single connection.
-	// Without this mutex, concurrent ExecContext calls would fail with "database is locked" errors.
-	// This represents a concurrency bottleneck but is required for DuckDB correctness.
-	q.mu.Lock()
-	defer q.mu.Unlock()
-
 	q.logger.Debugw("exec", "query", query, "args", args)
 
 	tx, ok := q.txFromContext(ctx)
