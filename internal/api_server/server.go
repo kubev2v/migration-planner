@@ -240,6 +240,8 @@ func (s *Server) Run(ctx context.Context) error {
 		accountsSvc = service.NewAuthzAccountsService(accountsSvc)
 	}
 
+	enhancementDataSvc := service.NewAssessmentEnhancementDataService(s.store)
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
@@ -248,6 +250,7 @@ func (s *Server) Run(ctx context.Context) error {
 		eventwrap.NewEventEstimationService(service.NewEstimationService(s.store), s.store),
 		partnerSvc,
 		accountsSvc,
+		enhancementDataSvc,
 	)
 
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)

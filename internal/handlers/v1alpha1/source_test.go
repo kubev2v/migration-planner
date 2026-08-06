@@ -90,7 +90,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -117,7 +117,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.ListSources(ctx, server.ListSourcesRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListSources200JSONResponse{}).String()))
@@ -144,7 +144,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -178,7 +178,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -217,7 +217,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "full-infra",
@@ -261,7 +261,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name: "test",
@@ -294,7 +294,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -324,7 +324,7 @@ var _ = Describe("source handler", Ordered, func() {
 				return &s
 			}
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
 				Body: &v1alpha1.CreateSourceJSONRequestBody{
 					Name:             "test",
@@ -349,7 +349,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 
 			// First create succeeds
 			resp1, err := srv.CreateSource(ctx, server.CreateSourceRequestObject{
@@ -401,7 +401,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -434,7 +434,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -491,7 +491,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -535,7 +535,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -570,7 +570,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -614,7 +614,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -652,7 +652,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -688,7 +688,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: uuid.New()})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource404JSONResponse{}).String()))
@@ -715,7 +715,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource403JSONResponse{}).String()))
@@ -741,7 +741,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: sourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -781,7 +781,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSource(ctx, server.GetSourceRequestObject{Id: sourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSource200JSONResponse{}).String()))
@@ -823,7 +823,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			_, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 
@@ -853,7 +853,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.DeleteSource(ctx, server.DeleteSourceRequestObject{Id: firstSourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.DeleteSource403JSONResponse{}).String()))
@@ -877,7 +877,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			invalidLabels := []v1alpha1.Label{
 				{Key: "-invalid-key", Value: "valid-value"},
 			}
@@ -902,7 +902,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			invalidLabels := []v1alpha1.Label{
 				{Key: "valid-key", Value: "invalid value with space"},
 			}
@@ -936,7 +936,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
@@ -978,7 +978,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
@@ -1026,7 +1026,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &v1alpha1.UpdateInventory{
@@ -1086,7 +1086,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: sourceID})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL200JSONResponse{}).String()))
@@ -1114,7 +1114,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: victimSourceID})
 
 			Expect(err).To(BeNil())
@@ -1139,7 +1139,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: victimSourceID})
 
 			Expect(err).To(BeNil())
@@ -1154,7 +1154,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: uuid.New()})
 
 			Expect(err).To(BeNil())
@@ -1176,7 +1176,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.GetSourceDownloadURL(ctx, server.GetSourceDownloadURLRequestObject{Id: sourceID})
 
 			Expect(err).To(BeNil())
