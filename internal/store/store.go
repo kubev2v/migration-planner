@@ -19,6 +19,7 @@ type Store interface {
 	Assessment() Assessment
 	AssessmentSubsetInventory() AssessmentSubsetInventory
 	ClusterSizingInput() ClusterSizingInput
+	AssessmentEnhancementData() AssessmentEnhancementData
 	Job() Job
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
@@ -40,6 +41,7 @@ type DataStore struct {
 	assessment                Assessment
 	assessmentSubsetInventory AssessmentSubsetInventory
 	cluster                   ClusterSizingInput
+	assessmentEnhancementData AssessmentEnhancementData
 	job                       Job
 	accounts                  Accounts
 	partnerCustomer           PartnerCustomer
@@ -60,6 +62,7 @@ func NewStore(db *gorm.DB) Store {
 		assessment:                assessment,
 		assessmentSubsetInventory: NewAssessmentSubsetInventory(db),
 		cluster:                   NewClusterSizingInputStore(db),
+		assessmentEnhancementData: NewAssessmentEnhancementDataStore(db),
 		job:                       NewJobStore(db),
 		authz:                     NewAuthzStore(db),
 		accounts:                  NewAccountsStore(db),
@@ -112,6 +115,10 @@ func (s *DataStore) AssessmentSubsetInventory() AssessmentSubsetInventory {
 
 func (s *DataStore) ClusterSizingInput() ClusterSizingInput {
 	return s.cluster
+}
+
+func (s *DataStore) AssessmentEnhancementData() AssessmentEnhancementData {
+	return s.assessmentEnhancementData
 }
 
 func (s *DataStore) Job() Job {

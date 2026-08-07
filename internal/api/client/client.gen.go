@@ -132,6 +132,14 @@ type ClientInterface interface {
 
 	CalculateMigrationComplexity(ctx context.Context, id openapi_types.UUID, body CalculateMigrationComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetAssessmentEnhancementData request
+	GetAssessmentEnhancementData(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SaveAssessmentEnhancementDataWithBody request with any body
+	SaveAssessmentEnhancementDataWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	SaveAssessmentEnhancementData(ctx context.Context, id openapi_types.UUID, body SaveAssessmentEnhancementDataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// CalculateMigrationEstimationWithBody request with any body
 	CalculateMigrationEstimationWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -429,6 +437,42 @@ func (c *Client) CalculateMigrationComplexityWithBody(ctx context.Context, id op
 
 func (c *Client) CalculateMigrationComplexity(ctx context.Context, id openapi_types.UUID, body CalculateMigrationComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCalculateMigrationComplexityRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAssessmentEnhancementData(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAssessmentEnhancementDataRequest(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAssessmentEnhancementDataWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAssessmentEnhancementDataRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) SaveAssessmentEnhancementData(ctx context.Context, id openapi_types.UUID, body SaveAssessmentEnhancementDataJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSaveAssessmentEnhancementDataRequest(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -1419,6 +1463,87 @@ func NewCalculateMigrationComplexityRequestWithBody(server string, id openapi_ty
 	}
 
 	operationPath := fmt.Sprintf("/api/v1/assessments/%s/complexity-estimation", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetAssessmentEnhancementDataRequest generates requests for GetAssessmentEnhancementData
+func NewGetAssessmentEnhancementDataRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/%s/enhancement-data", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSaveAssessmentEnhancementDataRequest calls the generic SaveAssessmentEnhancementData builder with application/json body
+func NewSaveAssessmentEnhancementDataRequest(server string, id openapi_types.UUID, body SaveAssessmentEnhancementDataJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSaveAssessmentEnhancementDataRequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewSaveAssessmentEnhancementDataRequestWithBody generates requests for SaveAssessmentEnhancementData with any type of body
+func NewSaveAssessmentEnhancementDataRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/assessments/%s/enhancement-data", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -2825,6 +2950,14 @@ type ClientWithResponsesInterface interface {
 
 	CalculateMigrationComplexityWithResponse(ctx context.Context, id openapi_types.UUID, body CalculateMigrationComplexityJSONRequestBody, reqEditors ...RequestEditorFn) (*CalculateMigrationComplexityResponse, error)
 
+	// GetAssessmentEnhancementDataWithResponse request
+	GetAssessmentEnhancementDataWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentEnhancementDataResponse, error)
+
+	// SaveAssessmentEnhancementDataWithBodyWithResponse request with any body
+	SaveAssessmentEnhancementDataWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAssessmentEnhancementDataResponse, error)
+
+	SaveAssessmentEnhancementDataWithResponse(ctx context.Context, id openapi_types.UUID, body SaveAssessmentEnhancementDataJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAssessmentEnhancementDataResponse, error)
+
 	// CalculateMigrationEstimationWithBodyWithResponse request with any body
 	CalculateMigrationEstimationWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationResponse, error)
 
@@ -3238,6 +3371,59 @@ func (r CalculateMigrationComplexityResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r CalculateMigrationComplexityResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type GetAssessmentEnhancementDataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *EnhancementData
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAssessmentEnhancementDataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAssessmentEnhancementDataResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+type SaveAssessmentEnhancementDataResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *EnhancementData
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r SaveAssessmentEnhancementDataResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SaveAssessmentEnhancementDataResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4248,6 +4434,32 @@ func (c *ClientWithResponses) CalculateMigrationComplexityWithResponse(ctx conte
 	return ParseCalculateMigrationComplexityResponse(rsp)
 }
 
+// GetAssessmentEnhancementDataWithResponse request returning *GetAssessmentEnhancementDataResponse
+func (c *ClientWithResponses) GetAssessmentEnhancementDataWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentEnhancementDataResponse, error) {
+	rsp, err := c.GetAssessmentEnhancementData(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAssessmentEnhancementDataResponse(rsp)
+}
+
+// SaveAssessmentEnhancementDataWithBodyWithResponse request with arbitrary body returning *SaveAssessmentEnhancementDataResponse
+func (c *ClientWithResponses) SaveAssessmentEnhancementDataWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SaveAssessmentEnhancementDataResponse, error) {
+	rsp, err := c.SaveAssessmentEnhancementDataWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAssessmentEnhancementDataResponse(rsp)
+}
+
+func (c *ClientWithResponses) SaveAssessmentEnhancementDataWithResponse(ctx context.Context, id openapi_types.UUID, body SaveAssessmentEnhancementDataJSONRequestBody, reqEditors ...RequestEditorFn) (*SaveAssessmentEnhancementDataResponse, error) {
+	rsp, err := c.SaveAssessmentEnhancementData(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSaveAssessmentEnhancementDataResponse(rsp)
+}
+
 // CalculateMigrationEstimationWithBodyWithResponse request with arbitrary body returning *CalculateMigrationEstimationResponse
 func (c *ClientWithResponses) CalculateMigrationEstimationWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CalculateMigrationEstimationResponse, error) {
 	rsp, err := c.CalculateMigrationEstimationWithBody(ctx, id, contentType, body, reqEditors...)
@@ -5241,6 +5453,121 @@ func ParseCalculateMigrationComplexityResponse(rsp *http.Response) (*CalculateMi
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest MigrationComplexityResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAssessmentEnhancementDataResponse parses an HTTP response from a GetAssessmentEnhancementDataWithResponse call
+func ParseGetAssessmentEnhancementDataResponse(rsp *http.Response) (*GetAssessmentEnhancementDataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAssessmentEnhancementDataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EnhancementData
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSaveAssessmentEnhancementDataResponse parses an HTTP response from a SaveAssessmentEnhancementDataWithResponse call
+func ParseSaveAssessmentEnhancementDataResponse(rsp *http.Response) (*SaveAssessmentEnhancementDataResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SaveAssessmentEnhancementDataResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest EnhancementData
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}

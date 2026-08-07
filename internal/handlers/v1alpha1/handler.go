@@ -3,13 +3,14 @@ package v1alpha1
 import "github.com/kubev2v/migration-planner/internal/service"
 
 type ServiceHandler struct {
-	sourceSrv     *service.SourceService
-	assessmentSrv service.AssessmentServicer
-	jobSrv        *service.JobService
-	sizerSrv      service.SizerServicer
-	estimationSrv service.EstimationServicer
-	partnerSrv    service.PartnerServicer
-	accountsSrv   service.AccountsServicer
+	sourceSrv          *service.SourceService
+	assessmentSrv      service.AssessmentServicer
+	jobSrv             *service.JobService
+	sizerSrv           service.SizerServicer
+	estimationSrv      service.EstimationServicer
+	partnerSrv         service.PartnerServicer
+	accountsSrv        service.AccountsServicer
+	enhancementDataSrv service.AssessmentEnhancementDataServicer
 }
 
 func NewServiceHandler(
@@ -20,14 +21,16 @@ func NewServiceHandler(
 	estimation service.EstimationServicer,
 	partner service.PartnerServicer,
 	accounts service.AccountsServicer,
+	enhancementData service.AssessmentEnhancementDataServicer,
 ) *ServiceHandler {
 	return &ServiceHandler{
-		sourceSrv:     sourceService,
-		assessmentSrv: a,
-		jobSrv:        j,
-		sizerSrv:      sizer,
-		estimationSrv: estimation,
-		accountsSrv:   accounts,
-		partnerSrv:    partner,
+		sourceSrv:          sourceService,
+		assessmentSrv:      a,
+		jobSrv:             j,
+		sizerSrv:           sizer,
+		estimationSrv:      estimation,
+		accountsSrv:        accounts,
+		partnerSrv:         partner,
+		enhancementDataSrv: enhancementData,
 	}
 }
