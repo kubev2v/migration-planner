@@ -84,7 +84,7 @@ require (
 	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.24 // indirect
 	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.24 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
-	github.com/elliotwutingfeng/asciiset v0.0.0-20260712024715-af198af8b1d6 // indirect
+	github.com/elliotwutingfeng/asciiset v0.0.0-20260801111138-45c5fff54b41 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
