@@ -8,6 +8,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -97,21 +99,36 @@ func (m *mockWriter) Write(_ context.Context, _ string, data []byte) error {
 	return nil
 }
 
+type mockNotifier struct {
+	written  [][]byte
+	writeErr error
+}
+
+func (m *mockNotifier) Write(_ context.Context, data []byte) error {
+	if m.writeErr != nil {
+		return m.writeErr
+	}
+	m.written = append(m.written, data)
+	return nil
+}
+
 var _ = Describe("OutboxDispatcher", func() {
 	var (
-		outbox *mockOutbox
-		s      *mockStore
-		writer *mockWriter
+		outbox   *mockOutbox
+		s        *mockStore
+		writer   *mockWriter
+		notifier *mockNotifier
 	)
 
 	BeforeEach(func() {
 		outbox = &mockOutbox{}
 		s = &mockStore{outbox: outbox}
 		writer = &mockWriter{}
+		notifier = &mockNotifier{}
 	})
 
 	runOneTick := func() {
-		dispatcher := eventwrap.NewOutboxDispatcher(s, writer, 10*time.Millisecond)
+		dispatcher := eventwrap.NewOutboxDispatcher(s, writer, notifier, 10*time.Millisecond)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		dispatcher.Run(ctx)
@@ -119,7 +136,7 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes events and deletes them from outbox", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: "test.event", Payload: []byte("event-data-1")},
+			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
 		}
 
 		runOneTick()
@@ -138,7 +155,7 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("skips events that fail to write and retains them", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: "test.event", Payload: []byte("event-data-1")},
+			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
 		}
 		writer.writeErr = fmt.Errorf("kafka unavailable")
 
@@ -150,13 +167,40 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes multiple events and bulk-deletes", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: "test.event.1", Payload: []byte("event-data-1")},
-			{ID: 2, EventType: "test.event.2", Payload: []byte("event-data-2")},
+			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
+			{ID: 2, EventType: kafka.SizingEventType, Payload: []byte("event-data-2")},
 		}
 
 		runOneTick()
 
 		Expect(writer.written).To(HaveLen(2))
 		Expect(outbox.events).To(BeEmpty())
+	})
+
+	It("routes notification-service events to the notifier, not the Kafka writer", func() {
+		outbox.events = []model.OutboxEvent{
+			{ID: 1, EventType: notification.PartnershipRequestEventType, Payload: []byte("notification-data")},
+			{ID: 2, EventType: kafka.VisitorEventType, Payload: []byte("event-data")},
+		}
+
+		runOneTick()
+
+		Expect(notifier.written).To(HaveLen(1))
+		Expect(notifier.written[0]).To(Equal([]byte("notification-data")))
+		Expect(writer.written).To(HaveLen(1))
+		Expect(writer.written[0]).To(Equal([]byte("event-data")))
+		Expect(outbox.events).To(BeEmpty())
+	})
+
+	It("skips and retains events with an unrecognized event type", func() {
+		outbox.events = []model.OutboxEvent{
+			{ID: 1, EventType: "some.unknown.type", Payload: []byte("event-data")},
+		}
+
+		runOneTick()
+
+		Expect(writer.written).To(BeNil())
+		Expect(notifier.written).To(BeNil())
+		Expect(outbox.events).To(HaveLen(1))
 	})
 })

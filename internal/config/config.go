@@ -7,9 +7,10 @@ import (
 var singleConfig *Config = nil
 
 type Config struct {
-	Database *dbConfig
-	Service  *svcConfig
-	Kafka    *Kafka
+	Database     *dbConfig
+	Service      *svcConfig
+	Kafka        *Kafka
+	Notification *Notification
 }
 
 type dbConfig struct {
@@ -55,6 +56,16 @@ type Kafka struct {
 	SASLUsername string `envconfig:"KAFKA_SASL_USERNAME" default:""`
 	SASLPassword string `envconfig:"KAFKA_SASL_PASSWORD" default:""`
 	UseTLS       bool   `envconfig:"KAFKA_USE_TLS" default:"false"`
+}
+
+// Notification configures the mTLS client used to deliver notifications to
+// the console notifications service. ClientCert/ClientKey are PEM-encoded
+// and are expected to be sourced from a Kubernetes secret; when either is
+// unset, notifications fall back to being logged to stdout.
+type Notification struct {
+	URL        string `envconfig:"NOTIFICATION_URL" default:""`
+	ClientCert string `envconfig:"NOTIFICATION_CLIENT_CERT" default:""`
+	ClientKey  string `envconfig:"NOTIFICATION_CLIENT_KEY" default:""`
 }
 
 func New() (*Config, error) {

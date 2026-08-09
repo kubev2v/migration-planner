@@ -17,7 +17,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
 const (
@@ -77,7 +78,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			}
 
 			var count int64
-			gormdb.Raw(countOutboxByTypeStm, events.VisitorEventType).Scan(&count)
+			gormdb.Raw(countOutboxByTypeStm, kafka.VisitorEventType).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
 		})
 
@@ -226,7 +227,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(*assessment.OwnerLastName).To(Equal("Johnson"))
 
 				var count int64
-				gormdb.Raw(countOutboxByTypeStm, events.AssessmentCreatedEventType).Scan(&count)
+				gormdb.Raw(countOutboxByTypeStm, kafka.AssessmentCreatedEventType).Scan(&count)
 				Expect(count).To(Equal(int64(1)))
 			})
 
@@ -458,6 +459,95 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
 				Expect(tx.Error).To(BeNil())
 				Expect(snapshotVersion).To(Equal(2)) // V2
+			})
+		})
+
+		Context("notification for assessments created on behalf of a customer", func() {
+			AfterEach(func() {
+				gormdb.Exec("DELETE FROM members;")
+				gormdb.Exec("DELETE FROM groups;")
+			})
+
+			DescribeTable("emits a notification event when the creator is a partner or admin",
+				func(groupKind string) {
+					groupID := uuid.New()
+					tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Group', 'desc', '%s', 'icon', 'Acme', NULL);", groupID, groupKind))
+					Expect(tx.Error).To(BeNil())
+					tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'creator1', 'creator1@test.com', '%s');", uuid.New(), groupID))
+					Expect(tx.Error).To(BeNil())
+
+					inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+						VcenterId: "test-vcenter",
+						Vcenter: &v1alpha1.InventoryData{
+							Vms:   v1alpha1.VMs{Total: 10},
+							Infra: v1alpha1.Infra{TotalHosts: 5},
+						},
+					})
+
+					testAssessmentID := uuid.New()
+					createForm := mappers.AssessmentCreateForm{
+						ID:        testAssessmentID,
+						Name:      "Assessment For Customer",
+						OrgID:     "org1",
+						Username:  "customer1",
+						Source:    service.SourceTypeInventory,
+						Inventory: inventoryJSON,
+					}
+
+					ctx := ctxWithUser("creator1", "org1")
+					assessment, err := svc.CreateAssessment(ctx, createForm)
+					Expect(err).To(BeNil())
+					Expect(assessment).ToNot(BeNil())
+
+					var count int64
+					gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
+					Expect(count).To(Equal(int64(1)))
+
+					var payload string
+					tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", notification.AssessmentCreatedEventType).Scan(&payload)
+					Expect(tx.Error).To(BeNil())
+
+					var n notification.Notification
+					Expect(json.Unmarshal([]byte(payload), &n)).To(Succeed())
+					Expect(n.EventType).To(Equal(notification.AssessmentCreatedEventType))
+					Expect(n.OrgID).To(Equal("org1"))
+					Expect(n.Context["assessment_id"]).To(Equal(testAssessmentID.String()))
+					Expect(n.Recipients).To(HaveLen(1))
+					Expect(n.Recipients[0].Users).To(ConsistOf("customer1"))
+					Expect(n.Recipients[0].IgnoreUserPreferences).To(BeTrue())
+
+					Expect(n.Events).To(HaveLen(1))
+				},
+				Entry("creator is a partner", "partner"),
+				Entry("creator is an admin", "admin"),
+			)
+
+			It("does not emit a notification event when the creator is a regular authenticated user", func() {
+				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+					VcenterId: "test-vcenter",
+					Vcenter: &v1alpha1.InventoryData{
+						Vms:   v1alpha1.VMs{Total: 10},
+						Infra: v1alpha1.Infra{TotalHosts: 5},
+					},
+				})
+
+				createForm := mappers.AssessmentCreateForm{
+					ID:        uuid.New(),
+					Name:      "Assessment By Regular User",
+					OrgID:     "org1",
+					Username:  "regular-user",
+					Source:    service.SourceTypeInventory,
+					Inventory: inventoryJSON,
+				}
+
+				ctx := ctxWithUser("regular-user", "org1")
+				assessment, err := svc.CreateAssessment(ctx, createForm)
+				Expect(err).To(BeNil())
+				Expect(assessment).ToNot(BeNil())
+
+				var count int64
+				gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
+				Expect(count).To(Equal(int64(0)))
 			})
 		})
 
@@ -748,7 +838,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(0))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.AssessmentDeletedEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, kafka.AssessmentDeletedEventType).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
@@ -984,8 +1074,23 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(1)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.ShareAssessmentEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, kafka.ShareAssessmentEventType).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
+
+			gormdb.Raw(countOutboxByTypeStm, notification.AssessmentSharedEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(1)))
+
+			var payload string
+			tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", notification.AssessmentSharedEventType).Scan(&payload)
+			Expect(tx.Error).To(BeNil())
+
+			var n notification.Notification
+			Expect(json.Unmarshal([]byte(payload), &n)).To(Succeed())
+			Expect(n.EventType).To(Equal(notification.AssessmentSharedEventType))
+			Expect(n.Context["assessment_id"]).To(Equal(assessmentID.String()))
+			Expect(n.Recipients).To(HaveLen(1))
+			Expect(n.Recipients[0].OnlyAdmins).To(BeTrue())
+			Expect(n.Recipients[0].IgnoreUserPreferences).To(BeTrue())
 		})
 
 		It("is idempotent — sharing twice does not error", func() {
@@ -1074,7 +1179,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(0)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.UnshareAssessmentEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, kafka.UnshareAssessmentEventType).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 

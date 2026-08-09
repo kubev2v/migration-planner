@@ -16,7 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
@@ -121,11 +121,11 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
-	payload := events.NewOVADownloadPayload(source.Username, source.ID.String())
-	ceBytes, err := events.BuildCloudEvent(events.DownloadOVAEventType, payload)
+	payload := kafka.NewOVADownloadPayload(source.Username, source.ID.String())
+	ceBytes, err := kafka.BuildCloudEvent(kafka.DownloadOVAEventType, payload)
 	if err != nil {
 		zap.S().Warnw("failed to build download event", "source_id", source.ID, "error", err)
-	} else if err := h.outbox.Insert(ctx, events.DownloadOVAEventType, ceBytes); err != nil {
+	} else if err := h.outbox.Insert(ctx, kafka.DownloadOVAEventType, ceBytes); err != nil {
 		zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "error", err)
 	}
 

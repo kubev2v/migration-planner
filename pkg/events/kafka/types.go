@@ -1,4 +1,4 @@
-package events
+package kafka
 
 const (
 	// GenericTopic is the Kafka topic where all events are produced

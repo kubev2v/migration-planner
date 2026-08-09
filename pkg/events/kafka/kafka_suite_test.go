@@ -1,4 +1,4 @@
-package events_test
+package kafka_test
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	. "github.com/onsi/gomega"
 )
 
-func TestEvents(t *testing.T) {
+func TestKafkaEvents(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Events Suite")
+	RunSpecs(t, "Kafka Events Suite")
 }
