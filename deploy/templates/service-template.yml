@@ -68,6 +68,19 @@ parameters:
   - name: KAFKA_PASSWORD_SECRET_KEY
     description: Key in the credentials secret for the password
     value: "password"
+  # Notification service config values
+  - name: NOTIFICATION_URL
+    description: URL of the console notifications service
+    value: "https://mtls.internal.cloud.stage.redhat.com/api/notifications-gw/notifications"
+  - name: NOTIFICATION_CERT_SECRET_NAME
+    description: Kubernetes secret containing the notification service mTLS client certificate and key
+    value: "notifications-cert"
+  - name: NOTIFICATION_CLIENT_CERT_SECRET_KEY
+    description: Key in the notification cert secret for the client certificate (PEM)
+    value: "notifications.crt"
+  - name: NOTIFICATION_CLIENT_KEY_SECRET_KEY
+    description: Key in the notification cert secret for the client private key (PEM)
+    value: "notifications.key"
   - name: PERSISTENT_DISK_DEVICE
     value: /dev/sda
   - name: INSECURE_REGISTRY
@@ -766,6 +779,21 @@ objects:
                     secretKeyRef:
                       name: ${KAFKA_CREDENTIALS_SECRET_NAME}
                       key: ${KAFKA_PASSWORD_SECRET_KEY}
+                      optional: true
+                # Notification service config values
+                - name: NOTIFICATION_URL
+                  value: "${NOTIFICATION_URL}"
+                - name: NOTIFICATION_CLIENT_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NOTIFICATION_CERT_SECRET_NAME}
+                      key: ${NOTIFICATION_CLIENT_CERT_SECRET_KEY}
+                      optional: true
+                - name: NOTIFICATION_CLIENT_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${NOTIFICATION_CERT_SECRET_NAME}
+                      key: ${NOTIFICATION_CLIENT_KEY_SECRET_KEY}
                       optional: true
               volumeMounts:
                 - name: migration-planner-dir

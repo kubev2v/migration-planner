@@ -26,7 +26,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
@@ -98,7 +99,7 @@ var runCmd = &cobra.Command{
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
 		// Create Kafka producer and event writer
-		var writer events.Writer = events.NewNoOpWriter()
+		var writer kafka.Writer = kafka.NewNoOpWriter()
 
 		if cfg.Kafka.Enabled {
 			var cleanup func()
@@ -111,7 +112,8 @@ var runCmd = &cobra.Command{
 		}
 
 		// Start outbox dispatcher
-		dispatcher := eventwrap.NewOutboxDispatcher(store, writer, 5*time.Second)
+		notifier := createNotificationWriter(cfg)
+		dispatcher := eventwrap.NewOutboxDispatcher(store, writer, notifier, 5*time.Second)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -178,7 +180,7 @@ func newListener(address string) (net.Listener, error) {
 	return net.Listen("tcp", address)
 }
 
-func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, func(), error) {
+func createEventWriter(ctx context.Context, cfg *config.Config) (kafka.Writer, func(), error) {
 	brokers := strings.Split(cfg.Kafka.Brokers, ",")
 	var kafkaOpts []kgo.Opt
 
@@ -196,9 +198,9 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, 
 
 	noop := func() {}
 
-	producer, err := events.NewKafkaProducer(brokers, kafkaOpts...)
+	producer, err := kafka.NewKafkaProducer(brokers, kafkaOpts...)
 	if err != nil {
-		return events.NewNoOpWriter(), noop, err
+		return kafka.NewNoOpWriter(), noop, err
 	}
 
 	pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
@@ -206,12 +208,32 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, 
 
 	if err := producer.Ping(pingCtx); err != nil {
 		producer.Close()
-		return events.NewNoOpWriter(), noop, fmt.Errorf("kafka broker unreachable: %w", err)
+		return kafka.NewNoOpWriter(), noop, fmt.Errorf("kafka broker unreachable: %w", err)
 	}
 
 	zap.S().Infow("kafka producer connected", "brokers", cfg.Kafka.Brokers)
 
 	return producer, producer.Close, nil
+}
+
+func createNotificationWriter(cfg *config.Config) notification.Writer {
+	if cfg.Notification.ClientCert == "" || cfg.Notification.ClientKey == "" {
+		zap.S().Info("notification service client certificate not configured, logging notifications to stdout")
+		return notification.NewStdoutWriter()
+	}
+
+	writer, err := notification.NewHTTPWriter(
+		cfg.Notification.URL,
+		[]byte(cfg.Notification.ClientCert),
+		[]byte(cfg.Notification.ClientKey),
+	)
+	if err != nil {
+		zap.S().Warnw("failed to create notification service client, logging notifications to stdout", "error", err)
+		return notification.NewStdoutWriter()
+	}
+
+	zap.S().Infow("notification service client initialized", "url", cfg.Notification.URL)
+	return writer
 }
 
 func ensureIsoExist(path string) error {

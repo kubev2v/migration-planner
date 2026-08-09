@@ -5,20 +5,31 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"go.uber.org/zap"
 )
 
 type OutboxDispatcher struct {
 	store    store.Store
-	writer   events.Writer
+	writer   kafka.Writer
+	notifier notification.Writer
 	interval time.Duration
 }
 
-func NewOutboxDispatcher(s store.Store, writer events.Writer, interval time.Duration) *OutboxDispatcher {
+type writerType int
+
+const (
+	writerTypeUnknown writerType = iota
+	writerTypeKafka
+	writerTypeNotification
+)
+
+func NewOutboxDispatcher(s store.Store, writer kafka.Writer, notifier notification.Writer, interval time.Duration) *OutboxDispatcher {
 	return &OutboxDispatcher{
 		store:    s,
 		writer:   writer,
+		notifier: notifier,
 		interval: interval,
 	}
 }
@@ -59,7 +70,18 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 
 	var published []int
 	for _, outboxEvent := range outboxEvents {
-		if err := d.writer.Write(ctx, events.GenericTopic, outboxEvent.Payload); err != nil {
+		var err error
+		switch writerTypeForEventType(outboxEvent.EventType) {
+		case writerTypeKafka:
+			err = d.writer.Write(ctx, kafka.GenericTopic, outboxEvent.Payload)
+		case writerTypeNotification:
+			err = d.notifier.Write(ctx, outboxEvent.Payload)
+		default:
+			zap.S().Errorw("outbox dispatcher: no writer registered for event type, will retry",
+				"id", outboxEvent.ID, "event_type", outboxEvent.EventType)
+			continue
+		}
+		if err != nil {
 			zap.S().Errorw("outbox dispatcher: failed to write event, will retry",
 				"id", outboxEvent.ID, "event_type", outboxEvent.EventType, "error", err)
 			continue
@@ -73,5 +95,22 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 
 	if _, err := store.Commit(ctx); err != nil {
 		zap.S().Errorw("outbox dispatcher: failed to commit transaction", "error", err)
+	}
+}
+
+// writerTypeForEventType classifies an outbox event type so the dispatcher
+// knows which writer to hand it to.
+func writerTypeForEventType(eventType string) writerType {
+	switch eventType {
+	case kafka.AssessmentCreatedEventType, kafka.AssessmentDeletedEventType, kafka.PartnerCustomerEventType,
+		kafka.ShareAssessmentEventType, kafka.UnshareAssessmentEventType, kafka.SizingEventType,
+		kafka.MigrationComplexityEventType, kafka.MigrationTimeEstimationEventType,
+		kafka.DownloadOVAEventType, kafka.VisitorEventType:
+		return writerTypeKafka
+	case notification.PartnershipRequestEventType, notification.PartnershipResponseEventType,
+		notification.AssessmentSharedEventType, notification.AssessmentCreatedEventType:
+		return writerTypeNotification
+	default:
+		return writerTypeUnknown
 	}
 }

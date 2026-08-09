@@ -9,7 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
@@ -57,7 +57,7 @@ var backfillCmd = &cobra.Command{
 	},
 }
 
-func backfillAssessments(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+func backfillAssessments(ctx context.Context, s store.Store, writer kafka.Writer, writerClose func()) error {
 	defer writerClose()
 
 	assessments, err := s.Assessment().List(ctx, nil)
@@ -94,7 +94,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			continue
 		}
 
-		payload := events.NewAssessmentCreatedPayload(events.AssessmentData{
+		payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 			ID:         assessment.ID.String(),
 			SnapshotID: assessment.Snapshots[0].ID,
 			Inventory:  inventory,
@@ -107,14 +107,14 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			UpdatedAt:  assessment.UpdatedAt,
 		})
 
-		ceBytes, err := events.BuildCloudEvent(events.AssessmentCreatedEventType, payload)
+		ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)
 		if err != nil {
 			zap.S().Errorw("building cloud event", "id", assessment.ID, "error", err)
 			eventBuildErrors++
 			continue
 		}
 
-		if err := writer.Write(ctx, events.GenericTopic, ceBytes); err != nil {
+		if err := writer.Write(ctx, kafka.GenericTopic, ceBytes); err != nil {
 			zap.S().Errorw("publishing event", "id", assessment.ID, "error", err)
 			publishErrors++
 			continue

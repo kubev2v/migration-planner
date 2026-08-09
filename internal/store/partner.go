@@ -51,7 +51,7 @@ func (p *PartnerCustomerStore) Create(ctx context.Context, pc model.PartnerCusto
 			}
 			return result.Error
 		}
-		result := tx.Preload("Partner").First(&created, "id = ?", pc.ID)
+		result := tx.Preload("Partner.Members").First(&created, "id = ?", pc.ID)
 		return result.Error
 	})
 	if err != nil {
