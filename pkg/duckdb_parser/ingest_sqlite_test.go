@@ -10,6 +10,8 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // sqliteCluster describes a cluster for createTestSQLite.
@@ -17,6 +19,7 @@ type sqliteCluster struct {
 	id         string
 	name       string
 	datacenter string // datacenter name (matched to a Datacenter row)
+	dasEnabled bool   // forklift Cluster.DasEnabled (HA)
 }
 
 // sqliteVM describes a VM for createTestSQLite.
@@ -55,7 +58,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Folder (ID VARCHAR PRIMARY KEY, Datacenter VARCHAR)`,
 
 		// Cluster
-		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR)`,
+		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false)`,
 
 		// Host
 		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
@@ -113,8 +116,9 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		folderID := fmt.Sprintf("folder-%d", dcIdx)
 		parentJSON := fmt.Sprintf(`{"id":"%s"}`, folderID)
 		_, err := db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s')`,
+			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %t)`,
 			escapeSQLString(c.id), escapeSQLString(c.name), escapeSQLString(parentJSON),
+			c.dasEnabled,
 		))
 		require.NoError(t, err)
 
@@ -216,6 +220,84 @@ func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
 		assert.Equal(t, expectedID, vclusterMap[c.name],
 			"Object ID for cluster %q should match generateClusterID output", c.name)
 	}
+}
+
+// TestIngestSqlite_PopulatesVClusterHaEnabled is the regression test for the bug where HaEnabled
+// was silently always false for agent/SQLite uploads: forklift's real Cluster.DasEnabled was
+// collected but never reached the vcluster table, only Name+ID did. This asserts the real value
+// now comes through. (DRS wiring on this path is a separate, still-open issue - not covered here.)
+func TestIngestSqlite_PopulatesVClusterHaEnabled(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster-ha-on", datacenter: "dc1", dasEnabled: true},
+		{id: "domain-c2", name: "cluster-ha-off", datacenter: "dc1", dasEnabled: false},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster-ha-on"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster-ha-off"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx, `SELECT "Name", "Object ID", "DasEnabled" FROM vcluster ORDER BY "Name"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	type gotFeatures struct {
+		objectID string
+		das      bool
+	}
+	got := make(map[string]gotFeatures)
+	for rows.Next() {
+		var name, objectID string
+		var das bool
+		require.NoError(t, rows.Scan(&name, &objectID, &das))
+		got[name] = gotFeatures{objectID: objectID, das: das}
+	}
+	require.NoError(t, rows.Err())
+
+	require.Contains(t, got, "cluster-ha-on")
+	assert.True(t, got["cluster-ha-on"].das, "HA should be enabled")
+
+	require.Contains(t, got, "cluster-ha-off")
+	assert.False(t, got["cluster-ha-off"].das, "HA should be disabled")
+
+	// The staging table is internal plumbing and must not leak into the final schema.
+	var stagingCount int
+	err = db.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'cluster_features_staging'`).Scan(&stagingCount)
+	require.NoError(t, err)
+	assert.Equal(t, 0, stagingCount, "cluster_features_staging should be dropped after use")
+
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+
+	onID, offID := got["cluster-ha-on"].objectID, got["cluster-ha-off"].objectID
+	var onCluster, offCluster *inventory.InventoryData
+	for id, cluster := range inv.Clusters {
+		c := cluster
+		switch id {
+		case onID:
+			onCluster = &c
+		case offID:
+			offCluster = &c
+		}
+	}
+
+	require.NotNil(t, onCluster)
+	require.NotNil(t, onCluster.ClusterFeatures)
+	require.NotNil(t, onCluster.ClusterFeatures.HaEnabled)
+	assert.True(t, *onCluster.ClusterFeatures.HaEnabled)
+
+	require.NotNil(t, offCluster)
+	require.NotNil(t, offCluster.ClusterFeatures)
+	require.NotNil(t, offCluster.ClusterFeatures.HaEnabled)
+	assert.False(t, *offCluster.ClusterFeatures.HaEnabled)
 }
 
 func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {

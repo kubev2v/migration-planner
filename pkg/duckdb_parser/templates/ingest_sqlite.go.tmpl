@@ -13,6 +13,7 @@ Key transformations:
   - Host → vhost with memory converted from bytes to MiB
   - Datastore → vdatastore with capacity/free converted from bytes to MiB
   - Network → dvport for distributed virtual switches
+  - Cluster.DasEnabled (HA) → cluster_features_staging, joined by populateVCluster() after src is detached
 */ -}}
 
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
@@ -224,6 +225,12 @@ SELECT
     n.VlanId
 FROM src.Network n
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
+
+CREATE TABLE cluster_features_staging AS
+SELECT
+    c.Name       AS "Name",
+    c.DasEnabled AS "DasEnabled"
+FROM src.Cluster c;
 
 DETACH src;
 

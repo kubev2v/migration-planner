@@ -115,6 +115,7 @@ func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inve
 			DrsEnabled:        cluster.ClusterFeatures.DrsEnabled,
 			DrsMode:           cluster.ClusterFeatures.DrsMode,
 			StorageDrsEnabled: cluster.ClusterFeatures.StorageDrsEnabled,
+			HaEnabled:         cluster.ClusterFeatures.HaEnabled,
 		}
 	}
 

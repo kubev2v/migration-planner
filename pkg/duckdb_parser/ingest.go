@@ -113,9 +113,20 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	return result, nil
 }
 
-// populateVCluster inserts a name→ID row into vcluster for each cluster, using the same
-// anonymous ID that BuildInventory assigns as the cluster's key. This lets vcluster serve
-// as a name→ID map for the agent without exposing real VMware moref IDs.
+// stagedClusterFeatures holds forklift's real cluster-level HA flag, carried across the `src`
+// detach boundary during SQLite ingestion via the cluster_features_staging table (see
+// ingest_sqlite.go.tmpl). Zero-valued when a cluster has no staged row (e.g. RVTools ingestion,
+// which never creates the staging table at all).
+type stagedClusterFeatures struct {
+	DasEnabled bool
+}
+
+// populateVCluster inserts a row into vcluster for each cluster, using the same anonymous ID
+// that BuildInventory assigns as the cluster's key. This lets vcluster serve as a name→ID map
+// for the agent without exposing real VMware moref IDs. HA (DasEnabled) is joined in from
+// cluster_features_staging when present - only the SQLite ingest path stages it, since RVTools
+// ingestion populates vcluster (including features) directly and this function never runs for
+// it (see the no-op guard below).
 // It is a no-op when vcluster already contains data (e.g. after RVTools ingestion).
 func (p *Parser) populateVCluster(ctx context.Context) error {
 	var count int
@@ -142,23 +153,78 @@ func (p *Parser) populateVCluster(ctx context.Context) error {
 		return fmt.Errorf("getting clusters: %w", err)
 	}
 
+	features, err := p.clusterFeaturesStaging(ctx)
+	if err != nil {
+		return fmt.Errorf("reading staged cluster features: %w", err)
+	}
+
 	values := make([]string, 0, len(clusters))
 	for _, clusterName := range clusters {
 		datacenter := clusterDatacenters[clusterName]
 		id := generateClusterID(clusterName, datacenter, vcenterID)
-		values = append(values, fmt.Sprintf("('%s', '%s')", escapeSQLString(clusterName), escapeSQLString(id)))
+		f := features[clusterName]
+		values = append(values, fmt.Sprintf(
+			"('%s', '%s', %t)",
+			escapeSQLString(clusterName), escapeSQLString(id), f.DasEnabled,
+		))
 	}
 	if len(values) == 0 {
 		return nil
 	}
 	query := fmt.Sprintf(
-		`INSERT INTO vcluster ("Name", "Object ID") VALUES %s`,
+		`INSERT INTO vcluster ("Name", "Object ID", "DasEnabled") VALUES %s`,
 		strings.Join(values, ", "),
 	)
 	if _, err := p.db.ExecContext(ctx, query); err != nil {
 		return fmt.Errorf("inserting vcluster rows: %w", err)
 	}
+	if err := p.dropClusterFeaturesStaging(ctx); err != nil {
+		return fmt.Errorf("dropping cluster_features_staging: %w", err)
+	}
 	return nil
+}
+
+// clusterFeaturesStaging reads forklift's real HA flag staged by the SQLite ingest template
+// before it detached the source database (see ingest_sqlite.go.tmpl). Returns an empty map when
+// the staging table doesn't exist, which is expected for RVTools ingestion - only the SQLite
+// template creates it.
+func (p *Parser) clusterFeaturesStaging(ctx context.Context) (map[string]stagedClusterFeatures, error) {
+	var exists bool
+	err := p.db.QueryRowContext(ctx,
+		`SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'cluster_features_staging')`,
+	).Scan(&exists)
+	if err != nil {
+		return nil, fmt.Errorf("checking cluster_features_staging: %w", err)
+	}
+	if !exists {
+		return map[string]stagedClusterFeatures{}, nil
+	}
+
+	rows, err := p.db.QueryContext(ctx,
+		`SELECT "Name", "DasEnabled" FROM cluster_features_staging`,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("querying cluster_features_staging: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[string]stagedClusterFeatures)
+	for rows.Next() {
+		var name string
+		var f stagedClusterFeatures
+		if err := rows.Scan(&name, &f.DasEnabled); err != nil {
+			return nil, fmt.Errorf("scanning cluster_features_staging row: %w", err)
+		}
+		result[name] = f
+	}
+	return result, rows.Err()
+}
+
+// dropClusterFeaturesStaging drops the temporary staging table used to carry forklift's cluster
+// feature flags across the src detach boundary during SQLite ingestion.
+func (p *Parser) dropClusterFeaturesStaging(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS cluster_features_staging")
+	return err
 }
 
 // dropVinfoRaw drops the temporary vinfo_raw table used during RVTools ingestion.

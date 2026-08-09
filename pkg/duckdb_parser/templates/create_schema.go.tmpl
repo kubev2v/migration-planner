@@ -164,7 +164,8 @@ CREATE TABLE IF NOT EXISTS vcluster (
     "Object ID" VARCHAR,
     "DrsEnabled" BOOLEAN DEFAULT false,
     "DrsDefaultVmBehavior" VARCHAR DEFAULT 'None',
-    "StorageDrsEnabled" BOOLEAN DEFAULT false
+    "StorageDrsEnabled" BOOLEAN DEFAULT false,
+    "DasEnabled" BOOLEAN DEFAULT false
 );
 
 CREATE TABLE IF NOT EXISTS about (

@@ -63,4 +63,5 @@ type ClusterFeatures struct {
 	DrsEnabled        *bool   `json:"drsEnabled,omitempty"`
 	DrsMode           *string `json:"drsMode,omitempty"`
 	StorageDrsEnabled *bool   `json:"storageDrsEnabled,omitempty"`
+	HaEnabled         *bool   `json:"haEnabled,omitempty"`
 }
