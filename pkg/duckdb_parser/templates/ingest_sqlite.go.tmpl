@@ -13,6 +13,7 @@ Key transformations:
   - Host → vhost with memory converted from bytes to MiB
   - Datastore → vdatastore with capacity/free converted from bytes to MiB
   - Network → dvport for distributed virtual switches
+  - Cluster → vcluster: Name, Object ID, DasEnabled (HA)
 */ -}}
 
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
@@ -224,6 +225,10 @@ SELECT
     n.VlanId
 FROM src.Network n
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
+
+INSERT INTO vcluster ("Name", "Object ID", "DasEnabled")
+SELECT c.Name, c.ID, c.DasEnabled
+FROM src.Cluster c;
 
 DETACH src;
 

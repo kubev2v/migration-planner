@@ -545,6 +545,7 @@ func (p *Parser) ClusterFeatures(ctx context.Context, clusterName string) (*mode
 		&cluster.DrsEnabled,
 		&cluster.DrsMode,
 		&cluster.StorageDrsEnabled,
+		&cluster.HaEnabled,
 	)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

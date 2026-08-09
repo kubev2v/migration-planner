@@ -312,8 +312,9 @@ SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);
 ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "drs" VARCHAR;
 ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "DrsDefaultVmBehavior" VARCHAR;
 ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "Storage DRS" VARCHAR;
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "HA enabled" VARCHAR;
 
-INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "StorageDrsEnabled")
+INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "StorageDrsEnabled", "DasEnabled")
 SELECT "Name", "Object ID",
     CASE
         WHEN LOWER(TRIM(COALESCE("drs", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
@@ -323,5 +324,9 @@ SELECT "Name", "Object ID",
     CASE
         WHEN LOWER(TRIM(COALESCE("Storage DRS", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
         ELSE false
-    END as "StorageDrsEnabled"
+    END as "StorageDrsEnabled",
+    CASE
+        WHEN LOWER(TRIM(COALESCE("HA enabled", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
+        ELSE false
+    END as "DasEnabled"
 FROM vcluster_raw;

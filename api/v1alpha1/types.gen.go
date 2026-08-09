@@ -283,6 +283,9 @@ type ClusterFeatures struct {
 	// DrsMode DRS automation mode for the cluster
 	DrsMode *ClusterFeaturesDrsMode `json:"drsMode,omitempty"`
 
+	// HaEnabled Whether vSphere HA (High Availability) is enabled for this cluster - automatically restarts VMs on surviving hosts after a host failure
+	HaEnabled *bool `json:"haEnabled,omitempty"`
+
 	// StorageDrsEnabled Whether Storage DRS is enabled for this cluster
 	StorageDrsEnabled *bool `json:"storageDrsEnabled,omitempty"`
 }

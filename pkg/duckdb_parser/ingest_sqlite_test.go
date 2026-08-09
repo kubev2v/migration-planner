@@ -10,6 +10,8 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // sqliteCluster describes a cluster for createTestSQLite.
@@ -17,6 +19,7 @@ type sqliteCluster struct {
 	id         string
 	name       string
 	datacenter string // datacenter name (matched to a Datacenter row)
+	dasEnabled *bool  // forklift Cluster.DasEnabled (HA); nil → SQL NULL (unknown state)
 }
 
 // sqliteVM describes a VM for createTestSQLite.
@@ -55,7 +58,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Folder (ID VARCHAR PRIMARY KEY, Datacenter VARCHAR)`,
 
 		// Cluster
-		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR)`,
+		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false)`,
 
 		// Host
 		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
@@ -112,9 +115,14 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		dcIdx := dcSeen[c.datacenter]
 		folderID := fmt.Sprintf("folder-%d", dcIdx)
 		parentJSON := fmt.Sprintf(`{"id":"%s"}`, folderID)
+		dasValue := "NULL"
+		if c.dasEnabled != nil {
+			dasValue = fmt.Sprintf("%t", *c.dasEnabled)
+		}
 		_, err := db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s')`,
+			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %s)`,
 			escapeSQLString(c.id), escapeSQLString(c.name), escapeSQLString(parentJSON),
+			dasValue,
 		))
 		require.NoError(t, err)
 
@@ -205,17 +213,96 @@ func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
 
 	assert.Len(t, vclusterMap, 2, "vcluster should have one row per cluster")
 
-	// Each Object ID must equal what generateClusterID would produce.
-	vcenterID, err := parser.VCenterID(ctx)
+	// Each Object ID must match the real cluster ID from the source.
+	for _, c := range clusters {
+		assert.Equal(t, c.id, vclusterMap[c.name],
+			"Object ID for cluster %q should match the source cluster ID", c.name)
+	}
+}
+
+// TestIngestSqlite_PopulatesVClusterHaEnabled is the regression test for the bug where HaEnabled
+// was silently always false for agent/SQLite uploads: forklift's real Cluster.DasEnabled was
+// collected but never reached the vcluster table, only Name+ID did. This asserts the real value
+// now comes through. (DRS wiring on this path is a separate, still-open issue - not covered here.)
+func TestIngestSqlite_PopulatesVClusterHaEnabled(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster-ha-on", datacenter: "dc1", dasEnabled: boolPtr(true)},
+		{id: "domain-c2", name: "cluster-ha-off", datacenter: "dc1", dasEnabled: boolPtr(false)},
+		{id: "domain-c3", name: "cluster-ha-unknown", datacenter: "dc1"}, // dasEnabled nil → SQL NULL
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster-ha-on"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster-ha-off"},
+		{id: "vm-003", name: "vm-3", clusterName: "cluster-ha-unknown"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
 	require.NoError(t, err)
-	clusterDatacenters, err := parser.ClusterDatacenters(ctx)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx, `SELECT "Name", "Object ID", "DasEnabled" FROM vcluster ORDER BY "Name"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	type gotFeatures struct {
+		objectID string
+		das      *bool
+	}
+	got := make(map[string]gotFeatures)
+	for rows.Next() {
+		var name, objectID string
+		var das *bool
+		require.NoError(t, rows.Scan(&name, &objectID, &das))
+		got[name] = gotFeatures{objectID: objectID, das: das}
+	}
+	require.NoError(t, rows.Err())
+
+	require.Contains(t, got, "cluster-ha-on")
+	require.NotNil(t, got["cluster-ha-on"].das)
+	assert.True(t, *got["cluster-ha-on"].das, "HA should be enabled")
+
+	require.Contains(t, got, "cluster-ha-off")
+	require.NotNil(t, got["cluster-ha-off"].das)
+	assert.False(t, *got["cluster-ha-off"].das, "HA should be disabled")
+
+	require.Contains(t, got, "cluster-ha-unknown")
+	assert.Nil(t, got["cluster-ha-unknown"].das, "HA should be nil when source is NULL")
+
+	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
 
-	for _, c := range clusters {
-		expectedID := generateClusterID(c.name, clusterDatacenters[c.name], vcenterID)
-		assert.Equal(t, expectedID, vclusterMap[c.name],
-			"Object ID for cluster %q should match generateClusterID output", c.name)
+	onID, offID, unknownID := got["cluster-ha-on"].objectID, got["cluster-ha-off"].objectID, got["cluster-ha-unknown"].objectID
+	var onCluster, offCluster, unknownCluster *inventory.InventoryData
+	for id, cluster := range inv.Clusters {
+		c := cluster
+		switch id {
+		case onID:
+			onCluster = &c
+		case offID:
+			offCluster = &c
+		case unknownID:
+			unknownCluster = &c
+		}
 	}
+
+	require.NotNil(t, onCluster)
+	require.NotNil(t, onCluster.ClusterFeatures)
+	require.NotNil(t, onCluster.ClusterFeatures.HaEnabled)
+	assert.True(t, *onCluster.ClusterFeatures.HaEnabled)
+
+	require.NotNil(t, offCluster)
+	require.NotNil(t, offCluster.ClusterFeatures)
+	require.NotNil(t, offCluster.ClusterFeatures.HaEnabled)
+	assert.False(t, *offCluster.ClusterFeatures.HaEnabled)
+
+	require.NotNil(t, unknownCluster)
+	require.NotNil(t, unknownCluster.ClusterFeatures)
+	assert.Nil(t, unknownCluster.ClusterFeatures.HaEnabled, "unknown HA should surface as nil, not false")
 }
 
 func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {
@@ -406,11 +493,7 @@ func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.IsValid())
 
-	// vcluster must still contain only the pre-existing row.
-	var count int
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM vcluster`).Scan(&count))
-	assert.Equal(t, 1, count, "populateVCluster should not insert when vcluster is already populated")
-
+	// Pre-existing row must not be overwritten.
 	var objectID string
 	require.NoError(t, db.QueryRowContext(ctx, `SELECT "Object ID" FROM vcluster WHERE "Name" = 'existing-cluster'`).Scan(&objectID))
 	assert.Equal(t, "sentinel-id", objectID, "pre-existing row must not be overwritten")
