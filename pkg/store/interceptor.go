@@ -10,12 +10,9 @@ import (
 // QueryInterceptor provides database query methods with transaction awareness.
 // Implementations route queries through an active transaction if present in context.
 //
-// NOTE: The default implementation (queryInterceptor) is DuckDB-specific. It uses:
-// - Mutex serialization in ExecContext to satisfy DuckDB's single-connection constraint
-// - FORCE CHECKPOINT after non-transactional writes to flush DuckDB's WAL to the main file
-//
-// If supporting other databases, a separate implementation would be needed without
-// these DuckDB-specific behaviors.
+// NOTE: DuckDB durability is handled by the WAL — it replays on startup. Explicit
+// checkpointing is only needed before file-level operations (close, clone) and is
+// available via Store2.Checkpoint().
 type QueryInterceptor interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
@@ -64,19 +61,7 @@ func (q *queryInterceptor) ExecContext(ctx context.Context, query string, args .
 		return tx.ExecContext(ctx, query, args...)
 	}
 
-	result, err := q.db.ExecContext(ctx, query, args...)
-	if err != nil {
-		return result, err
-	}
-
-	// Issue a DuckDB-specific FORCE CHECKPOINT to flush the write-ahead log (WAL) to the main database file.
-	// This ensures durability for non-transactional writes by persisting changes immediately.
-	// FORCE CHECKPOINT is DuckDB-specific SQL and would fail on other databases.
-	// We only checkpoint on the non-transaction path; transactions handle their own durability on commit.
-	if _, cpErr := q.db.ExecContext(ctx, "FORCE CHECKPOINT"); cpErr != nil {
-		q.logger.Warnw("checkpoint failed", "error", cpErr)
-	}
-	return result, nil
+	return q.db.ExecContext(ctx, query, args...)
 }
 
 func (q *queryInterceptor) txFromContext(ctx context.Context) (*sql.Tx, bool) {
