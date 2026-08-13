@@ -48,6 +48,64 @@ func TestPutCredentials(t *testing.T) {
 	}
 }
 
+func TestInventory(t *testing.T) {
+	var gotMethod string
+	var gotPath string
+
+	// Response shape: inventory -> UpdateInventory -> inventory (v1alpha1.Inventory).
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotMethod = r.Method
+		gotPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"inventory":{"agentId":"11111111-1111-1111-1111-111111111111","inventory":{"vcenter_id":"vc-123","clusters":{"cluster-1":{}}}}}`))
+	}))
+	defer server.Close()
+
+	api := NewAgentApi(server.URL+"/", server.Client())
+	inventory, err := api.Inventory()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotMethod != http.MethodGet {
+		t.Errorf("expected method GET, got %s", gotMethod)
+	}
+	if gotPath != "/inventory" {
+		t.Errorf("expected path /inventory, got %s", gotPath)
+	}
+	if inventory.VcenterId != "vc-123" {
+		t.Errorf("expected vcenter_id %q, got %q", "vc-123", inventory.VcenterId)
+	}
+	if _, ok := inventory.Clusters["cluster-1"]; !ok {
+		t.Errorf("expected cluster %q in inventory clusters, got %v", "cluster-1", inventory.Clusters)
+	}
+}
+
+func TestInventoryMissingEnvelope(t *testing.T) {
+	// An HTTP 200 with an empty object (or explicit null inventory) must be
+	// rejected rather than returning a zero-valued inventory.
+	for name, body := range map[string]string{
+		"empty object":   `{}`,
+		"null inventory": `{"inventory":null}`,
+		"empty body":     ``,
+	} {
+		t.Run(name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(body))
+			}))
+			defer server.Close()
+
+			api := NewAgentApi(server.URL+"/", server.Client())
+			if _, err := api.Inventory(); err == nil {
+				t.Errorf("expected an error for %s response, got nil", name)
+			}
+		})
+	}
+}
+
 func TestStartCollector(t *testing.T) {
 	var gotMethod string
 	var gotPath string
