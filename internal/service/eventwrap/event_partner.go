@@ -62,9 +62,8 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 	// Notify the partner when a customer sent a partnership request
 	notificationBytes, err := notification.Build(
 		notification.PartnershipRequestEventType,
-		created.Partner.Company,
+		"11111111", // Todo: Send the correct console.redhat.com partner org_id if needed
 		notification.SeverityImportant,
-		nil,
 		nil,
 		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: true, Users: notifiedUsers},
 	)
@@ -214,7 +213,6 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 		user.Organization,
 		notification.SeverityImportant,
 		map[string]string{"decision": decision, "reason": reason},
-		nil,
 		notification.Recipient{Users: []string{updated.Username}, IgnoreUserPreferences: true},
 	)
 	if err != nil {

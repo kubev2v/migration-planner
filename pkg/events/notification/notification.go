@@ -55,8 +55,8 @@ func New(eventType, orgID, severity string, context map[string]string, payload a
 
 // Build constructs a Notification for eventType and marshals it to JSON,
 // ready to be stored in the outbox and later dispatched by a Writer.
-func Build(eventType, orgID, severity string, context map[string]string, payload any, recipients ...Recipient) ([]byte, error) {
-	data, err := json.Marshal(New(eventType, orgID, severity, context, payload, recipients...))
+func Build(eventType, orgID, severity string, context map[string]string, recipients ...Recipient) ([]byte, error) {
+	data, err := json.Marshal(New(eventType, orgID, severity, context, make(map[string]string), recipients...))
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal notification %s: %w", eventType, err)
 	}
