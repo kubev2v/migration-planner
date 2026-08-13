@@ -99,11 +99,14 @@ func (a *AgentApi) Status() (*AgentStatus, error) {
 	return result, nil
 }
 
-// Inventory retrieves the inventory data collected by the agent
+// Inventory retrieves the inventory data collected by the agent.
+// The agent returns a v2 envelope wrapping UpdateInventory; we unwrap it here.
 func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
-	var inv v1alpha1.Inventory
+	var envelope struct {
+		Inventory v1alpha1.UpdateInventory `json:"inventory"`
+	}
 
-	res, err := a.request(http.MethodGet, "inventory", nil, &inv)
+	res, err := a.request(http.MethodGet, "inventory", nil, &envelope)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get inventory: %w", err)
 	}
@@ -112,7 +115,7 @@ func (a *AgentApi) Inventory() (*v1alpha1.Inventory, error) {
 		return nil, fmt.Errorf(" unexpected response code %d", res.StatusCode)
 	}
 
-	return &inv, nil
+	return &envelope.Inventory.Inventory, nil
 }
 
 func (a *AgentApi) SetAgentMode(mode string) (*AgentStatus, error) {
