@@ -118,6 +118,7 @@ func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inve
 			DrsEnabled:        cluster.ClusterFeatures.DrsEnabled,
 			DrsMode:           cluster.ClusterFeatures.DrsMode,
 			StorageDrsEnabled: cluster.ClusterFeatures.StorageDrsEnabled,
+			HaEnabled:         cluster.ClusterFeatures.HaEnabled,
 		}
 	}
 
@@ -488,6 +489,8 @@ func resolveClusterID(clusterName string, objectIDs, datacenters map[string]stri
 
 // generateClusterID creates a consistent anonymized cluster ID.
 // Format: cluster-{first16hexchars} matching the old implementation.
+// Duplicated as SQL in templates/ingest_sqlite.go.tmpl (INSERT INTO vcluster); keep in sync.
+// Guarded by TestIngestSqlite_PopulatesVCluster.
 func generateClusterID(clusterName, datacenterName, vcenterUUID string) string {
 	// Combine all identifying info for uniqueness
 	// Include vcenterUUID to avoid collisions across vCenters
