@@ -3,6 +3,7 @@ package store_test
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -150,6 +151,84 @@ var _ = Describe("outbox store", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			events, err := s.Outbox().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(events).To(HaveLen(1))
+		})
+	})
+
+	Context("MarkFailed", func() {
+		insertOne := func() int {
+			err := s.Outbox().Insert(context.TODO(), model.OutboxEvent{
+				EventType: "test.event",
+				Payload:   []byte(`{}`),
+			})
+			Expect(err).To(BeNil())
+			events, err := s.Outbox().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(events).ToNot(BeEmpty())
+			return events[len(events)-1].ID
+		}
+
+		It("increments retry_count and schedules a future next_retry_at", func() {
+			id := insertOne()
+
+			err := s.Outbox().MarkFailed(context.TODO(), 2, 3600, id)
+			Expect(err).To(BeNil())
+
+			var event model.OutboxEvent
+			Expect(gormdb.First(&event, id).Error).To(BeNil())
+			Expect(event.RetryCount).To(Equal(1))
+			Expect(event.NextRetryAt).ToNot(BeNil())
+			Expect(event.NextRetryAt.After(time.Now())).To(BeTrue())
+		})
+
+		It("is a no-op when called with no IDs", func() {
+			id := insertOne()
+
+			err := s.Outbox().MarkFailed(context.TODO(), 2, 3600)
+			Expect(err).To(BeNil())
+
+			var event model.OutboxEvent
+			Expect(gormdb.First(&event, id).Error).To(BeNil())
+			Expect(event.RetryCount).To(Equal(0))
+			Expect(event.NextRetryAt).To(BeNil())
+		})
+	})
+
+	Context("List backoff filtering", func() {
+		It("excludes events whose next_retry_at is in the future", func() {
+			err := s.Outbox().Insert(context.TODO(), model.OutboxEvent{
+				EventType: "test.event",
+				Payload:   []byte(`{}`),
+			})
+			Expect(err).To(BeNil())
+
+			events, err := s.Outbox().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(events).To(HaveLen(1))
+
+			// MarkFailed should make it no longer eligible for pull in the immediate time.
+			Expect(s.Outbox().MarkFailed(context.TODO(), 2, 3600, events[0].ID)).To(BeNil())
+
+			events, err = s.Outbox().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(events).To(BeEmpty())
+		})
+
+		It("includes events whose next_retry_at is in the past", func() {
+			err := s.Outbox().Insert(context.TODO(), model.OutboxEvent{
+				EventType: "test.event",
+				Payload:   []byte(`{}`),
+			})
+			Expect(err).To(BeNil())
+
+			events, err := s.Outbox().List(context.TODO())
+			Expect(err).To(BeNil())
+			Expect(events).To(HaveLen(1))
+
+			gormdb.Exec("UPDATE outbox_events SET next_retry_at = now() - interval '1 minute' WHERE id = ?", events[0].ID)
+
+			events, err = s.Outbox().List(context.TODO())
 			Expect(err).To(BeNil())
 			Expect(events).To(HaveLen(1))
 		})

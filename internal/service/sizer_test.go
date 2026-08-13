@@ -200,6 +200,10 @@ func (m *MockOutboxStore) Delete(ctx context.Context, ids ...int) error {
 	return nil
 }
 
+func (m *MockOutboxStore) MarkFailed(ctx context.Context, backoffBase, capSeconds int, ids ...int) error {
+	return nil
+}
+
 // createTestSizerServer creates an HTTP test server that mocks the sizer service
 func createTestSizerServer(response *client.SizerResponse, healthStatus int, healthError bool) *httptest.Server {
 	return createTestSizerServerWithRequestCapture(response, healthStatus, healthError, nil)
