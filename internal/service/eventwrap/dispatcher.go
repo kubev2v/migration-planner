@@ -84,6 +84,7 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 		if err != nil {
 			zap.S().Errorw("outbox dispatcher: failed to write event, will retry",
 				"id", outboxEvent.ID, "event_type", outboxEvent.EventType, "error", err)
+			zap.S().Debugw("failed payload", "id", outboxEvent.ID, "payload", string(outboxEvent.Payload))
 			continue
 		}
 		published = append(published, outboxEvent.ID)
