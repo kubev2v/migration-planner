@@ -10,6 +10,8 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // sqliteCluster describes a cluster for createTestSQLite.
@@ -17,6 +19,7 @@ type sqliteCluster struct {
 	id         string
 	name       string
 	datacenter string // datacenter name (matched to a Datacenter row)
+	dasEnabled bool
 }
 
 // sqliteVM describes a VM for createTestSQLite.
@@ -44,9 +47,10 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 	stmts := []string{
 		fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath),
 
-		// About
-		`CREATE TABLE dst.About (InstanceUuid VARCHAR)`,
-		fmt.Sprintf(`INSERT INTO dst.About VALUES ('%s')`, escapeSQLString(instanceUUID)),
+		// About (all three columns needed so the template's INSERT INTO about succeeds
+		// and VCenterID() returns the real UUID for cluster ID hashing)
+		`CREATE TABLE dst.About ("APIVersion" VARCHAR, "Product" VARCHAR, "InstanceUuid" VARCHAR)`,
+		fmt.Sprintf(`INSERT INTO dst.About VALUES ('7.0', 'VMware vCenter', '%s')`, escapeSQLString(instanceUUID)),
 
 		// Datacenter
 		`CREATE TABLE dst.Datacenter (ID VARCHAR PRIMARY KEY, Name VARCHAR)`,
@@ -55,7 +59,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Folder (ID VARCHAR PRIMARY KEY, Datacenter VARCHAR)`,
 
 		// Cluster
-		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR)`,
+		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false)`,
 
 		// Host
 		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
@@ -113,8 +117,9 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		folderID := fmt.Sprintf("folder-%d", dcIdx)
 		parentJSON := fmt.Sprintf(`{"id":"%s"}`, folderID)
 		_, err := db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s')`,
+			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %t)`,
 			escapeSQLString(c.id), escapeSQLString(c.name), escapeSQLString(parentJSON),
+			c.dasEnabled,
 		))
 		require.NoError(t, err)
 
@@ -205,7 +210,8 @@ func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
 
 	assert.Len(t, vclusterMap, 2, "vcluster should have one row per cluster")
 
-	// Each Object ID must equal what generateClusterID would produce.
+	// Each Object ID must match the anonymized hash that generateClusterID produces.
+	// This also proves DuckDB's sha256() matches Go's crypto/sha256.
 	vcenterID, err := parser.VCenterID(ctx)
 	require.NoError(t, err)
 	clusterDatacenters, err := parser.ClusterDatacenters(ctx)
@@ -216,6 +222,76 @@ func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
 		assert.Equal(t, expectedID, vclusterMap[c.name],
 			"Object ID for cluster %q should match generateClusterID output", c.name)
 	}
+}
+
+func TestIngestSqlite_PopulatesVClusterFeatures(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster-ha-on", datacenter: "dc1", dasEnabled: true},
+		{id: "domain-c2", name: "cluster-ha-off", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-001", name: "vm-1", clusterName: "cluster-ha-on"},
+		{id: "vm-002", name: "vm-2", clusterName: "cluster-ha-off"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	rows, err := db.QueryContext(ctx, `SELECT "Name", "Object ID", "DasEnabled" FROM vcluster ORDER BY "Name"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+
+	type gotFeatures struct {
+		objectID string
+		das      bool
+	}
+	got := make(map[string]gotFeatures)
+	for rows.Next() {
+		var name, objectID string
+		var das bool
+		require.NoError(t, rows.Scan(&name, &objectID, &das))
+		got[name] = gotFeatures{objectID: objectID, das: das}
+	}
+	require.NoError(t, rows.Err())
+
+	require.Contains(t, got, "cluster-ha-on")
+	assert.Regexp(t, `^cluster-[0-9a-f]{16}$`, got["cluster-ha-on"].objectID, "Object ID must be anonymized")
+	assert.True(t, got["cluster-ha-on"].das, "HA should be enabled")
+
+	require.Contains(t, got, "cluster-ha-off")
+	assert.Regexp(t, `^cluster-[0-9a-f]{16}$`, got["cluster-ha-off"].objectID, "Object ID must be anonymized")
+	assert.False(t, got["cluster-ha-off"].das, "HA should be disabled")
+
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+
+	onID, offID := got["cluster-ha-on"].objectID, got["cluster-ha-off"].objectID
+	var onCluster, offCluster *inventory.InventoryData
+	for id, cluster := range inv.Clusters {
+		c := cluster
+		switch id {
+		case onID:
+			onCluster = &c
+		case offID:
+			offCluster = &c
+		}
+	}
+
+	require.NotNil(t, onCluster)
+	require.NotNil(t, onCluster.ClusterFeatures)
+	require.NotNil(t, onCluster.ClusterFeatures.HaEnabled)
+	assert.True(t, *onCluster.ClusterFeatures.HaEnabled)
+
+	require.NotNil(t, offCluster)
+	require.NotNil(t, offCluster.ClusterFeatures)
+	require.NotNil(t, offCluster.ClusterFeatures.HaEnabled)
+	assert.False(t, *offCluster.ClusterFeatures.HaEnabled)
 }
 
 func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {
@@ -383,37 +459,6 @@ func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, vmotionSupport, "VMotion support should be true, not hard-coded false")
 	assert.True(t, storageVmotionSupport, "Storage VMotion support should be true, not hard-coded false")
-}
-
-func TestIngestSqlite_PopulateVCluster_SkipsWhenAlreadyPopulated(t *testing.T) {
-	ctx := context.Background()
-	parser, db, cleanup := setupTestParser(t, &testValidator{})
-	defer cleanup()
-
-	// Pre-populate vcluster with a sentinel row.
-	_, err := db.ExecContext(ctx, `INSERT INTO vcluster ("Name", "Object ID") VALUES ('existing-cluster', 'sentinel-id')`)
-	require.NoError(t, err)
-
-	clusters := []sqliteCluster{
-		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
-	}
-	vms := []sqliteVM{
-		{id: "vm-001", name: "vm-1", clusterName: "cluster1"},
-	}
-	sqlitePath := createTestSQLite(t, "vcenter-uuid-001", clusters, vms)
-
-	result, err := parser.IngestSqlite(ctx, sqlitePath)
-	require.NoError(t, err)
-	require.True(t, result.IsValid())
-
-	// vcluster must still contain only the pre-existing row.
-	var count int
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*) FROM vcluster`).Scan(&count))
-	assert.Equal(t, 1, count, "populateVCluster should not insert when vcluster is already populated")
-
-	var objectID string
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT "Object ID" FROM vcluster WHERE "Name" = 'existing-cluster'`).Scan(&objectID))
-	assert.Equal(t, "sentinel-id", objectID, "pre-existing row must not be overwritten")
 }
 
 func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {

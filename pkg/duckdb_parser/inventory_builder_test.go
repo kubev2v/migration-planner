@@ -114,7 +114,7 @@ var (
 	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status", "VMotion support", "Storage VMotion support"}
 	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
 		"SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"}
-	vClusterHeaders = []string{"Name", "Object ID", "drs"}
+	vClusterHeaders = []string{"Name", "Object ID", "drs", "HA enabled"}
 )
 
 // defaultStandardSheets returns vInfo, vHost, default vDatastore, and vCluster from hosts for createTestExcel.
@@ -127,7 +127,7 @@ func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 			continue
 		}
 		clustersSeen[cluster] = true
-		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1), "drs": "false"})
+		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1), "drs": "false", "HA enabled": ""})
 	}
 
 	vDatastoreRows := []map[string]string{
@@ -1568,11 +1568,11 @@ func TestBuildInventory_ClusterFeatures(t *testing.T) {
 		{"Datacenter": "dc1", "Cluster": "cluster-no-drs-data", "# Cores": "12", "# CPU": "2", "Object ID": "host-003", "# Memory": "49152", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-3", "Config status": "green"},
 	}
 
-	// Custom vCluster data with specific DRS settings
+	// Custom vCluster data with specific DRS and HA settings
 	vClustersRows := []map[string]string{
-		{"Name": "cluster-drs-enabled", "Object ID": "domain-c1", "drs": "true"},
-		{"Name": "cluster-drs-disabled", "Object ID": "domain-c2", "drs": "false"},
-		{"Name": "cluster-no-drs-data", "Object ID": "domain-c3", "drs": ""}, // Empty DRS value should default to false
+		{"Name": "cluster-drs-enabled", "Object ID": "domain-c1", "drs": "true", "HA enabled": "true"},
+		{"Name": "cluster-drs-disabled", "Object ID": "domain-c2", "drs": "false", "HA enabled": "false"},
+		{"Name": "cluster-no-drs-data", "Object ID": "domain-c3", "drs": "", "HA enabled": ""}, // Empty values should default to false
 	}
 
 	vDatastoreRows := []map[string]string{
@@ -1627,6 +1627,18 @@ func TestBuildInventory_ClusterFeatures(t *testing.T) {
 	require.NotNil(t, noDrsDataCluster.ClusterFeatures, "cluster-no-drs-data should have cluster features")
 	require.NotNil(t, noDrsDataCluster.ClusterFeatures.DrsEnabled, "cluster-no-drs-data should have DrsEnabled set")
 	assert.False(t, *noDrsDataCluster.ClusterFeatures.DrsEnabled, "cluster-no-drs-data should default to DRS disabled")
+
+	// Verify cluster with HA enabled
+	require.NotNil(t, drsEnabledCluster.ClusterFeatures.HaEnabled, "cluster-drs-enabled should have HaEnabled set")
+	assert.True(t, *drsEnabledCluster.ClusterFeatures.HaEnabled, "cluster-drs-enabled should have HA enabled")
+
+	// Verify cluster with HA disabled
+	require.NotNil(t, drsDisabledCluster.ClusterFeatures.HaEnabled, "cluster-drs-disabled should have HaEnabled set")
+	assert.False(t, *drsDisabledCluster.ClusterFeatures.HaEnabled, "cluster-drs-disabled should have HA disabled")
+
+	// Verify cluster with missing HA data (should default to false)
+	require.NotNil(t, noDrsDataCluster.ClusterFeatures.HaEnabled, "cluster-no-drs-data should have HaEnabled set")
+	assert.False(t, *noDrsDataCluster.ClusterFeatures.HaEnabled, "cluster-no-drs-data should default to HA disabled")
 }
 
 // TestBuildInventory_ClusterFeaturesFlexibleParsing tests that the DRS parsing

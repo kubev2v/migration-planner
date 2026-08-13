@@ -38,6 +38,7 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 		clusterFeatures := api.ClusterFeatures{
 			DrsEnabled:        d.ClusterFeatures.DrsEnabled,
 			StorageDrsEnabled: d.ClusterFeatures.StorageDrsEnabled,
+			HaEnabled:         d.ClusterFeatures.HaEnabled,
 		}
 
 		// Map DrsMode string to enum type
