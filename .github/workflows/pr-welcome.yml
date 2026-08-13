@@ -1,0 +1,16 @@
+name: PR Welcome
+
+on:
+  pull_request_target:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [edited]
+
+jobs:
+  welcome:
+    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-welcome.yml@main
+    with:
+      skip-authors: '["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]'
+    permissions:
+      pull-requests: write
+      issues: write
