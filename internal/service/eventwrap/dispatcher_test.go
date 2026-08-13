@@ -3,6 +3,7 @@ package eventwrap_test
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
@@ -15,11 +16,13 @@ import (
 )
 
 type mockOutbox struct {
-	events     []model.OutboxEvent
-	deletedIDs []int
-	listErr    error
-	deleteErr  error
-	insertErr  error
+	events      []model.OutboxEvent
+	deletedIDs  []int
+	failedIDs   []int
+	listErr     error
+	deleteErr   error
+	insertErr   error
+	markFailErr error
 }
 
 func (m *mockOutbox) Insert(_ context.Context, event model.OutboxEvent) error {
@@ -54,6 +57,19 @@ func (m *mockOutbox) Delete(_ context.Context, ids ...int) error {
 		}
 	}
 	m.events = remaining
+	return nil
+}
+
+func (m *mockOutbox) MarkFailed(_ context.Context, _, _ int, ids ...int) error {
+	if m.markFailErr != nil {
+		return m.markFailErr
+	}
+	m.failedIDs = append(m.failedIDs, ids...)
+	for i := range m.events {
+		if slices.Contains(ids, m.events[i].ID) {
+			m.events[i].RetryCount++
+		}
+	}
 	return nil
 }
 
@@ -153,9 +169,10 @@ var _ = Describe("OutboxDispatcher", func() {
 		Expect(outbox.deletedIDs).To(BeNil())
 	})
 
-	It("skips events that fail to write and retains them", func() {
+	It("backs off events that fail to write and retains them", func() {
+		id := 17
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
+			{ID: id, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
 		}
 		writer.writeErr = fmt.Errorf("kafka unavailable")
 
@@ -163,6 +180,23 @@ var _ = Describe("OutboxDispatcher", func() {
 
 		Expect(writer.written).To(BeNil())
 		Expect(outbox.events).To(HaveLen(1))
+		Expect(outbox.deletedIDs).To(BeEmpty())
+		Expect(outbox.failedIDs).To(ContainElement(id))
+	})
+
+	It("drops events that exceeded the max retry count without writing them", func() {
+		outbox.events = []model.OutboxEvent{
+			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("poison"), RetryCount: 15},
+			{ID: 2, EventType: kafka.VisitorEventType, Payload: []byte("fresh")},
+		}
+
+		runOneTick()
+
+		Expect(writer.written).To(HaveLen(1))
+		Expect(writer.written[0]).To(Equal([]byte("fresh")))
+		Expect(outbox.deletedIDs).To(ContainElement(1))
+		Expect(outbox.failedIDs).To(BeEmpty())
+		Expect(outbox.events).To(BeEmpty())
 	})
 
 	It("writes multiple events and bulk-deletes", func() {
@@ -192,7 +226,7 @@ var _ = Describe("OutboxDispatcher", func() {
 		Expect(outbox.events).To(BeEmpty())
 	})
 
-	It("skips and retains events with an unrecognized event type", func() {
+	It("drop events with an unrecognized event type", func() {
 		outbox.events = []model.OutboxEvent{
 			{ID: 1, EventType: "some.unknown.type", Payload: []byte("event-data")},
 		}
@@ -201,6 +235,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 		Expect(writer.written).To(BeNil())
 		Expect(notifier.written).To(BeNil())
-		Expect(outbox.events).To(HaveLen(1))
+		Expect(outbox.events).To(HaveLen(0))
+		Expect(outbox.deletedIDs).To(ConsistOf(1))
+		Expect(outbox.failedIDs).To(BeEmpty())
 	})
 })

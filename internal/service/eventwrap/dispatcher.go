@@ -23,6 +23,10 @@ const (
 	writerTypeUnknown writerType = iota
 	writerTypeKafka
 	writerTypeNotification
+
+	outboxMaxRetries        = 10
+	outboxBackoffBase       = 5
+	outboxBackoffCapSeconds = 3 * 60 * 60 // 3h
 )
 
 func NewOutboxDispatcher(s store.Store, writer kafka.Writer, notifier notification.Writer, interval time.Duration) *OutboxDispatcher {
@@ -68,8 +72,19 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 		return
 	}
 
-	var published []int
+	var toDelete, toRetain []int
 	for _, outboxEvent := range outboxEvents {
+		if outboxEvent.RetryCount >= outboxMaxRetries {
+			zap.S().Warnw(
+				"outbox dispatcher: max retries exceeded",
+				"id", outboxEvent.ID,
+				"event_type", outboxEvent.EventType,
+				"retries", outboxEvent.RetryCount,
+			)
+			toDelete = append(toDelete, outboxEvent.ID)
+			continue
+		}
+
 		var err error
 		switch writerTypeForEventType(outboxEvent.EventType) {
 		case writerTypeKafka:
@@ -77,21 +92,36 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 		case writerTypeNotification:
 			err = d.notifier.Write(ctx, outboxEvent.Payload)
 		default:
-			zap.S().Errorw("outbox dispatcher: no writer registered for event type, will retry",
+			zap.S().Errorw("outbox dispatcher: no writer registered for event type, dropping",
 				"id", outboxEvent.ID, "event_type", outboxEvent.EventType)
+			toDelete = append(toDelete, outboxEvent.ID)
 			continue
 		}
 		if err != nil {
-			zap.S().Errorw("outbox dispatcher: failed to write event, will retry",
-				"id", outboxEvent.ID, "event_type", outboxEvent.EventType, "error", err)
-			zap.S().Debugw("failed payload", "id", outboxEvent.ID, "payload", string(outboxEvent.Payload))
+			zap.S().Errorw(
+				"outbox dispatcher: failed to write event, will retry",
+				"id", outboxEvent.ID,
+				"event_type", outboxEvent.EventType,
+				"error", err,
+			)
+			toRetain = append(toRetain, outboxEvent.ID)
 			continue
 		}
-		published = append(published, outboxEvent.ID)
+
+		zap.S().Debugw(
+			"successfully dispatched",
+			"id", outboxEvent.ID,
+			"event_type", outboxEvent.EventType,
+		)
+		toDelete = append(toDelete, outboxEvent.ID)
 	}
 
-	if err := d.store.Outbox().Delete(ctx, published...); err != nil {
-		zap.S().Errorw("outbox dispatcher: failed to delete published events", "error", err)
+	if err := d.store.Outbox().Delete(ctx, toDelete...); err != nil {
+		zap.S().Errorw("outbox dispatcher: failed to delete toDelete events", "error", err)
+	}
+
+	if err := d.store.Outbox().MarkFailed(ctx, outboxBackoffBase, outboxBackoffCapSeconds, toRetain...); err != nil {
+		zap.S().Errorw("outbox dispatcher: failed to record retry backoff", "error", err)
 	}
 
 	if _, err := store.Commit(ctx); err != nil {

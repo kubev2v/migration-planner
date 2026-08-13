@@ -12,6 +12,7 @@ type Outbox interface {
 	Insert(ctx context.Context, event model.OutboxEvent) error
 	List(ctx context.Context) ([]model.OutboxEvent, error)
 	Delete(ctx context.Context, ids ...int) error
+	MarkFailed(ctx context.Context, backoffBase, capSeconds int, ids ...int) error
 }
 
 type OutboxStore struct {
@@ -31,6 +32,7 @@ func (s *OutboxStore) Insert(ctx context.Context, event model.OutboxEvent) error
 func (s *OutboxStore) List(ctx context.Context) ([]model.OutboxEvent, error) {
 	var events []model.OutboxEvent
 	result := s.getDB(ctx).
+		Where("next_retry_at IS NULL OR next_retry_at <= now()").
 		Order("id ASC").
 		Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
 		Find(&events)
@@ -45,6 +47,19 @@ func (s *OutboxStore) Delete(ctx context.Context, ids ...int) error {
 		return nil
 	}
 	return s.getDB(ctx).Where("id IN ?", ids).Delete(&model.OutboxEvent{}).Error
+}
+
+func (s *OutboxStore) MarkFailed(ctx context.Context, backoffBase, capSeconds int, ids ...int) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return s.getDB(ctx).
+		Model(&model.OutboxEvent{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"retry_count":   gorm.Expr("retry_count + 1"),
+			"next_retry_at": gorm.Expr("now() + make_interval(secs => LEAST(POWER(?, retry_count + 1), ?))", backoffBase, capSeconds),
+		}).Error
 }
 
 func (s *OutboxStore) getDB(ctx context.Context) *gorm.DB {
