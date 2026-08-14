@@ -419,6 +419,12 @@ build-e2e:
 	go build -o bin/e2e github.com/kubev2v/migration-planner/test/e2e
 	@echo "e2e binary built at bin/e2e"
 
+# Build custom vcsim Docker image for e2e tests (with SIOC/IORM configuration)
+build-e2e-vcsim:
+	@echo "Building custom vcsim image..."
+	docker build -t e2e-vcsim:latest -f test/e2e/cmd/vcsim/Containerfile.vcsim .
+	@echo "e2e-vcsim image built"
+
 # Run integration tests using ginkgo
 integration-test: $(GINKGO)
 	@echo "🧪 Running integration tests..."

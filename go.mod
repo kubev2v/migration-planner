@@ -43,6 +43,7 @@ require (
 	github.com/thoas/go-funk v0.9.3
 	github.com/twmb/franz-go v1.21.0
 	github.com/twmb/franz-go/plugin/kprom v1.4.0
+	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/sync v0.22.0
