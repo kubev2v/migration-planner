@@ -16,6 +16,12 @@ parameters:
   - name: PASSWORD
     description: Password for the simulator.
     required: true
+  - name: VCSIM_IMAGE
+    description: Container image for the vcsim simulator.
+    value: docker.io/vmware/vcsim
+  - name: VCSIM_IMAGE_PULL_POLICY
+    description: Image pull policy for the vcsim container.
+    value: Always
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -44,8 +50,8 @@ objects:
         spec:
           containers:
             - name: ${APP_NAME}
-              image: docker.io/vmware/vcsim
-              imagePullPolicy: Always
+              image: ${VCSIM_IMAGE}
+              imagePullPolicy: ${VCSIM_IMAGE_PULL_POLICY}
               args: ["-l", "0.0.0.0:${PORT}", "-username", "${USERNAME}", "-password", "${PASSWORD}"]
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File

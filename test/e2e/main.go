@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -57,7 +58,7 @@ func run() error {
 	}()
 
 	if !config.Cfg.Infra.SkipSetup {
-		if err := setupInfra(im); err != nil {
+		if err := setupInfra(context.Background(), im); err != nil {
 			return fmt.Errorf("infra setup failed: %w", err)
 		}
 	}
@@ -73,7 +74,7 @@ func run() error {
 	return nil
 }
 
-func setupInfra(im infra.InfraManager) error {
+func setupInfra(ctx context.Context, im infra.InfraManager) error {
 	cfg := config.Cfg.Infra
 
 	if err := im.CreateCluster(); err != nil {
@@ -86,7 +87,7 @@ func setupInfra(im infra.InfraManager) error {
 		return fmt.Errorf("api-image tag %q and iso-image tag %q must match. please provide same tag", apiTag, isoTag)
 	}
 
-	if err := im.LoadImages([]string{cfg.APIImage, cfg.ISOImage}); err != nil {
+	if err := im.LoadImages(ctx, []string{cfg.APIImage, cfg.ISOImage}); err != nil {
 		return fmt.Errorf("loading images: %w", err)
 	}
 
@@ -96,7 +97,7 @@ func setupInfra(im infra.InfraManager) error {
 	if err := im.DeployPostgres(); err != nil {
 		return fmt.Errorf("deploying postgres: %w", err)
 	}
-	if err := im.DeployVcsim(); err != nil {
+	if err := im.DeployVcsim(ctx); err != nil {
 		return fmt.Errorf("deploying vcsim: %w", err)
 	}
 

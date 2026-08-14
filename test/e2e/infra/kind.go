@@ -133,16 +133,20 @@ func (k *KindInfraManager) DeployPostgres() error {
 	return k.waitForDeployment(k.cfg.PostgresDeployName)
 }
 
-func (k *KindInfraManager) DeployVcsim() error {
+func (k *KindInfraManager) DeployVcsim(ctx context.Context) error {
 	zap.S().Info("Deploying vcsim instances")
 
+	vcsimImage, err := k.buildVcsimImage(ctx)
+	if err != nil {
+		return fmt.Errorf("building vcsim image: %w", err)
+	}
+
+	if err := k.loadImage(ctx, vcsimImage); err != nil {
+		return fmt.Errorf("loading vcsim image: %w", err)
+	}
+
 	for _, v := range k.cfg.Vcsim {
-		if err := k.applyTemplate("vcsim-template.yml", map[string]string{
-			"APP_NAME": v.Name,
-			"PORT":     fmt.Sprintf("%d", v.Port),
-			"USERNAME": v.Username,
-			"PASSWORD": v.Password,
-		}); err != nil {
+		if err := k.applyTemplate("vcsim-template.yml", vcsimTemplateParams(v, vcsimImage)); err != nil {
 			return fmt.Errorf("deploying %s: %w", v.Name, err)
 		}
 	}
@@ -155,6 +159,55 @@ func (k *KindInfraManager) DeployVcsim() error {
 	return nil
 }
 
+// vcsimTemplateParams builds the template parameters for a single vcsim
+// instance. The custom image is built and loaded into Kind locally, so its pull
+// policy must be Never to avoid a registry lookup.
+func vcsimTemplateParams(v config.VcsimInstance, image string) map[string]string {
+	return map[string]string{
+		"APP_NAME":                v.Name,
+		"PORT":                    fmt.Sprintf("%d", v.Port),
+		"USERNAME":                v.Username,
+		"PASSWORD":                v.Password,
+		"VCSIM_IMAGE":             image,
+		"VCSIM_IMAGE_PULL_POLICY": "Never",
+	}
+}
+
+const (
+	e2eVcsimImage      = "e2e-vcsim:latest"
+	vcsimContainerfile = "test/e2e/cmd/vcsim/Containerfile.vcsim"
+)
+
+// execCommandContext is a seam so tests can stub out docker/kind invocations.
+var execCommandContext = exec.CommandContext
+
+func (k *KindInfraManager) buildVcsimImage(ctx context.Context) (string, error) {
+	zap.S().Info("Building custom vcsim image")
+
+	build := execCommandContext(ctx, "docker", "build",
+		"-t", e2eVcsimImage,
+		"-f", vcsimContainerfile,
+		".")
+	build.Stdout = os.Stdout
+	build.Stderr = os.Stderr
+	if err := build.Run(); err != nil {
+		return "", fmt.Errorf("docker build: %w", err)
+	}
+	return e2eVcsimImage, nil
+}
+
+func (k *KindInfraManager) loadImage(ctx context.Context, image string) error {
+	if err := ensureImageExists(ctx, image); err != nil {
+		return err
+	}
+
+	zap.S().Infof("Loading image %s into Kind cluster", image)
+	cmd := execCommandContext(ctx, "kind", "load", "docker-image", image, "--name", k.cfg.ClusterName)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
 func (k *KindInfraManager) DeployService(params map[string]string) error {
 	zap.S().Info("Deploying migration planner service")
 	if err := k.applyTemplate("service-template.yml", params); err != nil {
@@ -163,14 +216,14 @@ func (k *KindInfraManager) DeployService(params map[string]string) error {
 	return k.waitForAllDeployments()
 }
 
-func (k *KindInfraManager) LoadImages(images []string) error {
+func (k *KindInfraManager) LoadImages(ctx context.Context, images []string) error {
 	for _, img := range images {
-		if err := ensureImageExists(img); err != nil {
+		if err := ensureImageExists(ctx, img); err != nil {
 			return err
 		}
 
 		zap.S().Infof("Loading image %s into Kind cluster", img)
-		cmd := exec.Command("kind", "load", "docker-image", img, "--name", k.cfg.ClusterName)
+		cmd := execCommandContext(ctx, "kind", "load", "docker-image", img, "--name", k.cfg.ClusterName)
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
@@ -264,14 +317,14 @@ func (k *KindInfraManager) applyObject(obj unstructured.Unstructured) error {
 	return nil
 }
 
-func ensureImageExists(image string) error {
-	if exec.Command("docker", "image", "inspect", image).Run() == nil {
+func ensureImageExists(ctx context.Context, image string) error {
+	if execCommandContext(ctx, "docker", "image", "inspect", image).Run() == nil {
 		zap.S().Infof("Image %s found locally", image)
 		return nil
 	}
 
 	zap.S().Infof("Image %s not found locally, pulling", image)
-	cmd := exec.Command("docker", "pull", image)
+	cmd := execCommandContext(ctx, "docker", "pull", image)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
