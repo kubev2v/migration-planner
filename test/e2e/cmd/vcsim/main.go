@@ -15,6 +15,20 @@ import (
 
 	"github.com/vmware/govmomi/simulator"
 	"github.com/vmware/govmomi/vim25/types"
+
+	// Register the optional SOAP/REST endpoints via their init() functions, the
+	// same way the stock vmware/vcsim binary does. Without these blank imports
+	// the base simulator serves only /sdk, so the vAPI REST endpoint is absent
+	// and the forklift collector's REST login gets a 404 and retries
+	// forever, leaving collection stuck in "collecting".
+	_ "github.com/vmware/govmomi/cns/simulator"
+	_ "github.com/vmware/govmomi/eam/simulator"
+	_ "github.com/vmware/govmomi/lookup/simulator"
+	_ "github.com/vmware/govmomi/pbm/simulator"
+	_ "github.com/vmware/govmomi/sts/simulator"
+	_ "github.com/vmware/govmomi/vapi/simulator"
+	_ "github.com/vmware/govmomi/vsan/simulator"
+	_ "github.com/vmware/govmomi/vslm/simulator"
 )
 
 const (
