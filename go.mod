@@ -3,7 +3,7 @@ module github.com/kubev2v/migration-planner
 go 1.26.0
 
 require (
-	github.com/MicahParks/jwkset v0.11.0
+	github.com/MicahParks/jwkset v0.11.3
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/cloudevents/sdk-go/v2 v2.15.2
 	github.com/coreos/butane v0.25.1
