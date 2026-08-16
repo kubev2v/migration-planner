@@ -35,10 +35,9 @@ type ClusterUtilization struct {
 
 // ClusterFeatures contains cluster-level feature information.
 type ClusterFeatures struct {
-	DrsEnabled        *bool   `json:"drsEnabled,omitempty"`
-	DrsMode           *string `json:"drsMode,omitempty"`
-	StorageDrsEnabled *bool   `json:"storageDrsEnabled,omitempty"`
-	HaEnabled         *bool   `json:"haEnabled,omitempty"`
+	DrsEnabled *bool   `json:"drsEnabled,omitempty"`
+	DrsMode    *string `json:"drsMode,omitempty"`
+	HaEnabled  *bool   `json:"haEnabled,omitempty"`
 }
 
 // VMsData contains aggregated VM statistics and distribution data.
