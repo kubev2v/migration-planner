@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/kubev2v/assisted-migration-agent/pkg/e2e/vcsim"
 	"github.com/kubev2v/migration-planner/test/e2e/config"
 	"go.uber.org/zap"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
@@ -136,12 +137,60 @@ func (k *KindInfraManager) DeployPostgres() error {
 func (k *KindInfraManager) DeployVcsim() error {
 	zap.S().Info("Deploying vcsim instances")
 
+	modelDir, err := os.MkdirTemp("", "vcsim-model-*")
+	if err != nil {
+		return fmt.Errorf("creating vcsim model dir: %w", err)
+	}
+
+	gen, err := vcsim.NewDataset(modelDir)
+	if err != nil {
+		return fmt.Errorf("creating vcsim dataset: %w", err)
+	}
+
+	if err := gen.GenerateXML(); err != nil {
+		return fmt.Errorf("generating vcsim model: %w", err)
+	}
+
+	// Copy model directory into Kind node so it's accessible via hostPath
+	kindNodeName := k.cfg.ClusterName + "-control-plane"
+	containerModelDir := "/tmp/vcsim-model"
+
+	// Create directory in Kind node
+	cmd := exec.Command("docker", "exec", kindNodeName, "mkdir", "-p", containerModelDir)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("creating model dir in Kind node: %w", err)
+	}
+
+	// Copy model files into Kind node using tar (docker cp doesn't work reliably with /. syntax)
+	tarCmd := exec.Command("tar", "-C", modelDir, "-cf", "-", ".")
+	dockerCmd := exec.Command("docker", "exec", "-i", kindNodeName, "tar", "-C", containerModelDir, "-xf", "-")
+
+	pipe, err := tarCmd.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("creating tar pipe: %w", err)
+	}
+	dockerCmd.Stdin = pipe
+
+	if err := tarCmd.Start(); err != nil {
+		return fmt.Errorf("starting tar: %w", err)
+	}
+	if err := dockerCmd.Start(); err != nil {
+		return fmt.Errorf("starting docker exec: %w", err)
+	}
+	if err := tarCmd.Wait(); err != nil {
+		return fmt.Errorf("tar command failed: %w", err)
+	}
+	if err := dockerCmd.Wait(); err != nil {
+		return fmt.Errorf("docker exec tar failed: %w", err)
+	}
+
 	for _, v := range k.cfg.Vcsim {
 		if err := k.applyTemplate("vcsim-template.yml", map[string]string{
-			"APP_NAME": v.Name,
-			"PORT":     fmt.Sprintf("%d", v.Port),
-			"USERNAME": v.Username,
-			"PASSWORD": v.Password,
+			"APP_NAME":  v.Name,
+			"PORT":      fmt.Sprintf("%d", v.Port),
+			"USERNAME":  v.Username,
+			"PASSWORD":  v.Password,
+			"MODEL_DIR": containerModelDir,
 		}); err != nil {
 			return fmt.Errorf("deploying %s: %w", v.Name, err)
 		}

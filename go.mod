@@ -19,14 +19,15 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/kubev2v/assisted-migration-agent v0.0.0-20260816121534-4f35189ee030
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/onsi/ginkgo/v2 v2.28.0
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/ginkgo/v2 v2.29.0
+	github.com/onsi/gomega v1.41.0
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20260715165912-72066cc9718b
 	github.com/openshift/assisted-image-service v0.0.0-20260804155527-a31e3c3f2765
@@ -44,7 +45,7 @@ require (
 	github.com/twmb/franz-go v1.21.0
 	github.com/twmb/franz-go/plugin/kprom v1.4.0
 	github.com/xuri/excelize/v2 v2.11.0
-	go.uber.org/zap v1.27.1
+	go.uber.org/zap v1.28.0
 	golang.org/x/sync v0.22.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
@@ -58,7 +59,7 @@ require (
 
 require (
 	al.essio.dev/pkg/shellescape v1.5.1 // indirect
-	github.com/BurntSushi/toml v1.4.0 // indirect
+	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
 	github.com/anchore/go-lzo v0.1.1 // indirect
@@ -77,7 +78,7 @@ require (
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/diskfs/go-diskfs v1.7.1-0.20251217162235-58541aa8f559 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
-	github.com/duckdb/duckdb-go-bindings v0.1.21 // indirect
+	github.com/duckdb/duckdb-go-bindings v0.1.24 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-arm64 v0.1.24 // indirect
 	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.24 // indirect
@@ -86,7 +87,7 @@ require (
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20260801111138-45c5fff54b41 // indirect
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
-	github.com/evanphx/json-patch/v5 v5.6.0 // indirect
+	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/fxamacker/cbor/v2 v2.9.2 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.15 // indirect
 	github.com/go-ini/ini v1.67.3 // indirect
@@ -113,7 +114,7 @@ require (
 	github.com/go-viper/mapstructure/v2 v2.5.0 // indirect
 	github.com/gobwas/glob v0.2.3 // indirect
 	github.com/goccy/go-json v0.10.6 // indirect
-	github.com/google/flatbuffers v25.2.10+incompatible // indirect
+	github.com/google/flatbuffers v25.9.23+incompatible // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/pprof v0.0.0-20260802141513-ef3492d7dac3 // indirect
@@ -152,7 +153,7 @@ require (
 	github.com/pkg/xattr v0.4.12 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/prometheus/client_model v0.6.2 // indirect
-	github.com/prometheus/common v0.67.5 // indirect
+	github.com/prometheus/common v0.68.0 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/richardlehane/mscfb v1.0.7 // indirect
@@ -182,10 +183,10 @@ require (
 	github.com/yashtewari/glob-intersection v0.2.0 // indirect
 	github.com/zeebo/xxh3 v1.0.2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/otel v1.43.0 // indirect
-	go.opentelemetry.io/otel/metric v1.43.0 // indirect
-	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
-	go.opentelemetry.io/otel/trace v1.43.0 // indirect
+	go.opentelemetry.io/otel v1.44.0 // indirect
+	go.opentelemetry.io/otel/metric v1.44.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.44.0 // indirect
+	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
@@ -195,7 +196,7 @@ require (
 	golang.org/x/exp v0.0.0-20260727155853-b88d891fe743 // indirect
 	golang.org/x/mod v0.38.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
-	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260717140457-bdb89881bb75 // indirect
 	golang.org/x/term v0.45.0 // indirect

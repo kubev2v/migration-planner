@@ -16,6 +16,9 @@ parameters:
   - name: PASSWORD
     description: Password for the simulator.
     required: true
+  - name: MODEL_DIR
+    description: Directory which contains vcsim XML.
+    required: true
 objects:
   - apiVersion: apps/v1
     kind: Deployment
@@ -46,15 +49,21 @@ objects:
             - name: ${APP_NAME}
               image: docker.io/vmware/vcsim
               imagePullPolicy: Always
-              args: ["-l", "0.0.0.0:${PORT}", "-username", "${USERNAME}", "-password", "${PASSWORD}"]
+              args: ["-l", "0.0.0.0:${PORT}", "-username", "${USERNAME}", "-password", "${PASSWORD}", "-load", "/models"]
               terminationMessagePath: /dev/termination-log
               terminationMessagePolicy: File
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+                - name: model
+                  mountPath: /models
           volumes:
             - name: tmp
               emptyDir: {}
+            - name: model
+              hostPath:
+                path: ${MODEL_DIR}
+                type: Directory
           dnsPolicy: ClusterFirst
           restartPolicy: Always
           schedulerName: default-scheduler
