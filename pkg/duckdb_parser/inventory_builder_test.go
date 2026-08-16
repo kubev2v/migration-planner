@@ -114,7 +114,7 @@ var (
 	vHostHeaders      = []string{"Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status", "VMotion support", "Storage VMotion support"}
 	vDatastoreHeaders = []string{"Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
 		"SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"}
-	vClusterHeaders = []string{"Name", "Object ID", "drs", "HA enabled"}
+	vClusterHeaders = []string{"Name", "Object ID", "DRS enabled", "DRS default VM behavior", "HA enabled"}
 )
 
 // defaultStandardSheets returns vInfo, vHost, default vDatastore, and vCluster from hosts for createTestExcel.
@@ -127,7 +127,7 @@ func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 			continue
 		}
 		clustersSeen[cluster] = true
-		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1), "drs": "false", "HA enabled": ""})
+		vClustersRows = append(vClustersRows, map[string]string{"Name": cluster, "Object ID": fmt.Sprintf("domain-c%d", i+1), "DRS enabled": "false", "HA enabled": ""})
 	}
 
 	vDatastoreRows := []map[string]string{
@@ -1570,9 +1570,9 @@ func TestBuildInventory_ClusterFeatures(t *testing.T) {
 
 	// Custom vCluster data with specific DRS and HA settings
 	vClustersRows := []map[string]string{
-		{"Name": "cluster-drs-enabled", "Object ID": "domain-c1", "drs": "true", "HA enabled": "true"},
-		{"Name": "cluster-drs-disabled", "Object ID": "domain-c2", "drs": "false", "HA enabled": "false"},
-		{"Name": "cluster-no-drs-data", "Object ID": "domain-c3", "drs": "", "HA enabled": ""}, // Empty values should default to false
+		{"Name": "cluster-drs-enabled", "Object ID": "domain-c1", "DRS enabled": "true", "DRS default VM behavior": "fullyAutomated", "HA enabled": "true"},
+		{"Name": "cluster-drs-disabled", "Object ID": "domain-c2", "DRS enabled": "false", "HA enabled": "false"},
+		{"Name": "cluster-no-drs-data", "Object ID": "domain-c3", "DRS enabled": "", "HA enabled": ""}, // Empty values should default to false
 	}
 
 	vDatastoreRows := []map[string]string{
@@ -1615,6 +1615,8 @@ func TestBuildInventory_ClusterFeatures(t *testing.T) {
 	require.NotNil(t, drsEnabledCluster.ClusterFeatures, "cluster-drs-enabled should have cluster features")
 	require.NotNil(t, drsEnabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-enabled should have DrsEnabled set")
 	assert.True(t, *drsEnabledCluster.ClusterFeatures.DrsEnabled, "cluster-drs-enabled should have DRS enabled")
+	require.NotNil(t, drsEnabledCluster.ClusterFeatures.DrsMode, "cluster-drs-enabled should have DrsMode set")
+	assert.Equal(t, "fullyAutomated", *drsEnabledCluster.ClusterFeatures.DrsMode, "cluster-drs-enabled should carry DRS default VM behavior")
 
 	// Verify cluster with DRS disabled
 	require.NotNil(t, drsDisabledCluster, "Should find cluster-drs-disabled")
@@ -1680,7 +1682,7 @@ func TestBuildInventory_ClusterFeaturesFlexibleParsing(t *testing.T) {
 				{"Datacenter": "dc1", "Cluster": "test-cluster", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 			}
 			vClustersRows := []map[string]string{
-				{"Name": "test-cluster", "Object ID": "domain-c1", "drs": tc.drsValue},
+				{"Name": "test-cluster", "Object ID": "domain-c1", "DRS enabled": tc.drsValue},
 			}
 			vDatastoreRows := []map[string]string{
 				{"Hosts": "esxi-host-1", "Address": "10.0.0.1", "Name": "datastore1", "Object ID": "datastore-001", "Free MiB": "524288", "MHA": "false", "Capacity MiB": "1048576", "Type": "VMFS"},
@@ -2171,7 +2173,7 @@ func TestBuildInventory_VMotionSupport_DefaultWhenMissing(t *testing.T) {
 	defer cleanup()
 
 	// Use old headers (without vMotion columns) to simulate old RVTools format
-	vClustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1", "drs": "false"}}
+	vClustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1", "DRS enabled": "false"}}
 	sheets := []ExcelSheet{
 		NewExcelSheet("vInfo", vInfoHeaders, vms),
 		NewExcelSheet("vHost", oldHeaders, hostsOld),

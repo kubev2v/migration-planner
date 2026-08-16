@@ -309,22 +309,17 @@ FROM read_xlsx('{{.FilePath}}', sheet='dvSwitch', all_varchar=true);
 CREATE TABLE vcluster_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);
 
-ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "drs" VARCHAR;
-ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "DrsDefaultVmBehavior" VARCHAR;
-ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "Storage DRS" VARCHAR;
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "DRS enabled" VARCHAR;
+ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "DRS default VM behavior" VARCHAR;
 ALTER TABLE vcluster_raw ADD COLUMN IF NOT EXISTS "HA enabled" VARCHAR;
 
-INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "StorageDrsEnabled", "DasEnabled")
+INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "DasEnabled")
 SELECT "Name", "Object ID",
     CASE
-        WHEN LOWER(TRIM(COALESCE("drs", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
+        WHEN LOWER(TRIM(COALESCE("DRS enabled", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
         ELSE false
     END as "DrsEnabled",
-    COALESCE(NULLIF(TRIM("DrsDefaultVmBehavior"), ''), 'None') as "DrsDefaultVmBehavior",
-    CASE
-        WHEN LOWER(TRIM(COALESCE("Storage DRS", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
-        ELSE false
-    END as "StorageDrsEnabled",
+    COALESCE(NULLIF(TRIM("DRS default VM behavior"), ''), 'None') as "DrsDefaultVmBehavior",
     CASE
         WHEN LOWER(TRIM(COALESCE("HA enabled", ''))) IN ('true', '1', 'yes', 'enabled') THEN true
         ELSE false

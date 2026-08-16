@@ -2,7 +2,7 @@
 Cluster Features Query Template - Returns cluster features including DRS settings.
 Takes cluster name filter to return features for specific cluster.
 */ -}}
-SELECT "DrsEnabled", "DrsDefaultVmBehavior" as drsMode, "StorageDrsEnabled", "DasEnabled"
+SELECT "DrsEnabled", "DrsDefaultVmBehavior" as drsMode, "DasEnabled"
 FROM vcluster
 WHERE "Name" = '{{.ClusterName}}'
   AND "Name" IS NOT NULL AND "Name" != ''

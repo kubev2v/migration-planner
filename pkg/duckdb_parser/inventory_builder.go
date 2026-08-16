@@ -115,10 +115,9 @@ func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inve
 	var clusterFeatures *inventory.ClusterFeatures
 	if cluster != nil && cluster.ClusterFeatures != nil {
 		clusterFeatures = &inventory.ClusterFeatures{
-			DrsEnabled:        cluster.ClusterFeatures.DrsEnabled,
-			DrsMode:           cluster.ClusterFeatures.DrsMode,
-			StorageDrsEnabled: cluster.ClusterFeatures.StorageDrsEnabled,
-			HaEnabled:         cluster.ClusterFeatures.HaEnabled,
+			DrsEnabled: cluster.ClusterFeatures.DrsEnabled,
+			DrsMode:    cluster.ClusterFeatures.DrsMode,
+			HaEnabled:  cluster.ClusterFeatures.HaEnabled,
 		}
 	}
 

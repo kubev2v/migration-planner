@@ -544,7 +544,6 @@ func (p *Parser) ClusterFeatures(ctx context.Context, clusterName string) (*mode
 	err = p.db.QueryRowContext(ctx, q).Scan(
 		&cluster.DrsEnabled,
 		&cluster.DrsMode,
-		&cluster.StorageDrsEnabled,
 		&cluster.HaEnabled,
 	)
 	if err != nil {
