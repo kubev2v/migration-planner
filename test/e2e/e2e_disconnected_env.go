@@ -125,8 +125,13 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			Expect(so.Agent).To(BeNil())
 
 			// Get inventory
-			inventory, err := e2eAgent.Api.Inventory()
-			Expect(err).To(BeNil())
+			// TODO Remove the retry after the agent collector behave correctly
+			// Inventory status must not be "collected" before the DB is ready (ECOPROJECT-5318)
+			var inventory *v1alpha1.Inventory
+			Eventually(func() error {
+				inventory, err = e2eAgent.Api.Inventory()
+				return err
+			}, "1m", "2s").Should(BeNil())
 
 			// Manually upload the collected inventory data
 			err = svc.UpdateSource(source.Id, inventory)
