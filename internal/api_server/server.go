@@ -28,6 +28,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/middleware"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -230,8 +231,12 @@ func (s *Server) Run(ctx context.Context) error {
 		assessmentSvc service.AssessmentServicer
 		accountsSvc   service.AccountsServicer
 	)
-	partnerSvc = eventwrap.NewEventPartnerService(service.NewPartnerService(s.store, innerAccountsSvc), s.store)
-	assessmentSvc = eventwrap.NewEventAssessmentService(service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc), s.store, innerAccountsSvc)
+	iamClient, err := iam.NewIAMClient(s.cfg.IAM.URL, s.cfg.IAM.ClientCert, s.cfg.IAM.ClientKey)
+	if err != nil {
+		zap.S().Named("api_server").Warnf("Failed to create IAM client: %v", err)
+	}
+	partnerSvc = eventwrap.NewEventPartnerService(service.NewPartnerService(s.store, innerAccountsSvc), s.store).WithIamClient(iamClient)
+	assessmentSvc = eventwrap.NewEventAssessmentService(service.NewAssessmentService(s.store, s.opaValidator, innerAccountsSvc), s.store, innerAccountsSvc).WithIamClient(iamClient)
 	accountsSvc = innerAccountsSvc
 
 	if s.cfg.Service.Auth.AuthenticationType != "none" {
