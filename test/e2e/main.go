@@ -116,6 +116,7 @@ func setupInfra(ctx context.Context, im infra.InfraManager) error {
 		"MIGRATION_PLANNER_AUTH":              cfg.AuthMethod,
 		"MIGRATION_PLANNER_ADMIN_GROUP_FILE":  cfg.AdminGroupFile,
 		"RHCOS_PASSWORD":                      cfg.RHCOSPassword,
+		"IAM_ENABLED":                         "false",
 	}
 	return im.DeployService(serviceParams)
 }

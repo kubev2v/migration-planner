@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -40,7 +42,9 @@ var _ = Describe("partner handler", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		accountsSvc := service.NewAccountsService(s)
+		mockIAMClient := &iam.MockClient{}
+		iamService := service.NewIAMService(mockIAMClient)
+		accountsSvc := service.NewAccountsService(s, iamService)
 		partnerSvc := service.NewAuthzPartnerService(service.NewPartnerService(s, accountsSvc), accountsSvc, s)
 		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, partnerSvc, accountsSvc, nil)
 	})

@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -21,7 +22,7 @@ import (
 const (
 	insertPartnerCustomerStm = "INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s');"
 	insertPartnerGroupStm    = "INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertPartnerMemberStm   = "INSERT INTO members (id, username, email, group_id) VALUES ('%s', '%s', '%s', '%s');"
+	insertPartnerMemberStm   = "INSERT INTO members (id, username, email, group_id, org_id) VALUES ('%s', '%s', '%s', '%s', '%s');"
 )
 
 var _ = Describe("partner service", Ordered, func() {
@@ -39,7 +40,10 @@ var _ = Describe("partner service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		srv = service.NewPartnerService(s, service.NewAccountsService(s))
+		mockIAMClient := &iam.MockClient{}
+		iamService := service.NewIAMService(mockIAMClient)
+		accountsSvc := service.NewAccountsService(s, iamService)
+		srv = service.NewPartnerService(s, accountsSvc)
 	})
 
 	AfterAll(func() {
@@ -76,7 +80,7 @@ var _ = Describe("partner service", Ordered, func() {
 		})
 
 		It("returns all requests for the partner's group when called by a partner", func() {
-			tx := gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID1))
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID1, "111"))
 			Expect(tx.Error).To(BeNil())
 
 			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID1, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
@@ -238,7 +242,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{Username: "user1"}
@@ -270,7 +274,9 @@ var _ = Describe("partner service", Ordered, func() {
 			Expect(ok).To(BeTrue())
 
 			// User is still regular
-			accountsSvc := service.NewAccountsServicer(s)
+			mockIAMClient := &iam.MockClient{}
+			iamService := service.NewIAMService(mockIAMClient)
+			accountsSvc := service.NewAccountsServicer(s, iamService)
 			identity, err := accountsSvc.GetIdentity(context.TODO(), user)
 			Expect(err).To(BeNil())
 			Expect(identity.Kind).To(Equal(service.KindRegular))
@@ -303,7 +309,10 @@ var _ = Describe("partner service", Ordered, func() {
 		var wrapped service.PartnerServicer
 
 		BeforeEach(func() {
-			wrapped = eventwrap.NewEventPartnerService(service.NewPartnerService(s, service.NewAccountsService(s)), s)
+			mockIAMClient := &iam.MockClient{}
+			iamService := service.NewIAMService(mockIAMClient)
+			accountsSvc := service.NewAccountsService(s, iamService)
+			wrapped = eventwrap.NewEventPartnerService(service.NewPartnerService(s, accountsSvc), s)
 		})
 
 		It("commits the partner-customer event but does not emit a notification when the partner group has no members", func() {
@@ -337,7 +346,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 
 			pc := model.PartnerCustomer{
@@ -515,7 +524,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
@@ -542,7 +551,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "accepted", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
@@ -560,7 +569,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "pending", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())
@@ -575,7 +584,7 @@ var _ = Describe("partner service", Ordered, func() {
 			partnerGroupID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID, "111"))
 			Expect(tx.Error).To(BeNil())
 			tx = gormdb.Exec(fmt.Sprintf(insertPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "rejected", "Name1", "Contact1", "555-0001", "user1@example.com", "Location1"))
 			Expect(tx.Error).To(BeNil())

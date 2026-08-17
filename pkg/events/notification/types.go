@@ -25,6 +25,8 @@ const (
 	// AssessmentSharedEventType fires when a migration assessment is shared with a partner organization.
 	AssessmentSharedEventType = "assessment-shared"
 
+	// TODO: implement the mechnisem of notify the customer when a partner creates an assessment on their behalf.
+	// This is disabled because there is currently no "create on behalf of a customer"
 	// AssessmentCreatedEventType fires when a new assessment is created on behalf of a customer by a partner organization.
 	AssessmentCreatedEventType = "assessment-created"
 )

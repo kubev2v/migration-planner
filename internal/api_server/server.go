@@ -28,6 +28,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/middleware"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
@@ -212,7 +213,15 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
-	innerAccountsSvc := service.NewAccountsService(s.store)
+	// Create IAM client and service
+	iamClient, err := newIAMClient(s.cfg.IAM.URL, s.cfg.IAM.ClientCert, s.cfg.IAM.ClientKey, s.cfg.IAM.Enabled)
+	if err != nil {
+		return fmt.Errorf("failed to create IAM client: %w", err)
+	}
+	iamService := service.NewIAMService(iamClient)
+
+	// Create accounts service with IAM dependency
+	innerAccountsSvc := service.NewAccountsService(s.store, iamService)
 
 	if s.cfg.Service.AdminGroupFile != "" {
 		adminGroup, err := service.ParseAdminGroupFile(s.cfg.Service.AdminGroupFile)
@@ -273,4 +282,22 @@ func (s *Server) Run(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func newIAMClient(URL, ClientCert, ClientKey string, enabled bool) (iam.Client, error) {
+	if !enabled {
+		// IAM integration disabled - return mock client
+		return &iam.MockClient{}, nil
+	}
+
+	if URL == "" || ClientCert == "" || ClientKey == "" {
+		return &iam.UnimplementedClient{}, fmt.Errorf("IAM enabled but missing url, cert or key")
+	}
+
+	iamClient, err := iam.NewHTTPClient(URL, []byte(ClientCert), []byte(ClientKey))
+	if err != nil {
+		return &iam.UnimplementedClient{}, fmt.Errorf("unable to create IAM client: %w", err)
+	}
+
+	return iamClient, nil
 }

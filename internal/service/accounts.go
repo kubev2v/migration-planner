@@ -87,15 +87,16 @@ func ParseAdminGroupFile(path string) (*AdminGroup, error) {
 }
 
 type AccountsService struct {
-	store store.Store
+	store      store.Store
+	iamService IAMServicer
 }
 
-func NewAccountsService(store store.Store) *AccountsService {
-	return &AccountsService{store: store}
+func NewAccountsService(store store.Store, iamService IAMServicer) *AccountsService {
+	return &AccountsService{store: store, iamService: iamService}
 }
 
-func NewAccountsServicer(store store.Store) AccountsServicer {
-	return &AccountsService{store: store}
+func NewAccountsServicer(store store.Store, iamService IAMServicer) AccountsServicer {
+	return &AccountsService{store: store, iamService: iamService}
 }
 
 // Identity
@@ -271,6 +272,13 @@ func (s *AccountsService) ListGroupMembers(ctx context.Context, groupID uuid.UUI
 // CreateMember creates a new member. Verifies the group exists and the user
 // has no active customer relationship (pending or accepted).
 func (s *AccountsService) CreateMember(ctx context.Context, member model.Member) (model.Member, error) {
+	// Resolve user info from IAM - fail immediately if unavailable
+	userInfo, err := s.iamService.GetUserInfo(ctx, member.Username)
+	if err != nil {
+		return model.Member{}, fmt.Errorf("failed to resolve user from IAM: %w", err)
+	}
+	member.OrgID = userInfo.OrgID
+
 	if _, err := s.GetGroup(ctx, member.GroupID); err != nil {
 		return model.Member{}, err
 	}
@@ -286,7 +294,7 @@ func (s *AccountsService) CreateMember(ctx context.Context, member model.Member)
 		return model.Member{}, fmt.Errorf("failed to check existing member: %w", lookupErr)
 	}
 
-	ctx, err := s.store.NewTransactionContext(ctx)
+	ctx, err = s.store.NewTransactionContext(ctx)
 	if err != nil {
 		return model.Member{}, err
 	}
