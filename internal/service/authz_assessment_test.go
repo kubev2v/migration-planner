@@ -18,6 +18,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
 const (
@@ -46,7 +47,9 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		accountsSvc := service.NewAccountsService(s)
+		mockIAMClient := &iam.MockClient{}
+		iamService := service.NewIAMService(mockIAMClient)
+		accountsSvc := service.NewAccountsService(s, iamService)
 		inner := service.NewAssessmentService(s, nil, accountsSvc)
 		svc = service.NewAuthzAssessmentService(inner, s, accountsSvc)
 	})

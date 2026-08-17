@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -37,7 +39,10 @@ var _ = Describe("accounts service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		svc = service.NewAccountsServicer(s)
+		// Create mock IAM client and service
+		mockIAMClient := &iam.MockClient{}
+		iamService := service.NewIAMService(mockIAMClient)
+		svc = service.NewAccountsService(s, iamService)
 	})
 
 	AfterAll(func() {

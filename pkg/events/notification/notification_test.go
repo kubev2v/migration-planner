@@ -45,8 +45,8 @@ var _ = Describe("New", func() {
 	})
 
 	It("generates a unique id per call", func() {
-		a := notification.New(notification.AssessmentCreatedEventType, "org", notification.SeverityImportant, nil, nil)
-		b := notification.New(notification.AssessmentCreatedEventType, "org", notification.SeverityImportant, nil, nil)
+		a := notification.New(notification.PartnershipResponseEventType, "org", notification.SeverityImportant, nil, nil)
+		b := notification.New(notification.PartnershipResponseEventType, "org", notification.SeverityImportant, nil, nil)
 
 		Expect(a.ID).NotTo(Equal(b.ID))
 	})

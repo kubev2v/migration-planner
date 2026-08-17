@@ -19,6 +19,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
 const (
@@ -44,7 +45,9 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		s = store.NewStore(db)
 		gormdb = db
-		accountsSvc := service.NewAccountsService(s)
+		mockIAMClient := &iam.MockClient{}
+		iamService := service.NewIAMService(mockIAMClient)
+		accountsSvc := service.NewAccountsService(s, iamService)
 		inner := service.NewAssessmentService(s, nil, accountsSvc)
 		svc = eventwrap.NewEventAssessmentService(inner, s, accountsSvc)
 	})
@@ -459,95 +462,6 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
 				Expect(tx.Error).To(BeNil())
 				Expect(snapshotVersion).To(Equal(2)) // V2
-			})
-		})
-
-		Context("notification for assessments created on behalf of a customer", func() {
-			AfterEach(func() {
-				gormdb.Exec("DELETE FROM members;")
-				gormdb.Exec("DELETE FROM groups;")
-			})
-
-			DescribeTable("emits a notification event when the creator is a partner or admin",
-				func(groupKind string) {
-					groupID := uuid.New()
-					tx := gormdb.Exec(fmt.Sprintf("INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', 'Group', 'desc', '%s', 'icon', 'Acme', NULL);", groupID, groupKind))
-					Expect(tx.Error).To(BeNil())
-					tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'creator1', 'creator1@test.com', '%s');", uuid.New(), groupID))
-					Expect(tx.Error).To(BeNil())
-
-					inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-						VcenterId: "test-vcenter",
-						Vcenter: &v1alpha1.InventoryData{
-							Vms:   v1alpha1.VMs{Total: 10},
-							Infra: v1alpha1.Infra{TotalHosts: 5},
-						},
-					})
-
-					testAssessmentID := uuid.New()
-					createForm := mappers.AssessmentCreateForm{
-						ID:        testAssessmentID,
-						Name:      "Assessment For Customer",
-						OrgID:     "org1",
-						Username:  "customer1",
-						Source:    service.SourceTypeInventory,
-						Inventory: inventoryJSON,
-					}
-
-					ctx := ctxWithUser("creator1", "org1")
-					assessment, err := svc.CreateAssessment(ctx, createForm)
-					Expect(err).To(BeNil())
-					Expect(assessment).ToNot(BeNil())
-
-					var count int64
-					gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
-					Expect(count).To(Equal(int64(1)))
-
-					var payload string
-					tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", notification.AssessmentCreatedEventType).Scan(&payload)
-					Expect(tx.Error).To(BeNil())
-
-					var n notification.Notification
-					Expect(json.Unmarshal([]byte(payload), &n)).To(Succeed())
-					Expect(n.EventType).To(Equal(notification.AssessmentCreatedEventType))
-					Expect(n.OrgID).To(Equal("org1"))
-					Expect(n.Context["assessment_id"]).To(Equal(testAssessmentID.String()))
-					Expect(n.Recipients).To(HaveLen(1))
-					Expect(n.Recipients[0].Users).To(ConsistOf("customer1"))
-					Expect(n.Recipients[0].IgnoreUserPreferences).To(BeTrue())
-
-					Expect(n.Events).To(HaveLen(1))
-				},
-				Entry("creator is a partner", "partner"),
-				Entry("creator is an admin", "admin"),
-			)
-
-			It("does not emit a notification event when the creator is a regular authenticated user", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
-					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
-					},
-				})
-
-				createForm := mappers.AssessmentCreateForm{
-					ID:        uuid.New(),
-					Name:      "Assessment By Regular User",
-					OrgID:     "org1",
-					Username:  "regular-user",
-					Source:    service.SourceTypeInventory,
-					Inventory: inventoryJSON,
-				}
-
-				ctx := ctxWithUser("regular-user", "org1")
-				assessment, err := svc.CreateAssessment(ctx, createForm)
-				Expect(err).To(BeNil())
-				Expect(assessment).ToNot(BeNil())
-
-				var count int64
-				gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
-				Expect(count).To(Equal(int64(0)))
 			})
 		})
 
@@ -1060,11 +974,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		It("shares assessment when user is a customer with a partner", func() {
 			// Create accepted partner customer record
-			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location, username_org_id) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc', '111');", uuid.New(), partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
 			// Partner group has a member to notify
-			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'partner-admin', 'admin@partner.com', '%s');", uuid.New(), partnerGroupID))
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id, org_id) VALUES ('%s', 'partner-admin', 'admin@partner.com', '%s', '111');", uuid.New(), partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
 			ctx := ctxWithUser("customer1", "org1")
