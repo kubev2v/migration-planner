@@ -63,6 +63,7 @@ type Kafka struct {
 // and are expected to be sourced from a Kubernetes secret; when either is
 // unset, notifications fall back to being logged to stdout.
 type Notification struct {
+	Enabled    bool   `envconfig:"NOTIFICATION_ENABLED" default:"false"`
 	URL        string `envconfig:"NOTIFICATION_URL" default:""`
 	ClientCert string `envconfig:"NOTIFICATION_CLIENT_CERT" default:""`
 	ClientKey  string `envconfig:"NOTIFICATION_CLIENT_KEY" default:""`
