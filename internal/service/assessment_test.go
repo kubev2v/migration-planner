@@ -1063,6 +1063,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
 			Expect(tx.Error).To(BeNil())
 
+			// Partner group has a member to notify
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO members (id, username, email, group_id) VALUES ('%s', 'partner-admin', 'admin@partner.com', '%s');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
 			ctx := ctxWithUser("customer1", "org1")
 			err := svc.ShareAssessment(ctx, assessmentID)
 
@@ -1089,8 +1093,31 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(n.EventType).To(Equal(notification.AssessmentSharedEventType))
 			Expect(n.Context["assessment_id"]).To(Equal(assessmentID.String()))
 			Expect(n.Recipients).To(HaveLen(1))
-			Expect(n.Recipients[0].OnlyAdmins).To(BeTrue())
 			Expect(n.Recipients[0].IgnoreUserPreferences).To(BeTrue())
+		})
+
+		It("commits the share but does not emit a notification when the partner group has no members", func() {
+			// Accepted partner customer record, but the partner group has no members to notify
+			tx := gormdb.Exec(fmt.Sprintf("INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES ('%s', 'customer1', '%s', 'accepted', 'Name', 'Contact', '555', 'c@e.com', 'Loc');", uuid.New(), partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			ctx := ctxWithUser("customer1", "org1")
+			err := svc.ShareAssessment(ctx, assessmentID)
+			Expect(err).To(BeNil())
+
+			// The share itself is committed: viewer relation is created
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource = 'assessment' AND resource_id = ? AND relation = 'viewer' AND subject_namespace = 'org' AND subject_id = ?", assessmentID.String(), partnerGroupID.String()).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
+
+			// The share CloudEvent is committed
+			var outboxCount int64
+			gormdb.Raw(countOutboxByTypeStm, kafka.ShareAssessmentEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(1)))
+
+			// But no console notification is emitted (would otherwise email the whole org)
+			gormdb.Raw(countOutboxByTypeStm, notification.AssessmentSharedEventType).Scan(&outboxCount)
+			Expect(outboxCount).To(Equal(int64(0)))
 		})
 
 		It("is idempotent — sharing twice does not error", func() {

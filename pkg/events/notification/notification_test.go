@@ -51,3 +51,32 @@ var _ = Describe("New", func() {
 		Expect(a.ID).NotTo(Equal(b.ID))
 	})
 })
+
+var _ = Describe("Build", func() {
+	It("rejects an ignore-preferences recipient with no users", func() {
+		// IgnoreUserPreferences with no users would email the whole org.
+		data, err := notification.Build(
+			notification.AssessmentSharedEventType,
+			"org-1",
+			notification.SeverityImportant,
+			nil,
+			notification.Recipient{IgnoreUserPreferences: true},
+		)
+
+		Expect(err).To(HaveOccurred())
+		Expect(data).To(BeNil())
+	})
+
+	It("accepts an ignore-preferences recipient with a named user", func() {
+		data, err := notification.Build(
+			notification.AssessmentSharedEventType,
+			"org-1",
+			notification.SeverityImportant,
+			nil,
+			notification.Recipient{IgnoreUserPreferences: true, Users: []string{"alice"}},
+		)
+
+		Expect(err).ToNot(HaveOccurred())
+		Expect(data).ToNot(BeNil())
+	})
+})

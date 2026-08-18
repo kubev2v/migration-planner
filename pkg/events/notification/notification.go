@@ -3,6 +3,7 @@ package notification
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,9 +57,32 @@ func New(eventType, orgID, severity string, context map[string]string, payload a
 // Build constructs a Notification for eventType and marshals it to JSON,
 // ready to be stored in the outbox and later dispatched by a Writer.
 func Build(eventType, orgID, severity string, context map[string]string, recipients ...Recipient) ([]byte, error) {
-	data, err := json.Marshal(New(eventType, orgID, severity, context, make(map[string]string), recipients...))
+	notification := New(eventType, orgID, severity, context, make(map[string]string), recipients...)
+
+	if err := notification.validate(); err != nil {
+		return nil, fmt.Errorf("failed to validate notification %s: %w", eventType, err)
+	}
+
+	data, err := json.Marshal(notification)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal notification %s: %w", eventType, err)
 	}
 	return data, nil
+}
+
+func (n Notification) validate() error {
+	// Firing a notification when the users preferences is on but no users specified may send the email
+	// to the whole organization
+	for _, r := range n.Recipients {
+		if r.IgnoreUserPreferences && len(r.Users) == 0 {
+			return fmt.Errorf("ignore users preferences is on but no users specified")
+		}
+		for _, user := range r.Users {
+			if strings.TrimSpace(user) == "" {
+				return fmt.Errorf("have a user that is an empty string")
+			}
+		}
+	}
+
+	return nil
 }

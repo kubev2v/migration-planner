@@ -59,19 +59,21 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		notifiedUsers = append(notifiedUsers, m.Username)
 	}
 
-	// Notify the partner when a customer sent a partnership request
-	notificationBytes, err := notification.Build(
-		notification.PartnershipRequestEventType,
-		"11111111", // Todo: Send the correct console.redhat.com partner org_id if needed
-		notification.SeverityImportant,
-		nil,
-		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: true, Users: notifiedUsers},
-	)
-	if err != nil {
-		return nil, err
-	}
-	if err := e.outbox.Insert(ctx, notification.PartnershipRequestEventType, notificationBytes); err != nil {
-		return nil, err
+	if len(notifiedUsers) > 0 {
+		// Notify the partner when a customer sent a partnership request
+		notificationBytes, err := notification.Build(
+			notification.PartnershipRequestEventType,
+			"", // Todo: Send the correct console.redhat.com partner org_id
+			notification.SeverityImportant,
+			nil,
+			notification.Recipient{IgnoreUserPreferences: true, Users: notifiedUsers},
+		)
+		if err != nil {
+			return nil, err
+		}
+		if err := e.outbox.Insert(ctx, notification.PartnershipRequestEventType, notificationBytes); err != nil {
+			return nil, err
+		}
 	}
 
 	return created, nil
