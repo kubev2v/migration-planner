@@ -217,9 +217,14 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (kafka.Writer, f
 }
 
 func createNotificationWriter(cfg *config.Config) notification.Writer {
+	if !cfg.Notification.Enabled {
+		zap.S().Info("notifications disabled, discarding notifications")
+		return notification.NewNoopWriter()
+	}
+
 	if cfg.Notification.ClientCert == "" || cfg.Notification.ClientKey == "" {
 		zap.S().Info("notification service client certificate not configured, logging notifications to stdout")
-		return notification.NewStdoutWriter()
+		return notification.NewNoopWriter()
 	}
 
 	writer, err := notification.NewHTTPWriter(
@@ -229,7 +234,7 @@ func createNotificationWriter(cfg *config.Config) notification.Writer {
 	)
 	if err != nil {
 		zap.S().Warnw("failed to create notification service client, logging notifications to stdout", "error", err)
-		return notification.NewStdoutWriter()
+		return notification.NewNoopWriter()
 	}
 
 	zap.S().Infow("notification service client initialized", "url", cfg.Notification.URL)
