@@ -92,7 +92,7 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 				assessment.OrgID,
 				notification.SeverityImportant,
 				map[string]string{"assessment_id": assessment.ID.String()},
-				notification.Recipient{Users: []string{assessment.Username}, IgnoreUserPreferences: true},
+				notification.Recipient{Users: []string{assessment.Username}, IgnoreUserPreferences: false},
 			)
 			if err != nil {
 				return nil, err
@@ -201,7 +201,7 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		"11111111", // Todo: Send the correct console.redhat.com partner org_id if needed
 		notification.SeverityImportant,
 		map[string]string{"assessment_id": id.String()},
-		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: true, Users: notifiedUsers},
+		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: false, Users: notifiedUsers},
 	)
 	if err != nil {
 		return err

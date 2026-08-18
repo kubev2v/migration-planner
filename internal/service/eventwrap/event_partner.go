@@ -65,7 +65,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		"11111111", // Todo: Send the correct console.redhat.com partner org_id if needed
 		notification.SeverityImportant,
 		nil,
-		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: true, Users: notifiedUsers},
+		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: false, Users: notifiedUsers},
 	)
 	if err != nil {
 		return nil, err
@@ -213,7 +213,7 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 		user.Organization,
 		notification.SeverityImportant,
 		map[string]string{"decision": decision, "reason": reason},
-		notification.Recipient{Users: []string{updated.Username}, IgnoreUserPreferences: true},
+		notification.Recipient{Users: []string{updated.Username}, IgnoreUserPreferences: false},
 	)
 	if err != nil {
 		return nil, err
