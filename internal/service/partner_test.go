@@ -8,8 +8,11 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -290,6 +293,71 @@ var _ = Describe("partner service", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM partners_customers;")
+			gormdb.Exec("DELETE FROM members;")
+			gormdb.Exec("DELETE FROM groups;")
+		})
+	})
+
+	Context("CreateRequest notifications", func() {
+		var wrapped service.PartnerServicer
+
+		BeforeEach(func() {
+			wrapped = eventwrap.NewEventPartnerService(service.NewPartnerService(s, service.NewAccountsService(s)), s)
+		})
+
+		It("commits the partner-customer event but does not emit a notification when the partner group has no members", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			pc := model.PartnerCustomer{
+				Name:         "Name1",
+				ContactName:  "Contact1",
+				ContactPhone: "555-0001",
+				Email:        "user1@example.com",
+				Location:     "Location1",
+			}
+
+			created, err := wrapped.CreateRequest(context.TODO(), auth.User{Username: "user1"}, partnerGroupID.String(), pc)
+			Expect(err).To(BeNil())
+			Expect(created).ToNot(BeNil())
+
+			// The partner-customer CloudEvent is committed
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", kafka.PartnerCustomerEventType).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
+
+			// But no console notification is emitted (would otherwise email the whole org)
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", notification.PartnershipRequestEventType).Scan(&count)
+			Expect(count).To(Equal(int64(0)))
+		})
+
+		It("emits a notification when the partner group has members", func() {
+			partnerGroupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertPartnerGroupStm, partnerGroupID, "Partner Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertPartnerMemberStm, uuid.New(), "partneruser", "p@acme.com", partnerGroupID))
+			Expect(tx.Error).To(BeNil())
+
+			pc := model.PartnerCustomer{
+				Name:         "Name1",
+				ContactName:  "Contact1",
+				ContactPhone: "555-0001",
+				Email:        "user1@example.com",
+				Location:     "Location1",
+			}
+
+			_, err := wrapped.CreateRequest(context.TODO(), auth.User{Username: "user1"}, partnerGroupID.String(), pc)
+			Expect(err).To(BeNil())
+
+			var count int64
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", notification.PartnershipRequestEventType).Scan(&count)
+			Expect(count).To(Equal(int64(1)))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")

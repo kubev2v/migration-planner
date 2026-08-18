@@ -170,6 +170,15 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		return err
 	}
 
+	payload := kafka.NewShareAssessmentPayload(user.Username, id.String(), *identity.PartnerID)
+	ceBytes, err := kafka.BuildCloudEvent(kafka.ShareAssessmentEventType, payload)
+	if err != nil {
+		return err
+	}
+	if err := e.outbox.Insert(ctx, kafka.ShareAssessmentEventType, ceBytes); err != nil {
+		return err
+	}
+
 	// Because of ShareAssessment success Must be a consumer with a PartnerID
 	partnerGID, err := uuid.Parse(*identity.PartnerID)
 	if err != nil {
@@ -186,28 +195,21 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		notifiedUsers = append(notifiedUsers, m.Username)
 	}
 
-	payload := kafka.NewShareAssessmentPayload(user.Username, id.String(), *identity.PartnerID)
-	ceBytes, err := kafka.BuildCloudEvent(kafka.ShareAssessmentEventType, payload)
-	if err != nil {
-		return err
-	}
-	if err := e.outbox.Insert(ctx, kafka.ShareAssessmentEventType, ceBytes); err != nil {
-		return err
-	}
-
-	// Notify a partner when a customer shared an assessment with him
-	notificationBytes, err := notification.Build(
-		notification.AssessmentSharedEventType,
-		"11111111", // Todo: Send the correct console.redhat.com partner org_id if needed
-		notification.SeverityImportant,
-		map[string]string{"assessment_id": id.String()},
-		notification.Recipient{OnlyAdmins: true, IgnoreUserPreferences: true, Users: notifiedUsers},
-	)
-	if err != nil {
-		return err
-	}
-	if err := e.outbox.Insert(ctx, notification.AssessmentSharedEventType, notificationBytes); err != nil {
-		return err
+	if len(notifiedUsers) > 0 {
+		// Notify a partner when a customer shared an assessment with him
+		notificationBytes, err := notification.Build(
+			notification.AssessmentSharedEventType,
+			"", // Todo: Send the correct console.redhat.com partner org_id
+			notification.SeverityImportant,
+			map[string]string{"assessment_id": id.String()},
+			notification.Recipient{IgnoreUserPreferences: true, Users: notifiedUsers},
+		)
+		if err != nil {
+			return err
+		}
+		if err := e.outbox.Insert(ctx, notification.AssessmentSharedEventType, notificationBytes); err != nil {
+			return err
+		}
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
