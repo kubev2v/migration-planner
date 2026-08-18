@@ -90,6 +90,14 @@ func (w *HTTPWriter) Write(ctx context.Context, data []byte) error {
 	return nil
 }
 
+// NoopWriter discards notifications. It is used when notifications are
+// disabled via configuration.
+type NoopWriter struct{}
+
+func NewNoopWriter() *NoopWriter { return &NoopWriter{} }
+
+func (w *NoopWriter) Write(_ context.Context, _ []byte) error { return nil }
+
 // StdoutWriter prints notifications to stdout. It is used as a fallback
 // when the notification service's mTLS client certificate is not configured.
 type StdoutWriter struct{}
