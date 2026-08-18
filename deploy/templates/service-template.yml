@@ -69,6 +69,9 @@ parameters:
     description: Key in the credentials secret for the password
     value: "password"
   # Notification service config values
+  - name: NOTIFICATION_ENABLED
+    description: Whether notifications are dispatched to the console notifications service
+    value: "false"
   - name: NOTIFICATION_URL
     description: URL of the console notifications service
     value: "https://mtls.internal.cloud.stage.redhat.com/api/notifications-gw/notifications"
@@ -781,6 +784,8 @@ objects:
                       key: ${KAFKA_PASSWORD_SECRET_KEY}
                       optional: true
                 # Notification service config values
+                - name: NOTIFICATION_ENABLED
+                  value: "${NOTIFICATION_ENABLED}"
                 - name: NOTIFICATION_URL
                   value: "${NOTIFICATION_URL}"
                 - name: NOTIFICATION_CLIENT_CERT
