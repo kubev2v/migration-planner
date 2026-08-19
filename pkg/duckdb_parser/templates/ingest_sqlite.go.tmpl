@@ -13,7 +13,7 @@ Key transformations:
   - Host → vhost with memory converted from bytes to MiB
   - Datastore → vdatastore with capacity/free converted from bytes to MiB
   - Network → dvport for distributed virtual switches
-  - Cluster → vcluster: Name, anonymized Object ID (SHA-256), DasEnabled (HA)
+  - Cluster → vcluster: Name, anonymized Object ID (SHA-256), DasEnabled (HA), DrsEnabled and DrsDefaultVmBehavior (DRS)
 */ -}}
 
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
@@ -227,10 +227,12 @@ FROM src.Network n
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
 
 {{/* Cluster ID hash duplicates generateClusterID (inventory_builder.go); keep in sync. Guarded by TestIngestSqlite_PopulatesVCluster. */}}
-INSERT INTO vcluster ("Name", "Object ID", "DasEnabled")
+INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "DasEnabled")
 SELECT
     c.Name,
     'cluster-' || substring(sha256(about.InstanceUuid || ':' || COALESCE(d.Name, '') || ':' || c.Name), 1, 16),
+    c.DrsEnabled,
+    COALESCE(NULLIF(TRIM(c.DrsBehavior), ''), 'None'),
     c.DasEnabled
 FROM src.Cluster c
 LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
