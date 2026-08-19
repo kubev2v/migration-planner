@@ -808,6 +808,9 @@ type Infra struct {
 	TotalHosts       int  `json:"totalHosts"`
 	// Deprecated:
 	VmsPerCluster *[]int `json:"vmsPerCluster,omitempty"`
+
+	// VmsPerHostAverage Average VM density per ESXi host. Calculated as total VMs / totalHosts
+	VmsPerHostAverage *float64 `json:"vmsPerHostAverage,omitempty"`
 }
 
 // Inventory defines model for Inventory.
