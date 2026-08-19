@@ -15,21 +15,21 @@ import (
 func (s *plannerService) CalculateMigrationComplexity(assessmentID uuid.UUID, clusterID string) (int, error) {
 	return s.postEstimation(
 		path.Join(apiV1AssessmentsPath, assessmentID.String(), "complexity-estimation"),
-		v1alpha1.MigrationComplexityRequest{ClusterId: clusterID},
+		v1alpha1.MigrationComplexityRequest{ClusterId: &clusterID},
 	)
 }
 
 func (s *plannerService) CalculateMigrationEstimation(assessmentID uuid.UUID, clusterID string) (int, error) {
 	return s.postEstimation(
 		path.Join(apiV1AssessmentsPath, assessmentID.String(), "migration-estimation"),
-		v1alpha1.MigrationEstimationRequest{ClusterId: clusterID},
+		v1alpha1.MigrationEstimationRequest{ClusterId: &clusterID},
 	)
 }
 
 func (s *plannerService) CalculateMigrationEstimationByComplexity(assessmentID uuid.UUID, clusterID string) (int, error) {
 	return s.postEstimation(
 		path.Join(apiV1AssessmentsPath, assessmentID.String(), "migration-estimation", "by-complexity"),
-		v1alpha1.MigrationEstimationRequest{ClusterId: clusterID},
+		v1alpha1.MigrationEstimationRequest{ClusterId: &clusterID},
 	)
 }
 

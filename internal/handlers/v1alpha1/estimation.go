@@ -14,6 +14,13 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+func derefString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // (POST /api/v1/assessments/{id}/complexity-estimation)
 func (h *ServiceHandler) CalculateMigrationComplexity(ctx context.Context, request server.CalculateMigrationComplexityRequestObject) (server.CalculateMigrationComplexityResponseObject, error) {
 	logger := log.NewDebugLogger("complexity_handler").
@@ -31,12 +38,7 @@ func (h *ServiceHandler) CalculateMigrationComplexity(ctx context.Context, reque
 	}
 
 	assessmentID := request.Id
-	clusterID := request.Body.ClusterId
-
-	if clusterID == "" {
-		logger.Error(fmt.Errorf("clusterId is required")).Log()
-		return server.CalculateMigrationComplexity400JSONResponse{Message: "clusterId is required"}, nil
-	}
+	clusterID := derefString(request.Body.ClusterId)
 
 	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
 		switch err.(type) {
@@ -88,10 +90,7 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 	}
 
 	assessmentID := request.Id
-	clusterID := request.Body.ClusterId
-	if clusterID == "" {
-		return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: "clusterId is required"}, nil
-	}
+	clusterID := derefString(request.Body.ClusterId)
 
 	var schemas []engines.Schema
 	if request.Body.EstimationSchema != nil {
@@ -201,12 +200,7 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 	}
 
 	assessmentID := request.Id
-	clusterID := request.Body.ClusterId
-
-	if clusterID == "" {
-		logger.Error(fmt.Errorf("clusterId is required")).Log()
-		return server.CalculateMigrationEstimation400JSONResponse{Message: "clusterId is required"}, nil
-	}
+	clusterID := derefString(request.Body.ClusterId)
 
 	// Parse optional estimation schemas from request body
 	var schemas []engines.Schema
