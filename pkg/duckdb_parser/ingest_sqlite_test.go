@@ -16,10 +16,12 @@ import (
 
 // sqliteCluster describes a cluster for createTestSQLite.
 type sqliteCluster struct {
-	id         string
-	name       string
-	datacenter string // datacenter name (matched to a Datacenter row)
-	dasEnabled bool
+	id          string
+	name        string
+	datacenter  string // datacenter name (matched to a Datacenter row)
+	dasEnabled  bool
+	drsEnabled  bool
+	drsBehavior string
 }
 
 // sqliteVM describes a VM for createTestSQLite.
@@ -59,7 +61,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Folder (ID VARCHAR PRIMARY KEY, Datacenter VARCHAR)`,
 
 		// Cluster
-		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false)`,
+		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '')`,
 
 		// Host
 		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
@@ -117,9 +119,9 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		folderID := fmt.Sprintf("folder-%d", dcIdx)
 		parentJSON := fmt.Sprintf(`{"id":"%s"}`, folderID)
 		_, err := db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %t)`,
+			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %t, %t, '%s')`,
 			escapeSQLString(c.id), escapeSQLString(c.name), escapeSQLString(parentJSON),
-			c.dasEnabled,
+			c.dasEnabled, c.drsEnabled, escapeSQLString(c.drsBehavior),
 		))
 		require.NoError(t, err)
 
@@ -230,7 +232,7 @@ func TestIngestSqlite_PopulatesVClusterFeatures(t *testing.T) {
 	defer cleanup()
 
 	clusters := []sqliteCluster{
-		{id: "domain-c1", name: "cluster-ha-on", datacenter: "dc1", dasEnabled: true},
+		{id: "domain-c1", name: "cluster-ha-on", datacenter: "dc1", dasEnabled: true, drsEnabled: true, drsBehavior: "fullyAutomated"},
 		{id: "domain-c2", name: "cluster-ha-off", datacenter: "dc1"},
 	}
 	vms := []sqliteVM{
@@ -243,30 +245,36 @@ func TestIngestSqlite_PopulatesVClusterFeatures(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, result.IsValid())
 
-	rows, err := db.QueryContext(ctx, `SELECT "Name", "Object ID", "DasEnabled" FROM vcluster ORDER BY "Name"`)
+	rows, err := db.QueryContext(ctx, `SELECT "Name", "Object ID", "DasEnabled", "DrsEnabled", "DrsDefaultVmBehavior" FROM vcluster ORDER BY "Name"`)
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
 	type gotFeatures struct {
 		objectID string
 		das      bool
+		drs      bool
+		drsMode  string
 	}
 	got := make(map[string]gotFeatures)
 	for rows.Next() {
-		var name, objectID string
-		var das bool
-		require.NoError(t, rows.Scan(&name, &objectID, &das))
-		got[name] = gotFeatures{objectID: objectID, das: das}
+		var name, objectID, drsMode string
+		var das, drs bool
+		require.NoError(t, rows.Scan(&name, &objectID, &das, &drs, &drsMode))
+		got[name] = gotFeatures{objectID: objectID, das: das, drs: drs, drsMode: drsMode}
 	}
 	require.NoError(t, rows.Err())
 
 	require.Contains(t, got, "cluster-ha-on")
 	assert.Regexp(t, `^cluster-[0-9a-f]{16}$`, got["cluster-ha-on"].objectID, "Object ID must be anonymized")
 	assert.True(t, got["cluster-ha-on"].das, "HA should be enabled")
+	assert.True(t, got["cluster-ha-on"].drs, "DRS should be enabled")
+	assert.Equal(t, "fullyAutomated", got["cluster-ha-on"].drsMode, "DRS mode should be wired from forklift DrsBehavior")
 
 	require.Contains(t, got, "cluster-ha-off")
 	assert.Regexp(t, `^cluster-[0-9a-f]{16}$`, got["cluster-ha-off"].objectID, "Object ID must be anonymized")
 	assert.False(t, got["cluster-ha-off"].das, "HA should be disabled")
+	assert.False(t, got["cluster-ha-off"].drs, "DRS should be disabled")
+	assert.Equal(t, "None", got["cluster-ha-off"].drsMode, "empty DrsBehavior should default to None")
 
 	inv, err := parser.BuildInventory(ctx, nil)
 	require.NoError(t, err)
@@ -287,11 +295,19 @@ func TestIngestSqlite_PopulatesVClusterFeatures(t *testing.T) {
 	require.NotNil(t, onCluster.ClusterFeatures)
 	require.NotNil(t, onCluster.ClusterFeatures.HaEnabled)
 	assert.True(t, *onCluster.ClusterFeatures.HaEnabled)
+	require.NotNil(t, onCluster.ClusterFeatures.DrsEnabled)
+	assert.True(t, *onCluster.ClusterFeatures.DrsEnabled)
+	require.NotNil(t, onCluster.ClusterFeatures.DrsMode)
+	assert.Equal(t, "fullyAutomated", *onCluster.ClusterFeatures.DrsMode)
 
 	require.NotNil(t, offCluster)
 	require.NotNil(t, offCluster.ClusterFeatures)
 	require.NotNil(t, offCluster.ClusterFeatures.HaEnabled)
 	assert.False(t, *offCluster.ClusterFeatures.HaEnabled)
+	require.NotNil(t, offCluster.ClusterFeatures.DrsEnabled)
+	assert.False(t, *offCluster.ClusterFeatures.DrsEnabled)
+	require.NotNil(t, offCluster.ClusterFeatures.DrsMode)
+	assert.Equal(t, "None", *offCluster.ClusterFeatures.DrsMode)
 }
 
 func TestIngestSqlite_VClusterMatchesInventoryClusterKeys(t *testing.T) {
