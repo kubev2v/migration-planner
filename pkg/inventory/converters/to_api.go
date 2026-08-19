@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	invutil "github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
@@ -33,6 +34,7 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 		Vms:   toAPIVMs(&d.VMs),
 		Infra: toAPIInfra(&d.Infra),
 	}
+	result.Infra.VmsPerHostAverage = invutil.VmsPerHostAverage(d.VMs.Total, d.Infra.TotalHosts)
 
 	if d.ClusterFeatures != nil {
 		clusterFeatures := api.ClusterFeatures{

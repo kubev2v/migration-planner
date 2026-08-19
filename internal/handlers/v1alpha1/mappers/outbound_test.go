@@ -46,6 +46,32 @@ var _ = Describe("SourceToApi", func() {
 	})
 })
 
+var _ = Describe("SourceToApi inventory vmsPerHostAverage", func() {
+	It("computes vmsPerHostAverage from totals on read", func() {
+		source := model.Source{
+			ID:        uuid.New(),
+			Name:      "test-source",
+			Inventory: []byte(`{"vcenter_id":"vc-1","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5,"hostPowerStates":{},"networks":[],"datastores":[]}},"clusters":{"c1":{"vms":{"total":4},"infra":{"totalHosts":2,"hostPowerStates":{},"networks":[],"datastores":[]}}}}`),
+		}
+		result, err := mappers.SourceToApi(source)
+		Expect(err).To(BeNil())
+		Expect(result.Inventory.Vcenter.Infra.VmsPerHostAverage).NotTo(BeNil())
+		Expect(*result.Inventory.Vcenter.Infra.VmsPerHostAverage).To(Equal(2.0))
+		Expect(*result.Inventory.Clusters["c1"].Infra.VmsPerHostAverage).To(Equal(2.0))
+	})
+
+	It("leaves vmsPerHostAverage nil when there are no hosts", func() {
+		source := model.Source{
+			ID:        uuid.New(),
+			Name:      "test-source",
+			Inventory: []byte(`{"vcenter_id":"vc-1","vcenter":{"vms":{"total":10},"infra":{"totalHosts":0,"hostPowerStates":{},"networks":[],"datastores":[]}},"clusters":{}}`),
+		}
+		result, err := mappers.SourceToApi(source)
+		Expect(err).To(BeNil())
+		Expect(result.Inventory.Vcenter.Infra.VmsPerHostAverage).To(BeNil())
+	})
+})
+
 var _ = Describe("MigrationComplexityResultToAPI", func() {
 	It("maps complexityByDisk, complexityByOS, complexityByOSName, diskSizeRatings, osRatings", func() {
 		result := service.MigrationComplexityResult{

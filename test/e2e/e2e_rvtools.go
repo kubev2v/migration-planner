@@ -334,6 +334,8 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(infra.Hosts).NotTo(BeNil())
 			Expect(*infra.Hosts).To(HaveLen(2))
 			Expect(infra.Datastores).NotTo(BeEmpty())
+			Expect(infra.VmsPerHostAverage).NotTo(BeNil())
+			Expect(*infra.VmsPerHostAverage).To(Equal(1.0))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
