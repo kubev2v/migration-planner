@@ -1,6 +1,7 @@
 package converters
 
 import (
+	"math"
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -33,6 +34,7 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 		Vms:   toAPIVMs(&d.VMs),
 		Infra: toAPIInfra(&d.Infra),
 	}
+	result.Infra.VmsPerHostAverage = vmsPerHostAverage(d.VMs.Total, d.Infra.TotalHosts)
 
 	if d.ClusterFeatures != nil {
 		clusterFeatures := api.ClusterFeatures{
@@ -323,4 +325,14 @@ func anonymizeNFSDatastore(ds *api.Datastore) {
 		ds.DiskId = "N/A"
 		ds.ProtocolType = "N/A"
 	}
+}
+
+// vmsPerHostAverage returns the average VM density per host, rounded to 2
+// decimals. Returns nil when there are no hosts (division undefined).
+func vmsPerHostAverage(totalVMs, totalHosts int) *float64 {
+	if totalHosts <= 0 {
+		return nil
+	}
+	avg := math.Round(float64(totalVMs*100)/float64(totalHosts)) / 100
+	return &avg
 }

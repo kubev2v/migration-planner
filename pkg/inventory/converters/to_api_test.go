@@ -770,6 +770,37 @@ func TestToAPIInfra_Overcommitment(t *testing.T) {
 	}
 }
 
+func TestToAPI_VMsPerHostAverage(t *testing.T) {
+	tests := []struct {
+		name       string
+		totalVMs   int
+		totalHosts int
+		want       *float64
+	}{
+		{name: "10 VMs 2 hosts", totalVMs: 10, totalHosts: 2, want: floatPtr(5.0)},
+		{name: "328 VMs 7 hosts", totalVMs: 328, totalHosts: 7, want: floatPtr(46.86)},
+		{name: "0 hosts", totalVMs: 10, totalHosts: 0, want: nil},
+		{name: "201 VMs 200 hosts half-cent rounds up", totalVMs: 201, totalHosts: 200, want: floatPtr(1.01)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := ToAPI(&inventory.Inventory{
+				VCenter: &inventory.InventoryData{
+					VMs:   inventory.VMsData{Total: tt.totalVMs},
+					Infra: inventory.InfraData{TotalHosts: tt.totalHosts},
+				},
+			})
+			require.NotNil(t, result.Vcenter)
+			if tt.want == nil {
+				assert.Nil(t, result.Vcenter.Infra.VmsPerHostAverage)
+				return
+			}
+			require.NotNil(t, result.Vcenter.Infra.VmsPerHostAverage)
+			assert.Equal(t, *tt.want, *result.Vcenter.Infra.VmsPerHostAverage)
+		})
+	}
+}
+
 func TestToAPIVMs_Distributions(t *testing.T) {
 	input := inventory.VMsData{
 		DistributionByCPUTier:    map[string]int{"1-2": 10, "3-4": 20, "5+": 5},
@@ -924,3 +955,5 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 }
 
 func timePtr(t time.Time) *time.Time { return &t }
+
+func floatPtr(v float64) *float64 { return &v }
