@@ -940,8 +940,8 @@ type MemoryOverCommitRatio string
 
 // MigrationComplexityRequest Request payload for calculating migration complexity estimation
 type MigrationComplexityRequest struct {
-	// ClusterId ID of the cluster to calculate complexity estimation for
-	ClusterId string `json:"clusterId" validate:"required"`
+	// ClusterId ID of the cluster to calculate complexity estimation for. When omitted or empty, the vCenter-level aggregate is used.
+	ClusterId *string `json:"clusterId,omitempty"`
 }
 
 // MigrationComplexityResponse Migration complexity estimation results
@@ -974,8 +974,8 @@ type MigrationEstimationByComplexityResponse struct {
 
 // MigrationEstimationRequest Request payload for calculating migration time estimation
 type MigrationEstimationRequest struct {
-	// ClusterId ID of the cluster to calculate migration estimation for
-	ClusterId string `json:"clusterId" validate:"required"`
+	// ClusterId ID of the cluster to calculate migration estimation for. When omitted or empty, the vCenter-level aggregate is used.
+	ClusterId *string `json:"clusterId,omitempty"`
 
 	// EstimationSchema Schemas to run. Valid values: "network-based", "storage-offload". If omitted, all schemas are run.
 	EstimationSchema *[]string `json:"estimationSchema,omitempty"`

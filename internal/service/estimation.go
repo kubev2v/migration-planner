@@ -61,7 +61,8 @@ func NewEstimationService(store store.Store) *EstimationService {
 	}
 }
 
-// CalculateMigrationEstimation calculates migration time estimation for a given assessment and cluster
+// CalculateMigrationEstimation calculates migration time estimation for a given assessment and cluster.
+// When clusterID is empty, the vCenter-level aggregate inventory is used.
 func (es *EstimationService) CalculateMigrationEstimation(
 	ctx context.Context,
 	assessmentID uuid.UUID,
@@ -75,52 +76,20 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		WithString("cluster_id", clusterID).
 		Build()
 
-	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
 	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			tracer.Error(err).Log()
-			return nil, NewErrAssessmentNotFound(assessmentID)
-		}
-		tracer.Error(err).Log()
-		return nil, fmt.Errorf("failed to get assessment: %w", err)
-	}
-
-	if len(assessment.Snapshots) == 0 {
-		err := fmt.Errorf("assessment has no snapshots")
-		tracer.Error(err).Log()
 		return nil, err
 	}
 
-	// assuming each assessment has one snapshot at most
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		err := fmt.Errorf("latest snapshot has empty inventory")
-		tracer.Error(err).Log()
-		return nil, err
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		tracer.Error(err).Log()
-		return nil, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-
-	if len(inventory.Clusters) == 0 {
-		err := fmt.Errorf("inventory has no clusters")
-		tracer.Error(err).Log()
-		return nil, err
-	}
-
-	clusterInventory, exists := inventory.Clusters[clusterID]
-	if !exists {
-		err := NewErrClusterNotFound(clusterID, assessmentID)
+	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
 	}
 
 	params := mergeParams(
 		defaultParams(),
-		es.mapClusterToParams(clusterInventory),
+		es.mapClusterToParams(invData),
 		userParams,
 	)
 
@@ -140,6 +109,7 @@ func (es *EstimationService) CalculateMigrationEstimation(
 
 // CalculateMigrationComplexity calculates OS and disk complexity breakdowns
 // for the given cluster within the assessment's inventory.
+// When clusterID is empty, the vCenter-level aggregate inventory is used.
 func (es *EstimationService) CalculateMigrationComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
@@ -151,49 +121,18 @@ func (es *EstimationService) CalculateMigrationComplexity(
 		WithString("cluster_id", clusterID).
 		Build()
 
-	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
 	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			tracer.Error(err).Log()
-			return nil, NewErrAssessmentNotFound(assessmentID)
-		}
-		tracer.Error(err).Log()
-		return nil, fmt.Errorf("failed to get assessment: %w", err)
+		return nil, err
 	}
 
-	if len(assessment.Snapshots) == 0 {
-		err := fmt.Errorf("assessment has no snapshots")
+	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
 	}
 
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		err := fmt.Errorf("latest snapshot has empty inventory")
-		tracer.Error(err).Log()
-		return nil, err
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		tracer.Error(err).Log()
-		return nil, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-
-	if len(inventory.Clusters) == 0 {
-		err := fmt.Errorf("inventory has no clusters")
-		tracer.Error(err).Log()
-		return nil, err
-	}
-
-	clusterInventory, exists := inventory.Clusters[clusterID]
-	if !exists {
-		err := NewErrClusterNotFound(clusterID, assessmentID)
-		tracer.Error(err).Log()
-		return nil, err
-	}
-
-	result, err := es.buildComplexityResult(clusterInventory)
+	result, err := es.buildComplexityResult(invData)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
@@ -201,6 +140,52 @@ func (es *EstimationService) CalculateMigrationComplexity(
 
 	tracer.Success().Log()
 	return result, nil
+}
+
+// loadInventory fetches the assessment's latest snapshot and unmarshals its inventory.
+func (es *EstimationService) loadInventory(ctx context.Context, assessmentID uuid.UUID, tracer *log.OperationTracer) (api.Inventory, error) {
+	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			tracer.Error(err).Log()
+			return api.Inventory{}, NewErrAssessmentNotFound(assessmentID)
+		}
+		tracer.Error(err).Log()
+		return api.Inventory{}, fmt.Errorf("failed to get assessment: %w", err)
+	}
+	if len(assessment.Snapshots) == 0 {
+		err := fmt.Errorf("assessment has no snapshots")
+		tracer.Error(err).Log()
+		return api.Inventory{}, err
+	}
+	latestSnapshot := assessment.Snapshots[0]
+	if len(latestSnapshot.Inventory) == 0 {
+		err := fmt.Errorf("latest snapshot has empty inventory")
+		tracer.Error(err).Log()
+		return api.Inventory{}, err
+	}
+	var inventory api.Inventory
+	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
+		tracer.Error(err).Log()
+		return api.Inventory{}, fmt.Errorf("failed to parse inventory: %w", err)
+	}
+	return inventory, nil
+}
+
+// resolveInventoryData returns the InventoryData for the given clusterID,
+// or the vCenter-level aggregate when clusterID is empty.
+func resolveInventoryData(inventory api.Inventory, clusterID string, assessmentID uuid.UUID) (api.InventoryData, error) {
+	if clusterID == "" {
+		if inventory.Vcenter == nil {
+			return api.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
+		}
+		return *inventory.Vcenter, nil
+	}
+	data, ok := inventory.Clusters[clusterID]
+	if !ok {
+		return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+	}
+	return data, nil
 }
 
 // buildComplexityResult converts cluster inventory data into complexity breakdowns.
@@ -366,6 +351,7 @@ type OsDiskComplexityResult struct {
 
 // CalculateOsDiskComplexity fetches the cluster inventory and returns the
 // combined OS+Disk complexity distribution. Used by the by-complexity handler.
+// When clusterID is empty, the vCenter-level aggregate inventory is used.
 func (es *EstimationService) CalculateOsDiskComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
@@ -377,36 +363,18 @@ func (es *EstimationService) CalculateOsDiskComplexity(
 		WithString("cluster_id", clusterID).
 		Build()
 
-	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
+	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
 	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			tracer.Error(err).Log()
-			return nil, NewErrAssessmentNotFound(assessmentID)
-		}
+		return nil, err
+	}
+
+	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	if err != nil {
 		tracer.Error(err).Log()
-		return nil, fmt.Errorf("failed to get assessment: %w", err)
-	}
-	if len(assessment.Snapshots) == 0 {
-		return nil, fmt.Errorf("assessment has no snapshots")
-	}
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		return nil, fmt.Errorf("latest snapshot has empty inventory")
+		return nil, err
 	}
 
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		return nil, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-	if len(inventory.Clusters) == 0 {
-		return nil, fmt.Errorf("inventory has no clusters")
-	}
-	clusterInventory, exists := inventory.Clusters[clusterID]
-	if !exists {
-		return nil, NewErrClusterNotFound(clusterID, assessmentID)
-	}
-
-	buckets := buildComplexityByOsDisk(clusterInventory.Vms.ComplexityDistribution)
+	buckets := buildComplexityByOsDisk(invData.Vms.ComplexityDistribution)
 	tracer.Success().Log()
 	return &OsDiskComplexityResult{Buckets: buckets}, nil
 }

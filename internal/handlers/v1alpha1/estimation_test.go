@@ -17,6 +17,8 @@ import (
 	. "github.com/onsi/gomega"
 )
 
+func strPtr(s string) *string { return &s }
+
 func createTestInventoryForComplexityHandler(clusterID string) []byte {
 	osInfo := map[string]api.OsInfo{
 		"Red Hat Enterprise Linux 9 (64-bit)": {Count: 50, Supported: true},
@@ -175,7 +177,7 @@ var _ = Describe("estimation handler", func() {
 		Context("successful requests", func() {
 			It("successfully returns 200 with valid request", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
@@ -215,7 +217,7 @@ var _ = Describe("estimation handler", func() {
 
 			It("returns response with breakdown containing all calculators", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
@@ -262,7 +264,7 @@ var _ = Describe("estimation handler", func() {
 			It("returns only the requested schema when estimationSchema filter is provided", func() {
 				schemas := []string{"network-based"}
 				request := &api.MigrationEstimationRequest{
-					ClusterId:        clusterID,
+					ClusterId:        &clusterID,
 					EstimationSchema: &schemas,
 				}
 
@@ -294,7 +296,7 @@ var _ = Describe("estimation handler", func() {
 			It("returns 400 when an unknown schema is requested", func() {
 				schemas := []string{"unknown-schema"}
 				request := &api.MigrationEstimationRequest{
-					ClusterId:        clusterID,
+					ClusterId:        &clusterID,
 					EstimationSchema: &schemas,
 				}
 
@@ -361,7 +363,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimation(ctx, server.CalculateMigrationEstimationRequestObject{
 					Id: assessmentID,
 					Body: &api.MigrationEstimationRequest{
-						ClusterId: clusterID,
+						ClusterId: &clusterID,
 						Params:    &map[string]interface{}{"bogus_param": 1.0},
 					},
 				})
@@ -388,7 +390,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimation(ctx, server.CalculateMigrationEstimationRequestObject{
 					Id: assessmentID,
 					Body: &api.MigrationEstimationRequest{
-						ClusterId: clusterID,
+						ClusterId: &clusterID,
 						Params:    &map[string]interface{}{"transfer_rate_mbps": 0.0},
 					},
 				})
@@ -399,11 +401,8 @@ var _ = Describe("estimation handler", func() {
 				Expect(response.Message).To(ContainSubstring("transfer_rate_mbps"))
 			})
 
-			It("returns 400 when clusterId is empty", func() {
-				request := &api.MigrationEstimationRequest{
-					ClusterId: "",
-				}
-
+			It("accepts empty clusterId for vCenter-level estimation", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(
 					nil,
 					service.NewAssessmentService(mockStore, nil, nil),
@@ -417,18 +416,17 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationEstimation(ctx, server.CalculateMigrationEstimationRequestObject{
 					Id:   assessmentID,
-					Body: request,
+					Body: &api.MigrationEstimationRequest{},
 				})
 
 				Expect(err).To(BeNil())
-				response, ok := resp.(server.CalculateMigrationEstimation400JSONResponse)
+				_, ok := resp.(server.CalculateMigrationEstimation500JSONResponse)
 				Expect(ok).To(BeTrue())
-				Expect(response.Message).To(ContainSubstring("clusterId is required"))
 			})
 
 			It("accepts valid clusterId format", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: "domain-c8",
+					ClusterId: strPtr("domain-c8"),
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, "domain-c8")
@@ -457,7 +455,7 @@ var _ = Describe("estimation handler", func() {
 		Context("assessment not found errors", func() {
 			It("returns 404 when assessment not found", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				nonExistentID := uuid.New()
@@ -485,7 +483,7 @@ var _ = Describe("estimation handler", func() {
 
 			It("returns 500 when assessment service returns non-NotFound error", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				mockStore.getError = errors.New("database error")
@@ -514,7 +512,7 @@ var _ = Describe("estimation handler", func() {
 		Context("authorization errors", func() {
 			It("returns 403 when user doesn't own assessment (different username)", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				handler = handlers.NewServiceHandler(
@@ -541,7 +539,7 @@ var _ = Describe("estimation handler", func() {
 
 			It("returns 403 when user doesn't own assessment (different organization)", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				handler = handlers.NewServiceHandler(
@@ -568,7 +566,7 @@ var _ = Describe("estimation handler", func() {
 
 			It("allows access when user owns assessment", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
@@ -597,7 +595,7 @@ var _ = Describe("estimation handler", func() {
 		Context("estimation service errors", func() {
 			It("returns 404 when cluster ID is not found in inventory", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: "non-existent-cluster",
+					ClusterId: strPtr("non-existent-cluster"),
 				}
 
 				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
@@ -625,7 +623,7 @@ var _ = Describe("estimation handler", func() {
 
 			It("returns 500 when estimation service fails with no snapshots", func() {
 				request := &api.MigrationEstimationRequest{
-					ClusterId: clusterID,
+					ClusterId: &clusterID,
 				}
 
 				// Create assessment without snapshots
@@ -677,7 +675,7 @@ var _ = Describe("estimation handler", func() {
 				baseResp, err := handler.CalculateMigrationEstimation(ctx,
 					server.CalculateMigrationEstimationRequestObject{
 						Id:   assessmentID,
-						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+						Body: &api.MigrationEstimationRequest{ClusterId: &clusterID},
 					},
 				)
 				Expect(err).NotTo(HaveOccurred())
@@ -693,7 +691,7 @@ var _ = Describe("estimation handler", func() {
 					server.CalculateMigrationEstimationRequestObject{
 						Id: assessmentID,
 						Body: &api.MigrationEstimationRequest{
-							ClusterId: clusterID,
+							ClusterId: &clusterID,
 							Params: &map[string]interface{}{
 								"transfer_rate_mbps": 10000.0,
 							},
@@ -716,7 +714,7 @@ var _ = Describe("estimation handler", func() {
 	Describe("CalculateMigrationComplexity", func() {
 		Context("successful requests", func() {
 			It("returns 200 with complexityByDisk (4 entries) and complexityByOS (5 entries)", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -733,7 +731,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns diskSizeRatings with range-only keys and correct scores", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -752,7 +750,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns osRatings with one entry per OS in the cluster inventory", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -771,7 +769,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns disk scores in canonical order 1 through 4", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -788,7 +786,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns OS scores in canonical order 0 through 4", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -805,7 +803,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns complexityByOSName with one entry per distinct OS name", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -821,7 +819,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns complexityByOSName with correct osName, score and vmCount for a known OS", func() {
-				request := &api.MigrationComplexityRequest{ClusterId: clusterID}
+				request := &api.MigrationComplexityRequest{ClusterId: &clusterID}
 				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
@@ -860,18 +858,18 @@ var _ = Describe("estimation handler", func() {
 				Expect(response.Message).To(ContainSubstring("empty body"))
 			})
 
-			It("returns 400 when clusterId is empty", func() {
+			It("accepts empty clusterId for vCenter-level complexity", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForComplexityHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: ""},
+					Body: &api.MigrationComplexityRequest{},
 				})
 
 				Expect(err).To(BeNil())
-				response, ok := resp.(server.CalculateMigrationComplexity400JSONResponse)
+				_, ok := resp.(server.CalculateMigrationComplexity500JSONResponse)
 				Expect(ok).To(BeTrue())
-				Expect(response.Message).To(ContainSubstring("clusterId is required"))
 			})
 		})
 
@@ -881,7 +879,7 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   uuid.New(),
-					Body: &api.MigrationComplexityRequest{ClusterId: clusterID},
+					Body: &api.MigrationComplexityRequest{ClusterId: &clusterID},
 				})
 
 				Expect(err).To(BeNil())
@@ -895,7 +893,7 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: clusterID},
+					Body: &api.MigrationComplexityRequest{ClusterId: &clusterID},
 				})
 
 				Expect(err).To(BeNil())
@@ -909,7 +907,7 @@ var _ = Describe("estimation handler", func() {
 				handler = handlers.NewServiceHandler(nil, &ForbiddenAssessmentService{}, nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: clusterID},
+					Body: &api.MigrationComplexityRequest{ClusterId: &clusterID},
 				})
 
 				Expect(err).To(BeNil())
@@ -923,7 +921,7 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: clusterID},
+					Body: &api.MigrationComplexityRequest{ClusterId: &clusterID},
 				})
 
 				Expect(err).To(BeNil())
@@ -940,7 +938,7 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: "non-existent-cluster"},
+					Body: &api.MigrationComplexityRequest{ClusterId: strPtr("non-existent-cluster")},
 				})
 
 				Expect(err).To(BeNil())
@@ -961,7 +959,7 @@ var _ = Describe("estimation handler", func() {
 
 				resp, err := handler.CalculateMigrationComplexity(ctx, server.CalculateMigrationComplexityRequestObject{
 					Id:   assessmentID,
-					Body: &api.MigrationComplexityRequest{ClusterId: clusterID},
+					Body: &api.MigrationComplexityRequest{ClusterId: &clusterID},
 				})
 
 				Expect(err).To(BeNil())
@@ -982,7 +980,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id:   assessmentID,
-						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+						Body: &api.MigrationEstimationRequest{ClusterId: &clusterID},
 					})
 
 				Expect(err).To(BeNil())
@@ -1001,7 +999,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id:   assessmentID,
-						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+						Body: &api.MigrationEstimationRequest{ClusterId: &clusterID},
 					})
 
 				Expect(err).To(BeNil())
@@ -1025,7 +1023,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id:   assessmentID,
-						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+						Body: &api.MigrationEstimationRequest{ClusterId: &clusterID},
 					})
 
 				Expect(err).To(BeNil())
@@ -1037,7 +1035,7 @@ var _ = Describe("estimation handler", func() {
 				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id:   uuid.New(),
-						Body: &api.MigrationEstimationRequest{ClusterId: clusterID},
+						Body: &api.MigrationEstimationRequest{ClusterId: &clusterID},
 					})
 				Expect(err).To(BeNil())
 				_, ok := resp.(server.CalculateMigrationEstimationByComplexity404JSONResponse)
@@ -1064,7 +1062,7 @@ var _ = Describe("estimation handler", func() {
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id: assessmentID,
 						Body: &api.MigrationEstimationRequest{
-							ClusterId: clusterID,
+							ClusterId: &clusterID,
 							Params:    &map[string]interface{}{"bogus_param": 1.0},
 						},
 					})
@@ -1083,7 +1081,7 @@ var _ = Describe("estimation handler", func() {
 					server.CalculateMigrationEstimationByComplexityRequestObject{
 						Id: assessmentID,
 						Body: &api.MigrationEstimationRequest{
-							ClusterId: clusterID,
+							ClusterId: &clusterID,
 							Params:    &map[string]interface{}{"transfer_rate_mbps": 0.0},
 						},
 					})
