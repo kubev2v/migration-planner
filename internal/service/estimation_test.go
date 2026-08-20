@@ -156,6 +156,27 @@ func createTestAssessmentFromRawInventory(id uuid.UUID, username, orgID string, 
 	}
 }
 
+func createTestInventoryWithVcenter(osInfo *map[string]api.OsInfo, diskComplexityTier *map[string]api.DiskSizeTierSummary, dist *map[string]api.DiskSizeTierSummary) []byte {
+	vcenterData := api.InventoryData{
+		Vms: api.VMs{
+			Total:                  10,
+			OsInfo:                 osInfo,
+			DiskComplexityTier:     diskComplexityTier,
+			ComplexityDistribution: dist,
+			DiskGB:                 api.VMResourceBreakdown{Total: 100},
+			CpuCores:               api.VMResourceBreakdown{Total: 40},
+			RamGB:                  api.VMResourceBreakdown{Total: 80},
+		},
+	}
+	inventory := api.Inventory{
+		Vcenter:  &vcenterData,
+		Clusters: map[string]api.InventoryData{},
+	}
+	data, err := json.Marshal(inventory)
+	Expect(err).ToNot(HaveOccurred())
+	return data
+}
+
 func createTestInventoryForEstimation(clusterID string, totalVMs, totalDiskGB int) []byte {
 	inventory := api.Inventory{
 		Clusters: map[string]api.InventoryData{
@@ -577,6 +598,40 @@ var _ = Describe("EstimationService", func() {
 				Expect(err.Error()).To(ContainSubstring("diskSizeTier"))
 			})
 		})
+
+		Context("vCenter-level aggregate (empty clusterID)", func() {
+			It("returns complexity using vCenter data when clusterID is empty", func() {
+				diskTier := map[string]api.DiskSizeTierSummary{
+					"0-10TiB": {VmCount: 125, TotalSizeTB: 8.5},
+				}
+				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(
+					assessmentID, testUsername, testOrgID,
+					createTestInventoryWithVcenter(defaultOsInfo, &diskTier, nil),
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "")
+
+				Expect(err).To(BeNil())
+				Expect(result).NotTo(BeNil())
+				Expect(result.ComplexityByOS).To(HaveLen(5))
+				Expect(result.ComplexityByDisk).To(HaveLen(4))
+			})
+
+			It("returns error when vCenter data is nil and clusterID is empty", func() {
+				inventory := api.Inventory{Clusters: map[string]api.InventoryData{}}
+				data, err := json.Marshal(inventory)
+				Expect(err).ToNot(HaveOccurred())
+				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(
+					assessmentID, testUsername, testOrgID, data,
+				)
+
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "")
+
+				Expect(result).To(BeNil())
+				Expect(err).NotTo(BeNil())
+				Expect(err.Error()).To(ContainSubstring("vcenter"))
+			})
+		})
 	})
 
 	Describe("CalculateMigrationEstimation", func() {
@@ -772,7 +827,7 @@ var _ = Describe("EstimationService", func() {
 
 				Expect(results).To(BeNil())
 				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("no clusters"))
+				Expect(err.Error()).To(ContainSubstring("not found"))
 			})
 		})
 
@@ -904,6 +959,25 @@ var _ = Describe("EstimationService", func() {
 			)
 			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, "wrong-cluster")
 			Expect(err).To(HaveOccurred())
+		})
+
+		It("returns buckets from vCenter data when clusterID is empty", func() {
+			diskTier := map[string]api.DiskSizeTierSummary{
+				"0-10TiB": {VmCount: 100, TotalSizeTB: 5.0},
+			}
+			dist := buildComplexityDistribution(map[string]api.DiskSizeTierSummary{
+				"1": {VmCount: 30, TotalSizeTB: 5.0},
+			})
+			mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(
+				assessmentID, testUsername, testOrgID,
+				createTestInventoryWithVcenter(defaultOsInfo, &diskTier, dist),
+			)
+
+			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, "")
+
+			Expect(err).ToNot(HaveOccurred())
+			Expect(result.Buckets).To(HaveLen(5))
+			Expect(result.Buckets[1].VMCount).To(Equal(30))
 		})
 	})
 

@@ -3751,10 +3751,10 @@ components:
       properties:
         clusterId:
           type: string
-          description: ID of the cluster to calculate migration estimation for
+          description: >
+            ID of the cluster to calculate migration estimation for.
+            When omitted or empty, the vCenter-level aggregate is used.
           example: "domain-c8"
-          x-oapi-codegen-extra-tags:
-            validate: "required"
         estimationSchema:
           type: array
           description: >
@@ -3771,8 +3771,6 @@ components:
             User-supplied values take precedence over both defaults and
             inventory-derived values. Unknown keys are rejected with HTTP 400.
           additionalProperties: true
-      required:
-        - clusterId
 
     MigrationEstimationResponse:
       type: object
@@ -3841,12 +3839,10 @@ components:
       properties:
         clusterId:
           type: string
-          description: ID of the cluster to calculate complexity estimation for
+          description: >
+            ID of the cluster to calculate complexity estimation for.
+            When omitted or empty, the vCenter-level aggregate is used.
           example: "domain-c8"
-          x-oapi-codegen-extra-tags:
-            validate: "required"
-      required:
-        - clusterId
 
     MigrationComplexityResponse:
       type: object
