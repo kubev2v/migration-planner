@@ -1,0 +1,32 @@
+# Shared by pull-request.yml and kind.yml.
+# The `code` filter is true when at least one changed file is not excluded.
+# Keep this in the job (dorny/paths-filter), not on on.pull_request.paths —
+# skipping the whole workflow leaves required checks pending.
+code:
+  - '**'
+  - '!**/*.md'
+  - '!**/*.png'
+  - '!**/*.svg'
+  - '!**/*.gif'
+  - '!**/*.jpg'
+  - '!**/*.jpeg'
+  - '!**/*.webp'
+  - '!**/*.html'
+  - '!**/LICENSE'
+  - '!**/LICENSE.txt'
+  - '!OWNERS'
+  - '!CODEOWNERS'
+  - '!.github/CODEOWNERS'
+  - '!.github/ISSUE_TEMPLATE/**'
+  - '!.github/PULL_REQUEST_TEMPLATE/**'
+  - '!.github/release-config.txt'
+  - '!.coderabbit.yaml'
+  - '!renovate.json'
+  - '!.gitlab-ci.yml'
+  - '!.gitignore'
+  - '!.tekton/**'
+  - '!doc/**'
+  - '!skills/**'
+  - '!examples/**'
+  - '!hack/staging-debug-tool/**'
+  - '!build/migration-planner-iso/config'
