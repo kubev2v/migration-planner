@@ -7,8 +7,44 @@ on:
   pull_request:
     branches: [main, stable]
 
+permissions:
+  contents: read
+  pull-requests: read
+
 jobs:
+  # Path filtering lives here (not on on.pull_request.paths) so this workflow
+  # always runs and required checks are never left pending.
+  # Branch protection should require the "Required e2e" job.
+  # Skip list is shared with pull-request.yml via .github/path-filters.yml.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run-e2e: ${{ steps.set.outputs.run-e2e }}
+    steps:
+      - name: Check out path filters
+        if: github.event_name != 'workflow_dispatch'
+        uses: actions/checkout@v4
+
+      - name: Detect whether e2e is needed
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: .github/path-filters.yml
+          predicate-quantifier: 'every'
+
+      - name: Set run-e2e
+        id: set
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "run-e2e=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run-e2e=${{ steps.filter.outputs.code }}" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: changes
+    if: needs.changes.outputs.run-e2e == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -83,3 +119,28 @@ jobs:
             kubectl describe ${pod} 2>/dev/null || true
             echo "======================="
           done
+
+  # Always runs so branch protection can require this check on docs-only PRs.
+  required:
+    name: Required e2e
+    needs: [changes, test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify e2e job
+        env:
+          RUN_E2E: ${{ needs.changes.outputs.run-e2e }}
+          CHANGES: ${{ needs.changes.result }}
+          TEST: ${{ needs.test.result }}
+        run: |
+          echo "changes=$CHANGES run_e2e=$RUN_E2E test=$TEST"
+
+          fail() { echo "::error::$1"; exit 1; }
+
+          [[ "$CHANGES" == success ]] || fail "changes did not succeed ($CHANGES)"
+
+          if [[ "$RUN_E2E" == true ]]; then
+            [[ "$TEST" == success ]] || fail "e2e did not succeed ($TEST)"
+          else
+            echo "Only skippable files changed; e2e was skipped"
+          fi
