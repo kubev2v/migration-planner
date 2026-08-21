@@ -108,6 +108,7 @@ func (s *PartnerService) CreateRequest(ctx context.Context, user auth.User, part
 
 	pc.ID = uuid.New()
 	pc.Username = user.Username
+	pc.UsernameOrgID = user.Organization
 	pc.PartnerID = partnerID
 	pc.RequestStatus = model.RequestStatusPending
 	created, err := s.store.PartnerCustomer().Create(ctx, pc)

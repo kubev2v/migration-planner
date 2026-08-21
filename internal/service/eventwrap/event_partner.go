@@ -2,6 +2,9 @@ package eventwrap
 
 import (
 	"context"
+	"fmt"
+
+	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -10,15 +13,17 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
 type EventPartnerService struct {
 	inner  service.PartnerServicer
 	store  store.Store
 	outbox *OutboxService
+	iam    iam.Client
 }
 
-func NewEventPartnerService(inner service.PartnerServicer, s store.Store) service.PartnerServicer {
+func NewEventPartnerService(inner service.PartnerServicer, s store.Store) *EventPartnerService {
 	return &EventPartnerService{inner: inner, store: s, outbox: NewOutboxService(s)}
 }
 
@@ -31,6 +36,14 @@ func (e *EventPartnerService) ListRequests(ctx context.Context, user auth.User) 
 }
 
 func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User, partnerID string, pc model.PartnerCustomer) (*model.PartnerCustomer, error) {
+	ctx, err := e.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
 	created, err := e.inner.CreateRequest(ctx, user, partnerID, pc)
 	if err != nil {
 		return nil, err
@@ -54,26 +67,32 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		return nil, err
 	}
 
-	var notifiedUsers []string
-	for _, m := range created.Partner.Members {
-		notifiedUsers = append(notifiedUsers, m.Username)
+	// Partner members may belong to different orgs, so notify each org separately.
+	usersByOrg := usersByOrgID(ctx, created.Partner.Members, e.iam, e.store)
+	if len(usersByOrg) == 0 {
+		zap.S().Warnw("skipping partnership request notification: no partner members with a known org_id",
+			"partner_id", created.PartnerID)
 	}
 
-	if len(notifiedUsers) > 0 {
-		// Notify the partner when a customer sent a partnership request
+	// Notify the partner when a customer sent a partnership request.
+	for orgID, users := range usersByOrg {
 		notificationBytes, err := notification.Build(
 			notification.PartnershipRequestEventType,
-			"", // Todo: Send the correct console.redhat.com partner org_id
+			orgID,
 			notification.SeverityImportant,
 			nil,
-			notification.Recipient{IgnoreUserPreferences: true, Users: notifiedUsers},
+			notification.Recipient{IgnoreUserPreferences: true, Users: users},
 		)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to build notification for partnership request event: %w", err)
 		}
 		if err := e.outbox.Insert(ctx, notification.PartnershipRequestEventType, notificationBytes); err != nil {
 			return nil, err
 		}
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return nil, err
 	}
 
 	return created, nil
@@ -178,6 +197,14 @@ func (e *EventPartnerService) ListCustomers(ctx context.Context, user auth.User)
 }
 
 func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User, requestID uuid.UUID, req model.Request) (*model.PartnerCustomer, error) {
+	ctx, err := e.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
 	updated, err := e.inner.UpdateRequest(ctx, user, requestID, req)
 	if err != nil {
 		return nil, err
@@ -210,17 +237,37 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 	if updated.Reason != nil {
 		reason = *updated.Reason
 	}
-	notificationBytes, err := notification.Build(
-		notification.PartnershipResponseEventType,
-		user.Organization,
-		notification.SeverityImportant,
-		map[string]string{"decision": decision, "reason": reason},
-		notification.Recipient{Users: []string{updated.Username}, IgnoreUserPreferences: true},
-	)
-	if err != nil {
-		return nil, err
+
+	orgId := updated.UsernameOrgID
+	isOrgIdExist := orgId != ""
+	if !isOrgIdExist {
+		resolved, err := resolveAndPersistCustomerOrgID(ctx, updated, e.iam, e.store)
+		if err != nil {
+			zap.S().Errorw("failed to resolve and persist customer user", "username", updated.Username, "err", err)
+		} else {
+			orgId = resolved
+			isOrgIdExist = true
+		}
 	}
-	if err := e.outbox.Insert(ctx, notification.PartnershipResponseEventType, notificationBytes); err != nil {
+
+	if isOrgIdExist {
+		notificationBytes, err := notification.Build(
+			notification.PartnershipResponseEventType,
+			orgId,
+			notification.SeverityImportant,
+			map[string]string{"decision": decision, "reason": reason},
+			notification.Recipient{Users: []string{updated.Username}, IgnoreUserPreferences: true},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		if err := e.outbox.Insert(ctx, notification.PartnershipResponseEventType, notificationBytes); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
 		return nil, err
 	}
 
@@ -245,4 +292,9 @@ func (e *EventPartnerService) RemoveCustomer(ctx context.Context, user auth.User
 	}
 
 	return nil
+}
+
+func (e *EventPartnerService) WithIamClient(client iam.Client) *EventPartnerService {
+	e.iam = client
+	return e
 }

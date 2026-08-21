@@ -22,6 +22,7 @@ const (
 type PartnerCustomer struct {
 	ID            uuid.UUID     `gorm:"primaryKey;column:id;type:VARCHAR(255);"`
 	Username      string        `gorm:"not null;type:VARCHAR(100)"`
+	UsernameOrgID string        `gorm:"column:username_org_id;type:VARCHAR(255)"`
 	PartnerID     string        `gorm:"not null;type:VARCHAR(255)"`
 	RequestStatus RequestStatus `gorm:"not null;type:request_status;default:'pending'"`
 	Name          string        `gorm:"not null;type:VARCHAR(100)"`

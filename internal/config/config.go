@@ -11,6 +11,7 @@ type Config struct {
 	Service      *svcConfig
 	Kafka        *Kafka
 	Notification *Notification
+	IAM          *IAM
 }
 
 type dbConfig struct {
@@ -67,6 +68,15 @@ type Notification struct {
 	URL        string `envconfig:"NOTIFICATION_URL" default:""`
 	ClientCert string `envconfig:"NOTIFICATION_CLIENT_CERT" default:""`
 	ClientKey  string `envconfig:"NOTIFICATION_CLIENT_KEY" default:""`
+}
+
+// IAM configures the mTLS client used to resolve a user's details from the
+// Red Hat User Service. ClientCert/ClientKey are PEM-encoded and are expected
+// to be sourced from a Kubernetes secret
+type IAM struct {
+	URL        string `envconfig:"IAM_URL" default:""`
+	ClientCert string `envconfig:"IAM_CLIENT_CERT" default:""`
+	ClientKey  string `envconfig:"IAM_CLIENT_KEY" default:""`
 }
 
 func New() (*Config, error) {

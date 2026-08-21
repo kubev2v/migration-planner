@@ -14,6 +14,7 @@ type Member struct {
 	Username  string    `gorm:"uniqueIndex;not null;type:VARCHAR(255)"`
 	Email     string    `gorm:"not null;type:VARCHAR(255)"`
 	GroupID   uuid.UUID `gorm:"not null;type:VARCHAR(255)"`
+	OrgID     string    `gorm:"column:org_id;type:VARCHAR(255)"`
 	Group     *Group    `gorm:"foreignKey:GroupID" json:"-"`
 }
 

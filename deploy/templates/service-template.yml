@@ -74,7 +74,6 @@ parameters:
     value: "false"
   - name: NOTIFICATION_URL
     description: URL of the console notifications service
-    value: "https://mtls.internal.cloud.stage.redhat.com/api/notifications-gw/notifications"
   - name: NOTIFICATION_CERT_SECRET_NAME
     description: Kubernetes secret containing the notification service mTLS client certificate and key
     value: "notifications-cert"
@@ -83,6 +82,17 @@ parameters:
     value: "notifications.crt"
   - name: NOTIFICATION_CLIENT_KEY_SECRET_KEY
     description: Key in the notification cert secret for the client private key (PEM)
+    value: "notifications.key"
+  - name: IAM_URL
+    description: URL of the Red Hat User Service used to resolve a user's org_id
+  - name: IAM_CERT_SECRET_NAME
+    description: Kubernetes secret containing the User Service mTLS client certificate and key
+    value: "notifications-cert"
+  - name: IAM_CLIENT_CERT_SECRET_KEY
+    description: Key in the IAM cert secret for the client certificate (PEM)
+    value: "notifications.crt"
+  - name: IAM_CLIENT_KEY_SECRET_KEY
+    description: Key in the IAM cert secret for the client private key (PEM)
     value: "notifications.key"
   - name: PERSISTENT_DISK_DEVICE
     value: /dev/sda
@@ -799,6 +809,21 @@ objects:
                     secretKeyRef:
                       name: ${NOTIFICATION_CERT_SECRET_NAME}
                       key: ${NOTIFICATION_CLIENT_KEY_SECRET_KEY}
+                      optional: true
+                # IAM (Red Hat User Service) config values
+                - name: IAM_URL
+                  value: "${IAM_URL}"
+                - name: IAM_CLIENT_CERT
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${IAM_CERT_SECRET_NAME}
+                      key: ${IAM_CLIENT_CERT_SECRET_KEY}
+                      optional: true
+                - name: IAM_CLIENT_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: ${IAM_CERT_SECRET_NAME}
+                      key: ${IAM_CLIENT_KEY_SECRET_KEY}
                       optional: true
               volumeMounts:
                 - name: migration-planner-dir

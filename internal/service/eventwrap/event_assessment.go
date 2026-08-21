@@ -2,7 +2,10 @@ package eventwrap
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	"go.uber.org/zap"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -12,6 +15,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
 type EventAssessmentService struct {
@@ -19,9 +23,10 @@ type EventAssessmentService struct {
 	store       store.Store
 	outbox      *OutboxService
 	accountsSvc service.AccountsServicer
+	iam         iam.Client
 }
 
-func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store, accountsSvc service.AccountsServicer) service.AssessmentServicer {
+func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store, accountsSvc service.AccountsServicer) *EventAssessmentService {
 	return &EventAssessmentService{inner: inner, store: s, outbox: NewOutboxService(s), accountsSvc: accountsSvc}
 }
 
@@ -79,29 +84,35 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
-	// When a new assessment is created on behalf of a customer by a partner
-	// notify the customer by firing an email notification
-	if user, ok := auth.UserFromContext(ctx); ok {
-		identity, err := e.accountsSvc.GetIdentity(ctx, user)
-		if err != nil {
-			return nil, err
-		}
-		if identity.Kind == service.KindPartner || identity.Kind == service.KindAdmin {
-			notificationBytes, err := notification.Build(
-				notification.AssessmentCreatedEventType,
-				assessment.OrgID,
-				notification.SeverityImportant,
-				map[string]string{"assessment_id": assessment.ID.String()},
-				notification.Recipient{Users: []string{assessment.Username}, IgnoreUserPreferences: true},
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := e.outbox.Insert(ctx, notification.AssessmentCreatedEventType, notificationBytes); err != nil {
-				return nil, err
-			}
-		}
-	}
+	// TODO: notify the customer when a partner creates an assessment on their behalf.
+	// This is disabled because there is currently no "create on behalf of a customer"
+	// mechanism: CreateAssessment always owns the assessment by the acting user
+	// (assessment.OrgID/Username), and a partner can have multiple customers, so nothing
+	// links a created assessment to a specific customer. As written this notified the
+	// partner about their own assessment, not any customer. Re-enable once an on-behalf
+	// create flow identifies the target customer.
+	//
+	// if user, ok := auth.UserFromContext(ctx); ok {
+	// 	identity, err := e.accountsSvc.GetIdentity(ctx, user)
+	// 	if err != nil {
+	// 		return nil, err
+	// 	}
+	// 	if identity.Kind == service.KindPartner || identity.Kind == service.KindAdmin {
+	// 		notificationBytes, err := notification.Build(
+	// 			notification.AssessmentCreatedEventType,
+	// 			assessment.OrgID,
+	// 			notification.SeverityImportant,
+	// 			map[string]string{"assessment_id": assessment.ID.String()},
+	// 			notification.Recipient{Users: []string{assessment.Username}, IgnoreUserPreferences: true},
+	// 		)
+	// 		if err != nil {
+	// 			return nil, err
+	// 		}
+	// 		if err := e.outbox.Insert(ctx, notification.AssessmentCreatedEventType, notificationBytes); err != nil {
+	// 			return nil, err
+	// 		}
+	// 	}
+	// }
 
 	if _, err := store.Commit(ctx); err != nil {
 		return nil, err
@@ -185,27 +196,27 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		return err
 	}
 
-	group, err := e.store.Accounts().GetGroup(ctx, partnerGID)
+	members, err := e.store.Accounts().ListMembers(ctx, store.NewMemberQueryFilter().ByGroupID(partnerGID))
 	if err != nil {
 		return err
 	}
 
-	var notifiedUsers []string
-	for _, m := range group.Members {
-		notifiedUsers = append(notifiedUsers, m.Username)
+	usersByOrg := usersByOrgID(ctx, members, e.iam, e.store)
+	if len(usersByOrg) == 0 {
+		zap.S().Warnw("skipping assessment shared notification: no partner members with a known org_id",
+			"partner_id", *identity.PartnerID)
 	}
 
-	if len(notifiedUsers) > 0 {
-		// Notify a partner when a customer shared an assessment with him
+	for orgID, users := range usersByOrg {
 		notificationBytes, err := notification.Build(
 			notification.AssessmentSharedEventType,
-			"", // Todo: Send the correct console.redhat.com partner org_id
+			orgID,
 			notification.SeverityImportant,
 			map[string]string{"assessment_id": id.String()},
-			notification.Recipient{IgnoreUserPreferences: true, Users: notifiedUsers},
+			notification.Recipient{IgnoreUserPreferences: true, Users: users},
 		)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to build notification for shared assessment event: %w", err)
 		}
 		if err := e.outbox.Insert(ctx, notification.AssessmentSharedEventType, notificationBytes); err != nil {
 			return err
@@ -248,4 +259,9 @@ func (e *EventAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	}
 
 	return nil
+}
+
+func (e *EventAssessmentService) WithIamClient(client iam.Client) *EventAssessmentService {
+	e.iam = client
+	return e
 }
