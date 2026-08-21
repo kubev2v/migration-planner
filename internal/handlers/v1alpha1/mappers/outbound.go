@@ -34,6 +34,7 @@ func normalizeInventoryData(data *api.InventoryData) {
 	if data.Infra.HostPowerStates == nil {
 		data.Infra.HostPowerStates = map[string]int{}
 	}
+	data.Infra.VmsPerHostAverage = util.VmsPerHostAverage(data.Vms.Total, data.Infra.TotalHosts)
 
 	// Normalize VMs fields
 	if data.Vms.PowerStates == nil {

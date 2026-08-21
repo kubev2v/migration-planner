@@ -122,6 +122,16 @@ func Round(f float64) float64 {
 	return math.Round(f*100) / 100
 }
 
+// VmsPerHostAverage returns the average VM density per host, rounded to 2
+// decimals. Returns nil when there are no hosts (division undefined).
+func VmsPerHostAverage(totalVMs, totalHosts int) *float64 {
+	if totalHosts <= 0 {
+		return nil
+	}
+	avg := Round(float64(totalVMs) / float64(totalHosts))
+	return &avg
+}
+
 // BytesToTB converts a value in bytes to terabytes (TB).
 // Accepts int, int64, or float64.
 func BytesToTB[T ~int | ~int64 | ~float64](bytes T) float64 {
