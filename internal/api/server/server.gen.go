@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -4289,8 +4290,9 @@ func (response GetSourceDownloadURL500JSONResponse) VisitGetSourceDownloadURLRes
 }
 
 type UpdateInventoryRequestObject struct {
-	Id   openapi_types.UUID `json:"id"`
-	Body *UpdateInventoryJSONRequestBody
+	Id            openapi_types.UUID `json:"id"`
+	JSONBody      *UpdateInventoryJSONRequestBody
+	MultipartBody *multipart.Reader
 }
 
 type UpdateInventoryResponseObject interface {
@@ -5815,13 +5817,23 @@ func (sh *strictHandler) UpdateInventory(w http.ResponseWriter, r *http.Request,
 	var request UpdateInventoryRequestObject
 
 	request.Id = id
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 
-	var body UpdateInventoryJSONRequestBody
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-		return
+		var body UpdateInventoryJSONRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+			return
+		}
+		request.JSONBody = &body
 	}
-	request.Body = &body
+	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
+		if reader, err := r.MultipartReader(); err != nil {
+			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+			return
+		} else {
+			request.MultipartBody = reader
+		}
+	}
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateInventory(ctx, request.(UpdateInventoryRequestObject))

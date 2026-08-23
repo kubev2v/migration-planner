@@ -230,7 +230,10 @@ paths:
     put:
       tags:
         - source
-      description: Update inventory
+      description: >
+        Upload source inventory. Replaces the main inventory and all subset
+        inventories. Supports JSON (single inventory file) and ZIP bundle
+        (inventory.json + subsets/*.json from disconnected agent).
       operationId: updateInventory
       parameters:
         - name: id
@@ -246,6 +249,9 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateInventory"
+          multipart/form-data:
+            schema:
+              $ref: "#/components/schemas/SourceInventoryFileForm"
       responses:
         "200":
           description: Updated source inventory
@@ -3126,6 +3132,21 @@ components:
             validate: "required"
       required:
         - name
+        - file
+
+    SourceInventoryFileForm:
+      type: object
+      properties:
+        file:
+          type: string
+          format: binary
+          description: >
+            Full disconnected inventory for the source. Either a single `.json`
+            inventory file (clears subset inventories) or a `.zip` from the
+            disconnected agent (`inventory.json` plus `subsets/<groupId>.json`).
+          x-oapi-codegen-extra-tags:
+            validate: "required"
+      required:
         - file
 
     AssessmentUpdate:

@@ -5,14 +5,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"github.com/kubev2v/migration-planner/internal/inventorybundle"
 	"github.com/kubev2v/migration-planner/internal/service"
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
 // validateSourceData validates the source data using the source validation rules
@@ -170,43 +177,54 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 
 // (PUT /api/v1/sources/{id}/inventory)
 func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.UpdateInventoryRequestObject) (server.UpdateInventoryResponseObject, error) {
-	if request.Body == nil {
-		return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
-	}
+	logger := log.NewDebugLogger("source_handler").
+		WithContext(ctx).
+		Operation("update_inventory").
+		WithUUID("source_id", request.Id).
+		Build()
 
-	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	// Route based on content type
+	if request.MultipartBody != nil {
+		return s.updateInventoryMultipart(ctx, request.Id, request.MultipartBody, logger)
+	}
+	if request.JSONBody != nil {
+		return s.updateInventoryJSON(ctx, request.Id, request.JSONBody, logger)
+	}
+	return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
+}
+
+func (s *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uuid.UUID, logger *log.OperationTracer) (*model.Source, server.UpdateInventoryResponseObject, error) {
+	source, err := s.sourceSrv.GetSource(ctx, sourceID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
-			return server.UpdateInventory404JSONResponse{Message: err.Error()}, nil
+			return nil, server.UpdateInventory404JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.UpdateInventory500JSONResponse{}, nil
+			logger.Error(err).WithString("step", "get_source").Log()
+			return nil, server.UpdateInventory500JSONResponse{
+				Message: fmt.Sprintf("failed to get source %s: %v", sourceID, err),
+			}, nil
 		}
 	}
 
 	user := auth.MustHaveUser(ctx)
 	if user.Organization != source.OrgID || user.Username != source.Username {
-		message := fmt.Sprintf("forbidden to update inventory for source %s by user %s with org_id %s", request.Id, user.Username, user.Organization)
-		return server.UpdateInventory403JSONResponse{Message: message}, nil
+		message := fmt.Sprintf("forbidden to update inventory for source %s by user %s with org_id %s", sourceID, user.Username, user.Organization)
+		return nil, server.UpdateInventory403JSONResponse{Message: message}, nil
 	}
 
-	data, err := json.Marshal(request.Body.Inventory)
-	if err != nil {
-		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
-	}
+	return source, nil, nil
+}
 
-	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, srvMappers.InventoryUpdateForm{
-		AgentID:   request.Body.AgentId,
-		SourceID:  request.Id,
-		Inventory: data,
-		VCenterID: request.Body.Inventory.VcenterId,
-	})
+// inventoryUpdateResponse handles the common logic for updating inventory and returning the response
+func (s *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (server.UpdateInventoryResponseObject, error) {
+	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, form)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrInvalidVCenterID:
 			return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", request.Id, err)}, nil
+			return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
 		}
 	}
 
@@ -216,6 +234,116 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 	}
 
 	return server.UpdateInventory200JSONResponse(response), nil
+}
+
+func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.UUID, body *v1alpha1.UpdateInventoryJSONRequestBody, logger *log.OperationTracer) (server.UpdateInventoryResponseObject, error) {
+	_, errResponse, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+	if err != nil || errResponse != nil {
+		return errResponse, err
+	}
+
+	data, err := json.Marshal(body.Inventory)
+	if err != nil {
+		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
+	}
+
+	form := srvMappers.InventoryUpdateForm{
+		AgentID:   body.AgentId,
+		SourceID:  sourceID,
+		Inventory: data,
+		VCenterID: body.Inventory.VcenterId,
+		Subsets:   []srvMappers.SourceSubsetUpdateForm{}, // JSON uploads have no subsets
+	}
+
+	return s.inventoryUpdateResponse(ctx, sourceID, form)
+}
+
+func (s *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID uuid.UUID, body *multipart.Reader, logger *log.OperationTracer) (server.UpdateInventoryResponseObject, error) {
+	source, errResponse, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+	if err != nil || errResponse != nil {
+		return errResponse, err
+	}
+
+	fileBytes, err := readUploadedInventoryFile(body)
+	if err != nil {
+		logger.Error(err).WithString("step", "parse_multipart").Log()
+		return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
+	}
+
+	parsed, err := inventorybundle.Parse(fileBytes)
+	if err != nil {
+		logger.Error(err).WithString("step", "parse_inventory").Log()
+		return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
+	}
+
+	agentID := uuid.New()
+	if parsed.AgentID != nil {
+		agentID = *parsed.AgentID
+	} else if len(source.Agents) > 0 {
+		agentID = source.Agents[0].ID
+	}
+
+	form := srvMappers.InventoryUpdateForm{
+		AgentID:   agentID,
+		SourceID:  sourceID,
+		Inventory: parsed.MainInventory,
+		VCenterID: parsed.VCenterID,
+		Subsets:   make([]srvMappers.SourceSubsetUpdateForm, len(parsed.Subsets)),
+	}
+	for i, subset := range parsed.Subsets {
+		form.Subsets[i] = srvMappers.SourceSubsetUpdateForm{
+			ID:        subset.ID,
+			Name:      subset.Name,
+			SourceID:  sourceID,
+			VCenterID: subset.VCenterID,
+			VMsCount:  subset.VMsCount,
+			Inventory: subset.Inventory,
+		}
+	}
+
+	logger.Success().WithInt("subset_count", len(form.Subsets)).Log()
+	return s.inventoryUpdateResponse(ctx, sourceID, form)
+}
+
+func readUploadedInventoryFile(body *multipart.Reader) ([]byte, error) {
+	var fileBytes []byte
+	for {
+		part, err := body.NextPart()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				return nil, fmt.Errorf("file exceeds maximum upload size of %d MiB", inventorybundle.MaxFileSize>>20)
+			}
+			return nil, fmt.Errorf("failed to parse form: %w", err)
+		}
+
+		if part.FormName() != "file" {
+			_, _ = io.Copy(io.Discard, io.LimitReader(part, 1<<20))
+			_ = part.Close()
+			continue
+		}
+
+		data, err := io.ReadAll(io.LimitReader(part, inventorybundle.MaxFileSize+1))
+		_ = part.Close()
+		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				return nil, fmt.Errorf("file exceeds maximum upload size of %d MiB", inventorybundle.MaxFileSize>>20)
+			}
+			return nil, fmt.Errorf("failed to read file: %w", err)
+		}
+		if int64(len(data)) > inventorybundle.MaxFileSize {
+			return nil, fmt.Errorf("file exceeds maximum upload size of %d MiB", inventorybundle.MaxFileSize>>20)
+		}
+		fileBytes = data
+	}
+	if len(fileBytes) == 0 {
+		return nil, fmt.Errorf("file is required")
+	}
+	return fileBytes, nil
 }
 
 // (HEAD /api/v1/sources/{id}/image)

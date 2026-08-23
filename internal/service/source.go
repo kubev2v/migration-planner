@@ -246,7 +246,7 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 	}
 
 	if agent == nil {
-		newAgent := model.NewAgentForSource(uuid.New(), *source)
+		newAgent := model.NewAgentForSource(form.AgentID, *source)
 		if _, err := s.store.Agent().Create(ctx, newAgent); err != nil {
 			return model.Source{}, err
 		}
@@ -267,11 +267,43 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 		return model.Source{}, err
 	}
 
+	if err := s.replaceSourceSubsets(ctx, form.SourceID, form.Subsets); err != nil {
+		_, _ = store.Rollback(ctx)
+		return model.Source{}, err
+	}
+
 	if _, err := store.Commit(ctx); err != nil {
 		return model.Source{}, err
 	}
 
 	return *source, nil
+}
+
+func (s *SourceService) replaceSourceSubsets(ctx context.Context, sourceID uuid.UUID, subsets []mappers.SourceSubsetUpdateForm) error {
+	// Bulk delete all existing subsets for this source
+	if err := s.store.SourceSubsetInventory().DeleteBySourceID(ctx, sourceID); err != nil {
+		return fmt.Errorf("failed to delete source subset inventories: %w", err)
+	}
+
+	// Bulk create new subsets if any
+	if len(subsets) > 0 {
+		records := make([]model.SourceSubsetInventory, len(subsets))
+		for i, subset := range subsets {
+			records[i] = model.SourceSubsetInventory{
+				ID:         subset.ID,
+				Name:       subset.Name,
+				SourceID:   sourceID,
+				VCenterID:  subset.VCenterID,
+				VMsCount:   subset.VMsCount,
+				Inventory:  subset.Inventory,
+				UpdateType: "manual",
+			}
+		}
+		if err := s.store.SourceSubsetInventory().CreateMany(ctx, records); err != nil {
+			return fmt.Errorf("failed to create source subset inventories: %w", err)
+		}
+	}
+	return nil
 }
 
 type SourceFilterFunc func(s *SourceFilter)

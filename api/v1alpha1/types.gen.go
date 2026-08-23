@@ -1215,6 +1215,12 @@ type SourceCreate struct {
 // SourceCreateNetworkConfigType Set to dhcp to clear all network fields. Set to static when providing vmNetwork/network data. When omitted, network fields are preserved or updated normally.
 type SourceCreateNetworkConfigType string
 
+// SourceInventoryFileForm defines model for SourceInventoryFileForm.
+type SourceInventoryFileForm struct {
+	// File Full disconnected inventory for the source. Either a single `.json` inventory file (clears subset inventories) or a `.zip` from the disconnected agent (`inventory.json` plus `subsets/<groupId>.json`).
+	File openapi_types.File `json:"file" validate:"required"`
+}
+
 // SourceList defines model for SourceList.
 type SourceList = []Source
 
@@ -1553,3 +1559,6 @@ type UpdateSourceJSONRequestBody = SourceUpdate
 
 // UpdateInventoryJSONRequestBody defines body for UpdateInventory for application/json ContentType.
 type UpdateInventoryJSONRequestBody = UpdateInventory
+
+// UpdateInventoryMultipartRequestBody defines body for UpdateInventory for multipart/form-data ContentType.
+type UpdateInventoryMultipartRequestBody = SourceInventoryFileForm
