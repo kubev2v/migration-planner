@@ -2520,6 +2520,9 @@ components:
         totalWithSharedDisks:
           type: integer
           description: Number of VMs that have at least one shared disk
+        totalWithRDM:
+          type: integer
+          description: Number of VMs that have at least one raw device mapping (RDM) disk
         cpuCores:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskSizeTier:

@@ -510,6 +510,19 @@ func (p *Parser) VMsWithSharedDisksCount(ctx context.Context, filters Filters) (
 	return count, nil
 }
 
+// VMsWithRDMCount returns count of VMs that have at least one RDM disk.
+func (p *Parser) VMsWithRDMCount(ctx context.Context, filters Filters) (int, error) {
+	q, err := p.builder.VMsWithRDMCountQuery(filters)
+	if err != nil {
+		return 0, fmt.Errorf("building vms with rdm count query: %w", err)
+	}
+	var count int
+	if err := p.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
+		return 0, fmt.Errorf("scanning vms with rdm count: %w", err)
+	}
+	return count, nil
+}
+
 // ClustersPerDatacenter returns cluster count per datacenter.
 func (p *Parser) ClustersPerDatacenter(ctx context.Context) ([]int, error) {
 	q, err := p.builder.ClustersPerDatacenterQuery()

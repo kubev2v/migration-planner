@@ -225,6 +225,14 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 		zap.S().Named("duckdb_parser").Warnf("Failed to get total vms with shared disks: %v", err)
 	}
 
+	// Get total with RDM disk
+	totalRDM, err := p.VMsWithRDMCount(ctx, filters)
+	if err == nil {
+		vmsData.TotalWithRDM = totalRDM
+	} else {
+		zap.S().Named("duckdb_parser").Warnf("Failed to get total vms with RDM: %v", err)
+	}
+
 	// Get resource breakdowns
 	breakdowns, err := p.ResourceBreakdowns(ctx, filters)
 	if err == nil {
