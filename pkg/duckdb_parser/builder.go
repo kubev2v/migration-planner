@@ -67,11 +67,19 @@ type queryParams struct {
 	PowerStateFilter        string
 	VmIDFilter              string
 	VMListFilter            string
+	FaultTolerancePredicate string
 	Category                string
 	OSCaseClauses           string
 	ComplexityMatrixClauses string
 	Limit                   int
 	Offset                  int
+}
+
+const faultToleranceEnabledStates = "'enabled', 'running', 'starting', 'needSecondary', 'primary', 'secondary'"
+
+// faultToleranceEnabledPredicate keeps per-VM and aggregate FT classifications aligned.
+func faultToleranceEnabledPredicate(tableAlias string) string {
+	return fmt.Sprintf(`COALESCE(%s."FT State" IN (%s), false)`, tableAlias, faultToleranceEnabledStates)
 }
 
 // VMQuery builds the VM query with filters and pagination.
@@ -84,14 +92,15 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 	networkColumns := strings.Join(quoted, ", ")
 
 	params := queryParams{
-		NetworkColumns:   networkColumns,
-		ClusterFilter:    escapeSQLString(filters.Cluster),
-		OSFilter:         escapeSQLString(filters.OS),
-		PowerStateFilter: escapeSQLString(filters.PowerState),
-		VmIDFilter:       escapeSQLString(filters.VmId),
-		VMListFilter:     buildVMListFilter(filters.VMList, "i"),
-		Limit:            options.Limit,
-		Offset:           options.Offset,
+		NetworkColumns:          networkColumns,
+		ClusterFilter:           escapeSQLString(filters.Cluster),
+		OSFilter:                escapeSQLString(filters.OS),
+		PowerStateFilter:        escapeSQLString(filters.PowerState),
+		VmIDFilter:              escapeSQLString(filters.VmId),
+		VMListFilter:            buildVMListFilter(filters.VMList, "i"),
+		FaultTolerancePredicate: faultToleranceEnabledPredicate("i"),
+		Limit:                   options.Limit,
+		Offset:                  options.Offset,
 	}
 	return b.buildQuery("vm_query", mustGetTemplate("vm_query"), params)
 }
@@ -384,6 +393,16 @@ func (b *QueryBuilder) VMsWithRDMCountQuery(filters Filters) (string, error) {
 		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("vms_with_rdm_count_query", mustGetTemplate("vms_with_rdm_count_query"), params)
+}
+
+// VMsWithFaultToleranceCountQuery builds the VMs with Fault Tolerance enabled count query.
+func (b *QueryBuilder) VMsWithFaultToleranceCountQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter:           escapeSQLString(filters.Cluster),
+		VMListFilter:            buildVMListFilter(filters.VMList, "i"),
+		FaultTolerancePredicate: faultToleranceEnabledPredicate("i"),
+	}
+	return b.buildQuery("vms_with_fault_tolerance_count_query", mustGetTemplate("vms_with_fault_tolerance_count_query"), params)
 }
 
 // generateOSCaseClauses reads complexity.OSDifficultyScores and generates SQL WHEN clauses.

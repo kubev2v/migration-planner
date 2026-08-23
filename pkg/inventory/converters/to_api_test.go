@@ -809,6 +809,17 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 	}
 }
 
+func TestToAPI_TotalWithFaultTolerance(t *testing.T) {
+	result := ToAPI(&inventory.Inventory{
+		VCenter: &inventory.InventoryData{
+			VMs: inventory.VMsData{Total: 10, TotalWithFaultTolerance: 3},
+		},
+	})
+	require.NotNil(t, result.Vcenter)
+	require.NotNil(t, result.Vcenter.Vms.TotalWithFaultTolerance)
+	assert.Equal(t, 3, *result.Vcenter.Vms.TotalWithFaultTolerance)
+}
+
 func TestToAPIVMs_Distributions(t *testing.T) {
 	input := inventory.VMsData{
 		DistributionByCPUTier:    map[string]int{"1-2": 10, "3-4": 20, "5+": 5},

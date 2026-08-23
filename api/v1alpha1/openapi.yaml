@@ -2529,6 +2529,9 @@ components:
         totalWithRDM:
           type: integer
           description: Number of VMs that have at least one raw device mapping (RDM) disk
+        totalWithFaultTolerance:
+          type: integer
+          description: Number of VMs that have Fault Tolerance enabled
         cpuCores:
           $ref: "#/components/schemas/VMResourceBreakdown"
         diskSizeTier:

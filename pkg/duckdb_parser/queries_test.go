@@ -151,4 +151,15 @@ func TestVMs_FaultToleranceEnabled(t *testing.T) {
 	for id, want := range expected {
 		assert.Equal(t, want, vmMap[id].FaultToleranceEnabled, "VM %s: FaultToleranceEnabled", id)
 	}
+
+	count, err := parser.VMsWithFaultToleranceCount(ctx, Filters{})
+	require.NoError(t, err)
+
+	enabledVMs := 0
+	for _, vm := range vmsOut {
+		if vm.FaultToleranceEnabled {
+			enabledVMs++
+		}
+	}
+	assert.Equal(t, enabledVMs, count, "FT aggregate must match the per-VM FT classification")
 }
