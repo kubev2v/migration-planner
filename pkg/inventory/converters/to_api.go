@@ -164,6 +164,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 	migratableWithWarnings := v.TotalMigratableWithWarnings
 	totalWithSharedDisks := v.TotalWithSharedDisks
 	totalWithRDM := v.TotalWithRDM
+	totalWithFaultTolerance := v.TotalWithFaultTolerance
 
 	return api.VMs{
 		Total:                       v.Total,
@@ -171,6 +172,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		TotalMigratableWithWarnings: &migratableWithWarnings,
 		TotalWithSharedDisks:        &totalWithSharedDisks,
 		TotalWithRDM:                &totalWithRDM,
+		TotalWithFaultTolerance:     &totalWithFaultTolerance,
 		PowerStates:                 v.PowerStates,
 		OsInfo:                      &osInfo,
 		CpuCores: api.VMResourceBreakdown{

@@ -1390,6 +1390,9 @@ type VMs struct {
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 
+	// TotalWithFaultTolerance Number of VMs that have Fault Tolerance enabled
+	TotalWithFaultTolerance *int `json:"totalWithFaultTolerance,omitempty"`
+
 	// TotalWithRDM Number of VMs that have at least one raw device mapping (RDM) disk
 	TotalWithRDM *int `json:"totalWithRDM,omitempty"`
 

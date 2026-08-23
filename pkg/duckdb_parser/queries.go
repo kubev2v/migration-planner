@@ -523,6 +523,19 @@ func (p *Parser) VMsWithRDMCount(ctx context.Context, filters Filters) (int, err
 	return count, nil
 }
 
+// VMsWithFaultToleranceCount returns count of VMs that have Fault Tolerance enabled.
+func (p *Parser) VMsWithFaultToleranceCount(ctx context.Context, filters Filters) (int, error) {
+	q, err := p.builder.VMsWithFaultToleranceCountQuery(filters)
+	if err != nil {
+		return 0, fmt.Errorf("building vms with fault tolerance count query: %w", err)
+	}
+	var count int
+	if err := p.db.QueryRowContext(ctx, q).Scan(&count); err != nil {
+		return 0, fmt.Errorf("scanning vms with fault tolerance count: %w", err)
+	}
+	return count, nil
+}
+
 // ClustersPerDatacenter returns cluster count per datacenter.
 func (p *Parser) ClustersPerDatacenter(ctx context.Context) ([]int, error) {
 	q, err := p.builder.ClustersPerDatacenterQuery()

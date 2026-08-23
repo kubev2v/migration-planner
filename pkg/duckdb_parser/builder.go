@@ -386,6 +386,15 @@ func (b *QueryBuilder) VMsWithRDMCountQuery(filters Filters) (string, error) {
 	return b.buildQuery("vms_with_rdm_count_query", mustGetTemplate("vms_with_rdm_count_query"), params)
 }
 
+// VMsWithFaultToleranceCountQuery builds the VMs with Fault Tolerance enabled count query.
+func (b *QueryBuilder) VMsWithFaultToleranceCountQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: escapeSQLString(filters.Cluster),
+		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
+	}
+	return b.buildQuery("vms_with_fault_tolerance_count_query", mustGetTemplate("vms_with_fault_tolerance_count_query"), params)
+}
+
 // generateOSCaseClauses reads complexity.OSDifficultyScores and generates SQL WHEN clauses.
 func generateOSCaseClauses() string {
 	scoreToLevel := map[int]string{
