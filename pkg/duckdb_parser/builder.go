@@ -377,6 +377,15 @@ func (b *QueryBuilder) VMsWithSharedDisksCountQuery(filters Filters) (string, er
 	return b.buildQuery("vms_with_shared_disks_count_query", mustGetTemplate("vms_with_shared_disks_count_query"), params)
 }
 
+// VMsWithRDMCountQuery builds the VMs with RDM count query.
+func (b *QueryBuilder) VMsWithRDMCountQuery(filters Filters) (string, error) {
+	params := queryParams{
+		ClusterFilter: escapeSQLString(filters.Cluster),
+		VMListFilter:  buildVMListFilter(filters.VMList, "i"),
+	}
+	return b.buildQuery("vms_with_rdm_count_query", mustGetTemplate("vms_with_rdm_count_query"), params)
+}
+
 // generateOSCaseClauses reads complexity.OSDifficultyScores and generates SQL WHEN clauses.
 func generateOSCaseClauses() string {
 	scoreToLevel := map[int]string{

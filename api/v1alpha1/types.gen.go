@@ -1384,6 +1384,9 @@ type VMs struct {
 	TotalMigratable             int                 `json:"totalMigratable"`
 	TotalMigratableWithWarnings *int                `json:"totalMigratableWithWarnings,omitempty"`
 
+	// TotalWithRDM Number of VMs that have at least one raw device mapping (RDM) disk
+	TotalWithRDM *int `json:"totalWithRDM,omitempty"`
+
 	// TotalWithSharedDisks Number of VMs that have at least one shared disk
 	TotalWithSharedDisks *int `json:"totalWithSharedDisks,omitempty"`
 }

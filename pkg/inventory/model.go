@@ -46,6 +46,7 @@ type VMsData struct {
 	TotalMigratable             int
 	TotalMigratableWithWarnings int
 	TotalWithSharedDisks        int
+	TotalWithRDM                int
 	PowerStates                 map[string]int
 	OSInfo                      map[string]OSInfo
 	CPUCores                    ResourceBreakdown

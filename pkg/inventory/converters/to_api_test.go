@@ -130,6 +130,8 @@ func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
 				Total:                       100,
 				TotalMigratable:             80,
 				TotalMigratableWithWarnings: 15,
+				TotalWithSharedDisks:        12,
+				TotalWithRDM:                7,
 				CPUCores: inventory.ResourceBreakdown{
 					Total:                          400,
 					TotalForMigratable:             320,
@@ -179,6 +181,12 @@ func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := toAPIVMs(&tt.input)
+
+			// Verify shared-disks / RDM aggregate counts
+			require.NotNil(t, result.TotalWithSharedDisks)
+			assert.Equal(t, tt.input.TotalWithSharedDisks, *result.TotalWithSharedDisks)
+			require.NotNil(t, result.TotalWithRDM)
+			assert.Equal(t, tt.input.TotalWithRDM, *result.TotalWithRDM)
 
 			// Verify CPU cores breakdown
 			assert.Equal(t, tt.input.CPUCores.Total, result.CpuCores.Total)

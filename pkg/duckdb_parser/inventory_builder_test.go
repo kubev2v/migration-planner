@@ -1121,6 +1121,76 @@ func TestBuildInventory_VMsWithSharedDisksCount(t *testing.T) {
 	countCluster2, err := parser.VMsWithSharedDisksCount(ctx, Filters{Cluster: "cluster2"})
 	require.NoError(t, err)
 	assert.Equal(t, 1, countCluster2, "VMs with shared disks in cluster2 only")
+
+	// Same count must also be wired through BuildInventory -> VMsData.TotalWithSharedDisks
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 3, inv.VCenter.VMs.TotalWithSharedDisks, "TotalWithSharedDisks should be wired through BuildInventory")
+}
+
+// TestBuildInventory_VMsWithRDMCount ingests Excel with vDisk data and asserts
+// VMsWithRDMCount returns the count of VMs that have at least one RDM disk.
+func TestBuildInventory_VMsWithRDMCount(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-4", "VM ID": "vm-004", "VI SDK UUID": "uuid-4", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster2", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster2", "# Cores": "8", "# CPU": "2", "Object ID": "host-002", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+	}
+	// vm-001: one RDM disk -> counted
+	// vm-002: only non-RDM disks -> not counted
+	// vm-003: one RDM, one non-RDM -> counted
+	// vm-004: one RDM (cluster2) -> counted; filter by cluster1 should exclude it
+	vDiskHeaders := []string{
+		"VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
+		"Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+		"Thin", "Controller", "Label", "SCSI Unit #",
+	}
+	disks := []map[string]string{
+		{"VM ID": "vm-001", "Disk Key": "2000", "Unit #": "0", "Path": "[ds1] vm-1/disk.vmdk", "Capacity MiB": "10240", "Raw": "true"},
+		{"VM ID": "vm-002", "Disk Key": "2001", "Unit #": "0", "Path": "[ds1] vm-2/disk.vmdk", "Capacity MiB": "8192", "Raw": "false"},
+		{"VM ID": "vm-003", "Disk Key": "2002", "Unit #": "0", "Path": "[ds1] vm-3/disk0.vmdk", "Capacity MiB": "4096", "Raw": "true"},
+		{"VM ID": "vm-003", "Disk Key": "2003", "Unit #": "1", "Path": "[ds1] vm-3/disk1.vmdk", "Capacity MiB": "2048", "Raw": "false"},
+		{"VM ID": "vm-004", "Disk Key": "2004", "Unit #": "0", "Path": "[ds1] vm-4/disk.vmdk", "Capacity MiB": "4096", "Raw": "true"},
+	}
+
+	tmpFile := createTestExcel(t, append(defaultStandardSheets(vms, hosts), NewExcelSheet("vDisk", vDiskHeaders, disks))...)
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// No filter: 3 VMs with at least one RDM disk (vm-001, vm-003, vm-004)
+	count, err := parser.VMsWithRDMCount(ctx, Filters{})
+	require.NoError(t, err)
+	assert.Equal(t, 3, count, "VMs with at least one RDM disk (vm-001, vm-003, vm-004)")
+
+	// Filter by cluster1: 2 VMs (vm-001, vm-003); vm-004 is in cluster2
+	countCluster1, err := parser.VMsWithRDMCount(ctx, Filters{Cluster: "cluster1"})
+	require.NoError(t, err)
+	assert.Equal(t, 2, countCluster1, "VMs with RDM disks in cluster1 only")
+
+	countCluster2, err := parser.VMsWithRDMCount(ctx, Filters{Cluster: "cluster2"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, countCluster2, "VMs with RDM disks in cluster2 only")
+
+	// No RDM VMs at all -> 0, not error
+	noneCluster, err := parser.VMsWithRDMCount(ctx, Filters{Cluster: "nonexistent"})
+	require.NoError(t, err)
+	assert.Equal(t, 0, noneCluster, "no matching cluster yields zero, not an error")
+
+	// Same count must also be wired through BuildInventory -> VMsData.TotalWithRDM
+	inv, err := parser.BuildInventory(ctx, nil)
+	require.NoError(t, err)
+	assert.Equal(t, 3, inv.VCenter.VMs.TotalWithRDM, "TotalWithRDM should be wired through BuildInventory")
 }
 
 func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
