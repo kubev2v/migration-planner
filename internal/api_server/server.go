@@ -9,6 +9,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"path"
 	"strings"
 	"time"
 
@@ -24,6 +25,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/inventorybundle"
 	"github.com/kubev2v/migration-planner/internal/rvtools/jobs"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
@@ -113,8 +115,7 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 // New schema: inventory.{clusters, vcenter, vcenter_id} - VMs inside clusters/vcenter
 func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := strings.TrimSuffix(r.URL.Path, "/")
-		if r.Method != http.MethodPut || !strings.HasSuffix(path, "/inventory") {
+		if r.Method != http.MethodPut || path.Base(r.URL.Path) != "inventory" {
 			next.ServeHTTP(w, r)
 			return
 		}
@@ -122,6 +123,11 @@ func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 		body, err := io.ReadAll(r.Body)
 		_ = r.Body.Close()
 		if err != nil {
+			// Check if error is due to request size limit
+			if errors.Is(err, &http.MaxBytesError{}) {
+				http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+				return
+			}
 			http.Error(w, "Failed to read request body", http.StatusInternalServerError)
 			return
 		}
@@ -148,6 +154,15 @@ func detectOldSchemaMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		next.ServeHTTP(w, r)
+	})
+}
+
+func limitDisconnectedInventoryBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPut && path.Base(r.URL.Path) == "inventory" {
+			r.Body = http.MaxBytesReader(w, r.Body, inventorybundle.MaxRequestSize)
+		}
 		next.ServeHTTP(w, r)
 	})
 }
@@ -199,6 +214,7 @@ func (s *Server) Run(ctx context.Context) error {
 		middleware.RequestID,
 		middleware.Logger(),
 		chiMiddleware.Recoverer,
+		limitDisconnectedInventoryBody,
 		detectOldSchemaMiddleware,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 		WithResponseWriter,

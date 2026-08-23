@@ -939,7 +939,7 @@ var _ = Describe("source handler", Ordered, func() {
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.UpdateInventory{
+				JSONBody: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						VcenterId: "vcenter",
@@ -981,7 +981,7 @@ var _ = Describe("source handler", Ordered, func() {
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.UpdateInventory{
+				JSONBody: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						VcenterId: "vcenter",
@@ -1003,7 +1003,7 @@ var _ = Describe("source handler", Ordered, func() {
 
 			updateResp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.UpdateInventory{
+				JSONBody: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						VcenterId: "vcenter",
@@ -1029,7 +1029,7 @@ var _ = Describe("source handler", Ordered, func() {
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.UpdateInventory{
+				JSONBody: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						VcenterId: "vcenter",
@@ -1051,7 +1051,7 @@ var _ = Describe("source handler", Ordered, func() {
 
 			resp, err = srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: firstSourceID,
-				Body: &v1alpha1.UpdateInventory{
+				JSONBody: &v1alpha1.UpdateInventory{
 					AgentId: uuid.New(),
 					Inventory: v1alpha1.Inventory{
 						VcenterId: "another-vcenter-id",

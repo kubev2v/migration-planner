@@ -84,6 +84,11 @@ type InventoryUpdateForm struct {
 	AgentID   uuid.UUID
 	VCenterID string
 	Inventory []byte
+	// Subsets contains the subset inventories to replace.
+	// SourceService.UpdateInventory replaces all existing subsets with this value.
+	// Nil or empty input clears all subsets.
+	// Note: AgentService.UpdateSourceInventory ignores this field.
+	Subsets []SourceSubsetUpdateForm
 }
 
 type SourceInventoryUpdateForm struct {

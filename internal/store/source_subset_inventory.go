@@ -14,8 +14,10 @@ import (
 type SourceSubsetInventory interface {
 	List(ctx context.Context, filter *SourceSubsetInventoryQueryFilter) (model.SourceSubsetInventoryList, error)
 	Create(ctx context.Context, sourceInventory model.SourceSubsetInventory) (*model.SourceSubsetInventory, error)
+	CreateMany(ctx context.Context, sourceInventories []model.SourceSubsetInventory) error
 	Get(ctx context.Context, id uuid.UUID) (*model.SourceSubsetInventory, error)
 	Delete(ctx context.Context, id uuid.UUID) error
+	DeleteBySourceID(ctx context.Context, sourceID uuid.UUID) error
 	Update(ctx context.Context, sourceInventory model.SourceSubsetInventory) (*model.SourceSubsetInventory, error)
 }
 
@@ -77,6 +79,29 @@ func (s *SourceSubsetInventoryStore) Delete(ctx context.Context, id uuid.UUID) e
 	result := s.getDB(ctx).Unscoped().Delete(&sourceInventory)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		zap.S().Named("source_subset_inventory_store").Infof("ERROR: %v", result.Error)
+		return result.Error
+	}
+	return nil
+}
+
+func (s *SourceSubsetInventoryStore) DeleteBySourceID(ctx context.Context, sourceID uuid.UUID) error {
+	result := s.getDB(ctx).Unscoped().Where("source_id = ?", sourceID).Delete(&model.SourceSubsetInventory{})
+	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		zap.S().Named("source_subset_inventory_store").Infof("ERROR: %v", result.Error)
+		return result.Error
+	}
+	return nil
+}
+
+func (s *SourceSubsetInventoryStore) CreateMany(ctx context.Context, sourceInventories []model.SourceSubsetInventory) error {
+	if len(sourceInventories) == 0 {
+		return nil
+	}
+	result := s.getDB(ctx).Create(&sourceInventories)
+	if result.Error != nil {
+		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
+			return ErrDuplicateKey
+		}
 		return result.Error
 	}
 	return nil
