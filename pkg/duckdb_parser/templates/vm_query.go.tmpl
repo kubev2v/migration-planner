@@ -76,7 +76,7 @@ SELECT
     COALESCE(i."Firmware", '') AS "Firmware",
     COALESCE(i."Powerstate", '') AS "PowerState",
     COALESCE(i."Connection state", '') AS "ConnectionState",
-    (i."FT State" IS NOT NULL AND i."FT State" != '' AND i."FT State" != 'notConfigured') AS "FaultToleranceEnabled",
+    COALESCE(i."FT State" IN ('enabled', 'running', 'starting', 'needSecondary', 'primary', 'secondary'), false) AS "FaultToleranceEnabled",
     COALESCE(i."CPUs", 0) AS "CpuCount",
     COALESCE(i."Memory", 0) AS "MemoryMB",
     COALESCE(i."OS according to the configuration file", '') AS "GuestName",

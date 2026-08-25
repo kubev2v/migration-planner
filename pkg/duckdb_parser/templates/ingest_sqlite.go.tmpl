@@ -40,7 +40,7 @@ SELECT
     v.Firmware,
     v.PowerState,
     v.ConnectionState,
-    CASE WHEN v.FaultToleranceEnabled = 1 THEN 'Protected' ELSE 'Not protected' END,
+    CASE WHEN v.FaultToleranceEnabled = 1 THEN 'enabled' ELSE 'notConfigured' END,
     v.CpuCount,
     v.MemoryMB,
     v.GuestName,

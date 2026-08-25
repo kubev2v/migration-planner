@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
@@ -26,12 +27,13 @@ type sqliteCluster struct {
 
 // sqliteVM describes a VM for createTestSQLite.
 type sqliteVM struct {
-	id            string
-	name          string
-	clusterName   string // must match a sqliteCluster.name
-	ipAddress     string // primary IP; defaults to "" when empty
-	nics          string // JSON array; defaults to "[]" when empty
-	guestNetworks string // JSON array; defaults to "[]" when empty
+	id                    string
+	name                  string
+	clusterName           string // must match a sqliteCluster.name
+	ipAddress             string // primary IP; defaults to "" when empty
+	nics                  string // JSON array; defaults to "[]" when empty
+	guestNetworks         string // JSON array; defaults to "[]" when empty
+	faultToleranceEnabled bool
 }
 
 // createTestSQLite builds a minimal forklift SQLite database at a temp path and returns
@@ -146,6 +148,10 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			if guestNetworks == "" {
 				guestNetworks = "[]"
 			}
+			ftEnabled := 0
+			if vm.faultToleranceEnabled {
+				ftEnabled = 1
+			}
 			_, err = db.Exec(fmt.Sprintf(
 				`INSERT INTO dst.VM (
 					ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
@@ -156,7 +162,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 				) VALUES (
 					'%s', '%s', 'folder-1', '%s',
 					'%s', 'bios', 'poweredOn', 'connected',
-					0, 4, 8192, 'rhel', 'rhel', '', '%s',
+					%d, 4, 8192, 'rhel', 'rhel', '', '%s',
 					10737418240, 0, 0, 0, '[]', '%s',
 					0, 0, 2, 0, 0, '[]', '%s'
 				)`,
@@ -164,6 +170,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 				escapeSQLString(vm.name),
 				escapeSQLString(hostID),
 				escapeSQLString(vm.id+"-uuid"),
+				ftEnabled,
 				escapeSQLString(vm.ipAddress),
 				escapeSQLString(nics),
 				escapeSQLString(guestNetworks),
@@ -475,6 +482,47 @@ func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, vmotionSupport, "VMotion support should be true, not hard-coded false")
 	assert.True(t, storageVmotionSupport, "Storage VMotion support should be true, not hard-coded false")
+}
+
+// TestIngestSqlite_FaultToleranceEnabledMapping validates that the agent's
+// FaultToleranceEnabled boolean (0/1) is translated into vCenter FT State
+// vocabulary ('notConfigured'/'enabled') on ingest.
+func TestIngestSqlite_FaultToleranceEnabledMapping(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{
+		{id: "domain-c1", name: "cluster1", datacenter: "dc1"},
+	}
+	vms := []sqliteVM{
+		{id: "vm-ft-on", name: "vm-ft-on", clusterName: "cluster1", faultToleranceEnabled: true},
+		{id: "vm-ft-off", name: "vm-ft-off", clusterName: "cluster1", faultToleranceEnabled: false},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-ft", clusters, vms)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var ftState string
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT "FT State" FROM vinfo WHERE "VM ID" = 'vm-ft-on'`).Scan(&ftState))
+	assert.Equal(t, "enabled", ftState)
+
+	require.NoError(t, db.QueryRowContext(ctx,
+		`SELECT "FT State" FROM vinfo WHERE "VM ID" = 'vm-ft-off'`).Scan(&ftState))
+	assert.Equal(t, "notConfigured", ftState)
+
+	// End-to-end: predicate must resolve these through the real VMs() query path.
+	vmsOut, err := parser.VMs(ctx, Filters{}, Options{})
+	require.NoError(t, err)
+	vmMap := make(map[string]models.VM)
+	for _, vm := range vmsOut {
+		vmMap[vm.ID] = vm
+	}
+	assert.True(t, vmMap["vm-ft-on"].FaultToleranceEnabled)
+	assert.False(t, vmMap["vm-ft-off"].FaultToleranceEnabled)
 }
 
 func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {

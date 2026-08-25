@@ -93,3 +93,62 @@ func TestVMs_Labels(t *testing.T) {
 	assert.Equal(t, []string{"test"}, []string(vmMap["vm-002"].Labels), "vm-002 should have one label")
 	assert.Empty(t, vmMap["vm-003"].Labels, "vm-003 should still have empty labels")
 }
+
+// TestVMs_FaultToleranceEnabled validates the FT State → FaultToleranceEnabled predicate.
+// Covers all vCenter FT states: disabled, notConfigured, enabled, running, primary, secondary, starting, needSecondary, and NULL.
+func TestVMs_FaultToleranceEnabled(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	vms := []map[string]string{
+		// FT State = 'disabled' (FT was on, now off) → should be false
+		{"VM": "vm-disabled", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "disabled"},
+		// FT State = 'notConfigured' (never had FT) → should be false
+		{"VM": "vm-notconfigured", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "notConfigured"},
+		// Enabled states (all should be true)
+		{"VM": "vm-enabled", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "enabled"},
+		{"VM": "vm-running", "VM ID": "vm-004", "VI SDK UUID": "uuid-4", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "running"},
+		{"VM": "vm-primary", "VM ID": "vm-005", "VI SDK UUID": "uuid-5", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "primary"},
+		{"VM": "vm-secondary", "VM ID": "vm-006", "VI SDK UUID": "uuid-6", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "secondary"},
+		{"VM": "vm-starting", "VM ID": "vm-007", "VI SDK UUID": "uuid-7", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "starting"},
+		{"VM": "vm-needsecondary", "VM ID": "vm-008", "VI SDK UUID": "uuid-8", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "needSecondary"},
+		// NULL/empty case (no FT State column value) → should be false
+		{"VM": "vm-null", "VM ID": "vm-009", "VI SDK UUID": "uuid-9", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		// FT State = '' (empty string value) → should be false
+		{"VM": "vm-empty", "VM ID": "vm-010", "VI SDK UUID": "uuid-10", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": ""},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	vmsOut, err := parser.VMs(ctx, Filters{}, Options{})
+	require.NoError(t, err)
+	require.Len(t, vmsOut, 10)
+
+	vmMap := make(map[string]models.VM)
+	for _, vm := range vmsOut {
+		vmMap[vm.ID] = vm
+	}
+
+	expected := map[string]bool{
+		"vm-001": false, // disabled → false
+		"vm-002": false, // notConfigured → false
+		"vm-003": true,  // enabled → true
+		"vm-004": true,  // running → true
+		"vm-005": true,  // primary → true
+		"vm-006": true,  // secondary → true
+		"vm-007": true,  // starting → true
+		"vm-008": true,  // needSecondary → true
+		"vm-009": false, // NULL → false
+		"vm-010": false, // empty string → false
+	}
+	for id, want := range expected {
+		assert.Equal(t, want, vmMap[id].FaultToleranceEnabled, "VM %s: FaultToleranceEnabled", id)
+	}
+}
