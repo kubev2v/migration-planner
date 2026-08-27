@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
@@ -36,7 +37,7 @@ func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *se
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, kafka.VisitorEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 	return assessments, nil
@@ -75,7 +76,7 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, kafka.AssessmentCreatedEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -97,7 +98,7 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 			if err != nil {
 				return nil, err
 			}
-			if err := e.outbox.Insert(ctx, notification.AssessmentCreatedEventType, notificationBytes); err != nil {
+			if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
 				return nil, err
 			}
 		}
@@ -139,7 +140,7 @@ func (e *EventAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, kafka.AssessmentDeletedEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -175,7 +176,7 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, kafka.ShareAssessmentEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -207,7 +208,7 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		if err != nil {
 			return err
 		}
-		if err := e.outbox.Insert(ctx, notification.AssessmentSharedEventType, notificationBytes); err != nil {
+		if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
 			return err
 		}
 	}
@@ -239,7 +240,7 @@ func (e *EventAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, kafka.UnshareAssessmentEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 

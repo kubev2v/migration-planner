@@ -11,8 +11,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -325,11 +324,11 @@ var _ = Describe("partner service", Ordered, func() {
 
 			// The partner-customer CloudEvent is committed
 			var count int64
-			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", kafka.PartnerCustomerEventType).Scan(&count)
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", events.EventTypeKafka).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
 
 			// But no console notification is emitted (would otherwise email the whole org)
-			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", notification.PartnershipRequestEventType).Scan(&count)
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", events.EventTypeNotification).Scan(&count)
 			Expect(count).To(Equal(int64(0)))
 		})
 
@@ -352,7 +351,7 @@ var _ = Describe("partner service", Ordered, func() {
 			Expect(err).To(BeNil())
 
 			var count int64
-			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", notification.PartnershipRequestEventType).Scan(&count)
+			gormdb.Raw("SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;", events.EventTypeNotification).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
 		})
 

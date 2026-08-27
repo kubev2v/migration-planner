@@ -13,7 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -248,7 +248,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(result.ComplexityByOS).To(HaveLen(5))
 				Expect(result.ComplexityByDisk).To(HaveLen(4))
 
-				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, kafka.MigrationComplexityEventType)
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)
 				Expect(outboxCount).To(Equal(1))
 			})
 
@@ -597,7 +597,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(results[engines.SchemaNetworkBased].MaxTotalDuration).To(BeNumerically(">=", results[engines.SchemaNetworkBased].MinTotalDuration))
 				Expect(results[engines.SchemaNetworkBased].Breakdown).NotTo(BeEmpty())
 
-				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, kafka.MigrationTimeEstimationEventType)
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)
 				Expect(outboxCount).To(Equal(1))
 			})
 

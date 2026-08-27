@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
@@ -89,7 +90,7 @@ func (e *EventEstimationService) publishUserAction(ctx context.Context, assessme
 	if err != nil {
 		return err
 	}
-	return e.outbox.Insert(ctx, eventType, ceBytes)
+	return e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes)
 }
 
 func buildEstimationPayload(eventType, username, assessmentID string) (kafka.UserActionEventPayload, error) {

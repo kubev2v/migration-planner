@@ -8,6 +8,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
@@ -50,7 +51,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, kafka.PartnerCustomerEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -71,7 +72,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		if err != nil {
 			return nil, err
 		}
-		if err := e.outbox.Insert(ctx, notification.PartnershipRequestEventType, notificationBytes); err != nil {
+		if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
 			return nil, err
 		}
 	}
@@ -111,7 +112,7 @@ func (e *EventPartnerService) CancelRequest(ctx context.Context, user auth.User,
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, kafka.PartnerCustomerEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -161,7 +162,7 @@ func (e *EventPartnerService) LeavePartner(ctx context.Context, user auth.User, 
 		if err != nil {
 			return err
 		}
-		if err := e.outbox.Insert(ctx, kafka.PartnerCustomerEventType, ceBytes); err != nil {
+		if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 			return err
 		}
 	}
@@ -197,7 +198,7 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, kafka.PartnerCustomerEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -220,7 +221,7 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, notification.PartnershipResponseEventType, notificationBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
 		return nil, err
 	}
 
