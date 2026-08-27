@@ -26,6 +26,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -99,11 +100,11 @@ var runCmd = &cobra.Command{
 		var wg sync.WaitGroup // Responsible for keeping the main thread waiting for all goroutines to shut down gracefully
 
 		// Create Kafka producer and event writer
-		var writer kafka.Writer = kafka.NewNoOpWriter()
+		var kafkaWriter events.Writer = kafka.NewNoOpWriter()
 
 		if cfg.Kafka.Enabled {
 			var cleanup func()
-			writer, cleanup, err = createEventWriter(ctx, cfg)
+			kafkaWriter, cleanup, err = createEventWriter(ctx, cfg)
 			if err != nil {
 				zap.S().Warnw("failed to create kafka producer", "error", err)
 			}
@@ -112,8 +113,14 @@ var runCmd = &cobra.Command{
 		}
 
 		// Start outbox dispatcher
-		notifier := createNotificationWriter(cfg)
-		dispatcher := eventwrap.NewOutboxDispatcher(store, writer, notifier, 5*time.Second)
+		notificationWriter := createNotificationWriter(cfg)
+
+		writerRegistry := map[string][]events.Writer{
+			events.EventTypeKafka:        {kafkaWriter},
+			events.EventTypeNotification: {notificationWriter},
+		}
+
+		dispatcher := eventwrap.NewOutboxDispatcher(store, writerRegistry, 5*time.Second)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -180,7 +187,7 @@ func newListener(address string) (net.Listener, error) {
 	return net.Listen("tcp", address)
 }
 
-func createEventWriter(ctx context.Context, cfg *config.Config) (kafka.Writer, func(), error) {
+func createEventWriter(ctx context.Context, cfg *config.Config) (events.Writer, func(), error) {
 	brokers := strings.Split(cfg.Kafka.Brokers, ",")
 	var kafkaOpts []kgo.Opt
 
@@ -198,7 +205,7 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (kafka.Writer, f
 
 	noop := func() {}
 
-	producer, err := kafka.NewKafkaProducer(brokers, kafkaOpts...)
+	producer, err := kafka.NewTopicBoundProducer(brokers, kafka.GenericTopic, kafkaOpts...)
 	if err != nil {
 		return kafka.NewNoOpWriter(), noop, err
 	}
@@ -216,7 +223,7 @@ func createEventWriter(ctx context.Context, cfg *config.Config) (kafka.Writer, f
 	return producer, producer.Close, nil
 }
 
-func createNotificationWriter(cfg *config.Config) notification.Writer {
+func createNotificationWriter(cfg *config.Config) events.Writer {
 	if !cfg.Notification.Enabled {
 		zap.S().Info("notifications disabled, discarding notifications")
 		return notification.NewNoopWriter()

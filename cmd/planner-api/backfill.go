@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/spf13/cobra"
@@ -57,7 +58,7 @@ var backfillCmd = &cobra.Command{
 	},
 }
 
-func backfillAssessments(ctx context.Context, s store.Store, writer kafka.Writer, writerClose func()) error {
+func backfillAssessments(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
 	defer writerClose()
 
 	assessments, err := s.Assessment().List(ctx, nil)
@@ -114,7 +115,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer kafka.Writer
 			continue
 		}
 
-		if err := writer.Write(ctx, kafka.GenericTopic, ceBytes); err != nil {
+		if err := writer.Write(ctx, ceBytes); err != nil {
 			zap.S().Errorw("publishing event", "id", assessment.ID, "error", err)
 			publishErrors++
 			continue

@@ -9,8 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -107,20 +106,7 @@ type mockWriter struct {
 	writeErr error
 }
 
-func (m *mockWriter) Write(_ context.Context, _ string, data []byte) error {
-	if m.writeErr != nil {
-		return m.writeErr
-	}
-	m.written = append(m.written, data)
-	return nil
-}
-
-type mockNotifier struct {
-	written  [][]byte
-	writeErr error
-}
-
-func (m *mockNotifier) Write(_ context.Context, data []byte) error {
+func (m *mockWriter) Write(_ context.Context, data []byte) error {
 	if m.writeErr != nil {
 		return m.writeErr
 	}
@@ -130,21 +116,25 @@ func (m *mockNotifier) Write(_ context.Context, data []byte) error {
 
 var _ = Describe("OutboxDispatcher", func() {
 	var (
-		outbox   *mockOutbox
-		s        *mockStore
-		writer   *mockWriter
-		notifier *mockNotifier
+		outbox      *mockOutbox
+		s           *mockStore
+		kafkaWriter *mockWriter
+		notifWriter *mockWriter
 	)
 
 	BeforeEach(func() {
 		outbox = &mockOutbox{}
 		s = &mockStore{outbox: outbox}
-		writer = &mockWriter{}
-		notifier = &mockNotifier{}
+		kafkaWriter = &mockWriter{}
+		notifWriter = &mockWriter{}
 	})
 
 	runOneTick := func() {
-		dispatcher := eventwrap.NewOutboxDispatcher(s, writer, notifier, 10*time.Millisecond)
+		writerRegistry := map[string][]events.Writer{
+			events.EventTypeKafka:        {kafkaWriter},
+			events.EventTypeNotification: {notifWriter},
+		}
+		dispatcher := eventwrap.NewOutboxDispatcher(s, writerRegistry, 10*time.Millisecond)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
 		defer cancel()
 		dispatcher.Run(ctx)
@@ -152,33 +142,33 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes events and deletes them from outbox", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
+			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
 
 		runOneTick()
 
-		Expect(writer.written).To(HaveLen(1))
-		Expect(writer.written[0]).To(Equal([]byte("event-data-1")))
+		Expect(kafkaWriter.written).To(HaveLen(1))
+		Expect(kafkaWriter.written[0]).To(Equal([]byte("event-data-1")))
 		Expect(outbox.events).To(BeEmpty())
 	})
 
 	It("does nothing when outbox is empty", func() {
 		runOneTick()
 
-		Expect(writer.written).To(BeNil())
+		Expect(kafkaWriter.written).To(BeNil())
 		Expect(outbox.deletedIDs).To(BeNil())
 	})
 
 	It("backs off events that fail to write and retains them", func() {
 		id := 17
 		outbox.events = []model.OutboxEvent{
-			{ID: id, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
+			{ID: id, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
-		writer.writeErr = fmt.Errorf("kafka unavailable")
+		kafkaWriter.writeErr = fmt.Errorf("kafka unavailable")
 
 		runOneTick()
 
-		Expect(writer.written).To(BeNil())
+		Expect(kafkaWriter.written).To(BeNil())
 		Expect(outbox.events).To(HaveLen(1))
 		Expect(outbox.deletedIDs).To(BeEmpty())
 		Expect(outbox.failedIDs).To(ContainElement(id))
@@ -186,14 +176,14 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("drops events that exceeded the max retry count without writing them", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("poison"), RetryCount: 15},
-			{ID: 2, EventType: kafka.VisitorEventType, Payload: []byte("fresh")},
+			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("poison"), RetryCount: 15},
+			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("fresh")},
 		}
 
 		runOneTick()
 
-		Expect(writer.written).To(HaveLen(1))
-		Expect(writer.written[0]).To(Equal([]byte("fresh")))
+		Expect(kafkaWriter.written).To(HaveLen(1))
+		Expect(kafkaWriter.written[0]).To(Equal([]byte("fresh")))
 		Expect(outbox.deletedIDs).To(ContainElement(1))
 		Expect(outbox.failedIDs).To(BeEmpty())
 		Expect(outbox.events).To(BeEmpty())
@@ -201,28 +191,28 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes multiple events and bulk-deletes", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: kafka.VisitorEventType, Payload: []byte("event-data-1")},
-			{ID: 2, EventType: kafka.SizingEventType, Payload: []byte("event-data-2")},
+			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data-2")},
 		}
 
 		runOneTick()
 
-		Expect(writer.written).To(HaveLen(2))
+		Expect(kafkaWriter.written).To(HaveLen(2))
 		Expect(outbox.events).To(BeEmpty())
 	})
 
 	It("routes notification-service events to the notifier, not the Kafka writer", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: notification.PartnershipRequestEventType, Payload: []byte("notification-data")},
-			{ID: 2, EventType: kafka.VisitorEventType, Payload: []byte("event-data")},
+			{ID: 1, EventType: events.EventTypeNotification, Payload: []byte("notification-data")},
+			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data")},
 		}
 
 		runOneTick()
 
-		Expect(notifier.written).To(HaveLen(1))
-		Expect(notifier.written[0]).To(Equal([]byte("notification-data")))
-		Expect(writer.written).To(HaveLen(1))
-		Expect(writer.written[0]).To(Equal([]byte("event-data")))
+		Expect(notifWriter.written).To(HaveLen(1))
+		Expect(notifWriter.written[0]).To(Equal([]byte("notification-data")))
+		Expect(kafkaWriter.written).To(HaveLen(1))
+		Expect(kafkaWriter.written[0]).To(Equal([]byte("event-data")))
 		Expect(outbox.events).To(BeEmpty())
 	})
 
@@ -233,8 +223,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 		runOneTick()
 
-		Expect(writer.written).To(BeNil())
-		Expect(notifier.written).To(BeNil())
+		Expect(kafkaWriter.written).To(BeNil())
+		Expect(notifWriter.written).To(BeNil())
 		Expect(outbox.events).To(HaveLen(0))
 		Expect(outbox.deletedIDs).To(ConsistOf(1))
 		Expect(outbox.failedIDs).To(BeEmpty())
