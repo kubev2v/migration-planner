@@ -8,6 +8,12 @@ as well as it can generate the Agent, which OVA image that can be imported to VM
 
 The agent is responsible to collect the anonymous data from VMware environment.
 
+## Documentation
+
+**For the full user documentation, please visit: [OpenShift Migration Advisor Documentation](https://kubev2v.github.io/openshift-migration-advisor-docs/docs/)**
+
+The documentation is continuously updated and provides comprehensive guidance for users.
+
 ## The data that are collected
 
 ```
