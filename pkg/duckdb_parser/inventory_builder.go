@@ -347,7 +347,11 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 	hostModels, err := p.Hosts(ctx, filters, Options{})
 	if err == nil {
 		hosts := make([]inventory.Host, 0, len(hostModels))
+		standaloneDetected := false
 		for _, h := range hostModels {
+			if h.Cluster == "" {
+				standaloneDetected = true
+			}
 			hosts = append(hosts, inventory.Host{
 				ID:                      h.Id,
 				Vendor:                  h.Vendor,
@@ -361,6 +365,7 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 		}
 		infraData.Hosts = hosts
 		infraData.TotalHosts = len(hosts)
+		infraData.StandaloneHostsDetected = standaloneDetected
 	} else {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get hosts: %v", err)
 	}

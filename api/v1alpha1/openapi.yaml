@@ -2693,6 +2693,9 @@ components:
       properties:
         totalHosts:
           type: integer
+        standaloneHostsDetected:
+          type: boolean
+          description: Whether any hosts run without vCenter cluster management (not part of any cluster)
         totalDatacenters:
           type: integer
         totalClusters:
