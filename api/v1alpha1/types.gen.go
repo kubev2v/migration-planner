@@ -802,6 +802,9 @@ type Infra struct {
 	// MemoryOverCommitment RAM memory Overcommitment Ratio. Calculated as total Allocated memory / Total memory available
 	MemoryOverCommitment *float64  `json:"memoryOverCommitment,omitempty"`
 	Networks             []Network `json:"networks"`
+
+	// StandaloneHostsDetected Whether any hosts run without vCenter cluster management (not part of any cluster)
+	StandaloneHostsDetected *bool `json:"standaloneHostsDetected,omitempty"`
 	// Deprecated:
 	TotalClusters    *int `json:"totalClusters,omitempty"`
 	TotalDatacenters *int `json:"totalDatacenters,omitempty"`
