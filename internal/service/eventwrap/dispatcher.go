@@ -5,35 +5,26 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"go.uber.org/zap"
 )
 
 type OutboxDispatcher struct {
 	store    store.Store
-	writer   kafka.Writer
-	notifier notification.Writer
+	writers  map[string][]events.Writer
 	interval time.Duration
 }
 
-type writerType int
-
 const (
-	writerTypeUnknown writerType = iota
-	writerTypeKafka
-	writerTypeNotification
-
 	outboxMaxRetries        = 10
 	outboxBackoffBase       = 5
 	outboxBackoffCapSeconds = 3 * 60 * 60 // 3h
 )
 
-func NewOutboxDispatcher(s store.Store, writer kafka.Writer, notifier notification.Writer, interval time.Duration) *OutboxDispatcher {
+func NewOutboxDispatcher(s store.Store, writerRegistry map[string][]events.Writer, interval time.Duration) *OutboxDispatcher {
 	return &OutboxDispatcher{
 		store:    s,
-		writer:   writer,
-		notifier: notifier,
+		writers:  writerRegistry,
 		interval: interval,
 	}
 }
@@ -85,24 +76,30 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 			continue
 		}
 
-		var err error
-		switch writerTypeForEventType(outboxEvent.EventType) {
-		case writerTypeKafka:
-			err = d.writer.Write(ctx, kafka.GenericTopic, outboxEvent.Payload)
-		case writerTypeNotification:
-			err = d.notifier.Write(ctx, outboxEvent.Payload)
-		default:
+		writers, ok := d.writers[outboxEvent.EventType]
+		if !ok || len(writers) == 0 {
 			zap.S().Errorw("outbox dispatcher: no writer registered for event type, dropping",
 				"id", outboxEvent.ID, "event_type", outboxEvent.EventType)
 			toDelete = append(toDelete, outboxEvent.ID)
 			continue
 		}
-		if err != nil {
+
+		// Write to all registered writers, collect errors
+		var errs []error
+		for _, writer := range writers {
+			if err := writer.Write(ctx, outboxEvent.Payload); err != nil {
+				errs = append(errs, err)
+			}
+		}
+
+		if len(errs) > 0 {
 			zap.S().Errorw(
 				"outbox dispatcher: failed to write event, will retry",
 				"id", outboxEvent.ID,
 				"event_type", outboxEvent.EventType,
-				"error", err,
+				"errors", errs,
+				"failed_count", len(errs),
+				"total_writers", len(writers),
 			)
 			toRetain = append(toRetain, outboxEvent.ID)
 			continue
@@ -126,22 +123,5 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 
 	if _, err := store.Commit(ctx); err != nil {
 		zap.S().Errorw("outbox dispatcher: failed to commit transaction", "error", err)
-	}
-}
-
-// writerTypeForEventType classifies an outbox event type so the dispatcher
-// knows which writer to hand it to.
-func writerTypeForEventType(eventType string) writerType {
-	switch eventType {
-	case kafka.AssessmentCreatedEventType, kafka.AssessmentDeletedEventType, kafka.PartnerCustomerEventType,
-		kafka.ShareAssessmentEventType, kafka.UnshareAssessmentEventType, kafka.SizingEventType,
-		kafka.MigrationComplexityEventType, kafka.MigrationTimeEstimationEventType,
-		kafka.DownloadOVAEventType, kafka.VisitorEventType:
-		return writerTypeKafka
-	case notification.PartnershipRequestEventType, notification.PartnershipResponseEventType,
-		notification.AssessmentSharedEventType, notification.AssessmentCreatedEventType:
-		return writerTypeNotification
-	default:
-		return writerTypeUnknown
 	}
 }

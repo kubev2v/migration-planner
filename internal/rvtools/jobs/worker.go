@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -195,7 +196,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 	if err != nil {
 		return fmt.Errorf("failed to build outbox event: %w", err)
 	}
-	if err := w.store.Outbox().Insert(ctx, model.OutboxEvent{EventType: kafka.AssessmentCreatedEventType, Payload: ceBytes}); err != nil {
+	if err := w.store.Outbox().Insert(ctx, model.OutboxEvent{EventType: events.EventTypeKafka, Payload: ceBytes}); err != nil {
 		return fmt.Errorf("failed to write outbox event: %w", err)
 	}
 

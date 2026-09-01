@@ -17,7 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
@@ -78,7 +78,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			}
 
 			var count int64
-			gormdb.Raw(countOutboxByTypeStm, kafka.VisitorEventType).Scan(&count)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
 		})
 
@@ -227,7 +227,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(*assessment.OwnerLastName).To(Equal("Johnson"))
 
 				var count int64
-				gormdb.Raw(countOutboxByTypeStm, kafka.AssessmentCreatedEventType).Scan(&count)
+				gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&count)
 				Expect(count).To(Equal(int64(1)))
 			})
 
@@ -500,16 +500,16 @@ var _ = Describe("assessment service", Ordered, func() {
 					Expect(assessment).ToNot(BeNil())
 
 					var count int64
-					gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
+					gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&count)
 					Expect(count).To(Equal(int64(1)))
 
 					var payload string
-					tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", notification.AssessmentCreatedEventType).Scan(&payload)
+					tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", events.EventTypeNotification).Scan(&payload)
 					Expect(tx.Error).To(BeNil())
 
 					var n notification.Notification
 					Expect(json.Unmarshal([]byte(payload), &n)).To(Succeed())
-					Expect(n.EventType).To(Equal(notification.AssessmentCreatedEventType))
+					Expect(n.EventType).To(Equal(events.EventTypeNotification))
 					Expect(n.OrgID).To(Equal("org1"))
 					Expect(n.Context["assessment_id"]).To(Equal(testAssessmentID.String()))
 					Expect(n.Recipients).To(HaveLen(1))
@@ -546,7 +546,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment).ToNot(BeNil())
 
 				var count int64
-				gormdb.Raw(countOutboxByTypeStm, notification.AssessmentCreatedEventType).Scan(&count)
+				gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&count)
 				Expect(count).To(Equal(int64(0)))
 			})
 		})
@@ -838,7 +838,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(0))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, kafka.AssessmentDeletedEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
@@ -1078,19 +1078,19 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(1)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, kafka.ShareAssessmentEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
-			gormdb.Raw(countOutboxByTypeStm, notification.AssessmentSharedEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
 			var payload string
-			tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", notification.AssessmentSharedEventType).Scan(&payload)
+			tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", events.EventTypeNotification).Scan(&payload)
 			Expect(tx.Error).To(BeNil())
 
 			var n notification.Notification
 			Expect(json.Unmarshal([]byte(payload), &n)).To(Succeed())
-			Expect(n.EventType).To(Equal(notification.AssessmentSharedEventType))
+			Expect(n.EventType).To(Equal(events.EventTypeNotification))
 			Expect(n.Context["assessment_id"]).To(Equal(assessmentID.String()))
 			Expect(n.Recipients).To(HaveLen(1))
 			Expect(n.Recipients[0].IgnoreUserPreferences).To(BeTrue())
@@ -1112,11 +1112,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			// The share CloudEvent is committed
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, kafka.ShareAssessmentEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
 			// But no console notification is emitted (would otherwise email the whole org)
-			gormdb.Raw(countOutboxByTypeStm, notification.AssessmentSharedEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(0)))
 		})
 
@@ -1206,7 +1206,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(0)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, kafka.UnshareAssessmentEventType).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
