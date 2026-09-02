@@ -79,15 +79,16 @@ type IssuesBreakdown struct {
 
 // InfraData contains infrastructure-level data (hosts, datastores, networks).
 type InfraData struct {
-	Hosts                 []Host
-	HostPowerStates       map[string]int
-	Datastores            []Datastore
-	Networks              []Network
-	TotalHosts            int
-	TotalDatacenters      int
-	ClustersPerDatacenter []int
-	CPUOverCommitment     *float64
-	MemoryOverCommitment  *float64
+	Hosts                   []Host
+	HostPowerStates         map[string]int
+	Datastores              []Datastore
+	Networks                []Network
+	TotalHosts              int
+	TotalDatacenters        int
+	ClustersPerDatacenter   []int
+	StandaloneHostsDetected bool
+	CPUOverCommitment       *float64
+	MemoryOverCommitment    *float64
 }
 
 // ResourceBreakdown contains resource totals split by migrability status.

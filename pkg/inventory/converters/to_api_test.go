@@ -809,6 +809,24 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 	}
 }
 
+func TestToAPIInfra_StandaloneHostsDetected(t *testing.T) {
+	tests := []struct {
+		name  string
+		input bool
+	}{
+		{name: "standalone hosts detected", input: true},
+		{name: "no standalone hosts", input: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := toAPIInfra(&inventory.InfraData{StandaloneHostsDetected: tt.input})
+			require.NotNil(t, result.StandaloneHostsDetected)
+			assert.Equal(t, tt.input, *result.StandaloneHostsDetected)
+		})
+	}
+}
+
 func TestToAPIVMs_Distributions(t *testing.T) {
 	input := inventory.VMsData{
 		DistributionByCPUTier:    map[string]int{"1-2": 10, "3-4": 20, "5+": 5},

@@ -63,7 +63,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Folder (ID VARCHAR PRIMARY KEY, Datacenter VARCHAR)`,
 
 		// Cluster
-		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '')`,
+		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '', Variant VARCHAR DEFAULT 'ClusterComputeResource')`,
 
 		// Host
 		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
@@ -121,7 +121,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		folderID := fmt.Sprintf("folder-%d", dcIdx)
 		parentJSON := fmt.Sprintf(`{"id":"%s"}`, folderID)
 		_, err := db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Cluster VALUES ('%s', '%s', '%s', %t, %t, '%s')`,
+			`INSERT INTO dst.Cluster (ID, Name, Parent, DasEnabled, DrsEnabled, DrsBehavior) VALUES ('%s', '%s', '%s', %t, %t, '%s')`,
 			escapeSQLString(c.id), escapeSQLString(c.name), escapeSQLString(parentJSON),
 			c.dasEnabled, c.drsEnabled, escapeSQLString(c.drsBehavior),
 		))
@@ -482,6 +482,105 @@ func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, vmotionSupport, "VMotion support should be true, not hard-coded false")
 	assert.True(t, storageVmotionSupport, "Storage VMotion support should be true, not hard-coded false")
+}
+
+func TestIngestSqlite_StandaloneHostDetection(t *testing.T) {
+	cases := []struct {
+		name        string
+		vcenterUUID string
+		standalone  bool
+		want        bool
+	}{
+		{name: "standalone host (forklift ComputeResource placeholder)", vcenterUUID: "vcenter-uuid-standalone", standalone: true, want: true},
+		{name: "all hosts clustered", vcenterUUID: "vcenter-uuid-clustered", standalone: false, want: false},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			clusters := []sqliteCluster{{id: "domain-c1", name: "cluster1", datacenter: "dc1"}}
+			sqlitePath := createTestSQLite(t, tc.vcenterUUID, clusters, nil)
+
+			if tc.standalone {
+				sdb, err := sql.Open("duckdb", "")
+				require.NoError(t, err)
+				defer func() { _ = sdb.Close() }()
+				_, err = sdb.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+				require.NoError(t, err)
+				_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
+				require.NoError(t, err)
+				_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+				require.NoError(t, err)
+				require.NoError(t, func() error { _, err := sdb.Exec("DETACH dst"); return err }())
+			}
+
+			_, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			inv, err := parser.BuildInventory(ctx, nil)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, inv.VCenter.Infra.StandaloneHostsDetected)
+		})
+	}
+}
+
+func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{{id: "domain-c1", name: "cluster1", datacenter: "dc1"}}
+	vms := []sqliteVM{{id: "vm-clustered", name: "vm-clustered", clusterName: "cluster1"}}
+	sqlitePath := createTestSQLite(t, "vcenter-uuid-standalone-vm", clusters, vms)
+
+	sdb, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = sdb.Close() }()
+	_, err = sdb.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+	require.NoError(t, err)
+	_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
+	require.NoError(t, err)
+	_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+	require.NoError(t, err)
+	_, err = sdb.Exec(`INSERT INTO dst.VM (
+		ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
+		FaultToleranceEnabled, CpuCount, MemoryMB, GuestName, GuestNameFromVmwareTools,
+		HostName, IpAddress, StorageUsed, IsTemplate, ChangeTrackingEnabled, DiskEnableUuid,
+		Disks, NICs, CpuHotAddEnabled, CpuHotRemoveEnabled, CoresPerSocket,
+		MemoryHotAddEnabled, BalloonedMemory, GuestApps, GuestNetworks
+	) VALUES (
+		'vm-standalone', 'vm-standalone', 'folder-1', 'host-standalone',
+		'vm-standalone-uuid', 'bios', 'poweredOn', 'connected',
+		0, 4, 8192, 'rhel', 'rhel', '', '',
+		10737418240, 0, 0, 0, '[]', '[]', 0, 0, 2, 0, 0, '[]', '[]'
+	)`)
+	require.NoError(t, err)
+	_, err = sdb.Exec("DETACH dst")
+	require.NoError(t, err)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var vclusterNames []string
+	rows, err := db.QueryContext(ctx, `SELECT "Name" FROM vcluster ORDER BY "Name"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	for rows.Next() {
+		var name string
+		require.NoError(t, rows.Scan(&name))
+		vclusterNames = append(vclusterNames, name)
+	}
+	require.NoError(t, rows.Err())
+	assert.Equal(t, []string{"cluster1"}, vclusterNames)
+
+	var vmCluster, vmDatacenter string
+	err = db.QueryRowContext(ctx, `SELECT "Cluster", "Datacenter" FROM vinfo WHERE "VM ID" = 'vm-standalone'`).Scan(&vmCluster, &vmDatacenter)
+	require.NoError(t, err)
+	assert.Equal(t, "", vmCluster)
+	assert.Equal(t, "dc1", vmDatacenter)
 }
 
 // TestIngestSqlite_FaultToleranceEnabledMapping validates that the agent's

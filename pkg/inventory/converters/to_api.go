@@ -309,6 +309,9 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		MemoryOverCommitment: i.MemoryOverCommitment,
 	}
 
+	standaloneHostsDetected := i.StandaloneHostsDetected
+	infra.StandaloneHostsDetected = &standaloneHostsDetected
+
 	if i.TotalDatacenters > 0 {
 		dc := i.TotalDatacenters
 		infra.TotalDatacenters = &dc

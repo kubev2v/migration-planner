@@ -740,6 +740,57 @@ func TestBuildInventory_Overcommitment(t *testing.T) {
 	assert.Equal(t, 1.0, *inv.VCenter.Infra.MemoryOverCommitment)
 }
 
+func TestBuildInventory_StandaloneHostDetection(t *testing.T) {
+	cases := []struct {
+		name  string
+		vms   []map[string]string
+		hosts []map[string]string
+		want  bool
+	}{
+		{
+			name: "standalone host present",
+			vms: []map[string]string{
+				{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+				{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-2", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Datacenter": "dc1"},
+			},
+			hosts: []map[string]string{
+				{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+				// no "Cluster" key: standalone host, not managed by any vCenter cluster
+				{"Datacenter": "dc1", "# Cores": "8", "# CPU": "2", "Object ID": "host-002", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+			},
+			want: true,
+		},
+		{
+			name: "all hosts clustered",
+			vms: []map[string]string{
+				{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+			},
+			hosts: []map[string]string{
+				{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			tmpFile := createTestExcel(t, defaultStandardSheets(tc.vms, tc.hosts)...)
+
+			ctx := context.Background()
+			_, err := parser.IngestRvTools(ctx, tmpFile)
+			require.NoError(t, err)
+
+			inv, err := parser.BuildInventory(ctx, nil)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.want, inv.VCenter.Infra.StandaloneHostsDetected)
+		})
+	}
+}
+
 func TestBuildInventory_MigratableCounts(t *testing.T) {
 	// Use critical validator to make VMs not migratable
 	parser, _, cleanup := setupTestParser(t, &testCriticalValidator{})
