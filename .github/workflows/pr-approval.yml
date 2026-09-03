@@ -1,0 +1,19 @@
+name: PR Auto-Approval
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+jobs:
+  approve:
+    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-approval.yml@main
+    with:
+      user_path_permissions: |
+        migration-planner-sync[bot]:
+          - 'agent-v2'
+          - 'build/migration-planner-iso/config'
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_REVIEWER_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_REVIEWER_PRIVATE_KEY }}
+    permissions:
+      pull-requests: write
