@@ -1193,6 +1193,62 @@ func TestBuildInventory_VMsWithRDMCount(t *testing.T) {
 	assert.Equal(t, 3, inv.VCenter.VMs.TotalWithRDM, "TotalWithRDM should be wired through BuildInventory")
 }
 
+// TestBuildInventory_VMsWithFaultToleranceCount ingests Excel with vInfo "FT State" values
+// and asserts VMsWithFaultToleranceCount returns the count of VMs with Fault Tolerance enabled.
+func TestBuildInventory_VMsWithFaultToleranceCount(t *testing.T) {
+	parser, _, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	// vm-001: FT State "primary" -> enabled, counted
+	// vm-002: FT State "notConfigured" -> not counted
+	// vm-003: FT State "" (unset) -> not counted
+	// vm-004: FT State "secondary" (cluster2) -> counted; filter by cluster1 should exclude it
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "primary"},
+		{"VM": "vm-2", "VM ID": "vm-002", "VI SDK UUID": "uuid-2", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1", "FT State": "notConfigured"},
+		{"VM": "vm-3", "VM ID": "vm-003", "VI SDK UUID": "uuid-3", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+		{"VM": "vm-4", "VM ID": "vm-004", "VI SDK UUID": "uuid-4", "Host": "esxi-host-1", "CPUs": "2", "Memory": "4096", "Powerstate": "poweredOn", "Cluster": "cluster2", "Datacenter": "dc1", "FT State": "secondary"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+		{"Datacenter": "dc1", "Cluster": "cluster2", "# Cores": "8", "# CPU": "2", "Object ID": "host-002", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
+	}
+
+	tmpFile := createTestExcel(t, defaultStandardSheets(vms, hosts)...)
+	defer func() { _ = os.Remove(tmpFile) }()
+
+	ctx := context.Background()
+	_, err := parser.IngestRvTools(ctx, tmpFile)
+	require.NoError(t, err)
+
+	// No filter: 2 VMs with FT enabled (vm-001, vm-004)
+	count, err := parser.VMsWithFaultToleranceCount(ctx, Filters{})
+	require.NoError(t, err)
+	assert.Equal(t, 2, count, "VMs with FT enabled (vm-001, vm-004)")
+
+	// Filter by cluster1: 1 VM (vm-001); vm-004 is in cluster2
+	countCluster1, err := parser.VMsWithFaultToleranceCount(ctx, Filters{Cluster: "cluster1"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, countCluster1, "VMs with FT enabled in cluster1 only")
+
+	countCluster2, err := parser.VMsWithFaultToleranceCount(ctx, Filters{Cluster: "cluster2"})
+	require.NoError(t, err)
+	assert.Equal(t, 1, countCluster2, "VMs with FT enabled in cluster2 only")
+
+	// Filter by a cluster with zero FT VMs must return 0, not error
+	countEmpty, err := parser.VMsWithFaultToleranceCount(ctx, Filters{Cluster: "nonexistent-cluster"})
+	require.NoError(t, err)
+	assert.Equal(t, 0, countEmpty, "cluster with no VMs returns 0, not error")
+
+	// migration_excluded VMs must not be counted, even if FT-enabled
+	_, err = parser.db.ExecContext(ctx, `UPDATE vinfo SET "migration_excluded" = true WHERE "VM ID" = 'vm-001'`)
+	require.NoError(t, err)
+
+	countAfterExclusion, err := parser.VMsWithFaultToleranceCount(ctx, Filters{})
+	require.NoError(t, err)
+	assert.Equal(t, 1, countAfterExclusion, "migration_excluded vm-001 should no longer be counted")
+}
+
 func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 	parser, _, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()
