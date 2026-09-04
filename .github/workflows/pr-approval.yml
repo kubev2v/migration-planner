@@ -17,4 +17,4 @@ jobs:
       APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_REVIEWER_PRIVATE_KEY }}
     permissions:
       pull-requests: write
-      contents: read
+      contents: write
