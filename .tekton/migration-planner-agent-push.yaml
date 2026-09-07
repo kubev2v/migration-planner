@@ -170,11 +170,17 @@ spec:
           image: registry.access.redhat.com/ubi9/ubi-minimal:latest
           script: |
             #!/usr/bin/env sh
-            tr -d '\n' < "$(workspaces.source.path)/.github/release-config.txt" > "$(results.release-branch.path)"
+            config="$(workspaces.output.path)/.github/release-config.txt"
+            test -f "$config" || {
+              echo "Missing $config"
+              find "$(workspaces.output.path)" -maxdepth 3 -type f | sort
+              exit 1
+            }
+            tr -d '\n' < "$config" > "$(results.release-branch.path)"
         workspaces:
-        - name: source
+        - name: output
       workspaces:
-      - name: source
+      - name: output
         workspace: workspace
     - name: prefetch-dependencies
       params:
