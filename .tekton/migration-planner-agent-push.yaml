@@ -7,7 +7,7 @@ metadata:
     build.appstudio.redhat.com/target_branch: '{{target_branch}}'
     pipelinesascode.tekton.dev/cancel-in-progress: "false"
     pipelinesascode.tekton.dev/max-keep-runs: "3"
-    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && target_branch.startsWith("release-")
+    pipelinesascode.tekton.dev/on-cel-expression: event == "push" && (target_branch == "main" || target_branch == "stable")
   creationTimestamp:
   labels:
     appstudio.openshift.io/application: assisted-migration
@@ -158,6 +158,24 @@ spec:
         workspace: workspace
       - name: basic-auth
         workspace: git-auth
+    - name: read-release-branch
+      runAfter:
+      - clone-repository
+      taskSpec:
+        results:
+        - name: release-branch
+          type: string
+        steps:
+        - name: read-release-branch
+          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
+          script: |
+            #!/usr/bin/env sh
+            tr -d '\n' < "$(workspaces.source.path)/.github/release-config.txt" > "$(results.release-branch.path)"
+        workspaces:
+        - name: source
+      workspaces:
+      - name: source
+        workspace: workspace
     - name: prefetch-dependencies
       params:
       - name: input
@@ -202,7 +220,7 @@ spec:
         value:
         - $(params.build-args[*])
         - PLANNER_AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - PLANNER_AGENT_VERSION={{target_branch}}-$(tasks.clone-repository.results.short-commit)
+        - PLANNER_AGENT_VERSION={{target_branch}}-$(tasks.read-release-branch.results.release-branch)-$(tasks.clone-repository.results.short-commit)
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       - name: PRIVILEGED_NESTED
@@ -217,6 +235,7 @@ spec:
         value: $(params.omit-history)
       runAfter:
       - prefetch-dependencies
+      - read-release-branch
       taskRef:
         params:
         - name: name
@@ -413,7 +432,7 @@ spec:
         value:
         - $(params.build-args[*])
         - PLANNER_AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - PLANNER_AGENT_VERSION={{target_branch}}-$(tasks.clone-repository.results.short-commit)
+        - PLANNER_AGENT_VERSION={{target_branch}}-$(tasks.read-release-branch.results.release-branch)-$(tasks.clone-repository.results.short-commit)
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       - name: TARGET_DIRS
