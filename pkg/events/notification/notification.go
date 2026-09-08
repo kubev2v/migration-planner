@@ -19,7 +19,7 @@ type Notification struct {
 	Timestamp   string            `json:"timestamp"`
 	OrgID       string            `json:"org_id"`
 	Severity    string            `json:"severity"`
-	Context     map[string]string `json:"context,omitempty"`
+	Context     map[string]string `json:"context"`
 	Events      []Event           `json:"events"`
 	Recipients  []Recipient       `json:"recipients,omitempty"`
 }
@@ -57,6 +57,11 @@ func New(eventType, orgID, severity string, context map[string]string, payload a
 // Build constructs a Notification for eventType and marshals it to JSON,
 // ready to be stored in the outbox and later dispatched by a Writer.
 func Build(eventType, orgID, severity string, context map[string]string, recipients ...Recipient) ([]byte, error) {
+	// Notification service will reject request (400) with empty context. The minimum is passing an empty context.
+	if context == nil {
+		context = make(map[string]string)
+	}
+
 	notification := New(eventType, orgID, severity, context, make(map[string]string), recipients...)
 
 	if err := notification.validate(); err != nil {
