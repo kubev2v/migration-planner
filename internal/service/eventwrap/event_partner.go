@@ -78,7 +78,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 			notification.PartnershipRequestEventType,
 			orgID,
 			notification.SeverityImportant,
-			nil,
+			map[string]string{},
 			notification.Recipient{IgnoreUserPreferences: true, Users: users},
 		)
 		if err != nil {
