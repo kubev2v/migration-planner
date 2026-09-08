@@ -165,30 +165,6 @@ spec:
         workspace: workspace
       - name: basic-auth
         workspace: git-auth
-    - name: read-release-branch
-      runAfter:
-      - clone-repository
-      taskSpec:
-        results:
-        - name: release-branch
-          type: string
-        steps:
-        - name: read-release-branch
-          image: registry.access.redhat.com/ubi9/ubi-minimal:latest
-          script: |
-            #!/usr/bin/env sh
-            config="$(workspaces.output.path)/source/.github/release-config.txt"
-            test -f "$config" || {
-              echo "Missing $config"
-              find "$(workspaces.output.path)" -maxdepth 3 -type f | sort
-              exit 1
-            }
-            tr -d '\n' < "$config" > "$(results.release-branch.path)"
-        workspaces:
-        - name: output
-      workspaces:
-      - name: output
-        workspace: workspace
     - name: prefetch-dependencies
       params:
       - name: input
@@ -233,7 +209,7 @@ spec:
         value:
         - $(params.build-args[*])
         - PLANNER_AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - PLANNER_AGENT_VERSION={{target_branch}}-$(tasks.read-release-branch.results.release-branch)-$(tasks.clone-repository.results.short-commit)
+        - TARGET_BRANCH={{target_branch}}
       - name: BUILD_ARGS_FILE
         value: $(params.build-args-file)
       - name: PRIVILEGED_NESTED
@@ -250,7 +226,6 @@ spec:
         value: $(params.omit-history)
       runAfter:
       - prefetch-dependencies
-      - read-release-branch
       taskRef:
         params:
         - name: name

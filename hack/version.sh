@@ -22,10 +22,17 @@ fi
 # Get git tag
 # If SOURCE_GIT_TAG is already set (from build args), use it
 if [ -z "$SOURCE_GIT_TAG" ]; then
-    export SOURCE_GIT_TAG=$(git describe --always --tags --abbrev=7 \
-        --match '[0-9]*.[0-9]*.[0-9]*' \
-        --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null \
-        || echo "v0.0.0-${SOURCE_GIT_COMMIT_SHORT}")
+    # Try to construct tag from release config file if TARGET_BRANCH is set
+    if [ -n "$TARGET_BRANCH" ] && [ -f ".github/release-config.txt" ]; then
+        RELEASE_BRANCH=$(cat .github/release-config.txt | tr -d '\n\r ')
+        export SOURCE_GIT_TAG="${TARGET_BRANCH}-${RELEASE_BRANCH}-${SOURCE_GIT_COMMIT_SHORT}"
+    else
+        # Fallback to git describe
+        export SOURCE_GIT_TAG=$(git describe --always --tags --abbrev=7 \
+            --match '[0-9]*.[0-9]*.[0-9]*' \
+            --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null \
+            || echo "v0.0.0-${SOURCE_GIT_COMMIT_SHORT}")
+    fi
 fi
 
 # Get agent git commit
@@ -44,9 +51,14 @@ fi
 
 # Get agent git tag
 # If AGENT_GIT_TAG is already set (from build args), use it
-# Otherwise, default to SOURCE_GIT_TAG
+# Otherwise, construct from release config or default to SOURCE_GIT_TAG
 if [ -z "$AGENT_GIT_TAG" ]; then
-    export AGENT_GIT_TAG="$SOURCE_GIT_TAG"
+    if [ -n "$TARGET_BRANCH" ] && [ -f ".github/release-config.txt" ]; then
+        RELEASE_BRANCH=$(cat .github/release-config.txt | tr -d '\n\r ')
+        export AGENT_GIT_TAG="${TARGET_BRANCH}-${RELEASE_BRANCH}-${AGENT_GIT_COMMIT_SHORT}"
+    else
+        export AGENT_GIT_TAG="$SOURCE_GIT_TAG"
+    fi
 fi
 
 # Get git tree state
