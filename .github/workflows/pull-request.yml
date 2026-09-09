@@ -27,7 +27,7 @@ jobs:
       - id: set-config
         run: |
           echo 'allowed-types=["feat","fix","ci","build","chore","docs","refactor","test","style","perf"]' >> $GITHUB_OUTPUT
-          echo 'jira-pattern=ECOPROJECT-[0-9]+' >> $GITHUB_OUTPUT
+          echo 'jira-pattern=(ECOPROJECT|OMA)-[0-9]+' >> $GITHUB_OUTPUT
           echo 'jira-required-types=["feat","fix"]' >> $GITHUB_OUTPUT
           echo 'bot-authors=["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]' >> $GITHUB_OUTPUT
 
