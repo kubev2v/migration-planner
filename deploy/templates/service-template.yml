@@ -85,7 +85,7 @@ parameters:
     value: "notifications.key"
   - name: IAM_ENABLED
     description: Enable IAM integration to resolve user org_id from Red Hat User Service
-    value: "true"
+    value: "false"
   - name: IAM_URL
     description: URL of the Red Hat User Service used to resolve a user's org_id
   - name: IAM_CERT_SECRET_NAME
