@@ -14,6 +14,12 @@ Key transformations:
   - Datastore → vdatastore with capacity/free converted from bytes to MiB
   - Network → dvport for distributed virtual switches
   - Cluster → vcluster: Name, anonymized Object ID (SHA-256), DasEnabled (HA), DrsEnabled and DrsDefaultVmBehavior (DRS)
+
+Standalone hosts:
+  forklift models a host with no cluster as a synthetic ComputeResource "cluster" (Variant = 'ComputeResource', named
+  after the host) rather than leaving the cluster empty. RVTools-shape output has no such concept: a standalone host has
+  a blank Cluster and does not appear in vCluster. So the placeholder is normalized away here - blanked as a cluster name
+  in vinfo/vhost/vnetwork (its parent chain is kept so the host still resolves to a Datacenter) and excluded from vcluster.
 */ -}}
 
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
@@ -52,7 +58,7 @@ SELECT
     v.ChangeTrackingEnabled = 1,
     v.DiskEnableUuid = 1,
     d.Name,
-    c.Name,
+    CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END,
     '',
     0,
     0,
@@ -164,7 +170,7 @@ SELECT
          LIMIT 1),
         ''
     ),
-    c.Name
+    CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END
 FROM nic_flat nf
 LEFT JOIN src.Cluster c ON nf.cluster_id = c.ID
 LEFT JOIN src.Network n ON nf.network_id = n.ID;
@@ -191,7 +197,8 @@ SELECT
     COALESCE(h.VMotionSupported, false),
     COALESCE(h.StorageVMotionSupported, false)
 FROM src.Host h
-LEFT JOIN src.Cluster c ON h.Cluster = c.ID;
+-- Standalone-host placeholder (see header) filtered from the join so the host keeps a blank Cluster
+LEFT JOIN src.Cluster c ON h.Cluster = c.ID AND c.Variant != 'ComputeResource';
 
 INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices",
     "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
@@ -237,7 +244,9 @@ SELECT
 FROM src.Cluster c
 LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
 LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID
-CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about;
+CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
+-- Skip forklift synthetic ComputeResource placeholders (standalone hosts, not real clusters)
+WHERE c.Variant != 'ComputeResource';
 
 DETACH src;
 

@@ -325,3 +325,8 @@ SELECT "Name", "Object ID",
         ELSE false
     END as "DasEnabled"
 FROM vcluster_raw;
+
+-- DuckDB's XLSX reader can resolve RVTools empty shared-string cells as
+-- "VM", the existing RVTools empty-value placeholder. A real cluster named
+-- exactly "VM" is therefore unsupported by this RVTools import.
+UPDATE vhost SET "Cluster" = '' WHERE "Cluster" = 'VM';
