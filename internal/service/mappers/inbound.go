@@ -275,7 +275,11 @@ func (f *JobForm) ToAPIJob() *v1alpha1.Job {
 
 type ClusterRequirementsRequestForm struct {
 	// Required fields (always present)
-	ClusterID             string
+	ClusterID string
+
+	// ClusterIDs is an internal future multi-cluster selection.
+	// Nil uses ClusterID for compatibility; an empty list is invalid.
+	ClusterIDs            []string
 	CpuOverCommitRatio    string
 	MemoryOverCommitRatio string
 	WorkerNodeCPU         int

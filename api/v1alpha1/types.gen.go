@@ -410,8 +410,8 @@ type ClusterFeaturesDrsMode string
 
 // ClusterRequirementsRequest Request payload for calculating cluster requirements
 type ClusterRequirementsRequest struct {
-	// ClusterId ID of the cluster to calculate requirements for
-	ClusterId string `json:"clusterId" validate:"required"`
+	// ClusterId ID of the cluster to calculate requirements for. An empty value uses the vCenter-wide aggregate.
+	ClusterId string `json:"clusterId"`
 
 	// CompactMode If true, creates a 3-node compact cluster with no dedicated workers. Requires controlPlaneNodeCount=3 and controlPlaneSchedulable=true. Incompatible with hostedControlPlane=true
 	CompactMode *bool `json:"compactMode,omitempty"`

@@ -127,11 +127,6 @@ func (h *ServiceHandler) CalculateAssessmentClusterRequirements(ctx context.Cont
 	assessmentID := request.Id
 	clusterID := request.Body.ClusterId
 
-	if clusterID == "" {
-		logger.Error(fmt.Errorf("clusterId is required")).Log()
-		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: "clusterId is required"}, nil
-	}
-
 	if request.Body.WorkerNodeCPU <= 0 || request.Body.WorkerNodeMemory <= 0 {
 		logger.Error(fmt.Errorf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)).Log()
 		return server.CalculateAssessmentClusterRequirements400JSONResponse{Message: fmt.Sprintf("worker node size must be greater than zero: CPU=%d, Memory=%d", request.Body.WorkerNodeCPU, request.Body.WorkerNodeMemory)}, nil

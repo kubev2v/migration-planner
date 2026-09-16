@@ -192,54 +192,41 @@ func NewSizerService(sizerClient *client.SizerClient, store store.Store) *SizerS
 	}
 }
 
-func (s *SizerService) extractUtilizationFromInventory(
+func noUtilizationData(confidence float64) UtilizationContext {
+	return UtilizationContext{
+		CpuMultiplier:    1.0,
+		MemoryMultiplier: 1.0,
+		CpuPercent:       100.0,
+		MemoryPercent:    100.0,
+		Confidence:       confidence,
+		HasData:          false,
+	}
+}
+
+func extractUtilizationFromInventory(
 	inventory *api.Inventory,
-	clusterID string,
+	clusterIDs []string,
 ) UtilizationContext {
 	if inventory == nil {
-		return UtilizationContext{
-			CpuMultiplier:    1.0,
-			MemoryMultiplier: 1.0,
-			CpuPercent:       100.0,
-			MemoryPercent:    100.0,
-			Confidence:       0.0,
-			HasData:          false,
-		}
+		return noUtilizationData(0)
 	}
-
-	clusterData, exists := inventory.Clusters[clusterID]
-	if !exists {
-		return UtilizationContext{
-			CpuMultiplier:    1.0,
-			MemoryMultiplier: 1.0,
-			CpuPercent:       100.0,
-			MemoryPercent:    100.0,
-			Confidence:       0.0,
-			HasData:          false,
-		}
+	if usesVCenterAggregate(clusterIDs) {
+		return extractUtilizationFromData(inventory.Vcenter)
 	}
+	return aggregateClusterUtilization(inventory, clusterIDs)
+}
 
+func extractUtilizationFromData(clusterData *api.InventoryData) UtilizationContext {
+	if clusterData == nil {
+		return noUtilizationData(0)
+	}
 	utilization := clusterData.ClusterUtilization
 	if utilization == nil {
-		return UtilizationContext{
-			CpuMultiplier:    1.0,
-			MemoryMultiplier: 1.0,
-			CpuPercent:       100.0,
-			MemoryPercent:    100.0,
-			Confidence:       0.0,
-			HasData:          false,
-		}
+		return noUtilizationData(0)
 	}
 
 	if utilization.Confidence < MinConfidenceThreshold {
-		return UtilizationContext{
-			CpuMultiplier:    1.0,
-			MemoryMultiplier: 1.0,
-			CpuPercent:       100.0,
-			MemoryPercent:    100.0,
-			Confidence:       utilization.Confidence,
-			HasData:          false,
-		}
+		return noUtilizationData(utilization.Confidence)
 	}
 
 	cpuPct := utilization.CpuMax
@@ -247,14 +234,7 @@ func (s *SizerService) extractUtilizationFromInventory(
 
 	if math.IsNaN(cpuPct) || math.IsInf(cpuPct, 0) || cpuPct <= 0 ||
 		math.IsNaN(memPct) || math.IsInf(memPct, 0) || memPct <= 0 {
-		return UtilizationContext{
-			CpuMultiplier:    1.0,
-			MemoryMultiplier: 1.0,
-			CpuPercent:       100.0,
-			MemoryPercent:    100.0,
-			Confidence:       utilization.Confidence,
-			HasData:          false,
-		}
+		return noUtilizationData(utilization.Confidence)
 	}
 
 	cpuMultiplier := math.Min(cpuPct/100.0, 1.0)
@@ -271,6 +251,84 @@ func (s *SizerService) extractUtilizationFromInventory(
 		Confidence:       utilization.Confidence,
 		HasData:          true,
 	}
+}
+
+func aggregateClusterUtilization(inventory *api.Inventory, clusterIDs []string) UtilizationContext {
+	var totalCPU, totalMemory, weightedCPU, weightedMemory, weightedConfidence float64
+	for _, clusterID := range clusterIDs {
+		data, exists := inventory.Clusters[clusterID]
+		if !exists {
+			return noUtilizationData(0)
+		}
+		utilization := extractUtilizationFromData(&data)
+		if !utilization.HasData {
+			return utilization
+		}
+		cpu := float64(data.Vms.CpuCores.Total)
+		memory := float64(data.Vms.RamGB.Total)
+		totalCPU += cpu
+		totalMemory += memory
+		weightedCPU += cpu * utilization.CpuMultiplier
+		weightedMemory += memory * utilization.MemoryMultiplier
+		weightedConfidence += cpu * utilization.Confidence
+	}
+	if totalCPU == 0 || totalMemory == 0 {
+		return noUtilizationData(0)
+	}
+	return UtilizationContext{
+		CpuMultiplier:    weightedCPU / totalCPU,
+		MemoryMultiplier: weightedMemory / totalMemory,
+		CpuPercent:       weightedCPU / totalCPU * 100,
+		MemoryPercent:    weightedMemory / totalMemory * 100,
+		Confidence:       weightedConfidence / totalCPU,
+		HasData:          true,
+	}
+}
+
+func usesVCenterAggregate(clusterIDs []string) bool {
+	return len(clusterIDs) == 1 && clusterIDs[0] == ""
+}
+
+func normalizeClusterIDs(req *mappers.ClusterRequirementsRequestForm) ([]string, error) {
+	if req.ClusterIDs == nil {
+		return []string{req.ClusterID}, nil
+	}
+	if len(req.ClusterIDs) == 0 {
+		return nil, NewErrInvalidRequest("at least one cluster ID is required")
+	}
+	return req.ClusterIDs, nil
+}
+
+func resolveSizingInventoryData(inventory api.Inventory, assessmentID uuid.UUID, clusterIDs []string) (api.InventoryData, error) {
+	if usesVCenterAggregate(clusterIDs) {
+		if inventory.Vcenter == nil {
+			return api.InventoryData{}, NewErrInvalidClusterInventory("vcenter", "inventory has no vcenter-level data")
+		}
+		return *inventory.Vcenter, nil
+	}
+
+	var result api.InventoryData
+	seen := make(map[string]struct{}, len(clusterIDs))
+	for _, clusterID := range clusterIDs {
+		if clusterID == "" {
+			return api.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain an empty value")
+		}
+		if _, exists := seen[clusterID]; exists {
+			return api.InventoryData{}, NewErrInvalidRequest(fmt.Sprintf("cluster %s was selected more than once", clusterID))
+		}
+		seen[clusterID] = struct{}{}
+		data, exists := inventory.Clusters[clusterID]
+		if !exists {
+			return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+		}
+		if data.Vms.Total == 0 || data.Vms.CpuCores.Total == 0 || data.Vms.RamGB.Total == 0 {
+			return api.InventoryData{}, NewErrInvalidClusterInventory(clusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
+		}
+		result.Vms.Total += data.Vms.Total
+		result.Vms.CpuCores.Total += data.Vms.CpuCores.Total
+		result.Vms.RamGB.Total += data.Vms.RamGB.Total
+	}
+	return result, nil
 }
 
 func extractWorkerNodeThreads(params *clusterRequirementsParams) int {
@@ -541,6 +599,14 @@ func (s *SizerService) CalculateClusterRequirements(
 	assessmentID uuid.UUID,
 	req *mappers.ClusterRequirementsRequestForm,
 ) (*api.ClusterRequirementsResponse, error) {
+	clusterIDs, err := normalizeClusterIDs(req)
+	if err != nil {
+		return nil, err
+	}
+	selectionID := strings.Join(clusterIDs, ",")
+	if usesVCenterAggregate(clusterIDs) {
+		selectionID = "vcenter"
+	}
 	logger := s.logger.WithContext(ctx)
 
 	if s.sizerClient == nil {
@@ -571,13 +637,13 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("failed to parse inventory: %w", err)
 	}
 
-	if len(inventory.Clusters) == 0 {
+	if !usesVCenterAggregate(clusterIDs) && len(inventory.Clusters) == 0 {
 		return nil, fmt.Errorf("inventory has no clusters")
 	}
 
-	clusterInventory, exists := inventory.Clusters[calcReq.ClusterID]
-	if !exists {
-		return nil, fmt.Errorf("cluster %s not found in assessment %s", calcReq.ClusterID, assessmentID)
+	clusterInventory, err := resolveSizingInventoryData(inventory, assessmentID, clusterIDs)
+	if err != nil {
+		return nil, err
 	}
 
 	totalVMs := clusterInventory.Vms.Total
@@ -585,7 +651,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	totalMemory := clusterInventory.Vms.RamGB.Total
 
 	if totalVMs == 0 || totalCPU == 0 || totalMemory == 0 {
-		return nil, NewErrInvalidClusterInventory(calcReq.ClusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
+		return nil, NewErrInvalidClusterInventory(selectionID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
 	}
 
 	params := clusterRequirementsParams{
@@ -650,7 +716,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		}
 	}
 
-	utilizationContext := s.extractUtilizationFromInventory(&inventory, calcReq.ClusterID)
+	utilizationContext := extractUtilizationFromInventory(&inventory, clusterIDs)
 
 	// Track optimization attempt status
 	optimizationStatus := api.OptimizationStatus{
@@ -702,7 +768,7 @@ func (s *SizerService) CalculateClusterRequirements(
 	// using the raw sizer response before transformation, so it's removed from here
 
 	logger.Operation("calculate_baseline").
-		WithString("cluster_id", calcReq.ClusterID).
+		WithString("cluster_id", selectionID).
 		WithInt("total_nodes", baselineResult.TotalNodes).
 		WithInt("worker_nodes", baselineResult.WorkerNodes).
 		Build()
@@ -729,7 +795,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		if err != nil {
 			optimizationStatus.Reason = api.CalculationError
 			logger.Operation("calculate_optimized_error").
-				WithString("cluster_id", calcReq.ClusterID).
+				WithString("cluster_id", selectionID).
 				WithParam("error", err).
 				Build().
 				Error(err).
@@ -738,7 +804,7 @@ func (s *SizerService) CalculateClusterRequirements(
 			optimizationStatus.Reason = api.Success
 			optimizedResult = &result
 			logger.Operation("calculate_optimized").
-				WithString("cluster_id", calcReq.ClusterID).
+				WithString("cluster_id", selectionID).
 				WithInt("total_nodes", result.TotalNodes).
 				WithInt("worker_nodes", result.WorkerNodes).
 				WithParam("cpu_utilization_max", utilizationContext.CpuPercent).
@@ -750,9 +816,11 @@ func (s *SizerService) CalculateClusterRequirements(
 		}
 	}
 
-	if err := s.persistClusterSizingInput(ctx, assessmentID, req); err != nil {
-		logger.Operation("persist_cluster_sizing_input").Build().Error(err).Log()
-		return nil, err
+	if req.ClusterIDs == nil && clusterIDs[0] != "" {
+		if err := s.persistClusterSizingInput(ctx, assessmentID, req); err != nil {
+			logger.Operation("persist_cluster_sizing_input").Build().Error(err).Log()
+			return nil, err
+		}
 	}
 
 	baselineFailoverNodes := calculateFailoverNodes(baselineResult.WorkerNodes)
@@ -1163,6 +1231,7 @@ func applyDefaults(req *mappers.ClusterRequirementsRequestForm) *mappers.Cluster
 
 	return &mappers.ClusterRequirementsRequestForm{
 		ClusterID:               req.ClusterID,
+		ClusterIDs:              req.ClusterIDs,
 		CpuOverCommitRatio:      req.CpuOverCommitRatio,
 		MemoryOverCommitRatio:   req.MemoryOverCommitRatio,
 		WorkerNodeCPU:           req.WorkerNodeCPU,
