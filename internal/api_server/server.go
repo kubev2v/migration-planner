@@ -230,7 +230,12 @@ func (s *Server) Run(ctx context.Context) error {
 	sizerClient := client.NewSizerClient(s.cfg.Service.Sizer.ServiceURL, sizerTimeout)
 
 	// Create IAM client and service
-	iamClient, err := newIAMClient(s.cfg.IAM.URL, s.cfg.IAM.ClientCert, s.cfg.IAM.ClientKey, s.cfg.IAM.Enabled)
+	iamClient, err := newIAMClient(iam.Config{
+		URL:                s.cfg.IAM.URL,
+		ClientCert:         []byte(s.cfg.IAM.ClientCert),
+		ClientKey:          []byte(s.cfg.IAM.ClientKey),
+		InsecureSkipVerify: s.cfg.IAM.InsecureSkipVerify,
+	}, s.cfg.IAM.Enabled)
 	if err != nil {
 		return fmt.Errorf("failed to create IAM client: %w", err)
 	}
@@ -300,17 +305,17 @@ func (s *Server) Run(ctx context.Context) error {
 	return nil
 }
 
-func newIAMClient(URL, ClientCert, ClientKey string, enabled bool) (iam.Client, error) {
+func newIAMClient(config iam.Config, enabled bool) (iam.Client, error) {
 	if !enabled {
 		// IAM integration disabled - return mock client
 		return &iam.MockClient{}, nil
 	}
 
-	if URL == "" || ClientCert == "" || ClientKey == "" {
+	if config.URL == "" || len(config.ClientCert) == 0 || len(config.ClientKey) == 0 {
 		return &iam.UnimplementedClient{}, fmt.Errorf("IAM enabled but missing url, cert or key")
 	}
 
-	iamClient, err := iam.NewHTTPClient(URL, []byte(ClientCert), []byte(ClientKey))
+	iamClient, err := iam.NewHTTPClient(config)
 	if err != nil {
 		return &iam.UnimplementedClient{}, fmt.Errorf("unable to create IAM client: %w", err)
 	}

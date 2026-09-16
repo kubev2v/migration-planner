@@ -74,6 +74,9 @@ parameters:
     value: "false"
   - name: NOTIFICATION_URL
     description: URL of the console notifications service
+  - name: NOTIFICATION_INSECURE_SKIP_VERIFY
+    description: Disable TLS certificate verification for the console notifications service
+    value: "false"
   - name: NOTIFICATION_CERT_SECRET_NAME
     description: Kubernetes secret containing the notification service mTLS client certificate and key
     value: "notifications-cert"
@@ -88,6 +91,9 @@ parameters:
     value: "true"
   - name: IAM_URL
     description: URL of the Red Hat User Service used to resolve a user's org_id
+  - name: IAM_INSECURE_SKIP_VERIFY
+    description: Disable TLS certificate verification for the Red Hat User Service
+    value: "false"
   - name: IAM_CERT_SECRET_NAME
     description: Kubernetes secret containing the User Service mTLS client certificate and key
     value: "notifications-cert"
@@ -801,6 +807,8 @@ objects:
                   value: "${NOTIFICATION_ENABLED}"
                 - name: NOTIFICATION_URL
                   value: "${NOTIFICATION_URL}"
+                - name: NOTIFICATION_INSECURE_SKIP_VERIFY
+                  value: "${NOTIFICATION_INSECURE_SKIP_VERIFY}"
                 - name: NOTIFICATION_CLIENT_CERT
                   valueFrom:
                     secretKeyRef:
@@ -818,6 +826,8 @@ objects:
                   value: "${IAM_ENABLED}"
                 - name: IAM_URL
                   value: "${IAM_URL}"
+                - name: IAM_INSECURE_SKIP_VERIFY
+                  value: "${IAM_INSECURE_SKIP_VERIFY}"
                 - name: IAM_CLIENT_CERT
                   valueFrom:
                     secretKeyRef:

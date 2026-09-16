@@ -227,11 +227,12 @@ func createNotificationWriter(cfg *config.Config) notification.Writer {
 		return notification.NewNoopWriter()
 	}
 
-	writer, err := notification.NewHTTPWriter(
-		cfg.Notification.URL,
-		[]byte(cfg.Notification.ClientCert),
-		[]byte(cfg.Notification.ClientKey),
-	)
+	writer, err := notification.NewHTTPWriter(notification.Config{
+		URL:                cfg.Notification.URL,
+		ClientCert:         []byte(cfg.Notification.ClientCert),
+		ClientKey:          []byte(cfg.Notification.ClientKey),
+		InsecureSkipVerify: cfg.Notification.InsecureSkipVerify,
+	})
 	if err != nil {
 		zap.S().Warnw("failed to create notification service client, logging notifications to stdout", "error", err)
 		return notification.NewNoopWriter()
