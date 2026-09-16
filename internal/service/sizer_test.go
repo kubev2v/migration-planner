@@ -238,19 +238,21 @@ func createTestSizerServerWithRequestCapture(response *client.SizerResponse, hea
 }
 
 func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
-			clusterID: {
-				Vms: api.VMs{
-					Total: totalVMs,
-					CpuCores: api.VMResourceBreakdown{
-						Total: totalCPU,
-					},
-					RamGB: api.VMResourceBreakdown{
-						Total: totalMemory,
-					},
-				},
+	inventoryData := api.InventoryData{
+		Vms: api.VMs{
+			Total: totalVMs,
+			CpuCores: api.VMResourceBreakdown{
+				Total: totalCPU,
 			},
+			RamGB: api.VMResourceBreakdown{
+				Total: totalMemory,
+			},
+		},
+	}
+	inventory := api.Inventory{
+		Vcenter: &inventoryData,
+		Clusters: map[string]api.InventoryData{
+			clusterID: inventoryData,
 		},
 	}
 	data, err := json.Marshal(inventory)
@@ -390,6 +392,89 @@ var _ = Describe("sizer service", func() {
 				Expect(result.ClusterSizing.FailoverNodes).To(Equal(2))
 				Expect(result.ResourceConsumption.Cpu).To(Equal(100.0))
 				Expect(result.ResourceConsumption.Memory).To(Equal(200.0))
+			})
+
+			It("uses the vCenter aggregate when clusterId is empty", func() {
+				request.ClusterID = ""
+				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, clusterID, 10, 40, 80)
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result.InventoryTotals.TotalVMs).To(Equal(10))
+				Expect(mockStore.clusterInputs).To(BeEmpty())
+			})
+
+			It("aggregates a selected cluster list into one offer", func() {
+				request.ClusterIDs = []string{"east", "west"}
+				inventory := api.Inventory{Clusters: map[string]api.InventoryData{
+					"east": {
+						Vms:                api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}},
+						ClusterUtilization: &api.ClusterUtilization{CpuMax: 50, MemMax: 25, Confidence: 80},
+					},
+					"west": {
+						Vms:                api.VMs{Total: 5, CpuCores: api.VMResourceBreakdown{Total: 20}, RamGB: api.VMResourceBreakdown{Total: 40}},
+						ClusterUtilization: &api.ClusterUtilization{CpuMax: 100, MemMax: 50, Confidence: 60},
+					},
+				}}
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 60, 120), http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(BeNil())
+				Expect(result.InventoryTotals.TotalVMs).To(Equal(15))
+				Expect(result.InventoryTotals.TotalCPU).To(Equal(60))
+				Expect(result.InventoryTotals.TotalMemory).To(Equal(120))
+				Expect(result.OptimizedSizing).NotTo(BeNil())
+				Expect(*result.OptimizedSizing.CpuUtilizationMax).To(BeNumerically("~", 66.67, 0.01))
+				Expect(*result.OptimizedSizing.MemoryUtilizationMax).To(BeNumerically("~", 33.33, 0.01))
+				Expect(*result.OptimizedSizing.Confidence).To(BeNumerically("~", 73.33, 0.01))
+				Expect(mockStore.clusterInputs).To(BeEmpty())
+			})
+
+			DescribeTable("rejects invalid selected cluster lists",
+				func(clusterIDs []string, expectedMessage string) {
+					request.ClusterIDs = clusterIDs
+					inventory := api.Inventory{Clusters: map[string]api.InventoryData{
+						"east": {Vms: api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}}},
+					}}
+					mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+					testServer = createTestSizerServer(nil, http.StatusOK, false)
+					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+					sizerService = service.NewSizerService(sizerClient, mockStore)
+
+					_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+					Expect(err).To(MatchError(ContainSubstring(expectedMessage)))
+				},
+				Entry("empty list", []string{}, "at least one cluster ID is required"),
+				Entry("blank ID", []string{"east", ""}, "cannot contain an empty value"),
+				Entry("duplicate ID", []string{"east", "east"}, "selected more than once"),
+				Entry("unknown ID", []string{"east", "missing"}, "cluster missing not found"),
+			)
+
+			It("rejects an empty clusterId without vCenter aggregate data", func() {
+				request.ClusterID = ""
+				inventory := api.Inventory{
+					Clusters: map[string]api.InventoryData{
+						clusterID: {Vms: api.VMs{Total: 10}},
+					},
+				}
+				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
+				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
+				sizerService = service.NewSizerService(sizerClient, mockStore)
+
+				_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
+
+				Expect(err).To(HaveOccurred())
+				Expect(err.Error()).To(ContainSubstring("vcenter-level data"))
 			})
 
 			It("successfully handles control plane schedulable enabled", func() {
@@ -1024,6 +1109,8 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
+				var notFound *service.ErrResourceNotFound
+				Expect(errors.As(err, &notFound)).To(BeTrue())
 				Expect(err.Error()).To(ContainSubstring("cluster"))
 				Expect(err.Error()).To(ContainSubstring("not found"))
 			})

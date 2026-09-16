@@ -242,28 +242,24 @@ func createTestSizerServer(response *client.SizerResponse, healthStatus int, hea
 	}))
 }
 
-func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventory := api.Inventory{
-		Clusters: map[string]api.InventoryData{
-			clusterID: {
-				Vms: api.VMs{
-					Total: totalVMs,
-					CpuCores: api.VMResourceBreakdown{
-						Total: totalCPU,
-					},
-					RamGB: api.VMResourceBreakdown{
-						Total: totalMemory,
-					},
-				},
-			},
+func createTestAssessment(id uuid.UUID, username, orgID, clusterID string) *model.Assessment {
+	inventoryData := api.InventoryData{
+		Vms: api.VMs{
+			Total:    10,
+			CpuCores: api.VMResourceBreakdown{Total: 40},
+			RamGB:    api.VMResourceBreakdown{Total: 80},
 		},
 	}
-	data, err := json.Marshal(inventory)
-	Expect(err).ToNot(HaveOccurred())
-	return data
+	return createTestAssessmentWithInventory(id, username, orgID, api.Inventory{
+		Vcenter:  &inventoryData,
+		Clusters: map[string]api.InventoryData{clusterID: inventoryData},
+	})
 }
 
-func createTestAssessment(id uuid.UUID, username, orgID, clusterID string) *model.Assessment {
+func createTestAssessmentWithInventory(id uuid.UUID, username, orgID string, inventory api.Inventory) *model.Assessment {
+	inventoryBytes, err := json.Marshal(inventory)
+	Expect(err).NotTo(HaveOccurred())
+
 	return &model.Assessment{
 		ID:       id,
 		Name:     "test-assessment",
@@ -273,7 +269,7 @@ func createTestAssessment(id uuid.UUID, username, orgID, clusterID string) *mode
 			{
 				ID:           1,
 				CreatedAt:    time.Now(),
-				Inventory:    createTestInventory(clusterID, 10, 40, 80),
+				Inventory:    inventoryBytes,
 				AssessmentID: id,
 				Version:      2,
 			},
@@ -1020,7 +1016,7 @@ var _ = Describe("sizer handler", func() {
 				Expect(ok).To(BeTrue())
 			})
 
-			It("returns 400 when clusterId is empty", func() {
+			It("uses the vCenter aggregate when clusterId is empty", func() {
 				request := &api.ClusterRequirementsRequest{
 					ClusterId:             "",
 					CpuOverCommitRatio:    api.CpuOneToFour,
@@ -1029,7 +1025,13 @@ var _ = Describe("sizer handler", func() {
 					WorkerNodeMemory:      16,
 				}
 
-				testServer = createTestSizerServer(nil, http.StatusOK, false)
+				vcenterData := api.InventoryData{Vms: api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}}}
+				clusterData := api.InventoryData{Vms: api.VMs{Total: 2, CpuCores: api.VMResourceBreakdown{Total: 8}, RamGB: api.VMResourceBreakdown{Total: 16}}}
+				mockStore.assessments[assessmentID] = createTestAssessmentWithInventory(assessmentID, user.Username, user.Organization, api.Inventory{
+					Vcenter:  &vcenterData,
+					Clusters: map[string]api.InventoryData{clusterID: clusterData},
+				})
+				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
 				handler = handlers.NewServiceHandler(
 					nil,
@@ -1048,9 +1050,9 @@ var _ = Describe("sizer handler", func() {
 				})
 
 				Expect(err).To(BeNil())
-				errorResp, ok := resp.(server.CalculateAssessmentClusterRequirements400JSONResponse)
+				response, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
 				Expect(ok).To(BeTrue())
-				Expect(errorResp.Message).To(ContainSubstring("clusterId is required"))
+				Expect(response.InventoryTotals).To(Equal(api.InventoryTotals{TotalVMs: 10, TotalCPU: 40, TotalMemory: 80}))
 			})
 
 			It("accepts valid clusterId format", func() {
@@ -1083,6 +1085,27 @@ var _ = Describe("sizer handler", func() {
 
 				Expect(err).To(BeNil())
 				_, ok := resp.(server.CalculateAssessmentClusterRequirements200JSONResponse)
+				Expect(ok).To(BeTrue())
+			})
+
+			It("returns 404 when clusterId is not in the inventory", func() {
+				request := &api.ClusterRequirementsRequest{
+					ClusterId:             clusterID,
+					CpuOverCommitRatio:    api.CpuOneToFour,
+					MemoryOverCommitRatio: api.MemoryOneToTwo,
+					WorkerNodeCPU:         8,
+					WorkerNodeMemory:      16,
+				}
+				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, "different-cluster")
+				handler, testServer = setupTestHandler(mockStore, nil, assessment)
+
+				resp, err := handler.CalculateAssessmentClusterRequirements(ctx, server.CalculateAssessmentClusterRequirementsRequestObject{
+					Id:   assessmentID,
+					Body: request,
+				})
+
+				Expect(err).To(BeNil())
+				_, ok := resp.(server.CalculateAssessmentClusterRequirements404JSONResponse)
 				Expect(ok).To(BeTrue())
 			})
 
