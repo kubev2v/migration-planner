@@ -29,10 +29,18 @@ type HTTPWriter struct {
 	client *http.Client
 }
 
+// Config configures an HTTP writer for the notification service.
+type Config struct {
+	URL                string
+	ClientCert         []byte
+	ClientKey          []byte
+	InsecureSkipVerify bool
+}
+
 // NewHTTPWriter builds an HTTPWriter that authenticates with the notification
 // service using the given PEM-encoded client certificate and private key.
-func NewHTTPWriter(notificationURL string, certPEM, keyPEM []byte) (*HTTPWriter, error) {
-	parsedURL, err := url.ParseRequestURI(notificationURL)
+func NewHTTPWriter(config Config) (*HTTPWriter, error) {
+	parsedURL, err := url.ParseRequestURI(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing notification URL: %w", err)
 	}
@@ -43,7 +51,7 @@ func NewHTTPWriter(notificationURL string, certPEM, keyPEM []byte) (*HTTPWriter,
 		return nil, fmt.Errorf("notification URL must specify a host")
 	}
 
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	cert, err := tls.X509KeyPair(config.ClientCert, config.ClientKey)
 	if err != nil {
 		return nil, fmt.Errorf("loading notification service client certificate: %w", err)
 	}
@@ -54,8 +62,9 @@ func NewHTTPWriter(notificationURL string, certPEM, keyPEM []byte) (*HTTPWriter,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		TLSClientConfig: &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
+			Certificates:       []tls.Certificate{cert},
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: config.InsecureSkipVerify,
 		},
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
@@ -63,7 +72,7 @@ func NewHTTPWriter(notificationURL string, certPEM, keyPEM []byte) (*HTTPWriter,
 	}
 
 	return &HTTPWriter{
-		url:    notificationURL,
+		url:    config.URL,
 		client: &http.Client{Transport: transport, Timeout: 30 * time.Second},
 	}, nil
 }

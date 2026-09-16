@@ -64,20 +64,22 @@ type Kafka struct {
 // and are expected to be sourced from a Kubernetes secret; when either is
 // unset, notifications fall back to being logged to stdout.
 type Notification struct {
-	Enabled    bool   `envconfig:"NOTIFICATION_ENABLED" default:"false"`
-	URL        string `envconfig:"NOTIFICATION_URL" default:""`
-	ClientCert string `envconfig:"NOTIFICATION_CLIENT_CERT" default:""`
-	ClientKey  string `envconfig:"NOTIFICATION_CLIENT_KEY" default:""`
+	Enabled            bool   `envconfig:"NOTIFICATION_ENABLED" default:"false"`
+	URL                string `envconfig:"NOTIFICATION_URL" default:""`
+	ClientCert         string `envconfig:"NOTIFICATION_CLIENT_CERT" default:""`
+	ClientKey          string `envconfig:"NOTIFICATION_CLIENT_KEY" default:""`
+	InsecureSkipVerify bool   `envconfig:"NOTIFICATION_INSECURE_SKIP_VERIFY" default:"false"`
 }
 
 // IAM configures the mTLS client used to resolve a user's details from the
 // Red Hat User Service. ClientCert/ClientKey are PEM-encoded and are expected
 // to be sourced from a Kubernetes secret
 type IAM struct {
-	Enabled    bool   `envconfig:"IAM_ENABLED"`
-	URL        string `envconfig:"IAM_URL" default:""`
-	ClientCert string `envconfig:"IAM_CLIENT_CERT" default:""`
-	ClientKey  string `envconfig:"IAM_CLIENT_KEY" default:""`
+	Enabled            bool   `envconfig:"IAM_ENABLED"`
+	URL                string `envconfig:"IAM_URL" default:""`
+	ClientCert         string `envconfig:"IAM_CLIENT_CERT" default:""`
+	ClientKey          string `envconfig:"IAM_CLIENT_KEY" default:""`
+	InsecureSkipVerify bool   `envconfig:"IAM_INSECURE_SKIP_VERIFY" default:"false"`
 }
 
 func New() (*Config, error) {

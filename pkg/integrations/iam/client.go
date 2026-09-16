@@ -32,11 +32,18 @@ type HTTPClient struct {
 	client         *http.Client
 }
 
+// Config configures an HTTP client for the User Service.
+type Config struct {
+	URL                string
+	ClientCert         []byte
+	ClientKey          []byte
+	InsecureSkipVerify bool
+}
+
 // NewHTTPClient builds an HTTPClient that authenticates with the User Service
-// using the given PEM-encoded client certificate and private key. baseURL is
-// the service root (e.g. https://user.stage.api.redhat.com).
-func NewHTTPClient(baseURL string, certPEM, keyPEM []byte) (*HTTPClient, error) {
-	parsedURL, err := url.ParseRequestURI(baseURL)
+// using the given PEM-encoded client certificate and private key.
+func NewHTTPClient(config Config) (*HTTPClient, error) {
+	parsedURL, err := url.ParseRequestURI(config.URL)
 	if err != nil {
 		return nil, fmt.Errorf("parsing user service URL: %w", err)
 	}
@@ -47,7 +54,7 @@ func NewHTTPClient(baseURL string, certPEM, keyPEM []byte) (*HTTPClient, error) 
 		return nil, fmt.Errorf("user service URL must specify a host")
 	}
 
-	cert, err := tls.X509KeyPair(certPEM, keyPEM)
+	cert, err := tls.X509KeyPair(config.ClientCert, config.ClientKey)
 	if err != nil {
 		return nil, fmt.Errorf("loading user service client certificate: %w", err)
 	}
@@ -58,8 +65,9 @@ func NewHTTPClient(baseURL string, certPEM, keyPEM []byte) (*HTTPClient, error) 
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
 		TLSClientConfig: &tls.Config{
-			Certificates: []tls.Certificate{cert},
-			MinVersion:   tls.VersionTLS12,
+			Certificates:       []tls.Certificate{cert},
+			MinVersion:         tls.VersionTLS12,
+			InsecureSkipVerify: config.InsecureSkipVerify,
 		},
 		MaxIdleConns:          100,
 		IdleConnTimeout:       90 * time.Second,
