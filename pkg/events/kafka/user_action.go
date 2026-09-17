@@ -34,7 +34,8 @@ type TimeEstimationActionData struct {
 }
 
 type OVADownloadActionData struct {
-	SourceID string `json:"source_id"`
+	SourceID      string `json:"source_id"`
+	DownloadURLID string `json:"download_url_id"`
 }
 
 type VisitorActionData struct {
@@ -102,13 +103,14 @@ func NewTimeEstimationPayload(username, assessmentID string) UserActionEventPayl
 	}
 }
 
-func NewOVADownloadPayload(username, sourceID string) UserActionEventPayload {
+func NewOVADownloadPayload(username, sourceID, downloadURLID string) UserActionEventPayload {
 	return UserActionEventPayload{
 		UserAction: UserActionData{
 			Username:  username,
 			Timestamp: time.Now().UTC(),
 			Data: OVADownloadActionData{
-				SourceID: sourceID,
+				SourceID:      sourceID,
+				DownloadURLID: downloadURLID,
 			},
 		},
 	}
