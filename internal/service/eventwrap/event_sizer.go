@@ -8,6 +8,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
@@ -41,7 +42,7 @@ func (e *EventSizerService) CalculateClusterRequirements(
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, kafka.SizingEventType, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
