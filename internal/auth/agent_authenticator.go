@@ -107,12 +107,10 @@ func (aa *AgentAuthenticator) Authenticate(token string) (AgentJWT, error) {
 		return &rsaPublicKey, nil
 	})
 	if err != nil {
-		zap.S().Errorw("failed to parse or the token is invalid", "error", err)
 		return AgentJWT{}, fmt.Errorf("failed to authenticate token: %w", err)
 	}
 
 	if !t.Valid {
-		zap.S().Errorw("failed to parse or the token is invalid")
 		return AgentJWT{}, fmt.Errorf("failed to parse or validate token")
 	}
 
