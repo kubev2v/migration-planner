@@ -34,7 +34,8 @@ func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *se
 		return nil, err
 	}
 
-	payload := kafka.NewVisitorPayload(filter.Username, filter.OrgID)
+	user := auth.MustHaveUser(ctx)
+	payload := kafka.NewVisitorPayload(user.Username, user.Organization)
 	ceBytes, err := kafka.BuildCloudEvent(kafka.VisitorEventType, payload)
 	if err != nil {
 		return nil, err
