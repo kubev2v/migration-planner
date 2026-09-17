@@ -8,6 +8,8 @@ import (
 	"os"
 	"strings"
 
+	"go.uber.org/zap"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -191,6 +193,11 @@ func (s *AccountsService) Initialize(ctx context.Context, adminGroup AdminGroup)
 	}
 
 	for _, m := range adminGroup.Members {
+		if _, err := s.store.Accounts().GetMember(ctx, m.Username); err == nil {
+			zap.S().Warnf("member: %s is already assigned to a different group", m.Username)
+			continue
+		}
+
 		if _, err := s.store.Accounts().CreateMember(ctx, model.Member{
 			Username: m.Username,
 			Email:    m.Email,
