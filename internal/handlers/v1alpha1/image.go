@@ -122,12 +122,15 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
-	payload := kafka.NewOVADownloadPayload(source.Username, source.ID.String())
-	ceBytes, err := kafka.BuildCloudEvent(kafka.DownloadOVAEventType, payload)
-	if err != nil {
-		zap.S().Warnw("failed to build download event", "source_id", source.ID, "error", err)
-	} else if err := h.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
-		zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "error", err)
+	downloadURLID, err := image.DownloadURLID(req.Token)
+	if err == nil {
+		payload := kafka.NewOVADownloadPayload(source.Username, source.ID.String(), downloadURLID)
+		ceBytes, err := kafka.BuildCloudEvent(kafka.DownloadOVAEventType, payload)
+		if err != nil {
+			zap.S().Warnw("failed to build download event", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
+		} else if err := h.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+			zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
+		}
 	}
 
 	versionInfo := version.Get()

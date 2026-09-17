@@ -14,6 +14,7 @@ import (
 
 	"github.com/go-openapi/strfmt"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/pkg/errors"
 )
@@ -30,7 +31,7 @@ const (
 )
 
 func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
-	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String())
+	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String(), uuid.NewString())
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to sign image URL")
 	}
@@ -48,14 +49,36 @@ func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *
 	return shortURL, exp, err
 }
 
-func JWTForSymmetricKey(key []byte, expiration time.Duration, sub string) (string, error) {
+func JWTForSymmetricKey(key []byte, expiration time.Duration, sub, downloadURLID string) (string, error) {
 	exp := time.Now().Add(expiration).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"exp": exp,
 		"sub": sub,
+		"jti": downloadURLID,
 	})
 
 	return token.SignedString(key)
+}
+
+// DownloadURLID returns the stable identifier for a generated download URL.
+// The token is already validated by the caller before this function is used.
+func DownloadURLID(tokenString string) (string, error) {
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return "", errors.Errorf("failed to parse download URL token: %v", err)
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return "", errors.Errorf("malformed token claims in url")
+	}
+
+	downloadURLID, ok := claims["jti"].(string)
+	if !ok || downloadURLID == "" {
+		return "", errors.Errorf("token missing 'jti' claim")
+	}
+
+	return downloadURLID, nil
 }
 
 func ParseExpiration(tokenString string) (*strfmt.DateTime, error) {
@@ -75,29 +98,6 @@ func ParseExpiration(tokenString string) (*strfmt.DateTime, error) {
 	expiresAt := strfmt.DateTime(expTime)
 
 	return &expiresAt, nil
-}
-
-func buildURL(baseURL string, suffix string, insecure bool, params map[string]string) (string, error) {
-	base, err := url.Parse(baseURL)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to parse image service base URL")
-	}
-	downloadURL := url.URL{
-		Scheme: base.Scheme,
-		Host:   base.Host,
-		Path:   path.Join(base.Path, suffix),
-	}
-	queryValues := url.Values{}
-	for k, v := range params {
-		if v != "" {
-			queryValues.Set(k, v)
-		}
-	}
-	downloadURL.RawQuery = queryValues.Encode()
-	if insecure {
-		downloadURL.Scheme = "http"
-	}
-	return downloadURL.String(), nil
 }
 
 // HMACKey generates a hex string representing n random bytes
@@ -148,4 +148,27 @@ func IdFromJWT(jwt string) (string, error) {
 	}
 
 	return "", fmt.Errorf("sub ID not found in token")
+}
+
+func buildURL(baseURL string, suffix string, insecure bool, params map[string]string) (string, error) {
+	base, err := url.Parse(baseURL)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to parse image service base URL")
+	}
+	downloadURL := url.URL{
+		Scheme: base.Scheme,
+		Host:   base.Host,
+		Path:   path.Join(base.Path, suffix),
+	}
+	queryValues := url.Values{}
+	for k, v := range params {
+		if v != "" {
+			queryValues.Set(k, v)
+		}
+	}
+	downloadURL.RawQuery = queryValues.Encode()
+	if insecure {
+		downloadURL.Scheme = "http"
+	}
+	return downloadURL.String(), nil
 }
