@@ -15,24 +15,16 @@ import (
 
 // (GET /api/v1/assessments)
 func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.ListAssessmentsRequestObject) (server.ListAssessmentsResponseObject, error) {
+	user := auth.MustHaveUser(ctx)
+
 	logger := log.NewDebugLogger("assessment_handler").
 		WithContext(ctx).
 		Operation("list_assessments").
 		Build()
 
-	user := auth.MustHaveUser(ctx)
-	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
+	logger.Step("list_assessments").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
-	filter := service.NewAssessmentFilter(user.Username, user.Organization)
-
-	// Extract sourceId from query parameter if provided
-	if request.Params.SourceId != nil {
-		sourceIdStr := request.Params.SourceId.String()
-		filter = filter.WithSourceID(sourceIdStr)
-		logger.Step("filter_by_source_id").WithString("source_id", sourceIdStr).Log()
-	}
-
-	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
+	assessments, err := h.assessmentSrv.ListAssessments(ctx, service.NewAssessmentFilter())
 	if err != nil {
 		logger.Error(err).Log()
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil

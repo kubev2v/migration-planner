@@ -1485,12 +1485,6 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
-// ListAssessmentsParams defines parameters for ListAssessments.
-type ListAssessmentsParams struct {
-	// SourceId Filter assessments by source ID
-	SourceId *openapi_types.UUID `form:"sourceId,omitempty" json:"sourceId,omitempty"`
-}
-
 // GetAssessmentClusterRequirementsStoredInputParams defines parameters for GetAssessmentClusterRequirementsStoredInput.
 type GetAssessmentClusterRequirementsStoredInputParams struct {
 	// ClusterId ID of the VMware cluster

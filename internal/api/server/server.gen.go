@@ -22,7 +22,7 @@ import (
 type ServerInterface interface {
 
 	// (GET /api/v1/assessments)
-	ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams)
+	ListAssessments(w http.ResponseWriter, r *http.Request)
 
 	// (POST /api/v1/assessments)
 	CreateAssessment(w http.ResponseWriter, r *http.Request)
@@ -168,7 +168,7 @@ type ServerInterface interface {
 type Unimplemented struct{}
 
 // (GET /api/v1/assessments)
-func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams) {
+func (_ Unimplemented) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -415,21 +415,8 @@ type MiddlewareFunc func(http.Handler) http.Handler
 func (siw *ServerInterfaceWrapper) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	var err error
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params ListAssessmentsParams
-
-	// ------------- Optional query parameter "sourceId" -------------
-
-	err = runtime.BindQueryParameter("form", true, false, "sourceId", r.URL.Query(), &params.SourceId)
-	if err != nil {
-		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceId", Err: err})
-		return
-	}
-
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAssessments(w, r, params)
+		siw.Handler.ListAssessments(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1816,7 +1803,6 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ListAssessmentsRequestObject struct {
-	Params ListAssessmentsParams
 }
 
 type ListAssessmentsResponseObject interface {
@@ -4543,10 +4529,8 @@ type strictHandler struct {
 }
 
 // ListAssessments operation middleware
-func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request, params ListAssessmentsParams) {
+func (sh *strictHandler) ListAssessments(w http.ResponseWriter, r *http.Request) {
 	var request ListAssessmentsRequestObject
-
-	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAssessments(ctx, request.(ListAssessmentsRequestObject))
