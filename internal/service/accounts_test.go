@@ -492,6 +492,31 @@ var _ = Describe("accounts service", Ordered, func() {
 			Expect(groups[0].Members).To(HaveLen(2))
 		})
 
+		It("ignores members already assigned to another group", func() {
+			groupID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, groupID, "Existing Org", "desc", "partner", "icon", "Acme", "NULL"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAccountsMemberStm, uuid.New(), "alice", "alice@rh.com", groupID))
+			Expect(tx.Error).To(BeNil())
+
+			ag := service.AdminGroup{
+				Name: "test-admins",
+				Members: []service.AdminGroupMember{
+					{Username: "alice", Email: "alice@rh.com"},
+					{Username: "bob", Email: "bob@rh.com"},
+				},
+			}
+
+			err := svc.Initialize(context.TODO(), ag)
+			Expect(err).To(BeNil())
+
+			groups, err := svc.ListGroups(context.TODO(), store.NewGroupQueryFilter().ByName("test-admins"))
+			Expect(err).To(BeNil())
+			Expect(groups).To(HaveLen(1))
+			Expect(groups[0].Members).To(HaveLen(1))
+			Expect(groups[0].Members[0].Username).To(Equal("bob"))
+		})
+
 		It("replaces existing admin group on re-initialize", func() {
 			ag := service.AdminGroup{
 				Name: "test-admins",
