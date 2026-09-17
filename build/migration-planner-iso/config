@@ -1,4 +1,4 @@
 FINAL_ISO_PATH=/rhcos.iso
 ISO_URL=https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.19/4.19.10/rhcos-4.19.10-x86_64-live-iso.x86_64.iso
 ISO_CHECKSUM=7a47d0c7a9bf5edb143d52809e793af2d74731567b95d91c6225171a1c49b5ab
-AGENT_UI_IMAGE_TAG=4ce517a62ff92566271e98c3e553d0cf410e6f36
+AGENT_UI_IMAGE_TAG=6eb32a0a20959ef1e04514969f37c938c1172967
