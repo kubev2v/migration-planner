@@ -106,9 +106,10 @@ var runCmd = &cobra.Command{
 			writer, cleanup, err = createEventWriter(ctx, cfg)
 			if err != nil {
 				zap.S().Warnw("failed to create kafka producer", "error", err)
+			} else {
+				zap.S().Info("Kafka writer initialized successfully")
 			}
 			defer cleanup()
-			zap.S().Info("Kafka writer initialized")
 		}
 
 		// Start outbox dispatcher
