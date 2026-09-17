@@ -12,11 +12,13 @@ import (
 	"gorm.io/gorm"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
@@ -32,9 +34,10 @@ const (
 
 var _ = Describe("assessment service", Ordered, func() {
 	var (
-		s      store.Store
-		gormdb *gorm.DB
-		svc    service.AssessmentServicer
+		s             store.Store
+		gormdb        *gorm.DB
+		svc           service.AssessmentServicer
+		assessmentIDs []uuid.UUID
 	)
 
 	BeforeAll(func() {
@@ -59,20 +62,22 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("ListAssessments", func() {
 		BeforeEach(func() {
 			// Create test data
-			assessment1ID := uuid.New()
-			assessment2ID := uuid.New()
-			assessment3ID := uuid.New()
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment1ID, "Test Assessment 1", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
+			assessmentIDs = []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentIDs[0], "Test Assessment 1", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID, "Another Test", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentIDs[1], "Another Test", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment3ID, "Production Assessment", "org2", "user12", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentIDs[2], "Production Assessment", "org2", "user12", "Jane", "Smith", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 		})
 
-		It("lists all assessments for a user (private)", func() {
-			filter := service.NewAssessmentFilter("user1", "org1")
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+		It("emits visitor identity from the request context after ID filtering", func() {
+			filter := service.NewAssessmentFilter().WithIDs(assessmentIDs[:2])
+			ctx := auth.NewTokenContext(context.TODO(), auth.User{
+				Username:     "visitor-user",
+				Organization: "visitor-org",
+			})
+			assessments, err := svc.ListAssessments(ctx, filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
@@ -83,11 +88,36 @@ var _ = Describe("assessment service", Ordered, func() {
 			var count int64
 			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
+
+			var outboxEvent model.OutboxEvent
+			tx := gormdb.Raw(
+				"SELECT * FROM outbox_events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
+				events.EventTypeKafka,
+			).Scan(&outboxEvent)
+			Expect(tx.Error).To(BeNil())
+
+			var event struct {
+				Data struct {
+					UserAction struct {
+						Username string `json:"username"`
+						Data     struct {
+							OrgID string `json:"org_id"`
+						} `json:"data"`
+					} `json:"user_action"`
+				} `json:"data"`
+			}
+			Expect(json.Unmarshal(outboxEvent.Payload, &event)).To(Succeed())
+			Expect(event.Data.UserAction.Username).To(Equal("visitor-user"))
+			Expect(event.Data.UserAction.Data.OrgID).To(Equal("visitor-org"))
 		})
 
 		It("filters assessments by source", func() {
-			filter := service.NewAssessmentFilter("user1", "org1").WithSource(service.SourceTypeInventory)
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			filter := service.NewAssessmentFilter().
+				WithIDs(assessmentIDs[:2]).
+				WithSource(service.SourceTypeInventory)
+			assessments, err := svc.ListAssessments(auth.NewTokenContext(context.TODO(), auth.User{
+				Username: "user1", Organization: "org1",
+			}), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
@@ -95,8 +125,10 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		It("filters assessments by name pattern", func() {
-			filter := service.NewAssessmentFilter("user1", "org1").WithNameLike("Test")
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			filter := service.NewAssessmentFilter().WithNameLike("Test")
+			assessments, err := svc.ListAssessments(auth.NewTokenContext(context.TODO(), auth.User{
+				Username: "user1", Organization: "org1",
+			}), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(2))
@@ -120,8 +152,10 @@ var _ = Describe("assessment service", Ordered, func() {
 			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessment2ID.String(), "Assessment without Source", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(sourceID.String())
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			filter := service.NewAssessmentFilter().WithSourceID(sourceID.String())
+			assessments, err := svc.ListAssessments(auth.NewTokenContext(context.TODO(), auth.User{
+				Username: "user1", Organization: "org1",
+			}), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
@@ -141,14 +175,17 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			// Use a non-existent sourceID
 			nonExistentSourceID := uuid.New()
-			filter := service.NewAssessmentFilter("user1", "org1").WithSourceID(nonExistentSourceID.String())
-			assessments, err := svc.ListAssessments(context.TODO(), filter)
+			filter := service.NewAssessmentFilter().WithSourceID(nonExistentSourceID.String())
+			assessments, err := svc.ListAssessments(auth.NewTokenContext(context.TODO(), auth.User{
+				Username: "user1", Organization: "org1",
+			}), filter)
 
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(0))
 		})
 
 		AfterEach(func() {
+			assessmentIDs = nil
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
@@ -779,15 +816,13 @@ var _ = Describe("assessment service", Ordered, func() {
 
 	Context("AssessmentFilter", func() {
 		It("creates filter with username and chains methods", func() {
-			filter := service.NewAssessmentFilter("user1", "org1").
+			filter := service.NewAssessmentFilter().
 				WithSource(service.SourceTypeInventory).
 				WithSourceID("source-123").
 				WithNameLike("test").
 				WithLimit(10).
 				WithOffset(5)
 
-			Expect(filter.Username).To(Equal("user1"))
-			Expect(filter.OrgID).To(Equal("org1"))
 			Expect(filter.Source).To(Equal(service.SourceTypeInventory))
 			Expect(filter.SourceID).To(Equal("source-123"))
 			Expect(filter.NameLike).To(Equal("test"))

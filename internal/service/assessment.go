@@ -49,10 +49,12 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator, accoun
 }
 
 func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
+	user := auth.MustHaveUser(ctx)
+
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("list_assessments").
-		WithString("username", filter.Username).
-		WithString("org_id", filter.OrgID).
+		WithString("username", user.Username).
+		WithString("org_id", user.Organization).
 		WithString("source", filter.Source).
 		WithString("source_id", filter.SourceID).
 		WithString("name_like", filter.NameLike).
@@ -64,12 +66,6 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 
 	if len(filter.IDs) > 0 {
 		storeFilter = storeFilter.WithIDs(filter.IDs)
-	}
-	if filter.Username != "" {
-		storeFilter = storeFilter.WithUsername(filter.Username)
-	}
-	if filter.OrgID != "" {
-		storeFilter = storeFilter.WithOrgID(filter.OrgID)
 	}
 	if filter.Source != "" {
 		storeFilter = storeFilter.WithSourceType(filter.Source)
@@ -424,8 +420,6 @@ func (as *AssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID
 
 // AssessmentFilter represents filtering options for listing assessments
 type AssessmentFilter struct {
-	OrgID    string
-	Username string
 	Source   string
 	SourceID string
 	NameLike string
@@ -434,11 +428,13 @@ type AssessmentFilter struct {
 	Offset   int
 }
 
-func NewAssessmentFilter(username, orgID string) *AssessmentFilter {
-	return &AssessmentFilter{
-		Username: username,
-		OrgID:    orgID,
-	}
+func NewAssessmentFilter() *AssessmentFilter {
+	return &AssessmentFilter{}
+}
+
+func (f *AssessmentFilter) WithIDs(IDs []uuid.UUID) *AssessmentFilter {
+	f.IDs = IDs
+	return f
 }
 
 func (f *AssessmentFilter) WithSource(source string) *AssessmentFilter {

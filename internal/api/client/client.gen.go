@@ -92,7 +92,7 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 	// ListAssessments request
-	ListAssessments(ctx context.Context, params *ListAssessmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListAssessments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateAssessmentWithBody request with any body
 	CreateAssessmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -267,8 +267,8 @@ type ClientInterface interface {
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) ListAssessments(ctx context.Context, params *ListAssessmentsParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAssessmentsRequest(c.Server, params)
+func (c *Client) ListAssessments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAssessmentsRequest(c.Server)
 	if err != nil {
 		return nil, err
 	}
@@ -1036,7 +1036,7 @@ func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 }
 
 // NewListAssessmentsRequest generates requests for ListAssessments
-func NewListAssessmentsRequest(server string, params *ListAssessmentsParams) (*http.Request, error) {
+func NewListAssessmentsRequest(server string) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -1052,28 +1052,6 @@ func NewListAssessmentsRequest(server string, params *ListAssessmentsParams) (*h
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
-	}
-
-	if params != nil {
-		queryValues := queryURL.Query()
-
-		if params.SourceId != nil {
-
-			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceId", runtime.ParamLocationQuery, *params.SourceId); err != nil {
-				return nil, err
-			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
-				return nil, err
-			} else {
-				for k, v := range parsed {
-					for _, v2 := range v {
-						queryValues.Add(k, v2)
-					}
-				}
-			}
-
-		}
-
-		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -2910,7 +2888,7 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 	// ListAssessmentsWithResponse request
-	ListAssessmentsWithResponse(ctx context.Context, params *ListAssessmentsParams, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error)
+	ListAssessmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error)
 
 	// CreateAssessmentWithBodyWithResponse request with any body
 	CreateAssessmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error)
@@ -4304,8 +4282,8 @@ func (r HealthResponse) StatusCode() int {
 }
 
 // ListAssessmentsWithResponse request returning *ListAssessmentsResponse
-func (c *ClientWithResponses) ListAssessmentsWithResponse(ctx context.Context, params *ListAssessmentsParams, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error) {
-	rsp, err := c.ListAssessments(ctx, params, reqEditors...)
+func (c *ClientWithResponses) ListAssessmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error) {
+	rsp, err := c.ListAssessments(ctx, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

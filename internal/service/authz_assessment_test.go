@@ -83,7 +83,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		It("returns only assessments the user has relations to", func() {
 			ctx := ctxWithUser("user1", "org1")
-			filter := service.NewAssessmentFilter("user1", "org1")
+			filter := service.NewAssessmentFilter()
 
 			assessments, err := svc.ListAssessments(ctx, filter)
 
@@ -96,7 +96,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		It("returns empty list when user has no relations", func() {
 			ctx := ctxWithUser("unknown-user", "org1")
-			filter := service.NewAssessmentFilter("unknown-user", "org1")
+			filter := service.NewAssessmentFilter()
 
 			assessments, err := svc.ListAssessments(ctx, filter)
 
@@ -132,7 +132,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 			// Regular owner does not see share or edit
 			ctx := ctxWithUser("user1", "org1")
-			filter := service.NewAssessmentFilter("user1", "org1")
+			filter := service.NewAssessmentFilter()
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
@@ -156,7 +156,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			ctx := ctxWithUser("user1", "org1")
-			filter := service.NewAssessmentFilter("user1", "org1")
+			filter := service.NewAssessmentFilter()
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
@@ -175,7 +175,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(tx.Error).To(BeNil())
 
 			ctx := ctxWithUser("user1", "org1")
-			filter := service.NewAssessmentFilter("user1", "org1")
+			filter := service.NewAssessmentFilter()
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
@@ -200,7 +200,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 			// Owner sees sharedWith with resolved group name
 			ctx := ctxWithUser("user1", "org1")
-			filter := service.NewAssessmentFilter("user1", "org1")
+			filter := service.NewAssessmentFilter()
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 

@@ -13,7 +13,6 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
-	openapi_types "github.com/oapi-codegen/runtime/types"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -64,7 +63,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 	})
 
 	Context("list assessments", func() {
-		It("successfully lists all assessments for the user (private to username)", func() {
+		It("lists assessments returned by the service", func() {
 			assessmentID1 := uuid.New()
 			assessmentID2 := uuid.New()
 			assessmentID3 := uuid.New()
@@ -101,17 +100,13 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
 			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			Expect(assessmentList).To(HaveLen(2)) // Only admin user's assessments
-
-			for _, assessment := range assessmentList {
-				Expect(assessment.OwnerFirstName).ToNot(BeNil())
-				Expect(*assessment.OwnerFirstName).To(Equal("John"))
-				Expect(assessment.OwnerLastName).ToNot(BeNil())
-				Expect(*assessment.OwnerLastName).To(Equal("Doe"))
-			}
+			Expect(assessmentList).To(HaveLen(3))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID1)))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID2)))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID3)))
 		})
 
-		It("returns empty list when no assessments exist for the user", func() {
+		It("returns an empty list when no assessments exist", func() {
 			user := auth.User{
 				Username:     "empty",
 				Organization: "empty",
@@ -128,7 +123,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(assessmentList).To(HaveLen(0))
 		})
 
-		It("filters assessments by sourceId query parameter", func() {
+		It("lists assessments without sourceId filtering", func() {
 			// Create a source first
 			sourceID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
@@ -164,68 +159,16 @@ var _ = Describe("assessment handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			// Convert uuid.UUID to openapi_types.UUID
-			sourceIDOpenAPI := openapi_types.UUID(sourceID)
-			params := v1alpha1.ListAssessmentsParams{
-				SourceId: &sourceIDOpenAPI,
-			}
-
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{
-				Params: params,
-			})
+			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
 
 			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			// Should only return the assessment with the matching sourceID
-			Expect(assessmentList).To(HaveLen(1))
-			Expect(assessmentList[0].Id).To(Equal(assessmentID1))
-			Expect(assessmentList[0].SourceId).ToNot(BeNil())
-			Expect(*assessmentList[0].SourceId).To(Equal(sourceID))
-		})
-
-		It("returns empty list when filtering by non-existent sourceId", func() {
-			assessmentID1 := uuid.New()
-			assessmentID2 := uuid.New()
-
-			// Create assessments without sourceID
-			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID1.String(), "assessment1", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID2.String(), "assessment2", "admin", "admin", "John", "Doe", service.SourceTypeInventory, "NULL"))
-			Expect(tx.Error).To(BeNil())
-
-			// Create snapshots for assessments
-			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID1.String()))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID2.String()))
-			Expect(tx.Error).To(BeNil())
-
-			user := auth.User{
-				Username:     "admin",
-				Organization: "admin",
-				EmailDomain:  "admin.example.com",
-			}
-			ctx := auth.NewTokenContext(context.TODO(), user)
-
-			// Use a non-existent sourceID
-			nonExistentSourceID := uuid.New()
-			sourceIDOpenAPI := openapi_types.UUID(nonExistentSourceID)
-			params := v1alpha1.ListAssessmentsParams{
-				SourceId: &sourceIDOpenAPI,
-			}
-
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{
-				Params: params,
-			})
-			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
-
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
-			// Should return empty list when filtering by non-existent sourceID
-			Expect(assessmentList).To(HaveLen(0))
+			Expect(assessmentList).To(HaveLen(3))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID1)))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID2)))
+			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID3)))
 		})
 
 		AfterEach(func() {
