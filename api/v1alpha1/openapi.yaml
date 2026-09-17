@@ -3345,9 +3345,7 @@ components:
       properties:
         clusterId:
           type: string
-          description: ID of the cluster to calculate requirements for
-          x-oapi-codegen-extra-tags:
-            validate: "required"
+          description: ID of the cluster to calculate requirements for. An empty value uses the vCenter-wide aggregate.
         cpuOverCommitRatio:
           allOf:
             - $ref: "#/components/schemas/CpuOverCommitRatio"
