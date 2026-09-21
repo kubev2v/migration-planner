@@ -14,6 +14,7 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/opa"
 )
@@ -25,8 +26,8 @@ type Client struct {
 	Worker      *RVToolsWorker
 }
 
-func NewClient(pool *pgxpool.Pool, s store.Store, opaValidator *opa.Validator) (*Client, error) {
-	worker := NewRVToolsWorker(s, opaValidator)
+func NewClient(pool *pgxpool.Pool, s store.Store, assessmentSvc service.AssessmentServicer, opaValidator *opa.Validator) (*Client, error) {
+	worker := NewRVToolsWorker(s, assessmentSvc, opaValidator)
 
 	workers := river.NewWorkers()
 	river.AddWorker(workers, worker)

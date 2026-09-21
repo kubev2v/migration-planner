@@ -135,11 +135,11 @@ func (m *MockAssessmentStore) List(ctx context.Context, filter *store.Assessment
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error) {
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
 	return nil, nil
 }
 

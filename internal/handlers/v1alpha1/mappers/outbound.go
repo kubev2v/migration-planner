@@ -17,8 +17,41 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// normalizeInventoryData ensures all nil maps and slices are initialized to empty ones
-// This prevents null values in JSON that can cause UI crashes when reading data from database
+func unmarshalInventory(raw []byte, version uint) (api.Inventory, error) {
+	if len(raw) == 0 {
+		return api.Inventory{Clusters: make(map[string]api.InventoryData)}, nil
+	}
+	var inventory api.Inventory
+	switch version {
+	case model.SnapshotVersionV1:
+		var invV1 api.InventoryData
+		if err := json.Unmarshal(raw, &invV1); err != nil {
+			return api.Inventory{}, err
+		}
+		normalizeInventoryData(&invV1)
+		inventory.Vcenter = &invV1
+		if invV1.Vcenter != nil {
+			inventory.VcenterId = invV1.Vcenter.Id
+		}
+		inventory.Clusters = make(map[string]api.InventoryData)
+	default:
+		if err := json.Unmarshal(raw, &inventory); err != nil {
+			return api.Inventory{}, err
+		}
+		if inventory.Clusters == nil {
+			inventory.Clusters = make(map[string]api.InventoryData)
+		}
+		if inventory.Vcenter != nil {
+			normalizeInventoryData(inventory.Vcenter)
+		}
+		for clusterID, clusterData := range inventory.Clusters {
+			normalizeInventoryData(&clusterData)
+			inventory.Clusters[clusterID] = clusterData
+		}
+	}
+	return inventory, nil
+}
+
 func normalizeInventoryData(data *api.InventoryData) {
 	if data == nil {
 		return
@@ -267,97 +300,46 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 		OwnerFirstName: a.OwnerFirstName,
 		OwnerLastName:  a.OwnerLastName,
 		CreatedAt:      a.CreatedAt,
-		Snapshots:      make([]api.Snapshot, len(a.Snapshots)),
 	}
 
-	// Convert snapshots
-	for i, snapshot := range a.Snapshots {
-		assessment.Snapshots[i] = api.Snapshot{
-			CreatedAt: snapshot.CreatedAt,
-		}
-		if len(snapshot.Inventory) > 0 {
-			inventory := api.Inventory{}
-			switch snapshot.Version {
-			case 1:
-				invV1 := api.InventoryData{}
-				if err := json.Unmarshal(snapshot.Inventory, &invV1); err != nil {
-					return api.Assessment{}, err
-				}
-				// Normalize to prevent null values from database
-				normalizeInventoryData(&invV1)
-				inventory.Vcenter = &invV1
-				inventory.VcenterId = invV1.Vcenter.Id
-				// Ensure clusters is initialized
-				if inventory.Clusters == nil {
-					inventory.Clusters = make(map[string]api.InventoryData)
-				}
-			case 2:
-				if err := json.Unmarshal(snapshot.Inventory, &inventory); err != nil {
-					return api.Assessment{}, err
-				}
-				// Ensure clusters map is never nil (fix for null values from database)
-				if inventory.Clusters == nil {
-					inventory.Clusters = make(map[string]api.InventoryData)
-				}
-				// Normalize vcenter and all cluster inventories to prevent null values
-				if inventory.Vcenter != nil {
-					normalizeInventoryData(inventory.Vcenter)
-				}
-				for clusterID, clusterData := range inventory.Clusters {
-					normalizeInventoryData(&clusterData)
-					inventory.Clusters[clusterID] = clusterData
-				}
-			default:
-				return api.Assessment{}, fmt.Errorf("unsupported snapshot version: %d", snapshot.Version)
+	// Build API snapshots from assessment inventories
+	var mainInventory *model.AssessmentInventory
+	var subsets []api.AssessmentSubsetInventory
+	for i := range a.Inventories {
+		inv := &a.Inventories[i]
+		if inv.IsSubset {
+			parsedInv, err := unmarshalInventory(inv.Inventory, inv.Version)
+			if err != nil {
+				return api.Assessment{}, fmt.Errorf("failed to unmarshal subset inventory %q: %w", inv.Name, err)
 			}
-			assessment.Snapshots[i].Inventory = inventory
-		} else {
-			// Initialize empty inventory with non-nil Clusters
-			assessment.Snapshots[i].Inventory = api.Inventory{
-				Clusters: make(map[string]api.InventoryData),
-			}
+			subsets = append(subsets, api.AssessmentSubsetInventory{
+				Id:        inv.ID,
+				Name:      inv.Name,
+				VcenterId: inv.VCenterID,
+				VmsCount:  inv.VMsCount,
+				CreatedAt: inv.CreatedAt,
+				Inventory: parsedInv,
+			})
+		} else if mainInventory == nil {
+			mainInventory = inv
 		}
+	}
 
-		// Convert subset inventories for this snapshot
-		if len(snapshot.SubsetInventories) > 0 {
-			subsets := make([]api.AssessmentSubsetInventory, len(snapshot.SubsetInventories))
-			for j := range snapshot.SubsetInventories {
-				subset := snapshot.SubsetInventories[j] // Create local copy to avoid pointer aliasing
-
-				// Unmarshal inventory (required field)
-				var subsetInv api.Inventory
-				if len(subset.Inventory) > 0 {
-					if err := json.Unmarshal(subset.Inventory, &subsetInv); err != nil {
-						return api.Assessment{}, fmt.Errorf("failed to unmarshal subset inventory: %w", err)
-					}
-					// Ensure clusters map is never nil
-					if subsetInv.Clusters == nil {
-						subsetInv.Clusters = make(map[string]api.InventoryData)
-					}
-					// Normalize vcenter and all cluster inventories
-					if subsetInv.Vcenter != nil {
-						normalizeInventoryData(subsetInv.Vcenter)
-					}
-					for clusterID, clusterData := range subsetInv.Clusters {
-						normalizeInventoryData(&clusterData)
-						subsetInv.Clusters[clusterID] = clusterData
-					}
-				} else {
-					// Empty inventory with non-nil Clusters
-					subsetInv.Clusters = make(map[string]api.InventoryData)
-				}
-
-				subsets[j] = api.AssessmentSubsetInventory{
-					Id:        subset.ID,
-					Name:      subset.Name,
-					VcenterId: subset.VCenterID,
-					VmsCount:  subset.VMsCount,
-					CreatedAt: subset.CreatedAt,
-					Inventory: subsetInv,
-				}
-			}
-			assessment.Snapshots[i].SubsetInventories = &subsets
+	if mainInventory != nil {
+		parsedInv, err := unmarshalInventory(mainInventory.Inventory, mainInventory.Version)
+		if err != nil {
+			return api.Assessment{}, err
 		}
+		snapshot := api.Snapshot{
+			CreatedAt: mainInventory.CreatedAt,
+			Inventory: parsedInv,
+		}
+		if len(subsets) > 0 {
+			snapshot.SubsetInventories = &subsets
+		}
+		assessment.Snapshots = []api.Snapshot{snapshot}
+	} else {
+		assessment.Snapshots = []api.Snapshot{}
 	}
 
 	// Set source type based on source field

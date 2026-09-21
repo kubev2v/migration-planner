@@ -144,6 +144,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -182,6 +183,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -198,9 +200,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "test-assessment",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -232,9 +237,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				OwnerFirstName: &ownerFirstName,
 				OwnerLastName:  &ownerLastName,
 				SourceType:     "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -270,9 +278,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				OrgID:      "org1",
 				SourceType: "agent",
 				SourceID:   &sourceID,
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -307,9 +318,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				OrgID:      "org1",
 				Username:   "user1",
 				SourceType: "agent",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1, SubsetInventories: subsetInventories},
+				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, subsetInventories)
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -351,9 +365,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				OrgID:      "org1",
 				SourceType: "agent",
 				SourceID:   &nonExistentSourceID,
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			_, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("foreign key constraint"))
 		})
@@ -368,9 +385,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "test-assessment",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON, nil)
+			_, err := s.Assessment().Create(context.TODO(), assessment1)
 			Expect(err).To(BeNil())
 
 			// Try to create another assessment with same name in same org
@@ -379,9 +399,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "test-assessment", // Same name
 				OrgID:      "org1",            // Same org
 				SourceType: "rvtools",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON, nil)
+			_, err = s.Assessment().Create(context.TODO(), assessment2)
 			Expect(err).ToNot(BeNil())
 		})
 
@@ -396,9 +419,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "test-assessment",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1, inventoryJSON, nil)
+			_, err := s.Assessment().Create(context.TODO(), assessment1)
 			Expect(err).To(BeNil())
 
 			// Create assessment with same name but different org
@@ -408,9 +434,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Username:   "user1",
 				OrgID:      "org2", // Different org
 				SourceType: "rvtools",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2, inventoryJSON, nil)
+			_, err = s.Assessment().Create(context.TODO(), assessment2)
 			Expect(err).To(BeNil())
 
 			var count int
@@ -420,6 +449,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -445,7 +475,11 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceID:   &sourceID,
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			assessment.Snapshots = []model.Snapshot{
+				{Inventory: inventoryJSON, Version: 1},
+			}
+
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
@@ -461,6 +495,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -477,9 +512,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "original-name",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventoryJSON, Version: 1},
+				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			_, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 
 			newName := "updated-name"
@@ -490,7 +528,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(updated.UpdatedAt).ToNot(BeNil())
 		})
 
-		It("successfully adds new snapshot to assessment", func() {
+		It("successfully adds new inventory to assessment", func() {
 			assessmentID := uuid.New()
 			inventory1JSON := []byte(`{"vcenter":{"id":"test-vcenter-1"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
@@ -499,27 +537,39 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "test-assessment",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventory1JSON, Version: 1},
+				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON, nil)
+			created, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 			Expect(created.Snapshots).To(HaveLen(1))
 
-			// Add new snapshot
+			// Add new inventory
 			inventory2JSON := []byte(`{"vcenter":{"id":"test-vcenter-2"},"vms":{"total":15},"infra":{"totalHosts":7}}`)
+			newInventory := model.AssessmentInventory{
+				ID:           uuid.New(),
+				Name:         "new-inventory",
+				VCenterID:    "test-vcenter-2",
+				VMsCount:     15,
+				HostsCount:   7,
+				Inventory:    inventory2JSON,
+				AssessmentID: assessmentID,
+			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, inventory2JSON)
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, []model.AssessmentInventory{newInventory})
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 
-			// Verify new snapshot was added
+			// Verify new inventory was added
 			var count int
-			tx := gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&count)
+			tx := gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&count)
 			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(2))
+			Expect(count).To(Equal(1))
 		})
 
-		It("successfully updates both name and adds snapshot", func() {
+		It("successfully updates both name and adds inventory", func() {
 			assessmentID := uuid.New()
 			inventory1JSON := []byte(`{"vcenter":{"id":"test-vcenter-1"},"vms":{"total":10},"infra":{"totalHosts":5}}`)
 
@@ -528,26 +578,38 @@ var _ = Describe("assessment store", Ordered, func() {
 				Name:       "original-name",
 				OrgID:      "org1",
 				SourceType: "inventory",
+				Snapshots: []model.Snapshot{
+					{Inventory: inventory1JSON, Version: 1},
+				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventory1JSON, nil)
+			_, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 
-			// Update both name and add snapshot
+			// Update both name and add inventory
 			newName := "updated-name"
 			inventory2JSON := []byte(`{"vcenter":{"id":"test-vcenter-2"},"vms":{"total":15},"infra":{"totalHosts":7}}`)
+			newInventory := model.AssessmentInventory{
+				ID:           uuid.New(),
+				Name:         "new-inventory",
+				VCenterID:    "test-vcenter-2",
+				VMsCount:     15,
+				HostsCount:   7,
+				Inventory:    inventory2JSON,
+				AssessmentID: assessmentID,
+			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, inventory2JSON)
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, []model.AssessmentInventory{newInventory})
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 			Expect(updated.Name).To(Equal("updated-name"))
 			Expect(updated.UpdatedAt).ToNot(BeNil())
 
-			// Verify new snapshot was added
+			// Verify new inventory was added
 			var count int
-			tx := gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&count)
+			tx := gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&count)
 			Expect(tx.Error).To(BeNil())
-			Expect(count).To(Equal(2))
+			Expect(count).To(Equal(1))
 		})
 
 		It("fails to update non-existent assessment", func() {
@@ -560,6 +622,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -578,7 +641,11 @@ var _ = Describe("assessment store", Ordered, func() {
 				SourceType: "inventory",
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment, inventoryJSON, nil)
+			assessment.Snapshots = []model.Snapshot{
+				{Inventory: inventoryJSON, Version: 1},
+			}
+
+			_, err := s.Assessment().Create(context.TODO(), assessment)
 			Expect(err).To(BeNil())
 
 			// Verify assessment and snapshot exist
@@ -613,6 +680,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -667,6 +735,7 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")

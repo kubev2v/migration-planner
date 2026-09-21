@@ -242,6 +242,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -390,6 +391,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -406,13 +408,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			})
 
 			testID := uuid.New()
+			inv, err := model.NewAssessmentInventory(uuid.New(), "Authz Assessment", inventoryJSON)
+			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:        testID,
-				Name:      "Authz Assessment",
-				OrgID:     "org1",
-				Username:  "user1",
-				Source:    service.SourceTypeInventory,
-				Inventory: inventoryJSON,
+				ID:          testID,
+				Name:        "Authz Assessment",
+				OrgID:       "org1",
+				Username:    "user1",
+				SourceType:  service.SourceTypeInventory,
+				Inventories: []model.AssessmentInventory{inv},
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -437,17 +441,19 @@ var _ = Describe("authz assessment service", Ordered, func() {
 				},
 			})
 
+			inv, err := model.NewAssessmentInventory(uuid.New(), "Visible Assessment", inventoryJSON)
+			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:        uuid.New(),
-				Name:      "Visible Assessment",
-				OrgID:     "org1",
-				Username:  "user1",
-				Source:    service.SourceTypeInventory,
-				Inventory: inventoryJSON,
+				ID:          uuid.New(),
+				Name:        "Visible Assessment",
+				OrgID:       "org1",
+				Username:    "user1",
+				SourceType:  service.SourceTypeInventory,
+				Inventories: []model.AssessmentInventory{inv},
 			}
 
 			ctx := ctxWithUser("user1", "org1")
-			_, err := svc.CreateAssessment(ctx, createForm)
+			_, err = svc.CreateAssessment(ctx, createForm)
 			Expect(err).To(BeNil())
 
 			// List should find it through authz
@@ -460,12 +466,12 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		It("rolls back both assessment and relation on inner service failure", func() {
 			createForm := mappers.AssessmentCreateForm{
-				ID:       uuid.New(),
-				Name:     "Fail Assessment",
-				OrgID:    "org1",
-				Username: "user1",
-				Source:   service.SourceTypeAgent,
-				SourceID: func() *uuid.UUID { id := uuid.New(); return &id }(), // non-existent source
+				ID:         uuid.New(),
+				Name:       "Fail Assessment",
+				OrgID:      "org1",
+				Username:   "user1",
+				SourceType: service.SourceTypeAgent,
+				SourceID:   func() *uuid.UUID { id := uuid.New(); return &id }(), // non-existent source
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -486,6 +492,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -542,6 +549,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -604,6 +612,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -668,6 +677,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -723,6 +733,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})

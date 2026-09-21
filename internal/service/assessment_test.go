@@ -187,6 +187,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		AfterEach(func() {
 			assessmentIDs = nil
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -219,6 +220,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -239,6 +241,8 @@ var _ = Describe("assessment service", Ordered, func() {
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
 				ownerLastName := "Johnson"
+				inv, err := model.NewAssessmentInventory(uuid.New(), "Test Assessment", inventoryJSON)
+				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
 					Name:           "Test Assessment",
@@ -246,8 +250,8 @@ var _ = Describe("assessment service", Ordered, func() {
 					Username:       "user1",
 					OwnerFirstName: &ownerFirstName,
 					OwnerLastName:  &ownerLastName,
-					Source:         service.SourceTypeInventory,
-					Inventory:      inventoryJSON,
+					SourceType:     service.SourceTypeInventory,
+					Inventories:    []model.AssessmentInventory{inv},
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -281,6 +285,8 @@ var _ = Describe("assessment service", Ordered, func() {
 				})
 
 				testAssessmentID := uuid.New()
+				inv, err := model.NewAssessmentInventory(uuid.New(), "Test Assessment No Owner", inventoryJSON)
+				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
 					Name:           "Test Assessment No Owner",
@@ -288,8 +294,8 @@ var _ = Describe("assessment service", Ordered, func() {
 					Username:       "user1",
 					OwnerFirstName: nil, // Test nil values
 					OwnerLastName:  nil,
-					Source:         service.SourceTypeInventory,
-					Inventory:      inventoryJSON,
+					SourceType:     service.SourceTypeInventory,
+					Inventories:    []model.AssessmentInventory{inv},
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -319,13 +325,15 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Second creation with same name should fail via service (unique constraint)
+				inv, err := model.NewAssessmentInventory(uuid.New(), name, inventoryJSON)
+				Expect(err).To(BeNil())
 				secondForm := mappers.AssessmentCreateForm{
-					ID:        uuid.New(),
-					Name:      name, // duplicate name
-					OrgID:     "org1",
-					Username:  "user1",
-					Source:    service.SourceTypeInventory,
-					Inventory: inventoryJSON,
+					ID:          uuid.New(),
+					Name:        name, // duplicate name
+					OrgID:       "org1",
+					Username:    "user1",
+					SourceType:  service.SourceTypeInventory,
+					Inventories: []model.AssessmentInventory{inv},
 				}
 
 				secondAssessment, secondErr := svc.CreateAssessment(context.TODO(), secondForm)
@@ -351,12 +359,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				testAssessmentID := uuid.New()
 				createForm := mappers.AssessmentCreateForm{
-					ID:       testAssessmentID,
-					Name:     "Test Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         testAssessmentID,
+					Name:       "Test Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -380,12 +388,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1", // Different org than source
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1", // Different org than source
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -403,12 +411,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -422,12 +430,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				nonExistentSourceID := uuid.New()
 
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &nonExistentSourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &nonExistentSourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -438,7 +446,6 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("successfully creates assessment from source with V1 inventory and stores correct version", func() {
-				// Create a source with V1 inventory (no vcenter_id at root level)
 				sourceID := uuid.New()
 				v1InventoryJSON := `{"vms":{"total":100,"totalMigratable":80},"infra":{"totalHosts":10,"totalClusters":2},"vcenter":{"id":"vcenter-123","name":"test-vcenter"}}`
 
@@ -447,12 +454,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				testAssessmentID := uuid.New()
 				createForm := mappers.AssessmentCreateForm{
-					ID:       testAssessmentID,
-					Name:     "V1 Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         testAssessmentID,
+					Name:       "V1 Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -462,15 +469,13 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.ID).To(Equal(testAssessmentID))
 				Expect(assessment.Snapshots).To(HaveLen(1))
 
-				// Verify the snapshot was stored with V1 version
 				var snapshotVersion int
 				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotVersion).To(Equal(1)) // V1
+				Expect(snapshotVersion).To(Equal(1))
 			})
 
-			It("successfully creates assessment from source with V2 inventory and stores correct version", func() {
-				// Create a source with V2 inventory (has vcenter_id at root level)
+			It("successfully creates assessment from source and stores V2 version", func() {
 				sourceID := uuid.New()
 				v2InventoryJSON := `{"vcenter_id":"vcenter-456","vcenter":{"vms":{"total":200,"totalMigratable":150},"infra":{"totalHosts":20,"totalClusters":5}},"clusters":{}}`
 
@@ -479,12 +484,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				testAssessmentID := uuid.New()
 				createForm := mappers.AssessmentCreateForm{
-					ID:       testAssessmentID,
-					Name:     "V2 Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         testAssessmentID,
+					Name:       "V2 Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -494,16 +499,16 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.ID).To(Equal(testAssessmentID))
 				Expect(assessment.Snapshots).To(HaveLen(1))
 
-				// Verify the snapshot was stored with V2 version
 				var snapshotVersion int
 				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotVersion).To(Equal(2)) // V2
+				Expect(snapshotVersion).To(Equal(2))
 			})
 		})
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -537,11 +542,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(updatedAssessment.Name).To(Equal("Updated Name"))
 				Expect(updatedAssessment.UpdatedAt).ToNot(BeNil())
 
-				// Verify that a new snapshot was created from the source inventory
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Verify that a new inventory was created from the source
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(2)) // Original + new snapshot from source
+				Expect(inventoryCount).To(Equal(1))
 			})
 
 			It("only updates name when name is provided without creating new snapshot", func() {
@@ -567,14 +572,14 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(updatedAssessment.Name).To(Equal("Updated Name"))
 
-				// Should still create new snapshot since source has inventory
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should create new inventory entry since source has inventory
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(2))
+				Expect(inventoryCount).To(Equal(1))
 			})
 
-			It("creates a new snapshot on every PUT operation for sourceID-based assessments", func() {
+			It("creates a new inventory on every PUT operation for sourceID-based assessments", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
 				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
@@ -591,41 +596,41 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
-				// Verify initial state: 1 snapshot
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Verify initial state: 0 inventories
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(0))
 
 				// First update
 				newName1 := "Updated Name 1"
 				_, err := svc.UpdateAssessment(context.TODO(), assessmentID, &newName1)
 				Expect(err).To(BeNil())
 
-				// Should have 2 snapshots now
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should have 1 inventory now
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(2))
+				Expect(inventoryCount).To(Equal(1))
 
 				// Second update
 				newName2 := "Updated Name 2"
 				_, err = svc.UpdateAssessment(context.TODO(), assessmentID, &newName2)
 				Expect(err).To(BeNil())
 
-				// Should have 3 snapshots now
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should have 2 inventories now
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(3))
+				Expect(inventoryCount).To(Equal(2))
 
 				// Third update
 				newName3 := "Updated Name 3"
 				_, err = svc.UpdateAssessment(context.TODO(), assessmentID, &newName3)
 				Expect(err).To(BeNil())
 
-				// Should have 4 snapshots now
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should have 3 inventories now
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(4))
+				Expect(inventoryCount).To(Equal(3))
 			})
 
 			It("successfully updates when source is deleted (source_id becomes NULL)", func() {
@@ -766,6 +771,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -808,6 +814,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -835,6 +842,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		BeforeEach(func() {
 			// Clean up any existing data
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -863,12 +871,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Attempt to create assessment from source in different org (should fail - authorization check)
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1", // Different org than source (org2)
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1", // Different org than source (org2)
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -915,12 +923,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Attempt to create assessment with source that has no inventory (should fail)
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &sourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &sourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -956,12 +964,12 @@ var _ = Describe("assessment service", Ordered, func() {
 
 				// Attempt to create assessment with non-existent source (should fail)
 				createForm := mappers.AssessmentCreateForm{
-					ID:       uuid.New(),
-					Name:     "Test Assessment",
-					OrgID:    "org1",
-					Username: "user1",
-					Source:   service.SourceTypeAgent,
-					SourceID: &nonExistentSourceID,
+					ID:         uuid.New(),
+					Name:       "Test Assessment",
+					OrgID:      "org1",
+					Username:   "user1",
+					SourceType: service.SourceTypeAgent,
+					SourceID:   &nonExistentSourceID,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -984,6 +992,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -1113,6 +1122,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -1190,6 +1200,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM partners_customers;")
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})

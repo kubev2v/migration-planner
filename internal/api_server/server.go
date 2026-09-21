@@ -15,6 +15,8 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/opa"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/go-chi/chi/v5"
 	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
@@ -47,6 +49,7 @@ type Server struct {
 	listener     net.Listener
 	opaValidator *opa.Validator
 	jobsClient   *jobs.Client
+	pool         *pgxpool.Pool
 }
 
 // New returns a new instance of a migration-planner server.
@@ -55,14 +58,14 @@ func New(
 	store store.Store,
 	listener net.Listener,
 	opaValidator *opa.Validator,
-	jobsClient *jobs.Client,
+	pool *pgxpool.Pool,
 ) *Server {
 	return &Server{
 		cfg:          cfg,
 		store:        store,
 		listener:     listener,
 		opaValidator: opaValidator,
-		jobsClient:   jobsClient,
+		pool:         pool,
 	}
 }
 
@@ -272,6 +275,15 @@ func (s *Server) Run(ctx context.Context) error {
 
 	enhancementDataSvc := service.NewAssessmentEnhancementDataService(s.store)
 
+	jobsClient, err := jobs.NewClient(s.pool, s.store, assessmentSvc, s.opaValidator)
+	if err != nil {
+		return fmt.Errorf("initializing River jobs client: %w", err)
+	}
+	if err := jobsClient.RiverClient.Start(ctx); err != nil {
+		return fmt.Errorf("starting River jobs client: %w", err)
+	}
+	s.jobsClient = jobsClient
+
 	h := handlers.NewServiceHandler(
 		service.NewSourceService(s.store, s.opaValidator),
 		assessmentSvc,
@@ -292,6 +304,9 @@ func (s *Server) Run(ctx context.Context) error {
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 		defer cancel()
 
+		if err := s.jobsClient.Stop(ctxTimeout); err != nil {
+			zap.S().Named("api_server").Warnf("Error stopping River jobs client: %v", err)
+		}
 		srv.SetKeepAlivesEnabled(false)
 		_ = srv.Shutdown(ctxTimeout)
 		zap.S().Named("api_server").Info("api server terminated")

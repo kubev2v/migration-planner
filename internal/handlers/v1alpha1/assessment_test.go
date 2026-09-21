@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	insertAssessmentStm = "INSERT INTO assessments (id, created_at, name, username, org_id, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertSnapshotStm   = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s'::jsonb, '%s');"
+	insertAssessmentStm          = "INSERT INTO assessments (id, created_at, name, username, org_id, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
+	insertSnapshotStm            = "INSERT INTO snapshots (created_at, inventory, assessment_id) VALUES (now(), '%s'::jsonb, '%s');"
+	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, created_at, name, is_subset, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory, assessment_id) VALUES ('%s', now(), '%s', false, '', 0, 0, 0, 0, 2, '%s'::jsonb, '%s');"
 )
 
 // createMinimalInventory returns a minimal valid inventory for testing
@@ -36,8 +37,6 @@ func createMinimalInventory() v1alpha1.Inventory {
 	}
 }
 
-// createMinimalInventoryJSON returns a minimal valid inventory JSON string for testing
-// with a single VM to satisfy validation requirements
 func createMinimalInventoryJSON() string {
 	return `{"vcenter": {"id": "test-vcenter"}, "vms": {"total": 1}}`
 }
@@ -172,6 +171,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -351,6 +351,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -670,6 +671,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -684,6 +686,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
 			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, uuid.New().String(), "test-assessment", inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -737,6 +741,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
@@ -884,6 +889,8 @@ var _ = Describe("assessment handler", Ordered, func() {
 			inventoryJSON := `{"vcenter": {"id": "test-vcenter"}}`
 			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, uuid.New().String(), "rvtools-assessment", inventoryJSON, assessmentID.String()))
+			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
 				Username:     "admin",
@@ -909,7 +916,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 			Expect(assessment.Snapshots).To(HaveLen(1))
 		})
 
-		It("successfully updates assessment created from agent sourceType and creates new snapshot", func() {
+		It("successfully updates assessment created from agent sourceType and creates new inventory", func() {
 			// Create a source first
 			sourceID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID.String(), "admin", "admin"))
@@ -926,8 +933,10 @@ var _ = Describe("assessment handler", Ordered, func() {
 				assessmentID.String(), "agent-assessment", "admin", "admin", "John", "Doe", service.SourceTypeAgent, sourceID.String()))
 			Expect(tx.Error).To(BeNil())
 
-			// Create initial snapshot
+			// Create initial snapshot and assessment inventory
 			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, inventoryJSON, assessmentID.String()))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, uuid.New().String(), "agent-assessment", inventoryJSON, assessmentID.String()))
 			Expect(tx.Error).To(BeNil())
 
 			user := auth.User{
@@ -950,11 +959,15 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			assessment := resp.(server.UpdateAssessment200JSONResponse)
 			Expect(assessment.Name).To(Equal("updated-agent-name"))
-			// Verify it creates a new snapshot (should have 2 snapshots now)
-			Expect(assessment.Snapshots).To(HaveLen(2))
+			// Verify the update added a new inventory entry (2 total: initial + update)
+			var count int
+			tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID.String()).Scan(&count)
+			Expect(tx.Error).To(BeNil())
+			Expect(count).To(Equal(2))
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
@@ -1028,6 +1041,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 		})
 
 		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
