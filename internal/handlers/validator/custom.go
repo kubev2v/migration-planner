@@ -228,6 +228,18 @@ func AssessmentFormValidator() validator.StructLevelFunc {
 			if val.Inventory.VcenterId == "" {
 				sl.ReportError("inventory", "inventory", "inventory", "inventory has no vCenterID", "")
 			}
+
+			// Check if inventory has VMs
+			totalVMs := 0
+			if val.Inventory.Vcenter != nil {
+				totalVMs += val.Inventory.Vcenter.Vms.Total
+			}
+			for _, c := range val.Inventory.Clusters {
+				totalVMs += c.Vms.Total
+			}
+			if totalVMs == 0 {
+				sl.ReportError("inventory", "inventory", "inventory", "no VMs found in inventory", "")
+			}
 		}
 
 		// If sourceType is "agent", validate that sourceId is provided

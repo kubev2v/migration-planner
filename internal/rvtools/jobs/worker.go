@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -13,26 +12,29 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2" // DuckDB driver
 	"github.com/riverqueue/river"
 
+	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
 
 type RVToolsWorker struct {
-	river.WorkerDefaults[RVToolsJobArgs]
-	store     store.Store
-	validator duckdb_parser.Validator
+	river.WorkerDefaults[service.RVToolsJobArgs]
+	store         store.Store
+	assessmentSvc service.AssessmentServicer
+	validator     duckdb_parser.Validator
 }
 
-func NewRVToolsWorker(store store.Store, validator duckdb_parser.Validator) *RVToolsWorker {
+func NewRVToolsWorker(store store.Store, assessmentSvc service.AssessmentServicer, validator duckdb_parser.Validator) *RVToolsWorker {
 	return &RVToolsWorker{
-		store:     store,
-		validator: validator,
+		store:         store,
+		assessmentSvc: assessmentSvc,
+		validator:     validator,
 	}
 }
 
@@ -57,7 +59,7 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 	return parser, db, nil
 }
 
-func (w *RVToolsWorker) Timeout(_ *river.Job[RVToolsJobArgs]) time.Duration {
+func (w *RVToolsWorker) Timeout(_ *river.Job[service.RVToolsJobArgs]) time.Duration {
 	return 10 * time.Minute
 }
 
@@ -71,7 +73,7 @@ func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer
 }
 
 // Work processes an RVTools assessment job.
-func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]) error {
+func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVToolsJobArgs]) error {
 	logger := log.NewDebugLogger("rvtools_worker").
 		WithContext(ctx).
 		Operation("process_rvtools_job").
@@ -140,64 +142,37 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[RVToolsJobArgs]
 
 	logger.Step("creating_assessment").Log()
 
-	// Build assessment model
-	assessment := model.Assessment{
-		ID:         uuid.New(),
-		Name:       job.Args.Name,
-		OrgID:      job.Args.OrgID,
-		Username:   job.Args.Username,
-		SourceType: "rvtools",
+	assessmentInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.Name, inventoryJSON)
+	if err != nil {
+		return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
+	}
+
+	createForm := mappers.AssessmentCreateForm{
+		ID:          uuid.New(),
+		Name:        job.Args.Name,
+		OrgID:       job.Args.OrgID,
+		Username:    job.Args.Username,
+		SourceType:  "rvtools",
+		Inventories: []model.AssessmentInventory{assessmentInv},
 	}
 	if job.Args.FirstName != "" {
-		assessment.OwnerFirstName = &job.Args.FirstName
+		createForm.OwnerFirstName = &job.Args.FirstName
 	}
 	if job.Args.LastName != "" {
-		assessment.OwnerLastName = &job.Args.LastName
+		createForm.OwnerLastName = &job.Args.LastName
 	}
 
-	// RVTools assessments don't have subset inventories
-	createdAssessment, err := w.store.Assessment().Create(ctx, assessment, inventoryJSON, nil)
+	svcCtx := auth.NewTokenContext(ctx, auth.User{
+		Username:     job.Args.Username,
+		Organization: job.Args.OrgID,
+	})
+	createdAssessment, err := w.assessmentSvc.CreateAssessment(svcCtx, createForm)
 	if err != nil {
-		var errMsg string
-		if errors.Is(err, store.ErrDuplicateKey) {
-			errMsg = fmt.Sprintf("assessment with name '%s' already exists", assessment.Name)
-		} else {
-			errMsg = fmt.Sprintf("failed to create assessment: %v", err)
-		}
-		return w.failJob(ctx, logger, job.ID, "create_assessment", err, errMsg)
-	}
-	w.store.RequestMetricsCacheRefresh()
-
-	updates := store.NewRelationshipBuilder().
-		With(model.NewAssessmentResource(assessment.ID.String()), model.OwnerRelation, model.NewUserSubject(job.Args.Username)).
-		Build()
-
-	if err := w.store.Authz().WriteRelationships(ctx, updates); err != nil {
-		return fmt.Errorf("authz: failed to write owner relation: %w", err)
+		return w.failJob(ctx, logger, job.ID, "create_assessment", err, fmt.Sprintf("failed to create assessment: %v", err))
 	}
 
-	// Update job with assessment ID
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
 		logger.Error(err).WithString("step", "update_completed_status").Log()
-	}
-
-	cePayload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
-		ID:         createdAssessment.ID.String(),
-		SnapshotID: createdAssessment.Snapshots[0].ID,
-		Inventory:  createdAssessment.Snapshots[0].Inventory,
-		Name:       createdAssessment.Name,
-		OrgID:      createdAssessment.OrgID,
-		Username:   createdAssessment.Username,
-		SourceType: createdAssessment.SourceType,
-		CreatedAt:  createdAssessment.CreatedAt,
-		UpdatedAt:  createdAssessment.UpdatedAt,
-	})
-	ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, cePayload)
-	if err != nil {
-		return fmt.Errorf("failed to build outbox event: %w", err)
-	}
-	if err := w.store.Outbox().Insert(ctx, model.OutboxEvent{EventType: events.EventTypeKafka, Payload: ceBytes}); err != nil {
-		return fmt.Errorf("failed to write outbox event: %w", err)
 	}
 
 	logger.Success().

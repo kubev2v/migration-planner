@@ -78,13 +78,13 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	}
 
 	createForm := mappers.AssessmentFormToCreateForm(form, user)
-	logger.Step("mapped_form").WithString("source_type", createForm.Source).Log()
+	logger.Step("mapped_form").WithString("source_type", createForm.SourceType).Log()
 
 	logger.Step("create_assessment").
 		WithUUID("id", createForm.ID).
 		WithString("name", createForm.Name).
 		WithString("org_id", createForm.OrgID).
-		WithString("source", createForm.Source).
+		WithString("source", createForm.SourceType).
 		WithUUIDPtr("source_id", createForm.SourceID).
 		Log()
 

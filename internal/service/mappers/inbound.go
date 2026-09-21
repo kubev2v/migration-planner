@@ -210,14 +210,15 @@ func (f *SourceUpdateForm) ToLabels() []model.Label {
 
 type AssessmentCreateForm struct {
 	ID             uuid.UUID
+	SourceType     string
 	Name           string
 	OrgID          string
 	Username       string
 	OwnerFirstName *string
 	OwnerLastName  *string
-	Source         string
 	SourceID       *uuid.UUID
-	Inventory      []byte
+	Inventory      []byte                      // kept for backward compat (handler mapper)
+	Inventories    []model.AssessmentInventory // pre-built inventories (rvtools path)
 }
 
 func (f *AssessmentCreateForm) ToModel() model.Assessment {
@@ -228,7 +229,7 @@ func (f *AssessmentCreateForm) ToModel() model.Assessment {
 		Username:       f.Username,
 		OwnerFirstName: f.OwnerFirstName,
 		OwnerLastName:  f.OwnerLastName,
-		SourceType:     f.Source,
+		SourceType:     f.SourceType,
 		SourceID:       f.SourceID,
 	}
 }

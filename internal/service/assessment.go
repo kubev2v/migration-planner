@@ -12,7 +12,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -117,46 +116,26 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	tracer := logger.Operation("create_assessment").
 		WithString("org_id", createForm.OrgID).
 		WithString("name", createForm.Name).
-		WithString("source_type", createForm.Source).
+		WithString("source_type", createForm.SourceType).
 		WithUUIDPtr("source_id", createForm.SourceID).
 		Build()
 
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
-	// Validate inventory source before transaction
-	var inventory []byte
-	if assessment.SourceType == SourceTypeInventory {
-		tracer.Step("process_inventory_source").Log()
-		inventory = createForm.Inventory
-		// Validate inventory has VMs before creating assessment
-		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
-			switch err.(type) {
-			case *util.ErrNoVMsInInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			case *util.ErrInventoryUnmarshalError:
-				return nil, fmt.Errorf("inventory data corruption: %w", err)
-			case *util.ErrEmptyInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			default:
-				return nil, fmt.Errorf("inventory validation failed: %w", err)
-			}
-		}
-	}
-
-	ctx, err := as.store.NewTransactionContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_, _ = store.Rollback(ctx)
-	}()
-
-	// If creating from agent source, fetch source data within transaction for consistency
+	var assessmentInventories []model.AssessmentInventory
 	var subsetInventories []model.AssessmentSubsetInventory
-	if assessment.SourceType == SourceTypeAgent && assessment.SourceID != nil {
-		tracer.Step("process_agent_source").Log()
-		// We are sure to have a sourceID here. it has been validaded in handler's layer.
+
+	switch createForm.SourceType {
+	case SourceTypeRvtools, SourceTypeInventory:
+		tracer.Step("using_provided_inventories").WithInt("count", len(createForm.Inventories)).Log()
+		for i := range createForm.Inventories {
+			createForm.Inventories[i].AssessmentID = assessment.ID
+		}
+		assessmentInventories = createForm.Inventories
+
+	case "agent":
+		tracer.Step("process_source").Log()
 		source, err := as.store.Source().Get(ctx, *assessment.SourceID)
 		if err != nil {
 			return nil, err
@@ -167,62 +146,79 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		if source.Inventory == nil {
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
-		inventory = source.Inventory
-		// Validate inventory has VMs before creating assessment
-		if err := util.ValidateInventoryHasVMs(inventory); err != nil {
-			switch err.(type) {
-			case *util.ErrNoVMsInInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			case *util.ErrInventoryUnmarshalError:
-				return nil, fmt.Errorf("inventory data corruption: %w", err)
-			case *util.ErrEmptyInventory:
-				return nil, NewErrInventoryHasNoVMs()
-			default:
-				return nil, fmt.Errorf("inventory validation failed: %w", err)
-			}
+
+		mainInv, err := model.NewAssessmentInventory(uuid.New(), assessment.Name, source.Inventory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read source inventory: %w", err)
 		}
 
-		tracer.Step("fetch_source_subset_inventories").Log()
+		// TODO: move this validation to the source handler when inventory is pushed by the agent
+		if mainInv.VMsCount == 0 {
+			return nil, NewErrInventoryHasNoVMs()
+		}
 
-		// List all source subset inventories for this source (same transaction snapshot)
+		mainInv.AssessmentID = assessment.ID
+		assessmentInventories = append(assessmentInventories, mainInv)
+
 		sourceSubsetFilter := store.NewSourceSubsetInventoryQueryFilter().BySourceID(*assessment.SourceID)
 		sourceSubsets, err := as.store.SourceSubsetInventory().List(ctx, sourceSubsetFilter)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch source subset inventories: %w", err)
 		}
-
 		tracer.Step("found_source_subsets").WithInt("count", len(sourceSubsets)).Log()
 
-		// Prepare subset inventories to be created (linked to snapshot in store layer)
-		subsetInventories = make([]model.AssessmentSubsetInventory, len(sourceSubsets))
-		for i, sourceSubset := range sourceSubsets {
-			// Deep-copy inventory bytes to prevent aliasing between source and assessment records
-			inventoryCopy := make([]byte, len(sourceSubset.Inventory))
-			copy(inventoryCopy, sourceSubset.Inventory)
-
-			subsetInventories[i] = model.AssessmentSubsetInventory{
-				ID:        uuid.New(), // New ID for assessment subset
-				Name:      sourceSubset.Name,
-				VCenterID: sourceSubset.VCenterID,
-				VMsCount:  sourceSubset.VMsCount,
-				Inventory: inventoryCopy,
-				// SnapshotID will be set in the store layer after snapshot creation
+		for _, ss := range sourceSubsets {
+			inv, err := model.NewAssessmentInventory(uuid.New(), ss.Name, ss.Inventory)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read subset inventory %q: %w", ss.Name, err)
 			}
+			inv.IsSubset = true
+			inv.AssessmentID = assessment.ID
+			assessmentInventories = append(assessmentInventories, inv)
+
+			subsetInventories = append(subsetInventories, model.AssessmentSubsetInventory{
+				ID: uuid.New(), Name: ss.Name, VCenterID: ss.VCenterID,
+				VMsCount: ss.VMsCount, Inventory: ss.Inventory,
+			})
+		}
+
+	default:
+		return nil, fmt.Errorf("assessment must have either inventories or a source ID")
+	}
+
+	// Build snapshot for backward compatibility
+	for _, inv := range assessmentInventories {
+		if !inv.IsSubset {
+			assessment.Snapshots = []model.Snapshot{{
+				Inventory:         inv.Inventory,
+				Version:           inv.Version,
+				SubsetInventories: subsetInventories,
+			}}
+			break
 		}
 	}
 
-	createdAssessment, err := as.store.Assessment().Create(ctx, assessment, inventory, subsetInventories)
+	assessment.Inventories = assessmentInventories
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	createdAssessment, err := as.store.Assessment().Create(ctx, assessment)
 	if err != nil {
 		if errors.Is(err, store.ErrDuplicateKey) {
 			return nil, NewErrAssessmentDuplicateName(assessment.Name)
 		}
-
 		return nil, fmt.Errorf("failed to create assessment: %w", err)
 	}
 
 	tracer.Step("assessment_created_in_db").
 		WithUUID("created_assessment_id", createdAssessment.ID).
-		WithInt("subset_count", len(subsetInventories)).
+		WithInt("inventory_count", len(assessmentInventories)).
 		Log()
 
 	if _, err := store.Commit(ctx); err != nil {
@@ -255,7 +251,6 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 		_, _ = store.Rollback(ctx)
 	}()
 
-	// Check if assessment exists and user has access
 	assessment, err := as.store.Assessment().Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -266,17 +261,25 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 	tracer.Step("assessment_exists").WithString("current_name", assessment.Name).WithBool("has_source_id", assessment.SourceID != nil).Log()
 
-	// if assessment source is inventory or rvtools don't update the inventory. update the name only
-	// per design only assessments with sourceID can have multiple snapshots
 	if assessment.SourceID != nil {
-		tracer.Step("updating_with_new_snapshot").WithUUIDPtr("source_id", assessment.SourceID).Log()
+		tracer.Step("updating_with_new_inventory").WithUUIDPtr("source_id", assessment.SourceID).Log()
 		source, err := as.store.Source().Get(ctx, *assessment.SourceID)
 		if err != nil {
 			return nil, err
 		}
 		tracer.Step("source_retrieved").WithUUID("source_id", source.ID).Log()
-		// Update assessment with new snapshot
-		if _, err := as.store.Assessment().Update(ctx, id, name, source.Inventory); err != nil {
+
+		var inventories []model.AssessmentInventory
+		if source.Inventory != nil {
+			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.Name, source.Inventory)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read source inventory: %w", err)
+			}
+			inv.AssessmentID = id
+			inventories = append(inventories, inv)
+		}
+
+		if _, err := as.store.Assessment().Update(ctx, id, name, inventories); err != nil {
 			return nil, fmt.Errorf("failed to update assessment: %w", err)
 		}
 
@@ -286,12 +289,11 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 		as.store.RequestMetricsCacheRefresh()
 
-		tracer.Success().WithString("update_type", "with_new_snapshot").Log()
+		tracer.Success().WithString("update_type", "with_new_inventory").Log()
 		return as.GetAssessment(ctx, id)
 	}
 
 	tracer.Step("updating_name_only").Log()
-	// Update assessment with new snapshot
 	if _, err = as.store.Assessment().Update(ctx, id, name, nil); err != nil {
 		return nil, fmt.Errorf("failed to update assessment: %w", err)
 	}
@@ -310,7 +312,6 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 		WithUUID("assessment_id", id).
 		Build()
 
-	// Check if assessment exists
 	assessment, err := as.store.Assessment().Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {

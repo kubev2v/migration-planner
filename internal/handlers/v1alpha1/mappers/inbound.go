@@ -9,6 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -166,11 +167,11 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 
 func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User) mappers.AssessmentCreateForm {
 	form := mappers.AssessmentCreateForm{
-		ID:       uuid.New(),
-		Name:     resource.Name,
-		OrgID:    user.Organization,
-		Username: user.Username,
-		Source:   resource.SourceType,
+		ID:         uuid.New(),
+		Name:       resource.Name,
+		OrgID:      user.Organization,
+		Username:   user.Username,
+		SourceType: resource.SourceType,
 	}
 
 	// Set owner fields from user context (like username)
@@ -186,14 +187,18 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 		form.SourceID = resource.SourceId
 	}
 
-	// Set inventory if provided
+	// Build inventories if inline inventory is provided
 	if resource.Inventory != nil {
 		if resource.Inventory.CreatedAt == nil {
 			now := time.Now().UTC()
 			resource.Inventory.CreatedAt = &now
 		}
-		data, _ := json.Marshal(resource.Inventory) // cannot fail. it has been already validated
+		data, _ := json.Marshal(resource.Inventory)
 		form.Inventory = data
+		inv, err := model.NewAssessmentInventory(uuid.New(), resource.Name, data)
+		if err == nil {
+			form.Inventories = []model.AssessmentInventory{inv}
+		}
 	}
 
 	return form

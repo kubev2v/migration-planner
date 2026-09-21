@@ -129,35 +129,18 @@ var runCmd = &cobra.Command{
 		}()
 		zap.S().Info("Outbox dispatcher started")
 
-		// Create pgx pool for River and RVTools file storage
-		zap.S().Info("Initializing River jobs client...")
+		// Create pgx pool for River
+		zap.S().Info("Initializing pgx pool for River...")
 		pool, err := jobs.CreatePgxPool(ctx, cfg)
 		if err != nil {
 			zap.S().Fatalw("creating pgx pool", "error", err)
 		}
 
-		jobsClient, err := jobs.NewClient(pool, store, opaValidator)
-		if err != nil {
-			zap.S().Fatalw("initializing River jobs client", "error", err)
-		}
-		if err := jobsClient.RiverClient.Start(context.Background()); err != nil {
-			zap.S().Fatalw("starting River jobs client", "error", err)
-		}
-		zap.S().Info("River jobs client started")
-
-		// Ensure cleanup on function exit
-		defer func() {
-			zap.S().Info("Stopping River jobs client...")
-			if err := jobsClient.Stop(context.Background()); err != nil {
-				zap.S().Warnf("Error stopping River jobs client: %v", err)
-			}
-		}()
-
 		// register metrics
 		metrics.RegisterMetrics(store)
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator, jobsClient)
+			return apiserver.New(cfg, store, l, opaValidator, pool)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {

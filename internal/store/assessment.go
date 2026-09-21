@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,14 +10,13 @@ import (
 	"gorm.io/gorm/clause"
 
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/internal/util"
 )
 
 type Assessment interface {
 	List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error)
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
-	Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error)
-	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error)
+	Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error)
+	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error)
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -35,9 +33,13 @@ func NewAssessmentStore(db *gorm.DB) Assessment {
 
 func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error) {
 	var assessments model.AssessmentList
-	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC").Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
-		return db.Order("snapshots.created_at DESC")
-	})
+	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC").
+		Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
+			return db.Order("snapshots.created_at DESC")
+		}).
+		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
+			return db.Order("assessment_inventories.created_at DESC")
+		})
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -61,6 +63,9 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 		Preload("Snapshots.SubsetInventories", func(db *gorm.DB) *gorm.DB {
 			return db.Order("name ASC, id ASC")
 		}).
+		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
+			return db.Order("assessment_inventories.created_at DESC")
+		}).
 		First(&assessment, "id = ?", id)
 
 	if result.Error != nil {
@@ -72,8 +77,7 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 	return &assessment, nil
 }
 
-func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment, inventory []byte, subsetInventories []model.AssessmentSubsetInventory) (*model.Assessment, error) {
-	// Create the assessment first
+func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error) {
 	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
@@ -82,33 +86,10 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 		return nil, result.Error
 	}
 
-	// Create the initial snapshot with the inventory
-	snapshot := model.Snapshot{
-		AssessmentID: assessment.ID,
-		Inventory:    inventory,
-		Version:      uint(util.GetInventoryVersion(inventory)),
-	}
-
-	if err := a.getDB(ctx).Clauses(clause.Returning{}).Create(&snapshot).Error; err != nil {
-		return nil, fmt.Errorf("failed to create snapshot: %w", err)
-	}
-
-	// Create subset inventories linked to the snapshot
-	if len(subsetInventories) > 0 {
-		for i := range subsetInventories {
-			subsetInventories[i].SnapshotID = snapshot.ID
-		}
-		if err := a.getDB(ctx).Create(&subsetInventories).Error; err != nil {
-			return nil, fmt.Errorf("failed to create subset inventories: %w", err)
-		}
-	}
-
-	// Return the assessment with snapshots loaded
 	return a.Get(ctx, assessment.ID)
 }
 
-func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventory []byte) (*model.Assessment, error) {
-	// Check if assessment exists
+func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
 	var assessment model.Assessment
 	if err := a.getDB(ctx).First(&assessment, "id = ?", assessmentID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -117,19 +98,12 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		return nil, err
 	}
 
-	// Update assessment name if provided
 	if name != nil {
 		assessment.Name = *name
 	}
 
-	if inventory != nil {
-		snapshot := model.Snapshot{
-			AssessmentID: assessmentID,
-			Inventory:    inventory,
-			Version:      uint(util.GetInventoryVersion(inventory)),
-		}
-
-		if err := a.getDB(ctx).Create(&snapshot).Error; err != nil {
+	if len(inventories) > 0 {
+		if err := a.getDB(ctx).Create(&inventories).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -140,7 +114,6 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		return nil, err
 	}
 
-	// Return the updated assessment with snapshots
 	return &assessment, nil
 }
 

@@ -2,14 +2,12 @@ package util
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"os"
 	"strconv"
 	"time"
 
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -199,40 +197,4 @@ type ErrInventoryUnmarshalError struct {
 // ErrNoVMsInInventory indicates the inventory has no VMs (validation failure)
 type ErrNoVMsInInventory struct {
 	error
-}
-
-// ValidateInventoryHasVMs validates that inventory has at least one VM
-// Returns typed errors to distinguish between validation failures and data corruption
-func ValidateInventoryHasVMs(inventory []byte) error {
-	if len(inventory) == 0 {
-		return &ErrEmptyInventory{errors.New("inventory is empty")}
-	}
-
-	version := GetInventoryVersion(inventory)
-	switch version {
-	case model.SnapshotVersionV1:
-		var invData v1alpha1.InventoryData
-		if err := json.Unmarshal(inventory, &invData); err != nil {
-			return &ErrInventoryUnmarshalError{fmt.Errorf("failed to unmarshal v1 inventory: %w", err)}
-		}
-		if invData.Vms.Total == 0 {
-			return &ErrNoVMsInInventory{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
-		}
-	default:
-		var inv v1alpha1.Inventory
-		if err := json.Unmarshal(inventory, &inv); err != nil {
-			return &ErrInventoryUnmarshalError{fmt.Errorf("failed to unmarshal v2 inventory: %w", err)}
-		}
-		totalVMs := 0
-		if inv.Vcenter != nil {
-			totalVMs += inv.Vcenter.Vms.Total
-		}
-		for _, clusterData := range inv.Clusters {
-			totalVMs += clusterData.Vms.Total
-		}
-		if totalVMs == 0 {
-			return &ErrNoVMsInInventory{errors.New("no VMs found in inventory - cannot create assessment without VM data")}
-		}
-	}
-	return nil
 }
