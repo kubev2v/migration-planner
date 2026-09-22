@@ -249,7 +249,11 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		WithString("username", user.Username).
 		Log()
 
-	result, err := h.estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, clusterID, schemas, userParams)
+	var clusterIDs []string
+	if clusterID != "" {
+		clusterIDs = []string{clusterID}
+	}
+	result, err := h.estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, clusterIDs, schemas, userParams)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
