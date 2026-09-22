@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -9,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/service/helpers"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -23,6 +25,7 @@ type AssessmentServicer interface {
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
 	ShareAssessment(ctx context.Context, id uuid.UUID) error
 	UnshareAssessment(ctx context.Context, id uuid.UUID) error
+	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error)
 }
 
 const (
@@ -143,7 +146,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
 
-		mainInv, err := model.NewAssessmentInventory(uuid.New(), assessment.Name, source.Inventory)
+		mainInv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, false, source.Inventory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read source inventory: %w", err)
 		}
@@ -164,7 +167,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		tracer.Step("found_source_subsets").WithInt("count", len(sourceSubsets)).Log()
 
 		for _, ss := range sourceSubsets {
-			inv, err := model.NewAssessmentInventory(uuid.New(), ss.Name, ss.Inventory)
+			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, ss.Name, true, ss.Inventory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read subset inventory %q: %w", ss.Name, err)
 			}
@@ -265,11 +268,10 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 		var inventories []model.AssessmentInventory
 		if source.Inventory != nil {
-			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.Name, source.Inventory)
+			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, true, source.Inventory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read source inventory: %w", err)
 			}
-			inv.AssessmentID = id
 			inventories = append(inventories, inv)
 		}
 
@@ -450,6 +452,49 @@ func (f *AssessmentFilter) WithNameLike(pattern string) *AssessmentFilter {
 func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 	f.Limit = limit
 	return f
+}
+
+func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+	assessment, err := as.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return model.AssessmentInventory{}, NewErrAssessmentNotFound(assessmentID)
+		}
+		return model.AssessmentInventory{}, fmt.Errorf("failed to get assessment: %w", err)
+	}
+
+	var subsets []model.AssessmentInventory
+	for _, inv := range assessment.Inventories {
+		if !inv.IsSubset {
+			continue
+		}
+		subsets = append(subsets, inv)
+	}
+
+	aggregated, err := helpers.Aggregate(subsets)
+	if err != nil {
+		return model.AssessmentInventory{}, fmt.Errorf("failed to aggregate inventories: %w", err)
+	}
+
+	raw, err := json.Marshal(aggregated)
+	if err != nil {
+		return model.AssessmentInventory{}, fmt.Errorf("failed to marshal aggregated inventory: %w", err)
+	}
+
+	inventoryID := uuid.New()
+	for _, inv := range assessment.Inventories {
+		if !inv.IsSubset {
+			inventoryID = inv.ID
+			break
+		}
+	}
+
+	result, err := model.NewAssessmentInventory(inventoryID, assessmentID, assessment.Name, false, raw)
+	if err != nil {
+		return model.AssessmentInventory{}, fmt.Errorf("failed to build aggregated inventory model: %w", err)
+	}
+
+	return result, nil
 }
 
 func (f *AssessmentFilter) WithOffset(offset int) *AssessmentFilter {

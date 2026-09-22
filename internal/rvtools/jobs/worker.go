@@ -24,7 +24,7 @@ import (
 )
 
 type RVToolsWorker struct {
-	river.WorkerDefaults[service.RVToolsJobArgs]
+	river.WorkerDefaults[model.RVToolsJobArgs]
 	store         store.Store
 	assessmentSvc service.AssessmentServicer
 	validator     duckdb_parser.Validator
@@ -36,6 +36,176 @@ func NewRVToolsWorker(store store.Store, assessmentSvc service.AssessmentService
 		assessmentSvc: assessmentSvc,
 		validator:     validator,
 	}
+}
+
+// Work processes an RVTools assessment job.
+func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJobArgs]) error {
+	logger := log.NewDebugLogger("rvtools_worker").
+		WithContext(ctx).
+		Operation("process_rvtools_job").
+		WithParam("job_id", job.ID).
+		WithString("assessment_name", job.Args.Name).
+		Build()
+
+	logger.Step("job_started").Log()
+
+	// Create per-job DuckDB instance for isolation
+	parser, duckDB, err := w.createParser()
+	if err != nil {
+		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
+	}
+	defer func() {
+		_ = duckDB.Close()
+		_ = os.Remove(job.Args.File)
+	}()
+
+	// Update status to parsing
+	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusParsing, "", nil); err != nil {
+		logger.Error(err).WithString("step", "update_parsing_status").Log()
+	}
+
+	parsingErr := NewRVToolParsingError()
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	result, err := w.parseFile(ctx, parser, job.Args.File, logger)
+	if err != nil {
+		parsingErr.Add(job.Args.Name, err)
+	}
+
+	if cleanupErr := parser.Cleanup(); cleanupErr != nil {
+		logger.Error(cleanupErr).WithString("step", "cleanup").WithString("file", job.Args.File).Log()
+		parsingErr.Add(job.Args.Name, err)
+	}
+
+	if parsingErr.HasErrors() {
+		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, parsingErr.Error())
+	}
+
+	// Check for cancellation before creating assessment
+	if err := ctx.Err(); err != nil {
+		logger.Error(err).WithString("step", "pre_create_assessment_cancelled").Log()
+		return err
+	}
+
+	switch job.Args.OperationType {
+	case model.CreateOperationType:
+		logger.Step("creating_assessment").Log()
+		assessmentID := uuid.New()
+
+		assessmentInv, err := model.NewAssessmentInventory(uuid.New(), assessmentID, job.Args.Name, false, result)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
+		}
+
+		createForm := mappers.AssessmentCreateForm{
+			ID:          assessmentID,
+			Name:        job.Args.Name,
+			OrgID:       job.Args.OrgID,
+			Username:    job.Args.Username,
+			SourceType:  "rvtools",
+			Inventories: []model.AssessmentInventory{assessmentInv},
+		}
+		if job.Args.FirstName != "" {
+			createForm.OwnerFirstName = &job.Args.FirstName
+		}
+		if job.Args.LastName != "" {
+			createForm.OwnerLastName = &job.Args.LastName
+		}
+
+		svcCtx := auth.NewTokenContext(ctx, auth.User{
+			Username:     job.Args.Username,
+			Organization: job.Args.OrgID,
+		})
+		createdAssessment, err := w.assessmentSvc.CreateAssessment(svcCtx, createForm)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "create_assessment", err, fmt.Sprintf("failed to create assessment: %v", err))
+		}
+
+		if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
+			logger.Error(err).WithString("step", "update_completed_status").Log()
+		}
+
+		logger.Success().
+			WithUUID("assessment_id", createdAssessment.ID).
+			WithString("assessment_name", createdAssessment.Name).
+			Log()
+	case model.UpdateOperationType:
+		// Add the new file as a subset inventory to the existing assessment. If a subset
+		// with the same vCenter ID already exists, update it in place. Then re-aggregate
+		// all subsets into the main inventory (is_subset=false) and persist everything
+		// in a single transaction.
+		// Assessment itself is updated to update the "update_at" field.
+		logger.Step("updating_assessment").Log()
+
+		subsetInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.AssessmentID, job.Args.Name, true, result)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
+		}
+
+		assessment, err := w.store.Assessment().Get(ctx, job.Args.AssessmentID)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "get_assessment", err, fmt.Sprintf("failed to get assessment: %v", err))
+		}
+
+		for _, existing := range assessment.Inventories {
+			if existing.IsSubset && existing.VCenterID == subsetInv.VCenterID {
+				subsetInv.ID = existing.ID
+				break
+			}
+		}
+
+		txCtx, err := w.store.NewTransactionContext(ctx)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "begin_transaction", err, fmt.Sprintf("failed to begin transaction: %v", err))
+		}
+		defer func() {
+			_, _ = store.Rollback(txCtx)
+		}()
+
+		if err := w.store.Assessment().UpsertInventories(txCtx, subsetInv); err != nil {
+			return w.failJob(ctx, logger, job.ID, "upsert_subset_inventory", err, fmt.Sprintf("failed to upsert subset inventory: %v", err))
+		}
+
+		svcCtx := auth.NewTokenContext(txCtx, auth.User{
+			Username:     job.Args.Username,
+			Organization: job.Args.OrgID,
+		})
+
+		mainInv, err := w.assessmentSvc.AggregateInventories(svcCtx, job.Args.AssessmentID)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "aggregate_inventories", err, fmt.Sprintf("failed to aggregate inventories: %v", err))
+		}
+
+		if err := w.store.Assessment().UpsertInventories(txCtx, mainInv); err != nil {
+			return w.failJob(ctx, logger, job.ID, "upsert_main_inventory", err, fmt.Sprintf("failed to upsert main inventory: %v", err))
+		}
+
+		if _, err := w.store.Assessment().Update(txCtx, job.Args.AssessmentID, &assessment.Name, nil); err != nil {
+			return w.failJob(ctx, logger, job.ID, "update_assessment_timestamp", err, fmt.Sprintf("failed to update assessment: %v", err))
+		}
+
+		if _, err := store.Commit(txCtx); err != nil {
+			return w.failJob(ctx, logger, job.ID, "commit_transaction", err, fmt.Sprintf("failed to commit transaction: %v", err))
+		}
+
+		if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &job.Args.AssessmentID); err != nil {
+			logger.Error(err).WithString("step", "update_completed_status").Log()
+		}
+
+		logger.Success().
+			WithUUID("assessment_id", job.Args.AssessmentID).
+			Log()
+	default:
+		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, "invalid operation type")
+	}
+
+	return nil
+}
+
+func (w *RVToolsWorker) Timeout(_ *river.Job[model.RVToolsJobArgs]) time.Duration {
+	return 10 * time.Minute
 }
 
 // createParser creates a new per-job DuckDB instance and parser.
@@ -50,6 +220,10 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 		_ = db.Close()
 		return nil, nil, fmt.Errorf("setting duckdb extension directory: %w", err)
 	}
+	if _, err := db.Exec("SET memory_limit='1GB';"); err != nil {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("setting duckdb memory limit: %w", err)
+	}
 	qi := pkgstore.NewQueryInterceptor(db)
 	parser := duckdb_parser.New(qi, w.validator)
 	if err := parser.Init(); err != nil {
@@ -57,10 +231,6 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 		return nil, nil, fmt.Errorf("initializing duckdb schema: %w", err)
 	}
 	return parser, db, nil
-}
-
-func (w *RVToolsWorker) Timeout(_ *river.Job[service.RVToolsJobArgs]) time.Duration {
-	return 10 * time.Minute
 }
 
 // failJob logs an error, updates job status to failed, and returns the error.
@@ -72,42 +242,17 @@ func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer
 	return err
 }
 
-// Work processes an RVTools assessment job.
-func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVToolsJobArgs]) error {
-	logger := log.NewDebugLogger("rvtools_worker").
-		WithContext(ctx).
-		Operation("process_rvtools_job").
-		WithParam("job_id", job.ID).
-		WithString("assessment_name", job.Args.Name).
-		Build()
-
-	logger.Step("job_started").Log()
-
-	filePath := job.Args.FilePath
-	defer func() { _ = os.Remove(filePath) }()
-
-	// Create per-job DuckDB instance for isolation
-	parser, duckDB, err := w.createParser()
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
-	}
-	defer func() { _ = duckDB.Close() }()
-
-	// Update status to validating before ingestion (which includes OPA validation)
-	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {
-		logger.Error(err).WithString("step", "update_validating_status").Log()
-	}
-
+func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) ([]byte, error) {
 	// Ingest RVTools file using duckdb_parser
-	validationResult, err := parser.IngestRvTools(ctx, filePath)
+	validationResult, err := parser.IngestRvTools(ctx, filepath)
 	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "ingest_rvtools", err, fmt.Sprintf("error ingesting RVTools file: %v", err))
+		return []byte{}, err
 	}
 
 	// Check for validation errors
 	if validationResult.HasErrors() {
 		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
-		return w.failJob(ctx, logger, job.ID, "validate_rvtools", validationErr, fmt.Sprintf("RVTools validation failed: %v", validationResult.Errors[0].Message))
+		return []byte{}, validationErr
 	}
 
 	// Log any warnings
@@ -115,72 +260,21 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVTools
 		logger.Step("validation_warning").WithString("code", warning.Code).WithString("message", warning.Message).Log()
 	}
 
-	// Update status to parsing
-	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusParsing, "", nil); err != nil {
-		logger.Error(err).WithString("step", "update_parsing_status").Log()
-	}
-
 	// Build inventory from parsed data
 	logger.Step("building_inventory").Log()
 	inv, err := parser.BuildInventory(ctx, nil)
 	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "build_inventory", err, fmt.Sprintf("error building inventory: %v", err))
+		return []byte{}, err
 	}
 	inventory := converters.ToAPI(inv)
 
 	// Marshal inventory to JSON
 	inventoryJSON, err := json.Marshal(inventory)
 	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "marshal_inventory", err, fmt.Sprintf("error marshaling inventory: %v", err))
+		return []byte{}, err
 	}
 
-	// Check for cancellation before creating assessment
-	if err := ctx.Err(); err != nil {
-		logger.Error(err).WithString("step", "pre_create_assessment_cancelled").Log()
-		return err
-	}
-
-	logger.Step("creating_assessment").Log()
-
-	assessmentInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.Name, inventoryJSON)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
-	}
-
-	createForm := mappers.AssessmentCreateForm{
-		ID:          uuid.New(),
-		Name:        job.Args.Name,
-		OrgID:       job.Args.OrgID,
-		Username:    job.Args.Username,
-		SourceType:  "rvtools",
-		Inventories: []model.AssessmentInventory{assessmentInv},
-	}
-	if job.Args.FirstName != "" {
-		createForm.OwnerFirstName = &job.Args.FirstName
-	}
-	if job.Args.LastName != "" {
-		createForm.OwnerLastName = &job.Args.LastName
-	}
-
-	svcCtx := auth.NewTokenContext(ctx, auth.User{
-		Username:     job.Args.Username,
-		Organization: job.Args.OrgID,
-	})
-	createdAssessment, err := w.assessmentSvc.CreateAssessment(svcCtx, createForm)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_assessment", err, fmt.Sprintf("failed to create assessment: %v", err))
-	}
-
-	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
-		logger.Error(err).WithString("step", "update_completed_status").Log()
-	}
-
-	logger.Success().
-		WithUUID("assessment_id", createdAssessment.ID).
-		WithString("assessment_name", createdAssessment.Name).
-		Log()
-
-	return nil
+	return inventoryJSON, nil
 }
 
 // updateJobStatus updates the job's metadata with the current status using job store.

@@ -212,6 +212,10 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 	return nil
 }
 
+func (e *EventAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+	return e.inner.AggregateInventories(ctx, assessmentID, clusterIDs...)
+}
+
 func (e *EventAssessmentService) UnshareAssessment(ctx context.Context, id uuid.UUID) error {
 	user := auth.MustHaveUser(ctx)
 

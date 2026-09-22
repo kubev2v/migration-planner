@@ -10,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -113,13 +114,14 @@ partsLoop:
 
 	logger.Step("file_received").WithInt("file_size", int(fileSize)).Log()
 
-	jobArgs := service.RVToolsJobArgs{
-		Name:      name,
-		FilePath:  tempFilePath,
-		OrgID:     user.Organization,
-		Username:  user.Username,
-		FirstName: user.FirstName,
-		LastName:  user.LastName,
+	jobArgs := model.RVToolsJobArgs{
+		Name:          name,
+		OperationType: model.CreateOperationType,
+		File:          tempFilePath,
+		OrgID:         user.Organization,
+		Username:      user.Username,
+		FirstName:     user.FirstName,
+		LastName:      user.LastName,
 	}
 
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)

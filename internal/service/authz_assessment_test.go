@@ -408,7 +408,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			})
 
 			testID := uuid.New()
-			inv, err := model.NewAssessmentInventory(uuid.New(), "Authz Assessment", inventoryJSON)
+			inv, err := model.NewAssessmentInventory(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
 				ID:          testID,
@@ -441,7 +441,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 				},
 			})
 
-			inv, err := model.NewAssessmentInventory(uuid.New(), "Visible Assessment", inventoryJSON)
+			inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
 				ID:          uuid.New(),
