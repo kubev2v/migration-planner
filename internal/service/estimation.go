@@ -36,7 +36,7 @@ type MigrationAssessmentResult struct {
 }
 
 type EstimationServicer interface {
-	CalculateMigrationEstimation(ctx context.Context, assessmentID uuid.UUID, clusterID string, schemas []engines.Schema, userParams []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error)
+	CalculateMigrationEstimation(ctx context.Context, assessmentID uuid.UUID, clusterIDs []string, schemas []engines.Schema, userParams []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error)
 	CalculateMigrationComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*MigrationComplexityResult, error)
 	CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*OsDiskComplexityResult, error)
 	ValidateParams(userParams []estimation.Param) error
@@ -61,19 +61,18 @@ func NewEstimationService(store store.Store) *EstimationService {
 	}
 }
 
-// CalculateMigrationEstimation calculates migration time estimation for a given assessment and cluster.
-// When clusterID is empty, the vCenter-level aggregate inventory is used.
+// CalculateMigrationEstimation calculates migration time estimation for selected clusters.
+// When clusterIDs is empty, the vCenter-level aggregate inventory is used.
 func (es *EstimationService) CalculateMigrationEstimation(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	clusterID string,
+	clusterIDs []string,
 	schemas []engines.Schema,
 	userParams []estimation.Param,
 ) (map[engines.Schema]*MigrationAssessmentResult, error) {
 	logger := es.logger.WithContext(ctx)
 	tracer := logger.Operation("calculate_migration_estimation").
 		WithUUID("assessment_id", assessmentID).
-		WithString("cluster_id", clusterID).
 		Build()
 
 	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
@@ -81,7 +80,7 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		return nil, err
 	}
 
-	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	invData, err := resolveEstimationInventoryData(inventory, clusterIDs, assessmentID)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
@@ -186,6 +185,34 @@ func resolveInventoryData(inventory api.Inventory, clusterID string, assessmentI
 		return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
 	}
 	return data, nil
+}
+
+// resolveEstimationInventoryData returns the combined InventoryData for the given clusterIDs,
+// or the vCenter-level aggregate when clusterIDs is empty.
+func resolveEstimationInventoryData(inventory api.Inventory, clusterIDs []string, assessmentID uuid.UUID) (api.InventoryData, error) {
+	if len(clusterIDs) == 0 {
+		return resolveInventoryData(inventory, "", assessmentID)
+	}
+
+	var combined api.InventoryData
+	seen := make(map[string]struct{}, len(clusterIDs))
+	for _, clusterID := range clusterIDs {
+		if clusterID == "" {
+			return api.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain empty values")
+		}
+		if _, exists := seen[clusterID]; exists {
+			return api.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain duplicate values")
+		}
+		seen[clusterID] = struct{}{}
+
+		data, err := resolveInventoryData(inventory, clusterID, assessmentID)
+		if err != nil {
+			return api.InventoryData{}, err
+		}
+		combined.Vms.Total += data.Vms.Total
+		combined.Vms.DiskGB.Total += data.Vms.DiskGB.Total
+	}
+	return combined, nil
 }
 
 // buildComplexityResult converts cluster inventory data into complexity breakdowns.

@@ -25,11 +25,11 @@ func NewEventEstimationService(inner service.EstimationServicer, s store.Store) 
 func (e *EventEstimationService) CalculateMigrationEstimation(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	clusterID string,
+	clusterIDs []string,
 	schemas []engines.Schema,
 	userParams []estimation.Param,
 ) (map[engines.Schema]*service.MigrationAssessmentResult, error) {
-	results, err := e.inner.CalculateMigrationEstimation(ctx, assessmentID, clusterID, schemas, userParams)
+	results, err := e.inner.CalculateMigrationEstimation(ctx, assessmentID, clusterIDs, schemas, userParams)
 	if err != nil {
 		return nil, err
 	}
