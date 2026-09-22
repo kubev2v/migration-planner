@@ -282,6 +282,11 @@ func (a *AuthzAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	return a.inner.UnshareAssessment(ctx, id)
 }
 
+func (a *AuthzAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+	// TODO: Add authz when this method will be exposed
+	return a.inner.AggregateInventories(ctx, assessmentID, clusterIDs...)
+}
+
 func (a *AuthzAssessmentService) buildOwnerSharing(ctx context.Context, rels []model.Relationship) (*model.Sharing, error) {
 	shared := make([]model.SharingSubject, 0, len(rels))
 	for _, r := range rels {
