@@ -1,6 +1,9 @@
 package model
 
-import "github.com/google/uuid"
+import (
+	"github.com/google/uuid"
+	"github.com/riverqueue/river"
+)
 
 // RVToolsJobMetadata is stored in river_job.metadata to track progress and results.
 type RVToolsJobMetadata struct {
@@ -18,3 +21,23 @@ const (
 	JobStatusFailed     = "failed"
 	JobStatusCancelled  = "cancelled"
 )
+
+type RVToolsJobArgs struct {
+	Name      string            `json:"name"`
+	Files     map[string]string `json:"files"`
+	OrgID     string            `json:"org_id"`
+	Username  string            `json:"username"`
+	FirstName string            `json:"first_name"`
+	LastName  string            `json:"last_name"`
+}
+
+func (RVToolsJobArgs) Kind() string {
+	return "rvtools_assessment"
+}
+
+func (RVToolsJobArgs) InsertOpts() river.InsertOpts {
+	return river.InsertOpts{
+		Queue:       "default",
+		MaxAttempts: 1,
+	}
+}
