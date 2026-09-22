@@ -38,6 +38,18 @@ func (p *Parser) Init() error {
 	return nil
 }
 
+func (p *Parser) Cleanup() error {
+	q, err := p.builder.CleanupQuery()
+	if err != nil {
+		return fmt.Errorf("building cleanup query: %w", err)
+	}
+	_, err = p.db.ExecContext(context.Background(), q)
+	if err != nil {
+		return fmt.Errorf("cleaning up tables: %w", err)
+	}
+	return nil
+}
+
 func (p *Parser) createSchema() error {
 	q, err := p.builder.CreateSchemaQuery()
 	if err != nil {
