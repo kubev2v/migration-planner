@@ -37,8 +37,8 @@ type MigrationAssessmentResult struct {
 
 type EstimationServicer interface {
 	CalculateMigrationEstimation(ctx context.Context, assessmentID uuid.UUID, clusterID string, schemas []engines.Schema, userParams []estimation.Param) (map[engines.Schema]*MigrationAssessmentResult, error)
-	CalculateMigrationComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*MigrationComplexityResult, error)
-	CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*OsDiskComplexityResult, error)
+	CalculateMigrationComplexity(ctx context.Context, assessmentID uuid.UUID, clusterIDs []string) (*MigrationComplexityResult, error)
+	CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterIDs []string) (*OsDiskComplexityResult, error)
 	ValidateParams(userParams []estimation.Param) error
 	BuildBaseParams(userParams []estimation.Param) []estimation.Param
 	BuildBucketParams(baseParams []estimation.Param, vmCount int, diskGB float64) []estimation.Param
@@ -113,20 +113,16 @@ func (es *EstimationService) CalculateMigrationEstimation(
 func (es *EstimationService) CalculateMigrationComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	clusterID string,
+	clusterIDs []string,
 ) (*MigrationComplexityResult, error) {
 	logger := es.logger.WithContext(ctx)
 	tracer := logger.Operation("calculate_migration_complexity").
 		WithUUID("assessment_id", assessmentID).
-		WithString("cluster_id", clusterID).
+		WithParam("cluster_ids", clusterIDs).
 		Build()
 
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
-	if err != nil {
-		return nil, err
-	}
-
-	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	// Fetch and aggregate inventory data
+	invData, err := es.getAggregatedInventoryData(ctx, assessmentID, clusterIDs, tracer)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
@@ -170,6 +166,30 @@ func (es *EstimationService) loadInventory(ctx context.Context, assessmentID uui
 		return api.Inventory{}, fmt.Errorf("failed to parse inventory: %w", err)
 	}
 	return inventory, nil
+}
+
+// getAggregatedInventoryData fetches the assessment's inventory and returns
+// aggregated data for the specified clusters. This is the new entry point for
+// multi-cluster complexity calculations.
+func (es *EstimationService) getAggregatedInventoryData(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	clusterIDs []string,
+	tracer *log.OperationTracer,
+) (api.InventoryData, error) {
+	// Fetch full inventory from database
+	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
+	if err != nil {
+		return api.InventoryData{}, err
+	}
+
+	// Aggregate the requested clusters
+	invData, err := aggregateInventoryData(&inventory, clusterIDs, assessmentID)
+	if err != nil {
+		return api.InventoryData{}, err
+	}
+
+	return invData, nil
 }
 
 // resolveInventoryData returns the InventoryData for the given clusterID,
@@ -243,6 +263,138 @@ func buildComplexityByOsDisk(dist *map[string]api.DiskSizeTierSummary) []complex
 		result[i] = complexity.OSDiskEntry{Score: s, VMCount: vmCount, TotalSizeTB: totalSizeTB}
 	}
 	return result
+}
+
+// aggregateInventoryData merges inventory data from multiple clusters into a single InventoryData.
+// When clusterIDs contains a single empty string, it returns the vCenter aggregate.
+// When clusterIDs contains one cluster ID, it returns that cluster's data directly.
+// When clusterIDs contains multiple cluster IDs, it merges their data.
+func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, assessmentID uuid.UUID) (api.InventoryData, error) {
+	// Edge case: empty list
+	if len(clusterIDs) == 0 {
+		return api.InventoryData{}, fmt.Errorf("at least one cluster ID required")
+	}
+
+	// Special case: vCenter aggregate (single empty string)
+	if usesVCenterAggregate(clusterIDs) {
+		if inventory.Vcenter == nil {
+			return api.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
+		}
+		return *inventory.Vcenter, nil
+	}
+
+	// Fast path: single cluster (no aggregation needed)
+	if len(clusterIDs) == 1 {
+		data, exists := inventory.Clusters[clusterIDs[0]]
+		if !exists {
+			return api.InventoryData{}, NewErrClusterNotFound(clusterIDs[0], assessmentID)
+		}
+		return data, nil
+	}
+
+	// Multi-cluster aggregation
+	// Validate all clusters exist first
+	for _, clusterID := range clusterIDs {
+		if _, exists := inventory.Clusters[clusterID]; !exists {
+			return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+		}
+	}
+
+	// Initialize result
+	result := api.InventoryData{
+		Vms:   api.VMs{},
+		Infra: api.Infra{},
+	}
+
+	// Initialize maps
+	osInfo := make(map[string]api.OsInfo)
+
+	// Aggregate across clusters
+	for _, clusterID := range clusterIDs {
+		cluster := inventory.Clusters[clusterID]
+
+		// Aggregate VM totals
+		result.Vms.Total += cluster.Vms.Total
+		result.Vms.TotalMigratable += cluster.Vms.TotalMigratable
+		if cluster.Vms.TotalMigratableWithWarnings != nil {
+			if result.Vms.TotalMigratableWithWarnings == nil {
+				result.Vms.TotalMigratableWithWarnings = new(int)
+			}
+			*result.Vms.TotalMigratableWithWarnings += *cluster.Vms.TotalMigratableWithWarnings
+		}
+
+		// Aggregate resource breakdowns
+		result.Vms.CpuCores.Total += cluster.Vms.CpuCores.Total
+		result.Vms.CpuCores.TotalForMigratable += cluster.Vms.CpuCores.TotalForMigratable
+		result.Vms.CpuCores.TotalForMigratableWithWarnings += cluster.Vms.CpuCores.TotalForMigratableWithWarnings
+		result.Vms.CpuCores.TotalForNotMigratable += cluster.Vms.CpuCores.TotalForNotMigratable
+
+		result.Vms.RamGB.Total += cluster.Vms.RamGB.Total
+		result.Vms.RamGB.TotalForMigratable += cluster.Vms.RamGB.TotalForMigratable
+		result.Vms.RamGB.TotalForMigratableWithWarnings += cluster.Vms.RamGB.TotalForMigratableWithWarnings
+		result.Vms.RamGB.TotalForNotMigratable += cluster.Vms.RamGB.TotalForNotMigratable
+
+		result.Vms.DiskGB.Total += cluster.Vms.DiskGB.Total
+		result.Vms.DiskGB.TotalForMigratable += cluster.Vms.DiskGB.TotalForMigratable
+		result.Vms.DiskGB.TotalForMigratableWithWarnings += cluster.Vms.DiskGB.TotalForMigratableWithWarnings
+		result.Vms.DiskGB.TotalForNotMigratable += cluster.Vms.DiskGB.TotalForNotMigratable
+
+		// Aggregate OS info
+		if cluster.Vms.OsInfo != nil {
+			for osName, info := range *cluster.Vms.OsInfo {
+				existing := osInfo[osName]
+				existing.Count += info.Count
+				// Preserve support metadata from any cluster
+				if info.Supported {
+					existing.Supported = true
+				}
+				if info.SupportTier != nil && (existing.SupportTier == nil || *info.SupportTier > *existing.SupportTier) {
+					existing.SupportTier = info.SupportTier
+				}
+				if info.UpgradeRecommendation != nil && existing.UpgradeRecommendation == nil {
+					existing.UpgradeRecommendation = info.UpgradeRecommendation
+				}
+				osInfo[osName] = existing
+			}
+		}
+
+		// Aggregate disk complexity tiers
+		diskSource := cluster.Vms.DiskComplexityTier
+		if diskSource == nil || len(*diskSource) == 0 {
+			diskSource = cluster.Vms.DiskSizeTier // Fallback for old snapshots
+		}
+		if diskSource != nil {
+			if result.Vms.DiskComplexityTier == nil {
+				diskComplexityTier := make(map[string]api.DiskSizeTierSummary)
+				result.Vms.DiskComplexityTier = &diskComplexityTier
+			}
+			for tierLabel, summary := range *diskSource {
+				existing := (*result.Vms.DiskComplexityTier)[tierLabel]
+				existing.VmCount += summary.VmCount
+				existing.TotalSizeTB += summary.TotalSizeTB
+				(*result.Vms.DiskComplexityTier)[tierLabel] = existing
+			}
+		}
+
+		// Aggregate complexity distribution
+		if cluster.Vms.ComplexityDistribution != nil {
+			if result.Vms.ComplexityDistribution == nil {
+				complexityDist := make(map[string]api.DiskSizeTierSummary)
+				result.Vms.ComplexityDistribution = &complexityDist
+			}
+			for scoreKey, summary := range *cluster.Vms.ComplexityDistribution {
+				existing := (*result.Vms.ComplexityDistribution)[scoreKey]
+				existing.VmCount += summary.VmCount
+				existing.TotalSizeTB += summary.TotalSizeTB
+				(*result.Vms.ComplexityDistribution)[scoreKey] = existing
+			}
+		}
+	}
+
+	// Assign aggregated maps
+	result.Vms.OsInfo = &osInfo
+
+	return result, nil
 }
 
 // ParamDefinition describes a single calculator parameter that can be supplied
@@ -355,20 +507,15 @@ type OsDiskComplexityResult struct {
 func (es *EstimationService) CalculateOsDiskComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	clusterID string,
+	clusterIDs []string,
 ) (*OsDiskComplexityResult, error) {
 	logger := es.logger.WithContext(ctx)
-	tracer := logger.Operation("calculate_osdisk_complexity").
+	tracer := logger.Operation("calculate_os_disk_complexity").
 		WithUUID("assessment_id", assessmentID).
-		WithString("cluster_id", clusterID).
+		WithParam("cluster_ids", clusterIDs).
 		Build()
 
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
-	if err != nil {
-		return nil, err
-	}
-
-	invData, err := resolveInventoryData(inventory, clusterID, assessmentID)
+	invData, err := es.getAggregatedInventoryData(ctx, assessmentID, clusterIDs, tracer)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err

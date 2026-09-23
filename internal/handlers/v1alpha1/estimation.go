@@ -54,7 +54,7 @@ func (h *ServiceHandler) CalculateMigrationComplexity(ctx context.Context, reque
 		}
 	}
 
-	result, err := h.estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+	result, err := h.estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -131,7 +131,7 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		}
 	}
 
-	osDiskResult, err := h.estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, clusterID)
+	osDiskResult, err := h.estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{clusterID})
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
