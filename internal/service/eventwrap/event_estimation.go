@@ -44,9 +44,9 @@ func (e *EventEstimationService) CalculateMigrationEstimation(
 func (e *EventEstimationService) CalculateMigrationComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	clusterID string,
+	clusterIDs []string,
 ) (*service.MigrationComplexityResult, error) {
-	result, err := e.inner.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+	result, err := e.inner.CalculateMigrationComplexity(ctx, assessmentID, clusterIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func (e *EventEstimationService) CalculateMigrationComplexity(
 	return result, nil
 }
 
-func (e *EventEstimationService) CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterID string) (*service.OsDiskComplexityResult, error) {
-	return e.inner.CalculateOsDiskComplexity(ctx, assessmentID, clusterID)
+func (e *EventEstimationService) CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterIDs []string) (*service.OsDiskComplexityResult, error) {
+	return e.inner.CalculateOsDiskComplexity(ctx, assessmentID, clusterIDs)
 }
 
 func (e *EventEstimationService) ValidateParams(userParams []estimation.Param) error {

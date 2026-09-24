@@ -262,7 +262,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
@@ -278,7 +278,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				// score 0: no unknown entries
@@ -306,7 +306,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, diskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				// DiskComplexityTier is set by createTestInventoryForComplexity with a fixed
 				// single entry: "0-10TiB" → score 1, VmCount 125, TotalSizeTB 8.5
@@ -324,7 +324,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				for i, entry := range result.ComplexityByOS {
@@ -337,7 +337,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				for i, entry := range result.ComplexityByDisk {
@@ -352,7 +352,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				// defaultOsInfo has 3 distinct OS names
@@ -364,7 +364,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				byName := map[string]int{}
@@ -381,7 +381,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				byName := map[string]int{}
@@ -401,7 +401,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				Expect(result.DiskSizeRatings).To(HaveLen(4))
@@ -416,7 +416,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(err).To(BeNil())
 				// defaultOsInfo has 3 distinct OS names
@@ -449,7 +449,7 @@ var _ = Describe("EstimationService", func() {
 				data, err := json.Marshal(inv)
 				Expect(err).ToNot(HaveOccurred())
 				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 				Expect(err).To(BeNil())
 				Expect(result.ComplexityByDisk).To(HaveLen(4))
 				// "Easy (0-10TB)" maps to score 1 — verify VmCount and TotalSizeTB flowed through
@@ -461,7 +461,7 @@ var _ = Describe("EstimationService", func() {
 
 		Context("assessment not found", func() {
 			It("returns ErrResourceNotFound when assessment does not exist", func() {
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -472,7 +472,7 @@ var _ = Describe("EstimationService", func() {
 			It("returns error when store returns error", func() {
 				mockStore.getError = store.ErrRecordNotFound
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -488,7 +488,7 @@ var _ = Describe("EstimationService", func() {
 					Snapshots: []model.Snapshot{},
 				}
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -505,7 +505,7 @@ var _ = Describe("EstimationService", func() {
 					},
 				}
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -519,7 +519,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, "other-cluster", defaultOsInfo, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "non-existent-cluster")
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{"non-existent-cluster"})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -534,7 +534,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, clusterID, nil, defaultDiskTier,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -561,7 +561,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(err).ToNot(HaveOccurred())
 				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -591,7 +591,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(err).ToNot(HaveOccurred())
 				mockStore.assessments[assessmentID] = createTestAssessmentFromRawInventory(assessmentID, testUsername, testOrgID, data)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -609,7 +609,7 @@ var _ = Describe("EstimationService", func() {
 					createTestInventoryWithVcenter(defaultOsInfo, &diskTier, nil),
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "")
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{""})
 
 				Expect(err).To(BeNil())
 				Expect(result).NotTo(BeNil())
@@ -625,7 +625,7 @@ var _ = Describe("EstimationService", func() {
 					assessmentID, testUsername, testOrgID, data,
 				)
 
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, "")
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{""})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
@@ -938,7 +938,7 @@ var _ = Describe("EstimationService", func() {
 				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier, dist,
 			)
 
-			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, clusterID)
+			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{clusterID})
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Buckets).To(HaveLen(5))
@@ -949,7 +949,7 @@ var _ = Describe("EstimationService", func() {
 		})
 
 		It("returns error for unknown assessment", func() {
-			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, uuid.New(), clusterID)
+			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, uuid.New(), []string{clusterID})
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -957,7 +957,7 @@ var _ = Describe("EstimationService", func() {
 			mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
 				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 			)
-			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, "wrong-cluster")
+			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{"wrong-cluster"})
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -973,7 +973,7 @@ var _ = Describe("EstimationService", func() {
 				createTestInventoryWithVcenter(defaultOsInfo, &diskTier, dist),
 			)
 
-			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, "")
+			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{""})
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Buckets).To(HaveLen(5))
@@ -1043,7 +1043,7 @@ var _ = Describe("EstimationService", func() {
 	Describe("EventEstimationService event publishing", func() {
 		Context("CalculateMigrationComplexity", func() {
 			It("does not publish an event when the inner service fails", func() {
-				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), clusterID)
+				result, err := estimationSrv.CalculateMigrationComplexity(ctx, uuid.New(), []string{clusterID})
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
@@ -1124,6 +1124,20 @@ var _ = Describe("EstimationService", func() {
 			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 0.1}}
 			err := estimationSrv.ValidateParams(params)
 			Expect(err).To(BeNil())
+		})
+	})
+
+	Describe("GetAggregatedInventoryData", func() {
+		It("returns aggregated inventory data for single cluster", func() {
+			// This test requires a database setup - use existing test fixtures
+			// For now, write the interface test showing expected behavior
+
+			// Setup would create an assessment with inventory containing 2 clusters
+			// Execute: fetch with single cluster ID
+			// Verify: returns that cluster's data only
+
+			t := GinkgoT()
+			t.Skip("TODO: implement with test fixtures")
 		})
 	})
 })
