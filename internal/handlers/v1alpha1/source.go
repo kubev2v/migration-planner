@@ -183,68 +183,117 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 		WithUUID("source_id", request.Id).
 		Build()
 
-	// Route based on content type
-	if request.MultipartBody != nil {
-		return s.updateInventoryMultipart(ctx, request.Id, request.MultipartBody, logger)
+	if request.Body == nil {
+		return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
 	}
-	if request.JSONBody != nil {
-		return s.updateInventoryJSON(ctx, request.Id, request.JSONBody, logger)
+
+	source, updateErr, err := s.updateInventoryJSON(ctx, request.Id, request.Body, logger)
+	if err != nil {
+		return nil, err
 	}
-	return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
+	if updateErr != nil {
+		switch updateErr.code {
+		case http.StatusBadRequest:
+			return server.UpdateInventory400JSONResponse{Message: updateErr.message}, nil
+		case http.StatusForbidden:
+			return server.UpdateInventory403JSONResponse{Message: updateErr.message}, nil
+		case http.StatusNotFound:
+			return server.UpdateInventory404JSONResponse{Message: updateErr.message}, nil
+		default:
+			return server.UpdateInventory500JSONResponse{Message: updateErr.message}, nil
+		}
+	}
+	return server.UpdateInventory200JSONResponse(*source), nil
 }
 
-func (s *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uuid.UUID, logger *log.OperationTracer) (*model.Source, server.UpdateInventoryResponseObject, error) {
+// (PUT /api/v1/sources/{id}/inventory/file)
+func (s *ServiceHandler) UploadSourceInventoryFile(ctx context.Context, request server.UploadSourceInventoryFileRequestObject) (server.UploadSourceInventoryFileResponseObject, error) {
+	logger := log.NewDebugLogger("source_handler").
+		WithContext(ctx).
+		Operation("upload_source_inventory_file").
+		WithUUID("source_id", request.Id).
+		Build()
+
+	if request.Body == nil {
+		return server.UploadSourceInventoryFile400JSONResponse{Message: "empty body"}, nil
+	}
+
+	source, updateErr, err := s.updateInventoryMultipart(ctx, request.Id, request.Body, logger)
+	if err != nil {
+		return nil, err
+	}
+	if updateErr != nil {
+		switch updateErr.code {
+		case http.StatusBadRequest:
+			return server.UploadSourceInventoryFile400JSONResponse{Message: updateErr.message}, nil
+		case http.StatusForbidden:
+			return server.UploadSourceInventoryFile403JSONResponse{Message: updateErr.message}, nil
+		case http.StatusNotFound:
+			return server.UploadSourceInventoryFile404JSONResponse{Message: updateErr.message}, nil
+		default:
+			return server.UploadSourceInventoryFile500JSONResponse{Message: updateErr.message}, nil
+		}
+	}
+	return server.UploadSourceInventoryFile200JSONResponse(*source), nil
+}
+
+// inventoryUpdateError carries an HTTP status code and message so both the JSON
+// and file-upload handlers can build their own operation-specific responses.
+type inventoryUpdateError struct {
+	code    int
+	message string
+}
+
+func (s *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uuid.UUID, logger *log.OperationTracer) (*model.Source, *inventoryUpdateError, error) {
 	source, err := s.sourceSrv.GetSource(ctx, sourceID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
-			return nil, server.UpdateInventory404JSONResponse{Message: err.Error()}, nil
+			return nil, &inventoryUpdateError{code: http.StatusNotFound, message: err.Error()}, nil
 		default:
 			logger.Error(err).WithString("step", "get_source").Log()
-			return nil, server.UpdateInventory500JSONResponse{
-				Message: fmt.Sprintf("failed to get source %s: %v", sourceID, err),
-			}, nil
+			return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to get source %s: %v", sourceID, err)}, nil
 		}
 	}
 
 	user := auth.MustHaveUser(ctx)
 	if user.Organization != source.OrgID || user.Username != source.Username {
 		message := fmt.Sprintf("forbidden to update inventory for source %s by user %s with org_id %s", sourceID, user.Username, user.Organization)
-		return nil, server.UpdateInventory403JSONResponse{Message: message}, nil
+		return nil, &inventoryUpdateError{code: http.StatusForbidden, message: message}, nil
 	}
 
 	return source, nil, nil
 }
 
-// inventoryUpdateResponse handles the common logic for updating inventory and returning the response
-func (s *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (server.UpdateInventoryResponseObject, error) {
+// inventoryUpdateResponse handles the common logic for updating inventory and returning the mapped source
+func (s *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (*v1alpha1.Source, *inventoryUpdateError, error) {
 	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, form)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrInvalidVCenterID:
-			return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
+			return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: err.Error()}, nil
 		default:
-			return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
+			return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
 		}
 	}
 
 	response, err := mappers.SourceToApi(updatedSource)
 	if err != nil {
-		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
+		return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
 
-	return server.UpdateInventory200JSONResponse(response), nil
+	return &response, nil, nil
 }
 
-func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.UUID, body *v1alpha1.UpdateInventoryJSONRequestBody, logger *log.OperationTracer) (server.UpdateInventoryResponseObject, error) {
-	_, errResponse, err := s.authorizeSourceAccess(ctx, sourceID, logger)
-	if err != nil || errResponse != nil {
-		return errResponse, err
+func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.UUID, body *v1alpha1.UpdateInventoryJSONRequestBody, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	_, updateErr, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+	if err != nil || updateErr != nil {
+		return nil, updateErr, err
 	}
 
 	data, err := json.Marshal(body.Inventory)
 	if err != nil {
-		return server.UpdateInventory500JSONResponse{Message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
+		return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to update source inventory %s: %v", sourceID, err)}, nil
 	}
 
 	form := srvMappers.InventoryUpdateForm{
@@ -258,22 +307,22 @@ func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.
 	return s.inventoryUpdateResponse(ctx, sourceID, form)
 }
 
-func (s *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID uuid.UUID, body *multipart.Reader, logger *log.OperationTracer) (server.UpdateInventoryResponseObject, error) {
-	source, errResponse, err := s.authorizeSourceAccess(ctx, sourceID, logger)
-	if err != nil || errResponse != nil {
-		return errResponse, err
+func (s *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID uuid.UUID, body *multipart.Reader, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	source, updateErr, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+	if err != nil || updateErr != nil {
+		return nil, updateErr, err
 	}
 
 	fileBytes, err := readUploadedInventoryFile(body)
 	if err != nil {
 		logger.Error(err).WithString("step", "parse_multipart").Log()
-		return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
+		return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: err.Error()}, nil
 	}
 
 	parsed, err := inventorybundle.Parse(fileBytes)
 	if err != nil {
 		logger.Error(err).WithString("step", "parse_inventory").Log()
-		return server.UpdateInventory400JSONResponse{Message: err.Error()}, nil
+		return nil, &inventoryUpdateError{code: http.StatusBadRequest, message: err.Error()}, nil
 	}
 
 	agentID := uuid.New()

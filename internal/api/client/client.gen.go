@@ -263,6 +263,9 @@ type ClientInterface interface {
 
 	UpdateInventory(ctx context.Context, id openapi_types.UUID, body UpdateInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// UploadSourceInventoryFileWithBody request with any body
+	UploadSourceInventoryFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// Health request
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
@@ -1013,6 +1016,18 @@ func (c *Client) UpdateInventoryWithBody(ctx context.Context, id openapi_types.U
 
 func (c *Client) UpdateInventory(ctx context.Context, id openapi_types.UUID, body UpdateInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateInventoryRequest(c.Server, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UploadSourceInventoryFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSourceInventoryFileRequestWithBody(c.Server, id, contentType, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2817,6 +2832,42 @@ func NewUpdateInventoryRequestWithBody(server string, id openapi_types.UUID, con
 	return req, nil
 }
 
+// NewUploadSourceInventoryFileRequestWithBody generates requests for UploadSourceInventoryFile with any type of body
+func NewUploadSourceInventoryFileRequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/inventory/file", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PUT", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewHealthRequest generates requests for Health
 func NewHealthRequest(server string) (*http.Request, error) {
 	var err error
@@ -3058,6 +3109,9 @@ type ClientWithResponsesInterface interface {
 	UpdateInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInventoryResponse, error)
 
 	UpdateInventoryWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateInventoryJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInventoryResponse, error)
+
+	// UploadSourceInventoryFileWithBodyWithResponse request with any body
+	UploadSourceInventoryFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSourceInventoryFileResponse, error)
 
 	// HealthWithResponse request
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
@@ -4260,6 +4314,33 @@ func (r UpdateInventoryResponse) StatusCode() int {
 	return 0
 }
 
+type UploadSourceInventoryFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *Source
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadSourceInventoryFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadSourceInventoryFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type HealthResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -4829,6 +4910,15 @@ func (c *ClientWithResponses) UpdateInventoryWithResponse(ctx context.Context, i
 		return nil, err
 	}
 	return ParseUpdateInventoryResponse(rsp)
+}
+
+// UploadSourceInventoryFileWithBodyWithResponse request with arbitrary body returning *UploadSourceInventoryFileResponse
+func (c *ClientWithResponses) UploadSourceInventoryFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSourceInventoryFileResponse, error) {
+	rsp, err := c.UploadSourceInventoryFileWithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSourceInventoryFileResponse(rsp)
 }
 
 // HealthWithResponse request returning *HealthResponse
@@ -7276,6 +7366,67 @@ func ParseUpdateInventoryResponse(rsp *http.Response) (*UpdateInventoryResponse,
 	}
 
 	response := &UpdateInventoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Source
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUploadSourceInventoryFileResponse parses an HTTP response from a UploadSourceInventoryFileWithResponse call
+func ParseUploadSourceInventoryFileResponse(rsp *http.Response) (*UploadSourceInventoryFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadSourceInventoryFileResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
