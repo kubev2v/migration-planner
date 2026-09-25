@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
-	"strings"
 
 	"github.com/go-chi/chi/v5"
 	. "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -158,6 +157,9 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/inventory)
 	UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v1/sources/{id}/inventory/file)
+	UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
@@ -394,6 +396,11 @@ func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Reque
 
 // (PUT /api/v1/sources/{id}/inventory)
 func (_ Unimplemented) UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v1/sources/{id}/inventory/file)
+func (_ Unimplemented) UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1529,6 +1536,32 @@ func (siw *ServerInterfaceWrapper) UpdateInventory(w http.ResponseWriter, r *htt
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// UploadSourceInventoryFile operation middleware
+func (siw *ServerInterfaceWrapper) UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadSourceInventoryFile(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // Health operation middleware
 func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1794,6 +1827,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory", wrapper.UpdateInventory)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory/file", wrapper.UploadSourceInventoryFile)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
@@ -4276,9 +4312,8 @@ func (response GetSourceDownloadURL500JSONResponse) VisitGetSourceDownloadURLRes
 }
 
 type UpdateInventoryRequestObject struct {
-	Id            openapi_types.UUID `json:"id"`
-	JSONBody      *UpdateInventoryJSONRequestBody
-	MultipartBody *multipart.Reader
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateInventoryJSONRequestBody
 }
 
 type UpdateInventoryResponseObject interface {
@@ -4333,6 +4368,69 @@ func (response UpdateInventory404JSONResponse) VisitUpdateInventoryResponse(w ht
 type UpdateInventory500JSONResponse Error
 
 func (response UpdateInventory500JSONResponse) VisitUpdateInventoryResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFileRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *multipart.Reader
+}
+
+type UploadSourceInventoryFileResponseObject interface {
+	VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error
+}
+
+type UploadSourceInventoryFile200JSONResponse Source
+
+func (response UploadSourceInventoryFile200JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFile400JSONResponse Error
+
+func (response UploadSourceInventoryFile400JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFile401JSONResponse Error
+
+func (response UploadSourceInventoryFile401JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFile403JSONResponse Error
+
+func (response UploadSourceInventoryFile403JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFile404JSONResponse Error
+
+func (response UploadSourceInventoryFile404JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadSourceInventoryFile500JSONResponse Error
+
+func (response UploadSourceInventoryFile500JSONResponse) VisitUploadSourceInventoryFileResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -4494,6 +4592,9 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/inventory)
 	UpdateInventory(ctx context.Context, request UpdateInventoryRequestObject) (UpdateInventoryResponseObject, error)
+
+	// (PUT /api/v1/sources/{id}/inventory/file)
+	UploadSourceInventoryFile(ctx context.Context, request UploadSourceInventoryFileRequestObject) (UploadSourceInventoryFileResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -5801,23 +5902,13 @@ func (sh *strictHandler) UpdateInventory(w http.ResponseWriter, r *http.Request,
 	var request UpdateInventoryRequestObject
 
 	request.Id = id
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "application/json") {
 
-		var body UpdateInventoryJSONRequestBody
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
-			return
-		}
-		request.JSONBody = &body
+	var body UpdateInventoryJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
 	}
-	if strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/form-data") {
-		if reader, err := r.MultipartReader(); err != nil {
-			sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
-			return
-		} else {
-			request.MultipartBody = reader
-		}
-	}
+	request.Body = &body
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.UpdateInventory(ctx, request.(UpdateInventoryRequestObject))
@@ -5832,6 +5923,39 @@ func (sh *strictHandler) UpdateInventory(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateInventoryResponseObject); ok {
 		if err := validResponse.VisitUpdateInventoryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadSourceInventoryFile operation middleware
+func (sh *strictHandler) UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UploadSourceInventoryFileRequestObject
+
+	request.Id = id
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadSourceInventoryFile(ctx, request.(UploadSourceInventoryFileRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadSourceInventoryFile")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadSourceInventoryFileResponseObject); ok {
+		if err := validResponse.VisitUploadSourceInventoryFileResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

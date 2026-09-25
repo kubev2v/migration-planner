@@ -231,9 +231,10 @@ paths:
       tags:
         - source
       description: >
-        Upload source inventory. Replaces the main inventory and all subset
-        inventories. Supports JSON (single inventory file) and ZIP bundle
-        (inventory.json + subsets/*.json from disconnected agent).
+        Upload source inventory as a single JSON inventory file. Replaces the
+        main inventory and clears all subset inventories. To upload a full
+        disconnected bundle (inventory.json + subsets/*.json), use
+        PUT /api/v1/sources/{id}/inventory/file.
       operationId: updateInventory
       parameters:
         - name: id
@@ -249,6 +250,65 @@ paths:
           application/json:
             schema:
               $ref: "#/components/schemas/UpdateInventory"
+      responses:
+        "200":
+          description: Updated source inventory
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Source"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /api/v1/sources/{id}/inventory/file:
+    put:
+      tags:
+        - source
+      description: >
+        Upload a full disconnected inventory for the source as a file. Accepts
+        either a single `.json` inventory file (clears subset inventories) or a
+        `.zip` bundle from the disconnected agent (`inventory.json` plus
+        `subsets/<groupId>.json`). Replaces the main inventory and all subset
+        inventories.
+      operationId: uploadSourceInventoryFile
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
           multipart/form-data:
             schema:
               $ref: "#/components/schemas/SourceInventoryFileForm"
