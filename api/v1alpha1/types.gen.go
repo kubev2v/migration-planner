@@ -1560,5 +1560,5 @@ type UpdateSourceJSONRequestBody = SourceUpdate
 // UpdateInventoryJSONRequestBody defines body for UpdateInventory for application/json ContentType.
 type UpdateInventoryJSONRequestBody = UpdateInventory
 
-// UpdateInventoryMultipartRequestBody defines body for UpdateInventory for multipart/form-data ContentType.
-type UpdateInventoryMultipartRequestBody = SourceInventoryFileForm
+// UploadSourceInventoryFileMultipartRequestBody defines body for UploadSourceInventoryFile for multipart/form-data ContentType.
+type UploadSourceInventoryFileMultipartRequestBody = SourceInventoryFileForm
