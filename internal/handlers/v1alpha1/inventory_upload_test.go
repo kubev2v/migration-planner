@@ -108,10 +108,10 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 		return data
 	}
 
-	uploadZIP := func(sourceID uuid.UUID, content []byte) server.UpdateInventoryResponseObject {
-		resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
-			Id:            sourceID,
-			MultipartBody: buildUpload(content),
+	uploadZIP := func(sourceID uuid.UUID, content []byte) server.UploadSourceInventoryFileResponseObject {
+		resp, err := srv.UploadSourceInventoryFile(ctx, server.UploadSourceInventoryFileRequestObject{
+			Id:   sourceID,
+			Body: buildUpload(content),
 		})
 		Expect(err).To(BeNil())
 		return resp
@@ -120,7 +120,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 	uploadJSON := func(sourceID uuid.UUID, agentID uuid.UUID, inv v1alpha1.Inventory) server.UpdateInventoryResponseObject {
 		resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 			Id: sourceID,
-			JSONBody: &v1alpha1.UpdateInventory{
+			Body: &v1alpha1.UpdateInventory{
 				AgentId:   agentID,
 				Inventory: inv,
 			},
@@ -129,7 +129,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 		return resp
 	}
 
-	// upload is the old helper - defaults to ZIP upload for backward compatibility
+	// upload is the old helper - defaults to ZIP/file upload for backward compatibility
 	upload := uploadZIP
 
 	BeforeAll(func() {
@@ -168,9 +168,9 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 			invBytes, _ := json.Marshal(mainInventory())
 
 			resp := upload(sourceID, invBytes)
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 
-			updated := resp.(server.UpdateInventory200JSONResponse)
+			updated := resp.(server.UploadSourceInventoryFile200JSONResponse)
 			Expect(updated.OnPremises).To(BeTrue())
 			Expect(updated.Inventory).ToNot(BeNil())
 			Expect(updated.Inventory.VcenterId).To(Equal("test-vcenter"))
@@ -188,12 +188,12 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 					Inventory: v1alpha1.Inventory{VcenterId: "vc-a"},
 				},
 			}))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(1))
 
 			invBytes, _ := json.Marshal(mainInventory())
 			resp = upload(sourceID, invBytes)
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(0))
 		})
 	})
@@ -227,12 +227,12 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 					Inventory: v1alpha1.Inventory{VcenterId: "vc-a"},
 				},
 			}))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(1))
 
 			// Now update with JSON body - should clear subsets
-			resp = uploadJSON(sourceID, agentID, mainInventory())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			jsonResp := uploadJSON(sourceID, agentID, mainInventory())
+			Expect(reflect.TypeOf(jsonResp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(0))
 		})
 	})
@@ -258,7 +258,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 			}
 
 			resp := upload(sourceID, buildBundle(mainInventory(), subsets))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(2))
 
 			var vmsCount int
@@ -279,11 +279,11 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 					Inventory: v1alpha1.Inventory{VcenterId: "vc-a"},
 				},
 			}))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(1))
 
 			resp = upload(sourceID, buildBundle(mainInventory(), nil))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(subsetCount(sourceID)).To(Equal(0))
 		})
 
@@ -297,8 +297,8 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 			_ = zw.Close()
 
 			resp := upload(sourceID, buf.Bytes())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory400JSONResponse{}).String()))
-			Expect(resp.(server.UpdateInventory400JSONResponse).Message).To(ContainSubstring("inventory.json"))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile400JSONResponse{}).String()))
+			Expect(resp.(server.UploadSourceInventoryFile400JSONResponse).Message).To(ContainSubstring("inventory.json"))
 		})
 	})
 
@@ -306,7 +306,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 		It("returns 404 for a missing source", func() {
 			invBytes, _ := json.Marshal(mainInventory())
 			resp := upload(uuid.New(), invBytes)
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory404JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile404JSONResponse{}).String()))
 		})
 
 		It("returns 403 when the source belongs to another user", func() {
@@ -316,16 +316,24 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 
 			invBytes, _ := json.Marshal(mainInventory())
 			resp := upload(otherID, invBytes)
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory403JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile403JSONResponse{}).String()))
 			Expect(subsetCount(otherID)).To(Equal(0))
 		})
 
-		It("returns 400 for an empty body", func() {
+		It("returns 400 for an empty JSON body", func() {
 			resp, err := srv.UpdateInventory(ctx, server.UpdateInventoryRequestObject{
 				Id: uuid.New(),
 			})
 			Expect(err).To(BeNil())
 			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory400JSONResponse{}).String()))
+		})
+
+		It("returns 400 for an empty file body", func() {
+			resp, err := srv.UploadSourceInventoryFile(ctx, server.UploadSourceInventoryFileRequestObject{
+				Id: uuid.New(),
+			})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile400JSONResponse{}).String()))
 		})
 	})
 
@@ -371,7 +379,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 
 			// First upload with specific agent ID
 			resp := upload(sourceID, buildInventoryWithAgent(agentID))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 
 			// Verify agent was created with the correct ID
 			Expect(agentCount(sourceID)).To(Equal(1))
@@ -386,12 +394,12 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 
 			// First upload
 			resp := upload(sourceID, buildInventoryWithAgent(agentID))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 			Expect(agentCount(sourceID)).To(Equal(1))
 
 			// Second upload with same agent ID
 			resp = upload(sourceID, buildInventoryWithAgent(agentID))
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 
 			// Still only 1 agent
 			Expect(agentCount(sourceID)).To(Equal(1))
@@ -423,7 +431,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 			_ = zw.Close()
 
 			resp := upload(sourceID, buf.Bytes())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UpdateInventory200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.UploadSourceInventoryFile200JSONResponse{}).String()))
 
 			// Verify agent was created with the correct ID from ZIP
 			Expect(agentCount(sourceID)).To(Equal(1))
