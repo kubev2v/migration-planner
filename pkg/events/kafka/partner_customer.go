@@ -10,6 +10,7 @@ type PartnerCustomerData struct {
 	ID               string     `json:"id"`
 	CustomerUsername string     `json:"customer_username"`
 	PartnerID        string     `json:"partner_id"`
+	PartnerName      string     `json:"partner_name"`
 	RequestStatus    string     `json:"request_status"`
 	Location         string     `json:"location"`
 	AcceptedAt       *time.Time `json:"accepted_at,omitempty"`
