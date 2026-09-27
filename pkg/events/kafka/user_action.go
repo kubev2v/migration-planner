@@ -15,6 +15,7 @@ type UserActionData struct {
 type ShareAssessmentActionData struct {
 	AssessmentID string `json:"assessment_id"`
 	PartnerID    string `json:"partner_id"`
+	PartnerName  string `json:"partner_name"`
 }
 
 type UnshareAssessmentActionData struct {
@@ -42,7 +43,7 @@ type VisitorActionData struct {
 	OrgID string `json:"org_id"`
 }
 
-func NewShareAssessmentPayload(username, assessmentID, partnerID string) UserActionEventPayload {
+func NewShareAssessmentPayload(username, assessmentID, partnerID, partnerName string) UserActionEventPayload {
 	return UserActionEventPayload{
 		UserAction: UserActionData{
 			Username:  username,
@@ -50,6 +51,7 @@ func NewShareAssessmentPayload(username, assessmentID, partnerID string) UserAct
 			Data: ShareAssessmentActionData{
 				AssessmentID: assessmentID,
 				PartnerID:    partnerID,
+				PartnerName:  partnerName,
 			},
 		},
 	}

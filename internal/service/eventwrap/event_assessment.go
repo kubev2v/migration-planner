@@ -175,18 +175,23 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		return err
 	}
 
-	payload := kafka.NewShareAssessmentPayload(user.Username, id.String(), *identity.PartnerID)
+	// Because of ShareAssessment success Must be a consumer with a PartnerID
+	partnerID := *identity.PartnerID
+	partnerGID, err := uuid.Parse(partnerID)
+	if err != nil {
+		return err
+	}
+	partner, err := e.accountsSvc.GetGroup(ctx, partnerGID)
+	if err != nil {
+		return err
+	}
+
+	payload := kafka.NewShareAssessmentPayload(user.Username, id.String(), partnerID, partner.Name)
 	ceBytes, err := kafka.BuildCloudEvent(kafka.ShareAssessmentEventType, payload)
 	if err != nil {
 		return err
 	}
 	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
-		return err
-	}
-
-	// Because of ShareAssessment success Must be a consumer with a PartnerID
-	partnerGID, err := uuid.Parse(*identity.PartnerID)
-	if err != nil {
 		return err
 	}
 

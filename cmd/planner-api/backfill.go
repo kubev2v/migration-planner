@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
@@ -68,9 +69,9 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 
 	zap.S().Infow("found assessments to backfill", "count", len(assessments))
 
-	partnerIDs, err := resolvePartnerIDs(ctx, s, assessments)
+	partners, err := resolveAssessmentPartners(ctx, s, assessments)
 	if err != nil {
-		return fmt.Errorf("resolving partner IDs: %w", err)
+		return fmt.Errorf("resolving assessment partners: %w", err)
 	}
 
 	var success, noSnapshotsErrors, inventoryConvertErrors, eventBuildErrors, publishErrors int
@@ -95,17 +96,19 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			continue
 		}
 
+		partner := partners[assessment.ID.String()]
 		payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
-			ID:         assessment.ID.String(),
-			SnapshotID: assessment.Snapshots[0].ID,
-			Inventory:  inventory,
-			Name:       assessment.Name,
-			OrgID:      assessment.OrgID,
-			Username:   assessment.Username,
-			SourceType: assessment.SourceType,
-			PartnerID:  partnerIDs[assessment.ID.String()],
-			CreatedAt:  assessment.CreatedAt,
-			UpdatedAt:  assessment.UpdatedAt,
+			ID:          assessment.ID.String(),
+			SnapshotID:  assessment.Snapshots[0].ID,
+			Inventory:   inventory,
+			Name:        assessment.Name,
+			OrgID:       assessment.OrgID,
+			Username:    assessment.Username,
+			SourceType:  assessment.SourceType,
+			PartnerID:   partner.ID,
+			PartnerName: partner.Name,
+			CreatedAt:   assessment.CreatedAt,
+			UpdatedAt:   assessment.UpdatedAt,
 		})
 
 		ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)
@@ -138,7 +141,12 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 	return nil
 }
 
-func resolvePartnerIDs(ctx context.Context, s store.Store, assessments model.AssessmentList) (map[string]*string, error) {
+type assessmentPartner struct {
+	ID   *string
+	Name *string
+}
+
+func resolveAssessmentPartners(ctx context.Context, s store.Store, assessments model.AssessmentList) (map[string]assessmentPartner, error) {
 	ids := make([]string, len(assessments))
 	for i, a := range assessments {
 		ids[i] = a.ID.String()
@@ -149,13 +157,27 @@ func resolvePartnerIDs(ctx context.Context, s store.Store, assessments model.Ass
 		return nil, err
 	}
 
-	result := make(map[string]*string, len(assessments))
+	result := make(map[string]assessmentPartner, len(assessments))
+	partnerNames := make(map[string]string) // id to name map
 	for _, a := range assessments {
 		id := a.ID.String()
 		for _, rel := range relsByID[id] {
 			if rel.Relation == model.ViewerRelation && rel.Subject.Kind == model.OrgSubject {
 				partnerID := rel.Subject.ID
-				result[id] = &partnerID
+				partnerName, ok := partnerNames[partnerID]
+				if !ok {
+					partnerUUID, err := uuid.Parse(partnerID)
+					if err != nil {
+						return nil, fmt.Errorf("parsing partner ID %q: %w", partnerID, err)
+					}
+					partner, err := s.Accounts().GetGroup(ctx, partnerUUID)
+					if err != nil {
+						return nil, fmt.Errorf("getting partner group %q: %w", partnerID, err)
+					}
+					partnerName = partner.Name
+					partnerNames[partnerID] = partnerName
+				}
+				result[id] = assessmentPartner{ID: &partnerID, Name: &partnerName}
 				break
 			}
 		}
