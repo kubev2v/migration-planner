@@ -84,30 +84,6 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
-	// When a new assessment is created on behalf of a customer by a partner
-	// notify the customer by firing an email notification
-	if user, ok := auth.UserFromContext(ctx); ok {
-		identity, err := e.accountsSvc.GetIdentity(ctx, user)
-		if err != nil {
-			return nil, err
-		}
-		if identity.Kind == service.KindPartner || identity.Kind == service.KindAdmin {
-			notificationBytes, err := notification.Build(
-				notification.AssessmentCreatedEventType,
-				assessment.OrgID,
-				notification.SeverityImportant,
-				map[string]string{"assessment_id": assessment.ID.String()},
-				notification.Recipient{Users: []string{assessment.Username}, IgnoreUserPreferences: true},
-			)
-			if err != nil {
-				return nil, err
-			}
-			if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	if _, err := store.Commit(ctx); err != nil {
 		return nil, err
 	}
