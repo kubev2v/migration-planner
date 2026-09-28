@@ -12,7 +12,7 @@ import (
 
 type Authz interface {
 	WriteRelationships(ctx context.Context, updates []model.RelationshipUpdate) error
-	DeleteRelationships(ctx context.Context, resource model.Resource) error
+	DeleteRelationships(ctx context.Context, filter *RelationsQueryFilter) error
 	ListResources(ctx context.Context, userID string, resourceType model.ResourceType) ([]model.Resource, error)
 	GetPermissions(ctx context.Context, userID string, resource model.Resource) (model.Resource, error)
 	ListRelationships(ctx context.Context, resource model.Resource) ([]model.Relationship, error)
@@ -76,11 +76,15 @@ func (a *AuthzStore) WriteRelationships(ctx context.Context, updates []model.Rel
 	return nil
 }
 
-func (a *AuthzStore) DeleteRelationships(ctx context.Context, resource model.Resource) error {
-	db := a.getDB(ctx)
-	q := db.Where("resource = ?", string(resource.Type))
-	if resource.ID != "" {
-		q = q.Where("resource_id = ?", resource.ID)
+// DeleteRelationships requires a non-empty filter and deletes matching relationships.
+func (a *AuthzStore) DeleteRelationships(ctx context.Context, filter *RelationsQueryFilter) error {
+	if filter == nil || len(filter.QueryFn) == 0 {
+		return gorm.ErrMissingWhereClause
+	}
+
+	q := a.getDB(ctx)
+	for _, fn := range filter.QueryFn {
+		q = fn(q)
 	}
 	return q.Delete(&model.RelationSqlModel{}).Error
 }

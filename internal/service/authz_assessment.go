@@ -276,7 +276,7 @@ func (a *AuthzAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 		return err
 	}
 
-	if err := a.store.Authz().DeleteRelationships(ctx, model.NewAssessmentResource(id.String())); err != nil {
+	if err := a.store.Authz().DeleteRelationships(ctx, store.NewRelationsQueryFilter().ByResourceIDs(model.AssessmentResource, id.String())); err != nil {
 		return fmt.Errorf("authz: failed to delete relations: %w", err)
 	}
 

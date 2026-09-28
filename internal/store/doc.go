@@ -137,8 +137,18 @@
 //
 // ## Deleting all relationships for a resource
 //
+// A non-empty filter is required; nil and empty filters return an error.
+//
 //	ctx, _ = s.NewTransactionContext(ctx)
-//	err := s.Authz().DeleteRelationships(ctx, model.NewAssessmentResource(assessmentID))
+//	filter := store.NewRelationsQueryFilter().ByResourceIDs(model.AssessmentResource, assessmentID)
+//	err := s.Authz().DeleteRelationships(ctx, filter)
+//	ctx, _ = store.Commit(ctx)
+//
+// ## Deleting all relationships for a subject
+//
+//	ctx, _ = s.NewTransactionContext(ctx)
+//	filter := store.NewRelationsQueryFilter().BySubjectIDs(model.OrgSubject, orgID)
+//	err := s.Authz().DeleteRelationships(ctx, filter)
 //	ctx, _ = store.Commit(ctx)
 //
 // ## Listing relationships on a resource

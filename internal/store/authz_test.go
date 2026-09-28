@@ -128,7 +128,7 @@ var _ = Describe("authz store", Ordered, func() {
 			err := s.Authz().WriteRelationships(context.TODO(), updates)
 			Expect(err).To(BeNil())
 
-			err = s.Authz().DeleteRelationships(context.TODO(), model.NewAssessmentResource("assess1"))
+			err = s.Authz().DeleteRelationships(context.TODO(), store.NewRelationsQueryFilter().ByResourceIDs(model.AssessmentResource, "assess1"))
 			Expect(err).To(BeNil())
 
 			var count int
@@ -141,22 +141,107 @@ var _ = Describe("authz store", Ordered, func() {
 			Expect(rels).To(HaveLen(1))
 		})
 
-		It("deletes all relations for a resource type when ID is empty", func() {
+		It("deletes relations for multiple resource IDs within the resource type", func() {
 			updates := store.NewRelationshipBuilder().
 				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
 				With(model.NewAssessmentResource("assess2"), model.OwnerRelation, model.NewUserSubject("bob")).
-				With(model.NewOrgResource("acme"), model.MemberRelation, model.NewUserSubject("alice")).
+				With(model.NewAssessmentResource("assess3"), model.OwnerRelation, model.NewUserSubject("charlie")).
+				With(model.NewOrgResource("assess1"), model.MemberRelation, model.NewUserSubject("alice")).
 				Build()
 			err := s.Authz().WriteRelationships(context.TODO(), updates)
 			Expect(err).To(BeNil())
 
-			// Delete all assessment relations
-			err = s.Authz().DeleteRelationships(context.TODO(), model.Resource{Type: model.AssessmentResource})
+			err = s.Authz().DeleteRelationships(context.TODO(), store.NewRelationsQueryFilter().ByResourceIDs(model.AssessmentResource, "assess1", "assess2"))
 			Expect(err).To(BeNil())
 
 			var count int
 			gormdb.Raw("SELECT COUNT(*) FROM relations").Scan(&count)
-			Expect(count).To(Equal(1)) // only org relation remains
+			Expect(count).To(Equal(2)) // assess3 and the org with a matching ID remain
+		})
+
+		It("deletes relations for multiple subject IDs within the subject namespace", func() {
+			updates := store.NewRelationshipBuilder().
+				// acme is the subject (e.g. assessment shared with a group).
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewAssessmentResource("assess2"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewAssessmentResource("assess3"), model.ViewerRelation, model.NewOrgSubject("globex")).
+				// A user subject with the same id but different namespace must survive.
+				With(model.NewAssessmentResource("assess4"), model.ViewerRelation, model.NewUserSubject("acme")).
+				With(model.NewAssessmentResource("assess5"), model.ViewerRelation, model.NewOrgSubject("initech")).
+				With(model.NewAssessmentResource("assess6"), model.ViewerRelation, model.NewUserSubject("globex")).
+				Build()
+			err := s.Authz().WriteRelationships(context.TODO(), updates)
+			Expect(err).To(BeNil())
+
+			err = s.Authz().DeleteRelationships(context.TODO(), store.NewRelationsQueryFilter().BySubjectIDs(model.OrgSubject, "acme", "globex"))
+			Expect(err).To(BeNil())
+
+			var count int
+			gormdb.Raw("SELECT COUNT(*) FROM relations").Scan(&count)
+			Expect(count).To(Equal(3)) // initech org subject and both user subjects remain
+		})
+
+		It("deletes only relations matching both resource and subject filters", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewOrgSubject("globex")).
+				With(model.NewAssessmentResource("assess2"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewOrgResource("assess1"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				Build()
+			Expect(s.Authz().WriteRelationships(context.TODO(), updates)).To(Succeed())
+
+			filter := store.NewRelationsQueryFilter().
+				ByResourceIDs(model.AssessmentResource, "assess1").
+				BySubjectIDs(model.OrgSubject, "acme")
+			Expect(s.Authz().DeleteRelationships(context.TODO(), filter)).To(Succeed())
+
+			var rows []model.RelationSqlModel
+			Expect(gormdb.Find(&rows).Error).To(Succeed())
+			relationships := make([]string, len(rows))
+			for i, row := range rows {
+				relationships[i] = row.ToRelationship().String()
+			}
+			Expect(relationships).To(ConsistOf(
+				"assessment:assess1#viewer@org:globex",
+				"assessment:assess2#viewer@org:acme",
+				"org:assess1#viewer@org:acme",
+			))
+		})
+
+		It("rejects nil and empty filters without deleting relations", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
+				With(model.NewAssessmentResource("assess2"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewOrgResource("acme"), model.MemberRelation, model.NewUserSubject("bob")).
+				Build()
+			Expect(s.Authz().WriteRelationships(context.TODO(), updates)).To(Succeed())
+
+			for _, filter := range []*store.RelationsQueryFilter{nil, store.NewRelationsQueryFilter()} {
+				Expect(s.Authz().DeleteRelationships(context.TODO(), filter)).To(MatchError(gorm.ErrMissingWhereClause))
+
+				var count int64
+				Expect(gormdb.Model(&model.RelationSqlModel{}).Count(&count).Error).To(Succeed())
+				Expect(count).To(Equal(int64(3)))
+			}
+		})
+
+		It("does not delete relations when no resource or subject IDs are supplied", func() {
+			updates := store.NewRelationshipBuilder().
+				With(model.NewAssessmentResource("assess1"), model.OwnerRelation, model.NewUserSubject("alice")).
+				Build()
+			Expect(s.Authz().WriteRelationships(context.TODO(), updates)).To(Succeed())
+
+			filters := []*store.RelationsQueryFilter{
+				store.NewRelationsQueryFilter().ByResourceIDs(model.AssessmentResource),
+				store.NewRelationsQueryFilter().BySubjectIDs(model.UserSubject),
+			}
+			for _, filter := range filters {
+				Expect(s.Authz().DeleteRelationships(context.TODO(), filter)).To(Succeed())
+			}
+
+			rels, err := s.Authz().ListRelationships(context.TODO(), model.NewAssessmentResource("assess1"))
+			Expect(err).To(BeNil())
+			Expect(rels).To(HaveLen(1))
 		})
 
 		AfterEach(func() {

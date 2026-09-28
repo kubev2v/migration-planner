@@ -10,6 +10,26 @@ type BaseQuerier struct {
 	QueryFn []func(tx *gorm.DB) *gorm.DB
 }
 
+type RelationsQueryFilter BaseQuerier
+
+func NewRelationsQueryFilter() *RelationsQueryFilter {
+	return &RelationsQueryFilter{}
+}
+
+func (f *RelationsQueryFilter) ByResourceIDs(resourceType model.ResourceType, ids ...string) *RelationsQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("resource = ? AND resource_id IN ?", string(resourceType), ids)
+	})
+	return f
+}
+
+func (f *RelationsQueryFilter) BySubjectIDs(subjectType model.SubjectType, ids ...string) *RelationsQueryFilter {
+	f.QueryFn = append(f.QueryFn, func(tx *gorm.DB) *gorm.DB {
+		return tx.Where("subject_namespace = ? AND subject_id IN ?", string(subjectType), ids)
+	})
+	return f
+}
+
 type AgentQueryFilter BaseQuerier
 
 func NewAgentQueryFilter() *AgentQueryFilter {
