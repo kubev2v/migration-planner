@@ -619,6 +619,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 						TotalCapacityGB: 1000.0,
 						Type:            "VMFS",
 						StorageProtocol: inventory.StorageProtocolBlock,
+						SnapshotSupport: true,
 						HostId:          "host-1",
 						Model:           "SSD",
 						ProtocolType:    "SCSI",
@@ -690,6 +691,8 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 					assert.Nil(t, actual.StorageProtocol)
 				}
 
+				require.NotNil(t, actual.SnapshotSupport)
+				assert.Equal(t, expected.SnapshotSupport, *actual.SnapshotSupport)
 				if expected.HostId != "" {
 					require.NotNil(t, actual.HostId)
 					assert.Equal(t, expected.HostId, *actual.HostId)

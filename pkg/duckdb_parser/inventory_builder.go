@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -397,6 +398,7 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 				TotalCapacityGB: d.TotalCapacityGB,
 				Type:            d.Type,
 				StorageProtocol: inventory.StorageProtocolFromDatastoreType(d.Type),
+				SnapshotSupport: strings.EqualFold(strings.TrimSpace(d.Type), "vsan"),
 				HostId:          d.HostId,
 				Model:           d.Model,
 				ProtocolType:    d.ProtocolType,
