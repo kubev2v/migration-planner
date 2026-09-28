@@ -2868,6 +2868,9 @@ components:
           type: string
           description: Storage access category derived from Datastore.Type
           enum: [Block, File, Object]
+        snapshotSupport:
+          type: boolean
+          description: Whether the datastore supports point-in-time snapshots
         totalCapacityGB:
           type: integer
         freeCapacityGB:
