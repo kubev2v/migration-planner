@@ -1996,6 +1996,51 @@ func buildSiocDatastore(name, objectID, enabled, threshold, mode, percent string
 	}
 }
 
+func TestBuildInventory_SnapshotSupport(t *testing.T) {
+	vms := []map[string]string{
+		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
+	}
+	hosts := []map[string]string{
+		{"Datacenter": "dc1", "Cluster": "cluster1", "# Cores": "8", "# CPU": "2", "Object ID": "host-001", "# Memory": "32768", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
+	}
+	clustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1"}}
+
+	tests := []struct {
+		name                    string
+		datastoreType           string
+		expectedSnapshotSupport bool
+	}{
+		{name: "vSAN datastore", datastoreType: "VSAN", expectedSnapshotSupport: true},
+		{name: "non-vSAN datastore", datastoreType: "VMFS", expectedSnapshotSupport: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			datastore := buildSiocDatastore("test-datastore", "datastore-001", "false", "30", "automatic", "90")
+			datastore["Type"] = tt.datastoreType
+
+			sheets := []ExcelSheet{
+				NewExcelSheet("vInfo", vInfoHeaders, vms),
+				NewExcelSheet("vHost", vHostHeaders, hosts),
+				NewExcelSheet("vDatastore", vDatastoreHeaders, []map[string]string{datastore}),
+				NewExcelSheet("vCluster", vClusterHeaders, clustersRows),
+			}
+
+			ctx := context.Background()
+			_, err := parser.IngestRvTools(ctx, createTestExcel(t, sheets...))
+			require.NoError(t, err)
+
+			inv, err := parser.BuildInventory(ctx, nil)
+			require.NoError(t, err)
+			require.Len(t, inv.VCenter.Infra.Datastores, 1)
+			assert.Equal(t, tt.expectedSnapshotSupport, inv.VCenter.Infra.Datastores[0].SnapshotSupport)
+		})
+	}
+}
+
 // TestBuildInventory_StorageIoConfiguration verifies that SIOC fields are correctly
 // populated in the inventory datastores, both when explicit SIOC values are provided
 // and when SIOC columns are missing (defaults should apply).
