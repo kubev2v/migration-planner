@@ -132,6 +132,13 @@ const (
 	CpuOneToTwo   CpuOverCommitRatio = "1:2"
 )
 
+// Defines values for DatastoreStorageProtocol.
+const (
+	Block  DatastoreStorageProtocol = "Block"
+	File   DatastoreStorageProtocol = "File"
+	Object DatastoreStorageProtocol = "Object"
+)
+
 // Defines values for DeployedEnvironmentInputEnvironment.
 const (
 	DeployedEnvironmentInputEnvironmentManagedServices DeployedEnvironmentInputEnvironment = "managed_services"
@@ -639,10 +646,16 @@ type Datastore struct {
 	Model                  string                  `json:"model"`
 	ProtocolType           string                  `json:"protocolType"`
 	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
-	TotalCapacityGB        int                     `json:"totalCapacityGB"`
-	Type                   string                  `json:"type"`
-	Vendor                 string                  `json:"vendor"`
+
+	// StorageProtocol Storage access category derived from Datastore.Type
+	StorageProtocol *DatastoreStorageProtocol `json:"storageProtocol,omitempty"`
+	TotalCapacityGB int                       `json:"totalCapacityGB"`
+	Type            string                    `json:"type"`
+	Vendor          string                    `json:"vendor"`
 }
+
+// DatastoreStorageProtocol Storage access category derived from Datastore.Type
+type DatastoreStorageProtocol string
 
 // DeployedEnvironmentInput defines model for DeployedEnvironmentInput.
 type DeployedEnvironmentInput struct {

@@ -396,6 +396,7 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 				FreeCapacityGB:  d.FreeCapacityGB,
 				TotalCapacityGB: d.TotalCapacityGB,
 				Type:            d.Type,
+				StorageProtocol: inventory.StorageProtocolFromDatastoreType(d.Type),
 				HostId:          d.HostId,
 				Model:           d.Model,
 				ProtocolType:    d.ProtocolType,
