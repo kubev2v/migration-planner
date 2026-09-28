@@ -403,7 +403,8 @@ func TestBuildInventory_InfraData(t *testing.T) {
 	assert.Len(t, inv.VCenter.Infra.Hosts, 2)
 
 	// Verify datastores are populated
-	assert.NotEmpty(t, inv.VCenter.Infra.Datastores)
+	require.NotEmpty(t, inv.VCenter.Infra.Datastores)
+	assert.Equal(t, inventory.StorageProtocolBlock, inv.VCenter.Infra.Datastores[0].StorageProtocol)
 }
 
 func TestBuildInventory_ClusterInventories(t *testing.T) {

@@ -604,11 +604,13 @@ func TestToAPIInfra_Networks(t *testing.T) {
 
 func TestToAPIInfra_Datastores(t *testing.T) {
 	tests := []struct {
-		name  string
-		input inventory.InfraData
+		name                string
+		input               inventory.InfraData
+		wantStorageProtocol api.DatastoreStorageProtocol
 	}{
 		{
-			name: "VMFS datastore with host",
+			name:                "VMFS datastore with host",
+			wantStorageProtocol: api.Block,
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
 					{
@@ -616,6 +618,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 						FreeCapacityGB:  500.5,
 						TotalCapacityGB: 1000.0,
 						Type:            "VMFS",
+						StorageProtocol: inventory.StorageProtocolBlock,
 						HostId:          "host-1",
 						Model:           "SSD",
 						ProtocolType:    "SCSI",
@@ -625,7 +628,8 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 			},
 		},
 		{
-			name: "NFS datastore - should be anonymized",
+			name:                "NFS datastore - should be anonymized",
+			wantStorageProtocol: api.File,
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
 					{
@@ -633,10 +637,25 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 						FreeCapacityGB:  200.0,
 						TotalCapacityGB: 500.0,
 						Type:            "NFS",
+						StorageProtocol: inventory.StorageProtocolFile,
 						HostId:          "",
 						Model:           "",
 						ProtocolType:    "NFS v3",
 						Vendor:          "",
+					},
+				},
+			},
+		},
+		{
+			name: "unknown datastore type - storage protocol should be omitted",
+			input: inventory.InfraData{
+				Datastores: []inventory.Datastore{
+					{
+						DiskId:          "disk-unknown",
+						FreeCapacityGB:  100.0,
+						TotalCapacityGB: 200.0,
+						Type:            "OTHER",
+						ProtocolType:    "unknown",
 					},
 				},
 			},
@@ -664,6 +683,12 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 				assert.Equal(t, int(expected.FreeCapacityGB), actual.FreeCapacityGB)
 				assert.Equal(t, int(expected.TotalCapacityGB), actual.TotalCapacityGB)
 				assert.Equal(t, expected.Type, actual.Type)
+				if tt.wantStorageProtocol != "" {
+					require.NotNil(t, actual.StorageProtocol)
+					assert.Equal(t, tt.wantStorageProtocol, *actual.StorageProtocol)
+				} else {
+					assert.Nil(t, actual.StorageProtocol)
+				}
 
 				if expected.HostId != "" {
 					require.NotNil(t, actual.HostId)
