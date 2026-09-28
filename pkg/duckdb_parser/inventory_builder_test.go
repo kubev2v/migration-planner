@@ -2011,6 +2011,7 @@ func TestBuildInventory_SnapshotSupport(t *testing.T) {
 		expectedSnapshotSupport bool
 	}{
 		{name: "vSAN datastore", datastoreType: "VSAN", expectedSnapshotSupport: true},
+		{name: "vSAN datastore with whitespace", datastoreType: " vSaN ", expectedSnapshotSupport: true},
 		{name: "non-vSAN datastore", datastoreType: "VMFS", expectedSnapshotSupport: false},
 	}
 
