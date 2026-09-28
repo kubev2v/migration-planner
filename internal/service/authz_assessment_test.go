@@ -35,9 +35,10 @@ func ctxWithUser(username, org string) context.Context {
 
 var _ = Describe("authz assessment service", Ordered, func() {
 	var (
-		s      store.Store
-		gormdb *gorm.DB
-		svc    service.AssessmentServicer
+		s           store.Store
+		gormdb      *gorm.DB
+		svc         service.AssessmentServicer
+		accountsSvc *service.AccountsService
 	)
 
 	BeforeAll(func() {
@@ -50,7 +51,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		gormdb = db
 		mockIAMClient := &iam.MockClient{}
 		iamService := service.NewIAMService(mockIAMClient)
-		accountsSvc := service.NewAccountsService(s, iamService)
+		accountsSvc = service.NewAccountsService(s, iamService)
 		inner := service.NewAssessmentService(s, nil, accountsSvc)
 		svc = service.NewAuthzAssessmentService(inner, s, accountsSvc)
 	})
@@ -275,6 +276,49 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 			gormdb.Exec("DELETE FROM members")
 			gormdb.Exec("DELETE FROM groups")
+		})
+
+		Context("after partner group deletion", func() {
+			var partnerGroupID, sharedID uuid.UUID
+			customerCtx := ctxWithUser("user1", "org1")
+
+			BeforeEach(func() {
+				partnerGroupID = uuid.New()
+				Expect(gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, partnerGroupID, "Partner", "desc", "partner", "icon", "Acme", "NULL")).Error).To(Succeed())
+				Expect(gormdb.Exec(fmt.Sprintf(insertAccountsMemberStm, uuid.New(), "partner-user", "partner@example.com", partnerGroupID)).Error).To(Succeed())
+				Expect(gormdb.Exec(insertAccountsPartnerCustomerStm, uuid.New(), "user1", partnerGroupID, "accepted", "Customer", "Contact", "555-0100", "customer@example.com", "Location").Error).To(Succeed())
+				Expect(gormdb.Exec(fmt.Sprintf(insertRelationStm, "org", partnerGroupID, "member", "user", "partner-user")).Error).To(Succeed())
+
+				Expect(gormdb.Raw("SELECT id FROM assessments WHERE username = 'user1' ORDER BY id LIMIT 1").Row().Scan(&sharedID)).To(Succeed())
+				By("sharing one of the customer's two assessments with their partner")
+				Expect(svc.ShareAssessment(customerCtx, sharedID)).To(Succeed())
+			})
+
+			AfterEach(func() {
+				Expect(gormdb.Exec("DELETE FROM groups WHERE id = ?", partnerGroupID).Error).To(Succeed())
+			})
+
+			It("keeps shared and unrelated assessments listable after deleting the partner group", func() {
+				assessments, err := svc.ListAssessments(customerCtx, service.NewAssessmentFilter())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(assessments).To(HaveLen(2))
+				Expect(assessments).To(ContainElement(And(
+					HaveField("ID", sharedID), HaveField("Sharing", HaveValue(HaveField("IsShared", true))),
+				)))
+
+				By("deleting the group through the accounts service")
+				Expect(accountsSvc.DeleteGroup(context.Background(), partnerGroupID)).To(Succeed())
+
+				assessments, err = svc.ListAssessments(customerCtx, service.NewAssessmentFilter())
+				Expect(err).NotTo(HaveOccurred())
+				Expect(assessments).To(HaveLen(2))
+				Expect(assessments).To(ContainElement(HaveField("ID", sharedID)))
+				for _, assessment := range assessments {
+					Expect(assessment.Sharing).NotTo(BeNil())
+					Expect(assessment.Sharing.IsShared).To(BeFalse())
+					Expect(assessment.Sharing.SharedWith).To(BeEmpty())
+				}
+			})
 		})
 
 		AfterEach(func() {

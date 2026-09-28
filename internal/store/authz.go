@@ -13,6 +13,7 @@ import (
 type Authz interface {
 	WriteRelationships(ctx context.Context, updates []model.RelationshipUpdate) error
 	DeleteRelationships(ctx context.Context, resource model.Resource) error
+	DeleteRelationshipsBySubject(ctx context.Context, subject model.Subject) error
 	ListResources(ctx context.Context, userID string, resourceType model.ResourceType) ([]model.Resource, error)
 	GetPermissions(ctx context.Context, userID string, resource model.Resource) (model.Resource, error)
 	ListRelationships(ctx context.Context, resource model.Resource) ([]model.Relationship, error)
@@ -83,6 +84,13 @@ func (a *AuthzStore) DeleteRelationships(ctx context.Context, resource model.Res
 		q = q.Where("resource_id = ?", resource.ID)
 	}
 	return q.Delete(&model.RelationSqlModel{}).Error
+}
+
+func (a *AuthzStore) DeleteRelationshipsBySubject(ctx context.Context, subject model.Subject) error {
+	db := a.getDB(ctx)
+	return db.
+		Where("subject_namespace = ? AND subject_id = ?", string(subject.Kind), subject.ID).
+		Delete(&model.RelationSqlModel{}).Error
 }
 
 func (a *AuthzStore) ListRelationships(ctx context.Context, resource model.Resource) ([]model.Relationship, error) {
