@@ -2804,10 +2804,6 @@ components:
       properties:
         type:
           type: string
-        storageProtocol:
-          type: string
-          description: Storage access category derived from Datastore.Type
-          enum: [Block, File, Object]
         totalCapacityGB:
           type: integer
         freeCapacityGB:

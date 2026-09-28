@@ -260,10 +260,6 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			ProtocolType:            d.ProtocolType,
 			Vendor:                  d.Vendor,
 		}
-		if d.StorageProtocol != "" {
-			storageProtocol := api.DatastoreStorageProtocol(d.StorageProtocol)
-			ds.StorageProtocol = &storageProtocol
-		}
 		if d.HostId != "" {
 			hostId := d.HostId
 			ds.HostId = &hostId

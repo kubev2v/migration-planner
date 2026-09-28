@@ -156,7 +156,6 @@ type Datastore struct {
 	FreeCapacityGB         float64
 	TotalCapacityGB        float64
 	Type                   string
-	StorageProtocol        string
 	HostId                 string
 	Model                  string
 	ProtocolType           string
