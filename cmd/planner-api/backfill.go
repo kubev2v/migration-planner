@@ -50,7 +50,7 @@ var backfillCmd = &cobra.Command{
 		}
 
 		if err := backfillAssessments(ctx, s, w, cl); err != nil {
-			zap.S().Errorf("completed with errors: %f", err)
+			zap.S().Errorf("completed with errors: %v", err)
 			return nil
 		}
 
@@ -172,7 +172,9 @@ func resolveAssessmentPartners(ctx context.Context, s store.Store, assessments m
 					}
 					partner, err := s.Accounts().GetGroup(ctx, partnerUUID)
 					if err != nil {
-						return nil, fmt.Errorf("getting partner group %q: %w", partnerID, err)
+						// partner no longer exist, continue
+						zap.S().Warnf("getting partner group %q: %v", partnerID, err)
+						continue
 					}
 					partnerName = partner.Name
 					partnerNames[partnerID] = partnerName
