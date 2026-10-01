@@ -41,7 +41,8 @@ func NewBuilder() *QueryBuilder {
 }
 
 type ingestParams struct {
-	FilePath string
+	FilePath    string
+	HasMetadata bool
 }
 
 // CreateSchemaQuery returns queries to create all RVTools tables with proper schema.
@@ -55,8 +56,9 @@ func (b *QueryBuilder) CleanupQuery() (string, error) {
 }
 
 // IngestRvtoolsQuery returns a query that inserts data from an RVTools Excel file into schema tables.
-func (b *QueryBuilder) IngestRvtoolsQuery(filePath string) (string, error) {
-	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), ingestParams{FilePath: filePath})
+func (b *QueryBuilder) IngestRvtoolsQuery(filePath string, hasMetadata bool) (string, error) {
+	params := ingestParams{FilePath: filePath, HasMetadata: hasMetadata}
+	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), params)
 }
 
 // IngestSqliteQuery returns a query that creates RVTools-shaped tables from a forklift SQLite database.
@@ -66,6 +68,7 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 
 // queryParams holds all template parameters for queries.
 type queryParams struct {
+	MetadataTable           string
 	NetworkColumns          string
 	ClusterFilter           string
 	OSFilter                string
@@ -89,6 +92,10 @@ func faultToleranceEnabledPredicate(tableAlias string) string {
 
 // VMQuery builds the VM query with filters and pagination.
 func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error) {
+	return b.vmQuery(filters, options, "vm_metadata")
+}
+
+func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable string) (string, error) {
 	const maxNetworkNumbers = 8 // RVTools vInfo has Network #1 through Network #8
 	quoted := make([]string, 0, maxNetworkNumbers)
 	for i := 1; i <= maxNetworkNumbers; i++ {
@@ -97,6 +104,7 @@ func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error)
 	networkColumns := strings.Join(quoted, ", ")
 
 	params := queryParams{
+		MetadataTable:           metadataTable,
 		NetworkColumns:          networkColumns,
 		ClusterFilter:           escapeSQLString(filters.Cluster),
 		OSFilter:                escapeSQLString(filters.OS),

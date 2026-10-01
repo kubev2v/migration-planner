@@ -122,6 +122,22 @@ WHERE "VM" IS NOT NULL AND "VM" != ''
   AND LOWER(COALESCE("Template", '')) NOT IN ('true', '1', 'yes')
 ON CONFLICT DO NOTHING;
 
+{{if .HasMetadata}}
+WITH metadata AS (
+    SELECT key AS vm_id, from_json(value, '"MAP(VARCHAR, VARCHAR[])"') AS entries
+    FROM json_each(?)
+)
+INSERT INTO vm_metadata (vm_id, key, value)
+SELECT DISTINCT metadata.vm_id, entry.key, unnest(entry.value) AS value
+FROM metadata
+JOIN vinfo_raw source ON source."VM ID" = metadata.vm_id
+JOIN vinfo vm ON vm."VM ID" = metadata.vm_id AND vm."VI SDK UUID" = source."VI SDK UUID",
+    unnest(map_entries(metadata.entries)) m(entry)
+WHERE source."VM" IS NOT NULL AND source."VM" != ''
+    AND LOWER(COALESCE(source."Template", '')) NOT IN ('true', '1', 'yes')
+ON CONFLICT DO NOTHING;
+{{end}}
+
 INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
 SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
 FROM vinfo_raw
