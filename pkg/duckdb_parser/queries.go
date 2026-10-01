@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
@@ -612,6 +613,7 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 	var vms []models.VM
 	for rows.Next() {
 		var vm models.VM
+		var metadata any
 		if err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -652,8 +654,13 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 			&vm.MigrationExcluded,
 			&vm.Labels,
 			&vm.GuestApps,
+			&metadata,
 		); err != nil {
 			return nil, fmt.Errorf("scanning VM row: %w", err)
+		}
+
+		if err := mapstructure.Decode(metadata, &vm.Metadata); err != nil {
+			return nil, fmt.Errorf("scanning VM metadata: %w", err)
 		}
 
 		// Propagate VM's CBT setting to each disk for OPA per-disk CBT validation
