@@ -50,7 +50,8 @@ CREATE TABLE IF NOT EXISTS vinfo (
     "OsDiskComplexity" INTEGER DEFAULT 0,
     "migration_excluded" BOOLEAN DEFAULT false,
     "labels" VARCHAR DEFAULT '[]',
-    "guest_apps" VARCHAR DEFAULT '[]'
+    "guest_apps" VARCHAR DEFAULT '[]',
+    "source_metadata" VARCHAR DEFAULT '[]'
 );
 
 CREATE TABLE IF NOT EXISTS vcpu (

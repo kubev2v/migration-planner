@@ -41,7 +41,8 @@ func NewBuilder() *QueryBuilder {
 }
 
 type ingestParams struct {
-	FilePath string
+	FilePath          string
+	HasSourceMetadata bool
 }
 
 // CreateSchemaQuery returns queries to create all RVTools tables with proper schema.
@@ -50,8 +51,9 @@ func (b *QueryBuilder) CreateSchemaQuery() (string, error) {
 }
 
 // IngestRvtoolsQuery returns a query that inserts data from an RVTools Excel file into schema tables.
-func (b *QueryBuilder) IngestRvtoolsQuery(filePath string) (string, error) {
-	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), ingestParams{FilePath: filePath})
+func (b *QueryBuilder) IngestRvtoolsQuery(filePath string, hasSourceMetadata bool) (string, error) {
+	params := ingestParams{FilePath: filePath, HasSourceMetadata: hasSourceMetadata}
+	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), params)
 }
 
 // IngestSqliteQuery returns a query that creates RVTools-shaped tables from a forklift SQLite database.

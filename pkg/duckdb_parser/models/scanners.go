@@ -176,6 +176,30 @@ func (g GuestApps) Value() (driver.Value, error) {
 	return g, nil
 }
 
+// SourceMetadata implements sql.Scanner for JSON string parsing.
+type SourceMetadata []SourceMetadataEntry
+
+func (m *SourceMetadata) Scan(value interface{}) error {
+	if value == nil {
+		*m = nil
+		return nil
+	}
+	s, ok := value.(string)
+	if !ok {
+		return fmt.Errorf("SourceMetadata.Scan: expected string, got %T", value)
+	}
+	if s == "" || s == "[]" {
+		*m = nil
+		return nil
+	}
+	var result []SourceMetadataEntry
+	if err := json.Unmarshal([]byte(s), &result); err != nil {
+		return fmt.Errorf("SourceMetadata.Scan: failed to unmarshal JSON: %w", err)
+	}
+	*m = result
+	return nil
+}
+
 // Concerns is a slice of Concern that implements sql.Scanner for DuckDB LIST type.
 type Concerns []Concern
 
