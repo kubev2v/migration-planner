@@ -7,14 +7,20 @@ import (
 	"fmt"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
+	"github.com/go-viper/mapstructure/v2"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // VMs returns VMs with optional filters and pagination.
 func (p *Parser) VMs(ctx context.Context, filters Filters, options Options) ([]models.VM, error) {
-	q, err := p.builder.VMQuery(filters, options)
+	metadataTable, err := metadataTable(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	q, err := p.builder.vmQuery(filters, options, metadataTable)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build vm query: %v", err)
 	}
@@ -612,6 +618,7 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 	var vms []models.VM
 	for rows.Next() {
 		var vm models.VM
+		var metadata any
 		if err := rows.Scan(
 			&vm.ID,
 			&vm.Name,
@@ -652,8 +659,13 @@ func (p *Parser) readVMs(ctx context.Context, query string) ([]models.VM, error)
 			&vm.MigrationExcluded,
 			&vm.Labels,
 			&vm.GuestApps,
+			&metadata,
 		); err != nil {
 			return nil, fmt.Errorf("scanning VM row: %w", err)
+		}
+
+		if err := mapstructure.Decode(metadata, &vm.Metadata); err != nil {
+			return nil, fmt.Errorf("scanning VM metadata: %w", err)
 		}
 
 		// Propagate VM's CBT setting to each disk for OPA per-disk CBT validation
@@ -691,4 +703,19 @@ func (p *Parser) about(ctx context.Context) (models.About, error) {
 		Product:      product.String,
 		InstanceUuid: instanceUUID.String,
 	}, nil
+}
+
+// metadataTable returns the metadata relation, including an empty fallback for older collections.
+func metadataTable(ctx context.Context, db store.QueryInterceptor) (string, error) {
+	var exists bool
+	if err := db.QueryRowContext(ctx, `SELECT EXISTS (
+		SELECT 1 FROM information_schema.tables
+		WHERE table_catalog = current_database() AND table_schema = 'main' AND table_name = 'vm_metadata'
+	)`).Scan(&exists); err != nil {
+		return "", fmt.Errorf("checking metadata table: %w", err)
+	}
+	if !exists {
+		return "(SELECT NULL::VARCHAR AS vm_id, NULL::VARCHAR AS key, NULL::VARCHAR AS value WHERE false)", nil
+	}
+	return "vm_metadata", nil
 }

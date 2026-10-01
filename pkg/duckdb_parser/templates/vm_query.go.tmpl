@@ -109,8 +109,18 @@ SELECT
     COALESCE(con.concerns, []) AS "Concerns",
     COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
     COALESCE(CAST(i."labels" AS VARCHAR[]), []) AS "Labels",
-    COALESCE(i."guest_apps", '[]') AS "GuestApps"
+    COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(metadata.entries, map()) AS "Metadata"
 FROM vinfo i
+LEFT JOIN (
+    SELECT vm_id, map(list(key ORDER BY key), list(values ORDER BY key)) AS entries
+    FROM (
+        SELECT vm_id, key, list(DISTINCT value ORDER BY value) AS values
+        FROM {{ .MetadataTable }}
+        GROUP BY vm_id, key
+    ) metadata_values
+    GROUP BY vm_id
+) metadata ON metadata.vm_id = i."VM ID"
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"

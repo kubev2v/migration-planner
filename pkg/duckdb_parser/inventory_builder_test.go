@@ -506,6 +506,13 @@ func TestValidation_ErrorCodes(t *testing.T) {
 			forbiddenCodes: []string{CodeNoVMs},
 		},
 		{
+			name:           "metadata import preserves missing VM ID schema reporting",
+			customHeaders:  []string{"VM", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Annotation", "Team", "Datacenter"},
+			vms:            []map[string]string{{"VM": "vm-1", "VI SDK UUID": "uuid", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Team": "Finance", "Datacenter": "dc1"}},
+			expectedCodes:  []string{CodeColumnValidationFailed},
+			forbiddenCodes: []string{CodeNoVMs},
+		},
+		{
 			name:           "missing Cluster column reports MISSING_CLUSTER",
 			customHeaders:  []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Datacenter"},
 			vms:            []map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "550e8400-e29b-41d4-a716-446655440000", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Datacenter": "dc1"}},

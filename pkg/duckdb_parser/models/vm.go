@@ -5,6 +5,9 @@ type Ref struct {
 	ID string `json:"id"`
 }
 
+// Metadata maps metadata keys to their values for one VM.
+type Metadata map[string][]string
+
 // VM represents a virtual machine from VMware inventory.
 type VM struct {
 	ID                       string    `json:"id" db:"VM ID"`
@@ -47,6 +50,7 @@ type VM struct {
 	MigrationExcluded        bool      `json:"migrationExcluded" db:"migration_excluded"`
 	Labels                   Labels    `json:"labels" db:"labels"`
 	GuestApps                GuestApps `json:"guestApps" db:"guest_apps"`
+	Metadata                 Metadata  `json:"metadata" db:"metadata"`
 }
 
 // GuestApp represents a guest application installed on a VM.

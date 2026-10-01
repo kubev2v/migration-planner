@@ -73,7 +73,33 @@ LEFT JOIN src.Cluster c ON h.Cluster = c.ID
 LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
 LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID
 CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
-WHERE v.IsTemplate = 0;
+WHERE v.IsTemplate = 0
+ON CONFLICT DO NOTHING;
+
+-- Read optional fields through JSON to support older SQLite exports.
+WITH metadata AS (
+    SELECT v.ID AS id,
+        category.name AS key,
+        tag.value->>'name' AS value
+    FROM src.VM v,
+        json_each(COALESCE(to_json(v)->>'Tags', '[]')) tag
+    JOIN temp.main.tag_categories category ON category.id = (tag.value->>'categoryID')
+    WHERE v.IsTemplate = 0 AND trim(tag.value->>'name') != '' AND trim(category.name) != ''
+    UNION ALL
+    SELECT v.ID AS id, def.value->>'name' AS key, val.value->>'value' AS value
+    FROM src.VM v,
+        json_each(COALESCE(to_json(v)->>'CustomValues', '[]')) val,
+        json_each(COALESCE(to_json(v)->>'CustomDef', '[]')) def
+    WHERE v.IsTemplate = 0 AND (val.value->>'key') = (def.value->>'key')
+        AND trim(val.value->>'value') != '' AND trim(def.value->>'name') != ''
+)
+INSERT INTO vm_metadata (vm_id, key, value)
+SELECT DISTINCT metadata.id, metadata.key, metadata.value
+FROM metadata
+JOIN vinfo vm ON vm."VM ID" = metadata.id
+CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
+WHERE vm."VI SDK UUID" = about.InstanceUuid
+ON CONFLICT DO NOTHING;
 
 INSERT INTO vcpu ("VM ID", "Hot Add", "Hot Remove", "Sockets", "Cores p/s")
 SELECT
