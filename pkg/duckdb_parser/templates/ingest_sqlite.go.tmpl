@@ -248,6 +248,27 @@ CROSS JOIN (SELECT InstanceUuid FROM src.About LIMIT 1) about
 -- Skip forklift synthetic ComputeResource placeholders (standalone hosts, not real clusters)
 WHERE c.Variant != 'ComputeResource';
 
+-- Read optional fields through JSON to support older SQLite exports.
+WITH metadata AS (
+    SELECT v.ID AS id, json_object(
+        'key', COALESCE(tag.value->>'categoryID', ''),
+        'value', tag.value->>'name', 'kind', 'tag') AS entry
+    FROM src.VM v, json_each(COALESCE(to_json(v)->>'Tags', '[]')) tag
+    WHERE trim(tag.value->>'name') != ''
+    UNION ALL
+    SELECT v.ID AS id, json_object(
+        'key', def.value->>'name', 'value', val.value->>'value', 'kind', 'customAttribute') AS entry
+    FROM src.VM v,
+        json_each(COALESCE(to_json(v)->>'CustomValues', '[]')) val,
+        json_each(COALESCE(to_json(v)->>'CustomDef', '[]')) def
+    WHERE (val.value->>'key') = (def.value->>'key')
+        AND trim(val.value->>'value') != '' AND trim(def.value->>'name') != ''
+), grouped_metadata AS (
+    SELECT id, json_group_array(entry) AS entries FROM metadata GROUP BY id
+)
+UPDATE vinfo SET source_metadata = grouped_metadata.entries
+FROM grouped_metadata WHERE vinfo."VM ID" = grouped_metadata.id;
+
 DETACH src;
 
 -- Populate Network # columns in vinfo from vnetwork table

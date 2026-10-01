@@ -120,6 +120,12 @@ WHERE "VM" IS NOT NULL AND "VM" != ''
   AND LOWER(COALESCE("Template", '')) NOT IN ('true', '1', 'yes')
 ON CONFLICT DO NOTHING;
 
+{{if .HasSourceMetadata}}
+UPDATE vinfo SET source_metadata = metadata.value::VARCHAR
+FROM json_each(?) metadata
+WHERE vinfo."VM ID" = metadata.key;
+{{end}}
+
 INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
 SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
 FROM vinfo_raw

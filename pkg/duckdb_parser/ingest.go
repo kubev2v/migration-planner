@@ -2,6 +2,7 @@ package duckdb_parser
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
@@ -14,9 +15,10 @@ var stmtRegex = regexp.MustCompile(`(?s)(CREATE|INSERT|UPDATE|DROP|ALTER|WITH|IN
 // criticalStmtPatterns defines patterns for statements that must succeed.
 // If any of these fail, the ingestion should fail immediately.
 var criticalStmtPatterns = []string{
-	"INSTALL ",           // Extension installation must succeed
-	"LOAD ",              // Extension loading must succeed
-	"CREATE TABLE vinfo", // Main VM data table creation must succeed
+	"INSTALL ",                         // Extension installation must succeed
+	"LOAD ",                            // Extension loading must succeed
+	"CREATE TABLE vinfo",               // Main VM data table creation must succeed
+	"UPDATE vinfo SET source_metadata", // Source metadata updates must succeed
 }
 
 // isCriticalStatement checks if a statement matches any critical pattern.
@@ -52,11 +54,23 @@ func translateXLSXError(err error) error {
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
 func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (ValidationResult, error) {
-	query, err := p.builder.IngestRvtoolsQuery(excelFile)
+	metadata, err := readRVToolsMetadata(ctx, excelFile)
+	if err != nil {
+		return ValidationResult{}, fmt.Errorf("reading RVTools source metadata: %w", err)
+	}
+	var args []any
+	if len(metadata) > 0 {
+		data, err := json.Marshal(metadata)
+		if err != nil {
+			return ValidationResult{}, fmt.Errorf("encoding RVTools source metadata: %w", err)
+		}
+		args = []any{string(data)}
+	}
+	query, err := p.builder.IngestRvtoolsQuery(excelFile, len(metadata) > 0)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
-	if err := p.executeStatements(ctx, query); err != nil {
+	if err := p.executeStatements(ctx, query, args...); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
 	}
 
@@ -118,16 +132,20 @@ func (p *Parser) dropVinfoRaw(ctx context.Context) error {
 }
 
 // executeStatements executes a multi-statement SQL string.
-// Critical statements (INSTALL, LOAD, CREATE TABLE vinfo) must succeed or an error is returned.
+// Critical statements must succeed or an error is returned.
 // Non-critical statements (INSERT for optional sheets, ALTER for optional columns) are logged but don't fail.
-func (p *Parser) executeStatements(ctx context.Context, query string) error {
+func (p *Parser) executeStatements(ctx context.Context, query string, args ...any) error {
 	stmts := stmtRegex.FindAllString(query, -1)
 	for _, stmt := range stmts {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
 		}
-		if _, err := p.db.ExecContext(ctx, stmt); err != nil {
+		var stmtArgs []any
+		if strings.HasPrefix(stmt, "UPDATE vinfo SET source_metadata") {
+			stmtArgs = args
+		}
+		if _, err := p.db.ExecContext(ctx, stmt, stmtArgs...); err != nil {
 			if isCriticalStatement(stmt) {
 				return translateXLSXError(err)
 			}
