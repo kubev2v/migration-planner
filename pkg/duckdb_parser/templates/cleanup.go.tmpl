@@ -1,0 +1,27 @@
+{{- /*
+Cleanup Template - Deletes all data from RVTools tables to allow schema reuse.
+
+Child tables (those with foreign keys referencing vinfo) are deleted first,
+followed by standalone tables, and finally the parent vinfo table.
+Staging tables from ingestion are dropped since they are not part of the schema.
+
+No template parameters required.
+*/ -}}
+DELETE FROM concerns;
+DELETE FROM vnetwork;
+DELETE FROM vdisk;
+DELETE FROM vmemory;
+DELETE FROM vcpu;
+DELETE FROM about;
+DELETE FROM vcluster;
+DELETE FROM dvswitch;
+DELETE FROM dvport;
+DELETE FROM vhba;
+DELETE FROM vdatastore;
+DELETE FROM vhost;
+DELETE FROM vinfo;
+DROP TABLE IF EXISTS vinfo_raw;
+DROP TABLE IF EXISTS vdisk_raw;
+DROP TABLE IF EXISTS vdatastore_raw;
+DROP TABLE IF EXISTS vhost_raw;
+DROP TABLE IF EXISTS vcluster_raw;
