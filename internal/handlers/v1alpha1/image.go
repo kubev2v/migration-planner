@@ -18,7 +18,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
-	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
@@ -103,7 +102,6 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	reader, _, err := imageBuilder.OpenSeekableReader(modTime)
 	if err != nil {
-		metrics.IncreaseOvaDownloadsTotalMetric("failed")
 		zap.S().Named("image_service").Errorw("failed to create seekable reader", "error", err)
 		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to create seekable reader: %s", err)}, nil
 	}
@@ -119,8 +117,6 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	// http.ServeContent handles Range requests, Content-Length, Last-Modified, etc.
 	http.ServeContent(writer, httpReq, req.Name, modTime, reader)
-
-	metrics.IncreaseOvaDownloadsTotalMetric("successful")
 
 	downloadURLID, err := image.DownloadURLID(req.Token)
 	if err == nil {

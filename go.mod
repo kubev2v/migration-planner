@@ -22,7 +22,6 @@ require (
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
-	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.28.0
@@ -33,7 +32,6 @@ require (
 	github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
-	github.com/prometheus/client_golang v1.23.2
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
 	github.com/riverqueue/river/rivertype v0.27.0
@@ -42,7 +40,6 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/thoas/go-funk v0.9.3
 	github.com/twmb/franz-go v1.21.0
-	github.com/twmb/franz-go/plugin/kprom v1.4.0
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.1
@@ -151,6 +148,7 @@ require (
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
 	github.com/pkg/xattr v0.4.12 // indirect
+	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect

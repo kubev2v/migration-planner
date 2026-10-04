@@ -95,11 +95,7 @@ func (m *mockStore) AssessmentEnhancementData() store.AssessmentEnhancementData 
 func (m *mockStore) Job() store.Job                                             { return nil }
 func (m *mockStore) Accounts() store.Accounts                                   { return nil }
 func (m *mockStore) PartnerCustomer() store.PartnerCustomer                     { return nil }
-func (m *mockStore) Statistics(_ context.Context) (model.InventoryStats, error) {
-	return model.InventoryStats{}, nil
-}
-func (m *mockStore) RequestMetricsCacheRefresh() {}
-func (m *mockStore) Close() error                { return nil }
+func (m *mockStore) Close() error                                               { return nil }
 
 type mockWriter struct {
 	written  [][]byte

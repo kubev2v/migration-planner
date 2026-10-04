@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"github.com/twmb/franz-go/plugin/kprom"
 	"go.uber.org/zap"
 )
 
@@ -28,7 +27,6 @@ func NewKafkaProducer(brokers []string, opts ...kgo.Opt) (*KafkaProducer, error)
 		kgo.ClientID(clientID),
 		kgo.RequiredAcks(kgo.AllISRAcks()),
 		kgo.ProducerBatchMaxBytes(maxProducerBatchBytes),
-		kgo.WithHooks(kprom.NewMetrics("kafka_producer")),
 	}
 
 	cl, err := kgo.NewClient(append(defaults, opts...)...)

@@ -71,7 +71,6 @@ MIGRATION_PLANNER_MIGRATIONS_FOLDER=/home/cosmin/projects/migration-planner/pkg/
 2025-04-03T15:31:59+02:00       info    image_server    imageserver/server.go:57        Initializing Image-side API server
 2025-04-03T15:31:59+02:00       info    agent_server    agentserver/server.go:58        Initializing Agent-side API server
 2025-04-03T15:31:59+02:00       info    api_server      api_server/server.go:68 Initializing API server
-2025-04-03T15:31:59+02:00       info    metrics_server  api_server/metrics_server.go:49 serving metrics: 0.0.0.0:8080
 2025-04-03T15:31:59+02:00       info    image_server    imageserver/server.go:97        Listening on [::]:11443...
 2025-04-03T15:31:59+02:00       info    agent_server    agentserver/server.go:99        Listening on [::]:7443...
 2025-04-03T15:31:59+02:00       info    auth    auth/auth.go:26 authentication: 'local'
