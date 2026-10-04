@@ -4,19 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/google/uuid"
-	"go.uber.org/zap"
 
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/metrics"
-)
-
-const (
-	defaultUpToDatePeriod = 5 * 60 * time.Second
 )
 
 type AgentService struct {
@@ -259,47 +252,5 @@ func (as *AgentService) UpdateAgentStatus(ctx context.Context, updateForm mapper
 		return nil, false, fmt.Errorf("failed to update agent: %w", err)
 	}
 
-	// must not block here.
-	// don't care about errors or context
-	go as.updateMetrics()
-
 	return agent, false, nil
-}
-
-// update metrics about agents states
-// it lists all the agents and update the metrics by agent state
-func (as *AgentService) updateMetrics() {
-	agents, err := as.store.Agent().List(context.TODO(), store.NewAgentQueryFilter(), store.NewAgentQueryOptions())
-	if err != nil {
-		zap.S().Named("agent_handler").Warnw("failed to update agent metrics", "error", err)
-		return
-	}
-	// holds the total number of agents by state
-	// set defaults
-	// enum: [not-connected, waiting-for-credentials, error, gathering-initial-inventory, up-to-date, source-gone]
-	states := map[string]int{
-		"not-connected":               0,
-		"up-to-date":                  0,
-		"error":                       0,
-		"waiting-for-credentials":     0,
-		"gathering-initial-inventory": 0,
-	}
-	// If agent's status has not been update for more than 5min, we consider it not-connected
-	for _, a := range agents {
-		status := a.Status
-		if a.UpdatedAt.Before(time.Now().Add(-defaultUpToDatePeriod)) {
-			status = "not-connected"
-		}
-
-		if count, ok := states[status]; ok {
-			count += 1
-			states[status] = count
-			continue
-		}
-
-		states[status] = 1
-	}
-	for k, v := range states {
-		metrics.UpdateAgentStateCounterMetric(k, v)
-	}
 }

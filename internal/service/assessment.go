@@ -221,8 +221,6 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		return nil, err
 	}
 
-	as.store.RequestMetricsCacheRefresh()
-
 	tracer.Success().
 		WithUUID("assessment_id", createdAssessment.ID).
 		WithString("assessment_name", createdAssessment.Name).
@@ -283,8 +281,6 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 			return nil, err
 		}
 
-		as.store.RequestMetricsCacheRefresh()
-
 		tracer.Success().WithString("update_type", "with_new_inventory").Log()
 		return as.GetAssessment(ctx, id)
 	}
@@ -325,8 +321,6 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 	if err := as.store.Assessment().Delete(ctx, id); err != nil {
 		return fmt.Errorf("failed to delete assessment: %w", err)
 	}
-	as.store.RequestMetricsCacheRefresh()
-
 	tracer.Success().WithString("deleted_assessment_name", assessment.Name).Log()
 	return nil
 }

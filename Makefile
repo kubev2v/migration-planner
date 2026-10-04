@@ -288,12 +288,6 @@ delete-from-openshift: oc
 	oc delete route planner-agent planner-image; \
 	echo "*** OpenShift Migration Advisor has been deleted successfully from OpenShift ***"
 
-deploy-local-obs:
-	@podman play kube --network host deploy/observability.yml
-
-undeploy-local-obs:
-	@podman kube down deploy/observability.yml
-
 bin:
 	mkdir -p bin
 

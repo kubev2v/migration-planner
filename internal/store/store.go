@@ -3,7 +3,6 @@ package store
 import (
 	"context"
 
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 )
 
@@ -24,9 +23,7 @@ type Store interface {
 	Accounts() Accounts
 	PartnerCustomer() PartnerCustomer
 	Outbox() Outbox
-	Statistics(ctx context.Context) (model.InventoryStats, error)
 	Close() error
-	RequestMetricsCacheRefresh()
 }
 
 type DataStore struct {
@@ -46,7 +43,6 @@ type DataStore struct {
 	accounts                  Accounts
 	partnerCustomer           PartnerCustomer
 	outbox                    Outbox
-	metricCache               *MetricsCache
 }
 
 func NewStore(db *gorm.DB) Store {
@@ -68,7 +64,6 @@ func NewStore(db *gorm.DB) Store {
 		accounts:                  NewAccountsStore(db),
 		partnerCustomer:           NewPartnerCustomerStore(db),
 		outbox:                    NewOutboxStore(db),
-		metricCache:               NewMetricsCache(assessment),
 		db:                        db,
 	}
 }
@@ -135,14 +130,6 @@ func (s *DataStore) PartnerCustomer() PartnerCustomer {
 
 func (s *DataStore) Outbox() Outbox {
 	return s.outbox
-}
-
-func (s *DataStore) Statistics(ctx context.Context) (model.InventoryStats, error) {
-	return s.metricCache.GetStats(ctx)
-}
-
-func (s *DataStore) RequestMetricsCacheRefresh() {
-	s.metricCache.RequestMetricsCacheRefresh()
 }
 
 func (s *DataStore) Close() error {
