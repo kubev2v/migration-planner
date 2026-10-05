@@ -13,6 +13,8 @@ parameters:
   - name: JOB_NAME
     description: Descriptive name prefix for the job
     value: "kafka/ES-backfill"
+  - name: BACKFILL_SUBCOMMAND
+    description: Backfill subcommand to run
   - name: BACKOFF_LIMIT
     description: Number of retries before marking the job as failed
     value: "0"
@@ -78,7 +80,9 @@ objects:
               imagePullPolicy: IfNotPresent
               command:
                 - /app/planner-api
+              args:
                 - backfill
+                - "${BACKFILL_SUBCOMMAND}"
               env:
                 - name: DB_HOST
                   valueFrom:
