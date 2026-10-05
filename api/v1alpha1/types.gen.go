@@ -642,12 +642,9 @@ type Datastore struct {
 	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
 
 	// HostId Identifier of the host where this datastore is attached
-	HostId       *string `json:"hostId"`
-	Model        string  `json:"model"`
-	ProtocolType string  `json:"protocolType"`
-
-	// SnapshotSupport Whether the datastore supports point-in-time snapshots
-	SnapshotSupport        *bool                   `json:"snapshotSupport,omitempty"`
+	HostId                 *string                 `json:"hostId"`
+	Model                  string                  `json:"model"`
+	ProtocolType           string                  `json:"protocolType"`
 	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
 
 	// StorageProtocol Storage access category derived from Datastore.Type
@@ -655,6 +652,9 @@ type Datastore struct {
 	TotalCapacityGB int                       `json:"totalCapacityGB"`
 	Type            string                    `json:"type"`
 	Vendor          string                    `json:"vendor"`
+
+	// VsanSnapshotSupport Whether this datastore supports vSAN point-in-time snapshots
+	VsanSnapshotSupport *bool `json:"vsanSnapshotSupport,omitempty"`
 }
 
 // DatastoreStorageProtocol Storage access category derived from Datastore.Type

@@ -614,16 +614,16 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
 					{
-						DiskId:          "disk-123",
-						FreeCapacityGB:  500.5,
-						TotalCapacityGB: 1000.0,
-						Type:            "VMFS",
-						StorageProtocol: inventory.StorageProtocolBlock,
-						SnapshotSupport: true,
-						HostId:          "host-1",
-						Model:           "SSD",
-						ProtocolType:    "SCSI",
-						Vendor:          "Intel",
+						DiskId:              "disk-123",
+						FreeCapacityGB:      500.5,
+						TotalCapacityGB:     1000.0,
+						Type:                "VMFS",
+						StorageProtocol:     inventory.StorageProtocolBlock,
+						VsanSnapshotSupport: true,
+						HostId:              "host-1",
+						Model:               "SSD",
+						ProtocolType:        "SCSI",
+						Vendor:              "Intel",
 					},
 				},
 			},
@@ -691,8 +691,8 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 					assert.Nil(t, actual.StorageProtocol)
 				}
 
-				require.NotNil(t, actual.SnapshotSupport)
-				assert.Equal(t, expected.SnapshotSupport, *actual.SnapshotSupport)
+				require.NotNil(t, actual.VsanSnapshotSupport)
+				assert.Equal(t, expected.VsanSnapshotSupport, *actual.VsanSnapshotSupport)
 				if expected.HostId != "" {
 					require.NotNil(t, actual.HostId)
 					assert.Equal(t, expected.HostId, *actual.HostId)

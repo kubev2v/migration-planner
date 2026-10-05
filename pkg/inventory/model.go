@@ -157,7 +157,7 @@ type Datastore struct {
 	TotalCapacityGB        float64
 	Type                   string
 	StorageProtocol        string
-	SnapshotSupport        bool
+	VsanSnapshotSupport    bool
 	HostId                 string
 	Model                  string
 	ProtocolType           string
