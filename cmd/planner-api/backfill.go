@@ -17,46 +17,74 @@ import (
 	"go.uber.org/zap"
 )
 
+type backfillFunc func(context.Context, store.Store, events.Writer, func()) error
+
+type assessmentPartner struct {
+	ID   *string
+	Name *string
+}
+
 var backfillCmd = &cobra.Command{
 	Use:   "backfill",
+	Short: "Backfill existing data into Kafka",
+}
+
+var backfillAssessmentCmd = &cobra.Command{
+	Use:   "assessment",
 	Short: "Backfill existing assessments into Kafka",
 	Long:  "Reads all assessments from the database and publishes AssessmentCreated events to Kafka, backfilling historical data.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		logger := log.InitLog(zap.NewAtomicLevelAt(zap.InfoLevel))
-		defer func() { _ = logger.Sync() }()
-
-		undo := zap.ReplaceGlobals(logger)
-		defer undo()
-
-		cfg, err := config.New()
-		if err != nil {
-			zap.S().Fatalw("reading configuration", "error", err)
-		}
-
-		zap.S().Info("Initializing data store")
-		db, err := store.InitDB(cfg)
-		if err != nil {
-			zap.S().Fatalw("initializing data store", "error", err)
-		}
-
-		s := store.NewStore(db)
-		defer func() { _ = s.Close() }()
-
-		ctx := context.Background()
-
-		w, cl, err := createEventWriter(ctx, cfg)
-		if err != nil {
-			zap.S().Fatalw("initializing kafka producer", "error", err)
-		}
-
-		if err := backfillAssessments(ctx, s, w, cl); err != nil {
-			zap.S().Errorf("completed with errors: %v", err)
-			return nil
-		}
-
-		zap.S().Infow("completed successfully without any error")
-		return nil
+		return runBackfill(backfillAssessments)
 	},
+}
+
+var backfillPartnerCustomerCmd = &cobra.Command{
+	Use:   "partner-customer",
+	Short: "Backfill existing partner-customer relationships into Kafka",
+	Long:  "Reads all partner-customer relationships from the database and publishes partner-customer events to Kafka.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return runBackfill(backfillPartnerCustomers)
+	},
+}
+
+func init() {
+	backfillCmd.AddCommand(backfillAssessmentCmd, backfillPartnerCustomerCmd)
+}
+
+func runBackfill(backfill backfillFunc) error {
+	logger := log.InitLog(zap.NewAtomicLevelAt(zap.InfoLevel))
+	defer func() { _ = logger.Sync() }()
+
+	undo := zap.ReplaceGlobals(logger)
+	defer undo()
+
+	cfg, err := config.New()
+	if err != nil {
+		zap.S().Fatalw("reading configuration", "error", err)
+	}
+
+	zap.S().Info("Initializing data store")
+	db, err := store.InitDB(cfg)
+	if err != nil {
+		zap.S().Fatalw("initializing data store", "error", err)
+	}
+
+	s := store.NewStore(db)
+	defer func() { _ = s.Close() }()
+
+	ctx := context.Background()
+	w, cl, err := createEventWriter(ctx, cfg)
+	if err != nil {
+		zap.S().Fatalw("initializing kafka producer", "error", err)
+	}
+
+	if err := backfill(ctx, s, w, cl); err != nil {
+		zap.S().Errorf("completed with errors: %v", err)
+		return nil
+	}
+
+	zap.S().Infow("completed successfully without any error")
+	return nil
 }
 
 func backfillAssessments(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
@@ -141,9 +169,56 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 	return nil
 }
 
-type assessmentPartner struct {
-	ID   *string
-	Name *string
+func backfillPartnerCustomers(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+	defer writerClose()
+
+	partnerCustomers, err := s.PartnerCustomer().List(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("listing partner-customer relationships: %w", err)
+	}
+
+	zap.S().Infow("found partner-customer relationships to backfill", "count", len(partnerCustomers))
+
+	var success, eventBuildErrors, publishErrors int
+	for _, partnerCustomer := range partnerCustomers {
+		payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+			ID:               partnerCustomer.ID.String(),
+			CustomerUsername: partnerCustomer.Username,
+			PartnerID:        partnerCustomer.PartnerID,
+			PartnerName:      partnerCustomer.Partner.Name,
+			RequestStatus:    string(partnerCustomer.RequestStatus),
+			Location:         partnerCustomer.Location,
+			AcceptedAt:       partnerCustomer.AcceptedAt,
+			TerminatedAt:     partnerCustomer.TerminatedAt,
+			CreatedAt:        partnerCustomer.CreatedAt,
+		})
+
+		ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+		if err != nil {
+			zap.S().Errorw("building cloud event", "id", partnerCustomer.ID, "error", err)
+			eventBuildErrors++
+			continue
+		}
+
+		if err := writer.Write(ctx, ceBytes); err != nil {
+			zap.S().Errorw("publishing event", "id", partnerCustomer.ID, "error", err)
+			publishErrors++
+			continue
+		}
+
+		success++
+	}
+
+	if eventBuildErrors > 0 || publishErrors > 0 {
+		return fmt.Errorf(
+			"backfill completed with errors: success=%d event_build=%d publish=%d",
+			success,
+			eventBuildErrors,
+			publishErrors,
+		)
+	}
+
+	return nil
 }
 
 func resolveAssessmentPartners(ctx context.Context, s store.Store, assessments model.AssessmentList) (map[string]assessmentPartner, error) {
