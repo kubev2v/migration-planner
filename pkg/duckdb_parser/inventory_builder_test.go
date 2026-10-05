@@ -1996,7 +1996,7 @@ func buildSiocDatastore(name, objectID, enabled, threshold, mode, percent string
 	}
 }
 
-func TestBuildInventory_SnapshotSupport(t *testing.T) {
+func TestBuildInventory_VsanSnapshotSupport(t *testing.T) {
 	vms := []map[string]string{
 		{"VM": "vm-1", "VM ID": "vm-001", "VI SDK UUID": "uuid-1", "Host": "esxi-host-1", "CPUs": "4", "Memory": "8192", "Powerstate": "poweredOn", "Cluster": "cluster1", "Datacenter": "dc1"},
 	}
@@ -2006,13 +2006,13 @@ func TestBuildInventory_SnapshotSupport(t *testing.T) {
 	clustersRows := []map[string]string{{"Name": "cluster1", "Object ID": "domain-c1"}}
 
 	tests := []struct {
-		name                    string
-		datastoreType           string
-		expectedSnapshotSupport bool
+		name                        string
+		datastoreType               string
+		expectedVsanSnapshotSupport bool
 	}{
-		{name: "vSAN datastore", datastoreType: "VSAN", expectedSnapshotSupport: true},
-		{name: "vSAN datastore with whitespace", datastoreType: " vSaN ", expectedSnapshotSupport: true},
-		{name: "non-vSAN datastore", datastoreType: "VMFS", expectedSnapshotSupport: false},
+		{name: "vSAN datastore", datastoreType: "VSAN", expectedVsanSnapshotSupport: true},
+		{name: "vSAN datastore with whitespace", datastoreType: " vSaN ", expectedVsanSnapshotSupport: true},
+		{name: "non-vSAN datastore", datastoreType: "VMFS", expectedVsanSnapshotSupport: false},
 	}
 
 	for _, tt := range tests {
@@ -2037,7 +2037,7 @@ func TestBuildInventory_SnapshotSupport(t *testing.T) {
 			inv, err := parser.BuildInventory(ctx, nil)
 			require.NoError(t, err)
 			require.Len(t, inv.VCenter.Infra.Datastores, 1)
-			assert.Equal(t, tt.expectedSnapshotSupport, inv.VCenter.Infra.Datastores[0].SnapshotSupport)
+			assert.Equal(t, tt.expectedVsanSnapshotSupport, inv.VCenter.Infra.Datastores[0].VsanSnapshotSupport)
 		})
 	}
 }

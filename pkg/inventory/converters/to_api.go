@@ -250,13 +250,13 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 
 	datastores := make([]api.Datastore, 0, len(i.Datastores))
 	for _, d := range i.Datastores {
-		snapshotSupport := d.SnapshotSupport
+		vsanSnapshotSupport := d.VsanSnapshotSupport
 		ds := api.Datastore{
 			DiskId:                  d.DiskId,
 			FreeCapacityGB:          int(d.FreeCapacityGB),
 			TotalCapacityGB:         int(d.TotalCapacityGB),
 			Type:                    d.Type,
-			SnapshotSupport:         &snapshotSupport,
+			VsanSnapshotSupport:     &vsanSnapshotSupport,
 			HardwareAcceleratedMove: false, // Always false to match old behavior
 			Model:                   d.Model,
 			ProtocolType:            d.ProtocolType,
