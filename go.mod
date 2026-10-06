@@ -22,6 +22,7 @@ require (
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
+	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
 	github.com/onsi/ginkgo/v2 v2.28.0
@@ -32,6 +33,7 @@ require (
 	github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
+	github.com/prometheus/client_golang v1.23.2
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
 	github.com/riverqueue/river/rivertype v0.27.0
@@ -43,7 +45,7 @@ require (
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/sync v0.23.0
+	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
@@ -148,7 +150,6 @@ require (
 	github.com/philhofer/fwd v1.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.29 // indirect
 	github.com/pkg/xattr v0.4.12 // indirect
-	github.com/prometheus/client_golang v1.23.2 // indirect
 	github.com/prometheus/client_model v0.6.3 // indirect
 	github.com/prometheus/common v0.67.5 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
@@ -194,9 +195,9 @@ require (
 	golang.org/x/mod v0.41.0 // indirect
 	golang.org/x/net v0.59.0 // indirect
 	golang.org/x/oauth2 v0.34.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
-	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect
