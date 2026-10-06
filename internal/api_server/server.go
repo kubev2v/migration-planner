@@ -33,6 +33,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"github.com/kubev2v/migration-planner/pkg/middleware"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
@@ -200,7 +201,11 @@ func (s *Server) Run(ctx context.Context) error {
 
 	router := chi.NewRouter()
 
+	metricMiddleware := metrics.NewMiddleware("api_server")
+	metricMiddleware.MustRegisterDefault()
+
 	router.Use(
+		metricMiddleware.Handler,
 		cors.Handler(cors.Options{
 			AllowedOrigins:   []string{"https://console.stage.redhat.com", "https://stage.foo.redhat.com:1337"},
 			AllowedMethods:   []string{"GET", "PUT", "POST", "DELETE", "HEAD", "OPTIONS"},
