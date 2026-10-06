@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval:     15s 
+    
+    scrape_configs:
+      - job_name: 'am'
+        metrics_path: /metrics
+        static_configs:
+          - targets: [
+                'localhost:8080', 
+            ]
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: prometheus-streamer
+spec:
+  containers:
+    - name: prometheus
+      image: docker.io/prom/prometheus
+      volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus/prometheus.yml
+          subPath: prometheus.yml
+    - name: grafana
+      image: docker.io/grafana/grafana-oss
+      volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+  volumes:
+    - name: prometheus-config
+      configMap:
+        name: prometheus-config
+        items:
+          - key: prometheus.yml
+            path: prometheus.yml
+    - name: grafana-data
+      persistentVolumeClaim:
+        claimName: grafana-data
