@@ -29,6 +29,10 @@ func (a *AuthzAccountsService) GetIdentity(ctx context.Context, authUser auth.Us
 	return a.inner.GetIdentity(ctx, authUser)
 }
 
+func (a *AuthzAccountsService) GetAccountIdentity(ctx context.Context, accountID string) (AccountIdentity, error) {
+	return a.inner.GetAccountIdentity(ctx, accountID)
+}
+
 func (a *AuthzAccountsService) ListGroups(ctx context.Context, filter *store.GroupQueryFilter) (model.GroupList, error) {
 	if err := a.requireAdmin(ctx, "groups"); err != nil {
 		return nil, err

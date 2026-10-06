@@ -4,8 +4,6 @@ import "context"
 
 // MockClient is a mock implementation of Client for testing.
 type MockClient struct {
-	FindUserFunc func(ctx context.Context, username string) (*UserInfo, error)
-	FindOrgFunc  func(ctx context.Context, orgID string) (*OrgInfo, error)
 }
 
 func (m *MockClient) FindUser(_ context.Context, username string) (*UserInfo, error) {
@@ -17,14 +15,14 @@ func (m *MockClient) FindUser(_ context.Context, username string) (*UserInfo, er
 	}, nil
 }
 
-func (m *MockClient) FindOrg(_ context.Context, orgID string) (*OrgInfo, error) {
-	// return a fake org
-	return &OrgInfo{
-		ID:               orgID,
+func (m *MockClient) FindAccount(ctx context.Context, accountID string) (*AccountInfo, error) {
+	// return a fake account
+	return &AccountInfo{
+		ID:               accountID,
 		Name:             "Test Organization",
 		EBSAccountNumber: "12345",
 		Status:           "enabled",
-		Type:             accountTypeOrganization,
+		Type:             AccountTypeOrganization,
 	}, nil
 }
 
@@ -35,6 +33,6 @@ func (c *UnimplementedClient) FindUser(_ context.Context, _ string) (*UserInfo, 
 	return nil, ErrOrgNotFound
 }
 
-func (c *UnimplementedClient) FindOrg(_ context.Context, _ string) (*OrgInfo, error) {
+func (c *UnimplementedClient) FindAccount(_ context.Context, _ string) (*AccountInfo, error) {
 	return nil, ErrAccountNotFound
 }
