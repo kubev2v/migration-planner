@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -64,7 +65,11 @@ func (s *ImageServer) Run(ctx context.Context) error {
 
 	router := chi.NewRouter()
 
+	metricMiddleware := metrics.NewMiddleware("image_server")
+	metricMiddleware.MustRegisterDefault()
+
 	router.Use(
+		metricMiddleware.Handler,
 		middleware.RequestID,
 		log.ConditionalLogger(s.cfg.Service.LogLevel, zap.L(), "image_server"),
 		middleware.Recoverer,

@@ -147,6 +147,10 @@ var runCmd = &cobra.Command{
 			return imageserver.New(cfg, store, l)
 		})
 
+		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {
+			return apiserver.NewMetricServer("0.0.0.0:8080", l)
+		})
+
 		<-ctx.Done()
 		wg.Wait()
 
