@@ -7,7 +7,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/twmb/franz-go/pkg/kgo"
-	"go.uber.org/zap"
 )
 
 const maxProducerBatchBytes = 10 * 1024 * 1024 // 10 MiB
@@ -49,7 +48,6 @@ func (p *KafkaProducer) Write(ctx context.Context, topic string, data []byte) er
 		return fmt.Errorf("failed to produce message: %w", err)
 	}
 
-	zap.S().Infow("message pushed to kafka", "topic", record.Topic, "offset", record.Offset, "partition", record.Partition)
 	return nil
 }
 
