@@ -21,10 +21,12 @@ import (
 // If vmList is nil or empty, all VMs will be included (existing behavior).
 func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventory.Inventory, error) {
 	// Get vCenter ID
+	canPersistClusterIDs := true
 	vcenterID, err := p.VCenterID(ctx)
 	if err != nil {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get vCenter ID: %v", err)
 		vcenterID = ""
+		canPersistClusterIDs = false
 	}
 
 	// Build vcenter-level inventory (no cluster filter, optional VM list filter)
@@ -51,6 +53,7 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 	if err != nil {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get cluster object IDs: %v", err)
 		clusterObjectIDs = make(map[string]string)
+		canPersistClusterIDs = false
 	}
 	zap.S().Named("duckdb_parser").Infof("Found %d clusters in vCluster sheet", len(clusterObjectIDs))
 
@@ -59,6 +62,7 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 	if err != nil {
 		zap.S().Named("duckdb_parser").Warnf("Failed to get cluster datacenters: %v", err)
 		clusterDatacenters = make(map[string]string)
+		canPersistClusterIDs = false
 	}
 
 	// Build per-cluster inventories with cluster IDs from vCluster or generated
@@ -73,6 +77,21 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 
 		// Use Object ID from vCluster sheet if available, otherwise generate
 		clusterID := resolveClusterID(clusterName, clusterObjectIDs, clusterDatacenters, vcenterID)
+		if _, exists := clusterObjectIDs[clusterName]; !exists {
+			// Avoid creating rows for unsupported RVTools missing-name placeholders.
+			if trimmed := strings.TrimSpace(clusterName); trimmed != "" && trimmed != "VM" {
+				if canPersistClusterIDs {
+					if err := p.persistClusterID(ctx, clusterName, clusterID); err != nil {
+						return nil, fmt.Errorf("persisting ID for cluster %q: %w", clusterName, err)
+					}
+				} else {
+					zap.S().Named("duckdb_parser").Warnw(
+						"Skipping cluster ID persistence because an identity lookup failed",
+						"cluster", clusterName, "cluster_id", clusterID,
+					)
+				}
+			}
+		}
 		clusterInventories[clusterID] = *clusterInv
 	}
 
@@ -84,6 +103,61 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		VCenterVersion: vcenterVersion,
 		CreatedAt:      &now,
 	}, nil
+}
+
+// persistClusterID repairs a missing cluster ID without persisting ambiguous names.
+func (p *Parser) persistClusterID(ctx context.Context, name, id string) error {
+	var ambiguous bool
+	err := p.db.QueryRowContext(ctx, `
+        -- cluster ID identity ambiguity
+        SELECT COUNT(*) > 1
+        FROM (
+            SELECT DISTINCT
+                COALESCE("Datacenter", '') AS datacenter,
+                COALESCE("VI SDK UUID", '') AS vcenter
+            FROM vinfo
+            WHERE "Cluster" = ?
+            LIMIT 2
+        ) AS identities
+    `, name).Scan(&ambiguous)
+	if err != nil {
+		zap.S().Named("duckdb_parser").Warnw(
+			"Skipping cluster ID persistence because the identity ambiguity check failed",
+			"cluster", name, "error", err,
+		)
+		return nil
+	}
+	if ambiguous {
+		zap.S().Named("duckdb_parser").Warnw(
+			"Skipping cluster ID persistence for an ambiguous cluster name",
+			"cluster", name,
+		)
+		return nil
+	}
+	// Keep placeholder classification aligned with
+	// templates/cluster_object_ids_query.go.tmpl; see the consistency test.
+	if _, err := p.db.ExecContext(ctx, `
+        UPDATE vcluster SET "Object ID" = ?
+        WHERE "Name" = ?
+          AND regexp_full_match(
+              COALESCE("Object ID", ''), '[[:space:]]*(VM)?[[:space:]]*'
+          )
+    `, id, name); err != nil {
+		return fmt.Errorf("updating cluster Object ID: %w", err)
+	}
+	if _, err := p.db.ExecContext(ctx, `
+        INSERT INTO vcluster (
+            "Name", "Object ID",
+            "DrsEnabled", "DrsDefaultVmBehavior", "DasEnabled"
+        )
+        SELECT ?, ?, NULL, NULL, NULL
+        WHERE NOT EXISTS (
+            SELECT 1 FROM vcluster WHERE "Name" = ?
+        )
+    `, name, id, name); err != nil {
+		return fmt.Errorf("inserting cluster row: %w", err)
+	}
+	return nil
 }
 
 // buildInventoryData constructs an InventoryData for a given filter set.

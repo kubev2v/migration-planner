@@ -6,4 +6,9 @@ SELECT "DrsEnabled", "DrsDefaultVmBehavior" as drsMode, "DasEnabled"
 FROM vcluster
 WHERE "Name" = '{{.ClusterName}}'
   AND "Name" IS NOT NULL AND "Name" != ''
+  AND (
+      "DrsEnabled" IS NOT NULL
+      OR "DrsDefaultVmBehavior" IS NOT NULL
+      OR "DasEnabled" IS NOT NULL
+  )
 LIMIT 1;
