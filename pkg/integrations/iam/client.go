@@ -20,8 +20,8 @@ type Client interface {
 	// FindUser returns user info including org_id and personal details by username.
 	FindUser(ctx context.Context, username string) (*UserInfo, error)
 
-	// FindOrg retrieves organization details by org_id.
-	FindOrg(ctx context.Context, orgID string) (*OrgInfo, error)
+	// FindAccount retrieves account details by account ID.
+	FindAccount(ctx context.Context, accountID string) (*AccountInfo, error)
 }
 
 // HTTPClient talks to the User Service over an mTLS-authenticated HTTPS
@@ -145,14 +145,14 @@ func (c *HTTPClient) FindUser(ctx context.Context, username string) (*UserInfo, 
 	}, nil
 }
 
-func (c *HTTPClient) FindOrg(ctx context.Context, orgID string) (*OrgInfo, error) {
-	if orgID == "" {
-		return nil, fmt.Errorf("orgID must not be empty")
+func (c *HTTPClient) FindAccount(ctx context.Context, accountID string) (*AccountInfo, error) {
+	if accountID == "" {
+		return nil, fmt.Errorf("accountID must not be empty")
 	}
 
 	body, err := json.Marshal(findAccountRequest{
 		By: findAccountBy{
-			ID: orgID,
+			ID: accountID,
 		},
 	})
 	if err != nil {
@@ -187,11 +187,7 @@ func (c *HTTPClient) FindOrg(ctx context.Context, orgID string) (*OrgInfo, error
 		return nil, fmt.Errorf("decoding user service response: %w", err)
 	}
 
-	if parsed.Type != accountTypeOrganization {
-		return nil, fmt.Errorf("account type is %q, expected %q", parsed.Type, accountTypeOrganization)
-	}
-
-	return &OrgInfo{
+	return &AccountInfo{
 		ID:               parsed.ID,
 		Name:             parsed.Name,
 		EBSAccountNumber: parsed.EBSAccountNumber,

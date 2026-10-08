@@ -10,8 +10,11 @@ const findAccountPath = "/v2/findAccount"
 // login/principal. Console SSO logins are issued by "Red Hat".
 const authProvider = "Red Hat"
 
-// accountTypeOrganization is the expected account type when looking up organizations.
-const accountTypeOrganization = "organization"
+// AccountTypeOrganization is the account type for an organization.
+const AccountTypeOrganization = "organization"
+
+// AccountTypePerson is the account type for an individual.
+const AccountTypePerson = "person"
 
 // UserInfo contains user identity and organization details.
 type UserInfo struct {
@@ -20,13 +23,13 @@ type UserInfo struct {
 	LastName  string // from personalInformation (lastNames)
 }
 
-// OrgInfo contains organization account details.
-type OrgInfo struct {
+// AccountInfo contains account details returned by findAccount.
+type AccountInfo struct {
 	ID               string // account id
-	Name             string // organization name
+	Name             string // account name
 	EBSAccountNumber string // ebsAccountNumber
 	Status           string // enabled/disabled/etc
-	Type             string // organization/individual/etc
+	Type             string // organization/person/etc
 }
 
 // findUserRequest is the POST /v2/findUser body. We look the user up by their
