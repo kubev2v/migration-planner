@@ -109,8 +109,12 @@ SELECT
     COALESCE(con.concerns, []) AS "Concerns",
     COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
     COALESCE(CAST(i."labels" AS VARCHAR[]), []) AS "Labels",
-    COALESCE(i."guest_apps", '[]') AS "GuestApps"
-FROM vinfo i
+    COALESCE(i."guest_apps", '[]') AS "GuestApps",
+    COALESCE(i.metadata, map()) AS "Metadata"
+FROM (
+    SELECT * FROM vinfo
+    UNION ALL BY NAME SELECT map()::MAP(VARCHAR, VARCHAR[]) AS metadata WHERE false
+) i
 LEFT JOIN vcpu c ON i."VM ID" = c."VM ID"
 LEFT JOIN vmemory m ON i."VM ID" = m."VM ID"
 LEFT JOIN disks d ON i."VM ID" = d."VM ID"
