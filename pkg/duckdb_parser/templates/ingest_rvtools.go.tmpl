@@ -16,6 +16,7 @@ SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', header=true, all_varchar
 
 -- Add potentially missing columns with NULL defaults for minimal schema support
 -- Only VM ID and VM are required; all other columns are optional
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Annotation" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder ID" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
@@ -73,7 +74,7 @@ UPDATE vinfo_raw SET
   );
 
 INSERT INTO vinfo (
-    "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
+    "VM ID", "VM", "Annotation", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
     "CPUs", "Memory",
     "OS according to the configuration file", "OS according to the VMware Tools",
@@ -85,6 +86,7 @@ INSERT INTO vinfo (
 SELECT
     "VM ID",
     "VM",
+    "Annotation",
     "Folder ID",
     "Folder",
     "Host",
