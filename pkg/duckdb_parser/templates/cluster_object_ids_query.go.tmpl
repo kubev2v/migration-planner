@@ -3,8 +3,10 @@ Cluster Object IDs Query Template - Returns cluster name to Object ID mapping.
 Used for generating proper cluster IDs from the vCluster sheet.
 Falls back to empty result if vCluster sheet is not present.
 */ -}}
+-- Canonical placeholder classification; keep persistClusterID aligned.
 SELECT "Name", "Object ID"
 FROM vcluster
 WHERE "Name" IS NOT NULL AND "Name" != ''
-  AND "Object ID" IS NOT NULL AND "Object ID" != ''
+  AND "Object ID" IS NOT NULL
+  AND NOT regexp_full_match("Object ID", '[[:space:]]*(VM)?[[:space:]]*')
 ORDER BY "Name";
