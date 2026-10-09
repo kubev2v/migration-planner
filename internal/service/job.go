@@ -15,26 +15,6 @@ import (
 	"github.com/riverqueue/river"
 )
 
-type RVToolsJobArgs struct {
-	Name      string `json:"name"`
-	FilePath  string `json:"file_path"`
-	OrgID     string `json:"org_id"`
-	Username  string `json:"username"`
-	FirstName string `json:"first_name"`
-	LastName  string `json:"last_name"`
-}
-
-func (RVToolsJobArgs) Kind() string {
-	return "rvtools_assessment"
-}
-
-func (RVToolsJobArgs) InsertOpts() river.InsertOpts {
-	return river.InsertOpts{
-		Queue:       "default",
-		MaxAttempts: 1,
-	}
-}
-
 type JobService struct {
 	riverClient *river.Client[pgx.Tx]
 	jobStore    store.Job
@@ -51,7 +31,7 @@ func NewJobService(s store.Store, riverClient *river.Client[pgx.Tx], queue strin
 	}
 }
 
-func (s *JobService) CreateRVToolsJob(ctx context.Context, args RVToolsJobArgs) (*v1alpha1.Job, error) {
+func (s *JobService) CreateRVToolsJob(ctx context.Context, args model.RVToolsJobArgs) (*v1alpha1.Job, error) {
 	logger := s.logger.WithContext(ctx)
 	tracer := logger.Operation("create_rvtools_job").
 		WithString("name", args.Name).
@@ -90,7 +70,7 @@ func (s *JobService) GetJob(ctx context.Context, jobID int64, orgID, username st
 		return nil, fmt.Errorf("querying job: %w", err)
 	}
 
-	var args RVToolsJobArgs
+	var args model.RVToolsJobArgs
 	if err := json.Unmarshal(jobRow.ArgsJSON, &args); err != nil {
 		tracer.Error(err).Log()
 		return nil, fmt.Errorf("parsing job args: %w", err)

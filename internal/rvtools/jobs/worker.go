@@ -24,7 +24,7 @@ import (
 )
 
 type RVToolsWorker struct {
-	river.WorkerDefaults[service.RVToolsJobArgs]
+	river.WorkerDefaults[model.RVToolsJobArgs]
 	store         store.Store
 	assessmentSvc service.AssessmentServicer
 	validator     duckdb_parser.Validator
@@ -38,42 +38,8 @@ func NewRVToolsWorker(store store.Store, assessmentSvc service.AssessmentService
 	}
 }
 
-// createParser creates a new per-job DuckDB instance and parser.
-// The caller is responsible for closing the returned *sql.DB when done.
-func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
-	db, err := sql.Open("duckdb", "")
-	if err != nil {
-		return nil, nil, fmt.Errorf("opening duckdb: %w", err)
-	}
-	extensionDir := "/tmp/duckdb_extensions"
-	if _, err := db.Exec(fmt.Sprintf("SET extension_directory='%s';", extensionDir)); err != nil {
-		_ = db.Close()
-		return nil, nil, fmt.Errorf("setting duckdb extension directory: %w", err)
-	}
-	qi := pkgstore.NewQueryInterceptor(db)
-	parser := duckdb_parser.New(qi, w.validator)
-	if err := parser.Init(); err != nil {
-		_ = db.Close()
-		return nil, nil, fmt.Errorf("initializing duckdb schema: %w", err)
-	}
-	return parser, db, nil
-}
-
-func (w *RVToolsWorker) Timeout(_ *river.Job[service.RVToolsJobArgs]) time.Duration {
-	return 10 * time.Minute
-}
-
-// failJob logs an error, updates job status to failed, and returns the error.
-func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer, jobID int64, step string, err error, errMsg string) error {
-	logger.Error(err).WithString("step", step).Log()
-	if updateErr := w.updateJobStatus(ctx, jobID, model.JobStatusFailed, errMsg, nil); updateErr != nil {
-		logger.Error(updateErr).WithString("step", "update_failed_status").Log()
-	}
-	return err
-}
-
 // Work processes an RVTools assessment job.
-func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVToolsJobArgs]) error {
+func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJobArgs]) error {
 	logger := log.NewDebugLogger("rvtools_worker").
 		WithContext(ctx).
 		Operation("process_rvtools_job").
@@ -83,9 +49,6 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVTools
 
 	logger.Step("job_started").Log()
 
-	filePath := job.Args.FilePath
-	defer func() { _ = os.Remove(filePath) }()
-
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
 	if err != nil {
@@ -93,45 +56,41 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVTools
 	}
 	defer func() { _ = duckDB.Close() }()
 
-	// Update status to validating before ingestion (which includes OPA validation)
-	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusValidating, "", nil); err != nil {
-		logger.Error(err).WithString("step", "update_validating_status").Log()
-	}
-
-	// Ingest RVTools file using duckdb_parser
-	validationResult, err := parser.IngestRvTools(ctx, filePath)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "ingest_rvtools", err, fmt.Sprintf("error ingesting RVTools file: %v", err))
-	}
-
-	// Check for validation errors
-	if validationResult.HasErrors() {
-		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
-		return w.failJob(ctx, logger, job.ID, "validate_rvtools", validationErr, fmt.Sprintf("RVTools validation failed: %v", validationResult.Errors[0].Message))
-	}
-
-	// Log any warnings
-	for _, warning := range validationResult.Warnings {
-		logger.Step("validation_warning").WithString("code", warning.Code).WithString("message", warning.Message).Log()
-	}
-
 	// Update status to parsing
 	if err := w.updateJobStatus(ctx, job.ID, model.JobStatusParsing, "", nil); err != nil {
 		logger.Error(err).WithString("step", "update_parsing_status").Log()
 	}
 
-	// Build inventory from parsed data
-	logger.Step("building_inventory").Log()
-	inv, err := parser.BuildInventory(ctx, nil)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "build_inventory", err, fmt.Sprintf("error building inventory: %v", err))
-	}
-	inventory := converters.ToAPI(inv)
+	defer func() {
+		for _, filepath := range job.Args.Files {
+			_ = os.Remove(filepath)
+		}
+	}()
 
-	// Marshal inventory to JSON
-	inventoryJSON, err := json.Marshal(inventory)
-	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "marshal_inventory", err, fmt.Sprintf("error marshaling inventory: %v", err))
+	var inventoryJSON []byte
+	parsingErr := NewRVToolParsingError()
+	for name, filePath := range job.Args.Files {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		result, err := w.parseFile(ctx, parser, filePath, logger)
+		if err != nil {
+			parsingErr.Add(name, err)
+		} else {
+			// NOTE: temporary until we move to multi rvtools files
+			inventoryJSON = result
+		}
+
+		if cleanupErr := parser.Cleanup(); cleanupErr != nil {
+			logger.Error(cleanupErr).WithString("step", "cleanup").WithString("file", name).Log()
+			parsingErr.Add(name, err)
+			break
+		}
+	}
+
+	if parsingErr.HasErrors() {
+		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, parsingErr.Error())
 	}
 
 	// Check for cancellation before creating assessment
@@ -181,6 +140,79 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[service.RVTools
 		Log()
 
 	return nil
+}
+
+func (w *RVToolsWorker) Timeout(_ *river.Job[model.RVToolsJobArgs]) time.Duration {
+	return 10 * time.Minute
+}
+
+// createParser creates a new per-job DuckDB instance and parser.
+// The caller is responsible for closing the returned *sql.DB when done.
+func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
+	db, err := sql.Open("duckdb", "")
+	if err != nil {
+		return nil, nil, fmt.Errorf("opening duckdb: %w", err)
+	}
+	extensionDir := "/tmp/duckdb_extensions"
+	if _, err := db.Exec(fmt.Sprintf("SET extension_directory='%s';", extensionDir)); err != nil {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("setting duckdb extension directory: %w", err)
+	}
+	if _, err := db.Exec("SET memory_limit='1GB';"); err != nil {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("setting duckdb memory limit: %w", err)
+	}
+	qi := pkgstore.NewQueryInterceptor(db)
+	parser := duckdb_parser.New(qi, w.validator)
+	if err := parser.Init(); err != nil {
+		_ = db.Close()
+		return nil, nil, fmt.Errorf("initializing duckdb schema: %w", err)
+	}
+	return parser, db, nil
+}
+
+// failJob logs an error, updates job status to failed, and returns the error.
+func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer, jobID int64, step string, err error, errMsg string) error {
+	logger.Error(err).WithString("step", step).Log()
+	if updateErr := w.updateJobStatus(ctx, jobID, model.JobStatusFailed, errMsg, nil); updateErr != nil {
+		logger.Error(updateErr).WithString("step", "update_failed_status").Log()
+	}
+	return err
+}
+
+func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) ([]byte, error) {
+	// Ingest RVTools file using duckdb_parser
+	validationResult, err := parser.IngestRvTools(ctx, filepath)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// Check for validation errors
+	if validationResult.HasErrors() {
+		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
+		return []byte{}, validationErr
+	}
+
+	// Log any warnings
+	for _, warning := range validationResult.Warnings {
+		logger.Step("validation_warning").WithString("code", warning.Code).WithString("message", warning.Message).Log()
+	}
+
+	// Build inventory from parsed data
+	logger.Step("building_inventory").Log()
+	inv, err := parser.BuildInventory(ctx, nil)
+	if err != nil {
+		return []byte{}, err
+	}
+	inventory := converters.ToAPI(inv)
+
+	// Marshal inventory to JSON
+	inventoryJSON, err := json.Marshal(inventory)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return inventoryJSON, nil
 }
 
 // updateJobStatus updates the job's metadata with the current status using job store.
