@@ -29,7 +29,7 @@ require (
 	github.com/onsi/gomega v1.39.1
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0
-	github.com/openshift/assisted-image-service v0.0.0-20260923120948-efaaa9e8fb7b
+	github.com/openshift/assisted-image-service v0.0.0-20261006184439-25f991f84977
 	github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
@@ -45,7 +45,6 @@ require (
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.1
-	golang.org/x/term v0.46.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.5.9
 	gorm.io/driver/sqlite v1.5.6
@@ -198,6 +197,7 @@ require (
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/telemetry v0.0.0-20260924152758-ed294f943157 // indirect
+	golang.org/x/term v0.46.0 // indirect
 	golang.org/x/text v0.42.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	golang.org/x/tools v0.50.0 // indirect

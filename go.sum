@@ -329,8 +329,8 @@ github.com/open-policy-agent/opa v1.6.0 h1:/S/cnNQJ2MUMNzizHPbisTWBHowmLkPrugY5j
 github.com/open-policy-agent/opa v1.6.0/go.mod h1:zFmw4P+W62+CWGYRDDswfVYSCnPo6oYaktQnfIaRFC4=
 github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0 h1:LeENX/vq1cty+6Y53KfAluxJGLjd9Bvz9Pd8S75pkhM=
 github.com/openshift/api v0.0.0-20260925090845-44bef346c3f0/go.mod h1:k6qH5QOVa5GDln2VVm8Jz4NV3Z7R2SATHFLwGS6Wh3M=
-github.com/openshift/assisted-image-service v0.0.0-20260923120948-efaaa9e8fb7b h1:VdyTYc5uUF4Wy+SPNDP3BUsDJ6I4GCB7UltXEtjP7qc=
-github.com/openshift/assisted-image-service v0.0.0-20260923120948-efaaa9e8fb7b/go.mod h1:eLxB7EHTDEvuJHobsVZsyMKOFkVATz4aGAwNtSGMdyM=
+github.com/openshift/assisted-image-service v0.0.0-20261006184439-25f991f84977 h1:jk8k28nuFBzau8bCyFlVn/XLi8gDPZAihH2plJ4j5Wg=
+github.com/openshift/assisted-image-service v0.0.0-20261006184439-25f991f84977/go.mod h1:eLxB7EHTDEvuJHobsVZsyMKOFkVATz4aGAwNtSGMdyM=
 github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece h1:Uec2loy7Mvq2ngzFqiJyEJkQn/ZMsDL8Z92iCMZgqxE=
 github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece/go.mod h1:iWcB6wgeOhsByZAZGhmzBtEnrLQzABL0s3aeou8AmSI=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
