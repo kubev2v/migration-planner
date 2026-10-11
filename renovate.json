@@ -1,13 +1,17 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate configuration for migration-planner - runs dependency updates weekly on Saturdays",
+  "description": "Renovate configuration for migration-planner",
   "extends": [
     "config:recommended"
   ],
-  "schedule": [
-    "on Saturday"
-  ],
   "postUpdateOptions": [
     "gomodTidy"
+  ],
+  "packageRules": [
+    {
+      "description": "Automerge non-major updates",
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    }
   ]
 }
