@@ -110,6 +110,7 @@ Signed-off-by: Your Name <your-email@redhat.com>
 * **docs:** Documentation-only changes
 * **perf:** A code change that improves performance
 * **refactor:** A code change that neither fixes a bug nor adds a feature
+* **revert:** A commit that reverses an earlier change
 * **style:** Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc)
 * **test:** Adding missing tests or correcting existing tests
 
@@ -137,10 +138,11 @@ It includes:
    * `ECOPROJECT-1234 | feat: add login flow`
    * `feat: add user authentication` (JIRA can be in description instead)
    * `chore: update dependencies` (no JIRA needed for chore)
+   * `revert: restore the previous authentication behavior`
    
    **Requirements:**
    * **feat** and **fix** PR titles **MUST** include a JIRA ticket (either in title or description)
-   * Other types (ci, chore, docs, etc.) do **NOT** require a JIRA ticket
+   * Other types (ci, chore, docs, revert, etc.) do **NOT** require a JIRA ticket
    
 3. Provide a clear and detailed description of your changes in the pull request description. Include:
    * What problem does this PR solve?
