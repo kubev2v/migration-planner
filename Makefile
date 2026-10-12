@@ -307,7 +307,7 @@ clean:
 	- rm -f -r bin
 
 ##################### "make lint" support start ##########################
-GOLANGCI_LINT_VERSION := v2.10.1
+GOLANGCI_LINT_VERSION := v2.14.0
 GOLANGCI_LINT := $(GOBIN)/golangci-lint
 
 # Run every time: if installed version != required, remove binary so $(GOLANGCI_LINT) will re-install
@@ -325,8 +325,7 @@ check-golangci-lint-version:
 # Download golangci-lint if not present
 $(GOLANGCI_LINT):
 	@echo "🔍 Installing golangci-lint $(GOLANGCI_LINT_VERSION)..."
-	@curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | \
-		sh -s -- -b $(CURDIR)/bin $(GOLANGCI_LINT_VERSION)
+	GOBIN=$(CURDIR)/bin go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 	@echo "✅ 'golangci-lint' installed successfully."
 
 # Run linter
