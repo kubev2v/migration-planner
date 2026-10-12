@@ -3,7 +3,7 @@ ARG BASE_IMAGE
 FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS dlv-builder
 
 USER 0
-
+ENV GOTOOLCHAIN=auto
 RUN GOBIN=/app go install github.com/go-delve/delve/cmd/dlv@latest
 
 FROM ${BASE_IMAGE}
