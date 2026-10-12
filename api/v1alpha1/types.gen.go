@@ -75,9 +75,9 @@ const (
 
 // Defines values for AssessmentPermissions.
 const (
-	Delete AssessmentPermissions = "delete"
-	Read   AssessmentPermissions = "read"
-	Share  AssessmentPermissions = "share"
+	AssessmentPermissionsDelete AssessmentPermissions = "delete"
+	AssessmentPermissionsRead   AssessmentPermissions = "read"
+	AssessmentPermissionsShare  AssessmentPermissions = "share"
 )
 
 // Defines values for AssessmentSourceType.
@@ -85,6 +85,20 @@ const (
 	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
 	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
 	AssessmentSourceTypeSource    AssessmentSourceType = "source"
+)
+
+// Defines values for AssessmentV2SummaryPermissions.
+const (
+	AssessmentV2SummaryPermissionsDelete AssessmentV2SummaryPermissions = "delete"
+	AssessmentV2SummaryPermissionsRead   AssessmentV2SummaryPermissions = "read"
+	AssessmentV2SummaryPermissionsShare  AssessmentV2SummaryPermissions = "share"
+)
+
+// Defines values for AssessmentV2SummarySourceType.
+const (
+	AssessmentV2SummarySourceTypeInventory AssessmentV2SummarySourceType = "inventory"
+	AssessmentV2SummarySourceTypeRvtools   AssessmentV2SummarySourceType = "rvtools"
+	AssessmentV2SummarySourceTypeSource    AssessmentV2SummarySourceType = "source"
 )
 
 // Defines values for ClusterFeaturesDrsMode.
@@ -398,6 +412,45 @@ type AssessmentSubsetInventory struct {
 type AssessmentUpdate struct {
 	// Name Name of the assessment
 	Name *string `json:"name,omitempty" validate:"required,assessment_name"`
+}
+
+// AssessmentV2 defines model for AssessmentV2.
+type AssessmentV2 struct {
+	Data     InventoryV2   `json:"data"`
+	Vcetners []SubResource `json:"vcetners"`
+}
+
+// AssessmentV2Summary defines model for AssessmentV2Summary.
+type AssessmentV2Summary struct {
+	CreatedAt       time.Time          `json:"createdAt"`
+	DatastoresCount int                `json:"datastoresCount"`
+	HostsCount      int                `json:"hostsCount"`
+	Id              openapi_types.UUID `json:"id"`
+	Name            string             `json:"name"`
+	NetworksCount   int                `json:"networksCount"`
+
+	// OwnerFirstName Owner's first name
+	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
+
+	// OwnerLastName Owner's last name
+	OwnerLastName *string                           `json:"ownerLastName,omitempty"`
+	Permissions   *[]AssessmentV2SummaryPermissions `json:"permissions,omitempty"`
+	Sharing       *AssessmentSharing                `json:"sharing,omitempty"`
+	SourceId      *openapi_types.UUID               `json:"sourceId,omitempty"`
+	SourceType    AssessmentV2SummarySourceType     `json:"sourceType"`
+	VmsCount      int                               `json:"vmsCount"`
+}
+
+// AssessmentV2SummaryPermissions defines model for AssessmentV2Summary.Permissions.
+type AssessmentV2SummaryPermissions string
+
+// AssessmentV2SummarySourceType defines model for AssessmentV2Summary.SourceType.
+type AssessmentV2SummarySourceType string
+
+// AssessmentVCenterV2 defines model for AssessmentVCenterV2.
+type AssessmentVCenterV2 struct {
+	Clusters []SubResource `json:"clusters"`
+	Data     InventoryV2   `json:"data"`
 }
 
 // ClusterFeatures defines model for ClusterFeatures.
@@ -867,6 +920,17 @@ type InventoryTotals struct {
 
 	// TotalVMs Total number of VMs in the cluster
 	TotalVMs int `json:"totalVMs"`
+}
+
+// InventoryV2 defines model for InventoryV2.
+type InventoryV2 struct {
+	// CreatedAt Timestamp when the inventory data was created or collected
+	CreatedAt *time.Time    `json:"created_at,omitempty"`
+	Data      InventoryData `json:"data"`
+	Id        string        `json:"id"`
+
+	// VcenterVersion Version of the vCenter api. For example "8.0.3.0"
+	VcenterVersion *string `json:"vcenter_version,omitempty"`
 }
 
 // Ipv4Config defines model for Ipv4Config.
@@ -1350,6 +1414,11 @@ type StorageIoConfiguration struct {
 // StorageIoConfigurationCongestionThresholdMode Mode for congestion threshold calculation
 type StorageIoConfigurationCongestionThresholdMode string
 
+// SubResource defines model for SubResource.
+type SubResource struct {
+	Id string `json:"id"`
+}
+
 // UpdateInventory defines model for UpdateInventory.
 type UpdateInventory struct {
 	AgentId   openapi_types.UUID `json:"agentId"`
@@ -1522,6 +1591,12 @@ type ListGroupsParams struct {
 // ListGroupsParamsKind defines parameters for ListGroups.
 type ListGroupsParamsKind string
 
+// UploadRvtoolsToAssessmentMultipartBody defines parameters for UploadRvtoolsToAssessment.
+type UploadRvtoolsToAssessmentMultipartBody struct {
+	// File Rvtools extending the exising assessment
+	File openapi_types.File `json:"file" validate:"required"`
+}
+
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
 
@@ -1578,3 +1653,9 @@ type UpdateInventoryJSONRequestBody = UpdateInventory
 
 // UploadSourceInventoryFileMultipartRequestBody defines body for UploadSourceInventoryFile for multipart/form-data ContentType.
 type UploadSourceInventoryFileMultipartRequestBody = SourceInventoryFileForm
+
+// CreateRVToolsAssessmentV2MultipartRequestBody defines body for CreateRVToolsAssessmentV2 for multipart/form-data ContentType.
+type CreateRVToolsAssessmentV2MultipartRequestBody = AssessmentRvtoolsForm
+
+// UploadRvtoolsToAssessmentMultipartRequestBody defines body for UploadRvtoolsToAssessment for multipart/form-data ContentType.
+type UploadRvtoolsToAssessmentMultipartRequestBody UploadRvtoolsToAssessmentMultipartBody
