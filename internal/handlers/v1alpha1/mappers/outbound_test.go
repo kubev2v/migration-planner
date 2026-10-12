@@ -1,6 +1,7 @@
 package mappers_test
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -149,4 +150,73 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 		Expect(resp.ComplexityMatrix).NotTo(BeEmpty())
 
 	})
+})
+
+var _ = Describe("AssessmentInventoryToAPI", func() {
+	storedAt := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
+	collectedAt := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
+	for _, tc := range []struct {
+		id         int
+		name       string
+		version    uint
+		raw        string
+		created    time.Time
+		apiVersion string
+	}{
+		{
+			id:         1,
+			name:       "v2 preserves collection metadata",
+			version:    model.SnapshotVersionV2,
+			raw:        `{"vcenter_id":"vc-id","vcenter_version":"8.0.3.0","created_at":"2026-10-13T09:00:00Z","vcenter":{"vms":{"total":5}},"clusters":{"domain-c34":{"vms":{"total":2}}}}`,
+			created:    collectedAt,
+			apiVersion: "8.0.3.0",
+		},
+		{
+			id:      2,
+			name:    "v2 falls back to stored timestamp",
+			version: model.SnapshotVersionV2,
+			raw:     `{"vcenter_id":"vc-id","vcenter":{"vms":{"total":5}},"clusters":{}}`,
+			created: storedAt,
+		},
+		{
+			id:      3,
+			name:    "legacy inventory uses stored timestamp",
+			version: model.SnapshotVersionV1,
+			raw:     `{"vcenter":{"id":"vc-id"},"vms":{"total":5}}`,
+			created: storedAt,
+		},
+	} {
+		It(tc.name, func() {
+			data, clusters, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{
+				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: []byte(tc.raw),
+			})
+			Expect(err).NotTo(HaveOccurred())
+			raw, err := json.Marshal(data)
+			Expect(err).NotTo(HaveOccurred())
+			var result api.InventoryV2
+			Expect(json.Unmarshal(raw, &result)).To(Succeed())
+			Expect(result.CreatedAt).To(HaveValue(BeTemporally("==", tc.created)))
+			Expect(result.Data.Vms.Total).To(Equal(5))
+			if tc.apiVersion != "" {
+				Expect(result.VcenterVersion).To(HaveValue(Equal(tc.apiVersion)))
+			} else {
+				Expect(result.VcenterVersion).To(BeNil())
+			}
+			Expect(result.Data.Infra.Datastores).NotTo(BeNil(), "inventory collections must be normalized")
+			Expect(result.Data.Vms.PowerStates).NotTo(BeNil(), "inventory collections must be normalized")
+
+			if tc.id == 1 {
+				Expect(clusters).To(HaveKey("domain-c34"))
+				Expect(clusters["domain-c34"].Vms.Total).To(Equal(2))
+			}
+		})
+	}
+
+	DescribeTable("rejects malformed JSON", func(version uint) {
+		_, _, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{Version: version, Inventory: []byte(`{`)})
+		Expect(err).To(HaveOccurred())
+	},
+		Entry("for legacy inventory", uint(model.SnapshotVersionV1)),
+		Entry("for v2 inventory", uint(model.SnapshotVersionV2)),
+	)
 })

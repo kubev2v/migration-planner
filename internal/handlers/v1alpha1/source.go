@@ -30,12 +30,12 @@ func validateSourceData(data interface{}) error {
 }
 
 // (GET /api/v1/sources)
-func (s *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
+func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSourcesRequestObject) (server.ListSourcesResponseObject, error) {
 	user := auth.MustHaveUser(ctx)
 
 	filter := service.NewSourceFilter(service.WithUsername(user.Username), service.WithOrgID(user.Organization))
 
-	sources, err := s.sourceSrv.ListSources(ctx, filter)
+	sources, err := h.sourceSrv.ListSources(ctx, filter)
 	if err != nil {
 		return server.ListSources500JSONResponse{}, nil
 	}
@@ -44,7 +44,7 @@ func (s *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 }
 
 // (POST /api/v1/sources)
-func (s *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
+func (h *ServiceHandler) CreateSource(ctx context.Context, request server.CreateSourceRequestObject) (server.CreateSourceResponseObject, error) {
 	if request.Body == nil {
 		return server.CreateSource400JSONResponse{Message: "empty body"}, nil
 	}
@@ -60,7 +60,7 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 	sourceCreateForm.OrgID = user.Organization
 	sourceCreateForm.EmailDomain = user.EmailDomain
 
-	source, err := s.sourceSrv.CreateSource(ctx, sourceCreateForm)
+	source, err := h.sourceSrv.CreateSource(ctx, sourceCreateForm)
 	if err != nil {
 		var dupErr *service.ErrDuplicateKey
 		if errors.As(err, &dupErr) {
@@ -78,8 +78,8 @@ func (s *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 }
 
 // (DELETE /api/v1/sources/{id})
-func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
-	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+func (h *ServiceHandler) DeleteSource(ctx context.Context, request server.DeleteSourceRequestObject) (server.DeleteSourceResponseObject, error) {
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -95,7 +95,7 @@ func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 		return server.DeleteSource403JSONResponse{Message: message}, nil
 	}
 
-	if err := s.sourceSrv.DeleteSource(ctx, request.Id); err != nil {
+	if err := h.sourceSrv.DeleteSource(ctx, request.Id); err != nil {
 		return server.DeleteSource500JSONResponse{Message: fmt.Sprintf("failed to delete source: %v", err)}, nil
 	}
 
@@ -103,8 +103,8 @@ func (s *ServiceHandler) DeleteSource(ctx context.Context, request server.Delete
 }
 
 // (GET /api/v1/sources/{id})
-func (s *ServiceHandler) GetSource(ctx context.Context, request server.GetSourceRequestObject) (server.GetSourceResponseObject, error) {
-	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+func (h *ServiceHandler) GetSource(ctx context.Context, request server.GetSourceRequestObject) (server.GetSourceResponseObject, error) {
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -129,7 +129,7 @@ func (s *ServiceHandler) GetSource(ctx context.Context, request server.GetSource
 }
 
 // (PUT /api/v1/sources/{id})
-func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
+func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.UpdateSourceRequestObject) (server.UpdateSourceResponseObject, error) {
 	if request.Body == nil {
 		return server.UpdateSource400JSONResponse{Message: "There is nothing to update"}, nil
 	}
@@ -138,7 +138,7 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 		return server.UpdateSource400JSONResponse{Message: err.Error()}, nil
 	}
 
-	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -157,7 +157,7 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 	// Convert API request to service form using handler mapper
 	form := mappers.SourceUpdateFormApi(*request.Body)
 
-	updatedSource, err := s.sourceSrv.UpdateSource(ctx, request.Id, form)
+	updatedSource, err := h.sourceSrv.UpdateSource(ctx, request.Id, form)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -176,7 +176,7 @@ func (s *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 }
 
 // (PUT /api/v1/sources/{id}/inventory)
-func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.UpdateInventoryRequestObject) (server.UpdateInventoryResponseObject, error) {
+func (h *ServiceHandler) UpdateInventory(ctx context.Context, request server.UpdateInventoryRequestObject) (server.UpdateInventoryResponseObject, error) {
 	logger := log.NewDebugLogger("source_handler").
 		WithContext(ctx).
 		Operation("update_inventory").
@@ -187,7 +187,7 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 		return server.UpdateInventory400JSONResponse{Message: "empty body"}, nil
 	}
 
-	source, updateErr, err := s.updateInventoryJSON(ctx, request.Id, request.Body, logger)
+	source, updateErr, err := h.updateInventoryJSON(ctx, request.Id, request.Body, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +207,7 @@ func (s *ServiceHandler) UpdateInventory(ctx context.Context, request server.Upd
 }
 
 // (PUT /api/v1/sources/{id}/inventory/file)
-func (s *ServiceHandler) UploadSourceInventoryFile(ctx context.Context, request server.UploadSourceInventoryFileRequestObject) (server.UploadSourceInventoryFileResponseObject, error) {
+func (h *ServiceHandler) UploadSourceInventoryFile(ctx context.Context, request server.UploadSourceInventoryFileRequestObject) (server.UploadSourceInventoryFileResponseObject, error) {
 	logger := log.NewDebugLogger("source_handler").
 		WithContext(ctx).
 		Operation("upload_source_inventory_file").
@@ -218,7 +218,7 @@ func (s *ServiceHandler) UploadSourceInventoryFile(ctx context.Context, request 
 		return server.UploadSourceInventoryFile400JSONResponse{Message: "empty body"}, nil
 	}
 
-	source, updateErr, err := s.updateInventoryMultipart(ctx, request.Id, request.Body, logger)
+	source, updateErr, err := h.updateInventoryMultipart(ctx, request.Id, request.Body, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -244,8 +244,8 @@ type inventoryUpdateError struct {
 	message string
 }
 
-func (s *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uuid.UUID, logger *log.OperationTracer) (*model.Source, *inventoryUpdateError, error) {
-	source, err := s.sourceSrv.GetSource(ctx, sourceID)
+func (h *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uuid.UUID, logger *log.OperationTracer) (*model.Source, *inventoryUpdateError, error) {
+	source, err := h.sourceSrv.GetSource(ctx, sourceID)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -266,8 +266,8 @@ func (s *ServiceHandler) authorizeSourceAccess(ctx context.Context, sourceID uui
 }
 
 // inventoryUpdateResponse handles the common logic for updating inventory and returning the mapped source
-func (s *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (*v1alpha1.Source, *inventoryUpdateError, error) {
-	updatedSource, err := s.sourceSrv.UpdateInventory(ctx, form)
+func (h *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID uuid.UUID, form srvMappers.InventoryUpdateForm) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	updatedSource, err := h.sourceSrv.UpdateInventory(ctx, form)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrInvalidVCenterID:
@@ -285,8 +285,8 @@ func (s *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID u
 	return &response, nil, nil
 }
 
-func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.UUID, body *v1alpha1.UpdateInventoryJSONRequestBody, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
-	_, updateErr, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+func (h *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.UUID, body *v1alpha1.UpdateInventoryJSONRequestBody, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	_, updateErr, err := h.authorizeSourceAccess(ctx, sourceID, logger)
 	if err != nil || updateErr != nil {
 		return nil, updateErr, err
 	}
@@ -304,11 +304,11 @@ func (s *ServiceHandler) updateInventoryJSON(ctx context.Context, sourceID uuid.
 		Subsets:   []srvMappers.SourceSubsetUpdateForm{}, // JSON uploads have no subsets
 	}
 
-	return s.inventoryUpdateResponse(ctx, sourceID, form)
+	return h.inventoryUpdateResponse(ctx, sourceID, form)
 }
 
-func (s *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID uuid.UUID, body *multipart.Reader, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
-	source, updateErr, err := s.authorizeSourceAccess(ctx, sourceID, logger)
+func (h *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID uuid.UUID, body *multipart.Reader, logger *log.OperationTracer) (*v1alpha1.Source, *inventoryUpdateError, error) {
+	source, updateErr, err := h.authorizeSourceAccess(ctx, sourceID, logger)
 	if err != nil || updateErr != nil {
 		return nil, updateErr, err
 	}
@@ -351,7 +351,7 @@ func (s *ServiceHandler) updateInventoryMultipart(ctx context.Context, sourceID 
 	}
 
 	logger.Success().WithInt("subset_count", len(form.Subsets)).Log()
-	return s.inventoryUpdateResponse(ctx, sourceID, form)
+	return h.inventoryUpdateResponse(ctx, sourceID, form)
 }
 
 func readUploadedInventoryFile(body *multipart.Reader) ([]byte, error) {
@@ -396,13 +396,13 @@ func readUploadedInventoryFile(body *multipart.Reader) ([]byte, error) {
 }
 
 // (HEAD /api/v1/sources/{id}/image)
-func (s *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
+func (h *ServiceHandler) HeadImage(ctx context.Context, request server.HeadImageRequestObject) (server.HeadImageResponseObject, error) {
 	return nil, nil
 }
 
 // (GET /api/v1/sources/{id}/image-url)
-func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
-	source, err := s.sourceSrv.GetSource(ctx, request.Id)
+func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request server.GetSourceDownloadURLRequestObject) (server.GetSourceDownloadURLResponseObject, error) {
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
@@ -418,7 +418,7 @@ func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 		return server.GetSourceDownloadURL403JSONResponse{Message: message}, nil
 	}
 
-	url, expireAt, err := s.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
+	url, expireAt, err := h.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
 	if err != nil {
 		return server.GetSourceDownloadURL500JSONResponse{Message: fmt.Sprintf("failed to get download URL for source %s: %v", request.Id, err)}, nil
 	}
@@ -426,6 +426,6 @@ func (s *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 }
 
 // (GET /health)
-func (s *ServiceHandler) Health(ctx context.Context, request server.HealthRequestObject) (server.HealthResponseObject, error) {
+func (h *ServiceHandler) Health(ctx context.Context, request server.HealthRequestObject) (server.HealthResponseObject, error) {
 	return server.Health200Response{}, nil
 }
