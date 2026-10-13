@@ -67,7 +67,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '', Variant VARCHAR DEFAULT 'ClusterComputeResource')`,
 
 		// Host
-		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
+		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false, HbaDiskInfo VARCHAR DEFAULT '[]', HostScsiTopology VARCHAR DEFAULT '[]', HostScsiDisks VARCHAR DEFAULT '[]')`,
 
 		// VM
 		`CREATE TABLE dst.VM (
@@ -88,7 +88,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR)`,
 
 		// Datastore
-		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
+		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, FilesystemType VARCHAR, FilesystemMajorVersion INTEGER, ProtocolEndpointType VARCHAR DEFAULT '', BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
 	}
 
 	for _, stmt := range stmts {
@@ -131,7 +131,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		// Insert one host per cluster so Host→Cluster join resolves.
 		hostID := fmt.Sprintf("host-%d", i+1)
 		_, err = db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Host VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+			`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
 			escapeSQLString(hostID), escapeSQLString(c.id),
 		))
 		require.NoError(t, err)
@@ -513,7 +513,7 @@ func TestIngestSqlite_StandaloneHostDetection(t *testing.T) {
 				require.NoError(t, err)
 				_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 				require.NoError(t, err)
-				_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+				_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
 				require.NoError(t, err)
 				require.NoError(t, func() error { _, err := sdb.Exec("DETACH dst"); return err }())
 			}
@@ -543,7 +543,7 @@ func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 	require.NoError(t, err)
-	_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+	_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.VM (
 		ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
@@ -636,6 +636,41 @@ func TestIngestSqlite_FaultToleranceEnabledMapping(t *testing.T) {
 	assert.False(t, vmMap["vm-ft-off"].FaultToleranceEnabled)
 }
 
+func TestIngestSqlite_HostDatacenter(t *testing.T) {
+	for _, variant := range []string{"ClusterComputeResource", "ComputeResource"} {
+		t.Run(variant, func(t *testing.T) {
+			parser, db, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vc-1",
+				[]sqliteCluster{{id: "domain-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}},
+			)
+			src, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = src.Close() }()
+			_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+			require.NoError(t, err)
+			_, err = src.Exec(`UPDATE dst.Cluster SET Variant = ?`, variant)
+			require.NoError(t, err)
+			_, err = src.Exec("DETACH dst")
+			require.NoError(t, err)
+
+			_, err = parser.IngestSqlite(context.Background(), sqlitePath)
+			require.NoError(t, err)
+			var datacenter sql.NullString
+			var cluster sql.NullString
+			require.NoError(t, db.QueryRow(`SELECT "Datacenter", "Cluster" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&datacenter, &cluster))
+			require.True(t, datacenter.Valid, "the host's parent chain must resolve its datacenter")
+			require.Equal(t, "dc1", datacenter.String)
+			if variant == "ComputeResource" {
+				require.Empty(t, cluster.String, "a standalone host must not expose its synthetic cluster")
+			} else {
+				require.Equal(t, "cluster1", cluster.String)
+			}
+		})
+	}
+}
+
 func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {
 	ctx := context.Background()
 	parser, db, cleanup := setupTestParser(t, &testValidator{})
@@ -695,5 +730,103 @@ func TestIngestSqlite_CollectionTime(t *testing.T) {
 			require.Equal(t, &createdAt, inv.CollectionTime)
 			require.True(t, inv.CreatedAt.After(createdAt))
 		}
+	}
+}
+
+func TestIngestSqlite_DatastoreOptionalStorageColumns(t *testing.T) {
+	tests := []struct {
+		name               string
+		missing            []string
+		wantVMFSFilesystem string
+		wantVMFSVersion    int32
+		wantNFSFilesystem  string
+		wantVVolProtocol   string
+	}{
+		{name: "current snapshot", wantVMFSFilesystem: "VMFS", wantVMFSVersion: 6, wantNFSFilesystem: "NFS41", wantVVolProtocol: "SCSI"},
+		{name: "missing filesystem type", missing: []string{"FilesystemType"}, wantVMFSVersion: 6, wantVVolProtocol: "SCSI"},
+		{name: "missing filesystem version", missing: []string{"FilesystemMajorVersion"}, wantVMFSFilesystem: "VMFS", wantNFSFilesystem: "NFS41", wantVVolProtocol: "SCSI"},
+		{name: "missing endpoint protocol", missing: []string{"ProtocolEndpointType"}, wantVMFSFilesystem: "VMFS", wantVMFSVersion: 6, wantNFSFilesystem: "NFS41", wantVVolProtocol: "N/A"},
+		{name: "legacy snapshot", missing: []string{"FilesystemType", "FilesystemMajorVersion", "ProtocolEndpointType"}, wantVVolProtocol: "N/A"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vcenter-1",
+				[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}},
+			)
+			src, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = src.Close() }()
+			exec := func(query string, args ...any) {
+				t.Helper()
+				_, err := src.Exec(query, args...)
+				require.NoError(t, err)
+			}
+			exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+			exec(`INSERT INTO dst.Datastore (ID, Name, Type, FilesystemType, FilesystemMajorVersion,
+				ProtocolEndpointType, Free, Capacity, BackingDevicesNames)
+				VALUES ('ds-vmfs', 'vmfs-ds', 'VMFS', 'VMFS', 6, '', 1073741824, 2147483648, '["naa.shared"]'),
+				       ('ds-vvol', 'vvol-ds', 'VVOL', 'VVOL', 0, 'SCSI', 1073741824, 2147483648, '[]'),
+				       ('ds-nfs', 'nfs-ds', 'NFS', 'NFS41', 0, '', 1073741824, 2147483648, '[]')`)
+			exec(`UPDATE dst.Host SET Datastores = ?, HbaDiskInfo = ?, HostScsiTopology = ?, HostScsiDisks = ? WHERE ID = 'host-1'`,
+				`[{"id":"ds-vmfs"},{"id":"ds-vvol"},{"id":"ds-nfs"}]`,
+				`[{"key":"hba-1","hbaDevice":"vmhba64","protocol":"iSCSI","model":"Software Adapter"}]`,
+				`[{"key":"hba-1","scsiDiskKeys":["lun-1"]}]`,
+				`[{"key":"lun-1","canonicalName":"naa.shared","vendor":"NETAPP","model":"LUN C-Mode"}]`)
+			exec(`UPDATE dst.VM SET Disks = ? WHERE ID = 'vm-1'`,
+				`[{"key":2000,"file":"[vmfs-ds] vm1/disk.vmdk","capacity":1073741824,"bus":"scsi","mode":"persistent"}]`)
+			for _, column := range tt.missing {
+				exec(fmt.Sprintf(`ALTER TABLE dst.Datastore DROP COLUMN "%s"`, column))
+			}
+			exec("DETACH dst")
+
+			result, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "%v", result.Errors)
+			var count int
+			require.NoError(t, db.QueryRow(`SELECT count(*) FROM vdatastore`).Scan(&count))
+			require.Equal(t, 3, count, "missing optional columns must not drop datastore rows")
+
+			for _, filters := range []Filters{{}, {Cluster: "cluster1"}} {
+				datastores, err := parser.Datastores(ctx, filters, Options{})
+				require.NoError(t, err)
+				require.Len(t, datastores, 3)
+				byName := make(map[string]models.Datastore, len(datastores))
+				for _, ds := range datastores {
+					byName[ds.DiskId] = ds
+				}
+				vmfs := byName["vmfs-ds"]
+				require.Equal(t, "VMFS", vmfs.Type)
+				require.Equal(t, tt.wantVMFSFilesystem, vmfs.FilesystemType)
+				require.Equal(t, tt.wantVMFSVersion, vmfs.FilesystemMajorVersion)
+				require.Equal(t, "iSCSI", vmfs.ProtocolType)
+				require.Equal(t, "NETAPP", vmfs.Vendor)
+				require.Equal(t, "LUN C-Mode", vmfs.Model)
+				require.Equal(t, models.BackingDeviceIDs{"naa.shared"}, vmfs.BackingDeviceIDs)
+				require.Equal(t, "NFS", byName["nfs-ds"].ProtocolType)
+				require.Equal(t, tt.wantNFSFilesystem, byName["nfs-ds"].FilesystemType)
+				require.Equal(t, tt.wantVVolProtocol, byName["vvol-ds"].ProtocolType)
+			}
+
+			var capacity, free int64
+			require.NoError(t, db.QueryRow(`SELECT "Capacity MiB", "Free MiB" FROM vdatastore WHERE "Object ID" = 'ds-vmfs'`).Scan(&capacity, &free))
+			require.Equal(t, int64(2048), capacity)
+			require.Equal(t, int64(1024), free)
+			vms, err := parser.VMs(ctx, Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, vms, 1)
+			require.Len(t, vms[0].Disks, 1)
+			disk := vms[0].Disks[0]
+			require.Equal(t, "ds-vmfs", disk.Datastore.ID)
+			require.Equal(t, tt.wantVMFSFilesystem, disk.DatastoreFilesystemType)
+			require.Equal(t, tt.wantVMFSVersion, disk.DatastoreFilesystemMajorVersion)
+			require.Equal(t, "iSCSI", disk.DatastoreStorageProtocol)
+			require.Equal(t, "NETAPP", disk.DatastoreVendor)
+			require.Equal(t, "LUN C-Mode", disk.DatastoreModel)
+			require.Equal(t, []string{"naa.shared"}, disk.DatastoreBackingDeviceIDs)
+		})
 	}
 }

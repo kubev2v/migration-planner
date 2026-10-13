@@ -8,7 +8,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ValidationResult contains errors and warnings from schema validation.
+// ValidationResult contains errors and warnings from ingestion and schema validation.
 // Errors indicate the inventory cannot be built.
 // Warnings indicate the inventory can be built but with missing data.
 type ValidationResult struct {
@@ -63,13 +63,15 @@ const (
 
 // Validation codes for warnings
 const (
-	CodeEmptyHosts      = "EMPTY_HOSTS"
-	CodeEmptyDatastores = "EMPTY_DATASTORES"
-	CodeEmptyNetworks   = "EMPTY_NETWORKS"
-	CodeEmptyCPU        = "EMPTY_CPU"
-	CodeEmptyMemory     = "EMPTY_MEMORY"
-	CodeEmptyDisks      = "EMPTY_DISKS"
-	CodeEmptyNICs       = "EMPTY_NICS"
+	CodeDatastoreRowCountMismatch = "DATASTORE_ROW_COUNT_MISMATCH"
+	CodeDatastoreCountFailed      = "DATASTORE_COUNT_FAILED"
+	CodeEmptyHosts                = "EMPTY_HOSTS"
+	CodeEmptyDatastores           = "EMPTY_DATASTORES"
+	CodeEmptyNetworks             = "EMPTY_NETWORKS"
+	CodeEmptyCPU                  = "EMPTY_CPU"
+	CodeEmptyMemory               = "EMPTY_MEMORY"
+	CodeEmptyDisks                = "EMPTY_DISKS"
+	CodeEmptyNICs                 = "EMPTY_NICS"
 )
 
 // warningChecks defines optional table checks that produce warnings (non-fatal).
@@ -86,6 +88,67 @@ var warningChecks = []struct {
 	{"vmemory", CodeEmptyMemory, "No memory detail data found - memory hot-add info will be unavailable"},
 	{"vdisk", CodeEmptyDisks, "No disk detail data found - individual disk information will be unavailable"},
 	{"vnetwork", CodeEmptyNICs, "No NIC detail data found - network adapter information will be unavailable"},
+}
+
+type ingestionValidation struct {
+	parser           *Parser
+	source           string
+	sourceFile       string
+	sourceCountQuery string
+	datastoresBefore int
+}
+
+func (p *Parser) prepareIngestionValidation(ctx context.Context, source, sourceFile string) (*ingestionValidation, error) {
+	var sourceCountQuery string
+	switch source {
+	case "rvtools":
+		sourceCountQuery = `SELECT count(*) FROM read_xlsx(?, sheet='vDatastore', all_varchar=true)`
+	case "sqlite":
+		sourceCountQuery = `SELECT count(*) FROM sqlite_scan(?, 'Datastore')`
+	default:
+		return nil, fmt.Errorf("unsupported ingestion source %q", source)
+	}
+	before, err := p.countRows(ctx, "SELECT count(*) FROM vdatastore")
+	if err != nil {
+		return nil, fmt.Errorf("counting datastores before ingestion: %w", err)
+	}
+	return &ingestionValidation{
+		parser:           p,
+		source:           source,
+		sourceFile:       sourceFile,
+		sourceCountQuery: sourceCountQuery,
+		datastoresBefore: before,
+	}, nil
+}
+
+func (v *ingestionValidation) Validate(ctx context.Context, table string) (ValidationResult, error) {
+	result := v.parser.ValidateSchema(ctx, table)
+	after, err := v.parser.countRows(ctx, "SELECT count(*) FROM vdatastore")
+	if err != nil {
+		return result, fmt.Errorf("counting datastores after ingestion: %w", err)
+	}
+	sourceRows, err := v.parser.countRows(ctx, v.sourceCountQuery, v.sourceFile)
+	if err != nil {
+		zap.S().Warnw("failed to count source datastore rows", "source", v.source, "error", err)
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Code:    CodeDatastoreCountFailed,
+			Table:   "vdatastore",
+			Message: fmt.Sprintf("Could not verify %s datastore import: %v", v.source, err),
+		})
+		return result, nil
+	}
+	rowsInserted := after - v.datastoresBefore
+	if rowsInserted != sourceRows {
+		zap.S().Warnw("datastore ingestion row count mismatch", "source", v.source, "source_rows", sourceRows, "rows_inserted", rowsInserted)
+		result.Warnings = append(result.Warnings, ValidationIssue{
+			Code:    CodeDatastoreRowCountMismatch,
+			Table:   "vdatastore",
+			Message: fmt.Sprintf("Datastore row count mismatch: expected %d, imported %d", sourceRows, rowsInserted),
+		})
+		return result, nil
+	}
+	zap.S().Infow("datastore ingestion completed", "source", v.source, "source_rows", sourceRows, "rows_inserted", rowsInserted)
+	return result, nil
 }
 
 // ValidateSchema checks the ingested schema for required tables, columns, and data.
@@ -187,9 +250,9 @@ func (p *Parser) validateOptionalTables(ctx context.Context, result *ValidationR
 	}
 }
 
-func (p *Parser) countRows(ctx context.Context, query string) (int, error) {
+func (p *Parser) countRows(ctx context.Context, query string, args ...any) (int, error) {
 	var count int
-	if err := p.db.QueryRowContext(ctx, query).Scan(&count); err != nil {
+	if err := p.db.QueryRowContext(ctx, query, args...).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil

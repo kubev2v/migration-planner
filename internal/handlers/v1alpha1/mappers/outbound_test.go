@@ -295,3 +295,31 @@ var _ = Describe("Inventory collection time", func() {
 		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
 	})
 })
+
+var _ = Describe("Inventory datastore storage metadata", func() {
+	It("preserves metadata through the service model and persisted inventory", func() {
+		backingIDs := []string{"naa.123", "naa.456"}
+		filesystem := "VMFS"
+		version := int32(6)
+		datastore := api.Datastore{
+			DiskId:                 "datastore-1",
+			BackingDeviceIds:       &backingIDs,
+			FilesystemType:         &filesystem,
+			FilesystemMajorVersion: &version,
+		}
+		input := api.Inventory{
+			Vcenter: &api.InventoryData{Infra: api.Infra{Datastores: []api.Datastore{datastore}}},
+			Clusters: map[string]api.InventoryData{
+				"cluster-1": {Infra: api.Infra{Datastores: []api.Datastore{datastore}}},
+			},
+		}
+		domain := mappers.InventoryFromAPI(input)
+		data, err := json.Marshal(domain)
+		Expect(err).NotTo(HaveOccurred())
+		var restored model2.Inventory
+		Expect(json.Unmarshal(data, &restored)).To(Succeed())
+		output := mappers.InventoryToAPI(restored)
+		Expect(output.Vcenter.Infra.Datastores).To(Equal(input.Vcenter.Infra.Datastores))
+		Expect(output.Clusters["cluster-1"].Infra.Datastores).To(Equal(input.Clusters["cluster-1"].Infra.Datastores))
+	})
+})

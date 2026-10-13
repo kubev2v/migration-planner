@@ -2,6 +2,7 @@ package converters
 
 import (
 	"math"
+	"regexp"
 	"strings"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -263,6 +264,18 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			ProtocolType:            d.ProtocolType,
 			Vendor:                  d.Vendor,
 		}
+		if d.FilesystemType != "" {
+			filesystemType := d.FilesystemType
+			ds.FilesystemType = &filesystemType
+		}
+		if d.FilesystemMajorVersion > 0 {
+			filesystemMajorVersion := d.FilesystemMajorVersion
+			ds.FilesystemMajorVersion = &filesystemMajorVersion
+		}
+		if len(d.BackingDeviceIDs) > 0 {
+			backingDeviceIDs := append([]string(nil), d.BackingDeviceIDs...)
+			ds.BackingDeviceIds = &backingDeviceIDs
+		}
 		if d.StorageProtocol != "" {
 			storageProtocol := api.DatastoreStorageProtocol(d.StorageProtocol)
 			ds.StorageProtocol = &storageProtocol
@@ -332,13 +345,29 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 	return infra
 }
 
-// anonymizeNFSDatastore sets diskId and protocolType to "N/A" for NFS datastores.
-// NFS paths may contain sensitive server information that should not be exposed.
+// anonymizeNFSDatastore redacts NFS datastore identifiers that carry a server
+// address or export path (for example "10.46.29.166 /nfs-data/exports" or
+// "server:/export"), which may contain sensitive information. Plain datastore
+// names are kept. The protocol label ("NFS"/"NFS41") is not sensitive and is
+// never redacted.
 func anonymizeNFSDatastore(ds *api.Datastore) {
-	if strings.EqualFold(ds.Type, "NFS") {
+	if strings.EqualFold(ds.Type, "NFS") && nfsDiskIdIsAddressLike(ds.DiskId) {
 		ds.DiskId = "N/A"
-		ds.ProtocolType = "N/A"
 	}
+}
+
+// ipv4Pattern matches a bare IPv4 address, which RVTools reports as the NFS
+// datastore address when no export path is included.
+var ipv4Pattern = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+
+// nfsDiskIdIsAddressLike reports whether a datastore identifier looks like a
+// server address or export path rather than a datastore name. vSphere datastore
+// names cannot contain ":" or "/", so those characters identify an address.
+func nfsDiskIdIsAddressLike(diskId string) bool {
+	if strings.ContainsAny(diskId, ":/") {
+		return true
+	}
+	return ipv4Pattern.MatchString(strings.TrimSpace(diskId))
 }
 
 // vmsPerHostAverage returns the average VM density per host, rounded to 2

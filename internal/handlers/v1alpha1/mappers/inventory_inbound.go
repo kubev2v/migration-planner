@@ -202,6 +202,9 @@ func vmsFromAPI(v api.VMs) svcmodel.VMs {
 
 func datastoreFromAPI(d api.Datastore) svcmodel.Datastore {
 	result := svcmodel.Datastore{
+		BackingDeviceIds:        d.BackingDeviceIds,
+		FilesystemMajorVersion:  d.FilesystemMajorVersion,
+		FilesystemType:          d.FilesystemType,
 		DiskId:                  d.DiskId,
 		FreeCapacityGB:          d.FreeCapacityGB,
 		HardwareAcceleratedMove: d.HardwareAcceleratedMove,

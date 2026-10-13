@@ -690,12 +690,22 @@ type CustomerList = []Customer
 
 // Datastore defines model for Datastore.
 type Datastore struct {
-	DiskId                  string `json:"diskId"`
-	FreeCapacityGB          int    `json:"freeCapacityGB"`
-	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
+	// BackingDeviceIds Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+	BackingDeviceIds *[]string `json:"backingDeviceIds,omitempty"`
+	DiskId           string    `json:"diskId"`
+
+	// FilesystemMajorVersion VMFS major version when reported; omitted when unknown or not applicable
+	FilesystemMajorVersion *int32 `json:"filesystemMajorVersion,omitempty"`
+
+	// FilesystemType Filesystem type reported by the datastore, such as VMFS, NFS, or NFS41
+	FilesystemType          *string `json:"filesystemType,omitempty"`
+	FreeCapacityGB          int     `json:"freeCapacityGB"`
+	HardwareAcceleratedMove bool    `json:"hardwareAcceleratedMove"`
 
 	// HostId Identifier of the host where this datastore is attached
-	HostId                 *string                 `json:"hostId"`
+	HostId *string `json:"hostId"`
+
+	// Model Model reported by matching backing devices when available
 	Model                  string                  `json:"model"`
 	ProtocolType           string                  `json:"protocolType"`
 	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
@@ -704,7 +714,9 @@ type Datastore struct {
 	StorageProtocol *DatastoreStorageProtocol `json:"storageProtocol,omitempty"`
 	TotalCapacityGB int                       `json:"totalCapacityGB"`
 	Type            string                    `json:"type"`
-	Vendor          string                    `json:"vendor"`
+
+	// Vendor Vendor reported by matching backing devices when available
+	Vendor string `json:"vendor"`
 
 	// VsanSnapshotSupport Whether this datastore supports vSAN point-in-time snapshots
 	VsanSnapshotSupport *bool `json:"vsanSnapshotSupport,omitempty"`

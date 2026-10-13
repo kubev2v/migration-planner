@@ -11,7 +11,9 @@ Key transformations:
   - VM.NICs (JSON array) → vnetwork rows via LATERAL unnest
   - VM.Disks (JSON array) → vdisk rows via LATERAL unnest
   - Host → vhost with memory converted from bytes to MiB
-  - Datastore → vdatastore with capacity/free converted from bytes to MiB
+  - Host HBA array → vhba adapter inventory
+  - Host topology/SCSI disk arrays → distinct vhostscsi host/adapter/LUN associations
+  - Datastore → vdatastore with capacity/free converted from bytes to MiB and storage protocol joined by backing device
   - Network → dvport for distributed virtual switches
   - Cluster → vcluster: Name, anonymized Object ID (SHA-256), DasEnabled (HA), DrsEnabled and DrsDefaultVmBehavior (DRS)
 
@@ -121,7 +123,7 @@ WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
 
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
-    "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+    "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID", "RDM LUN UUID",
     "Thin", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
@@ -136,12 +138,13 @@ SELECT
     disk->>'bus',
     disk->>'mode',
     disk->>'serial',
+    CASE WHEN disk->>'rdm' = 'true' THEN NULLIF(TRIM(disk->>'lunUuid'), '') END,
     false,
     disk->>'bus',
     '',
     disk->>'unitNumber'
 FROM src.VM v,
-LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR"}]')) AS t(disk)
+LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR","lunUuid":"VARCHAR"}]')) AS t(disk)
 WHERE v.Disks != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
 
 WITH nic_flat AS (
@@ -208,10 +211,11 @@ SELECT
     a.InstanceUuid
 FROM src.About a;
 
-INSERT INTO vhost ("Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
     "VMotion support", "Storage VMotion support")
 SELECT
-    c.Name,
+    d.Name,
+    CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END,
     h.CpuCores,
     h.CpuSockets,
     h.ID,
@@ -223,10 +227,74 @@ SELECT
     COALESCE(h.VMotionSupported, false),
     COALESCE(h.StorageVMotionSupported, false)
 FROM src.Host h
--- Standalone-host placeholder (see header) filtered from the join so the host keeps a blank Cluster
-LEFT JOIN src.Cluster c ON h.Cluster = c.ID AND c.Variant != 'ComputeResource';
+-- Keep standalone-host ancestry to resolve its datacenter, but blank the cluster name.
+LEFT JOIN src.Cluster c ON h.Cluster = c.ID
+LEFT JOIN src.Folder f ON c.Parent->>'id' = f.ID
+LEFT JOIN src.Datacenter d ON f.Datacenter = d.ID;
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Backing Devices",
+INSERT INTO vhba ("Host ID", "Device", "HBA Key", "Protocol", "Model", "Driver", "Node WWN", "Port WWN")
+SELECT DISTINCT
+    h.ID,
+    NULLIF(TRIM(hba.hbaDevice), ''),
+    NULLIF(TRIM(hba.key), ''),
+    CASE WHEN LOWER(TRIM(hba.protocol)) != 'unknown' THEN NULLIF(TRIM(hba.protocol), '') END,
+    NULLIF(TRIM(hba.model), ''),
+    NULLIF(TRIM(hba.driver), ''),
+    NULLIF(TRIM(hba.nodeWorldWideName), ''),
+    NULLIF(TRIM(hba.portWorldWideName), '')
+FROM src.Host h,
+LATERAL unnest(TRY(from_json(COALESCE(NULLIF(h.HbaDiskInfo, ''), '[]'),
+        '[{"hbaDevice":"VARCHAR","protocol":"VARCHAR","model":"VARCHAR","driver":"VARCHAR","nodeWorldWideName":"VARCHAR","portWorldWideName":"VARCHAR","key":"VARCHAR"}]'
+))) AS t(hba);
+
+WITH host_topology_luns AS (
+    SELECT DISTINCT
+        h.ID AS host_id,
+        topology.key AS hba_key,
+        lun_key AS scsi_disk_key
+    FROM src.Host h,
+    LATERAL unnest(TRY(from_json(COALESCE(NULLIF(h.HostScsiTopology, ''), '[]'),
+        '[{"key":"VARCHAR","scsiDiskKeys":["VARCHAR"]}]'
+    ))) AS t(topology),
+    LATERAL unnest(topology.scsiDiskKeys) AS lun(lun_key)
+),
+host_scsi_disks AS (
+    SELECT
+        h.ID AS host_id,
+        disk.key AS scsi_disk_key,
+        disk.canonicalName AS canonical_name,
+        disk.vendor AS vendor,
+        disk.model AS model
+    FROM src.Host h,
+    LATERAL unnest(TRY(from_json(COALESCE(NULLIF(h.HostScsiDisks, ''), '[]'),
+        '[{"canonicalName":"VARCHAR","vendor":"VARCHAR","model":"VARCHAR","key":"VARCHAR"}]'
+    ))) AS t(disk)
+)
+INSERT INTO vhostscsi (
+    "Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model"
+)
+SELECT DISTINCT
+    COALESCE(disk.host_id, topology.host_id),
+    hba."Device",
+    COALESCE(disk.scsi_disk_key, topology.scsi_disk_key),
+    NULLIF(TRIM(disk.canonical_name), ''),
+    NULLIF(TRIM(disk.vendor), ''),
+    NULLIF(TRIM(disk.model), '')
+FROM host_scsi_disks disk
+FULL OUTER JOIN host_topology_luns topology
+    ON disk.host_id = topology.host_id AND disk.scsi_disk_key = topology.scsi_disk_key
+LEFT JOIN vhba hba ON hba."Host ID" = topology.host_id AND hba."HBA Key" = topology.hba_key;
+
+-- Read optional storage fields through JSON so older snapshots retain their datastores.
+WITH datastore_metadata AS (
+    SELECT
+        ds.*,
+        NULLIF(to_json(ds)->>'FilesystemType', '') AS filesystem_type,
+        NULLIF(TRY_CAST(to_json(ds)->>'FilesystemMajorVersion' AS INTEGER), 0) AS filesystem_major_version,
+        NULLIF(TRIM(to_json(ds)->>'ProtocolEndpointType'), '') AS protocol_endpoint_type
+    FROM src.Datastore ds
+)
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol",
     "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
 SELECT
     string_agg(DISTINCT h.ID, ','),
@@ -237,18 +305,50 @@ SELECT
     ds.MaintenanceMode = 'True',
     ds.Capacity / 1048576,
     ds.Type,
-    COALESCE(ds.BackingDevicesNames, '[]'),
+    ds.filesystem_type,
+    ds.filesystem_major_version,
+    CAST(to_json(COALESCE(
+        TRY(from_json(NULLIF(ds.BackingDevicesNames, ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS VARCHAR),
+    COALESCE((
+        SELECT string_agg(DISTINCT hba."Protocol", ', ' ORDER BY hba."Protocol")
+        FROM vhostscsi path
+        JOIN vhba hba ON hba."Host ID" = path."Host ID" AND hba."Device" = path."HBA Device"
+        JOIN src.Host storage_host ON storage_host.ID = path."Host ID"
+        CROSS JOIN LATERAL unnest(COALESCE(
+            TRY(from_json(COALESCE(NULLIF(storage_host.Datastores, ''), '[]'),
+                '[{"kind":"VARCHAR","id":"VARCHAR"}]'
+            )),
+            []::STRUCT(kind VARCHAR, id VARCHAR)[]
+        )) AS refs(datastore_ref)
+        CROSS JOIN LATERAL unnest(COALESCE(
+            TRY(from_json(NULLIF(ds.BackingDevicesNames, ''), '["VARCHAR"]')),
+            []::VARCHAR[]
+        )) AS devices(backing_device)
+        WHERE datastore_ref.id = ds.ID
+          AND path."Canonical Name" = backing_device
+          AND NULLIF(TRIM(hba."Protocol"), '') IS NOT NULL
+          AND LOWER(TRIM(hba."Protocol")) != 'unknown'
+    ), ds.protocol_endpoint_type, CASE
+        WHEN UPPER(TRIM(COALESCE(NULLIF(TRIM(ds.filesystem_type), ''), ds.Type)))
+            IN ('NFS', 'NFS41', 'NFS4.1', 'NFS 4.1') THEN 'NFS'
+        ELSE NULL
+    END),
     COALESCE(ds.IORMEnabled, false),
     COALESCE(ds.IORMCongestionThreshold, 30),
     COALESCE(ds.IORMCongestionThresholdMode, 'automatic'),
     COALESCE(ds.IORMPercentOfPeakThroughput, 90)
-FROM src.Datastore ds
+FROM datastore_metadata ds
 LEFT JOIN (
     SELECT h.ID, h.Cluster, dsref->>'id' AS datastore_id
     FROM src.Host h,
-    LATERAL unnest(from_json(h.Datastores, '[{"kind":"VARCHAR","id":"VARCHAR"}]')) AS t(dsref)
+    LATERAL unnest(COALESCE(
+        TRY(from_json(COALESCE(NULLIF(h.Datastores, ''), '[]'), '[{"kind":"VARCHAR","id":"VARCHAR"}]')),
+        []::STRUCT(kind VARCHAR, id VARCHAR)[]
+    )) AS t(dsref)
 ) h ON h.datastore_id = ds.ID
-GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.BackingDevicesNames,
+GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.filesystem_type, ds.filesystem_major_version, ds.BackingDevicesNames, ds.protocol_endpoint_type,
     COALESCE(ds.IORMEnabled, false), COALESCE(ds.IORMCongestionThreshold, 30),
     COALESCE(ds.IORMCongestionThresholdMode, 'automatic'), COALESCE(ds.IORMPercentOfPeakThroughput, 90);
 

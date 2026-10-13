@@ -124,6 +124,9 @@ type DatastoreStorageProtocol string
 
 // Datastore describes a single datastore.
 type Datastore struct {
+	BackingDeviceIds        *[]string                 `json:"backingDeviceIds,omitempty"`
+	FilesystemMajorVersion  *int32                    `json:"filesystemMajorVersion,omitempty"`
+	FilesystemType          *string                   `json:"filesystemType,omitempty"`
 	DiskId                  string                    `json:"diskId"`
 	FreeCapacityGB          int                       `json:"freeCapacityGB"`
 	HardwareAcceleratedMove bool                      `json:"hardwareAcceleratedMove"`
