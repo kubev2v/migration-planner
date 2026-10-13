@@ -182,12 +182,47 @@ func (p *Parser) executeStatements(ctx context.Context, query string, args ...an
 		if strings.HasPrefix(stmt, "WITH metadata AS (") {
 			stmtArgs = args
 		}
-		if _, err := p.db.ExecContext(ctx, stmt, stmtArgs...); err != nil {
+		upperStmt := strings.ToUpper(stmt)
+		isDatastoreInsert := strings.Contains(upperStmt, "INSERT INTO VDATASTORE")
+		isSQLiteDatastoreInsert := isDatastoreInsert && strings.Contains(upperStmt, "FROM SRC.DATASTORE")
+		datastoreSourceRows := int64(-1)
+		if isSQLiteDatastoreInsert {
+			if err := p.db.QueryRowContext(ctx, "SELECT count(*) FROM src.Datastore").Scan(&datastoreSourceRows); err != nil {
+				zap.S().Warnw("failed to count SQLite datastore rows before ingestion", "error", err)
+			}
+		}
+		result, err := p.db.ExecContext(ctx, stmt, stmtArgs...)
+		if err != nil {
 			if isCriticalStatement(stmt) {
 				return translateXLSXError(err)
 			}
-			// Non-critical failures are logged but don't stop execution
-			zap.S().Debugw("non-critical statement failed", "error", err)
+			// Datastore ingestion is optional for older/partial collections, but
+			// failures must be visible because they remove storage inventory.
+			if isDatastoreInsert {
+				if isSQLiteDatastoreInsert {
+					zap.S().Warnw("datastore ingestion statement failed", "source_rows", datastoreSourceRows, "error", err)
+				} else {
+					zap.S().Warnw("datastore ingestion statement failed", "error", err)
+				}
+			} else {
+				// Other non-critical failures are logged but don't stop execution.
+				zap.S().Debugw("non-critical statement failed", "error", err)
+			}
+		} else if isDatastoreInsert {
+			rowsInserted, rowsErr := result.RowsAffected()
+			if rowsErr != nil {
+				if isSQLiteDatastoreInsert {
+					zap.S().Warnw("datastore ingestion statement completed", "source_rows", datastoreSourceRows, "rows_affected_error", rowsErr)
+				} else {
+					zap.S().Warnw("datastore ingestion statement completed", "rows_affected_error", rowsErr)
+				}
+			} else {
+				if isSQLiteDatastoreInsert {
+					zap.S().Infow("datastore ingestion statement completed", "source_rows", datastoreSourceRows, "rows_inserted", rowsInserted)
+				} else {
+					zap.S().Infow("datastore ingestion statement completed", "rows_inserted", rowsInserted)
+				}
+			}
 		}
 	}
 	return nil

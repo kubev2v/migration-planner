@@ -14,7 +14,35 @@ Template Parameters:
   - Limit: max results (0 = unlimited)
   - Offset: skip first N results
 */ -}}
-WITH disks AS (
+WITH {{.StorageTopology}},
+datastore_backing_info AS (
+    SELECT
+        d.datastore_row_id,
+        string_agg(
+            DISTINCT hba."Protocol", ', ' ORDER BY hba."Protocol"
+        ) FILTER (WHERE LOWER(TRIM(hba."Protocol")) != 'unknown') AS protocols,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Vendor"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Vendor"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Vendor"), '') IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Model"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Model"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Model"), '') IS NOT NULL) AS model
+    FROM storage_datastores d
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    LEFT JOIN storage_datastore_hosts member_host
+        ON member_host.datastore_row_id = d.datastore_row_id
+    LEFT JOIN storage_scsi s
+        ON LOWER(TRIM(s."Canonical Name")) = LOWER(TRIM(backing.device))
+        AND member_host.host_id = s."Host ID"
+    LEFT JOIN storage_hbas hba ON hba."Host ID" = s."Host ID" AND hba."Device" = s."HBA Device"
+    GROUP BY d.datastore_row_id
+),
+disks AS (
     SELECT
         dk."VM ID",
         LIST({
@@ -24,6 +52,8 @@ WITH disks AS (
             'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
+            -- Row JSON keeps older read-only collections without this column queryable.
+            'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
             'Bus': dk."Shared Bus",
             'Mode': dk."Disk Mode",
             'Serial': dk."Disk UUID",
@@ -31,10 +61,24 @@ WITH disks AS (
             'Controller': dk."Controller",
             'Label': dk."Label",
             'SCSIUnit': dk."SCSI Unit #",
-            'Datastore': COALESCE(ds."Object ID", '')
+            'Datastore': COALESCE(ds."Object ID", ''),
+            'DatastoreName': COALESCE(ds."Name", ''),
+            'DatastoreType': COALESCE(ds."Type", ''),
+            'DatastoreFilesystemType': COALESCE(to_json(ds)->>'Filesystem Type', ''),
+            'DatastoreFilesystemMajorVersion': COALESCE(TRY_CAST(to_json(ds)->>'Filesystem Major Version' AS INTEGER), 0),
+            'DatastoreStorageProtocol': COALESCE(NULLIF(backing.protocols, ''), to_json(ds)->>'Storage Protocol', ''),
+            'DatastoreBackingDeviceIDs': COALESCE(
+                TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
+                []::VARCHAR[]
+            ),
+            'DatastoreVendor': COALESCE(backing.vendor, ''),
+            'DatastoreModel': COALESCE(backing.model, '')
         }) AS disks
     FROM vdisk dk
-    LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+    LEFT JOIN storage_disk_datastores resolved
+        ON resolved."VM ID" = dk."VM ID" AND resolved.disk_row_id = dk.rowid
+    LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
+    LEFT JOIN datastore_backing_info backing ON backing.datastore_row_id = ds.datastore_row_id
     GROUP BY dk."VM ID"
 ),
 nics AS (

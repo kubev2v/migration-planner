@@ -3,7 +3,10 @@ package models
 // Datastore represents a VMware datastore.
 type Datastore struct {
 	Cluster                 string  `db:"cluster" json:"-"`
+	BackingDevicesJSON      string  `db:"backingDevicesJSON" json:"-"`
 	DiskId                  string  `db:"diskId" json:"diskId"`
+	FilesystemType          string  `db:"filesystemType" json:"filesystemType,omitempty"`
+	FilesystemMajorVersion  int32   `db:"filesystemMajorVersion" json:"filesystemMajorVersion,omitempty"`
 	FreeCapacityGB          float64 `db:"freeCapacityGB" json:"freeCapacityGB"`
 	HardwareAcceleratedMove bool    `db:"hardwareAcceleratedMove" json:"hardwareAcceleratedMove"`
 	HostId                  string  `db:"hostId" json:"hostId"`

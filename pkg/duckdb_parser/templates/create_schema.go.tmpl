@@ -90,12 +90,16 @@ CREATE TABLE IF NOT EXISTS vdisk (
     "Shared Bus" VARCHAR,
     "Disk Mode" VARCHAR,
     "Disk UUID" VARCHAR,
+    "RDM LUN UUID" VARCHAR,
     "Thin" BOOLEAN DEFAULT false,
     "Controller" VARCHAR,
     "Label" VARCHAR,
     "SCSI Unit #" VARCHAR,
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
+
+-- Upgrade writable collections initialized before RDM LUN identity was retained.
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM LUN UUID" VARCHAR;
 
 CREATE TABLE IF NOT EXISTS vnetwork (
     "VM ID" VARCHAR,
@@ -137,16 +141,53 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "MHA" BOOLEAN DEFAULT false,
     "Capacity MiB" DOUBLE DEFAULT 0.0,
     "Type" VARCHAR,
+    "Filesystem Type" VARCHAR,
+    "Filesystem Major Version" INTEGER,
     "Backing Devices" VARCHAR DEFAULT '[]',
+    "Storage Protocol" VARCHAR,
     "SIOC Enabled" BOOLEAN DEFAULT false,
     "SIOC Congestion Threshold" INTEGER DEFAULT 30,
     "SIOC Congestion Threshold Mode" VARCHAR DEFAULT 'automatic',
     "SIOC Percent Of Peak Throughput" INTEGER DEFAULT 90
 );
 
+-- Existing collections need additive upgrades as CREATE TABLE does not add columns.
+ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Filesystem Type" VARCHAR;
+ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Filesystem Major Version" INTEGER;
+ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Storage Protocol" VARCHAR;
+
+-- Adapter inventory from either collector, identified by host and device.
 CREATE TABLE IF NOT EXISTS vhba (
+    "Host ID" VARCHAR,
     "Device" VARCHAR,
-    "Type" VARCHAR
+    "Type" VARCHAR,
+    "HBA Key" VARCHAR,
+    "Protocol" VARCHAR,
+    "Model" VARCHAR,
+    "Driver" VARCHAR,
+    "Node WWN" VARCHAR,
+    "Port WWN" VARCHAR
+);
+
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Host ID" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Type" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "HBA Key" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Protocol" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Model" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Driver" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Node WWN" VARCHAR;
+ALTER TABLE vhba ADD COLUMN IF NOT EXISTS "Port WWN" VARCHAR;
+
+-- Distinct host/adapter/LUN associations. HBA Device is NULL for an unresolved
+-- adapter, so LUN metadata can still be collected without topology information.
+CREATE TABLE IF NOT EXISTS vhostscsi (
+    "Host ID" VARCHAR,
+    "HBA Device" VARCHAR,
+    "SCSI Disk Key" VARCHAR,
+    "Canonical Name" VARCHAR,
+    "LUN Vendor" VARCHAR,
+    "LUN Model" VARCHAR,
+    "LUN UUID" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS dvport (
