@@ -1,8 +1,8 @@
 {{- /*
 Datastore Query Template - Extracts datastore data from the fixed schema.
 
-The schema always has vdatastore, vhost, and vhba tables. LEFT JOIN handles
-cases where vhba is empty.
+The schema always has vdatastore, vhost, vhba, and vhostscsi tables. LEFT JOINs
+preserve datastores when optional adapter or LUN information is unavailable.
 
 For vcenter-level queries (no ClusterFilter), return ALL datastores.
 For cluster-level queries, filter to datastores used by hosts in that cluster.
@@ -14,7 +14,40 @@ Template Parameters:
 */ -}}
 {{- if .ClusterFilter }}
 -- Cluster-level: filter to datastores used by hosts in the cluster
-WITH expanded AS (
+WITH backing_info AS (
+    SELECT
+        d."Object ID" AS datastore_id,
+        string_agg(
+            DISTINCT hba."Protocol", ', ' ORDER BY hba."Protocol"
+        ) FILTER (WHERE LOWER(TRIM(hba."Protocol")) != 'unknown') AS protocols,
+        CAST(to_json(COALESCE(
+            TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+            []::VARCHAR[]
+        )) AS VARCHAR) AS backing_devices_json,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Vendor"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Vendor"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Vendor"), '') IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Model"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Model"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Model"), '') IS NOT NULL) AS model
+    FROM vdatastore d
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    CROSS JOIN UNNEST(string_split(COALESCE(d."Hosts", ''), ',')) AS ds_host(host_id)
+    LEFT JOIN vhost member_host
+        ON TRIM(ds_host.host_id) = TRIM(member_host."Object ID")
+        OR LOWER(TRIM(ds_host.host_id)) = LOWER(TRIM(member_host."Host"))
+    LEFT JOIN vhostscsi s
+        ON LOWER(TRIM(s."Canonical Name")) = LOWER(TRIM(backing.device))
+        AND member_host."Object ID" = s."Host ID"
+    LEFT JOIN vhba hba ON hba."Host ID" = s."Host ID" AND hba."Device" = s."HBA Device"
+    GROUP BY d."Object ID", d."Backing Devices", d."Hosts"
+),
+expanded AS (
     SELECT
         d.*,
         trim(unnest(string_split(d.Hosts, ','))) AS ip,
@@ -31,7 +64,11 @@ with_host AS (
         e."MHA",
         e."Capacity MiB",
         e."Type",
+        e."Filesystem Type",
+        e."Filesystem Major Version",
+        e."Storage Protocol",
         e.ip,
+        e."Object ID" AS datastore_id,
         vh."Object ID",
         e.hba_device,
         e."SIOC Enabled",
@@ -39,7 +76,7 @@ with_host AS (
         e."SIOC Congestion Threshold Mode",
         e."SIOC Percent Of Peak Throughput"
     FROM expanded e
-    JOIN vhost vh ON vh.Host = e.ip
+    JOIN vhost vh ON TRIM(vh."Object ID") = e.ip OR LOWER(TRIM(vh."Host")) = LOWER(e.ip)
     WHERE vh."Cluster" = '{{.ClusterFilter}}'
 ),
 with_hba AS (
@@ -51,15 +88,19 @@ with_hba AS (
         w."MHA",
         w."Capacity MiB",
         w."Type",
+        w."Filesystem Type",
+        w."Filesystem Major Version",
+        w."Storage Protocol",
         w.ip,
+        w.datastore_id,
         w."Object ID",
-        FIRST(hba."Type") OVER (PARTITION BY w."Name") as hba_type,
+        FIRST(COALESCE(NULLIF(hba."Protocol", ''), hba."Type")) OVER (PARTITION BY w.datastore_id) as hba_type,
         w."SIOC Enabled",
         w."SIOC Congestion Threshold",
         w."SIOC Congestion Threshold Mode",
         w."SIOC Percent Of Peak Throughput"
     FROM with_host w
-    LEFT JOIN vhba hba ON hba."Device" = w.hba_device
+    LEFT JOIN vhba hba ON hba."Host ID" = w."Object ID" AND hba."Device" = w.hba_device
 )
 SELECT
     w."Cluster" as "cluster",
@@ -67,28 +108,67 @@ SELECT
     ROUND(w."Free MiB"::double / 1024)::integer as "freeCapacityGB",
     COALESCE(w."MHA", false) as "hardwareAcceleratedMove",
     COALESCE(string_agg(DISTINCT w."Object ID", ', '), 'N/A') AS "hostId",
-    'N/A' as "model",
+    COALESCE(NULLIF(b.model, ''), 'N/A') as "model",
     CASE
-        WHEN w."Type" = 'NFS' THEN 'N/A'
-        WHEN w."Address" LIKE 'naa.%' THEN 'iSCSI'
+        WHEN NULLIF(b.protocols, '') IS NOT NULL THEN b.protocols
+        WHEN NULLIF(w."Storage Protocol", '') IS NOT NULL THEN w."Storage Protocol"
+        WHEN UPPER(COALESCE(NULLIF(w."Filesystem Type", ''), w."Type")) IN ('NFS', 'NFS41') THEN 'NFS'
         WHEN w.hba_type IS NOT NULL THEN w.hba_type
         ELSE 'N/A'
     END as "protocolType",
     ROUND(w."Capacity MiB"::double / 1024)::integer as "totalCapacityGB",
     COALESCE(w."Type", 'N/A') as "type",
-    'N/A' as "vendor",
+    COALESCE(w."Filesystem Type", '') as "filesystemType",
+    COALESCE(w."Filesystem Major Version", 0) as "filesystemMajorVersion",
+    COALESCE(NULLIF(b.vendor, ''), 'N/A') as "vendor",
+    COALESCE(b.backing_devices_json, '[]') as "backingDevicesJSON",
     COALESCE(w."SIOC Enabled", false) as "siocEnabled",
     COALESCE(w."SIOC Congestion Threshold", 30) as "siocCongestionThreshold",
     COALESCE(w."SIOC Congestion Threshold Mode", 'automatic') as "siocCongestionThresholdMode",
     COALESCE(w."SIOC Percent Of Peak Throughput", 90) as "siocPercentOfPeakThroughput"
 FROM with_hba w
-GROUP BY w."Cluster", w."Address", w."Name", w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w.hba_type,
+LEFT JOIN backing_info b ON b.datastore_id = w.datastore_id
+GROUP BY w."Cluster", w."Address", w."Name", w.datastore_id, w."Free MiB", w."MHA", w."Capacity MiB", w."Type", w."Filesystem Type", w."Filesystem Major Version", w."Storage Protocol", w.hba_type,
+    b.model, b.vendor, b.backing_devices_json, b.protocols,
     w."SIOC Enabled", w."SIOC Congestion Threshold", w."SIOC Congestion Threshold Mode", w."SIOC Percent Of Peak Throughput"
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
 {{- else }}
 -- vCenter-level: return ALL datastores (matching old implementation)
-WITH expanded_hosts AS (
+WITH backing_info AS (
+    SELECT
+        d."Object ID" AS datastore_id,
+        string_agg(
+            DISTINCT hba."Protocol", ', ' ORDER BY hba."Protocol"
+        ) FILTER (WHERE LOWER(TRIM(hba."Protocol")) != 'unknown') AS protocols,
+        CAST(to_json(COALESCE(
+            TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+            []::VARCHAR[]
+        )) AS VARCHAR) AS backing_devices_json,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Vendor"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Vendor"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Vendor"), '') IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Model"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Model"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Model"), '') IS NOT NULL) AS model
+    FROM vdatastore d
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    CROSS JOIN UNNEST(string_split(COALESCE(d."Hosts", ''), ',')) AS ds_host(host_id)
+    LEFT JOIN vhost member_host
+        ON TRIM(ds_host.host_id) = TRIM(member_host."Object ID")
+        OR LOWER(TRIM(ds_host.host_id)) = LOWER(TRIM(member_host."Host"))
+    LEFT JOIN vhostscsi s
+        ON LOWER(TRIM(s."Canonical Name")) = LOWER(TRIM(backing.device))
+        AND member_host."Object ID" = s."Host ID"
+    LEFT JOIN vhba hba ON hba."Host ID" = s."Host ID" AND hba."Device" = s."HBA Device"
+    GROUP BY d."Object ID", d."Backing Devices", d."Hosts"
+),
+expanded_hosts AS (
     SELECT
         d."Name" as ds_name,
         trim(unnest(string_split(d."Hosts", ','))) AS ip
@@ -100,7 +180,7 @@ host_ids AS (
         e.ds_name,
         string_agg(DISTINCT vh."Object ID", ', ') as host_ids
     FROM expanded_hosts e
-    LEFT JOIN vhost vh ON vh."Host" = e.ip
+    LEFT JOIN vhost vh ON TRIM(vh."Object ID") = e.ip OR LOWER(TRIM(vh."Host")) = LOWER(e.ip)
     GROUP BY e.ds_name
 )
 SELECT
@@ -109,20 +189,26 @@ SELECT
     COALESCE(ROUND(d."Free MiB"::double / 1024)::integer, 0) as "freeCapacityGB",
     false as "hardwareAcceleratedMove",
     COALESCE(h.host_ids, 'N/A') AS "hostId",
-    'N/A' as "model",
+    COALESCE(NULLIF(b.model, ''), 'N/A') as "model",
     CASE
-        WHEN d."Type" = 'NFS' THEN 'N/A'
+        WHEN NULLIF(b.protocols, '') IS NOT NULL THEN b.protocols
+        WHEN NULLIF(d."Storage Protocol", '') IS NOT NULL THEN d."Storage Protocol"
+        WHEN UPPER(COALESCE(NULLIF(d."Filesystem Type", ''), d."Type")) IN ('NFS', 'NFS41') THEN 'NFS'
         ELSE 'N/A'
     END as "protocolType",
     COALESCE(ROUND(d."Capacity MiB"::double / 1024)::integer, 0) as "totalCapacityGB",
     COALESCE(d."Type", 'N/A') as "type",
-    'N/A' as "vendor",
+    COALESCE(d."Filesystem Type", '') as "filesystemType",
+    COALESCE(d."Filesystem Major Version", 0) as "filesystemMajorVersion",
+    COALESCE(NULLIF(b.vendor, ''), 'N/A') as "vendor",
+    COALESCE(b.backing_devices_json, '[]') as "backingDevicesJSON",
     COALESCE(d."SIOC Enabled", false) as "siocEnabled",
     COALESCE(d."SIOC Congestion Threshold", 30) as "siocCongestionThreshold",
     COALESCE(d."SIOC Congestion Threshold Mode", 'automatic') as "siocCongestionThresholdMode",
     COALESCE(d."SIOC Percent Of Peak Throughput", 90) as "siocPercentOfPeakThroughput"
 FROM vdatastore d
 LEFT JOIN host_ids h ON h.ds_name = d."Name"
+LEFT JOIN backing_info b ON b.datastore_id = d."Object ID"
 {{- if and .Limit (gt .Limit 0) }} LIMIT {{.Limit}}{{end}}
 {{- if and .Offset (gt .Offset 0) }} OFFSET {{.Offset}}{{end}};
 {{- end }}

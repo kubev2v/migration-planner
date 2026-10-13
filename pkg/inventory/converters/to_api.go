@@ -262,6 +262,18 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			ProtocolType:            d.ProtocolType,
 			Vendor:                  d.Vendor,
 		}
+		if d.FilesystemType != "" {
+			filesystemType := d.FilesystemType
+			ds.FilesystemType = &filesystemType
+		}
+		if d.FilesystemMajorVersion > 0 {
+			filesystemMajorVersion := d.FilesystemMajorVersion
+			ds.FilesystemMajorVersion = &filesystemMajorVersion
+		}
+		if len(d.BackingDeviceIDs) > 0 {
+			backingDeviceIDs := append([]string(nil), d.BackingDeviceIDs...)
+			ds.BackingDeviceIds = &backingDeviceIDs
+		}
 		if d.StorageProtocol != "" {
 			storageProtocol := api.DatastoreStorageProtocol(d.StorageProtocol)
 			ds.StorageProtocol = &storageProtocol

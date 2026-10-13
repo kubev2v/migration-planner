@@ -3,6 +3,7 @@ package duckdb_parser
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -393,16 +394,19 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 		datastores := make([]inventory.Datastore, 0, len(datastoreModels))
 		for _, d := range datastoreModels {
 			datastores = append(datastores, inventory.Datastore{
-				DiskId:              d.DiskId,
-				FreeCapacityGB:      d.FreeCapacityGB,
-				TotalCapacityGB:     d.TotalCapacityGB,
-				Type:                d.Type,
-				StorageProtocol:     inventory.StorageProtocolFromDatastoreType(d.Type),
-				VsanSnapshotSupport: strings.EqualFold(strings.TrimSpace(d.Type), "vsan"),
-				HostId:              d.HostId,
-				Model:               d.Model,
-				ProtocolType:        d.ProtocolType,
-				Vendor:              d.Vendor,
+				DiskId:                 d.DiskId,
+				BackingDeviceIDs:       parseBackingDevices(d.BackingDevicesJSON, d.DiskId),
+				FilesystemType:         d.FilesystemType,
+				FilesystemMajorVersion: d.FilesystemMajorVersion,
+				FreeCapacityGB:         d.FreeCapacityGB,
+				TotalCapacityGB:        d.TotalCapacityGB,
+				Type:                   d.Type,
+				StorageProtocol:        inventory.StorageProtocolFromDatastoreType(d.Type),
+				VsanSnapshotSupport:    strings.EqualFold(strings.TrimSpace(d.Type), "vsan"),
+				HostId:                 d.HostId,
+				Model:                  d.Model,
+				ProtocolType:           d.ProtocolType,
+				Vendor:                 d.Vendor,
 				StorageIoConfiguration: &inventory.StorageIoConfiguration{
 					Enabled:                 d.SiocEnabled,
 					CongestionThreshold:     d.SiocThreshold,
@@ -493,6 +497,22 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 	}
 
 	return infraData, nil
+}
+
+func parseBackingDevices(raw, datastoreID string) []string {
+	var devices []string
+	if raw == "" {
+		return devices
+	}
+	if err := json.Unmarshal([]byte(raw), &devices); err != nil {
+		zap.S().Named("duckdb_parser").Warnw(
+			"failed to parse datastore backing devices",
+			"datastore", datastoreID,
+			"error", err,
+		)
+		return nil
+	}
+	return devices
 }
 
 // resolveClusterID determines the cluster ID from vCluster Object ID or generates one.

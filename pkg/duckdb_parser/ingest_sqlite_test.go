@@ -66,7 +66,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '', Variant VARCHAR DEFAULT 'ClusterComputeResource')`,
 
 		// Host
-		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
+		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false, HbaDiskInfo VARCHAR DEFAULT '[]', HostScsiTopology VARCHAR DEFAULT '[]', HostScsiDisks VARCHAR DEFAULT '[]')`,
 
 		// VM
 		`CREATE TABLE dst.VM (
@@ -87,7 +87,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR)`,
 
 		// Datastore
-		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
+		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, FilesystemType VARCHAR, FilesystemMajorVersion INTEGER, ProtocolEndpointType VARCHAR DEFAULT '', BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
 	}
 
 	for _, stmt := range stmts {
@@ -130,7 +130,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		// Insert one host per cluster so Host→Cluster join resolves.
 		hostID := fmt.Sprintf("host-%d", i+1)
 		_, err = db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Host VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+			`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
 			escapeSQLString(hostID), escapeSQLString(c.id),
 		))
 		require.NoError(t, err)
@@ -512,7 +512,7 @@ func TestIngestSqlite_StandaloneHostDetection(t *testing.T) {
 				require.NoError(t, err)
 				_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 				require.NoError(t, err)
-				_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+				_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
 				require.NoError(t, err)
 				require.NoError(t, func() error { _, err := sdb.Exec("DETACH dst"); return err }())
 			}
@@ -542,7 +542,7 @@ func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 	require.NoError(t, err)
-	_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+	_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.VM (
 		ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
@@ -633,6 +633,41 @@ func TestIngestSqlite_FaultToleranceEnabledMapping(t *testing.T) {
 	}
 	assert.True(t, vmMap["vm-ft-on"].FaultToleranceEnabled)
 	assert.False(t, vmMap["vm-ft-off"].FaultToleranceEnabled)
+}
+
+func TestIngestSqlite_HostDatacenter(t *testing.T) {
+	for _, variant := range []string{"ClusterComputeResource", "ComputeResource"} {
+		t.Run(variant, func(t *testing.T) {
+			parser, db, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vc-1",
+				[]sqliteCluster{{id: "domain-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}},
+			)
+			src, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = src.Close() }()
+			_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+			require.NoError(t, err)
+			_, err = src.Exec(`UPDATE dst.Cluster SET Variant = ?`, variant)
+			require.NoError(t, err)
+			_, err = src.Exec("DETACH dst")
+			require.NoError(t, err)
+
+			_, err = parser.IngestSqlite(context.Background(), sqlitePath)
+			require.NoError(t, err)
+			var datacenter sql.NullString
+			var cluster sql.NullString
+			require.NoError(t, db.QueryRow(`SELECT "Datacenter", "Cluster" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&datacenter, &cluster))
+			require.True(t, datacenter.Valid, "the host's parent chain must resolve its datacenter")
+			require.Equal(t, "dc1", datacenter.String)
+			if variant == "ComputeResource" {
+				require.Empty(t, cluster.String, "a standalone host must not expose its synthetic cluster")
+			} else {
+				require.Equal(t, "cluster1", cluster.String)
+			}
+		})
+	}
 }
 
 func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {

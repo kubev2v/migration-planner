@@ -66,22 +66,30 @@ func (vm VM) EffectiveGuestName() string {
 
 // Disk represents a virtual disk from the vdisk table.
 type Disk struct {
-	Key                   string `json:"key" db:"Disk Key"`
-	UnitNumber            int32  `json:"unitNumber" db:"Unit #"` // Changed to int32 for OPA
-	ControllerKey         int32  `json:"controllerKey"`          // Populated by scanner using ControllerTracker
-	File                  string `json:"file" db:"Path"`
-	Capacity              int64  `json:"capacity" db:"Capacity MiB"` // SQL returns bytes
-	Shared                bool   `json:"shared" db:"Sharing mode"`
-	RDM                   bool   `json:"rdm" db:"Raw"`
-	Bus                   string `json:"bus" db:"Shared Bus"` // Populated by scanner using ControllerTracker
-	Mode                  string `json:"mode,omitempty" db:"Disk Mode"`
-	Serial                string `json:"serial" db:"Disk UUID"`
-	Thin                  string `json:"thin" db:"Thin"`
-	Controller            string `json:"controller" db:"Controller"`
-	Label                 string `json:"label" db:"Label"`
-	SCSIUnit              string `json:"scsiUnit" db:"SCSI Unit #"`
-	Datastore             Ref    `json:"datastore"`             // Changed from string to Ref
-	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"` // Inherited from VM for OPA per-disk CBT check
+	Key                             string   `json:"key" db:"Disk Key"`
+	UnitNumber                      int32    `json:"unitNumber" db:"Unit #"` // Changed to int32 for OPA
+	ControllerKey                   int32    `json:"controllerKey"`          // Populated by scanner using ControllerTracker
+	File                            string   `json:"file" db:"Path"`
+	Capacity                        int64    `json:"capacity" db:"Capacity MiB"` // SQL returns bytes
+	Shared                          bool     `json:"shared" db:"Sharing mode"`
+	RDM                             bool     `json:"rdm" db:"Raw"`
+	Bus                             string   `json:"bus" db:"Shared Bus"` // Populated by scanner using ControllerTracker
+	Mode                            string   `json:"mode,omitempty" db:"Disk Mode"`
+	Serial                          string   `json:"serial" db:"Disk UUID"`
+	Thin                            string   `json:"thin" db:"Thin"`
+	Controller                      string   `json:"controller" db:"Controller"`
+	Label                           string   `json:"label" db:"Label"`
+	SCSIUnit                        string   `json:"scsiUnit" db:"SCSI Unit #"`
+	Datastore                       Ref      `json:"datastore"` // Changed from string to Ref
+	DatastoreName                   string   `json:"datastoreName,omitempty"`
+	DatastoreType                   string   `json:"datastoreType,omitempty"`
+	DatastoreFilesystemType         string   `json:"datastoreFilesystemType,omitempty"`
+	DatastoreFilesystemMajorVersion int32    `json:"datastoreFilesystemMajorVersion,omitempty"`
+	DatastoreStorageProtocol        string   `json:"datastoreStorageProtocol,omitempty"`
+	DatastoreBackingDeviceIDs       []string `json:"datastoreBackingDeviceIds,omitempty"`
+	DatastoreVendor                 string   `json:"datastoreVendor,omitempty"`
+	DatastoreModel                  string   `json:"datastoreModel,omitempty"`
+	ChangeTrackingEnabled           bool     `json:"changeTrackingEnabled"` // Inherited from VM for OPA per-disk CBT check
 }
 
 // NIC represents a network interface from the vnetwork table.
