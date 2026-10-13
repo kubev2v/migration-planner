@@ -154,6 +154,9 @@ type StorageIoConfiguration struct {
 // Datastore represents a VMware datastore.
 type Datastore struct {
 	DiskId                 string
+	BackingDeviceIDs       []string
+	FilesystemType         string
+	FilesystemMajorVersion int32
 	FreeCapacityGB         float64
 	TotalCapacityGB        float64
 	Type                   string

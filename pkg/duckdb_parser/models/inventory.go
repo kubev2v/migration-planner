@@ -2,20 +2,23 @@ package models
 
 // Datastore represents a VMware datastore.
 type Datastore struct {
-	Cluster                 string  `db:"cluster" json:"-"`
-	DiskId                  string  `db:"diskId" json:"diskId"`
-	FreeCapacityGB          float64 `db:"freeCapacityGB" json:"freeCapacityGB"`
-	HardwareAcceleratedMove bool    `db:"hardwareAcceleratedMove" json:"hardwareAcceleratedMove"`
-	HostId                  string  `db:"hostId" json:"hostId"`
-	Model                   string  `db:"model" json:"model"`
-	ProtocolType            string  `db:"protocolType" json:"protocolType"`
-	TotalCapacityGB         float64 `db:"totalCapacityGB" json:"totalCapacityGB"`
-	Type                    string  `db:"type" json:"type"`
-	Vendor                  string  `db:"vendor" json:"vendor"`
-	SiocEnabled             bool    `db:"siocEnabled" json:"siocEnabled"`
-	SiocThreshold           int     `db:"siocCongestionThreshold" json:"siocCongestionThreshold"`
-	SiocMode                string  `db:"siocCongestionThresholdMode" json:"siocCongestionThresholdMode"`
-	SiocPercent             int     `db:"siocPercentOfPeakThroughput" json:"siocPercentOfPeakThroughput"`
+	Cluster                 string           `db:"cluster" json:"-"`
+	BackingDeviceIDs        BackingDeviceIDs `db:"backingDeviceIds" json:"-"`
+	DiskId                  string           `db:"diskId" json:"diskId"`
+	FilesystemType          string           `db:"filesystemType" json:"filesystemType,omitempty"`
+	FilesystemMajorVersion  int32            `db:"filesystemMajorVersion" json:"filesystemMajorVersion,omitempty"`
+	FreeCapacityGB          float64          `db:"freeCapacityGB" json:"freeCapacityGB"`
+	HardwareAcceleratedMove bool             `db:"hardwareAcceleratedMove" json:"hardwareAcceleratedMove"`
+	HostId                  string           `db:"hostId" json:"hostId"`
+	Model                   string           `db:"model" json:"model"`
+	ProtocolType            string           `db:"protocolType" json:"protocolType"`
+	TotalCapacityGB         float64          `db:"totalCapacityGB" json:"totalCapacityGB"`
+	Type                    string           `db:"type" json:"type"`
+	Vendor                  string           `db:"vendor" json:"vendor"`
+	SiocEnabled             bool             `db:"siocEnabled" json:"siocEnabled"`
+	SiocThreshold           int              `db:"siocCongestionThreshold" json:"siocCongestionThreshold"`
+	SiocMode                string           `db:"siocCongestionThresholdMode" json:"siocCongestionThresholdMode"`
+	SiocPercent             int              `db:"siocPercentOfPeakThroughput" json:"siocPercentOfPeakThroughput"`
 }
 
 // Os represents an operating system summary.

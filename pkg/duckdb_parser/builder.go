@@ -74,6 +74,7 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 // queryParams holds all template parameters for queries.
 type queryParams struct {
 	MetadataTable           string
+	StorageTopology         string
 	NetworkColumns          string
 	ClusterFilter           string
 	OSFilter                string
@@ -97,10 +98,10 @@ func faultToleranceEnabledPredicate(tableAlias string) string {
 
 // VMQuery builds the VM query with filters and pagination.
 func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error) {
-	return b.vmQuery(filters, options, "vm_metadata")
+	return b.vmQuery(filters, options, "vm_metadata", storageTopologyQuery("vhba", "vhostscsi", false))
 }
 
-func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable string) (string, error) {
+func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, storageTopology string) (string, error) {
 	const maxNetworkNumbers = 8 // RVTools vInfo has Network #1 through Network #8
 	quoted := make([]string, 0, maxNetworkNumbers)
 	for i := 1; i <= maxNetworkNumbers; i++ {
@@ -110,6 +111,7 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable s
 
 	params := queryParams{
 		MetadataTable:           metadataTable,
+		StorageTopology:         storageTopology,
 		NetworkColumns:          networkColumns,
 		ClusterFilter:           escapeSQLString(filters.Cluster),
 		OSFilter:                escapeSQLString(filters.OS),
@@ -120,17 +122,22 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable s
 		Limit:                   options.Limit,
 		Offset:                  options.Offset,
 	}
-	return b.buildQuery("vm_query", mustGetTemplate("vm_query"), params)
+	return b.buildQuery("vm_query", mustGetTemplate("storage_backing")+mustGetTemplate("vm_query"), params)
 }
 
 // DatastoreQuery builds the datastore query with filters and pagination.
 func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string, error) {
+	return b.datastoreQuery(filters, options, storageTopologyQuery("vhba", "vhostscsi", false))
+}
+
+func (b *QueryBuilder) datastoreQuery(filters Filters, options Options, storageTopology string) (string, error) {
 	params := queryParams{
-		ClusterFilter: escapeSQLString(filters.Cluster),
-		Limit:         options.Limit,
-		Offset:        options.Offset,
+		StorageTopology: storageTopology,
+		ClusterFilter:   escapeSQLString(filters.Cluster),
+		Limit:           options.Limit,
+		Offset:          options.Offset,
 	}
-	return b.buildQuery("datastore_query", mustGetTemplate("datastore_query"), params)
+	return b.buildQuery("datastore_query", mustGetTemplate("storage_backing")+mustGetTemplate("datastore_query"), params)
 }
 
 // NetworkQuery builds the network query with filters and pagination.
@@ -267,8 +274,9 @@ func (b *QueryBuilder) DiskComplexityTierQuery(filters Filters) (string, error) 
 // DiskTypeSummaryQuery builds the disk type summary query.
 func (b *QueryBuilder) DiskTypeSummaryQuery(filters Filters) (string, error) {
 	params := queryParams{
-		ClusterFilter: escapeSQLString(filters.Cluster),
-		VMListFilter:  buildVMListFilter(filters.VMList, ""),
+		StorageTopology: DatastoreResolutionQuery(),
+		ClusterFilter:   escapeSQLString(filters.Cluster),
+		VMListFilter:    buildVMListFilter(filters.VMList, "i"),
 	}
 	return b.buildQuery("disk_type_summary_query", mustGetTemplate("disk_type_summary_query"), params)
 }

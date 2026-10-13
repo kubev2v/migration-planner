@@ -1,0 +1,29 @@
+{{define "datastore_backing_info"}}
+datastore_backing_info AS (
+    SELECT
+        d.datastore_row_id,
+        string_agg(
+            DISTINCT hba."Protocol", ', ' ORDER BY hba."Protocol"
+        ) FILTER (WHERE LOWER(TRIM(hba."Protocol")) != 'unknown') AS protocols,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Vendor"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Vendor"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Vendor"), '') IS NOT NULL) AS vendor,
+        string_agg(
+            DISTINCT NULLIF(TRIM(s."LUN Model"), ''), ', '
+            ORDER BY NULLIF(TRIM(s."LUN Model"), '')
+        ) FILTER (WHERE NULLIF(TRIM(s."LUN Model"), '') IS NOT NULL) AS model
+    FROM storage_datastores d
+    CROSS JOIN UNNEST(COALESCE(
+        TRY(from_json(NULLIF(d."Backing Devices", ''), '["VARCHAR"]')),
+        []::VARCHAR[]
+    )) AS backing(device)
+    LEFT JOIN storage_datastore_hosts member_host
+        ON member_host.datastore_row_id = d.datastore_row_id
+    LEFT JOIN storage_scsi s
+        ON LOWER(TRIM(s."Canonical Name")) = LOWER(TRIM(backing.device))
+        AND member_host.host_id = s."Host ID"
+    LEFT JOIN storage_hbas hba ON hba."Host ID" = s."Host ID" AND hba."Device" = s."HBA Device"
+    GROUP BY d.datastore_row_id
+)
+{{end}}

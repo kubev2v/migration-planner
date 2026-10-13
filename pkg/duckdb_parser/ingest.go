@@ -72,16 +72,22 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
+	validation, err := p.prepareIngestionValidation(ctx, "rvtools", excelFile)
+	if err != nil {
+		return ValidationResult{}, err
+	}
 	if err := p.executeStatements(ctx, query, args...); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
 	}
-
 	// Validate schema against vinfo_raw (unfiltered RVTools data) for granular error reporting
-	result := p.ValidateSchema(ctx, "vinfo_raw")
+	result, err := validation.Validate(ctx, "vinfo_raw")
 
 	// Drop vinfo_raw now that validation is complete
-	if err := p.dropVinfoRaw(ctx); err != nil {
-		return result, fmt.Errorf("dropping vinfo_raw: %w", err)
+	if dropErr := p.dropVinfoRaw(ctx); dropErr != nil {
+		return result, fmt.Errorf("dropping vinfo_raw: %w", dropErr)
+	}
+	if err != nil {
+		return result, err
 	}
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
@@ -109,12 +115,18 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result Va
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
 	}
+	validation, err := p.prepareIngestionValidation(ctx, "sqlite", sqliteFile)
+	if err != nil {
+		return ValidationResult{}, err
+	}
 	if err := p.executeStatements(ctx, query); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting sqlite data: %w", err)
 	}
-
 	// Validate schema against vinfo (SQLite inserts directly into vinfo, no vinfo_raw)
-	result = p.ValidateSchema(ctx, "vinfo")
+	result, err = validation.Validate(ctx, "vinfo")
+	if err != nil {
+		return result, err
+	}
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
@@ -164,7 +176,7 @@ func (p *Parser) executeStatements(ctx context.Context, query string, args ...an
 			if isCriticalStatement(stmt) {
 				return translateXLSXError(err)
 			}
-			// Non-critical failures are logged but don't stop execution
+			// Non-critical failures are logged but don't stop execution.
 			zap.S().Debugw("non-critical statement failed", "error", err)
 		}
 	}

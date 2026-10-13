@@ -555,16 +555,26 @@ func TestMetadataPersistenceFailure(t *testing.T) {
 	require.Zero(t, count, "failed metadata persistence must stop later statements")
 }
 
-func TestMetadataCleanup(t *testing.T) {
+func TestParserCleanup(t *testing.T) {
 	p, _, cleanup := setupTestParser(t, nil)
 	defer cleanup()
 	ctx := context.Background()
 	_, err := p.db.ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'vm');
-        INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm1', 'Owner', 'Alice')`)
+        INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm1', 'Owner', 'Alice');
+        INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Vendor", "LUN Model")
+        VALUES ('host-1', 'naa.shared', 'OLD', 'old-model')`)
 	require.NoError(t, err)
 	require.NoError(t, p.Cleanup())
 	require.Empty(t, storedMetadata(t, p.db, "vm1"))
 	vms, err := p.VMs(ctx, Filters{}, Options{})
 	require.NoError(t, err)
 	require.Empty(t, vms)
+	_, err = p.db.ExecContext(ctx, `INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
+        INSERT INTO vdatastore ("Name", "Hosts", "Backing Devices") VALUES ('new-datastore', 'esxi1', '["naa.shared"]')`)
+	require.NoError(t, err)
+	datastores, err := p.Datastores(ctx, Filters{}, Options{})
+	require.NoError(t, err)
+	require.Len(t, datastores, 1)
+	require.Equal(t, "N/A", datastores[0].Vendor, "previous LUN metadata must not survive parser reuse")
+	require.Equal(t, "N/A", datastores[0].Model)
 }

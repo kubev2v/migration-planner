@@ -14,7 +14,9 @@ Template Parameters:
   - Limit: max results (0 = unlimited)
   - Offset: skip first N results
 */ -}}
-WITH disks AS (
+WITH {{.StorageTopology}},
+{{template "datastore_backing_info" .}},
+disks AS (
     SELECT
         dk."VM ID",
         LIST({
@@ -24,6 +26,8 @@ WITH disks AS (
             'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
+            -- Row JSON keeps older read-only collections without this column queryable.
+            'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
             'Bus': dk."Shared Bus",
             'Mode': dk."Disk Mode",
             'Serial': dk."Disk UUID",
@@ -31,10 +35,24 @@ WITH disks AS (
             'Controller': dk."Controller",
             'Label': dk."Label",
             'SCSIUnit': dk."SCSI Unit #",
-            'Datastore': COALESCE(ds."Object ID", '')
+            'Datastore': COALESCE(ds."Object ID", ''),
+            'DatastoreName': COALESCE(ds."Name", ''),
+            'DatastoreType': COALESCE(ds."Type", ''),
+            'DatastoreFilesystemType': COALESCE(to_json(ds)->>'Filesystem Type', ''),
+            'DatastoreFilesystemMajorVersion': COALESCE(TRY_CAST(to_json(ds)->>'Filesystem Major Version' AS INTEGER), 0),
+            'DatastoreStorageProtocol': COALESCE(NULLIF(backing.protocols, ''), to_json(ds)->>'Storage Protocol', ''),
+            'DatastoreBackingDeviceIDs': COALESCE(
+                TRY(from_json(NULLIF(ds."Backing Devices", ''), '["VARCHAR"]')),
+                []::VARCHAR[]
+            ),
+            'DatastoreVendor': COALESCE(backing.vendor, ''),
+            'DatastoreModel': COALESCE(backing.model, '')
         }) AS disks
     FROM vdisk dk
-    LEFT JOIN vdatastore ds ON ds."Name" = regexp_extract(COALESCE(dk."Path", dk."Disk Path"), '\[([^\]]+)\]', 1)
+    LEFT JOIN storage_disk_datastores resolved
+        ON resolved."VM ID" = dk."VM ID" AND resolved.disk_row_id = dk.rowid
+    LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
+    LEFT JOIN datastore_backing_info backing ON backing.datastore_row_id = ds.datastore_row_id
     GROUP BY dk."VM ID"
 ),
 nics AS (
