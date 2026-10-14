@@ -13,6 +13,7 @@ import (
 // InventoryToAPI converts the domain Inventory to the API Inventory.
 func InventoryToAPI(inv svcmodel.Inventory) api.Inventory {
 	result := api.Inventory{
+		CollectionTime: inv.CollectionTime,
 		CreatedAt:      inv.CreatedAt,
 		VcenterId:      inv.VcenterId,
 		VcenterVersion: inv.VcenterVersion,

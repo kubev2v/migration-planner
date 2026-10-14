@@ -95,6 +95,14 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		clusterInventories[clusterID] = *clusterInv
 	}
 
+	collectionTime, err := p.CollectionTime(ctx)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		zap.S().Named("duckdb_parser").Warnf("Failed to get collection time: %v", err)
+	}
+
 	now := time.Now().UTC()
 	return &inventory.Inventory{
 		VCenterID:      vcenterID,
@@ -102,6 +110,7 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		Clusters:       clusterInventories,
 		VCenterVersion: vcenterVersion,
 		CreatedAt:      &now,
+		CollectionTime: collectionTime,
 	}, nil
 }
 

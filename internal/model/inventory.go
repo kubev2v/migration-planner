@@ -25,6 +25,7 @@ const (
 // Inventory is the top-level structured inventory for an assessment.
 type Inventory struct {
 	Clusters       map[string]InventoryData `json:"clusters"`
+	CollectionTime *time.Time               `json:"collection_time"`
 	CreatedAt      *time.Time               `json:"created_at,omitempty"`
 	Vcenter        *InventoryData           `json:"vcenter,omitempty"`
 	VcenterId      string                   `json:"vcenter_id"`

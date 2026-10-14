@@ -1,13 +1,18 @@
 package duckdb_parser
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +21,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // testValidator returns no concerns for all VMs.
@@ -2452,4 +2458,286 @@ func TestBuildInventory_VMotionSupport_DefaultWhenMissing(t *testing.T) {
 	assert.False(t, *host.VMotionSupported, "should default to false when column missing")
 	require.NotNil(t, host.StorageVMotionSupported, "should not be nil when column missing")
 	assert.False(t, *host.StorageVMotionSupported, "should default to false when column missing")
+}
+
+func TestIngestRvTools_CollectionTime(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		sheet      string
+		header     string
+		values     []any
+		styled     bool
+		emptyIndex bool
+		want       *time.Time
+	}{
+		{name: "Excel date", sheet: "vMetaData", values: []any{46285.4375}, want: &want},
+		{name: "fractional Excel date", sheet: "vMetaData", values: []any{46285.437500001}, want: &want},
+		{name: "styled Excel date", sheet: "vMetaData", values: []any{46285.4375}, styled: true, want: &want},
+		{name: "RVTools text date", sheet: "vMetaData", values: []any{"2026/09/20 10:30:00"}, want: &want},
+		{name: "unsupported dashed text", sheet: "vMetaData", values: []any{"2026-09-20 10:30:00"}},
+		{name: "unsupported timezone offset", sheet: "vMetaData", values: []any{"2026-09-20T13:30:00+03:00"}},
+		{name: "case insensitive header", sheet: "vMetaData", header: "XLSX creation datetime", values: []any{46285.4375}, want: &want},
+		{name: "missing sheet"},
+		{name: "missing header", sheet: "vMetaData", header: "Other metadata", values: []any{"4.7"}},
+		{name: "empty cell", sheet: "vMetaData", values: []any{nil}},
+		{name: "empty string", sheet: "vMetaData", values: []any{""}},
+		{name: "VM placeholder", sheet: "vMetaData", values: []any{"VM"}},
+		{name: "padded lowercase placeholder", sheet: "vMetaData", values: []any{" vm "}},
+		{name: "empty shared-string index", sheet: "vMetaData", values: []any{"placeholder"}, emptyIndex: true},
+		{name: "empty shared-string index before date", sheet: "vMetaData", values: []any{"placeholder", 46285.4375}, emptyIndex: true, want: &want},
+		{name: "empty row before date", sheet: "vMetaData", values: []any{nil, 46285.4375}, want: &want},
+		{name: "VM placeholder before date", sheet: "vMetaData", values: []any{"VM", 46285.4375}, want: &want},
+		{name: "bad date", sheet: "vMetaData", values: []any{"not a date"}},
+		{name: "ambiguous locale", sheet: "vMetaData", values: []any{"09/10/2026 10:30:00"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make "VM" the first shared string, reproducing the XLSX reader's
+			// empty-cell placeholder when a shared-string index is missing.
+			filePath := createTestExcel(t, NewExcelSheet("vInfo",
+				[]string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+				[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}}))
+			f, err := excelize.OpenFile(filePath)
+			require.NoError(t, err)
+			defer func() { _ = f.Close() }()
+			if tt.sheet != "" {
+				_, err := f.NewSheet(tt.sheet)
+				require.NoError(t, err)
+				header := tt.header
+				if header == "" {
+					header = "xlsx creation datetime"
+				}
+				require.NoError(t, f.SetCellValue(tt.sheet, "A1", header))
+				require.NoError(t, f.SetCellValue(tt.sheet, "B1", "RVTools version"))
+				for i, value := range tt.values {
+					cell := fmt.Sprintf("A%d", i+2)
+					if value != nil {
+						require.NoError(t, f.SetCellValue(tt.sheet, cell, value))
+					}
+					require.NoError(t, f.SetCellValue(tt.sheet, fmt.Sprintf("B%d", i+2), "4.8"))
+					if tt.styled {
+						style, err := f.NewStyle(&excelize.Style{NumFmt: 22})
+						require.NoError(t, err)
+						require.NoError(t, f.SetCellStyle(tt.sheet, cell, cell, style))
+					}
+				}
+			}
+			require.NoError(t, f.Save())
+			if tt.emptyIndex {
+				for id, name := range f.GetSheetMap() {
+					if name == tt.sheet {
+						clearSharedStringIndex(t, filePath, fmt.Sprintf("xl/worksheets/sheet%d.xml", id))
+					}
+				}
+			}
+
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			// Collection time must not depend on the database session timezone.
+			_, err = db.Exec("SET TimeZone = 'America/New_York'")
+			require.NoError(t, err)
+			result, err := parser.IngestRvTools(context.Background(), filePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "Metadata must not reject valid inventory: %v", result.Errors)
+			collectionTime, err := parser.CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, collectionTime)
+			if tt.emptyIndex {
+				var rawValue string
+				require.NoError(t, db.QueryRow(`SELECT "xlsx creation datetime" FROM read_xlsx(?, sheet='vMetaData', header=true, all_varchar=true)`, filePath).Scan(&rawValue))
+				require.Equal(t, "VM", rawValue, "The fixture must reproduce DuckDB's empty-cell placeholder")
+			}
+			// The same parser builds the inventory after the uploaded file is removed.
+			require.NoError(t, os.Remove(filePath))
+			inv, err := parser.BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.Equal(t, 1, inv.VCenter.VMs.Total)
+			require.Equal(t, tt.want, inv.CollectionTime)
+			require.Equal(t, "uuid-1", inv.VCenterID)
+			collectionTime, err = parser.CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, collectionTime)
+		})
+	}
+}
+
+func TestCollectionTime(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	later := want.Add(time.Hour)
+	for _, tt := range []struct {
+		name  string
+		dates []*time.Time
+		want  *time.Time
+	}{
+		{name: "no sources"},
+		{name: "one known date", dates: []*time.Time{&want}, want: &want},
+		{name: "same dates across sources", dates: []*time.Time{&want, &want}, want: &want},
+		{name: "different dates across sources", dates: []*time.Time{&want, &later}, want: &want},
+		{name: "oldest date last", dates: []*time.Time{&later, &want}, want: &want},
+		{name: "unknown date", dates: []*time.Time{nil}},
+		{name: "all dates unknown", dates: []*time.Time{nil, nil}},
+		{name: "known and unknown dates", dates: []*time.Time{&want, nil}, want: &want},
+		{name: "unknown date first", dates: []*time.Time{nil, &want}, want: &want},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			for _, date := range tt.dates {
+				_, err := db.Exec(`INSERT INTO about ("CollectionTime") VALUES (?)`, date)
+				require.NoError(t, err)
+			}
+			got, err := New(db, nil).CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+	t.Run("older collection database", func(t *testing.T) {
+		_, db, cleanup := setupTestParser(t, nil)
+		defer cleanup()
+		_, err := db.Exec(`ALTER TABLE about DROP COLUMN "CollectionTime"`)
+		require.NoError(t, err)
+		inv, err := New(db, nil).BuildInventory(context.Background(), nil)
+		require.NoError(t, err)
+		require.Nil(t, inv.CollectionTime)
+	})
+	t.Run("context cancellation is returned", func(t *testing.T) {
+		parser, _, cleanup := setupTestParser(t, nil)
+		defer cleanup()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := parser.CollectionTime(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestCollectionTime_PersistsAfterReopening(t *testing.T) {
+	filePath := createTestExcel(t,
+		NewExcelSheet("vInfo", []string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+			[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}}),
+		NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+			[]map[string]string{{"xlsx creation datetime": "46285.4375"}}))
+	databasePath := filepath.Join(t.TempDir(), "collection.duckdb")
+	db, err := sql.Open("duckdb", databasePath)
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	parser := New(db, nil)
+	require.NoError(t, parser.Init())
+	result, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+	require.NoError(t, os.Remove(filePath))
+	require.NoError(t, db.Close())
+
+	reopened, err := sql.Open("duckdb", databasePath)
+	require.NoError(t, err)
+	defer func() { _ = reopened.Close() }()
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	for _, vmIDs := range [][]string{nil, {"vm-001"}} {
+		inv, err := New(reopened, nil).BuildInventory(context.Background(), vmIDs)
+		require.NoError(t, err)
+		require.Equal(t, &want, inv.CollectionTime)
+	}
+}
+
+func TestIngestRvTools_CollectionTimeAcrossConnections(t *testing.T) {
+	filePath := createTestExcel(t,
+		NewExcelSheet("vInfo", []string{"VM", "VM ID", "Cluster", "VI SDK UUID", "Annotation", "Owner", "Datacenter"},
+			[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1", "Owner": "Finance", "Datacenter": "dc1"}}),
+		NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+			[]map[string]string{{"xlsx creation datetime": "46285.4375"}}))
+	db, err := sql.Open("duckdb", filepath.Join(t.TempDir(), "collection.duckdb"))
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	// Close each connection after use so ingestion cannot rely on session state.
+	db.SetMaxIdleConns(0)
+	parser := New(store.NewQueryInterceptor(db), nil)
+	require.NoError(t, parser.Init())
+	result, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+	inv, err := parser.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	require.Equal(t, &want, inv.CollectionTime)
+	require.Equal(t, "uuid-1", inv.VCenterID)
+	require.Equal(t, map[string][]string{"Owner": {"Finance"}}, storedMetadata(t, parser.db, "vm-001"))
+}
+
+func TestIngestRvTools_CollectionTimeAcrossFiles(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	earlier := want.Add(-24 * time.Hour)
+	for _, tt := range []struct {
+		name       string
+		secondDate string
+		want       *time.Time
+	}{
+		{name: "same date", secondDate: "46285.4375", want: &want},
+		{name: "later date", secondDate: "46286.4375", want: &want},
+		{name: "earlier date", secondDate: "46284.4375", want: &earlier},
+		{name: "missing date", want: &want},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			for _, date := range []string{"46285.4375", tt.secondDate} {
+				sheets := []ExcelSheet{NewExcelSheet("vInfo",
+					[]string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+					[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}})}
+				if date != "" {
+					sheets = append(sheets, NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+						[]map[string]string{{"xlsx creation datetime": date}}))
+				}
+				result, err := parser.IngestRvTools(context.Background(), createTestExcel(t, sheets...))
+				require.NoError(t, err)
+				require.True(t, result.IsValid())
+			}
+			var aboutRows, datedRows int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*), COUNT("CollectionTime") FROM about`).Scan(&aboutRows, &datedRows))
+			require.Equal(t, 2, aboutRows, "Each file adds its source metadata, even with the same vCenter UUID")
+			if tt.secondDate == "" {
+				require.Equal(t, 1, datedRows, "Missing metadata must not inherit the preceding file's date")
+			} else {
+				require.Equal(t, 2, datedRows)
+			}
+			var stagingTables int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'about_raw'`).Scan(&stagingTables))
+			require.Zero(t, stagingTables)
+			inv, err := New(db, nil).BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, inv.CollectionTime)
+		})
+	}
+}
+
+// clearSharedStringIndex creates the empty shared-string cell that DuckDB
+// misreads as shared string zero ("VM"), instead of only testing a literal "VM".
+func clearSharedStringIndex(t *testing.T, filePath, sheetPath string) {
+	t.Helper()
+	f, err := zip.OpenReader(filePath)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	changed := false
+	for _, entry := range f.File {
+		r, err := entry.Open()
+		require.NoError(t, err)
+		content, err := io.ReadAll(r)
+		require.NoError(t, err)
+		require.NoError(t, r.Close())
+		if entry.Name == sheetPath {
+			pattern := regexp.MustCompile(`<c r="A2"[^>]*>.*?</c>`)
+			require.True(t, pattern.Match(content))
+			content = pattern.ReplaceAll(content, []byte(`<c r="A2" t="s"><v></v></c>`))
+			changed = true
+		}
+		dest, err := w.Create(entry.Name)
+		require.NoError(t, err)
+		_, err = dest.Write(content)
+		require.NoError(t, err)
+	}
+	require.True(t, changed)
+	require.NoError(t, w.Close())
+	require.NoError(t, f.Close())
+	require.NoError(t, os.WriteFile(filePath, buf.Bytes(), 0600))
 }

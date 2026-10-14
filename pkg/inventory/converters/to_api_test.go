@@ -1,6 +1,7 @@
 package converters
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -1022,3 +1023,26 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 func timePtr(t time.Time) *time.Time { return &t }
 
 func floatPtr(v float64) *float64 { return &v }
+
+func TestToAPI_CollectionTime(t *testing.T) {
+	collectionTime := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	createdAt := collectionTime.Add(24 * time.Hour)
+	for _, value := range []*time.Time{nil, &collectionTime} {
+		converted := ToAPI(&inventory.Inventory{CreatedAt: &createdAt, CollectionTime: value})
+		data, err := json.Marshal(converted)
+		require.NoError(t, err)
+		var fields map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(data, &fields))
+		require.Contains(t, fields, "collection_time")
+		if value == nil {
+			require.JSONEq(t, "null", string(fields["collection_time"]))
+		}
+		var roundTrip api.Inventory
+		require.NoError(t, json.Unmarshal(data, &roundTrip))
+		require.Equal(t, value, roundTrip.CollectionTime)
+		require.Equal(t, &createdAt, roundTrip.CreatedAt)
+	}
+	var older api.Inventory
+	require.NoError(t, json.Unmarshal([]byte(`{"vcenter_id":"vc-1","clusters":{}}`), &older))
+	require.Nil(t, older.CollectionTime)
+}

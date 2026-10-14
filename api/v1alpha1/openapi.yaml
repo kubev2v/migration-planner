@@ -2771,7 +2771,13 @@ components:
         created_at:
           type: string
           format: date-time
-          description: Timestamp when the inventory data was created or collected
+          description: Timestamp when the inventory document was built
+        collection_time:
+          type: string
+          format: date-time
+          nullable: true
+          x-omitempty: false
+          description: Oldest known source collection time. Agent data uses collection database creation time; RVTools uses export metadata, assuming UTC when no timezone is specified. Null when unknown.
 
     InventoryV2:
       type: object
@@ -2787,6 +2793,12 @@ components:
           type: string
           format: date-time
           description: Timestamp when the inventory data was created or collected
+        collection_time:
+          type: string
+          format: date-time
+          nullable: true
+          x-omitempty: false
+          description: Oldest known source collection time. Null when unknown.
       required:
         - id
         - data

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/go-viper/mapstructure/v2"
@@ -718,4 +719,21 @@ func metadataTable(ctx context.Context, db store.QueryInterceptor) (string, erro
 		return "(SELECT NULL::VARCHAR AS vm_id, NULL::VARCHAR AS key, NULL::VARCHAR AS value WHERE false)", nil
 	}
 	return "vm_metadata", nil
+}
+
+// CollectionTime reads the oldest known source date from the collected data.
+func (p *Parser) CollectionTime(ctx context.Context) (*time.Time, error) {
+	query, err := p.builder.CollectionTimeQuery()
+	if err != nil {
+		return nil, fmt.Errorf("building collection time query: %w", err)
+	}
+	var collectedAt sql.NullTime
+	if err := p.db.QueryRowContext(ctx, query).Scan(&collectedAt); err != nil {
+		return nil, fmt.Errorf("reading collection time: %w", err)
+	}
+	if !collectedAt.Valid {
+		return nil, nil
+	}
+	utc := collectedAt.Time.UTC()
+	return &utc, nil
 }

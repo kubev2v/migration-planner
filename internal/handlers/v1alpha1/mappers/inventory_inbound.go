@@ -8,6 +8,7 @@ import (
 // InventoryFromAPI converts an API inventory to the structured service model.
 func InventoryFromAPI(inv api.Inventory) svcmodel.Inventory {
 	result := svcmodel.Inventory{
+		CollectionTime: inv.CollectionTime,
 		CreatedAt:      inv.CreatedAt,
 		VcenterId:      inv.VcenterId,
 		VcenterVersion: inv.VcenterVersion,
