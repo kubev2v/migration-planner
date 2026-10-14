@@ -10,7 +10,8 @@ Strategy:
   - TRY_CAST returns NULL if conversion fails (e.g., "VM" placeholder)
 */ -}}
 INSTALL excel;
-LOAD excel; 
+LOAD excel;
+
 CREATE TABLE vinfo_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', header=true, all_varchar=true);
 
@@ -138,11 +139,35 @@ WHERE source."VM" IS NOT NULL AND source."VM" != ''
 ON CONFLICT DO NOTHING;
 {{end}}
 
-INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
-SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
-FROM vinfo_raw
+-- Stage source metadata so an absent vMetaData sheet does not lose vCenter details.
+CREATE TABLE about_raw AS
+SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID",
+    NULL::TIMESTAMP AS "CollectionTime"
+FROM vinfo_raw;
+
+-- Excel export dates have no timezone; assume UTC.
+UPDATE about_raw SET "CollectionTime" = (
+    SELECT TRY_STRPTIME(
+        COALESCE(
+            TRY(excel_text(
+                TRY_CAST(TRIM("xlsx creation datetime") AS DOUBLE),
+                'yyyy/mm/dd hh:mm:ss'
+            )),
+            TRIM("xlsx creation datetime")
+        ),
+        '%Y/%m/%d %H:%M:%S'
+    )
+    FROM read_xlsx('{{.FilePath}}', sheet='vMetaData', header=true, all_varchar=true)
+    WHERE LOWER(TRIM("xlsx creation datetime")) NOT IN ('', 'vm')
+);
+
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid", "CollectionTime")
+SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID", "CollectionTime"
+FROM about_raw
 WHERE "VI SDK UUID" IS NOT NULL
 ORDER BY "VI SDK API Version" IS NOT NULL DESC;
+
+DROP TABLE about_raw;
 
 WITH cleaned_networks AS (
     SELECT

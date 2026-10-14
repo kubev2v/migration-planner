@@ -61,6 +61,11 @@ func (b *QueryBuilder) IngestRvtoolsQuery(filePath string, hasMetadata bool) (st
 	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), params)
 }
 
+// CollectionTimeQuery returns the oldest known source date.
+func (b *QueryBuilder) CollectionTimeQuery() (string, error) {
+	return b.buildQuery("collection_time_query", mustGetTemplate("collection_time_query"), nil)
+}
+
 // IngestSqliteQuery returns a query that creates RVTools-shaped tables from a forklift SQLite database.
 func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"), ingestParams{FilePath: filePath})
