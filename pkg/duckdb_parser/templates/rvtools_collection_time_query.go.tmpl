@@ -1,0 +1,13 @@
+-- Excel export dates have no timezone; assume UTC.
+WITH dates AS (
+    SELECT COALESCE(
+        TRY(TO_TIMESTAMP(ROUND((TRY_CAST(TRIM("xlsx creation datetime") AS DOUBLE) - 25569) * 86400))) AT TIME ZONE 'UTC',
+        TRY_STRPTIME(TRIM("xlsx creation datetime"), '%Y/%m/%d %H:%M:%S')
+    ) AS collection_time
+    FROM vmetadata_raw
+    WHERE LOWER(TRIM("xlsx creation datetime")) NOT IN ('', 'vm')
+)
+SELECT MIN(collection_time) AS collection_time,
+       COUNT(DISTINCT collection_time) AS distinct_dates,
+       COUNT(*) FILTER (WHERE collection_time IS NULL) AS invalid_dates
+FROM dates;

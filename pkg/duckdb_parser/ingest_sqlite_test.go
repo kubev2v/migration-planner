@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
@@ -672,4 +673,26 @@ func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {
 
 	assert.True(t, siocEnabled, "SIOC Enabled should be true")
 	assert.Equal(t, 50, congestionThreshold, "SIOC Congestion Threshold should be 50, not the default 30")
+}
+
+func TestIngestSqlite_CollectionTime(t *testing.T) {
+	ctx := context.Background()
+	first := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	for _, createdAt := range []time.Time{first, first.Add(24 * time.Hour)} {
+		parser, _, cleanup := setupTestParser(t, nil)
+		t.Cleanup(cleanup)
+		sqlitePath := createTestSQLite(t, "vc-1",
+			[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+			[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}})
+		result, err := parser.IngestSqlite(ctx, sqlitePath)
+		require.NoError(t, err)
+		require.True(t, result.IsValid())
+		require.NoError(t, parser.SetCollectionTime(ctx, &createdAt))
+		for _, vmIDs := range [][]string{nil, {"vm-1"}} {
+			inv, err := parser.BuildInventory(ctx, vmIDs)
+			require.NoError(t, err)
+			require.Equal(t, &createdAt, inv.CollectionTime)
+			require.True(t, inv.CreatedAt.After(createdAt))
+		}
+	}
 }

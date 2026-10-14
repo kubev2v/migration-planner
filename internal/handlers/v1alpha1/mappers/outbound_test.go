@@ -150,3 +150,33 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 
 	})
 })
+
+var _ = Describe("Inventory collection time", func() {
+	It("preserves source, subset, and assessment collection times in API responses", func() {
+		raw := []byte(`{"vcenter_id":"vc-1","clusters":{},"collection_time":"2026-09-20T10:30:00Z"}`)
+		want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+		source, err := mappers.SourceToApi(model.Source{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(source.Inventory.CollectionTime).To(Equal(&want))
+		subset, err := mappers.SourceInventoryToApi(model.SourceSubsetInventory{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
+		main, err := model.NewAssessmentInventory(uuid.New(), "main", raw)
+		Expect(err).NotTo(HaveOccurred())
+		group, err := model.NewAssessmentInventory(uuid.New(), "group", raw)
+		Expect(err).NotTo(HaveOccurred())
+		group.IsSubset = true
+		createdAt := want.Add(24 * time.Hour)
+		assessment, err := mappers.AssessmentToApi(model.Assessment{
+			CreatedAt:   createdAt,
+			Inventories: []model.AssessmentInventory{main, group},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(assessment.CreatedAt).To(Equal(createdAt))
+		Expect(assessment.Snapshots).To(HaveLen(1))
+		snapshot := assessment.Snapshots[0]
+		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
+		Expect(snapshot.SubsetInventories).NotTo(BeNil())
+		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+	})
+})
