@@ -165,6 +165,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		raw        model2.Inventory
 		created    time.Time
 		apiVersion string
+		collection *time.Time
 	}{
 		{
 			id:      1,
@@ -174,6 +175,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 				VcenterId:      "vcenter-id",
 				VcenterVersion: &vcenterVersion,
 				CreatedAt:      &collectedAt,
+				CollectionTime: &collectedAt,
 				Vcenter: &model2.InventoryData{
 					Vms: model2.VMs{
 						Total: 5,
@@ -189,6 +191,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			},
 			created:    collectedAt,
 			apiVersion: "8.0.3.0",
+			collection: &collectedAt,
 		},
 		{
 			id:      2,
@@ -230,6 +233,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			var result api.InventoryV2
 			Expect(json.Unmarshal(raw, &result)).To(Succeed())
 			Expect(result.CreatedAt).To(HaveValue(BeTemporally("==", tc.created)))
+			Expect(result.CollectionTime).To(Equal(tc.collection))
 			Expect(result.Data.Vms.Total).To(Equal(5))
 			if tc.apiVersion != "" {
 				Expect(result.VcenterVersion).To(HaveValue(Equal(tc.apiVersion)))
@@ -245,4 +249,49 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			}
 		})
 	}
+})
+
+var _ = Describe("Inventory collection time", func() {
+	It("preserves source, subset, and assessment collection times in API responses", func() {
+		raw := []byte(`{"vcenter_id":"vc-1","clusters":{},"collection_time":"2026-09-20T10:30:00Z"}`)
+		want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+		var input api.Inventory
+		Expect(json.Unmarshal(raw, &input)).To(Succeed())
+		domain := mappers.InventoryFromAPI(input)
+		Expect(domain.CollectionTime).To(Equal(&want))
+		Expect(mappers.InventoryToAPI(domain).CollectionTime).To(Equal(&want))
+		source, err := mappers.SourceToApi(model.Source{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(source.Inventory.CollectionTime).To(Equal(&want))
+		subset, err := mappers.SourceInventoryToApi(model.SourceSubsetInventory{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
+		assessmentID := uuid.New()
+		main, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "main", false, raw)
+		Expect(err).NotTo(HaveOccurred())
+		group, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "group", true, raw)
+		Expect(err).NotTo(HaveOccurred())
+		createdAt := want.Add(24 * time.Hour)
+		assessment, err := mappers.StoreAssessmentToApi(model.Assessment{
+			CreatedAt:   createdAt,
+			Inventories: []model.AssessmentInventory{main, group},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(assessment.CreatedAt).To(Equal(createdAt))
+		Expect(assessment.Snapshots).To(HaveLen(1))
+		snapshot := assessment.Snapshots[0]
+		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
+		Expect(snapshot.SubsetInventories).NotTo(BeNil())
+		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+		assessment, err = mappers.AssessmentToApi(model2.Assessment{
+			MainInventory:     model2.AssessmentInventory{Inventory: domain},
+			SubsetInventories: []model2.AssessmentInventory{{Inventory: domain}},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(assessment.Snapshots).To(HaveLen(1))
+		snapshot = assessment.Snapshots[0]
+		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
+		Expect(snapshot.SubsetInventories).NotTo(BeNil())
+		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+	})
 })

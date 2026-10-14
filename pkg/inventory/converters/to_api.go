@@ -20,6 +20,7 @@ func ToAPI(inv *inventory.Inventory) *api.Inventory {
 		Clusters:       clusters,
 		VcenterVersion: &inv.VCenterVersion,
 		CreatedAt:      inv.CreatedAt,
+		CollectionTime: inv.CollectionTime,
 	}
 	if inv.VCenter != nil {
 		vcenter := toAPIInventoryData(inv.VCenter)

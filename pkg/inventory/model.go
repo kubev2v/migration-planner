@@ -10,6 +10,7 @@ type Inventory struct {
 	Clusters       map[string]InventoryData
 	VCenterVersion string
 	CreatedAt      *time.Time
+	CollectionTime *time.Time
 }
 
 // InventoryData contains VM and infrastructure data for a scope (vCenter or cluster).

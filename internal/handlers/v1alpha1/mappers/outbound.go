@@ -524,6 +524,7 @@ func AssessmentInventoryToAPI(inv model2.AssessmentInventory) (api.InventoryV2, 
 	}
 
 	result.VcenterVersion = inventory.VcenterVersion
+	result.CollectionTime = inventory.CollectionTime
 
 	if inventory.Vcenter != nil {
 		result.Data = *inventory.Vcenter
@@ -563,6 +564,7 @@ func StoreAssessmentInventoryToAPI(inv model.AssessmentInventory) (api.Inventory
 		result.CreatedAt = inventory.CreatedAt
 	}
 	result.VcenterVersion = inventory.VcenterVersion
+	result.CollectionTime = inventory.CollectionTime
 	if inventory.Vcenter != nil {
 		result.Data = *inventory.Vcenter
 	}

@@ -890,7 +890,10 @@ type Inventory struct {
 	// Clusters Map of cluster names to their inventory data
 	Clusters map[string]InventoryData `json:"clusters"`
 
-	// CreatedAt Timestamp when the inventory data was created or collected
+	// CollectionTime Oldest known source collection time. Agent data uses collection database creation time; RVTools uses export metadata, assuming UTC when no timezone is specified. Null when unknown.
+	CollectionTime *time.Time `json:"collection_time"`
+
+	// CreatedAt Timestamp when the inventory document was built
 	CreatedAt *time.Time     `json:"created_at,omitempty"`
 	Vcenter   *InventoryData `json:"vcenter,omitempty"`
 
@@ -924,6 +927,9 @@ type InventoryTotals struct {
 
 // InventoryV2 defines model for InventoryV2.
 type InventoryV2 struct {
+	// CollectionTime Oldest known source collection time. Null when unknown.
+	CollectionTime *time.Time `json:"collection_time"`
+
 	// CreatedAt Timestamp when the inventory data was created or collected
 	CreatedAt *time.Time    `json:"created_at,omitempty"`
 	Data      InventoryData `json:"data"`
