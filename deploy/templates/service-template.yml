@@ -145,6 +145,22 @@ parameters:
     value: docker.io/envoyproxy/envoy:v1.33.2
   - name: RHCOS_PASSWORD
     description: "Password to be set for the default RHCOS user"
+  # Appliance Image Config values
+  - name: APPLIANCE_IMAGE
+    description: Container registry and image name for the appliance (without tag)
+    value: quay.io/redhat-user-workloads/assisted-migration-tenant/oma-appliance
+  - name: APPLIANCE_IMAGE_TAG
+    description: Tag for the appliance container image (use commit SHA for immutability, or 'latest' for dev)
+    value: latest
+  - name: APPLIANCE_IMAGE_CACHE_PATH
+    description: Path where the appliance image cache is stored
+    value: /tmp/appliance-image-cache
+  - name: APPLIANCE_IMAGE_REFRESH_INTERVAL
+    description: How often to refresh the cached appliance image (e.g., 1h, 6h, 24h)
+    value: "6h"
+  - name: APPLIANCE_IMAGE_TLS_VERIFY
+    description: Enable TLS verification when pulling appliance images
+    value: "true"
   # Sizer Service Config values
   - name: SIZER_IMAGE
     description: Sizer service container image
@@ -699,8 +715,9 @@ objects:
                   port: 13443
                 initialDelaySeconds: 30
               readinessProbe:
-                tcpSocket:
-                  port: 17443
+                httpGet:
+                  path: /health
+                  port: 21443
                 initialDelaySeconds: 30
               env:
                 - name: CONFIG_SERVER
@@ -736,6 +753,17 @@ objects:
                   value: ${MIGRATION_PLANNER_LOG_LEVEL}
                 - name: RHCOS_PASSWORD
                   value: "${RHCOS_PASSWORD}"
+                # Appliance Image Config values
+                - name: APPLIANCE_IMAGE
+                  value: ${APPLIANCE_IMAGE}
+                - name: APPLIANCE_IMAGE_TAG
+                  value: ${APPLIANCE_IMAGE_TAG}
+                - name: APPLIANCE_IMAGE_CACHE_PATH
+                  value: ${APPLIANCE_IMAGE_CACHE_PATH}
+                - name: APPLIANCE_IMAGE_REFRESH_INTERVAL
+                  value: ${APPLIANCE_IMAGE_REFRESH_INTERVAL}
+                - name: APPLIANCE_IMAGE_TLS_VERIFY
+                  value: "${APPLIANCE_IMAGE_TLS_VERIFY}"
                 # Auth Config values
                 - name: MIGRATION_PLANNER_AUTH
                   value: ${MIGRATION_PLANNER_AUTH}

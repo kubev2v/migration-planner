@@ -18,6 +18,7 @@ import (
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
@@ -28,9 +29,10 @@ const (
 )
 
 type ImageServer struct {
-	cfg      *config.Config
-	store    store.Store
-	listener net.Listener
+	cfg            *config.Config
+	store          store.Store
+	listener       net.Listener
+	applianceCache *service.ApplianceImageCache
 }
 
 // New returns a new instance of a migration-planner server.
@@ -52,6 +54,21 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 
 func (s *ImageServer) Run(ctx context.Context) error {
 	zap.S().Named("image_server").Info("Initializing Image-side API server")
+
+	// Initialize appliance image cache
+	baseISOPath := s.cfg.Service.IsoPath
+	s.applianceCache = service.NewApplianceImageCache(s.cfg.ApplianceImage, baseISOPath, zap.L().Named("appliance_cache"))
+
+	// Cancel an in-flight pull/build as soon as the server context ends.
+	stopCancellation := context.AfterFunc(ctx, s.applianceCache.Stop)
+	defer stopCancellation()
+	defer s.applianceCache.Stop()
+
+	zap.S().Named("image_server").Info("Starting appliance image cache service")
+	if err := s.applianceCache.Start(); err != nil {
+		return fmt.Errorf("failed to start appliance image cache: %w", err)
+	}
+
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed to load swagger spec: %w", err)
@@ -77,7 +94,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		apiserver.WithResponseWriter,
 	)
 
-	h := handlers.NewImageHandler(s.store, s.cfg)
+	h := handlers.NewImageHandler(s.store, s.cfg, s.applianceCache)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 

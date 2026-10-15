@@ -37,9 +37,17 @@ RUN echo "Downloading OPA policies using Makefile target..." && \
     OPA_POLICIES_DIR=/app/policies make setup-opa-policies
 
 # Final runtime image
-FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/ubi-minimal
+FROM --platform=linux/amd64 quay.io/centos/centos:stream9
 
 WORKDIR /app
+
+# Install runtime dependencies for appliance image cache service
+# - skopeo: pull appliance container images
+# - xorriso: modify and rebuild ISOs with embedded appliance
+# - rsync: copy extracted ISO files
+# - syslinux: provides isohybrid for the rebuilt ISO
+RUN dnf install -y skopeo xorriso rsync syslinux && \
+    dnf clean all
 
 COPY /data /app/data/
 COPY /pkg/migrations/sql /app/migrations/

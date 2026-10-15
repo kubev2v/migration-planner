@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -23,41 +24,47 @@ import (
 )
 
 type ImageHandler struct {
-	store  store.Store
-	cfg    *config.Config
-	outbox *eventwrap.OutboxService
+	store          store.Store
+	cfg            *config.Config
+	outbox         *eventwrap.OutboxService
+	applianceCache *service.ApplianceImageCache
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
+func NewImageHandler(store store.Store, cfg *config.Config, applianceCache *service.ApplianceImageCache) *ImageHandler {
 	return &ImageHandler{
-		store:  store,
-		cfg:    cfg,
-		outbox: eventwrap.NewOutboxService(store),
+		store:          store,
+		cfg:            cfg,
+		outbox:         eventwrap.NewOutboxService(store),
+		applianceCache: applianceCache,
 	}
 }
 
 func (h *ImageHandler) Health(ctx context.Context, request imageServer.HealthRequestObject) (imageServer.HealthResponseObject, error) {
-	return nil, nil
+	if err := h.applianceCache.HealthCheck(); err != nil {
+		return nil, err
+	}
+	return imageServer.Health200Response{}, nil
 }
 
+// HEAD and GET use the same representation and validators so download clients
+// can obtain a strong ETag before requesting ranges.
 func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.HeadImageByTokenRequestObject) (imageServer.HeadImageByTokenResponseObject, error) {
-	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
-		return imageServer.HeadImageByToken401JSONResponse{Message: err.Error()}, nil
+	response, err := h.GetImageByToken(ctx, imageServer.GetImageByTokenRequestObject(req))
+	if response == nil {
+		return nil, err
 	}
+	return headImageResponse{response}, err
+}
 
-	sourceId, err := image.IdFromJWT(req.Token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
-	}
-	_, err = h.getSource(ctx, sourceId)
-	if err != nil {
-		return imageServer.HeadImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
-	}
+type headImageResponse struct {
+	imageServer.GetImageByTokenResponseObject
+}
 
-	return imageServer.HeadImageByToken200Response{}, nil
+func (response headImageResponse) VisitHeadImageByTokenResponse(writer http.ResponseWriter) error {
+	return response.VisitGetImageByTokenResponse(writer)
 }
 
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {
@@ -83,11 +90,19 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		return imageServer.GetImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
 	}
 
-	imageBuilder := image.NewImageBuilder(source.ID)
+	// Get the modified ISO path from the appliance cache
+	modifiedISOPath, isoDigest, err := h.applianceCache.GetModifiedISO()
+	if err != nil {
+		zap.S().Named("image_service").Errorw("failed to get modified ISO from cache", "error", err)
+		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to get modified ISO: %s", err)}, nil
+	}
+
+	imageBuilder := image.NewImageBuilderWithISO(source.ID, modifiedISOPath)
 	imageBuilder.WithImageInfra(source.ImageInfra)
 
 	// Use pre-generated agent token from DB (stored at download URL creation time).
-	// This ensures all pods produce byte-identical OVAs for Akamai LFO range requests.
+	// This keeps ignition stable across requests; the content ETag also detects
+	// differences in the cached ISO between pods.
 	if source.ImageInfra.AgentToken != nil && *source.ImageInfra.AgentToken != "" {
 		imageBuilder.WithAgentToken(*source.ImageInfra.AgentToken)
 	} else {
@@ -100,23 +115,20 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	// Use source.CreatedAt as deterministic ModTime for TAR headers
 	modTime := source.CreatedAt
 
-	reader, _, err := imageBuilder.OpenSeekableReader(modTime)
+	reader, _, etag, err := imageBuilder.OpenSeekableReaderWithETag(modTime, isoDigest)
 	if err != nil {
 		zap.S().Named("image_service").Errorw("failed to create seekable reader", "error", err)
 		return imageServer.GetImageByToken500JSONResponse{Message: fmt.Sprintf("failed to create seekable reader: %s", err)}, nil
 	}
 	defer func() { _ = reader.Close() }()
 
-	// Set headers before ServeContent.
-	// ETag derived from source ID + creation time — deterministic across pods.
-	// Must be strong (no W/ prefix) for Akamai LFO.
-	etag := fmt.Sprintf(`"%s-%d"`, source.ID, modTime.Unix())
-	writer.Header().Set("ETag", etag)
 	writer.Header().Set("Content-Type", "application/ovf")
 	writer.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, req.Name))
 
-	// http.ServeContent handles Range requests, Content-Length, Last-Modified, etc.
-	http.ServeContent(writer, httpReq, req.Name, modTime, reader)
+	image.ServeOVA(writer, httpReq, req.Name, etag, reader)
+	if httpReq.Method == http.MethodHead {
+		return nil, nil
+	}
 
 	downloadURLID, err := image.DownloadURLID(req.Token)
 	if err == nil {
