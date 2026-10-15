@@ -56,7 +56,7 @@ require (
 )
 
 require (
-	al.essio.dev/pkg/shellescape v1.5.1 // indirect
+	al.essio.dev/pkg/shellescape v1.6.1 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/Masterminds/semver/v3 v3.5.0 // indirect
 	github.com/agnivade/levenshtein v1.2.1 // indirect
