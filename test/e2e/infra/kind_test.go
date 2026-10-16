@@ -2,12 +2,18 @@ package infra
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/kubev2v/migration-planner/test/e2e/config"
+	appsv1 "k8s.io/api/apps/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 )
 
 // stubExec replaces execCommandContext with a fake that runs TestHelperProcess
@@ -84,5 +90,60 @@ func TestVcsimTemplateParams(t *testing.T) {
 	}
 	if got := params["PASSWORD"]; got != "pass" {
 		t.Errorf("PASSWORD = %q, want %q", got, "pass")
+	}
+}
+
+func TestWaitForAllDeploymentsReady(t *testing.T) {
+	replicas := int32(2)
+	zero := int32(0)
+	k := &KindInfraManager{
+		cfg: config.InfraConfig{Namespace: "default", DeploymentReadyTimeout: time.Second},
+		clientset: fake.NewClientset(
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "planner", Namespace: "default"},
+				Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+				Status:     appsv1.DeploymentStatus{ReadyReplicas: 2},
+			},
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "scaled-down", Namespace: "default"},
+				Spec:       appsv1.DeploymentSpec{Replicas: &zero},
+			},
+		),
+	}
+	if err := k.waitForAllDeployments(); err != nil {
+		t.Fatalf("ready deployments should not time out: %v", err)
+	}
+}
+
+func TestWaitForAllDeploymentsTimeoutReportsAllUnready(t *testing.T) {
+	replicas := int32(2)
+	k := &KindInfraManager{
+		cfg: config.InfraConfig{Namespace: "default", DeploymentReadyTimeout: 20 * time.Millisecond},
+		clientset: fake.NewClientset(
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "planner", Namespace: "default"},
+				Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+				Status:     appsv1.DeploymentStatus{ReadyReplicas: 1},
+			},
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "sizer", Namespace: "default"},
+			},
+			&appsv1.Deployment{
+				ObjectMeta: metav1.ObjectMeta{Name: "ready", Namespace: "default"},
+				Status:     appsv1.DeploymentStatus{ReadyReplicas: 1},
+			},
+		),
+	}
+	err := k.waitForAllDeployments()
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("expected the configured deadline to expire, got %v", err)
+	}
+	for _, want := range []string{"20ms", "planner (1/2 ready)", "sizer (0/1 ready)"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("timeout %q does not include %q", err, want)
+		}
+	}
+	if strings.Contains(err.Error(), "ready (1/1 ready)") {
+		t.Errorf("timeout includes a ready deployment: %v", err)
 	}
 }

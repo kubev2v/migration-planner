@@ -39,6 +39,21 @@ RUN echo "Downloading OPA policies using Makefile target..." && \
 # Final runtime image
 FROM --platform=linux/amd64 quay.io/centos/centos:stream9
 
+# Konflux requires these labels on the final image; CentOS does not provide them.
+# Reuse the source metadata passed by Konflux, with defaults for local/branch builds.
+ARG SOURCE_GIT_TAG="devel"
+ARG SOURCE_GIT_COMMIT="local"
+
+LABEL name="migration-planner-api" \
+      vendor="Red Hat, Inc." \
+      version="${SOURCE_GIT_TAG}" \
+      release="${SOURCE_GIT_COMMIT}" \
+      com.redhat.component="migration-planner-api" \
+      distribution-scope="public" \
+      description="Migration Planner API service" \
+      io.k8s.description="Migration Planner API service" \
+      url="https://github.com/kubev2v/migration-planner"
+
 WORKDIR /app
 
 # Install runtime dependencies for appliance image cache service

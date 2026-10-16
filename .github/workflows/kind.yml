@@ -46,6 +46,8 @@ jobs:
     needs: changes
     if: needs.changes.outputs.run-e2e == 'true'
     runs-on: ubuntu-latest
+    env:
+      KUBECONFIG: ${{ runner.temp }}/e2e-kubeconfig
 
     steps:
       - name: Checkout the code
@@ -105,20 +107,31 @@ jobs:
         run: |
           sudo -E ./bin/e2e \
             --api-image="${E2E_API_IMAGE}" \
-            --iso-image="${E2E_ISO_IMAGE}" 
+            --iso-image="${E2E_ISO_IMAGE}" \
+            --keep-env \
+            --deployment-ready-timeout=10m
 
       - name: Collect logs
         if: always()
+        timeout-minutes: 5
         run: |
-          kubectl get deploy -o yaml 2>/dev/null || true
-          kubectl get pods -o wide 2>/dev/null || true
-          for pod in $(kubectl get pods -o name 2>/dev/null); do
+          KUBECTL=(sudo -E kubectl --context=kind-kind-e2e --namespace=default --request-timeout=20s)
+          "${KUBECTL[@]}" get deploy -o yaml || true
+          "${KUBECTL[@]}" get pods -o wide || true
+          "${KUBECTL[@]}" get events --sort-by=.metadata.creationTimestamp || true
+          for pod in $("${KUBECTL[@]}" get pods -o name || true); do
             echo "=== Logs for ${pod} ==="
-            kubectl logs ${pod} --all-containers 2>/dev/null || true
+            "${KUBECTL[@]}" logs "${pod}" --all-containers --timestamps --prefix --tail=500 || true
+            echo "=== Previous logs for ${pod} ==="
+            "${KUBECTL[@]}" logs "${pod}" --all-containers --previous --timestamps --prefix --tail=500 || true
             echo "=== Describe ${pod} ==="
-            kubectl describe ${pod} 2>/dev/null || true
+            "${KUBECTL[@]}" describe "${pod}" || true
             echo "======================="
           done
+
+      - name: Delete e2e cluster
+        if: always()
+        run: sudo -E kind delete cluster --name kind-e2e
 
   # Always runs so branch protection can require this check on docs-only PRs.
   required:

@@ -29,6 +29,8 @@ type InfraConfig struct {
 	KeepEnv              bool
 	SkipSetup            bool
 
+	DeploymentReadyTimeout time.Duration
+
 	// Service deployment
 	ServiceAPIPath       string
 	ImagePullPolicy      string
@@ -72,6 +74,8 @@ type Config struct {
 
 var Cfg = Config{
 	Infra: InfraConfig{
+		DeploymentReadyTimeout: 3 * time.Minute,
+
 		Namespace:            "default",
 		RelativeTemplatesDir: filepath.Join("deploy", "templates"),
 		ServiceAPIPath:       "/api/migration-assessment",
