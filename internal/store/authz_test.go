@@ -164,6 +164,33 @@ var _ = Describe("authz store", Ordered, func() {
 		})
 	})
 
+	Context("DeleteRelationshipsBySubject", func() {
+		It("deletes all relations where the given subject appears", func() {
+			updates := store.NewRelationshipBuilder().
+				// acme is the subject (e.g. assessment shared with a group).
+				With(model.NewAssessmentResource("assess1"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				With(model.NewAssessmentResource("assess2"), model.ViewerRelation, model.NewOrgSubject("acme")).
+				// A different org subject must survive.
+				With(model.NewAssessmentResource("assess3"), model.ViewerRelation, model.NewOrgSubject("globex")).
+				// A user subject with the same id but different namespace must survive.
+				With(model.NewAssessmentResource("assess4"), model.ViewerRelation, model.NewUserSubject("acme")).
+				Build()
+			err := s.Authz().WriteRelationships(context.TODO(), updates)
+			Expect(err).To(BeNil())
+
+			err = s.Authz().DeleteRelationshipsBySubject(context.TODO(), model.NewOrgSubject("acme"))
+			Expect(err).To(BeNil())
+
+			var count int
+			gormdb.Raw("SELECT COUNT(*) FROM relations").Scan(&count)
+			Expect(count).To(Equal(2)) // globex org subject and acme user subject remain
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations")
+		})
+	})
+
 	Context("ListRelationships", func() {
 		It("lists all relations for a resource", func() {
 			updates := store.NewRelationshipBuilder().

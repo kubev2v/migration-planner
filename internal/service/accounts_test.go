@@ -22,6 +22,7 @@ const (
 	insertAccountsGroupStm           = "INSERT INTO groups (id, name, description, kind, icon, company, parent_id) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', %s);"
 	insertAccountsMemberStm          = "INSERT INTO members (id, username, email, group_id) VALUES ('%s', '%s', '%s', '%s');"
 	insertAccountsPartnerCustomerStm = "INSERT INTO partners_customers (id, username, partner_id, request_status, name, contact_name, contact_phone, email, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);"
+	insertAccountsRelationStm        = "INSERT INTO relations (resource, resource_id, relation, subject_namespace, subject_id) VALUES ('%s', '%s', '%s', '%s', '%s');"
 )
 
 var _ = Describe("accounts service", Ordered, func() {
@@ -237,7 +238,41 @@ var _ = Describe("accounts service", Ordered, func() {
 				Expect(count).To(Equal(0))
 			})
 
+			It("deletes associated relations where the group is the resource or the subject", func() {
+				orgID := uuid.New()
+				otherOrgID := uuid.New()
+
+				tx := gormdb.Exec(fmt.Sprintf(insertAccountsGroupStm, orgID, "To Delete", "desc", "partner", "icon", "Acme", "NULL"))
+				Expect(tx.Error).To(BeNil())
+
+				// Group as resource: org membership tuple.
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsRelationStm, "org", orgID.String(), "member", "user", "alice"))
+				Expect(tx.Error).To(BeNil())
+				// Group as subject: assessment shared with the group.
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsRelationStm, "assessment", uuid.New().String(), "viewer", "org", orgID.String()))
+				Expect(tx.Error).To(BeNil())
+				// Unrelated relation belonging to another group must survive.
+				tx = gormdb.Exec(fmt.Sprintf(insertAccountsRelationStm, "org", otherOrgID.String(), "member", "user", "bob"))
+				Expect(tx.Error).To(BeNil())
+
+				err := svc.DeleteGroup(context.TODO(), orgID)
+				Expect(err).To(BeNil())
+
+				var deletedGroupRelations int
+				tx = gormdb.Raw(
+					"SELECT COUNT(*) FROM relations WHERE (resource = 'org' AND resource_id = ?) OR (subject_namespace = 'org' AND subject_id = ?);",
+					orgID.String(), orgID.String()).Scan(&deletedGroupRelations)
+				Expect(tx.Error).To(BeNil())
+				Expect(deletedGroupRelations).To(Equal(0))
+
+				var survivingRelations int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM relations WHERE resource_id = ?;", otherOrgID.String()).Scan(&survivingRelations)
+				Expect(tx.Error).To(BeNil())
+				Expect(survivingRelations).To(Equal(1))
+			})
+
 			AfterEach(func() {
+				gormdb.Exec("DELETE FROM relations;")
 				gormdb.Exec("DELETE FROM groups;")
 			})
 		})

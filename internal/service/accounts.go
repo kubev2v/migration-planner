@@ -254,7 +254,32 @@ func (s *AccountsService) UpdateGroup(ctx context.Context, group model.Group) (m
 }
 
 func (s *AccountsService) DeleteGroup(ctx context.Context, id uuid.UUID) error {
-	return s.store.Accounts().DeleteGroup(ctx, id)
+	ctx, err := s.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	if err := s.store.Accounts().DeleteGroup(ctx, id); err != nil {
+		return err
+	}
+
+	// Purge authz relations where the group (org) is the resource
+	if err := s.store.Authz().DeleteRelationships(ctx, model.NewOrgResource(id.String())); err != nil {
+		return fmt.Errorf("failed to delete group authz resource relations: %w", err)
+	}
+
+	// Purge authz relations where the group (org) is the subject
+	if err := s.store.Authz().DeleteRelationshipsBySubject(ctx, model.NewOrgSubject(id.String())); err != nil {
+		return fmt.Errorf("failed to delete group authz subject relations: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *AccountsService) GetMember(ctx context.Context, username string) (model.Member, error) {
