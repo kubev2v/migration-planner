@@ -20,6 +20,7 @@ import (
 type AccountsServicer interface {
 	Initialize(ctx context.Context, adminGroup AdminGroup) error
 	GetIdentity(ctx context.Context, authUser auth.User) (Identity, error)
+	GetAccountIdentity(ctx context.Context, accountID string) (AccountIdentity, error)
 	ListGroups(ctx context.Context, filter *store.GroupQueryFilter) (model.GroupList, error)
 	GetGroup(ctx context.Context, id uuid.UUID) (model.Group, error)
 	CreateGroup(ctx context.Context, group model.Group) (model.Group, error)
@@ -119,12 +120,26 @@ type Identity struct {
 	PartnerID *string
 }
 
+type AccountIdentity struct {
+	Name string
+	Type string
+}
+
 func (s *AccountsService) IsKind(ctx context.Context, user auth.User, kind IdentityKind) (bool, error) {
 	identity, err := s.GetIdentity(ctx, user)
 	if err != nil {
 		return false, err
 	}
 	return identity.Kind == kind, nil
+}
+
+func (s *AccountsService) GetAccountIdentity(ctx context.Context, accountID string) (AccountIdentity, error) {
+	account, err := s.iamService.GetAccountInfo(ctx, accountID)
+	if err != nil {
+		return AccountIdentity{}, fmt.Errorf("failed to get account info for account %q: %w", accountID, err)
+	}
+
+	return AccountIdentity{Name: account.Name, Type: account.Type}, nil
 }
 
 func (s *AccountsService) GetIdentity(ctx context.Context, authUser auth.User) (Identity, error) {

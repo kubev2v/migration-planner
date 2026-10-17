@@ -52,7 +52,12 @@ func (e *EventAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 }
 
 func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
-	ctx, err := e.store.NewTransactionContext(ctx)
+	accountIdentity, err := e.accountsSvc.GetAccountIdentity(ctx, createForm.OrgID)
+	if err != nil {
+		zap.S().Named("assessment_events_service").Warnf("failed to get account identity %v", err)
+	}
+
+	ctx, err = e.store.NewTransactionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,6 +76,8 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		Inventory:  assessment.Snapshots[0].Inventory,
 		Name:       assessment.Name,
 		OrgID:      assessment.OrgID,
+		OrgName:    accountIdentity.Name,
+		OrgType:    accountIdentity.Type,
 		Username:   assessment.Username,
 		SourceType: assessment.SourceType,
 		CreatedAt:  assessment.CreatedAt,

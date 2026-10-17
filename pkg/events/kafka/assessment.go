@@ -14,6 +14,8 @@ type AssessmentData struct {
 	SnapshotID  uint            `json:"snapshot_id,omitempty"`
 	Name        string          `json:"name,omitempty"`
 	OrgID       string          `json:"org_id,omitempty"`
+	OrgName     string          `json:"org_name,omitempty"`
+	OrgType     string          `json:"org_type,omitempty"`
 	Username    string          `json:"username,omitempty"`
 	SourceType  string          `json:"source_type,omitempty"`
 	PartnerID   *string         `json:"partner_id,omitempty"`
