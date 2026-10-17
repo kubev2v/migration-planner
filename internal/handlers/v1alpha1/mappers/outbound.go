@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"sort"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
@@ -382,6 +383,109 @@ func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, er
 		assessmentList[i] = a
 	}
 	return assessmentList, nil
+}
+
+func AssessmentV2ToApi(a model.Assessment) api.AssessmentV2Summary {
+	result := api.AssessmentV2Summary{
+		Id:             a.ID,
+		Name:           a.Name,
+		CreatedAt:      a.CreatedAt,
+		OwnerFirstName: a.OwnerFirstName,
+		OwnerLastName:  a.OwnerLastName,
+		SourceId:       a.SourceID,
+	}
+
+	switch a.SourceType {
+	case service.SourceTypeAgent:
+		result.SourceType = api.AssessmentV2SummarySourceTypeSource
+	case service.SourceTypeRvtools:
+		result.SourceType = api.AssessmentV2SummarySourceTypeRvtools
+	case service.SourceTypeInventory:
+		result.SourceType = api.AssessmentV2SummarySourceTypeInventory
+	}
+
+	for _, inventory := range a.Inventories {
+		if !inventory.IsSubset {
+			result.VmsCount = inventory.VMsCount
+			result.HostsCount = inventory.HostsCount
+			result.NetworksCount = inventory.NetworksCount
+			result.DatastoresCount = inventory.DatastoresCount
+			break
+		}
+	}
+
+	if len(a.Permissions) > 0 {
+		permissions := make([]api.AssessmentV2SummaryPermissions, len(a.Permissions))
+		for i, permission := range a.Permissions {
+			permissions[i] = api.AssessmentV2SummaryPermissions(permission)
+		}
+		result.Permissions = &permissions
+	}
+
+	if a.Sharing != nil {
+		sharing := api.AssessmentSharing{
+			IsShared:   a.Sharing.IsShared,
+			SharedWith: make([]api.SharingSubject, len(a.Sharing.SharedWith)),
+		}
+		for i, subject := range a.Sharing.SharedWith {
+			sharing.SharedWith[i] = api.SharingSubject{Type: subject.Type, Id: subject.ID, Name: subject.Name}
+		}
+		if a.Sharing.SharedBy != nil {
+			sharing.SharedBy = &api.SharingSubject{
+				Type: a.Sharing.SharedBy.Type,
+				Id:   a.Sharing.SharedBy.ID,
+				Name: a.Sharing.SharedBy.Name,
+			}
+		}
+		result.Sharing = &sharing
+	}
+
+	return result
+}
+
+func AssessmentClustersToAPI(clusters map[string]api.InventoryData) []api.AssessmentCluster {
+	result := make([]api.AssessmentCluster, 0, len(clusters))
+	for id := range clusters {
+		result = append(result, api.AssessmentCluster{Id: id})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Id < result[j].Id })
+	return result
+}
+
+func AssessmentInventoryToV2(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
+	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
+	clusters := make(map[string]api.InventoryData)
+	if inv.Version == model.SnapshotVersionV1 {
+		if err := json.Unmarshal(inv.Inventory, &result.Data); err != nil {
+			return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
+		}
+		if result.Id == "" && result.Data.Vcenter != nil {
+			result.Id = result.Data.Vcenter.Id
+		}
+		normalizeInventoryData(&result.Data)
+		return result, clusters, nil
+	}
+
+	var inventory api.Inventory
+	if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
+		return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
+	}
+	if result.Id == "" {
+		result.Id = inventory.VcenterId
+	}
+	if inventory.CreatedAt != nil {
+		result.CreatedAt = inventory.CreatedAt
+	}
+	result.VcenterVersion = inventory.VcenterVersion
+	if inventory.Vcenter != nil {
+		result.Data = *inventory.Vcenter
+	}
+	normalizeInventoryData(&result.Data)
+	for id, cluster := range inventory.Clusters {
+		normalizeInventoryData(&cluster)
+		clusters[id] = cluster
+	}
+	return result, clusters, nil
 }
 
 func ClusterRequirementsResponseFormToAPI(form api.ClusterRequirementsResponse) api.ClusterRequirementsResponse {

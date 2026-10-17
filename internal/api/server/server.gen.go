@@ -161,6 +161,24 @@ type ServerInterface interface {
 	// (PUT /api/v1/sources/{id}/inventory/file)
 	UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (GET /api/v2/assessments)
+	ListAssessmentsV2(w http.ResponseWriter, r *http.Request)
+
+	// (POST /api/v2/assessments/rvtools)
+	CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.Request)
+
+	// (GET /api/v2/assessments/{id})
+	GetAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PUT /api/v2/assessments/{id}/rvtools)
+	UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v2/assessments/{id}/vcenters/{vid})
+	GetVcenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID)
+
+	// (GET /api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid})
+	GetVcenterCluster(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID, cid string)
+
 	// (GET /health)
 	Health(w http.ResponseWriter, r *http.Request)
 }
@@ -401,6 +419,36 @@ func (_ Unimplemented) UpdateInventory(w http.ResponseWriter, r *http.Request, i
 
 // (PUT /api/v1/sources/{id}/inventory/file)
 func (_ Unimplemented) UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v2/assessments)
+func (_ Unimplemented) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (POST /api/v2/assessments/rvtools)
+func (_ Unimplemented) CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v2/assessments/{id})
+func (_ Unimplemented) GetAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PUT /api/v2/assessments/{id}/rvtools)
+func (_ Unimplemented) UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v2/assessments/{id}/vcenters/{vid})
+func (_ Unimplemented) GetVcenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid})
+func (_ Unimplemented) GetVcenterCluster(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID, cid string) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1562,6 +1610,167 @@ func (siw *ServerInterfaceWrapper) UploadSourceInventoryFile(w http.ResponseWrit
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// ListAssessmentsV2 operation middleware
+func (siw *ServerInterfaceWrapper) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAssessmentsV2(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// CreateRVToolsAssessmentV2 operation middleware
+func (siw *ServerInterfaceWrapper) CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRVToolsAssessmentV2(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAssessmentV2 operation middleware
+func (siw *ServerInterfaceWrapper) GetAssessmentV2(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAssessmentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UploadRvtoolsToAssessment operation middleware
+func (siw *ServerInterfaceWrapper) UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadRvtoolsToAssessment(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetVcenter operation middleware
+func (siw *ServerInterfaceWrapper) GetVcenter(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "vid" -------------
+	var vid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "vid", chi.URLParam(r, "vid"), &vid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "vid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVcenter(w, r, id, vid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetVcenterCluster operation middleware
+func (siw *ServerInterfaceWrapper) GetVcenterCluster(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "vid" -------------
+	var vid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "vid", chi.URLParam(r, "vid"), &vid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "vid", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "cid" -------------
+	var cid string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "cid", chi.URLParam(r, "cid"), &cid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVcenterCluster(w, r, id, vid, cid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // Health operation middleware
 func (siw *ServerInterfaceWrapper) Health(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -1830,6 +2039,24 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/inventory/file", wrapper.UploadSourceInventoryFile)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v2/assessments", wrapper.ListAssessmentsV2)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/v2/assessments/rvtools", wrapper.CreateRVToolsAssessmentV2)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v2/assessments/{id}", wrapper.GetAssessmentV2)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/v2/assessments/{id}/rvtools", wrapper.UploadRvtoolsToAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v2/assessments/{id}/vcenters/{vid}", wrapper.GetVcenter)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid}", wrapper.GetVcenterCluster)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/health", wrapper.Health)
@@ -4437,6 +4664,309 @@ func (response UploadSourceInventoryFile500JSONResponse) VisitUploadSourceInvent
 	return json.NewEncoder(w).Encode(response)
 }
 
+type ListAssessmentsV2RequestObject struct {
+}
+
+type ListAssessmentsV2ResponseObject interface {
+	VisitListAssessmentsV2Response(w http.ResponseWriter) error
+}
+
+type ListAssessmentsV2200JSONResponse []AssessmentV2Summary
+
+func (response ListAssessmentsV2200JSONResponse) VisitListAssessmentsV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentsV2401JSONResponse Error
+
+func (response ListAssessmentsV2401JSONResponse) VisitListAssessmentsV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentsV2500JSONResponse Error
+
+func (response ListAssessmentsV2500JSONResponse) VisitListAssessmentsV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2RequestObject struct {
+	Body *multipart.Reader
+}
+
+type CreateRVToolsAssessmentV2ResponseObject interface {
+	VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error
+}
+
+type CreateRVToolsAssessmentV2202JSONResponse Job
+
+func (response CreateRVToolsAssessmentV2202JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2400JSONResponse Error
+
+func (response CreateRVToolsAssessmentV2400JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2401JSONResponse Error
+
+func (response CreateRVToolsAssessmentV2401JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2403JSONResponse Error
+
+func (response CreateRVToolsAssessmentV2403JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2404JSONResponse Error
+
+func (response CreateRVToolsAssessmentV2404JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type CreateRVToolsAssessmentV2500JSONResponse Error
+
+func (response CreateRVToolsAssessmentV2500JSONResponse) VisitCreateRVToolsAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentV2RequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAssessmentV2ResponseObject interface {
+	VisitGetAssessmentV2Response(w http.ResponseWriter) error
+}
+
+type GetAssessmentV2200JSONResponse AssessmentV2
+
+func (response GetAssessmentV2200JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentV2401JSONResponse Error
+
+func (response GetAssessmentV2401JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentV2403JSONResponse Error
+
+func (response GetAssessmentV2403JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentV2404JSONResponse Error
+
+func (response GetAssessmentV2404JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAssessmentV2500JSONResponse Error
+
+func (response GetAssessmentV2500JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsToAssessmentRequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *multipart.Reader
+}
+
+type UploadRvtoolsToAssessmentResponseObject interface {
+	VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error
+}
+
+type UploadRvtoolsToAssessment202JSONResponse Job
+
+func (response UploadRvtoolsToAssessment202JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsToAssessment400JSONResponse Error
+
+func (response UploadRvtoolsToAssessment400JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsToAssessment401JSONResponse Error
+
+func (response UploadRvtoolsToAssessment401JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsToAssessment500JSONResponse Error
+
+func (response UploadRvtoolsToAssessment500JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterRequestObject struct {
+	Id  openapi_types.UUID `json:"id"`
+	Vid openapi_types.UUID `json:"vid"`
+}
+
+type GetVcenterResponseObject interface {
+	VisitGetVcenterResponse(w http.ResponseWriter) error
+}
+
+type GetVcenter200JSONResponse AssessmentV2
+
+func (response GetVcenter200JSONResponse) VisitGetVcenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenter401JSONResponse Error
+
+func (response GetVcenter401JSONResponse) VisitGetVcenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenter403JSONResponse Error
+
+func (response GetVcenter403JSONResponse) VisitGetVcenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenter404JSONResponse Error
+
+func (response GetVcenter404JSONResponse) VisitGetVcenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenter500JSONResponse Error
+
+func (response GetVcenter500JSONResponse) VisitGetVcenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterClusterRequestObject struct {
+	Id  openapi_types.UUID `json:"id"`
+	Vid openapi_types.UUID `json:"vid"`
+	Cid string             `json:"cid"`
+}
+
+type GetVcenterClusterResponseObject interface {
+	VisitGetVcenterClusterResponse(w http.ResponseWriter) error
+}
+
+type GetVcenterCluster200JSONResponse InventoryData
+
+func (response GetVcenterCluster200JSONResponse) VisitGetVcenterClusterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterCluster401JSONResponse Error
+
+func (response GetVcenterCluster401JSONResponse) VisitGetVcenterClusterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterCluster403JSONResponse Error
+
+func (response GetVcenterCluster403JSONResponse) VisitGetVcenterClusterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterCluster404JSONResponse Error
+
+func (response GetVcenterCluster404JSONResponse) VisitGetVcenterClusterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetVcenterCluster500JSONResponse Error
+
+func (response GetVcenterCluster500JSONResponse) VisitGetVcenterClusterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type HealthRequestObject struct {
 }
 
@@ -4595,6 +5125,24 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/inventory/file)
 	UploadSourceInventoryFile(ctx context.Context, request UploadSourceInventoryFileRequestObject) (UploadSourceInventoryFileResponseObject, error)
+
+	// (GET /api/v2/assessments)
+	ListAssessmentsV2(ctx context.Context, request ListAssessmentsV2RequestObject) (ListAssessmentsV2ResponseObject, error)
+
+	// (POST /api/v2/assessments/rvtools)
+	CreateRVToolsAssessmentV2(ctx context.Context, request CreateRVToolsAssessmentV2RequestObject) (CreateRVToolsAssessmentV2ResponseObject, error)
+
+	// (GET /api/v2/assessments/{id})
+	GetAssessmentV2(ctx context.Context, request GetAssessmentV2RequestObject) (GetAssessmentV2ResponseObject, error)
+
+	// (PUT /api/v2/assessments/{id}/rvtools)
+	UploadRvtoolsToAssessment(ctx context.Context, request UploadRvtoolsToAssessmentRequestObject) (UploadRvtoolsToAssessmentResponseObject, error)
+
+	// (GET /api/v2/assessments/{id}/vcenters/{vid})
+	GetVcenter(ctx context.Context, request GetVcenterRequestObject) (GetVcenterResponseObject, error)
+
+	// (GET /api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid})
+	GetVcenterCluster(ctx context.Context, request GetVcenterClusterRequestObject) (GetVcenterClusterResponseObject, error)
 
 	// (GET /health)
 	Health(ctx context.Context, request HealthRequestObject) (HealthResponseObject, error)
@@ -5956,6 +6504,175 @@ func (sh *strictHandler) UploadSourceInventoryFile(w http.ResponseWriter, r *htt
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadSourceInventoryFileResponseObject); ok {
 		if err := validResponse.VisitUploadSourceInventoryFileResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListAssessmentsV2 operation middleware
+func (sh *strictHandler) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
+	var request ListAssessmentsV2RequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAssessmentsV2(ctx, request.(ListAssessmentsV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAssessmentsV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAssessmentsV2ResponseObject); ok {
+		if err := validResponse.VisitListAssessmentsV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRVToolsAssessmentV2 operation middleware
+func (sh *strictHandler) CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.Request) {
+	var request CreateRVToolsAssessmentV2RequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRVToolsAssessmentV2(ctx, request.(CreateRVToolsAssessmentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRVToolsAssessmentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRVToolsAssessmentV2ResponseObject); ok {
+		if err := validResponse.VisitCreateRVToolsAssessmentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAssessmentV2 operation middleware
+func (sh *strictHandler) GetAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAssessmentV2RequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAssessmentV2(ctx, request.(GetAssessmentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAssessmentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAssessmentV2ResponseObject); ok {
+		if err := validResponse.VisitGetAssessmentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadRvtoolsToAssessment operation middleware
+func (sh *strictHandler) UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UploadRvtoolsToAssessmentRequestObject
+
+	request.Id = id
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadRvtoolsToAssessment(ctx, request.(UploadRvtoolsToAssessmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadRvtoolsToAssessment")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadRvtoolsToAssessmentResponseObject); ok {
+		if err := validResponse.VisitUploadRvtoolsToAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetVcenter operation middleware
+func (sh *strictHandler) GetVcenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID) {
+	var request GetVcenterRequestObject
+
+	request.Id = id
+	request.Vid = vid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVcenter(ctx, request.(GetVcenterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVcenter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVcenterResponseObject); ok {
+		if err := validResponse.VisitGetVcenterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetVcenterCluster operation middleware
+func (sh *strictHandler) GetVcenterCluster(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID, cid string) {
+	var request GetVcenterClusterRequestObject
+
+	request.Id = id
+	request.Vid = vid
+	request.Cid = cid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVcenterCluster(ctx, request.(GetVcenterClusterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVcenterCluster")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVcenterClusterResponseObject); ok {
+		if err := validResponse.VisitGetVcenterClusterResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -9,7 +9,7 @@ import (
 )
 
 // (GET /api/v1/info)
-func (s *ServiceHandler) GetInfo(ctx context.Context, request server.GetInfoRequestObject) (server.GetInfoResponseObject, error) {
+func (h *ServiceHandler) GetInfo(ctx context.Context, request server.GetInfoRequestObject) (server.GetInfoResponseObject, error) {
 	versionInfo := version.Get()
 
 	response := v1alpha1.Info{
