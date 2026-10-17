@@ -1,17 +1,20 @@
 package config
 
 import (
+	"fmt"
+
 	"github.com/kelseyhightower/envconfig"
 )
 
 var singleConfig *Config = nil
 
 type Config struct {
-	Database     *dbConfig
-	Service      *svcConfig
-	Kafka        *Kafka
-	Notification *Notification
-	IAM          *IAM
+	Database       *dbConfig
+	Service        *svcConfig
+	Kafka          *Kafka
+	Notification   *Notification
+	IAM            *IAM
+	ApplianceImage *ApplianceImage
 }
 
 type dbConfig struct {
@@ -80,6 +83,21 @@ type IAM struct {
 	ClientCert         string `envconfig:"IAM_CLIENT_CERT" default:""`
 	ClientKey          string `envconfig:"IAM_CLIENT_KEY" default:""`
 	InsecureSkipVerify bool   `envconfig:"IAM_INSECURE_SKIP_VERIFY" default:"false"`
+}
+
+// ApplianceImage configures the container image used for the appliance/agent
+// that gets embedded in the OVA ISO at runtime
+type ApplianceImage struct {
+	Image           string `envconfig:"APPLIANCE_IMAGE" default:"quay.io/redhat-user-workloads/assisted-migration-tenant/oma-appliance"`
+	Tag             string `envconfig:"APPLIANCE_IMAGE_TAG" default:"latest"`
+	CachePath       string `envconfig:"APPLIANCE_IMAGE_CACHE_PATH" default:"/tmp/appliance-image-cache"`
+	RefreshInterval string `envconfig:"APPLIANCE_IMAGE_REFRESH_INTERVAL" default:"6h"`
+	TLSVerify       bool   `envconfig:"APPLIANCE_IMAGE_TLS_VERIFY" default:"true"`
+}
+
+// GetPullSpec returns the full container image pull specification
+func (a *ApplianceImage) GetPullSpec() string {
+	return fmt.Sprintf("%s:%s", a.Image, a.Tag)
 }
 
 func New() (*Config, error) {
