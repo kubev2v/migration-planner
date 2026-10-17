@@ -2,9 +2,11 @@ package duckdb_parser
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -14,9 +16,11 @@ var stmtRegex = regexp.MustCompile(`(?s)(CREATE|INSERT|UPDATE|DROP|ALTER|WITH|IN
 // criticalStmtPatterns defines patterns for statements that must succeed.
 // If any of these fail, the ingestion should fail immediately.
 var criticalStmtPatterns = []string{
-	"INSTALL ",           // Extension installation must succeed
-	"LOAD ",              // Extension loading must succeed
-	"CREATE TABLE vinfo", // Main VM data table creation must succeed
+	"INSTALL ",                // Extension installation must succeed
+	"LOAD ",                   // Extension loading must succeed
+	"CREATE TABLE vinfo",      // Main VM data table creation must succeed
+	"WITH metadata AS (",      // Metadata ingestion must succeed
+	"INSERT INTO vm_metadata", // Metadata persistence must succeed
 }
 
 // isCriticalStatement checks if a statement matches any critical pattern.
@@ -51,17 +55,39 @@ func translateXLSXError(err error) error {
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (ValidationResult, error) {
-	query, err := p.builder.IngestRvtoolsQuery(excelFile)
+func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result ValidationResult, err error) {
+	metadata, err := readRVToolsMetadata(ctx, excelFile)
+	if err != nil {
+		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", err)
+	}
+	var args []any
+	if len(metadata) > 0 {
+		data, err := json.Marshal(metadata)
+		if err != nil {
+			return ValidationResult{}, fmt.Errorf("encoding RVTools metadata: %w", err)
+		}
+		args = []any{string(data)}
+	}
+	query, err := p.builder.IngestRvtoolsQuery(excelFile, len(metadata) > 0)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
-	if err := p.executeStatements(ctx, query); err != nil {
+	defer func() {
+		if err == nil {
+			return
+		}
+		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if cleanupErr := p.dropVinfoRaw(cleanupCtx); cleanupErr != nil {
+			zap.S().Warnw("dropping vinfo_raw after failed import", "error", cleanupErr)
+		}
+	}()
+	if err := p.executeStatements(ctx, query, args...); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
 	}
 
 	// Validate schema against vinfo_raw (unfiltered RVTools data) for granular error reporting
-	result := p.ValidateSchema(ctx, "vinfo_raw")
+	result = p.ValidateSchema(ctx, "vinfo_raw")
 
 	// Drop vinfo_raw now that validation is complete
 	if err := p.dropVinfoRaw(ctx); err != nil {
@@ -85,7 +111,14 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (ValidationResult, error) {
+// Optional category names come from temp.main.tag_categories on the same connection.
+func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result ValidationResult, err error) {
+	defer func() {
+		p.cleanupSqliteImport(ctx, err)
+	}()
+	if err := p.setupTagCategories(ctx); err != nil {
+		return ValidationResult{}, fmt.Errorf("creating tag categories: %w", err)
+	}
 	query, err := p.builder.IngestSqliteQuery(sqliteFile)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
@@ -95,7 +128,7 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	}
 
 	// Validate schema against vinfo (SQLite inserts directly into vinfo, no vinfo_raw)
-	result := p.ValidateSchema(ctx, "vinfo")
+	result = p.ValidateSchema(ctx, "vinfo")
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
@@ -110,6 +143,24 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 	return result, nil
 }
 
+func (p *Parser) setupTagCategories(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, "CREATE TEMP TABLE IF NOT EXISTS tag_categories (id VARCHAR, name VARCHAR)")
+	return err
+}
+
+func (p *Parser) cleanupSqliteImport(ctx context.Context, importErr error) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+	if _, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS temp.main.tag_categories"); err != nil {
+		zap.S().Warnw("dropping tag categories after import", "error", err)
+	}
+	if importErr != nil {
+		if _, err := p.db.ExecContext(ctx, "DETACH DATABASE IF EXISTS src"); err != nil {
+			zap.S().Warnw("detaching SQLite source after failed import", "error", err)
+		}
+	}
+}
+
 // dropVinfoRaw drops the temporary vinfo_raw table used during RVTools ingestion.
 // This table holds unfiltered data from the Excel file and is only needed for validation.
 func (p *Parser) dropVinfoRaw(ctx context.Context) error {
@@ -118,16 +169,20 @@ func (p *Parser) dropVinfoRaw(ctx context.Context) error {
 }
 
 // executeStatements executes a multi-statement SQL string.
-// Critical statements (INSTALL, LOAD, CREATE TABLE vinfo) must succeed or an error is returned.
+// Critical statements must succeed or an error is returned.
 // Non-critical statements (INSERT for optional sheets, ALTER for optional columns) are logged but don't fail.
-func (p *Parser) executeStatements(ctx context.Context, query string) error {
+func (p *Parser) executeStatements(ctx context.Context, query string, args ...any) error {
 	stmts := stmtRegex.FindAllString(query, -1)
 	for _, stmt := range stmts {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
 			continue
 		}
-		if _, err := p.db.ExecContext(ctx, stmt); err != nil {
+		var stmtArgs []any
+		if strings.HasPrefix(stmt, "WITH metadata AS (") {
+			stmtArgs = args
+		}
+		if _, err := p.db.ExecContext(ctx, stmt, stmtArgs...); err != nil {
 			if isCriticalStatement(stmt) {
 				return translateXLSXError(err)
 			}

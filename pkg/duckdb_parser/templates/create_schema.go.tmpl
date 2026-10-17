@@ -54,6 +54,14 @@ CREATE TABLE IF NOT EXISTS vinfo (
     "guest_apps" VARCHAR DEFAULT '[]'
 );
 
+CREATE TABLE IF NOT EXISTS vm_metadata (
+    vm_id VARCHAR NOT NULL,
+    key VARCHAR NOT NULL,
+    value VARCHAR NOT NULL,
+    PRIMARY KEY (vm_id, key, value),
+    FOREIGN KEY (vm_id) REFERENCES vinfo("VM ID")
+);
+
 CREATE TABLE IF NOT EXISTS vcpu (
     "VM ID" VARCHAR,
     "Hot Add" BOOLEAN DEFAULT false,
