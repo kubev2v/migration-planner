@@ -233,24 +233,8 @@ UPDATE vdatastore_raw SET
     NULLIF(TRIM("Capacity MB"), '')
   );
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
-    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
-SELECT
-    "Hosts",
-    "Address",
-    "Name",
-    "Object ID",
-    TRY_CAST("Free MiB" AS DOUBLE),
-    CASE WHEN LOWER("MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    TRY_CAST("Capacity MiB" AS DOUBLE),
-    "Type",
-    CASE WHEN LOWER(TRIM(COALESCE("SIOC Enabled", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
-    COALESCE(TRY_CAST("SIOC Congestion Threshold" AS INTEGER), 30),
-    CASE WHEN LOWER(TRIM(COALESCE("SIOC Congestion Threshold Mode", ''))) = 'manual' THEN 'manual' ELSE 'automatic' END,
-    COALESCE(TRY_CAST("SIOC Percent Of Peak Throughput" AS INTEGER), 90)
-FROM vdatastore_raw;
-
-DROP TABLE vdatastore_raw;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "# Extents" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Major Version" VARCHAR;
 
 CREATE TABLE vhost_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
@@ -276,9 +260,216 @@ FROM vhost_raw;
 
 DROP TABLE vhost_raw;
 
-INSERT INTO vhba ("Device", "Type")
-SELECT "Device", "Type"
-FROM read_xlsx('{{.FilePath}}', sheet='vHBA', all_varchar=true);
+-- Resolve RVTools host names without linking ambiguous names to an arbitrary host.
+CREATE OR REPLACE TEMP TABLE rvtools_host_map AS
+SELECT LOWER(TRIM("Host")) AS source_key, "Object ID" AS "Host ID"
+FROM vhost
+WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
+  AND NULLIF(TRIM("Object ID"), '') IS NOT NULL
+  AND LOWER(TRIM("Host")) IN (
+      SELECT LOWER(TRIM("Host"))
+      FROM vhost
+      WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
+      GROUP BY LOWER(TRIM("Host"))
+      HAVING COUNT(*) = 1
+  );
+
+-- vHBA is optional in partial RVTools exports.
+CREATE OR REPLACE TEMP TABLE vhba_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHBA', all_varchar=true);
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Device" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Type" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Model" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Driver" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "WWN" VARCHAR;
+
+INSERT INTO vhba ("Host ID", "Device", "Type", "HBA Key", "Protocol", "Model", "Driver", "Node WWN", "Port WWN")
+SELECT DISTINCT
+    h."Host ID",
+    CASE WHEN UPPER(TRIM(COALESCE(a."Device", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Device") END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Type", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Type") END,
+    NULL,
+    CASE UPPER(TRIM(COALESCE(a."Type", '')))
+        WHEN 'ISCSI' THEN 'iSCSI'
+        WHEN 'FIBRE CHANNEL' THEN 'FibreChannel'
+        ELSE NULL
+    END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Model") END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Driver", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Driver") END,
+    CASE
+        WHEN regexp_matches(TRIM(COALESCE(a."WWN", '')), '^[0-9A-Fa-f]{16}[[:space:]]+[0-9A-Fa-f]{16}$')
+        THEN LOWER(regexp_extract(TRIM(a."WWN"), '^([0-9A-Fa-f]{16})[[:space:]]+[0-9A-Fa-f]{16}$', 1))
+        ELSE NULL
+    END,
+    CASE
+        WHEN regexp_matches(TRIM(COALESCE(a."WWN", '')), '^[0-9A-Fa-f]{16}[[:space:]]+[0-9A-Fa-f]{16}$')
+        THEN LOWER(regexp_extract(TRIM(a."WWN"), '^[0-9A-Fa-f]{16}[[:space:]]+([0-9A-Fa-f]{16})$', 1))
+        ELSE NULL
+    END
+FROM vhba_raw a
+LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(a."Host"))
+WHERE UPPER(TRIM(COALESCE(a."Device", ''))) NOT IN ('', 'VM');
+
+DROP TABLE IF EXISTS vhba_raw;
+
+-- Keep a stable empty source table when the optional vMultiPath sheet is absent.
+CREATE OR REPLACE TEMP TABLE vMultiPath_raw (
+    "Host" VARCHAR,
+    "Disk" VARCHAR,
+    "Vendor" VARCHAR,
+    "Model" VARCHAR,
+    "UUID" VARCHAR,
+    "Object ID" VARCHAR,
+    "Path 1" VARCHAR,
+    "Path 2" VARCHAR,
+    "Path 3" VARCHAR,
+    "Path 4" VARCHAR,
+    "Path 5" VARCHAR,
+    "Path 6" VARCHAR,
+    "Path 7" VARCHAR,
+    "Path 8" VARCHAR
+);
+
+CREATE OR REPLACE TEMP TABLE vMultiPath_sheet_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vMultiPath', all_varchar=true);
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Disk" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Vendor" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Model" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "UUID" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 1" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 2" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 3" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 4" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 5" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 6" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 7" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 8" VARCHAR;
+INSERT INTO vMultiPath_raw
+SELECT "Host", "Disk", "Vendor", "Model", "UUID", "Object ID",
+       "Path 1", "Path 2", "Path 3", "Path 4", "Path 5", "Path 6", "Path 7", "Path 8"
+FROM vMultiPath_sheet_raw;
+DROP TABLE IF EXISTS vMultiPath_sheet_raw;
+
+CREATE OR REPLACE TEMP TABLE vMultiPath_normalized AS
+SELECT
+    CASE WHEN UPPER(TRIM(COALESCE("Host", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Host") END AS "Host",
+    CASE WHEN UPPER(TRIM(COALESCE("Disk", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Disk") END AS "Disk",
+    CASE WHEN UPPER(TRIM(COALESCE("Vendor", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Vendor") END AS "Vendor",
+    CASE WHEN UPPER(TRIM(COALESCE("Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Model") END AS "Model",
+    CASE WHEN UPPER(TRIM(COALESCE("UUID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("UUID") END AS "UUID",
+    CASE WHEN UPPER(TRIM(COALESCE("Object ID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Object ID") END AS "Object ID",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 1", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 1") END AS "Path 1",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 2", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 2") END AS "Path 2",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 3", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 3") END AS "Path 3",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 4", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 4") END AS "Path 4",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 5", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 5") END AS "Path 5",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 6", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 6") END AS "Path 6",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 7", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 7") END AS "Path 7",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 8", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 8") END AS "Path 8"
+FROM vMultiPath_raw;
+
+WITH path_records AS (
+    SELECT
+        h."Host ID",
+        NULLIF(TRIM(path.adapter_device), '') AS hba_device,
+        NULLIF(TRIM(m."Disk"), '') AS canonical_name,
+        NULLIF(TRIM(m."Vendor"), '') AS lun_vendor,
+        NULLIF(TRIM(m."Model"), '') AS lun_model,
+        NULLIF(TRIM(m."UUID"), '') AS lun_uuid
+    FROM vMultiPath_normalized m
+    LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(m."Host"))
+    CROSS JOIN UNNEST([
+        m."Path 1", m."Path 2", m."Path 3", m."Path 4",
+        m."Path 5", m."Path 6", m."Path 7", m."Path 8"
+    ]) AS path(adapter_device)
+    WHERE m."Disk" IS NOT NULL
+      AND path.adapter_device IS NOT NULL
+),
+unassociated_records AS (
+    SELECT
+        h."Host ID",
+        NULL::VARCHAR AS hba_device,
+        NULLIF(TRIM(m."Disk"), '') AS canonical_name,
+        NULLIF(TRIM(m."Vendor"), '') AS lun_vendor,
+        NULLIF(TRIM(m."Model"), '') AS lun_model,
+        NULLIF(TRIM(m."UUID"), '') AS lun_uuid
+    FROM vMultiPath_normalized m
+    LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(m."Host"))
+    WHERE m."Disk" IS NOT NULL
+      AND COALESCE(
+          m."Path 1", m."Path 2", m."Path 3", m."Path 4",
+          m."Path 5", m."Path 6", m."Path 7", m."Path 8"
+      ) IS NULL
+)
+INSERT INTO vhostscsi ("Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model", "LUN UUID")
+SELECT DISTINCT "Host ID", hba_device, NULL, canonical_name, lun_vendor, lun_model, lun_uuid
+FROM path_records
+UNION
+SELECT DISTINCT "Host ID", hba_device, NULL, canonical_name, lun_vendor, lun_model, lun_uuid
+FROM unassociated_records;
+
+WITH multipath_backing AS (
+    SELECT
+        "Object ID" AS datastore_id,
+        CAST(to_json(
+            list(DISTINCT "Disk" ORDER BY "Disk") FILTER (WHERE "Disk" IS NOT NULL)
+        ) AS VARCHAR) AS backing_devices
+    FROM vMultiPath_normalized
+    WHERE "Object ID" IS NOT NULL
+    GROUP BY "Object ID"
+)
+INSERT INTO vdatastore (
+    "Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
+    "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol",
+    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"
+)
+SELECT
+    d."Hosts",
+    d."Address",
+    d."Name",
+    d."Object ID",
+    TRY_CAST(d."Free MiB" AS DOUBLE),
+    CASE WHEN LOWER(d."MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    TRY_CAST(d."Capacity MiB" AS DOUBLE),
+    d."Type",
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) IN ('NFS4.1', 'NFS 4.1') THEN 'NFS41'
+        ELSE NULLIF(UPPER(TRIM(d."Type")), '')
+    END,
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) = 'VMFS'
+         AND TRY_CAST(d."Major Version" AS INTEGER) > 0
+        THEN TRY_CAST(d."Major Version" AS INTEGER)
+        ELSE NULL
+    END,
+    COALESCE(
+        b.backing_devices,
+        CASE
+            WHEN UPPER(TRIM(COALESCE(d."Type", ''))) = 'VMFS'
+             AND TRY_CAST(d."# Extents" AS INTEGER) = 1
+			AND regexp_matches(LOWER(TRIM(COALESCE(d."Address", ''))), '^(naa\.|eui\.|t10\.|mpx\.|vml\.|nvme\.).+')
+            THEN CAST(to_json([TRIM(d."Address")]) AS VARCHAR)
+            ELSE '[]'
+        END
+    ),
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) IN ('NFS', 'NFS41', 'NFS4.1', 'NFS 4.1') THEN 'NFS'
+        ELSE NULL
+    END,
+    CASE WHEN LOWER(TRIM(COALESCE(d."SIOC Enabled", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    COALESCE(TRY_CAST(d."SIOC Congestion Threshold" AS INTEGER), 30),
+    CASE WHEN LOWER(TRIM(COALESCE(d."SIOC Congestion Threshold Mode", ''))) = 'manual' THEN 'manual' ELSE 'automatic' END,
+    COALESCE(TRY_CAST(d."SIOC Percent Of Peak Throughput" AS INTEGER), 90)
+FROM vdatastore_raw d
+LEFT JOIN multipath_backing b ON b.datastore_id = d."Object ID";
+
+DROP TABLE IF EXISTS vdatastore_raw;
+DROP TABLE IF EXISTS rvtools_host_map;
+DROP TABLE IF EXISTS vMultiPath_normalized;
+DROP TABLE IF EXISTS vMultiPath_raw;
 
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",

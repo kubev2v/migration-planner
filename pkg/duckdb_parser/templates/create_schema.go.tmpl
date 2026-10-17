@@ -129,16 +129,39 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "MHA" BOOLEAN DEFAULT false,
     "Capacity MiB" DOUBLE DEFAULT 0.0,
     "Type" VARCHAR,
+    "Filesystem Type" VARCHAR,
+    "Filesystem Major Version" INTEGER,
     "Backing Devices" VARCHAR DEFAULT '[]',
+    "Storage Protocol" VARCHAR,
     "SIOC Enabled" BOOLEAN DEFAULT false,
     "SIOC Congestion Threshold" INTEGER DEFAULT 30,
     "SIOC Congestion Threshold Mode" VARCHAR DEFAULT 'automatic',
     "SIOC Percent Of Peak Throughput" INTEGER DEFAULT 90
 );
 
+-- Adapter inventory from either collector, identified by host and device.
 CREATE TABLE IF NOT EXISTS vhba (
+    "Host ID" VARCHAR,
     "Device" VARCHAR,
-    "Type" VARCHAR
+    "Type" VARCHAR,
+    "HBA Key" VARCHAR,
+    "Protocol" VARCHAR,
+    "Model" VARCHAR,
+    "Driver" VARCHAR,
+    "Node WWN" VARCHAR,
+    "Port WWN" VARCHAR
+);
+
+-- Distinct host/adapter/LUN associations. HBA Device is NULL for an unresolved
+-- adapter, so LUN metadata can still be collected without topology information.
+CREATE TABLE IF NOT EXISTS vhostscsi (
+    "Host ID" VARCHAR,
+    "HBA Device" VARCHAR,
+    "SCSI Disk Key" VARCHAR,
+    "Canonical Name" VARCHAR,
+    "LUN Vendor" VARCHAR,
+    "LUN Model" VARCHAR,
+    "LUN UUID" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS dvport (
