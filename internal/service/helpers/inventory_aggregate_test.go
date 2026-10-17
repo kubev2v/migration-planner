@@ -1,7 +1,11 @@
 package helpers
 
 import (
+	"encoding/json"
+
+	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -29,16 +33,13 @@ var _ = Describe("inventory aggregation", func() {
 			},
 		}
 
-		got := aggregate(inventories)
+		got := AggregateInventoryData(inventories)
 
-		Expect(got.Clusters).To(BeEmpty())
-		Expect(got.VcenterId).To(Equal("vc-1"))
-		Expect(got.Vcenter).ToNot(BeNil())
-		Expect(got.Vcenter.Vcenter).To(Equal(&api.VCenter{Id: "vc-1"}))
-		Expect(got.Vcenter.Vms.Total).To(Equal(8))
-		Expect(got.Vcenter.Vms.CpuCores.Total).To(Equal(8))
-		Expect(got.Vcenter.Vms.RamGB.Total).To(Equal(16))
-		Expect(got.Vcenter.Vms.DiskGB.Total).To(Equal(25))
+		Expect(got.Vcenter).To(Equal(&api.VCenter{Id: "vc-1"}))
+		Expect(got.Vms.Total).To(Equal(8))
+		Expect(got.Vms.CpuCores.Total).To(Equal(8))
+		Expect(got.Vms.RamGB.Total).To(Equal(16))
+		Expect(got.Vms.DiskGB.Total).To(Equal(25))
 	})
 
 	It("aggregates infrastructure fields across inventories", func() {
@@ -92,9 +93,9 @@ var _ = Describe("inventory aggregation", func() {
 			},
 		}
 
-		got := aggregate(inventories)
+		got := AggregateInventoryData(inventories)
 
-		infra := got.Vcenter.Infra
+		infra := got.Infra
 		Expect(infra.TotalHosts).To(Equal(3))
 		Expect(infra.Hosts).ToNot(BeNil())
 		Expect(*infra.Hosts).To(Equal(append(hosts1, hosts2...)))
@@ -134,13 +135,12 @@ var _ = Describe("inventory aggregation", func() {
 			},
 		}
 
-		got := aggregate(inventories)
+		got := AggregateInventoryData(inventories)
 
-		Expect(got.Vcenter).ToNot(BeNil())
-		Expect(got.Vcenter.Vms.Total).To(Equal(10))
-		Expect(got.Vcenter.Vms.CpuCores.Total).To(Equal(10))
-		Expect(got.Vcenter.Vms.RamGB.Total).To(Equal(10))
-		Expect(got.Vcenter.Vms.DiskGB.Total).To(Equal(100))
+		Expect(got.Vms.Total).To(Equal(10))
+		Expect(got.Vms.CpuCores.Total).To(Equal(10))
+		Expect(got.Vms.RamGB.Total).To(Equal(10))
+		Expect(got.Vms.DiskGB.Total).To(Equal(100))
 	})
 
 	It("omits the vCenter ID when inventory IDs disagree", func() {
@@ -149,19 +149,134 @@ var _ = Describe("inventory aggregation", func() {
 			{Vcenter: &api.VCenter{Id: "vc-2"}},
 		}
 
-		got := aggregate(inventories)
+		got := AggregateInventoryData(inventories)
 
-		Expect(got.VcenterId).To(BeEmpty())
-		Expect(got.Vcenter).ToNot(BeNil())
-		Expect(got.Vcenter.Vcenter).To(BeNil())
+		Expect(got.Vcenter).To(BeNil())
 	})
 
 	It("returns an empty aggregate when there are no inventories", func() {
-		got := aggregate(nil)
+		got := AggregateInventoryData(nil)
 
-		Expect(got.Clusters).To(BeEmpty())
-		Expect(got.Clusters).ToNot(BeNil())
+		Expect(got.Vms.Total).To(Equal(0))
 		Expect(got.Vcenter).To(BeNil())
-		Expect(got.VcenterId).To(BeEmpty())
 	})
 })
+
+var _ = Describe("Aggregate", func() {
+	It("aggregates V2 assessment inventories", func() {
+		inv1 := mustMarshal(api.Inventory{
+			VcenterId: "vc-1",
+			Clusters:  map[string]api.InventoryData{},
+			Vcenter: &api.InventoryData{
+				Vcenter: &api.VCenter{Id: "vc-1"},
+				Vms:     api.VMs{Total: 3, CpuCores: api.VMResourceBreakdown{Total: 4}},
+				Infra:   api.Infra{TotalHosts: 1, Datastores: []api.Datastore{{DiskId: "ds-1"}}, Networks: []api.Network{{Name: "net-1"}}},
+			},
+		})
+		inv2 := mustMarshal(api.Inventory{
+			VcenterId: "vc-1",
+			Clusters:  map[string]api.InventoryData{},
+			Vcenter: &api.InventoryData{
+				Vcenter: &api.VCenter{Id: "vc-1"},
+				Vms:     api.VMs{Total: 5, CpuCores: api.VMResourceBreakdown{Total: 8}},
+				Infra:   api.Infra{TotalHosts: 2, Datastores: []api.Datastore{{DiskId: "ds-2"}}, Networks: []api.Network{{Name: "net-2"}}},
+			},
+		})
+
+		models := []model.AssessmentInventory{
+			{ID: uuid.New(), Version: model.SnapshotVersionV2, Inventory: inv1},
+			{ID: uuid.New(), Version: model.SnapshotVersionV2, Inventory: inv2},
+		}
+
+		got, err := Aggregate(models)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vcenter).ToNot(BeNil())
+		Expect(got.Vcenter.Vms.Total).To(Equal(8))
+		Expect(got.Vcenter.Vms.CpuCores.Total).To(Equal(12))
+		Expect(got.Vcenter.Infra.TotalHosts).To(Equal(3))
+		Expect(got.Vcenter.Infra.Datastores).To(HaveLen(2))
+		Expect(got.Vcenter.Infra.Networks).To(HaveLen(2))
+	})
+
+	It("aggregates V1 assessment inventories", func() {
+		inv1 := mustMarshal(api.InventoryData{
+			Vcenter: &api.VCenter{Id: "vc-1"},
+			Vms:     api.VMs{Total: 2},
+			Infra:   api.Infra{TotalHosts: 1, Datastores: []api.Datastore{{DiskId: "ds-1"}}, Networks: []api.Network{{Name: "n-1"}}},
+		})
+		inv2 := mustMarshal(api.InventoryData{
+			Vcenter: &api.VCenter{Id: "vc-1"},
+			Vms:     api.VMs{Total: 3},
+			Infra:   api.Infra{TotalHosts: 2, Datastores: []api.Datastore{{DiskId: "ds-2"}}, Networks: []api.Network{{Name: "n-2"}}},
+		})
+
+		models := []model.AssessmentInventory{
+			{ID: uuid.New(), Version: model.SnapshotVersionV1, Inventory: inv1},
+			{ID: uuid.New(), Version: model.SnapshotVersionV1, Inventory: inv2},
+		}
+
+		got, err := Aggregate(models)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vcenter).ToNot(BeNil())
+		Expect(got.Vcenter.Vms.Total).To(Equal(5))
+		Expect(got.Vcenter.Infra.TotalHosts).To(Equal(3))
+	})
+
+	It("returns empty inventory for nil input", func() {
+		got, err := Aggregate(nil)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vcenter).To(BeNil())
+	})
+})
+
+var _ = Describe("UnmarshalInventoryData", func() {
+	It("unmarshals V2 inventory", func() {
+		raw := mustMarshal(api.Inventory{
+			VcenterId: "vc-1",
+			Clusters:  map[string]api.InventoryData{},
+			Vcenter: &api.InventoryData{
+				Vcenter: &api.VCenter{Id: "vc-1"},
+				Vms:     api.VMs{Total: 10},
+				Infra:   api.Infra{TotalHosts: 3},
+			},
+		})
+
+		inv := model.AssessmentInventory{Version: model.SnapshotVersionV2, Inventory: raw}
+		got, err := UnmarshalInventoryData(inv)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vms.Total).To(Equal(10))
+		Expect(got.Infra.TotalHosts).To(Equal(3))
+	})
+
+	It("unmarshals V1 inventory", func() {
+		raw := mustMarshal(api.InventoryData{
+			Vcenter: &api.VCenter{Id: "vc-1"},
+			Vms:     api.VMs{Total: 5},
+			Infra:   api.Infra{TotalHosts: 2},
+		})
+
+		inv := model.AssessmentInventory{Version: model.SnapshotVersionV1, Inventory: raw}
+		got, err := UnmarshalInventoryData(inv)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vms.Total).To(Equal(5))
+		Expect(got.Infra.TotalHosts).To(Equal(2))
+	})
+
+	It("returns empty data when V2 inventory has nil vcenter", func() {
+		raw := mustMarshal(api.Inventory{
+			VcenterId: "vc-1",
+			Clusters:  map[string]api.InventoryData{},
+		})
+
+		inv := model.AssessmentInventory{Version: model.SnapshotVersionV2, Inventory: raw}
+		got, err := UnmarshalInventoryData(inv)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(got.Vms.Total).To(Equal(0))
+	})
+})
+
+func mustMarshal(v any) []byte {
+	b, err := json.Marshal(v)
+	Expect(err).ToNot(HaveOccurred())
+	return b
+}

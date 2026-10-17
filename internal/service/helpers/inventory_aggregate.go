@@ -1,28 +1,39 @@
 package helpers
 
 import (
+	"encoding/json"
 	"math"
 	"time"
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
-func aggregate(inventories []api.InventoryData) api.Inventory {
+func Aggregate(inventories []model.AssessmentInventory) (api.Inventory, error) {
 	now := time.Now().UTC()
 	result := api.Inventory{Clusters: map[string]api.InventoryData{}, CreatedAt: &now}
 	if len(inventories) == 0 {
-		return result
+		return result, nil
 	}
 
-	aggregated := aggregateInventoryData(inventories)
+	dataSlice := make([]api.InventoryData, 0, len(inventories))
+	for _, inv := range inventories {
+		d, err := UnmarshalInventoryData(inv)
+		if err != nil {
+			return api.Inventory{}, err
+		}
+		dataSlice = append(dataSlice, d)
+	}
+
+	aggregated := AggregateInventoryData(dataSlice)
 	result.Vcenter = &aggregated
 	if aggregated.Vcenter != nil {
 		result.VcenterId = aggregated.Vcenter.Id
 	}
-	return result
+	return result, nil
 }
 
-func aggregateInventoryData(inventories []api.InventoryData) api.InventoryData {
+func AggregateInventoryData(inventories []api.InventoryData) api.InventoryData {
 	vms := aggregateVMs(inventories)
 
 	var vcenter *api.VCenter
@@ -379,6 +390,24 @@ func optionalMap[V any](m map[string]V) *map[string]V {
 		return nil
 	}
 	return &m
+}
+
+func UnmarshalInventoryData(inv model.AssessmentInventory) (api.InventoryData, error) {
+	if inv.Version == model.SnapshotVersionV2 {
+		var inventory api.Inventory
+		if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
+			return api.InventoryData{}, err
+		}
+		if inventory.Vcenter != nil {
+			return *inventory.Vcenter, nil
+		}
+		return api.InventoryData{}, nil
+	}
+	var invData api.InventoryData
+	if err := json.Unmarshal(inv.Inventory, &invData); err != nil {
+		return api.InventoryData{}, err
+	}
+	return invData, nil
 }
 
 func vcenterID(inventories []api.InventoryData) (string, bool) {

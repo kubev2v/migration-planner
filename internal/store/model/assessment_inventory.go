@@ -37,11 +37,13 @@ func (ai AssessmentInventory) String() string {
 
 // PopulateFromInventory unmarshals raw inventory JSON and extracts
 // VCenterID and resource counts into the receiver. It sets Inventory to raw.
-func NewAssessmentInventory(id uuid.UUID, name string, raw []byte) (AssessmentInventory, error) {
+func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, isSubset bool, raw []byte) (AssessmentInventory, error) {
 	ai := AssessmentInventory{
-		ID:        id,
-		Name:      name,
-		Inventory: raw,
+		AssessmentID: assessmentID,
+		ID:           id,
+		Name:         name,
+		Inventory:    raw,
+		IsSubset:     isSubset,
 	}
 
 	var keys map[string]json.RawMessage

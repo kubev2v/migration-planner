@@ -195,7 +195,7 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 		}
 		data, _ := json.Marshal(resource.Inventory)
 		form.Inventory = data
-		inv, err := model.NewAssessmentInventory(uuid.New(), resource.Name, data)
+		inv, err := model.NewAssessmentInventory(uuid.New(), form.ID, resource.Name, false, data)
 		if err == nil {
 			form.Inventories = []model.AssessmentInventory{inv}
 		}

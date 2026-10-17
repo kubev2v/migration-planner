@@ -79,6 +79,10 @@ func (f *ForbiddenAssessmentService) UnshareAssessment(_ context.Context, id uui
 	return service.NewErrForbidden("assessment", id.String())
 }
 
+func (f *ForbiddenAssessmentService) AggregateInventories(_ context.Context, id uuid.UUID, _ ...uuid.UUID) (model.AssessmentInventory, error) {
+	return model.AssessmentInventory{}, service.NewErrForbidden("assessment", id.String())
+}
+
 func (m *MockStore) Source() store.Source {
 	panic("Source() not implemented in MockStore for this test")
 }
@@ -168,6 +172,10 @@ func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Asses
 
 func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
 	panic("Update() not implemented in MockAssessmentStore for this test")
+}
+
+func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
+	panic("UpsertInventories() not implemented in MockAssessmentStore for this test")
 }
 
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {

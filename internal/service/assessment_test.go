@@ -241,7 +241,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
 				ownerLastName := "Johnson"
-				inv, err := model.NewAssessmentInventory(uuid.New(), "Test Assessment", inventoryJSON)
+				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -285,7 +285,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				})
 
 				testAssessmentID := uuid.New()
-				inv, err := model.NewAssessmentInventory(uuid.New(), "Test Assessment No Owner", inventoryJSON)
+				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -325,7 +325,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Second creation with same name should fail via service (unique constraint)
-				inv, err := model.NewAssessmentInventory(uuid.New(), name, inventoryJSON)
+				inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), name, false, inventoryJSON)
 				Expect(err).To(BeNil())
 				secondForm := mappers.AssessmentCreateForm{
 					ID:          uuid.New(),
@@ -1203,6 +1203,128 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
+		})
+	})
+
+	Context("AggregateInventories", func() {
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM outbox_events;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
+			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessments;")
+		})
+
+		It("aggregates subset inventories and returns main inventory with correct counts", func() {
+			mainJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vc-1",
+				Clusters:  map[string]v1alpha1.InventoryData{},
+				Vcenter: &v1alpha1.InventoryData{
+					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
+					Vms:     v1alpha1.VMs{Total: 1},
+					Infra:   v1alpha1.Infra{TotalHosts: 1},
+				},
+			})
+			inv1JSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vc-1",
+				Clusters:  map[string]v1alpha1.InventoryData{},
+				Vcenter: &v1alpha1.InventoryData{
+					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
+					Vms:     v1alpha1.VMs{Total: 3, CpuCores: v1alpha1.VMResourceBreakdown{Total: 6}},
+					Infra:   v1alpha1.Infra{TotalHosts: 1, Datastores: []v1alpha1.Datastore{{DiskId: "ds-1"}}, Networks: []v1alpha1.Network{{Name: "net-1"}}},
+				},
+			})
+			inv2JSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vc-1",
+				Clusters:  map[string]v1alpha1.InventoryData{},
+				Vcenter: &v1alpha1.InventoryData{
+					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
+					Vms:     v1alpha1.VMs{Total: 5, CpuCores: v1alpha1.VMResourceBreakdown{Total: 10}},
+					Infra:   v1alpha1.Infra{TotalHosts: 2, Datastores: []v1alpha1.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []v1alpha1.Network{{Name: "net-2"}}},
+				},
+			})
+
+			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			Expect(err).To(BeNil())
+
+			subset1, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
+			Expect(err).To(BeNil())
+
+			subset2, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
+			Expect(err).To(BeNil())
+
+			createForm := mappers.AssessmentCreateForm{
+				ID:          uuid.New(),
+				Name:        "aggregate-test",
+				OrgID:       "org1",
+				Username:    "user1",
+				SourceType:  service.SourceTypeRvtools,
+				Inventories: []model.AssessmentInventory{mainInv, subset1, subset2},
+			}
+			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
+			Expect(err).To(BeNil())
+
+			result, err := svc.AggregateInventories(context.TODO(), assessment.ID)
+
+			Expect(err).To(BeNil())
+			Expect(result).ToNot(BeNil())
+			Expect(result.IsSubset).To(BeFalse())
+			Expect(result.AssessmentID).To(Equal(assessment.ID))
+			Expect(result.VMsCount).To(Equal(8))
+			Expect(result.HostsCount).To(Equal(3))
+			Expect(result.DatastoresCount).To(Equal(3))
+			Expect(result.NetworksCount).To(Equal(2))
+		})
+
+		It("skips non-subset inventories", func() {
+			mainJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vc-1",
+				Clusters:  map[string]v1alpha1.InventoryData{},
+				Vcenter: &v1alpha1.InventoryData{
+					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
+					Vms:     v1alpha1.VMs{Total: 100},
+					Infra:   v1alpha1.Infra{TotalHosts: 50},
+				},
+			})
+			subsetJSON, _ := json.Marshal(v1alpha1.Inventory{
+				VcenterId: "vc-1",
+				Clusters:  map[string]v1alpha1.InventoryData{},
+				Vcenter: &v1alpha1.InventoryData{
+					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
+					Vms:     v1alpha1.VMs{Total: 7},
+					Infra:   v1alpha1.Infra{TotalHosts: 2},
+				},
+			})
+
+			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			Expect(err).To(BeNil())
+
+			subset, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
+			Expect(err).To(BeNil())
+
+			createForm := mappers.AssessmentCreateForm{
+				ID:          uuid.New(),
+				Name:        "skip-main-test",
+				OrgID:       "org1",
+				Username:    "user1",
+				SourceType:  service.SourceTypeRvtools,
+				Inventories: []model.AssessmentInventory{mainInv, subset},
+			}
+			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
+			Expect(err).To(BeNil())
+
+			result, err := svc.AggregateInventories(context.TODO(), assessment.ID)
+
+			Expect(err).To(BeNil())
+			Expect(result.VMsCount).To(Equal(7))
+			Expect(result.HostsCount).To(Equal(2))
+		})
+
+		It("returns error when assessment does not exist", func() {
+			_, err := svc.AggregateInventories(context.TODO(), uuid.New())
+
+			Expect(err).ToNot(BeNil())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
 		})
 	})
 })

@@ -49,6 +49,11 @@ func (b *QueryBuilder) CreateSchemaQuery() (string, error) {
 	return b.buildQuery("create_schema", mustGetTemplate("create_schema"), nil)
 }
 
+// CleanupQuery returns queries to delete all data from RVTools tables, allowing schema reuse.
+func (b *QueryBuilder) CleanupQuery() (string, error) {
+	return b.buildQuery("cleanup", mustGetTemplate("cleanup"), nil)
+}
+
 // IngestRvtoolsQuery returns a query that inserts data from an RVTools Excel file into schema tables.
 func (b *QueryBuilder) IngestRvtoolsQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), ingestParams{FilePath: filePath})

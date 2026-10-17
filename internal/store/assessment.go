@@ -17,6 +17,7 @@ type Assessment interface {
 	Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
 	Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error)
 	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error)
+	UpsertInventories(ctx context.Context, inventory ...model.AssessmentInventory) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -115,6 +116,15 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 	}
 
 	return &assessment, nil
+}
+
+func (a *AssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
+	for _, i := range inventories {
+		if err := a.getDB(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&i).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (a *AssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {

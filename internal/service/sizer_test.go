@@ -137,6 +137,10 @@ func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID
 	return nil, nil
 }
 
+func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
+	return nil
+}
+
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
