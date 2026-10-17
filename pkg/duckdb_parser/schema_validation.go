@@ -63,13 +63,14 @@ const (
 
 // Validation codes for warnings
 const (
-	CodeEmptyHosts      = "EMPTY_HOSTS"
-	CodeEmptyDatastores = "EMPTY_DATASTORES"
-	CodeEmptyNetworks   = "EMPTY_NETWORKS"
-	CodeEmptyCPU        = "EMPTY_CPU"
-	CodeEmptyMemory     = "EMPTY_MEMORY"
-	CodeEmptyDisks      = "EMPTY_DISKS"
-	CodeEmptyNICs       = "EMPTY_NICS"
+	CodeInvalidCollectionTime = "INVALID_COLLECTION_TIME"
+	CodeEmptyHosts            = "EMPTY_HOSTS"
+	CodeEmptyDatastores       = "EMPTY_DATASTORES"
+	CodeEmptyNetworks         = "EMPTY_NETWORKS"
+	CodeEmptyCPU              = "EMPTY_CPU"
+	CodeEmptyMemory           = "EMPTY_MEMORY"
+	CodeEmptyDisks            = "EMPTY_DISKS"
+	CodeEmptyNICs             = "EMPTY_NICS"
 )
 
 // warningChecks defines optional table checks that produce warnings (non-fatal).

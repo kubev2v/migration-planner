@@ -11,6 +11,14 @@ Strategy:
 */ -}}
 INSTALL excel;
 LOAD excel; 
+
+-- Reset optional export metadata before each file so a missing sheet cannot reuse an earlier date.
+CREATE OR REPLACE TEMP TABLE vmetadata_raw ("xlsx creation datetime" VARCHAR);
+CREATE OR REPLACE TEMP TABLE vmetadata_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vMetaData', header=true, all_varchar=true);
+
+ALTER TABLE vmetadata_raw ADD COLUMN IF NOT EXISTS "xlsx creation datetime" VARCHAR;
+
 CREATE TABLE vinfo_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', header=true, all_varchar=true);
 

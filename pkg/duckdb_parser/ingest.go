@@ -76,6 +76,24 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (Validatio
 		if err := p.validateVMs(ctx); err != nil {
 			return result, fmt.Errorf("validating VMs: %w", err)
 		}
+		collectionTime, err := p.rvtoolsCollectionTime(ctx)
+		if err != nil {
+			if ctx.Err() != nil {
+				return result, ctx.Err()
+			}
+			result.Warnings = append(result.Warnings, ValidationIssue{
+				Code:    CodeInvalidCollectionTime,
+				Table:   "vMetaData",
+				Column:  "xlsx creation datetime",
+				Message: fmt.Sprintf("Collection time is unknown: %v", err),
+			})
+		}
+		if err := p.SetCollectionTime(ctx, collectionTime); err != nil {
+			return result, fmt.Errorf("recording collection time: %w", err)
+		}
+	}
+	if err := p.dropVmetadataRaw(ctx); err != nil {
+		return result, fmt.Errorf("dropping vmetadata_raw: %w", err)
 	}
 
 	return result, nil
@@ -114,6 +132,12 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (Validatio
 // This table holds unfiltered data from the Excel file and is only needed for validation.
 func (p *Parser) dropVinfoRaw(ctx context.Context) error {
 	_, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS vinfo_raw")
+	return err
+}
+
+// dropVmetadataRaw drops the temporary metadata table after its collection time is recorded.
+func (p *Parser) dropVmetadataRaw(ctx context.Context) error {
+	_, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS vmetadata_raw")
 	return err
 }
 

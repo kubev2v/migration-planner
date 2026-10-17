@@ -54,6 +54,11 @@ func (b *QueryBuilder) IngestRvtoolsQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_rvtools", mustGetTemplate("ingest_rvtools"), ingestParams{FilePath: filePath})
 }
 
+// RVToolsCollectionTimeQuery returns the collection date and validation counts from ingestion.
+func (b *QueryBuilder) RVToolsCollectionTimeQuery() (string, error) {
+	return b.buildQuery("rvtools_collection_time_query", mustGetTemplate("rvtools_collection_time_query"), nil)
+}
+
 // IngestSqliteQuery returns a query that creates RVTools-shaped tables from a forklift SQLite database.
 func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 	return b.buildQuery("ingest_sqlite", mustGetTemplate("ingest_sqlite"), ingestParams{FilePath: filePath})

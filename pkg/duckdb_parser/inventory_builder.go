@@ -95,6 +95,11 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		clusterInventories[clusterID] = *clusterInv
 	}
 
+	collectionTime, err := p.CollectionTime(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("getting collection time: %w", err)
+	}
+
 	now := time.Now().UTC()
 	return &inventory.Inventory{
 		VCenterID:      vcenterID,
@@ -102,6 +107,7 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		Clusters:       clusterInventories,
 		VCenterVersion: vcenterVersion,
 		CreatedAt:      &now,
+		CollectionTime: collectionTime,
 	}, nil
 }
 
@@ -596,4 +602,35 @@ func generateClusterID(clusterName, datacenterName, vcenterUUID string) string {
 
 	// Return as cluster-{first16hexchars}
 	return fmt.Sprintf("cluster-%x", hash[:8])
+}
+
+// SetCollectionTime records one source's collection time for the current build.
+func (p *Parser) SetCollectionTime(ctx context.Context, collectionTime *time.Time) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if collectionTime != nil {
+		utc := collectionTime.UTC()
+		collectionTime = &utc
+	}
+	p.collectionTimes = append(p.collectionTimes, collectionTime)
+	return nil
+}
+
+// CollectionTime returns the original collection time when every source agrees.
+func (p *Parser) CollectionTime(ctx context.Context) (*time.Time, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if len(p.collectionTimes) == 0 || p.collectionTimes[0] == nil {
+		return nil, nil
+	}
+	first := p.collectionTimes[0]
+	for _, date := range p.collectionTimes[1:] {
+		if date == nil || !date.Equal(*first) {
+			return nil, nil
+		}
+	}
+	result := *first
+	return &result, nil
 }

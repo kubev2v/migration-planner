@@ -3,6 +3,7 @@ package duckdb_parser
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/store"
@@ -15,10 +16,12 @@ type Validator interface {
 }
 
 // Parser provides methods for parsing and querying VMware inventory data.
+// Ingestion and inventory building on the same Parser must run sequentially.
 type Parser struct {
-	db        store.QueryInterceptor
-	builder   *QueryBuilder
-	validator Validator
+	db              store.QueryInterceptor
+	builder         *QueryBuilder
+	validator       Validator
+	collectionTimes []*time.Time
 }
 
 // New creates a new Parser with optional validator.

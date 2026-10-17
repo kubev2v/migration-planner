@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 
@@ -691,4 +692,28 @@ func (p *Parser) about(ctx context.Context) (models.About, error) {
 		Product:      product.String,
 		InstanceUuid: instanceUUID.String,
 	}, nil
+}
+
+// rvtoolsCollectionTime reads the date from metadata loaded during ingestion.
+func (p *Parser) rvtoolsCollectionTime(ctx context.Context) (*time.Time, error) {
+	query, err := p.builder.RVToolsCollectionTimeQuery()
+	if err != nil {
+		return nil, fmt.Errorf("building RVTools collection time query: %w", err)
+	}
+	var collectedAt sql.NullTime
+	var distinctDates, invalidDates int
+	if err := p.db.QueryRowContext(ctx, query).Scan(&collectedAt, &distinctDates, &invalidDates); err != nil {
+		return nil, fmt.Errorf("reading RVTools collection time: %w", err)
+	}
+	if invalidDates > 0 {
+		return nil, fmt.Errorf("RVTools metadata contains an unsupported collection date")
+	}
+	if distinctDates > 1 {
+		return nil, fmt.Errorf("RVTools metadata contains different collection times")
+	}
+	if !collectedAt.Valid {
+		return nil, nil
+	}
+	utc := collectedAt.Time.UTC()
+	return &utc, nil
 }
