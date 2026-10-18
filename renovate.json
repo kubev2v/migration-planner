@@ -1,17 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": "Renovate configuration for migration-planner",
-  "extends": [
-    "config:recommended"
-  ],
-  "postUpdateOptions": [
-    "gomodTidy"
-  ],
-  "packageRules": [
-    {
-      "description": "Automerge non-major updates",
-      "matchUpdateTypes": ["minor", "patch"],
-      "automerge": true
-    }
-  ]
+  "extends": ["github>kubev2v/migration-planner-workflows//renovate-config/default.json"],
+  "postUpdateOptions": ["gomodTidy"]
 }
