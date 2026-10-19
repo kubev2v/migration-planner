@@ -4849,6 +4849,24 @@ func (response UploadRvtoolsToAssessment401JSONResponse) VisitUploadRvtoolsToAss
 	return json.NewEncoder(w).Encode(response)
 }
 
+type UploadRvtoolsToAssessment403JSONResponse Error
+
+func (response UploadRvtoolsToAssessment403JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UploadRvtoolsToAssessment404JSONResponse Error
+
+func (response UploadRvtoolsToAssessment404JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type UploadRvtoolsToAssessment500JSONResponse Error
 
 func (response UploadRvtoolsToAssessment500JSONResponse) VisitUploadRvtoolsToAssessmentResponse(w http.ResponseWriter) error {

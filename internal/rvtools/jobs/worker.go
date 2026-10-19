@@ -98,6 +98,10 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		if err != nil {
 			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
 		}
+		// The initial aggregate is the same inventory as its first vCenter subset.
+		subsetInv := assessmentInv
+		subsetInv.ID = uuid.New()
+		subsetInv.IsSubset = true
 
 		createForm := mappers.AssessmentCreateForm{
 			ID:          assessmentID,
@@ -105,7 +109,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 			OrgID:       job.Args.OrgID,
 			Username:    job.Args.Username,
 			SourceType:  "rvtools",
-			Inventories: []model.AssessmentInventory{assessmentInv},
+			Inventories: []model.AssessmentInventory{assessmentInv, subsetInv},
 		}
 		if job.Args.FirstName != "" {
 			createForm.OwnerFirstName = &job.Args.FirstName

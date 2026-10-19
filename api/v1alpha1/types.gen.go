@@ -417,7 +417,7 @@ type AssessmentUpdate struct {
 // AssessmentV2 defines model for AssessmentV2.
 type AssessmentV2 struct {
 	Data     InventoryV2   `json:"data"`
-	Vcetners []SubResource `json:"vcetners"`
+	Vcenters []SubResource `json:"vcenters"`
 }
 
 // AssessmentV2Summary defines model for AssessmentV2Summary.

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/test/e2e/config"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -48,7 +49,7 @@ var _ = Describe("e2e-rvtools", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Generate a valid example Excel file that meets validation requirements
-			exampleContent, err := CreateExample1Excel()
+			exampleContent, err := CreateExample1Excel(uuid.New())
 			Expect(err).To(BeNil(), "Failed to generate example Excel file")
 			tmpFile, err := CreateTempExcelFile(exampleContent)
 			Expect(err).To(BeNil(), "Failed to create temporary Excel file")
@@ -73,6 +74,187 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(MatchError(ContainSubstring("status: 404")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
+		})
+	})
+
+	Context("assessment v2 RVTools aggregation", func() {
+		It("POSTs the initial inventory and PUT aggregates a second vCenter inventory", func() {
+			firstVCenterID := uuid.New()
+			secondVCenterID := uuid.New()
+
+			firstContent, err := CreateValidTestExcel(firstVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			firstFile, err := CreateTempExcelFile(firstContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(firstFile) }()
+
+			secondContent, err := CreateMultiClusterTestExcel(secondVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			secondFile, err := CreateTempExcelFile(secondContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(secondFile) }()
+
+			createJob, err := svc.CreateRVToolsV2Job("v2-rvtools-aggregation-test", firstFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob).NotTo(BeNil())
+			Expect(createJob.Status).NotTo(Equal(v1alpha1.JobStatusFailed))
+
+			createJob, err = waitForRVToolsJob(svc, createJob.Id)
+			if createJob != nil && createJob.AssessmentId != nil {
+				assessmentID := *createJob.AssessmentId
+				defer func() { _ = svc.RemoveAssessment(assessmentID) }()
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob.AssessmentId).NotTo(BeNil())
+			assessmentID := *createJob.AssessmentId
+
+			initial, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(initial.Data.Id).To(Equal(firstVCenterID.String()))
+			Expect(initial.Data.Data.Vms.Total).To(Equal(2))
+			Expect(initial.Data.Data.Vms.CpuCores.Total).To(Equal(6))
+			Expect(initial.Data.Data.Vms.RamGB.Total).To(Equal(12))
+			Expect(initial.Data.Data.Vms.PowerStates).To(Equal(map[string]int{
+				"poweredOn":  1,
+				"poweredOff": 1,
+			}))
+			Expect(initial.Vcenters).To(ConsistOf(v1alpha1.SubResource{Id: firstVCenterID.String()}))
+
+			updateJob, err := svc.UploadRVToolsToAssessment(assessmentID, secondFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updateJob).NotTo(BeNil())
+			Expect(updateJob.Status).NotTo(Equal(v1alpha1.JobStatusFailed))
+
+			updateJob, err = waitForRVToolsJob(svc, updateJob.Id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updateJob.AssessmentId).NotTo(BeNil())
+			Expect(*updateJob.AssessmentId).To(Equal(assessmentID))
+
+			aggregated, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(aggregated.Data.Data.Vms.Total).To(Equal(6))
+			Expect(aggregated.Data.Data.Vms.CpuCores.Total).To(Equal(24))
+			Expect(aggregated.Data.Data.Vms.RamGB.Total).To(Equal(48))
+			Expect(aggregated.Data.Data.Vms.PowerStates).To(Equal(map[string]int{
+				"poweredOn":  4,
+				"poweredOff": 2,
+			}))
+			Expect(aggregated.Vcenters).To(ConsistOf(
+				v1alpha1.SubResource{Id: firstVCenterID.String()},
+				v1alpha1.SubResource{Id: secondVCenterID.String()},
+			))
+		})
+
+		It("upserts the same vCenter so re-uploading the identical file leaves the aggregate unchanged", func() {
+			vCenterID := uuid.New()
+
+			content, err := CreateValidTestExcel(vCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			file, err := CreateTempExcelFile(content)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(file) }()
+
+			createJob, err := svc.CreateRVToolsV2Job("v2-rvtools-upsert-test", file)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob).NotTo(BeNil())
+			Expect(createJob.Status).NotTo(Equal(v1alpha1.JobStatusFailed))
+
+			createJob, err = waitForRVToolsJob(svc, createJob.Id)
+			if createJob != nil && createJob.AssessmentId != nil {
+				assessmentID := *createJob.AssessmentId
+				defer func() { _ = svc.RemoveAssessment(assessmentID) }()
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob.AssessmentId).NotTo(BeNil())
+			assessmentID := *createJob.AssessmentId
+
+			initial, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(initial.Data.Data.Vms.Total).To(Equal(2))
+			Expect(initial.Data.Data.Vms.CpuCores.Total).To(Equal(6))
+			Expect(initial.Data.Data.Vms.RamGB.Total).To(Equal(12))
+			Expect(initial.Data.Data.Vms.PowerStates).To(Equal(map[string]int{
+				"poweredOn":  1,
+				"poweredOff": 1,
+			}))
+			Expect(initial.Vcenters).To(ConsistOf(v1alpha1.SubResource{Id: vCenterID.String()}))
+
+			// Re-upload the identical file: the same vCenter ID must be upserted, not aggregated.
+			updateJob, err := svc.UploadRVToolsToAssessment(assessmentID, file)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updateJob).NotTo(BeNil())
+			Expect(updateJob.Status).NotTo(Equal(v1alpha1.JobStatusFailed))
+
+			updateJob, err = waitForRVToolsJob(svc, updateJob.Id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(updateJob.AssessmentId).NotTo(BeNil())
+			Expect(*updateJob.AssessmentId).To(Equal(assessmentID))
+
+			// Totals and vCenter list must be identical to the initial upload.
+			afterUpsert, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(afterUpsert.Data.Data.Vms.Total).To(Equal(initial.Data.Data.Vms.Total))
+			Expect(afterUpsert.Data.Data.Vms.CpuCores.Total).To(Equal(initial.Data.Data.Vms.CpuCores.Total))
+			Expect(afterUpsert.Data.Data.Vms.RamGB.Total).To(Equal(initial.Data.Data.Vms.RamGB.Total))
+			Expect(afterUpsert.Data.Data.Vms.PowerStates).To(Equal(initial.Data.Data.Vms.PowerStates))
+			Expect(afterUpsert.Vcenters).To(ConsistOf(v1alpha1.SubResource{Id: vCenterID.String()}))
+		})
+
+		It("rejects uploading RVTools to an assessment owned by another organization", func() {
+			firstVCenterID := uuid.New()
+
+			firstContent, err := CreateValidTestExcel(firstVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			firstFile, err := CreateTempExcelFile(firstContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(firstFile) }()
+
+			secondContent, err := CreateMultiClusterTestExcel(uuid.New())
+			Expect(err).NotTo(HaveOccurred())
+			secondFile, err := CreateTempExcelFile(secondContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(secondFile) }()
+
+			// Create the assessment as the default user.
+			createJob, err := svc.CreateRVToolsV2Job("v2-rvtools-authz-test", firstFile)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob).NotTo(BeNil())
+
+			createJob, err = waitForRVToolsJob(svc, createJob.Id)
+			if createJob != nil && createJob.AssessmentId != nil {
+				assessmentID := *createJob.AssessmentId
+				defer func() { _ = svc.RemoveAssessment(assessmentID) }()
+			}
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob.AssessmentId).NotTo(BeNil())
+			assessmentID := *createJob.AssessmentId
+
+			// A user from a different organization must not be able to upload to it.
+			otherSvc, err := NewPlannerService(UserAuth("rvtools-intruder", "otherorg", config.Cfg.Test.DefaultEmailDomain))
+			Expect(err).NotTo(HaveOccurred())
+
+			updateJob, err := otherSvc.UploadRVToolsToAssessment(assessmentID, secondFile)
+			Expect(err).To(HaveOccurred())
+			Expect(updateJob).To(BeNil())
+			Expect(err).To(MatchError(ContainSubstring("403")))
+
+			// The assessment must remain untouched (single vCenter inventory).
+			unchanged, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(unchanged.Vcenters).To(ConsistOf(v1alpha1.SubResource{Id: firstVCenterID.String()}))
+		})
+
+		It("rejects uploading RVTools to a nonexistent assessment", func() {
+			content, err := CreateMultiClusterTestExcel(uuid.New())
+			Expect(err).NotTo(HaveOccurred())
+			file, err := CreateTempExcelFile(content)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(file) }()
+
+			updateJob, err := svc.UploadRVToolsToAssessment(uuid.New(), file)
+			Expect(err).To(HaveOccurred())
+			Expect(updateJob).To(BeNil())
+			Expect(err).To(MatchError(ContainSubstring("404")))
 		})
 	})
 
@@ -116,7 +298,7 @@ var _ = Describe("e2e-rvtools", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Create Excel file missing required sheets
-			missingSheetsContent, err := CreateExcelOnlyWithVInfo()
+			missingSheetsContent, err := CreateExcelOnlyWithVInfo(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(missingSheetsContent)
 			Expect(err).To(BeNil())
@@ -139,7 +321,7 @@ var _ = Describe("e2e-rvtools", func() {
 				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 				// Create a valid Excel file
-				validContent, err := CreateValidTestExcel()
+				validContent, err := CreateValidTestExcel(uuid.New())
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
@@ -166,7 +348,7 @@ var _ = Describe("e2e-rvtools", func() {
 				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 				// Create a valid Excel file
-				validContent, err := CreateValidTestExcel()
+				validContent, err := CreateValidTestExcel(uuid.New())
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
@@ -202,7 +384,7 @@ var _ = Describe("e2e-rvtools", func() {
 				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 				// Create a large Excel file
-				largeContent, err := CreateLargeExcel()
+				largeContent, err := CreateLargeExcel(uuid.New())
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(largeContent)
 				Expect(err).To(BeNil())
@@ -224,7 +406,7 @@ var _ = Describe("e2e-rvtools", func() {
 				zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 				// Create a valid Excel file
-				validContent, err := CreateValidTestExcel()
+				validContent, err := CreateValidTestExcel(uuid.New())
 				Expect(err).To(BeNil())
 				tmpFile, err := CreateTempExcelFile(validContent)
 				Expect(err).To(BeNil())
@@ -267,7 +449,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should build inventory with correct VM counts", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateValidTestExcel()
+			excelContent, err := CreateValidTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -290,7 +472,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should have correct power state distribution", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateValidTestExcel()
+			excelContent, err := CreateValidTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -315,7 +497,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should populate infrastructure data", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateValidTestExcel()
+			excelContent, err := CreateValidTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -343,7 +525,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should have resource breakdowns that sum correctly", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateValidTestExcel()
+			excelContent, err := CreateValidTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -370,7 +552,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should handle multiple clusters correctly", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateMultiClusterTestExcel()
+			excelContent, err := CreateMultiClusterTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -402,7 +584,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should have consistent cluster totals", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateMultiClusterTestExcel()
+			excelContent, err := CreateMultiClusterTestExcel(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -428,7 +610,7 @@ var _ = Describe("e2e-rvtools", func() {
 		It("should populate migration concerns in inventory", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			excelContent, err := CreateExcelWithConcerns()
+			excelContent, err := CreateExcelWithConcerns(uuid.New())
 			Expect(err).To(BeNil())
 			tmpFile, err := CreateTempExcelFile(excelContent)
 			Expect(err).To(BeNil())
@@ -453,3 +635,30 @@ var _ = Describe("e2e-rvtools", func() {
 		})
 	})
 })
+
+func waitForRVToolsJob(svc PlannerService, jobID int64) (*v1alpha1.Job, error) {
+	deadline := time.Now().Add(time.Minute)
+	for {
+		job, err := svc.GetJob(jobID)
+		if err != nil {
+			return nil, fmt.Errorf("get RVTools job %d: %w", jobID, err)
+		}
+
+		switch job.Status {
+		case v1alpha1.JobStatusCompleted:
+			return job, nil
+		case v1alpha1.JobStatusFailed:
+			if job.Error != nil {
+				return job, fmt.Errorf("RVTools job %d failed: %s", jobID, *job.Error)
+			}
+			return job, fmt.Errorf("RVTools job %d failed", jobID)
+		case v1alpha1.JobStatusCancelled:
+			return job, fmt.Errorf("RVTools job %d was cancelled", jobID)
+		}
+
+		if time.Now().After(deadline) {
+			return job, fmt.Errorf("timed out waiting for RVTools job %d", jobID)
+		}
+		time.Sleep(time.Second)
+	}
+}

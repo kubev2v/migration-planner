@@ -32,6 +32,9 @@ type imageApi interface {
 type assessmentApi interface {
 	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
 	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error)
+	CreateRVToolsV2Job(name, filepath string) (*v1alpha1.Job, error)
+	UploadRVToolsToAssessment(uuid.UUID, string) (*v1alpha1.Job, error)
+	GetAssessmentV2(uuid.UUID) (*v1alpha1.AssessmentV2, error)
 	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
 	GetAssessments() (*v1alpha1.AssessmentList, error)
 	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)

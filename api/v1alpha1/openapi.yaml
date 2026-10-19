@@ -1633,6 +1633,18 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+        "403":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
           content:
@@ -3399,13 +3411,13 @@ components:
       properties:
         data:
           $ref: "#/components/schemas/InventoryV2"
-        vcetners:
+        vcenters:
           type: array
           items:
             $ref: "#/components/schemas/SubResource"
       required:
         - data
-        - vcetners
+        - vcenters
 
     AssessmentVCenterV2:
       type: object

@@ -13,6 +13,8 @@ const (
 	apiV1AssessmentsPath        = "/api/v1/assessments"
 	apiV1AssessmentsRVToolsPath = "/api/v1/assessments/rvtools"
 	apiV1AssessmentsJobsPath    = "/api/v1/assessments/jobs"
+	apiV2AssessmentsPath        = "/api/v2/assessments"
+	apiV2AssessmentsRVToolsPath = "/api/v2/assessments/rvtools"
 )
 
 // plannerService is the concrete implementation of PlannerService

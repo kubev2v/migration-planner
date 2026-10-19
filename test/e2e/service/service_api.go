@@ -110,6 +110,15 @@ func (api *ServiceApi) request(method string, path string, body []byte) (*http.R
 
 // MultipartRequest uploads a file and optional fields using multipart/form-data
 func (api *ServiceApi) MultipartRequest(path, filepathStr, assessmentName string) (*http.Response, error) {
+	return api.multipartRequest(http.MethodPost, path, filepathStr, assessmentName)
+}
+
+// MultipartPutRequest uploads a file to an endpoint using multipart/form-data.
+func (api *ServiceApi) MultipartPutRequest(path, filepathStr string) (*http.Response, error) {
+	return api.multipartRequest(http.MethodPut, path, filepathStr, "")
+}
+
+func (api *ServiceApi) multipartRequest(method, path, filepathStr, assessmentName string) (*http.Response, error) {
 	file, err := os.Open(filepathStr)
 	if err != nil {
 		return nil, err
@@ -119,8 +128,10 @@ func (api *ServiceApi) MultipartRequest(path, filepathStr, assessmentName string
 	var buf bytes.Buffer
 	writer := multipart.NewWriter(&buf)
 
-	if err := writer.WriteField("name", assessmentName); err != nil {
-		return nil, err
+	if method == http.MethodPost {
+		if err := writer.WriteField("name", assessmentName); err != nil {
+			return nil, err
+		}
 	}
 
 	part, err := writer.CreateFormFile("file", filepath.Base(filepathStr))
@@ -136,7 +147,7 @@ func (api *ServiceApi) MultipartRequest(path, filepathStr, assessmentName string
 		return nil, err
 	}
 
-	req, err := api.prepareRequest(http.MethodPost, path, buf.Bytes())
+	req, err := api.prepareRequest(method, path, buf.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("error preparing request: %v", err)
 	}
