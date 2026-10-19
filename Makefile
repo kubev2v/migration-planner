@@ -189,8 +189,8 @@ stop-local:
 	@echo "✅ Database stopped and volume cleaned"
 
 # rebuild container only on source changes
-bin/.migration-planner-agent-container: bin submodules agent-v2/Containerfile
-	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f agent-v2/Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
+bin/.migration-planner-agent-container: bin submodules agent-v2/agent/Containerfile
+	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f agent-v2/agent/Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)

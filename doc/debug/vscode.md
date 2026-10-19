@@ -19,7 +19,7 @@ Please create following file on `.vscode/launch.json`:
             "type": "go",
             "request": "launch",
             "mode": "auto",
-            "program": "${workspaceFolder}/agent-v2/main.go",
+            "program": "${workspaceFolder}/agent-v2/agent/main.go",
             "cwd": "${workspaceFolder}/agent-v2"
         },
         {
