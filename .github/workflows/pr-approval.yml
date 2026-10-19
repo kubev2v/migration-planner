@@ -12,6 +12,8 @@ jobs:
         migration-planner-sync[bot]:
           - 'agent-v2'
           - 'build/migration-planner-iso/config'
+        '*':
+          - '.github/release-config.txt'
     secrets:
       APP_ID: ${{ secrets.MIGRATION_PLANNER_REVIEWER_APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_REVIEWER_PRIVATE_KEY }}
