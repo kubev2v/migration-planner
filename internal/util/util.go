@@ -173,15 +173,15 @@ func AnyToFloat32(v any) (float32, bool) {
 func GetInventoryVersion(inventory []byte) int {
 	var keys map[string]json.RawMessage
 	if err := json.Unmarshal(inventory, &keys); err != nil {
-		return model.SnapshotVersionV1
+		return model.InventoryVersionV1
 	}
 	if _, ok := keys["clusters"]; ok {
-		return model.SnapshotVersionV2
+		return model.InventoryVersionV2
 	}
 	if _, ok := keys["vcenter_id"]; ok {
-		return model.SnapshotVersionV2
+		return model.InventoryVersionV2
 	}
-	return model.SnapshotVersionV1
+	return model.InventoryVersionV1
 }
 
 // ErrEmptyInventory indicates the inventory data is empty

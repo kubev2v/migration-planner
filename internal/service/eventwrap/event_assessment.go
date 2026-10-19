@@ -70,10 +70,17 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
+	var main model.AssessmentInventory
+	for _, inv := range assessment.Inventories {
+		if !inv.IsSubset {
+			main = inv
+			break
+		}
+	}
+
 	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 		ID:         assessment.ID.String(),
-		SnapshotID: assessment.Snapshots[0].ID,
-		Inventory:  assessment.Snapshots[0].Inventory,
+		Inventory:  main.Inventory,
 		Name:       assessment.Name,
 		OrgID:      assessment.OrgID,
 		OrgName:    accountIdentity.Name,

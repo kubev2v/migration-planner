@@ -393,7 +393,7 @@ func optionalMap[V any](m map[string]V) *map[string]V {
 }
 
 func UnmarshalInventoryData(inv model.AssessmentInventory) (api.InventoryData, error) {
-	if inv.Version == model.SnapshotVersionV2 {
+	if inv.Version == model.InventoryVersionV2 {
 		var inventory api.Inventory
 		if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
 			return api.InventoryData{}, err

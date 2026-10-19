@@ -109,9 +109,9 @@ func createTestAssessmentWithComplexityDistribution(
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventoryWithComplexityDistribution(clusterID, osInfo, diskSizeTier, dist),
 				AssessmentID: id,
@@ -127,9 +127,9 @@ func createTestAssessmentForComplexity(id uuid.UUID, username, orgID, clusterID 
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventoryForComplexity(clusterID, osInfo, diskSizeTier),
 				AssessmentID: id,
@@ -145,9 +145,9 @@ func createTestAssessmentFromRawInventory(id uuid.UUID, username, orgID string, 
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    inventory,
 				AssessmentID: id,
@@ -208,9 +208,9 @@ func createTestAssessmentForEstimation(id uuid.UUID, username, orgID, clusterID 
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventoryForEstimation(clusterID, totalVMs, totalDiskGB),
 				AssessmentID: id,
@@ -480,29 +480,29 @@ var _ = Describe("EstimationService", func() {
 			})
 		})
 
-		Context("snapshot validation", func() {
-			It("returns error when assessment has no snapshots", func() {
+		Context("inventory validation", func() {
+			It("returns error when assessment has no full inventory", func() {
 				mockStore.assessments[assessmentID] = &model.Assessment{
-					ID:        assessmentID,
-					OrgID:     testOrgID,
-					Username:  testUsername,
-					Snapshots: []model.Snapshot{},
+					ID:          assessmentID,
+					OrgID:       testOrgID,
+					Username:    testUsername,
+					Inventories: []model.AssessmentInventory{},
 				}
 
 				result, err := estimationSrv.CalculateMigrationComplexity(ctx, assessmentID, []string{clusterID})
 
 				Expect(result).To(BeNil())
 				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("no snapshots"))
+				Expect(err.Error()).To(ContainSubstring("no full inventory"))
 			})
 
-			It("returns error when snapshot has empty inventory", func() {
+			It("returns error when assessment inventory is empty", func() {
 				mockStore.assessments[assessmentID] = &model.Assessment{
 					ID:       assessmentID,
 					OrgID:    testOrgID,
 					Username: testUsername,
-					Snapshots: []model.Snapshot{
-						{ID: 1, Inventory: []byte{}, AssessmentID: assessmentID},
+					Inventories: []model.AssessmentInventory{
+						{ID: uuid.New(), Inventory: []byte{}, AssessmentID: assessmentID},
 					},
 				}
 
@@ -812,34 +812,34 @@ var _ = Describe("EstimationService", func() {
 			})
 		})
 
-		Context("snapshot validation", func() {
-			It("returns error when assessment has no snapshots", func() {
-				// Create assessment without snapshots
+		Context("inventory validation", func() {
+			It("returns error when assessment has no full inventory", func() {
+				// Create assessment without inventories
 				mockStore.assessments[assessmentID] = &model.Assessment{
-					ID:        assessmentID,
-					Name:      "test-assessment",
-					OrgID:     testOrgID,
-					Username:  testUsername,
-					Snapshots: []model.Snapshot{}, // Empty snapshots
+					ID:          assessmentID,
+					Name:        "test-assessment",
+					OrgID:       testOrgID,
+					Username:    testUsername,
+					Inventories: []model.AssessmentInventory{}, // Empty inventories
 				}
 
 				results, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, nil)
 
 				Expect(results).To(BeNil())
 				Expect(err).NotTo(BeNil())
-				Expect(err.Error()).To(ContainSubstring("no snapshots"))
+				Expect(err.Error()).To(ContainSubstring("no full inventory"))
 			})
 
-			It("returns error when snapshot has empty inventory", func() {
+			It("returns error when assessment inventory is empty", func() {
 				// Create assessment with empty inventory
 				mockStore.assessments[assessmentID] = &model.Assessment{
 					ID:       assessmentID,
 					Name:     "test-assessment",
 					OrgID:    testOrgID,
 					Username: testUsername,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte{}, // Empty inventory
 							AssessmentID: assessmentID,
@@ -863,9 +863,9 @@ var _ = Describe("EstimationService", func() {
 					Name:     "test-assessment",
 					OrgID:    testOrgID,
 					Username: testUsername,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte("invalid json {{{"),
 							AssessmentID: assessmentID,
@@ -892,9 +892,9 @@ var _ = Describe("EstimationService", func() {
 					Name:     "test-assessment",
 					OrgID:    testOrgID,
 					Username: testUsername,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    data,
 							AssessmentID: assessmentID,

@@ -39,19 +39,11 @@ if [ -f "assessments.sql" ]; then
   sed -i "/^INSERT INTO assessments.*VALUES ('00000000-0000-0000-0000-000000000000',/d" "assessments.sql"
 fi
 
-if [ -f "snapshots.sql" ]; then
-  # For snapshots, only remove if assessment_id (4th column) is zero-UUID
-  # Pattern: VALUES (id, created_at, inventory, '00000000-0000-0000-0000-000000000000'
-  # We need to match the 4th value being the zero-UUID
-  # This is complex, so we'll use a more targeted approach in the cleanup SQL below
-  echo "Snapshots will be cleaned up via SQL after load..."
-fi
-
 # Load in FK-safe order so parent tables exist before children
 files=(
   "sources.sql"       # parents for many tables
   "assessments.sql"   # FK -> sources
-  "snapshots.sql"     # FK -> assessments
+  "assessment_inventories.sql" # FK -> assessments
   "agents.sql"        # FK -> sources
   "image_infras.sql"  # FK -> sources
   "labels.sql"        # FK -> sources
@@ -113,11 +105,8 @@ DELETE FROM sources WHERE id = '00000000-0000-0000-0000-000000000000';
 -- Remove any assessments whose source no longer exists (preserve FK consistency)
 DELETE FROM assessments a WHERE source_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sources s WHERE s.id = a.source_id);
 
--- Remove any snapshots whose assessment no longer exists
-DELETE FROM snapshots s WHERE NOT EXISTS (SELECT 1 FROM assessments a WHERE a.id = s.assessment_id);
-
--- Reset snapshots sequence (explicit IDs were loaded)
-SELECT setval(pg_get_serial_sequence('snapshots','id'), COALESCE(MAX(id),0)) FROM snapshots;
+-- Remove any inventories whose assessment no longer exists
+DELETE FROM assessment_inventories ai WHERE NOT EXISTS (SELECT 1 FROM assessments a WHERE a.id = ai.assessment_id);
 EOSQL
 
 echo "✅ Data cleanup complete"

@@ -166,7 +166,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		{
 			id:         1,
 			name:       "v2 preserves collection metadata",
-			version:    model.SnapshotVersionV2,
+			version:    model.InventoryVersionV2,
 			raw:        `{"vcenter_id":"vc-id","vcenter_version":"8.0.3.0","created_at":"2026-10-13T09:00:00Z","vcenter":{"vms":{"total":5}},"clusters":{"domain-c34":{"vms":{"total":2}}}}`,
 			created:    collectedAt,
 			apiVersion: "8.0.3.0",
@@ -174,14 +174,14 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		{
 			id:      2,
 			name:    "v2 falls back to stored timestamp",
-			version: model.SnapshotVersionV2,
+			version: model.InventoryVersionV2,
 			raw:     `{"vcenter_id":"vc-id","vcenter":{"vms":{"total":5}},"clusters":{}}`,
 			created: storedAt,
 		},
 		{
 			id:      3,
 			name:    "legacy inventory uses stored timestamp",
-			version: model.SnapshotVersionV1,
+			version: model.InventoryVersionV1,
 			raw:     `{"vcenter":{"id":"vc-id"},"vms":{"total":5}}`,
 			created: storedAt,
 		},
@@ -216,7 +216,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		_, _, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{Version: version, Inventory: []byte(`{`)})
 		Expect(err).To(HaveOccurred())
 	},
-		Entry("for legacy inventory", uint(model.SnapshotVersionV1)),
-		Entry("for v2 inventory", uint(model.SnapshotVersionV2)),
+		Entry("for legacy inventory", uint(model.InventoryVersionV1)),
+		Entry("for v2 inventory", uint(model.InventoryVersionV2)),
 	)
 })

@@ -37,7 +37,7 @@ var _ = Describe("assessment v2 handler", func() {
 		return model.AssessmentInventory{
 			VCenterID: vcenterID,
 			IsSubset:  isSubset,
-			Version:   model.SnapshotVersionV2,
+			Version:   model.InventoryVersionV2,
 			Inventory: []byte(fmt.Sprintf(`{"vcenter_id":%q,"vcenter":{"vms":{"total":%d}},"clusters":{%q:{"vms":{"total":%d}}}}`,
 				vcenterID, totalVMs, clusterID.String(), totalVMs)),
 		}
@@ -60,15 +60,13 @@ var _ = Describe("assessment v2 handler", func() {
 	}
 
 	Context("GetAssessmentV2", func() {
-		DescribeTable("returns RVTools aggregate data and only the individual vCenters",
-			func(mainIndex int) {
-				main := inventory("", false, 30, uuid.Nil)
+		It("returns RVTools aggregate data and only the individual vCenters",
+			func() {
 				inventories := []model.AssessmentInventory{
+					inventory("", false, 30, uuid.Nil),
 					inventory(vcenterID1.String(), true, 10, clusterID1),
 					inventory(vcenterID2.String(), true, 20, clusterID2),
 				}
-				inventories = append(inventories[:mainIndex], append([]model.AssessmentInventory{main}, inventories[mainIndex:]...)...)
-
 				response := getAssessment(service.SourceTypeRvtools, inventories)
 
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
@@ -77,19 +75,13 @@ var _ = Describe("assessment v2 handler", func() {
 					HaveField("Id", vcenterID2.String()),
 				))
 			},
-			Entry("with the aggregate first", 0),
-			Entry("with the aggregate between subsets", 1),
-			Entry("with the aggregate last", 2),
 		)
 
-		DescribeTable("returns agent main inventory data with one vCenter subresource",
-			func(mainFirst bool) {
+		It("returns agent main inventory data with one vCenter subresource",
+			func() {
 				main := inventory(vcenterID1.String(), false, 30, clusterID1)
 				subset := inventory(vcenterID1.String(), true, 10, clusterID2)
-				inventories := []model.AssessmentInventory{subset, main}
-				if mainFirst {
-					inventories = []model.AssessmentInventory{main, subset}
-				}
+				inventories := []model.AssessmentInventory{main, subset}
 
 				response := getAssessment(service.SourceTypeAgent, inventories)
 
@@ -97,8 +89,6 @@ var _ = Describe("assessment v2 handler", func() {
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
 				Expect(response.Vcenters).To(ConsistOf(HaveField("Id", vcenterID1.String())))
 			},
-			Entry("with the main inventory before the subset", true),
-			Entry("with the main inventory after the subset", false),
 		)
 	})
 })

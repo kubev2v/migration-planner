@@ -2,12 +2,15 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"time"
+
+	"github.com/kubev2v/migration-planner/internal/store/model"
+
+	"github.com/kubev2v/migration-planner/internal/util"
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -75,8 +78,9 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		WithUUID("assessment_id", assessmentID).
 		Build()
 
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
+	inventory, err := loadAssessmentInventory(ctx, es.store, assessmentID)
 	if err != nil {
+		tracer.Error(err).Log()
 		return nil, err
 	}
 
@@ -137,36 +141,6 @@ func (es *EstimationService) CalculateMigrationComplexity(
 	return result, nil
 }
 
-// loadInventory fetches the assessment's latest snapshot and unmarshals its inventory.
-func (es *EstimationService) loadInventory(ctx context.Context, assessmentID uuid.UUID, tracer *log.OperationTracer) (api.Inventory, error) {
-	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
-	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			tracer.Error(err).Log()
-			return api.Inventory{}, NewErrAssessmentNotFound(assessmentID)
-		}
-		tracer.Error(err).Log()
-		return api.Inventory{}, fmt.Errorf("failed to get assessment: %w", err)
-	}
-	if len(assessment.Snapshots) == 0 {
-		err := fmt.Errorf("assessment has no snapshots")
-		tracer.Error(err).Log()
-		return api.Inventory{}, err
-	}
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		err := fmt.Errorf("latest snapshot has empty inventory")
-		tracer.Error(err).Log()
-		return api.Inventory{}, err
-	}
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		tracer.Error(err).Log()
-		return api.Inventory{}, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-	return inventory, nil
-}
-
 // getAggregatedInventoryData fetches the assessment's inventory and returns
 // aggregated data for the specified clusters. This is the new entry point for
 // multi-cluster complexity calculations.
@@ -177,8 +151,9 @@ func (es *EstimationService) getAggregatedInventoryData(
 	tracer *log.OperationTracer,
 ) (api.InventoryData, error) {
 	// Fetch full inventory from database
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
+	inventory, err := loadAssessmentInventory(ctx, es.store, assessmentID)
 	if err != nil {
+		tracer.Error(err).Log()
 		return api.InventoryData{}, err
 	}
 
@@ -659,4 +634,37 @@ func (es *EstimationService) RunEstimation(schemas []engines.Schema, params []es
 		}
 	}
 	return results, nil
+}
+
+// loadAssessmentInventory reads the main inventory, which the store returns first.
+func loadAssessmentInventory(ctx context.Context, s store.Store, id uuid.UUID) (api.Inventory, error) {
+	assessment, err := s.Assessment().Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return api.Inventory{}, NewErrAssessmentNotFound(id)
+		}
+		return api.Inventory{}, fmt.Errorf("failed to get assessment: %w", err)
+	}
+	if len(assessment.Inventories) == 0 {
+		return api.Inventory{}, fmt.Errorf("assessment has no full inventory")
+	}
+
+	var main model.AssessmentInventory
+	for _, inv := range assessment.Inventories {
+		if !inv.IsSubset {
+			main = inv
+			break
+		}
+	}
+
+	if len(main.Inventory) == 0 {
+		return api.Inventory{}, fmt.Errorf("assessment has empty inventory")
+	}
+
+	inventory, err := util.UnmarshalInventory(main.Inventory, main.Version)
+	if err != nil {
+		return api.Inventory{}, fmt.Errorf("failed to parse inventory: %w", err)
+	}
+
+	return inventory, nil
 }

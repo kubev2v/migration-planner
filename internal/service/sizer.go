@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -613,29 +612,12 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("sizer client is not configured")
 	}
 
-	assessment, err := s.store.Assessment().Get(ctx, assessmentID)
+	inventory, err := loadAssessmentInventory(ctx, s.store, assessmentID)
 	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			return nil, NewErrAssessmentNotFound(assessmentID)
-		}
-		return nil, fmt.Errorf("failed to get assessment: %w", err)
+		return nil, err
 	}
 
 	calcReq := applyDefaults(req)
-
-	if len(assessment.Snapshots) == 0 {
-		return nil, fmt.Errorf("assessment has no snapshots")
-	}
-
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		return nil, fmt.Errorf("latest snapshot has empty inventory")
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		return nil, fmt.Errorf("failed to parse inventory: %w", err)
-	}
 
 	if !usesVCenterAggregate(clusterIDs) && len(inventory.Clusters) == 0 {
 		return nil, fmt.Errorf("inventory has no clusters")
