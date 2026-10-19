@@ -197,7 +197,7 @@ spec:
       - name: IMAGE
         value: $(params.agent-output-image)
       - name: DOCKERFILE
-        value: Containerfile
+        value: agent/Containerfile
       - name: CONTEXT
         value: agent-v2
       - name: HERMETIC
