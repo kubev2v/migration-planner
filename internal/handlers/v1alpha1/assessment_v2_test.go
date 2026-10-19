@@ -72,7 +72,7 @@ var _ = Describe("assessment v2 handler", func() {
 				response := getAssessment(service.SourceTypeRvtools, inventories)
 
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
-				Expect(response.Vcetners).To(ConsistOf(
+				Expect(response.Vcenters).To(ConsistOf(
 					HaveField("Id", vcenterID1.String()),
 					HaveField("Id", vcenterID2.String()),
 				))
@@ -95,7 +95,7 @@ var _ = Describe("assessment v2 handler", func() {
 
 				Expect(response.Data.Id).To(Equal(vcenterID1.String()))
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
-				Expect(response.Vcetners).To(ConsistOf(HaveField("Id", vcenterID1.String())))
+				Expect(response.Vcenters).To(ConsistOf(HaveField("Id", vcenterID1.String())))
 			},
 			Entry("with the main inventory before the subset", true),
 			Entry("with the main inventory after the subset", false),

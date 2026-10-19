@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -14,7 +15,7 @@ func ColumnToLetter(col int) string {
 	return name
 }
 
-func CreateExcelOnlyWithVInfo() ([]byte, error) {
+func CreateExcelOnlyWithVInfo(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -36,7 +37,7 @@ func CreateExcelOnlyWithVInfo() ([]byte, error) {
 	}
 
 	// Add at least one VM data row to pass validation
-	vmRow := []string{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "cluster1", "poweredOn"}
+	vmRow := []string{"test-vm-1", "vm-001", vcenterID.String(), "esxi-host-1", "cluster1", "poweredOn"}
 	for colIndex, value := range vmRow {
 		cellRef := ColumnToLetter(colIndex) + "2"
 		if err := f.SetCellValue("vInfo", cellRef, value); err != nil {
@@ -72,7 +73,7 @@ func CreateExcelOnlyWithVInfo() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func CreateLargeExcel() ([]byte, error) {
+func CreateLargeExcel(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -87,7 +88,7 @@ func CreateLargeExcel() ([]byte, error) {
 		vmRows = append(vmRows, []string{
 			fmt.Sprintf("test-vm-%d", i),
 			fmt.Sprintf("vm-%03d", i),
-			fmt.Sprintf("12345678-1234-1234-1234-%012d", i),
+			vcenterID.String(),
 			"esxi-host-1",
 			"4",
 			"8192",
@@ -149,7 +150,7 @@ func CreateLargeExcel() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func CreateValidTestExcel() ([]byte, error) {
+func CreateValidTestExcel(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -162,8 +163,8 @@ func CreateValidTestExcel() ([]byte, error) {
 		"vInfo": {
 			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster"},
 			Rows: [][]string{
-				{"test-vm-1", "vm-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
-				{"test-vm-2", "vm-002", "87654321-4321-4321-4321-210987654321", "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
+				{"test-vm-1", "vm-001", vcenterID.String(), "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
+				{"test-vm-2", "vm-002", vcenterID.String(), "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
 			},
 		},
 		"vHost": {
@@ -222,7 +223,7 @@ func CreateValidTestExcel() ([]byte, error) {
 
 // CreateExample1Excel creates a valid example Excel file matching the format expected by e2e tests
 // This replaces the static example1.xlsx file with a dynamically generated one that meets validation requirements
-func CreateExample1Excel() ([]byte, error) {
+func CreateExample1Excel(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -235,8 +236,8 @@ func CreateExample1Excel() ([]byte, error) {
 		"vInfo": {
 			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster"},
 			Rows: [][]string{
-				{"example-vm-1", "vm-example-001", "12345678-1234-1234-1234-123456789abc", "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
-				{"example-vm-2", "vm-example-002", "87654321-4321-4321-4321-210987654321", "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
+				{"example-vm-1", "vm-example-001", vcenterID.String(), "esxi-host-1", "4", "8192", "poweredOn", "cluster1"},
+				{"example-vm-2", "vm-example-002", vcenterID.String(), "esxi-host-2", "2", "4096", "poweredOff", "cluster1"},
 			},
 		},
 		"vHost": {
@@ -324,7 +325,7 @@ func CreateTempExcelFile(content []byte) (string, error) {
 
 // CreateMultiClusterTestExcel creates a test Excel file with 4 VMs across 2 clusters.
 // Used for testing multi-cluster inventory scenarios.
-func CreateMultiClusterTestExcel() ([]byte, error) {
+func CreateMultiClusterTestExcel(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -337,10 +338,10 @@ func CreateMultiClusterTestExcel() ([]byte, error) {
 		"vInfo": {
 			Headers: []string{"VM", "VM ID", "VI SDK UUID", "Host", "CPUs", "Memory", "Powerstate", "Cluster", "Datacenter"},
 			Rows: [][]string{
-				{"vm-cluster1-1", "vm-c1-001", "11111111-1111-1111-1111-111111111111", "esxi-host-1", "4", "8192", "poweredOn", "cluster1", "datacenter1"},
-				{"vm-cluster1-2", "vm-c1-002", "22222222-2222-2222-2222-222222222222", "esxi-host-1", "2", "4096", "poweredOff", "cluster1", "datacenter1"},
-				{"vm-cluster2-1", "vm-c2-001", "33333333-3333-3333-3333-333333333333", "esxi-host-2", "8", "16384", "poweredOn", "cluster2", "datacenter1"},
-				{"vm-cluster2-2", "vm-c2-002", "44444444-4444-4444-4444-444444444444", "esxi-host-2", "4", "8192", "poweredOn", "cluster2", "datacenter1"},
+				{"vm-cluster1-1", "vm-c1-001", vcenterID.String(), "esxi-host-1", "4", "8192", "poweredOn", "cluster1", "datacenter1"},
+				{"vm-cluster1-2", "vm-c1-002", vcenterID.String(), "esxi-host-1", "2", "4096", "poweredOff", "cluster1", "datacenter1"},
+				{"vm-cluster2-1", "vm-c2-001", vcenterID.String(), "esxi-host-2", "8", "16384", "poweredOn", "cluster2", "datacenter1"},
+				{"vm-cluster2-2", "vm-c2-002", vcenterID.String(), "esxi-host-2", "4", "8192", "poweredOn", "cluster2", "datacenter1"},
 			},
 		},
 		"vHost": {
@@ -405,7 +406,7 @@ func CreateMultiClusterTestExcel() ([]byte, error) {
 
 // CreateExcelWithConcerns creates a test Excel file with VMs that will trigger migration concerns.
 // Contains VMs with CBT disabled, templates, and other concern-triggering configurations.
-func CreateExcelWithConcerns() ([]byte, error) {
+func CreateExcelWithConcerns(vcenterID uuid.UUID) ([]byte, error) {
 	f := excelize.NewFile()
 	defer func() { _ = f.Close() }()
 
@@ -425,9 +426,9 @@ func CreateExcelWithConcerns() ([]byte, error) {
 				"Cluster", "Datacenter", "Template", "CBT", "Firmware",
 			},
 			Rows: [][]string{
-				{"vm-template", "vm-001", "11111111-1111-1111-1111-111111111111", "esxi-host-1", "4", "8192", "poweredOff", "cluster1", "datacenter1", "true", "true", "bios"},
-				{"vm-cbt-disabled", "vm-002", "22222222-2222-2222-2222-222222222222", "esxi-host-1", "2", "4096", "poweredOn", "cluster1", "datacenter1", "false", "false", "bios"},
-				{"vm-normal", "vm-003", "33333333-3333-3333-3333-333333333333", "esxi-host-1", "4", "8192", "poweredOn", "cluster1", "datacenter1", "false", "true", "bios"},
+				{"vm-template", "vm-001", vcenterID.String(), "esxi-host-1", "4", "8192", "poweredOff", "cluster1", "datacenter1", "true", "true", "bios"},
+				{"vm-cbt-disabled", "vm-002", vcenterID.String(), "esxi-host-1", "2", "4096", "poweredOn", "cluster1", "datacenter1", "false", "false", "bios"},
+				{"vm-normal", "vm-003", vcenterID.String(), "esxi-host-1", "4", "8192", "poweredOn", "cluster1", "datacenter1", "false", "true", "bios"},
 			},
 		},
 		"vHost": {
