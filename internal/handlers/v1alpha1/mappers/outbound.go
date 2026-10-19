@@ -19,36 +19,14 @@ import (
 )
 
 func unmarshalInventory(raw []byte, version uint) (api.Inventory, error) {
-	if len(raw) == 0 {
-		return api.Inventory{Clusters: make(map[string]api.InventoryData)}, nil
+	inventory, err := util.UnmarshalInventory(raw, version)
+	if err != nil {
+		return api.Inventory{}, err
 	}
-	var inventory api.Inventory
-	switch version {
-	case model.SnapshotVersionV1:
-		var invV1 api.InventoryData
-		if err := json.Unmarshal(raw, &invV1); err != nil {
-			return api.Inventory{}, err
-		}
-		normalizeInventoryData(&invV1)
-		inventory.Vcenter = &invV1
-		if invV1.Vcenter != nil {
-			inventory.VcenterId = invV1.Vcenter.Id
-		}
-		inventory.Clusters = make(map[string]api.InventoryData)
-	default:
-		if err := json.Unmarshal(raw, &inventory); err != nil {
-			return api.Inventory{}, err
-		}
-		if inventory.Clusters == nil {
-			inventory.Clusters = make(map[string]api.InventoryData)
-		}
-		if inventory.Vcenter != nil {
-			normalizeInventoryData(inventory.Vcenter)
-		}
-		for clusterID, clusterData := range inventory.Clusters {
-			normalizeInventoryData(&clusterData)
-			inventory.Clusters[clusterID] = clusterData
-		}
+	normalizeInventoryData(inventory.Vcenter)
+	for clusterID, data := range inventory.Clusters {
+		normalizeInventoryData(&data)
+		inventory.Clusters[clusterID] = data
 	}
 	return inventory, nil
 }
@@ -120,7 +98,7 @@ func SourceToApi(s model.Source) (api.Source, error) {
 	if len(s.Inventory) > 0 {
 		v := util.GetInventoryVersion(s.Inventory)
 		switch v {
-		case model.SnapshotVersionV1:
+		case model.InventoryVersionV1:
 			i := api.InventoryData{}
 			if err := json.Unmarshal(s.Inventory, &i); err != nil {
 				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
@@ -455,7 +433,7 @@ func AssessmentClustersToAPI(clusters map[string]api.InventoryData) []api.SubRes
 func AssessmentInventoryToAPI(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
 	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
 	clusters := make(map[string]api.InventoryData)
-	if inv.Version == model.SnapshotVersionV1 {
+	if inv.Version == model.InventoryVersionV1 {
 		if err := json.Unmarshal(inv.Inventory, &result.Data); err != nil {
 			return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 		}

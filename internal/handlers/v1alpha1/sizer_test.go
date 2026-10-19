@@ -91,10 +91,6 @@ func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("SourceSubsetInventory() not implemented in MockStore for this test")
 }
 
-func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
-	panic("AssessmentSubsetInventory() not implemented in MockStore for this test")
-}
-
 func (m *MockStore) Agent() store.Agent {
 	panic("Agent() not implemented in MockStore for this test")
 }
@@ -267,9 +263,9 @@ func createTestAssessmentWithInventory(id uuid.UUID, username, orgID string, inv
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    inventoryBytes,
 				AssessmentID: id,
@@ -1651,7 +1647,7 @@ var _ = Describe("sizer handler", func() {
 				// Create assessment with empty cluster (0 VMs, 0 CPU, 0 Memory)
 				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
 				// Override inventory to have empty cluster
-				assessment.Snapshots[0].Inventory = []byte(`{"clusters":{"` + clusterID + `":{"vms":{"total":0,"cpu_cores":{"total":0},"ram_gb":{"total":0}}}}}`)
+				assessment.Inventories[0].Inventory = []byte(`{"clusters":{"` + clusterID + `":{"vms":{"total":0,"cpu_cores":{"total":0},"ram_gb":{"total":0}}}}}`)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)

@@ -123,7 +123,6 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
 	var assessmentInventories []model.AssessmentInventory
-	var subsetInventories []model.AssessmentSubsetInventory
 
 	switch createForm.SourceType {
 	case SourceTypeRvtools, SourceTypeInventory:
@@ -174,27 +173,10 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			inv.IsSubset = true
 			inv.AssessmentID = assessment.ID
 			assessmentInventories = append(assessmentInventories, inv)
-
-			subsetInventories = append(subsetInventories, model.AssessmentSubsetInventory{
-				ID: uuid.New(), Name: ss.Name, VCenterID: ss.VCenterID,
-				VMsCount: ss.VMsCount, Inventory: ss.Inventory,
-			})
 		}
 
 	default:
 		return nil, fmt.Errorf("assessment must have either inventories or a source ID")
-	}
-
-	// Build snapshot for backward compatibility
-	for _, inv := range assessmentInventories {
-		if !inv.IsSubset {
-			assessment.Snapshots = []model.Snapshot{{
-				Inventory:         inv.Inventory,
-				Version:           inv.Version,
-				SubsetInventories: subsetInventories,
-			}}
-			break
-		}
 	}
 
 	assessment.Inventories = assessmentInventories

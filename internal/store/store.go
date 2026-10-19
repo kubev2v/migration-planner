@@ -16,7 +16,6 @@ type Store interface {
 	PrivateKey() PrivateKey
 	Label() Label
 	Assessment() Assessment
-	AssessmentSubsetInventory() AssessmentSubsetInventory
 	ClusterSizingInput() ClusterSizingInput
 	AssessmentEnhancementData() AssessmentEnhancementData
 	Job() Job
@@ -36,7 +35,6 @@ type DataStore struct {
 	privateKey                PrivateKey
 	label                     Label
 	assessment                Assessment
-	assessmentSubsetInventory AssessmentSubsetInventory
 	cluster                   ClusterSizingInput
 	assessmentEnhancementData AssessmentEnhancementData
 	job                       Job
@@ -56,7 +54,6 @@ func NewStore(db *gorm.DB) Store {
 		privateKey:                NewCacheKeyStore(NewPrivateKey(db)),
 		label:                     NewLabelStore(db),
 		assessment:                assessment,
-		assessmentSubsetInventory: NewAssessmentSubsetInventory(db),
 		cluster:                   NewClusterSizingInputStore(db),
 		assessmentEnhancementData: NewAssessmentEnhancementDataStore(db),
 		job:                       NewJobStore(db),
@@ -102,10 +99,6 @@ func (s *DataStore) Label() Label {
 
 func (s *DataStore) Assessment() Assessment {
 	return s.assessment
-}
-
-func (s *DataStore) AssessmentSubsetInventory() AssessmentSubsetInventory {
-	return s.assessmentSubsetInventory
 }
 
 func (s *DataStore) ClusterSizingInput() ClusterSizingInput {

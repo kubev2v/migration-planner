@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
@@ -102,22 +104,37 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 		return fmt.Errorf("resolving assessment partners: %w", err)
 	}
 
-	var success, noSnapshotsErrors, inventoryConvertErrors, eventBuildErrors, publishErrors int
+	var success, noInventoriesErrors, inventoryConvertErrors, eventBuildErrors, publishErrors int
 	for _, assessment := range assessments {
-		if len(assessment.Snapshots) == 0 {
-			zap.S().Warnw("skipping assessment with no snapshots", "id", assessment.ID)
-			noSnapshotsErrors++
+		if len(assessment.Inventories) == 0 {
+			zap.S().Warnw("skipping assessment with no inventories", "id", assessment.ID)
+			noInventoriesErrors++
 			continue
 		}
 
-		apiAssessment, err := mappers.AssessmentToApi(assessment)
+		var inv model.AssessmentInventory
+
+		for _, v := range assessment.Inventories {
+			if !v.IsSubset {
+				inv = v
+				break
+			}
+		}
+
+		mainInv, _, err := mappers.AssessmentInventoryToAPI(inv)
 		if err != nil {
 			zap.S().Errorw("converting assessment", "id", assessment.ID, "error", err)
 			inventoryConvertErrors++
 			continue
 		}
 
-		inventory, err := json.Marshal(apiAssessment.Snapshots[0].Inventory)
+		var contract v1alpha1.Inventory
+		contract.Vcenter = &mainInv.Data
+		contract.VcenterId = mainInv.Id
+		contract.VcenterVersion = mainInv.VcenterVersion
+		contract.CreatedAt = mainInv.CreatedAt
+
+		inventory, err := json.Marshal(contract)
 		if err != nil {
 			zap.S().Errorw("marshaling inventory", "id", assessment.ID, "error", err)
 			inventoryConvertErrors++
@@ -127,7 +144,6 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 		partner := partners[assessment.ID.String()]
 		payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 			ID:          assessment.ID.String(),
-			SnapshotID:  assessment.Snapshots[0].ID,
 			Inventory:   inventory,
 			Name:        assessment.Name,
 			OrgID:       assessment.OrgID,
@@ -155,11 +171,11 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 		success++
 	}
 
-	if publishErrors > 0 || inventoryConvertErrors > 0 || eventBuildErrors > 0 || noSnapshotsErrors > 0 {
+	if publishErrors > 0 || inventoryConvertErrors > 0 || eventBuildErrors > 0 || noInventoriesErrors > 0 {
 		return fmt.Errorf(
-			"backfill completed with errors: success=%d no_snapshots=%d inventory_convert=%d event_build=%d publish=%d",
+			"backfill completed with errors: success=%d no_inventories=%d inventory_convert=%d event_build=%d publish=%d",
 			success,
-			noSnapshotsErrors,
+			noInventoriesErrors,
 			inventoryConvertErrors,
 			eventBuildErrors,
 			publishErrors,

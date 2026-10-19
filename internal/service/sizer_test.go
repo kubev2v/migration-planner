@@ -54,10 +54,6 @@ func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("MockStore.SourceSubsetInventory() called unexpectedly - not implemented for this test")
 }
 
-func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
-	panic("MockStore.AssessmentSubsetInventory() called unexpectedly - not implemented for this test")
-}
-
 func (m *MockStore) Agent() store.Agent {
 	panic("MockStore.Agent() called unexpectedly - not implemented for this test")
 }
@@ -264,9 +260,9 @@ func createTestAssessment(id uuid.UUID, clusterID string, totalVMs, totalCPU, to
 		Name:     "test-assessment",
 		OrgID:    "test-org",
 		Username: "test-user",
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventory(clusterID, totalVMs, totalCPU, totalMemory),
 				AssessmentID: id,
@@ -1027,10 +1023,10 @@ var _ = Describe("sizer service", func() {
 				Expect(err.Error()).To(ContainSubstring("failed to get assessment"))
 			})
 
-			It("returns error when assessment has no snapshots", func() {
+			It("returns error when assessment has no full inventory", func() {
 				assessment := &model.Assessment{
-					ID:        assessmentID,
-					Snapshots: []model.Snapshot{},
+					ID:          assessmentID,
+					Inventories: []model.AssessmentInventory{},
 				}
 				mockStore.assessments[assessmentID] = assessment
 				// Create a dummy sizerService - it won't be used since validation will fail first
@@ -1042,15 +1038,15 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("no snapshots"))
+				Expect(err.Error()).To(ContainSubstring("no full inventory"))
 			})
 
-			It("returns error when snapshot has empty inventory", func() {
+			It("returns error when assessment inventory is empty", func() {
 				assessment := &model.Assessment{
 					ID: assessmentID,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte{},
 							AssessmentID: assessmentID,
@@ -1073,9 +1069,9 @@ var _ = Describe("sizer service", func() {
 			It("returns error when inventory JSON is invalid", func() {
 				assessment := &model.Assessment{
 					ID: assessmentID,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte("{invalid json}"),
 							AssessmentID: assessmentID,
@@ -2677,9 +2673,9 @@ func createAssessmentWithInventory(id uuid.UUID, inventory api.Inventory) *model
 	Expect(err).NotTo(HaveOccurred())
 	return &model.Assessment{
 		ID: id,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				AssessmentID: id,
 				Inventory:    inventoryJSON,
 				CreatedAt:    time.Now(),

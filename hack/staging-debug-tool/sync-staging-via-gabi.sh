@@ -116,7 +116,11 @@ query_and_convert() {
                 fi
             fi
 
-            if [ "$value" = "null" ] || [ "$value" = "" ]; then
+            if [ "$table" = "assessment_inventories" ] && [ "$value" = "" ] &&
+                { [ "$col_name" = "name" ] || [ "$col_name" = "vcenter_id" ]; }; then
+                # These NOT NULL columns may contain valid empty strings.
+                values="${values}''"
+            elif [ "$value" = "null" ] || [ "$value" = "" ]; then
                 values="${values}NULL"
             else
                 # Normalize org_id to 'internal' for single-tenant (auth=none) mode
@@ -190,13 +194,9 @@ query_and_convert() {
         fi
     fi
     
-    # Post-process snapshots table for data quality
-    if [ "$table" = "snapshots" ]; then
-        echo "🔧 Cleaning snapshots data..."
-        
-        # Remove snapshots with NULL inventory entirely (they cause UI crashes)
-        # These snapshots have no real data and should not be loaded
-        grep -v "', NULL, '" "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    # Post-process assessment_inventories table for data quality
+    if [ "$table" = "assessment_inventories" ]; then
+        echo "🔧 Cleaning assessment_inventories data..."
         
         # Build list of valid assessment IDs from assessments.sql
         if [ -f "$OUTPUT_DIR/assessments.sql" ]; then
@@ -204,14 +204,14 @@ query_and_convert() {
             grep "^INSERT INTO assessments" "$OUTPUT_DIR/assessments.sql" | \
                 sed -E "s/.*VALUES \('([^']+)'.*/\1/" | sort -u > "${file}.assessment_ids"
             
-            # Remove snapshots that reference non-existent assessments
+            # Remove assessment_inventories that reference non-existent assessments
             local original_count
-            original_count=$(grep -c "^INSERT INTO snapshots" "$file" || echo "0")
+            original_count=$(grep -c "^INSERT INTO assessment_inventories" "$file" || true)
             while IFS= read -r line; do
-                if [[ $line == INSERT\ INTO\ snapshots* ]]; then
-                    # Extract assessment_id (4th column in VALUES clause)
+                if [[ $line == INSERT\ INTO\ assessment_inventories* ]]; then
+                    # Extract assessment_id (last column in VALUES clause)
                     local assessment_id
-                    assessment_id=$(echo "$line" | sed -E "s/.*', '([^']+)', '[0-9]+'\);/\1/")
+                    assessment_id=$(echo "$line" | sed -E "s/.*', '([^']+)'\);/\1/")
                     # Only include if assessment exists
                     if grep -q "^${assessment_id}$" "${file}.assessment_ids"; then
                         echo "$line"
@@ -222,16 +222,16 @@ query_and_convert() {
             done < "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
             
             local final_count
-            final_count=$(grep -c "^INSERT INTO snapshots" "$file" || echo "0")
+            final_count=$(grep -c "^INSERT INTO assessment_inventories" "$file" || true)
             local removed=$((original_count - final_count))
             if [ $removed -gt 0 ]; then
-                echo "  ⚠️  Removed $removed orphaned snapshots (assessment no longer exists)"
+                echo "  ⚠️  Removed $removed orphaned assessment_inventories (assessment no longer exists)"
             fi
             
             rm -f "${file}.assessment_ids"
         fi
         
-        echo "✅ Snapshots cleaned: $(grep -c '^INSERT INTO snapshots' "$file" || echo 0) valid records"
+        echo "✅ Inventories cleaned: $(grep -c '^INSERT INTO assessment_inventories' "$file" || true) valid records"
     fi
 
 }
@@ -247,9 +247,8 @@ query_and_convert "assessments" "SELECT * FROM assessments;"
 query_and_convert "agents" "SELECT * FROM agents;"
 query_and_convert "keys" "SELECT * FROM keys;"
 query_and_convert "labels" "SELECT * FROM labels;"
-# Snapshots: only export columns that exist in local schema (id, created_at, inventory, assessment_id, version)
-# GABI versions are correct as-is - no swap needed
-query_and_convert "snapshots" "SELECT id, created_at, inventory, assessment_id, version FROM snapshots;"
+# Export full and subset assessment inventories in the current schema.
+query_and_convert "assessment_inventories" "SELECT id, created_at, name, is_subset, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory, assessment_id FROM assessment_inventories WHERE inventory IS NOT NULL;"
 query_and_convert "image_infras" "SELECT * FROM image_infras;"
 
 # Skip goose_db_version (just migration tracking)

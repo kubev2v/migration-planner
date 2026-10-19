@@ -25,11 +25,11 @@ import (
 )
 
 const (
-	insertSourceStm      = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
-	insertAssessmentStm  = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertSnapshotStm    = "INSERT INTO snapshots (assessment_id, inventory) VALUES ('%s', '%s');"
-	countOutboxByTypeStm = "SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;"
-	countOutboxEventsStm = "SELECT COUNT(*) FROM outbox_events;"
+	insertSourceStm              = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
+	insertAssessmentStm          = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
+	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, assessment_id, name, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (gen_random_uuid()::text, '%s', 'test', '', 0, 0, 0, 0, 2, '%s');"
+	countOutboxByTypeStm         = "SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;"
+	countOutboxEventsStm         = "SELECT COUNT(*) FROM outbox_events;"
 )
 
 var _ = Describe("assessment service", Ordered, func() {
@@ -188,7 +188,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			assessmentIDs = nil
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -221,7 +221,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -263,7 +263,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.Username).To(Equal("user1"))
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeInventory))
 				Expect(assessment.SourceID).To(BeNil())
-				Expect(assessment.Snapshots).To(HaveLen(1))
+				Expect(assessment.Inventories).To(HaveLen(1))
 				// Verify owner fields are properly mapped from user context
 				Expect(assessment.OwnerFirstName).ToNot(BeNil())
 				Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
@@ -376,7 +376,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeAgent))
 				Expect(assessment.SourceID).ToNot(BeNil())
 				Expect(assessment.SourceID.String()).To(Equal(sourceID.String()))
-				Expect(assessment.Snapshots).To(HaveLen(1))
+				Expect(assessment.Inventories).To(HaveLen(1))
 			})
 
 			It("fails when user orgID is different than source orgID", func() {
@@ -467,12 +467,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Snapshots).To(HaveLen(1))
+				Expect(assessment.Inventories).To(HaveLen(1))
 
-				var snapshotVersion int
-				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
+				var inventoryVersion int
+				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotVersion).To(Equal(1))
+				Expect(inventoryVersion).To(Equal(1))
 			})
 
 			It("successfully creates assessment from source and stores V2 version", func() {
@@ -497,19 +497,19 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Snapshots).To(HaveLen(1))
+				Expect(assessment.Inventories).To(HaveLen(1))
 
-				var snapshotVersion int
-				tx = gormdb.Raw("SELECT version FROM snapshots WHERE assessment_id = ?", testAssessmentID).Scan(&snapshotVersion)
+				var inventoryVersion int
+				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotVersion).To(Equal(2))
+				Expect(inventoryVersion).To(Equal(2))
 			})
 		})
 
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -517,7 +517,7 @@ var _ = Describe("assessment service", Ordered, func() {
 
 	Context("UpdateAssessment", func() {
 		Context("assessment with sourceID (source type)", func() {
-			It("successfully updates assessment name and adds new snapshot", func() {
+			It("successfully updates assessment name and adds new inventory", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
 				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
@@ -530,8 +530,8 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -546,10 +546,10 @@ var _ = Describe("assessment service", Ordered, func() {
 				var inventoryCount int
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(2))
 			})
 
-			It("only updates name when name is provided without creating new snapshot", func() {
+			It("refreshes source inventory when a new name is provided", func() {
 				// Create a source with inventory
 				sourceID := uuid.New()
 				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":15},"infra":{"totalHosts":7}}}`
@@ -562,8 +562,8 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -576,7 +576,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				var inventoryCount int
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(2))
 			})
 
 			It("creates a new inventory on every PUT operation for sourceID-based assessments", func() {
@@ -592,15 +592,15 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 0 inventories
 				var inventoryCount int
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(0))
+				Expect(inventoryCount).To(Equal(1))
 
 				// First update
 				newName1 := "Updated Name 1"
@@ -610,7 +610,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				// Should have 1 inventory now
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(2))
 
 				// Second update
 				newName2 := "Updated Name 2"
@@ -620,7 +620,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				// Should have 2 inventories now
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(2))
+				Expect(inventoryCount).To(Equal(3))
 
 				// Third update
 				newName3 := "Updated Name 3"
@@ -630,7 +630,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				// Should have 3 inventories now
 				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(inventoryCount).To(Equal(3))
+				Expect(inventoryCount).To(Equal(4))
 			})
 
 			It("successfully updates when source is deleted (source_id becomes NULL)", func() {
@@ -646,8 +646,8 @@ var _ = Describe("assessment service", Ordered, func() {
 				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Test Assessment", "org1", "user1", "John", "Doe", service.SourceTypeAgent, fmt.Sprintf("'%s'", sourceID)))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Delete the source (this will set source_id to NULL due to ON DELETE SET NULL)
@@ -657,28 +657,28 @@ var _ = Describe("assessment service", Ordered, func() {
 				newName := "Updated Name"
 				updatedAssessment, err := svc.UpdateAssessment(context.TODO(), assessmentID, &newName)
 
-				// Should succeed and only update name (no new snapshot since source_id is now NULL)
+				// Should succeed and only update name (no new inventory since source_id is now NULL)
 				Expect(err).To(BeNil())
 				Expect(updatedAssessment).ToNot(BeNil())
 				Expect(updatedAssessment.Name).To(Equal("Updated Name"))
 
-				// Verify that no new snapshot was created
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Verify that no new inventory was created
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1)) // Only original snapshot
+				Expect(inventoryCount).To(Equal(1)) // Only original inventory
 			})
 		})
 
 		Context("assessment without sourceID (inventory/rvtools type)", func() {
-			It("successfully updates assessment name only (no new snapshot)", func() {
+			It("successfully updates assessment name only (no new inventory)", func() {
 				// Create assessment without sourceID (inventory type)
 				assessmentID := uuid.New()
 				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -689,11 +689,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(updatedAssessment.Name).To(Equal("Updated Name"))
 				Expect(updatedAssessment.UpdatedAt).ToNot(BeNil())
 
-				// Verify that no new snapshot was created (only name update)
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Verify that no new inventory was created (only name update)
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1)) // Only original snapshot
+				Expect(inventoryCount).To(Equal(1)) // Only original inventory
 			})
 
 			It("successfully updates rvtools assessment name only", func() {
@@ -710,51 +710,51 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(updatedAssessment.SourceType).To(Equal(service.SourceTypeRvtools))
 			})
 
-			It("maintains only one snapshot after multiple updates for non-sourceID assessments", func() {
+			It("maintains only one inventory after multiple updates for non-sourceID assessments", func() {
 				// Create assessment without sourceID (inventory type)
 				assessmentID := uuid.New()
 				tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID.String(), "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 				Expect(tx.Error).To(BeNil())
 
-				// Add initial snapshot
-				tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				// Add initial inventory
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
-				// Verify initial state: 1 snapshot
-				var snapshotCount int
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Verify initial state: 1 inventory
+				var inventoryCount int
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(1))
 
 				// First update
 				newName1 := "Updated Name 1"
 				_, err := svc.UpdateAssessment(context.TODO(), assessmentID, &newName1)
 				Expect(err).To(BeNil())
 
-				// Should still have only 1 snapshot (no new snapshot created)
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should still have only 1 inventory (no new inventory created)
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(1))
 
 				// Second update
 				newName2 := "Updated Name 2"
 				_, err = svc.UpdateAssessment(context.TODO(), assessmentID, &newName2)
 				Expect(err).To(BeNil())
 
-				// Should still have only 1 snapshot
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should still have only 1 inventory
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(1))
 
 				// Third update
 				newName3 := "Updated Name 3"
 				_, err = svc.UpdateAssessment(context.TODO(), assessmentID, &newName3)
 				Expect(err).To(BeNil())
 
-				// Should still have only 1 snapshot
-				tx = gormdb.Raw("SELECT COUNT(*) FROM snapshots WHERE assessment_id = ?", assessmentID).Scan(&snapshotCount)
+				// Should still have only 1 inventory
+				tx = gormdb.Raw("SELECT COUNT(*) FROM assessment_inventories WHERE assessment_id = ?", assessmentID).Scan(&inventoryCount)
 				Expect(tx.Error).To(BeNil())
-				Expect(snapshotCount).To(Equal(1))
+				Expect(inventoryCount).To(Equal(1))
 			})
 		})
 
@@ -772,7 +772,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -815,7 +815,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -843,7 +843,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			// Clean up any existing data
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -862,12 +862,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				gormdb.Table("sources").Count(&sourceCount)
 				Expect(sourceCount).To(Equal(int64(1)))
 
-				// Verify no assessments or snapshots exist initially
-				var assessmentCount, snapshotCount int64
+				// Verify no assessments or inventories exist initially
+				var assessmentCount, inventoryCount int64
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Attempt to create assessment from source in different org (should fail - authorization check)
 				createForm := mappers.AssessmentCreateForm{
@@ -886,11 +886,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("forbidden to create assessment from source id"))
 
-				// Verify database is clean - no assessments or snapshots were created
+				// Verify database is clean - no assessments or inventories were created
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Verify source still exists (wasn't affected)
 				gormdb.Table("sources").Count(&sourceCount)
@@ -914,12 +914,12 @@ var _ = Describe("assessment service", Ordered, func() {
 				gormdb.Table("sources").Count(&sourceCount)
 				Expect(sourceCount).To(Equal(int64(1)))
 
-				// Verify no assessments or snapshots exist initially
-				var assessmentCount, snapshotCount int64
+				// Verify no assessments or inventories exist initially
+				var assessmentCount, inventoryCount int64
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Attempt to create assessment with source that has no inventory (should fail)
 				createForm := mappers.AssessmentCreateForm{
@@ -938,11 +938,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment).To(BeNil())
 				Expect(err.Error()).To(ContainSubstring("source has no inventory"))
 
-				// Verify database is clean - no assessments or snapshots were created
+				// Verify database is clean - no assessments or inventories were created
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Verify source still exists (wasn't affected)
 				gormdb.Table("sources").Count(&sourceCount)
@@ -954,13 +954,13 @@ var _ = Describe("assessment service", Ordered, func() {
 				nonExistentSourceID := uuid.New()
 
 				// Verify no data exists initially
-				var sourceCount, assessmentCount, snapshotCount int64
+				var sourceCount, assessmentCount, inventoryCount int64
 				gormdb.Table("sources").Count(&sourceCount)
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(sourceCount).To(Equal(int64(0)))
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Attempt to create assessment with non-existent source (should fail)
 				createForm := mappers.AssessmentCreateForm{
@@ -978,11 +978,11 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).ToNot(BeNil())
 				Expect(assessment).To(BeNil())
 
-				// Verify database is clean - no assessments or snapshots were created
+				// Verify database is clean - no assessments or inventories were created
 				gormdb.Table("assessments").Count(&assessmentCount)
-				gormdb.Table("snapshots").Count(&snapshotCount)
+				gormdb.Table("assessment_inventories").Count(&inventoryCount)
 				Expect(assessmentCount).To(Equal(int64(0)))
-				Expect(snapshotCount).To(Equal(int64(0)))
+				Expect(inventoryCount).To(Equal(int64(0)))
 
 				// Verify no sources exist
 				gormdb.Table("sources").Count(&sourceCount)
@@ -993,7 +993,7 @@ var _ = Describe("assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
@@ -1123,7 +1123,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -1201,7 +1201,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})

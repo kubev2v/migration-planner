@@ -243,7 +243,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -392,7 +391,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -493,7 +491,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -505,7 +502,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessmentID = uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 			Expect(tx.Error).To(BeNil())
 		})
 
@@ -550,7 +547,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -613,7 +609,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -678,7 +673,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -734,7 +728,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})

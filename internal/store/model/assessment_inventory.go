@@ -57,7 +57,7 @@ func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, i
 	_, hasClusters := keys["clusters"]
 	_, hasVCenterID := keys["vcenter_id"]
 	if hasClusters || hasVCenterID {
-		ai.Version = SnapshotVersionV2
+		ai.Version = InventoryVersionV2
 		var inv v1alpha1.Inventory
 		if err := json.Unmarshal(raw, &inv); err != nil {
 			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
@@ -70,7 +70,7 @@ func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, i
 			ai.DatastoresCount = len(inv.Vcenter.Infra.Datastores)
 		}
 	} else {
-		ai.Version = SnapshotVersionV1
+		ai.Version = InventoryVersionV1
 		var invData v1alpha1.InventoryData
 		if err := json.Unmarshal(raw, &invData); err != nil {
 			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
