@@ -1,43 +1,44 @@
-package converters
+package mappers
 
 import (
 	"math"
 	"strings"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service/model"
+
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
-// ToAPI converts domain Inventory to api.Inventory.
-func ToAPI(inv *inventory.Inventory) *api.Inventory {
-	clusters := make(map[string]api.InventoryData)
+// DuckdbToModel converts duckdb Inventory to domain Inventory.
+func DuckdbToModel(inv *inventory.Inventory) *model.Inventory {
+	clusters := make(map[string]model.InventoryData)
 	for clusterID, data := range inv.Clusters {
-		clusters[clusterID] = toAPIInventoryData(&data)
+		clusters[clusterID] = duckdbToDomainInventoryData(&data)
 	}
 
-	result := &api.Inventory{
+	result := &model.Inventory{
 		VcenterId:      inv.VCenterID,
 		Clusters:       clusters,
 		VcenterVersion: &inv.VCenterVersion,
 		CreatedAt:      inv.CreatedAt,
 	}
 	if inv.VCenter != nil {
-		vcenter := toAPIInventoryData(inv.VCenter)
+		vcenter := duckdbToDomainInventoryData(inv.VCenter)
 		result.Vcenter = &vcenter
 	}
 
 	return result
 }
 
-func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
-	result := api.InventoryData{
-		Vms:   toAPIVMs(&d.VMs),
-		Infra: toAPIInfra(&d.Infra),
+func duckdbToDomainInventoryData(d *inventory.InventoryData) model.InventoryData {
+	result := model.InventoryData{
+		Vms:   duckdbToDomainVMs(&d.VMs),
+		Infra: duckdbToDomainInfra(&d.Infra),
 	}
 	result.Infra.VmsPerHostAverage = vmsPerHostAverage(d.VMs.Total, d.Infra.TotalHosts)
 
 	if d.ClusterFeatures != nil {
-		clusterFeatures := api.ClusterFeatures{
+		clusterFeatures := model.ClusterFeatures{
 			DrsEnabled: d.ClusterFeatures.DrsEnabled,
 			HaEnabled:  d.ClusterFeatures.HaEnabled,
 		}
@@ -47,16 +48,16 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 			normalized := strings.ToLower(strings.TrimSpace(*d.ClusterFeatures.DrsMode))
 			switch normalized {
 			case "fullyautomated", "fully automated":
-				mode := api.ClusterFeaturesDrsModeFullyAutomated
+				mode := model.ClusterFeaturesDrsModeFullyAutomated
 				clusterFeatures.DrsMode = &mode
 			case "partiallyautomated", "partially automated":
-				mode := api.ClusterFeaturesDrsModePartiallyAutomated
+				mode := model.ClusterFeaturesDrsModePartiallyAutomated
 				clusterFeatures.DrsMode = &mode
 			case "manual":
-				mode := api.ClusterFeaturesDrsModeManual
+				mode := model.ClusterFeaturesDrsModeManual
 				clusterFeatures.DrsMode = &mode
 			default:
-				mode := api.ClusterFeaturesDrsModeNone
+				mode := model.ClusterFeaturesDrsModeNone
 				clusterFeatures.DrsMode = &mode
 			}
 		}
@@ -65,7 +66,7 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 	}
 
 	if d.ClusterUtilization != nil {
-		util := api.ClusterUtilization{
+		util := model.ClusterUtilization{
 			CpuAvg:     d.ClusterUtilization.CpuAvg,
 			CpuP95:     d.ClusterUtilization.CpuP95,
 			CpuMax:     d.ClusterUtilization.CpuMax,
@@ -80,11 +81,11 @@ func toAPIInventoryData(d *inventory.InventoryData) api.InventoryData {
 	return result
 }
 
-func toAPIVMs(v *inventory.VMsData) api.VMs {
-	osInfo := make(map[string]api.OsInfo)
+func duckdbToDomainVMs(v *inventory.VMsData) model.VMs {
+	osInfo := make(map[string]model.OsInfo)
 	for name, os := range v.OSInfo {
-		tier := api.OsInfoSupportTier(os.SupportTier)
-		info := api.OsInfo{
+		tier := model.OsInfoSupportTier(os.SupportTier)
+		info := model.OsInfo{
 			Count:       os.Count,
 			Supported:   os.IsSupported,
 			SupportTier: &tier,
@@ -96,19 +97,19 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		osInfo[name] = info
 	}
 
-	diskSizeTiers := make(map[string]api.DiskSizeTierSummary)
+	diskSizeTiers := make(map[string]model.DiskSizeTierSummary)
 	for tier, summary := range v.DiskSizeTiers {
-		diskSizeTiers[tier] = api.DiskSizeTierSummary{
+		diskSizeTiers[tier] = model.DiskSizeTierSummary{
 			VmCount:     summary.VMCount,
 			TotalSizeTB: summary.TotalSizeTB,
 		}
 	}
 
-	var diskComplexityTierPtr *map[string]api.DiskSizeTierSummary
+	var diskComplexityTierPtr *map[string]model.DiskSizeTierSummary
 	if len(v.DiskComplexityTiers) > 0 {
-		m := make(map[string]api.DiskSizeTierSummary, len(v.DiskComplexityTiers))
+		m := make(map[string]model.DiskSizeTierSummary, len(v.DiskComplexityTiers))
 		for tier, summary := range v.DiskComplexityTiers {
-			m[tier] = api.DiskSizeTierSummary{
+			m[tier] = model.DiskSizeTierSummary{
 				VmCount:     summary.VMCount,
 				TotalSizeTB: summary.TotalSizeTB,
 			}
@@ -116,26 +117,26 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		diskComplexityTierPtr = &m
 	}
 
-	diskTypes := make(map[string]api.DiskTypeSummary)
+	diskTypes := make(map[string]model.DiskTypeSummary)
 	for diskType, summary := range v.DiskTypes {
-		diskTypes[diskType] = api.DiskTypeSummary{
+		diskTypes[diskType] = model.DiskTypeSummary{
 			VmCount:     summary.VMCount,
 			TotalSizeTB: summary.TotalSizeTB,
 		}
 	}
 
-	complexityDist := make(map[string]api.DiskSizeTierSummary, len(v.ComplexityDistribution))
+	complexityDist := make(map[string]model.DiskSizeTierSummary, len(v.ComplexityDistribution))
 	for level, summary := range v.ComplexityDistribution {
-		complexityDist[level] = api.DiskSizeTierSummary{
+		complexityDist[level] = model.DiskSizeTierSummary{
 			VmCount:     summary.VMCount,
 			TotalSizeTB: summary.TotalSizeTB,
 		}
 	}
 
-	migrationWarnings := make([]api.MigrationIssue, 0, len(v.MigrationWarnings))
+	migrationWarnings := make([]model.MigrationIssue, 0, len(v.MigrationWarnings))
 	for _, w := range v.MigrationWarnings {
 		id := w.ID
-		migrationWarnings = append(migrationWarnings, api.MigrationIssue{
+		migrationWarnings = append(migrationWarnings, model.MigrationIssue{
 			Id:         &id,
 			Label:      w.Label,
 			Assessment: w.Assessment,
@@ -143,10 +144,10 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		})
 	}
 
-	notMigratableReasons := make([]api.MigrationIssue, 0, len(v.NotMigratableReasons))
+	notMigratableReasons := make([]model.MigrationIssue, 0, len(v.NotMigratableReasons))
 	for _, c := range v.NotMigratableReasons {
 		id := c.ID
-		notMigratableReasons = append(notMigratableReasons, api.MigrationIssue{
+		notMigratableReasons = append(notMigratableReasons, model.MigrationIssue{
 			Id:         &id,
 			Label:      c.Label,
 			Assessment: c.Assessment,
@@ -154,7 +155,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		})
 	}
 
-	nicCount := api.VMResourceBreakdown{
+	nicCount := model.VMResourceBreakdown{
 		Total:                          v.NicCount.Total,
 		TotalForMigratable:             v.NicCount.TotalForMigratable,
 		TotalForMigratableWithWarnings: v.NicCount.TotalForMigratableWithWarnings,
@@ -166,7 +167,7 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 	totalWithRDM := v.TotalWithRDM
 	totalWithFaultTolerance := v.TotalWithFaultTolerance
 
-	return api.VMs{
+	return model.VMs{
 		Total:                       v.Total,
 		TotalMigratable:             v.TotalMigratable,
 		TotalMigratableWithWarnings: &migratableWithWarnings,
@@ -175,25 +176,25 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		TotalWithFaultTolerance:     &totalWithFaultTolerance,
 		PowerStates:                 v.PowerStates,
 		OsInfo:                      &osInfo,
-		CpuCores: api.VMResourceBreakdown{
+		CpuCores: model.VMResourceBreakdown{
 			Total:                          v.CPUCores.Total,
 			TotalForMigratable:             v.CPUCores.TotalForMigratable,
 			TotalForMigratableWithWarnings: v.CPUCores.TotalForMigratableWithWarnings,
 			TotalForNotMigratable:          v.CPUCores.TotalForNotMigratable,
 		},
-		RamGB: api.VMResourceBreakdown{
+		RamGB: model.VMResourceBreakdown{
 			Total:                          v.RamGB.Total,
 			TotalForMigratable:             v.RamGB.TotalForMigratable,
 			TotalForMigratableWithWarnings: v.RamGB.TotalForMigratableWithWarnings,
 			TotalForNotMigratable:          v.RamGB.TotalForNotMigratable,
 		},
-		DiskCount: api.VMResourceBreakdown{
+		DiskCount: model.VMResourceBreakdown{
 			Total:                          v.DiskCount.Total,
 			TotalForMigratable:             v.DiskCount.TotalForMigratable,
 			TotalForMigratableWithWarnings: v.DiskCount.TotalForMigratableWithWarnings,
 			TotalForNotMigratable:          v.DiskCount.TotalForNotMigratable,
 		},
-		DiskGB: api.VMResourceBreakdown{
+		DiskGB: model.VMResourceBreakdown{
 			Total:                          v.DiskGB.Total,
 			TotalForMigratable:             v.DiskGB.TotalForMigratable,
 			TotalForMigratableWithWarnings: v.DiskGB.TotalForMigratableWithWarnings,
@@ -203,14 +204,13 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 		DistributionByCpuTier:    &v.DistributionByCPUTier,
 		DistributionByMemoryTier: &v.DistributionByMemoryTier,
 		DistributionByNicCount:   &v.DistributionByNICCount,
-		DistributionByComplexity: &v.DistributionByComplexity,
 		ComplexityDistribution:   &complexityDist,
 		DiskSizeTier:             &diskSizeTiers,
 		DiskComplexityTier:       diskComplexityTierPtr,
 		DiskTypes:                &diskTypes,
 		MigrationWarnings:        migrationWarnings,
 		NotMigratableReasons:     notMigratableReasons,
-		IssuesBreakdown: &api.IssuesBreakdown{
+		IssuesBreakdown: &model.IssuesBreakdown{
 			Critical:    v.IssuesBreakdown.Critical,
 			Warning:     v.IssuesBreakdown.Warning,
 			Information: v.IssuesBreakdown.Information,
@@ -220,10 +220,10 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 	}
 }
 
-func toAPIInfra(i *inventory.InfraData) api.Infra {
-	hosts := make([]api.Host, 0, len(i.Hosts))
+func duckdbToDomainInfra(i *inventory.InfraData) model.Infra {
+	hosts := make([]model.Host, 0, len(i.Hosts))
 	for _, h := range i.Hosts {
-		host := api.Host{
+		host := model.Host{
 			Vendor: h.Vendor,
 			Model:  h.Model,
 		}
@@ -248,10 +248,10 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		hosts = append(hosts, host)
 	}
 
-	datastores := make([]api.Datastore, 0, len(i.Datastores))
+	datastores := make([]model.Datastore, 0, len(i.Datastores))
 	for _, d := range i.Datastores {
 		vsanSnapshotSupport := d.VsanSnapshotSupport
-		ds := api.Datastore{
+		ds := model.Datastore{
 			DiskId:                  d.DiskId,
 			FreeCapacityGB:          int(d.FreeCapacityGB),
 			TotalCapacityGB:         int(d.TotalCapacityGB),
@@ -263,7 +263,7 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 			Vendor:                  d.Vendor,
 		}
 		if d.StorageProtocol != "" {
-			storageProtocol := api.DatastoreStorageProtocol(d.StorageProtocol)
+			storageProtocol := model.DatastoreStorageProtocol(d.StorageProtocol)
 			ds.StorageProtocol = &storageProtocol
 		}
 		if d.HostId != "" {
@@ -273,9 +273,9 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		if d.StorageIoConfiguration != nil {
 			enabled := d.StorageIoConfiguration.Enabled
 			congestion := d.StorageIoConfiguration.CongestionThreshold
-			mode := api.StorageIoConfigurationCongestionThresholdMode(d.StorageIoConfiguration.CongestionThresholdMode)
+			mode := model.StorageIoConfigurationCongestionThresholdMode(d.StorageIoConfiguration.CongestionThresholdMode)
 			percent := d.StorageIoConfiguration.PercentOfPeakThroughput
-			ds.StorageIoConfiguration = &api.StorageIoConfiguration{
+			ds.StorageIoConfiguration = &model.StorageIoConfiguration{
 				Enabled:                 &enabled,
 				CongestionThreshold:     &congestion,
 				CongestionThresholdMode: &mode,
@@ -286,11 +286,11 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		datastores = append(datastores, ds)
 	}
 
-	networks := make([]api.Network, 0, len(i.Networks))
+	networks := make([]model.Network, 0, len(i.Networks))
 	for _, n := range i.Networks {
-		net := api.Network{
+		net := model.Network{
 			Name: n.Name,
-			Type: api.NetworkType(n.Type),
+			Type: model.NetworkType(n.Type),
 		}
 		if n.Dvswitch != "" {
 			dvs := n.Dvswitch
@@ -307,7 +307,7 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		networks = append(networks, net)
 	}
 
-	infra := api.Infra{
+	infra := model.Infra{
 		Hosts:                &hosts,
 		HostPowerStates:      i.HostPowerStates,
 		Datastores:           datastores,
@@ -333,7 +333,7 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 
 // anonymizeNFSDatastore sets diskId and protocolType to "N/A" for NFS datastores.
 // NFS paths may contain sensitive server information that should not be exposed.
-func anonymizeNFSDatastore(ds *api.Datastore) {
+func anonymizeNFSDatastore(ds *model.Datastore) {
 	if strings.EqualFold(ds.Type, "NFS") {
 		ds.DiskId = "N/A"
 		ds.ProtocolType = "N/A"

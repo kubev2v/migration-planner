@@ -17,6 +17,7 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
@@ -51,19 +52,19 @@ func (m *MockStore) Authz() store.Authz {
 // from all methods. Used to test handler 403 responses.
 type ForbiddenAssessmentService struct{}
 
-func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
-func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]model.Assessment, error) {
+func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", "list")
 }
 
-func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", "create")
 }
 
-func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
@@ -79,8 +80,8 @@ func (f *ForbiddenAssessmentService) UnshareAssessment(_ context.Context, id uui
 	return service.NewErrForbidden("assessment", id.String())
 }
 
-func (f *ForbiddenAssessmentService) AggregateInventories(_ context.Context, id uuid.UUID, _ ...uuid.UUID) (model.AssessmentInventory, error) {
-	return model.AssessmentInventory{}, service.NewErrForbidden("assessment", id.String())
+func (f *ForbiddenAssessmentService) AggregateInventories(_ context.Context, id uuid.UUID, _ ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
+	return svcmodel.AssessmentInventory{}, service.NewErrForbidden("assessment", id.String())
 }
 
 func (m *MockStore) Source() store.Source {
@@ -89,10 +90,6 @@ func (m *MockStore) Source() store.Source {
 
 func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("SourceSubsetInventory() not implemented in MockStore for this test")
-}
-
-func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
-	panic("AssessmentSubsetInventory() not implemented in MockStore for this test")
 }
 
 func (m *MockStore) Agent() store.Agent {
@@ -267,9 +264,9 @@ func createTestAssessmentWithInventory(id uuid.UUID, username, orgID string, inv
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    inventoryBytes,
 				AssessmentID: id,
@@ -1651,7 +1648,7 @@ var _ = Describe("sizer handler", func() {
 				// Create assessment with empty cluster (0 VMs, 0 CPU, 0 Memory)
 				assessment := createTestAssessment(assessmentID, user.Username, user.Organization, clusterID)
 				// Override inventory to have empty cluster
-				assessment.Snapshots[0].Inventory = []byte(`{"clusters":{"` + clusterID + `":{"vms":{"total":0,"cpu_cores":{"total":0},"ram_gb":{"total":0}}}}}`)
+				assessment.Inventories[0].Inventory = []byte(`{"clusters":{"` + clusterID + `":{"vms":{"total":0,"cpu_cores":{"total":0},"ram_gb":{"total":0}}}}}`)
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)

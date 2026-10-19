@@ -18,9 +18,3 @@ type StandaloneClusterRequirementsRequestForm struct {
 	HostedControlPlane      *bool
 	CompactMode             *bool
 }
-
-// StandaloneClusterRequirementsResponseForm omits inventory totals (already in request).
-type StandaloneClusterRequirementsResponseForm struct {
-	ClusterSizing       ClusterSizingForm
-	ResourceConsumption ResourceConsumptionForm
-}

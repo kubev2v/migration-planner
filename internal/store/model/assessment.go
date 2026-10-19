@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	SnapshotVersionV1 = 1 + iota
-	SnapshotVersionV2
+	InventoryVersionV1 = 1 + iota
+	InventoryVersionV2
 )
 
 type Assessment struct {
@@ -23,29 +23,14 @@ type Assessment struct {
 	OwnerLastName  *string               `gorm:"type:VARCHAR(100)"`
 	SourceType     string                `gorm:"not null;type:VARCHAR(100)"`
 	SourceID       *uuid.UUID            `gorm:"type:TEXT"`
-	Snapshots      []Snapshot            `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
 	Inventories    []AssessmentInventory `gorm:"foreignKey:AssessmentID;references:ID;constraint:OnDelete:CASCADE;"`
 	Permissions    []Permission          `gorm:"-"`
 	Sharing        *Sharing              `gorm:"-"`
-}
-
-type Snapshot struct {
-	ID                uint                        `gorm:"primaryKey;autoIncrement"`
-	CreatedAt         time.Time                   `gorm:"not null;default:now()"`
-	Inventory         []byte                      `gorm:"type:jsonb;not null"`
-	AssessmentID      uuid.UUID                   `gorm:"not null;type:VARCHAR(255);"`
-	Version           uint                        `gorm:"type:smallint;not null;default:1"`
-	SubsetInventories []AssessmentSubsetInventory `gorm:"foreignKey:SnapshotID;references:ID;constraint:OnDelete:CASCADE;"`
 }
 
 type AssessmentList []Assessment
 
 func (a Assessment) String() string {
 	val, _ := json.Marshal(a)
-	return string(val)
-}
-
-func (s Snapshot) String() string {
-	val, _ := json.Marshal(s)
 	return string(val)
 }

@@ -85,7 +85,6 @@ func (m *mockStore) Agent() store.Agent                                         
 func (m *mockStore) Authz() store.Authz                                         { return nil }
 func (m *mockStore) Source() store.Source                                       { return nil }
 func (m *mockStore) SourceSubsetInventory() store.SourceSubsetInventory         { return nil }
-func (m *mockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory { return nil }
 func (m *mockStore) ImageInfra() store.ImageInfra                               { return nil }
 func (m *mockStore) PrivateKey() store.PrivateKey                               { return nil }
 func (m *mockStore) Label() store.Label                                         { return nil }

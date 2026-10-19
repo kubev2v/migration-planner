@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
@@ -204,7 +205,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 
-			var shared *model.Assessment
+			var shared *svcmodel.AssessmentSummary
 			for i, a := range assessments {
 				if a.ID.String() == resourceID {
 					shared = &assessments[i]
@@ -243,7 +244,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -392,7 +392,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -410,13 +409,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			testID := uuid.New()
 			inv, err := model.NewAssessmentInventory(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
+			domainInv, err := mappers.AssessmentInventoryFromStore(inv)
+			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          testID,
-				Name:        "Authz Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:         testID,
+				Name:       "Authz Assessment",
+				OrgID:      "org1",
+				Username:   "user1",
+				SourceType: service.SourceTypeInventory,
+				Inventory:  domainInv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -443,13 +444,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 			inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
+			domainInv, err := mappers.AssessmentInventoryFromStore(inv)
+			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "Visible Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:         uuid.New(),
+				Name:       "Visible Assessment",
+				OrgID:      "org1",
+				Username:   "user1",
+				SourceType: service.SourceTypeInventory,
+				Inventory:  domainInv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -493,7 +496,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -505,7 +507,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessmentID = uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertSnapshotStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 			Expect(tx.Error).To(BeNil())
 		})
 
@@ -550,7 +552,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -613,7 +614,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM relations;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -678,7 +678,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})
@@ -734,7 +733,6 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM members;")
 			gormdb.Exec("DELETE FROM groups;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
-			gormdb.Exec("DELETE FROM snapshots;")
 			gormdb.Exec("DELETE FROM assessments;")
 		})
 	})

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service/model"
 )
 
 type AssessmentInventory struct {
@@ -57,8 +57,8 @@ func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, i
 	_, hasClusters := keys["clusters"]
 	_, hasVCenterID := keys["vcenter_id"]
 	if hasClusters || hasVCenterID {
-		ai.Version = SnapshotVersionV2
-		var inv v1alpha1.Inventory
+		ai.Version = InventoryVersionV2
+		var inv model.Inventory
 		if err := json.Unmarshal(raw, &inv); err != nil {
 			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
 		}
@@ -70,8 +70,8 @@ func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, i
 			ai.DatastoresCount = len(inv.Vcenter.Infra.Datastores)
 		}
 	} else {
-		ai.Version = SnapshotVersionV1
-		var invData v1alpha1.InventoryData
+		ai.Version = InventoryVersionV1
+		var invData model.InventoryData
 		if err := json.Unmarshal(raw, &invData); err != nil {
 			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
 		}

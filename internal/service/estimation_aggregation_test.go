@@ -4,22 +4,22 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func Test_AggregateInventoryData_VCenterAggregate(t *testing.T) {
 	// Setup: inventory with vCenter aggregate
-	inventory := &api.Inventory{
-		Vcenter: &api.InventoryData{
-			Vms: api.VMs{
+	inventory := &model.Inventory{
+		Vcenter: &model.InventoryData{
+			Vms: model.VMs{
 				Total: 100,
 			},
 		},
-		Clusters: map[string]api.InventoryData{
-			"cluster1": {Vms: api.VMs{Total: 50}},
-			"cluster2": {Vms: api.VMs{Total: 50}},
+		Clusters: map[string]model.InventoryData{
+			"cluster1": {Vms: model.VMs{Total: 50}},
+			"cluster2": {Vms: model.VMs{Total: 50}},
 		},
 	}
 
@@ -32,12 +32,12 @@ func Test_AggregateInventoryData_VCenterAggregate(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_SingleCluster(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total: 50,
-					OsInfo: &map[string]api.OsInfo{
+					OsInfo: &map[string]model.OsInfo{
 						"RHEL 8":       {Count: 30},
 						"Windows 2019": {Count: 20},
 					},
@@ -54,21 +54,21 @@ func Test_AggregateInventoryData_SingleCluster(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_MultiCluster_OsInfo(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total: 50,
-					OsInfo: &map[string]api.OsInfo{
+					OsInfo: &map[string]model.OsInfo{
 						"RHEL 8":       {Count: 30},
 						"Windows 2019": {Count: 20},
 					},
 				},
 			},
 			"cluster2": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total: 40,
-					OsInfo: &map[string]api.OsInfo{
+					OsInfo: &map[string]model.OsInfo{
 						"RHEL 8":       {Count: 25}, // Same OS as cluster1
 						"Ubuntu 20.04": {Count: 15},
 					},
@@ -88,19 +88,19 @@ func Test_AggregateInventoryData_MultiCluster_OsInfo(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_MultiCluster_DiskTiers(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
-					DiskComplexityTier: &map[string]api.DiskSizeTierSummary{
+				Vms: model.VMs{
+					DiskComplexityTier: &map[string]model.DiskSizeTierSummary{
 						"0-10TiB":  {VmCount: 20, TotalSizeTB: 5.5},
 						"10-20TiB": {VmCount: 10, TotalSizeTB: 12.3},
 					},
 				},
 			},
 			"cluster2": {
-				Vms: api.VMs{
-					DiskComplexityTier: &map[string]api.DiskSizeTierSummary{
+				Vms: model.VMs{
+					DiskComplexityTier: &map[string]model.DiskSizeTierSummary{
 						"0-10TiB":  {VmCount: 15, TotalSizeTB: 3.2}, // Same tier
 						"20-50TiB": {VmCount: 5, TotalSizeTB: 30.1},
 					},
@@ -124,31 +124,31 @@ func Test_AggregateInventoryData_MultiCluster_DiskTiers(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_MultiCluster_ResourceBreakdown(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
-					CpuCores: api.VMResourceBreakdown{
+				Vms: model.VMs{
+					CpuCores: model.VMResourceBreakdown{
 						Total:                          100,
 						TotalForMigratable:             80,
 						TotalForMigratableWithWarnings: 15,
 						TotalForNotMigratable:          5,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: model.VMResourceBreakdown{
 						Total:              500,
 						TotalForMigratable: 400,
 					},
 				},
 			},
 			"cluster2": {
-				Vms: api.VMs{
-					CpuCores: api.VMResourceBreakdown{
+				Vms: model.VMs{
+					CpuCores: model.VMResourceBreakdown{
 						Total:                          150,
 						TotalForMigratable:             120,
 						TotalForMigratableWithWarnings: 20,
 						TotalForNotMigratable:          10,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: model.VMResourceBreakdown{
 						Total:              750,
 						TotalForMigratable: 600,
 					},
@@ -169,11 +169,11 @@ func Test_AggregateInventoryData_MultiCluster_ResourceBreakdown(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_MultiCluster_ComplexityDistribution(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
-					ComplexityDistribution: &map[string]api.DiskSizeTierSummary{
+				Vms: model.VMs{
+					ComplexityDistribution: &map[string]model.DiskSizeTierSummary{
 						"0": {VmCount: 10, TotalSizeTB: 2.5},
 						"1": {VmCount: 20, TotalSizeTB: 5.5},
 						"2": {VmCount: 15, TotalSizeTB: 8.3},
@@ -181,8 +181,8 @@ func Test_AggregateInventoryData_MultiCluster_ComplexityDistribution(t *testing.
 				},
 			},
 			"cluster2": {
-				Vms: api.VMs{
-					ComplexityDistribution: &map[string]api.DiskSizeTierSummary{
+				Vms: model.VMs{
+					ComplexityDistribution: &map[string]model.DiskSizeTierSummary{
 						"1": {VmCount: 12, TotalSizeTB: 3.2}, // Same score as cluster1
 						"2": {VmCount: 18, TotalSizeTB: 7.1}, // Same score as cluster1
 						"3": {VmCount: 5, TotalSizeTB: 10.5}, // New score
@@ -216,16 +216,16 @@ func Test_AggregateInventoryData_MultiCluster_ComplexityDistribution(t *testing.
 
 func Test_AggregateInventoryData_DuplicateClusterIDs(t *testing.T) {
 	// Setup: inventory with one cluster
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total:           50,
 					TotalMigratable: 45,
-					OsInfo: &map[string]api.OsInfo{
+					OsInfo: &map[string]model.OsInfo{
 						"RHEL 8": {Count: 30},
 					},
-					DiskComplexityTier: &map[string]api.DiskSizeTierSummary{
+					DiskComplexityTier: &map[string]model.DiskSizeTierSummary{
 						"0-10TiB": {VmCount: 20, TotalSizeTB: 5.5},
 					},
 				},
@@ -261,17 +261,17 @@ func Test_AggregateInventoryData_DuplicateClusterIDs(t *testing.T) {
 
 func Test_AggregateInventoryData_EmptyOsInfo(t *testing.T) {
 	// Setup: clusters with no OS info (nil)
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
 			"cluster1": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total:           50,
 					TotalMigratable: 45,
 					OsInfo:          nil, // No OS data
 				},
 			},
 			"cluster2": {
-				Vms: api.VMs{
+				Vms: model.VMs{
 					Total:           30,
 					TotalMigratable: 28,
 					OsInfo:          nil, // No OS data
@@ -295,9 +295,9 @@ func Test_AggregateInventoryData_EmptyOsInfo(t *testing.T) {
 }
 
 func Test_AggregateInventoryData_ErrorCases(t *testing.T) {
-	inventory := &api.Inventory{
-		Clusters: map[string]api.InventoryData{
-			"cluster1": {Vms: api.VMs{Total: 50}},
+	inventory := &model.Inventory{
+		Clusters: map[string]model.InventoryData{
+			"cluster1": {Vms: model.VMs{Total: 50}},
 		},
 	}
 

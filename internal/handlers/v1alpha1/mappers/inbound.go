@@ -1,7 +1,6 @@
 package mappers
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -9,7 +8,6 @@ import (
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -187,25 +185,16 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 		form.SourceID = resource.SourceId
 	}
 
-	// Build inventories if inline inventory is provided
+	// Build the service snapshot if inline inventory is provided.
 	if resource.Inventory != nil {
 		if resource.Inventory.CreatedAt == nil {
 			now := time.Now().UTC()
 			resource.Inventory.CreatedAt = &now
 		}
-		data, _ := json.Marshal(resource.Inventory)
-		form.Inventory = data
-		inv, err := model.NewAssessmentInventory(uuid.New(), form.ID, resource.Name, false, data)
-		if err == nil {
-			form.Inventories = []model.AssessmentInventory{inv}
-		}
+		form.Inventory = mappers.AssessmentInventoryFromInventory(
+			uuid.New(), form.ID, resource.Name, false, InventoryFromAPI(*resource.Inventory),
+		)
 	}
 
 	return form
-}
-
-func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
-	return mappers.InventoryForm{
-		Data: inventory,
-	}
 }

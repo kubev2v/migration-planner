@@ -2,16 +2,13 @@ package service
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
 	"time"
 
 	"github.com/google/uuid"
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
@@ -46,18 +43,18 @@ type EstimationServicer interface {
 }
 
 // EstimationService orchestrates the migration time estimation workflow.
-// It retrieves assessment and inventory data from the store and runs them
+// It retrieves structured inventory data from the assessment service and runs it
 // through the estimation Engine to produce a MigrationAssessmentResult.
 type EstimationService struct {
-	store  store.Store
-	logger *log.StructuredLogger
+	assessmentSvc AssessmentServicer
+	logger        *log.StructuredLogger
 }
 
 // NewEstimationService creates an EstimationService.
-func NewEstimationService(store store.Store) *EstimationService {
+func NewEstimationService(assessmentSvc AssessmentServicer) *EstimationService {
 	return &EstimationService{
-		store:  store,
-		logger: log.NewDebugLogger("estimation_service"),
+		assessmentSvc: assessmentSvc,
+		logger:        log.NewDebugLogger("estimation_service"),
 	}
 }
 
@@ -75,12 +72,13 @@ func (es *EstimationService) CalculateMigrationEstimation(
 		WithUUID("assessment_id", assessmentID).
 		Build()
 
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
+	assessment, err := es.assessmentSvc.GetAssessment(ctx, assessmentID)
 	if err != nil {
+		tracer.Error(err).Log()
 		return nil, err
 	}
 
-	invData, err := resolveEstimationInventoryData(inventory, clusterIDs, assessmentID)
+	invData, err := resolveEstimationInventoryData(assessment.MainInventory.Inventory, clusterIDs, assessmentID)
 	if err != nil {
 		tracer.Error(err).Log()
 		return nil, err
@@ -137,36 +135,6 @@ func (es *EstimationService) CalculateMigrationComplexity(
 	return result, nil
 }
 
-// loadInventory fetches the assessment's latest snapshot and unmarshals its inventory.
-func (es *EstimationService) loadInventory(ctx context.Context, assessmentID uuid.UUID, tracer *log.OperationTracer) (api.Inventory, error) {
-	assessment, err := es.store.Assessment().Get(ctx, assessmentID)
-	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			tracer.Error(err).Log()
-			return api.Inventory{}, NewErrAssessmentNotFound(assessmentID)
-		}
-		tracer.Error(err).Log()
-		return api.Inventory{}, fmt.Errorf("failed to get assessment: %w", err)
-	}
-	if len(assessment.Snapshots) == 0 {
-		err := fmt.Errorf("assessment has no snapshots")
-		tracer.Error(err).Log()
-		return api.Inventory{}, err
-	}
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		err := fmt.Errorf("latest snapshot has empty inventory")
-		tracer.Error(err).Log()
-		return api.Inventory{}, err
-	}
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		tracer.Error(err).Log()
-		return api.Inventory{}, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-	return inventory, nil
-}
-
 // getAggregatedInventoryData fetches the assessment's inventory and returns
 // aggregated data for the specified clusters. This is the new entry point for
 // multi-cluster complexity calculations.
@@ -175,17 +143,18 @@ func (es *EstimationService) getAggregatedInventoryData(
 	assessmentID uuid.UUID,
 	clusterIDs []string,
 	tracer *log.OperationTracer,
-) (api.InventoryData, error) {
-	// Fetch full inventory from database
-	inventory, err := es.loadInventory(ctx, assessmentID, tracer)
+) (model.InventoryData, error) {
+	// Fetch structured inventory from the assessment service.
+	assessment, err := es.assessmentSvc.GetAssessment(ctx, assessmentID)
 	if err != nil {
-		return api.InventoryData{}, err
+		tracer.Error(err).Log()
+		return model.InventoryData{}, err
 	}
 
 	// Aggregate the requested clusters
-	invData, err := aggregateInventoryData(&inventory, clusterIDs, assessmentID)
+	invData, err := aggregateInventoryData(&assessment.MainInventory.Inventory, clusterIDs, assessmentID)
 	if err != nil {
-		return api.InventoryData{}, err
+		return model.InventoryData{}, err
 	}
 
 	return invData, nil
@@ -193,16 +162,16 @@ func (es *EstimationService) getAggregatedInventoryData(
 
 // resolveInventoryData returns the InventoryData for the given clusterID,
 // or the vCenter-level aggregate when clusterID is empty.
-func resolveInventoryData(inventory api.Inventory, clusterID string, assessmentID uuid.UUID) (api.InventoryData, error) {
+func resolveInventoryData(inventory model.Inventory, clusterID string, assessmentID uuid.UUID) (model.InventoryData, error) {
 	if clusterID == "" {
 		if inventory.Vcenter == nil {
-			return api.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
+			return model.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
 		}
 		return *inventory.Vcenter, nil
 	}
 	data, ok := inventory.Clusters[clusterID]
 	if !ok {
-		return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+		return model.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
 	}
 	return data, nil
 }
@@ -210,12 +179,12 @@ func resolveInventoryData(inventory api.Inventory, clusterID string, assessmentI
 // resolveEstimationInventoryData returns the combined InventoryData for the given clusterIDs,
 // or the vCenter-level aggregate when clusterIDs is empty.
 // Empty and duplicate IDs are ignored, but a non-empty list needs at least one usable ID.
-func resolveEstimationInventoryData(inventory api.Inventory, clusterIDs []string, assessmentID uuid.UUID) (api.InventoryData, error) {
+func resolveEstimationInventoryData(inventory model.Inventory, clusterIDs []string, assessmentID uuid.UUID) (model.InventoryData, error) {
 	if len(clusterIDs) == 0 {
 		return resolveInventoryData(inventory, "", assessmentID)
 	}
 
-	var combined api.InventoryData
+	var combined model.InventoryData
 	seen := make(map[string]struct{}, len(clusterIDs))
 	for _, clusterID := range clusterIDs {
 		if clusterID == "" {
@@ -228,19 +197,19 @@ func resolveEstimationInventoryData(inventory api.Inventory, clusterIDs []string
 
 		data, err := resolveInventoryData(inventory, clusterID, assessmentID)
 		if err != nil {
-			return api.InventoryData{}, err
+			return model.InventoryData{}, err
 		}
 		combined.Vms.Total += data.Vms.Total
 		combined.Vms.DiskGB.Total += data.Vms.DiskGB.Total
 	}
 	if len(seen) == 0 {
-		return api.InventoryData{}, NewErrInvalidRequest("cluster IDs must contain at least one non-empty value")
+		return model.InventoryData{}, NewErrInvalidRequest("cluster IDs must contain at least one non-empty value")
 	}
 	return combined, nil
 }
 
 // buildComplexityResult converts cluster inventory data into complexity breakdowns.
-func (es *EstimationService) buildComplexityResult(clusterInventory api.InventoryData) (*MigrationComplexityResult, error) {
+func (es *EstimationService) buildComplexityResult(clusterInventory model.InventoryData) (*MigrationComplexityResult, error) {
 	if clusterInventory.Vms.OsInfo == nil {
 		return nil, fmt.Errorf("inventory has no osInfo data")
 	}
@@ -279,7 +248,7 @@ func (es *EstimationService) buildComplexityResult(clusterInventory api.Inventor
 
 // buildComplexityByOsDisk converts the sparse ComplexityDistribution map (string score → DiskSizeTierSummary)
 // into a []OSDiskEntry in canonical score order (0–4). Absent scores carry VMCount == 0 and TotalSizeTB == 0.
-func buildComplexityByOsDisk(dist *map[string]api.DiskSizeTierSummary) []complexity.OSDiskEntry {
+func buildComplexityByOsDisk(dist *map[string]model.DiskSizeTierSummary) []complexity.OSDiskEntry {
 	result := make([]complexity.OSDiskEntry, len(complexity.OSScores))
 	for i, s := range complexity.OSScores {
 		var vmCount int
@@ -300,16 +269,16 @@ func buildComplexityByOsDisk(dist *map[string]api.DiskSizeTierSummary) []complex
 // When clusterIDs contains a single empty string, it returns the vCenter aggregate.
 // When clusterIDs contains one cluster ID, it returns that cluster's data directly.
 // When clusterIDs contains multiple cluster IDs, it merges their data.
-func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, assessmentID uuid.UUID) (api.InventoryData, error) {
+func aggregateInventoryData(inventory *model.Inventory, clusterIDs []string, assessmentID uuid.UUID) (model.InventoryData, error) {
 	// Edge case: empty list
 	if len(clusterIDs) == 0 {
-		return api.InventoryData{}, fmt.Errorf("at least one cluster ID required")
+		return model.InventoryData{}, fmt.Errorf("at least one cluster ID required")
 	}
 
 	// Special case: vCenter aggregate (single empty string)
 	if usesVCenterAggregate(clusterIDs) {
 		if inventory.Vcenter == nil {
-			return api.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
+			return model.InventoryData{}, fmt.Errorf("inventory has no vcenter-level data")
 		}
 		return *inventory.Vcenter, nil
 	}
@@ -318,7 +287,7 @@ func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, asses
 	if len(clusterIDs) == 1 {
 		data, exists := inventory.Clusters[clusterIDs[0]]
 		if !exists {
-			return api.InventoryData{}, NewErrClusterNotFound(clusterIDs[0], assessmentID)
+			return model.InventoryData{}, NewErrClusterNotFound(clusterIDs[0], assessmentID)
 		}
 		return data, nil
 	}
@@ -328,19 +297,19 @@ func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, asses
 	uniqueClusterIDs := make(map[string]bool, len(clusterIDs))
 	for _, clusterID := range clusterIDs {
 		if _, exists := inventory.Clusters[clusterID]; !exists {
-			return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+			return model.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
 		}
 		uniqueClusterIDs[clusterID] = true
 	}
 
 	// Initialize result
-	result := api.InventoryData{
-		Vms:   api.VMs{},
-		Infra: api.Infra{},
+	result := model.InventoryData{
+		Vms:   model.VMs{},
+		Infra: model.Infra{},
 	}
 
 	// Initialize maps
-	osInfo := make(map[string]api.OsInfo)
+	osInfo := make(map[string]model.OsInfo)
 
 	// Aggregate across unique clusters
 	for clusterID := range uniqueClusterIDs {
@@ -398,7 +367,7 @@ func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, asses
 		}
 		if diskSource != nil {
 			if result.Vms.DiskComplexityTier == nil {
-				diskComplexityTier := make(map[string]api.DiskSizeTierSummary)
+				diskComplexityTier := make(map[string]model.DiskSizeTierSummary)
 				result.Vms.DiskComplexityTier = &diskComplexityTier
 			}
 			for tierLabel, summary := range *diskSource {
@@ -412,7 +381,7 @@ func aggregateInventoryData(inventory *api.Inventory, clusterIDs []string, asses
 		// Aggregate complexity distribution
 		if cluster.Vms.ComplexityDistribution != nil {
 			if result.Vms.ComplexityDistribution == nil {
-				complexityDist := make(map[string]api.DiskSizeTierSummary)
+				complexityDist := make(map[string]model.DiskSizeTierSummary)
 				result.Vms.ComplexityDistribution = &complexityDist
 			}
 			for scoreKey, summary := range *cluster.Vms.ComplexityDistribution {
@@ -524,7 +493,7 @@ func mergeParams(layers ...[]estimation.Param) []estimation.Param {
 }
 
 // mapClusterToParams converts cluster inventory data to estimation parameters
-func (es *EstimationService) mapClusterToParams(clusterInventory api.InventoryData) []estimation.Param {
+func (es *EstimationService) mapClusterToParams(clusterInventory model.InventoryData) []estimation.Param {
 	return []estimation.Param{
 		{Key: calculators.ParamTotalDiskGB, Value: float64(clusterInventory.Vms.DiskGB.Total)},
 		{Key: calculators.ParamVMCount, Value: clusterInventory.Vms.Total},

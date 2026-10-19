@@ -184,8 +184,8 @@ var _ = Describe("Aggregate", func() {
 		})
 
 		models := []model.AssessmentInventory{
-			{ID: uuid.New(), Version: model.SnapshotVersionV2, Inventory: inv1},
-			{ID: uuid.New(), Version: model.SnapshotVersionV2, Inventory: inv2},
+			{ID: uuid.New(), Version: model.InventoryVersionV2, Inventory: inv1},
+			{ID: uuid.New(), Version: model.InventoryVersionV2, Inventory: inv2},
 		}
 
 		got, err := Aggregate(models)
@@ -211,8 +211,8 @@ var _ = Describe("Aggregate", func() {
 		})
 
 		models := []model.AssessmentInventory{
-			{ID: uuid.New(), Version: model.SnapshotVersionV1, Inventory: inv1},
-			{ID: uuid.New(), Version: model.SnapshotVersionV1, Inventory: inv2},
+			{ID: uuid.New(), Version: model.InventoryVersionV1, Inventory: inv1},
+			{ID: uuid.New(), Version: model.InventoryVersionV1, Inventory: inv2},
 		}
 
 		got, err := Aggregate(models)
@@ -241,7 +241,7 @@ var _ = Describe("UnmarshalInventoryData", func() {
 			},
 		})
 
-		inv := model.AssessmentInventory{Version: model.SnapshotVersionV2, Inventory: raw}
+		inv := model.AssessmentInventory{Version: model.InventoryVersionV2, Inventory: raw}
 		got, err := UnmarshalInventoryData(inv)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(got.Vms.Total).To(Equal(10))
@@ -255,7 +255,7 @@ var _ = Describe("UnmarshalInventoryData", func() {
 			Infra:   api.Infra{TotalHosts: 2},
 		})
 
-		inv := model.AssessmentInventory{Version: model.SnapshotVersionV1, Inventory: raw}
+		inv := model.AssessmentInventory{Version: model.InventoryVersionV1, Inventory: raw}
 		got, err := UnmarshalInventoryData(inv)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(got.Vms.Total).To(Equal(5))
@@ -268,7 +268,7 @@ var _ = Describe("UnmarshalInventoryData", func() {
 			Clusters:  map[string]api.InventoryData{},
 		})
 
-		inv := model.AssessmentInventory{Version: model.SnapshotVersionV2, Inventory: raw}
+		inv := model.AssessmentInventory{Version: model.InventoryVersionV2, Inventory: raw}
 		got, err := UnmarshalInventoryData(inv)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(got.Vms.Total).To(Equal(0))

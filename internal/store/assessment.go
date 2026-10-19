@@ -35,11 +35,8 @@ func NewAssessmentStore(db *gorm.DB) Assessment {
 func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error) {
 	var assessments model.AssessmentList
 	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC").
-		Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
-			return db.Order("snapshots.created_at DESC")
-		}).
 		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
-			return db.Order("assessment_inventories.created_at DESC")
+			return db.Order("assessment_inventories.is_subset ASC, assessment_inventories.created_at DESC")
 		})
 
 	if filter != nil {
@@ -58,14 +55,8 @@ func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilte
 func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
 	var assessment model.Assessment
 	result := a.getDB(ctx).
-		Preload("Snapshots", func(db *gorm.DB) *gorm.DB {
-			return db.Order("snapshots.created_at DESC")
-		}).
-		Preload("Snapshots.SubsetInventories", func(db *gorm.DB) *gorm.DB {
-			return db.Order("name ASC, id ASC")
-		}).
 		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
-			return db.Order("assessment_inventories.created_at DESC")
+			return db.Order("assessment_inventories.is_subset ASC, assessment_inventories.created_at DESC")
 		}).
 		First(&assessment, "id = ?", id)
 

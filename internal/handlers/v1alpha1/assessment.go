@@ -24,7 +24,7 @@ func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.Lis
 
 	logger.Step("list_assessments").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
 
-	assessments, err := h.assessmentSrv.ListAssessments(ctx, service.NewAssessmentFilter())
+	assessments, err := h.assessmentSrv.ListAssessments(ctx, service.NewAssessmentFilter().WithInventories())
 	if err != nil {
 		logger.Error(err).Log()
 		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil

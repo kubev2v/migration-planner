@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -12,20 +11,21 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/helpers"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
 type AssessmentServicer interface {
-	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error)
-	GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
-	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error)
-	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error)
+	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error)
+	GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error)
+	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error)
+	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
 	ShareAssessment(ctx context.Context, id uuid.UUID) error
 	UnshareAssessment(ctx context.Context, id uuid.UUID) error
-	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error)
+	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error)
 }
 
 const (
@@ -50,7 +50,7 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator, accoun
 	}
 }
 
-func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
+func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	user := auth.MustHaveUser(ctx)
 
 	logger := as.logger.WithContext(ctx)
@@ -84,11 +84,16 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 		return nil, fmt.Errorf("failed to list assessments: %w", err)
 	}
 
-	tracer.Success().WithInt("count", len(assessments)).Log()
-	return assessments, nil
+	summaries, err := mappers.AssessmentSummaryListFromStore(assessments, filter.IncludeInventories)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessments: %w", err)
+	}
+
+	tracer.Success().WithInt("count", len(summaries)).Log()
+	return summaries, nil
 }
 
-func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("get_assessment").
 		WithUUID("assessment_id", id).
@@ -102,15 +107,20 @@ func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*
 		return nil, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
+	domainAssessment, err := mappers.AssessmentFromStore(*assessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment: %w", err)
+	}
+
 	tracer.Success().
 		WithString("assessment_name", assessment.Name).
 		WithString("source_type", assessment.SourceType).
 		WithBool("has_source_id", assessment.SourceID != nil).
 		Log()
-	return assessment, nil
+	return &domainAssessment, nil
 }
 
-func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("create_assessment").
 		WithString("org_id", createForm.OrgID).
@@ -123,15 +133,17 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
 	var assessmentInventories []model.AssessmentInventory
-	var subsetInventories []model.AssessmentSubsetInventory
 
 	switch createForm.SourceType {
 	case SourceTypeRvtools, SourceTypeInventory:
-		tracer.Step("using_provided_inventories").WithInt("count", len(createForm.Inventories)).Log()
-		for i := range createForm.Inventories {
-			createForm.Inventories[i].AssessmentID = assessment.ID
+		tracer.Step("using_provided_inventory").WithUUID("inventory_id", createForm.Inventory.ID).Log()
+		inventory := createForm.Inventory
+		inventory.AssessmentID = assessment.ID
+		storedInventory, err := mappers.AssessmentInventoryToStore(inventory)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert provided inventory: %w", err)
 		}
-		assessmentInventories = createForm.Inventories
+		assessmentInventories = []model.AssessmentInventory{storedInventory}
 
 	case "agent":
 		tracer.Step("process_source").Log()
@@ -174,27 +186,10 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			inv.IsSubset = true
 			inv.AssessmentID = assessment.ID
 			assessmentInventories = append(assessmentInventories, inv)
-
-			subsetInventories = append(subsetInventories, model.AssessmentSubsetInventory{
-				ID: uuid.New(), Name: ss.Name, VCenterID: ss.VCenterID,
-				VMsCount: ss.VMsCount, Inventory: ss.Inventory,
-			})
 		}
 
 	default:
-		return nil, fmt.Errorf("assessment must have either inventories or a source ID")
-	}
-
-	// Build snapshot for backward compatibility
-	for _, inv := range assessmentInventories {
-		if !inv.IsSubset {
-			assessment.Snapshots = []model.Snapshot{{
-				Inventory:         inv.Inventory,
-				Version:           inv.Version,
-				SubsetInventories: subsetInventories,
-			}}
-			break
-		}
+		return nil, fmt.Errorf("assessment must have either an inventory or a source ID")
 	}
 
 	assessment.Inventories = assessmentInventories
@@ -224,16 +219,21 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		return nil, err
 	}
 
+	domainAssessment, err := mappers.AssessmentFromStore(*createdAssessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment: %w", err)
+	}
+
 	tracer.Success().
 		WithUUID("assessment_id", createdAssessment.ID).
 		WithString("assessment_name", createdAssessment.Name).
 		WithString("source_type", createdAssessment.SourceType).
 		Log()
 
-	return createdAssessment, nil
+	return &domainAssessment, nil
 }
 
-func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
+func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("update_assessment").
 		WithUUID("assessment_id", id).
@@ -423,6 +423,9 @@ type AssessmentFilter struct {
 	IDs      []uuid.UUID
 	Limit    int
 	Offset   int
+	// IncludeInventories, when set, populates each returned summary with the
+	// full structured inventories (heavier; used by endpoints that need them).
+	IncludeInventories bool
 }
 
 func NewAssessmentFilter() *AssessmentFilter {
@@ -449,37 +452,43 @@ func (f *AssessmentFilter) WithNameLike(pattern string) *AssessmentFilter {
 	return f
 }
 
+// WithInventories requests that returned summaries include the full structured
+// inventories.
+func (f *AssessmentFilter) WithInventories() *AssessmentFilter {
+	f.IncludeInventories = true
+	return f
+}
+
 func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 	f.Limit = limit
 	return f
 }
 
-func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
 	assessment, err := as.store.Assessment().Get(ctx, assessmentID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			return model.AssessmentInventory{}, NewErrAssessmentNotFound(assessmentID)
+			return svcmodel.AssessmentInventory{}, NewErrAssessmentNotFound(assessmentID)
 		}
-		return model.AssessmentInventory{}, fmt.Errorf("failed to get assessment: %w", err)
+		return svcmodel.AssessmentInventory{}, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
-	var subsets []model.AssessmentInventory
+	var subsets []svcmodel.AssessmentInventory
 	for _, inv := range assessment.Inventories {
 		if !inv.IsSubset {
 			continue
 		}
-		subsets = append(subsets, inv)
+		if len(inv.Inventory) == 0 {
+			return svcmodel.AssessmentInventory{}, fmt.Errorf("subset inventory %q is empty", inv.Name)
+		}
+		subset, err := mappers.AssessmentInventoryFromStore(inv)
+		if err != nil {
+			return svcmodel.AssessmentInventory{}, fmt.Errorf("failed to convert subset inventory %q: %w", inv.Name, err)
+		}
+		subsets = append(subsets, subset)
 	}
 
-	aggregated, err := helpers.Aggregate(subsets)
-	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to aggregate inventories: %w", err)
-	}
-
-	raw, err := json.Marshal(aggregated)
-	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to marshal aggregated inventory: %w", err)
-	}
+	aggregated := helpers.Aggregate(subsets)
 
 	inventoryID := uuid.New()
 	for _, inv := range assessment.Inventories {
@@ -489,9 +498,19 @@ func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmen
 		}
 	}
 
-	result, err := model.NewAssessmentInventory(inventoryID, assessmentID, assessment.Name, false, raw)
-	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to build aggregated inventory model: %w", err)
+	result := svcmodel.AssessmentInventory{
+		ID:           inventoryID,
+		Name:         assessment.Name,
+		VCenterID:    aggregated.VcenterId,
+		Version:      svcmodel.InventoryVersionV2,
+		Inventory:    aggregated,
+		AssessmentID: assessmentID,
+	}
+	if aggregated.Vcenter != nil {
+		result.VMsCount = aggregated.Vcenter.Vms.Total
+		result.HostsCount = aggregated.Vcenter.Infra.TotalHosts
+		result.NetworksCount = len(aggregated.Vcenter.Infra.Networks)
+		result.DatastoresCount = len(aggregated.Vcenter.Infra.Datastores)
 	}
 
 	return result, nil

@@ -1,4 +1,4 @@
-package converters
+package mappers
 
 import (
 	"testing"
@@ -112,7 +112,7 @@ func TestToAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ToAPI(tt.input)
+			result := DuckdbToModel(tt.input)
 			require.NotNil(t, result)
 			tt.validate(t, result)
 		})
@@ -180,7 +180,7 @@ func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := duckdbToDomainVMs(&tt.input)
 
 			// Verify shared-disks / RDM aggregate counts
 			require.NotNil(t, result.TotalWithSharedDisks)
@@ -252,7 +252,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := duckdbToDomainVMs(&tt.input)
 
 			require.NotNil(t, result.OsInfo)
 			osInfo := *result.OsInfo
@@ -304,7 +304,7 @@ func TestToAPIVMs_MigrationIssues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := duckdbToDomainVMs(&tt.input)
 
 			assert.Len(t, result.MigrationWarnings, len(tt.input.MigrationWarnings))
 			assert.Len(t, result.NotMigratableReasons, len(tt.input.NotMigratableReasons))
@@ -427,7 +427,7 @@ func TestToAPIVMs_DiskComplexityTier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := duckdbToDomainVMs(&tt.input)
 
 			if tt.expectNilField {
 				assert.Nil(t, result.DiskComplexityTier,
@@ -487,7 +487,7 @@ func TestToAPIInfra_Hosts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := duckdbToDomainInfra(&tt.input)
 
 			require.NotNil(t, result.Hosts)
 			hosts := *result.Hosts
@@ -568,7 +568,7 @@ func TestToAPIInfra_Networks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := duckdbToDomainInfra(&tt.input)
 
 			require.Len(t, result.Networks, len(tt.input.Networks))
 
@@ -665,7 +665,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := duckdbToDomainInfra(&tt.input)
 
 			require.Len(t, result.Datastores, len(tt.input.Datastores))
 
@@ -742,7 +742,7 @@ func TestToAPIInfra_DatacenterInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := duckdbToDomainInfra(&tt.input)
 
 			if tt.expectDatacenters {
 				require.NotNil(t, result.TotalDatacenters)
@@ -787,7 +787,7 @@ func TestToAPIInfra_Overcommitment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := duckdbToDomainInfra(&tt.input)
 
 			if tt.input.CPUOverCommitment != nil {
 				require.NotNil(t, result.CpuOverCommitment)
@@ -820,7 +820,7 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ToAPI(&inventory.Inventory{
+			result := DuckdbToModel(&inventory.Inventory{
 				VCenter: &inventory.InventoryData{
 					VMs:   inventory.VMsData{Total: tt.totalVMs},
 					Infra: inventory.InfraData{TotalHosts: tt.totalHosts},
@@ -838,7 +838,7 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 }
 
 func TestToAPI_TotalWithFaultTolerance(t *testing.T) {
-	result := ToAPI(&inventory.Inventory{
+	result := DuckdbToModel(&inventory.Inventory{
 		VCenter: &inventory.InventoryData{
 			VMs: inventory.VMsData{Total: 10, TotalWithFaultTolerance: 3},
 		},
@@ -859,7 +859,7 @@ func TestToAPIInfra_StandaloneHostsDetected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&inventory.InfraData{StandaloneHostsDetected: tt.input})
+			result := duckdbToDomainInfra(&inventory.InfraData{StandaloneHostsDetected: tt.input})
 			require.NotNil(t, result.StandaloneHostsDetected)
 			assert.Equal(t, tt.input, *result.StandaloneHostsDetected)
 		})
@@ -886,7 +886,7 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 		},
 	}
 
-	result := toAPIVMs(&input)
+	result := duckdbToDomainVMs(&input)
 
 	// Verify CPU tier distribution
 	require.NotNil(t, result.DistributionByCpuTier)
@@ -953,7 +953,7 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		apiInv := DuckdbToModel(domainInv)
 
 		require.Contains(t, apiInv.Clusters, "cluster-1")
 		clusterData := apiInv.Clusters["cluster-1"]
@@ -980,7 +980,7 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		apiInv := DuckdbToModel(domainInv)
 
 		require.Contains(t, apiInv.Clusters, "cluster-1")
 		assert.Nil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)
@@ -1009,7 +1009,7 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		apiInv := DuckdbToModel(domainInv)
 
 		assert.Len(t, apiInv.Clusters, 2)
 		assert.NotNil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)

@@ -11,7 +11,6 @@ type AssessmentEventPayload struct {
 
 type AssessmentData struct {
 	ID          string          `json:"id"`
-	SnapshotID  uint            `json:"snapshot_id,omitempty"`
 	Name        string          `json:"name,omitempty"`
 	OrgID       string          `json:"org_id,omitempty"`
 	OrgName     string          `json:"org_name,omitempty"`

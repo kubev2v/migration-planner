@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
@@ -14,6 +13,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
@@ -119,9 +119,10 @@ func (s SizingResult) ToMapperSizingResult() mappers.SizingResult {
 
 // SizerService handles cluster sizing calculations
 type SizerService struct {
-	sizerClient *client.SizerClient
-	store       store.Store
-	logger      *log.StructuredLogger
+	sizerClient   *client.SizerClient
+	store         store.Store
+	assessmentSvc AssessmentServicer
+	logger        *log.StructuredLogger
 }
 
 // BatchedService represents an aggregated service workload for the sizer API.
@@ -184,11 +185,12 @@ var memoryOverCommitMultipliers = map[string]float64{
 	"1:4": 4.0,
 }
 
-func NewSizerService(sizerClient *client.SizerClient, store store.Store) *SizerService {
+func NewSizerService(sizerClient *client.SizerClient, store store.Store, assessmentSvc AssessmentServicer) *SizerService {
 	return &SizerService{
-		sizerClient: sizerClient,
-		store:       store,
-		logger:      log.NewDebugLogger("sizing_service"),
+		sizerClient:   sizerClient,
+		store:         store,
+		assessmentSvc: assessmentSvc,
+		logger:        log.NewDebugLogger("sizing_service"),
 	}
 }
 
@@ -204,7 +206,7 @@ func noUtilizationData(confidence float64) UtilizationContext {
 }
 
 func extractUtilizationFromInventory(
-	inventory *api.Inventory,
+	inventory *svcmodel.Inventory,
 	clusterIDs []string,
 ) UtilizationContext {
 	if inventory == nil {
@@ -216,7 +218,7 @@ func extractUtilizationFromInventory(
 	return aggregateClusterUtilization(inventory, clusterIDs)
 }
 
-func extractUtilizationFromData(clusterData *api.InventoryData) UtilizationContext {
+func extractUtilizationFromData(clusterData *svcmodel.InventoryData) UtilizationContext {
 	if clusterData == nil {
 		return noUtilizationData(0)
 	}
@@ -253,7 +255,7 @@ func extractUtilizationFromData(clusterData *api.InventoryData) UtilizationConte
 	}
 }
 
-func aggregateClusterUtilization(inventory *api.Inventory, clusterIDs []string) UtilizationContext {
+func aggregateClusterUtilization(inventory *svcmodel.Inventory, clusterIDs []string) UtilizationContext {
 	var totalCPU, totalMemory, weightedCPU, weightedMemory, weightedConfidence float64
 	for _, clusterID := range clusterIDs {
 		data, exists := inventory.Clusters[clusterID]
@@ -299,30 +301,30 @@ func normalizeClusterIDs(req *mappers.ClusterRequirementsRequestForm) ([]string,
 	return req.ClusterIDs, nil
 }
 
-func resolveSizingInventoryData(inventory api.Inventory, assessmentID uuid.UUID, clusterIDs []string) (api.InventoryData, error) {
+func resolveSizingInventoryData(inventory svcmodel.Inventory, assessmentID uuid.UUID, clusterIDs []string) (svcmodel.InventoryData, error) {
 	if usesVCenterAggregate(clusterIDs) {
 		if inventory.Vcenter == nil {
-			return api.InventoryData{}, NewErrInvalidClusterInventory("vcenter", "inventory has no vcenter-level data")
+			return svcmodel.InventoryData{}, NewErrInvalidClusterInventory("vcenter", "inventory has no vcenter-level data")
 		}
 		return *inventory.Vcenter, nil
 	}
 
-	var result api.InventoryData
+	var result svcmodel.InventoryData
 	seen := make(map[string]struct{}, len(clusterIDs))
 	for _, clusterID := range clusterIDs {
 		if clusterID == "" {
-			return api.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain an empty value")
+			return svcmodel.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain an empty value")
 		}
 		if _, exists := seen[clusterID]; exists {
-			return api.InventoryData{}, NewErrInvalidRequest(fmt.Sprintf("cluster %s was selected more than once", clusterID))
+			return svcmodel.InventoryData{}, NewErrInvalidRequest(fmt.Sprintf("cluster %s was selected more than once", clusterID))
 		}
 		seen[clusterID] = struct{}{}
 		data, exists := inventory.Clusters[clusterID]
 		if !exists {
-			return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+			return svcmodel.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
 		}
 		if data.Vms.Total == 0 || data.Vms.CpuCores.Total == 0 || data.Vms.RamGB.Total == 0 {
-			return api.InventoryData{}, NewErrInvalidClusterInventory(clusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
+			return svcmodel.InventoryData{}, NewErrInvalidClusterInventory(clusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
 		}
 		result.Vms.Total += data.Vms.Total
 		result.Vms.CpuCores.Total += data.Vms.CpuCores.Total
@@ -613,35 +615,19 @@ func (s *SizerService) CalculateClusterRequirements(
 		return nil, fmt.Errorf("sizer client is not configured")
 	}
 
-	assessment, err := s.store.Assessment().Get(ctx, assessmentID)
+	assessment, err := s.assessmentSvc.GetAssessment(ctx, assessmentID)
 	if err != nil {
-		if errors.Is(err, store.ErrRecordNotFound) {
-			return nil, NewErrAssessmentNotFound(assessmentID)
-		}
-		return nil, fmt.Errorf("failed to get assessment: %w", err)
+		return nil, err
 	}
 
+	mainInv := assessment.MainInventory.Inventory
 	calcReq := applyDefaults(req)
 
-	if len(assessment.Snapshots) == 0 {
-		return nil, fmt.Errorf("assessment has no snapshots")
-	}
-
-	latestSnapshot := assessment.Snapshots[0]
-	if len(latestSnapshot.Inventory) == 0 {
-		return nil, fmt.Errorf("latest snapshot has empty inventory")
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(latestSnapshot.Inventory, &inventory); err != nil {
-		return nil, fmt.Errorf("failed to parse inventory: %w", err)
-	}
-
-	if !usesVCenterAggregate(clusterIDs) && len(inventory.Clusters) == 0 {
+	if !usesVCenterAggregate(clusterIDs) && len(mainInv.Clusters) == 0 {
 		return nil, fmt.Errorf("inventory has no clusters")
 	}
 
-	clusterInventory, err := resolveSizingInventoryData(inventory, assessmentID, clusterIDs)
+	clusterInventory, err := resolveSizingInventoryData(mainInv, assessmentID, clusterIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -716,7 +702,7 @@ func (s *SizerService) CalculateClusterRequirements(
 		}
 	}
 
-	utilizationContext := extractUtilizationFromInventory(&inventory, clusterIDs)
+	utilizationContext := extractUtilizationFromInventory(&mainInv, clusterIDs)
 
 	// Track optimization attempt status
 	optimizationStatus := api.OptimizationStatus{

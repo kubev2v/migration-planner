@@ -15,10 +15,10 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
@@ -94,18 +94,13 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		logger.Step("creating_assessment").Log()
 		assessmentID := uuid.New()
 
-		assessmentInv, err := model.NewAssessmentInventory(uuid.New(), assessmentID, job.Args.Name, false, result)
-		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
-		}
-
 		createForm := mappers.AssessmentCreateForm{
-			ID:          assessmentID,
-			Name:        job.Args.Name,
-			OrgID:       job.Args.OrgID,
-			Username:    job.Args.Username,
-			SourceType:  "rvtools",
-			Inventories: []model.AssessmentInventory{assessmentInv},
+			ID:         assessmentID,
+			Name:       job.Args.Name,
+			OrgID:      job.Args.OrgID,
+			Username:   job.Args.Username,
+			SourceType: "rvtools",
+			Inventory:  mappers.AssessmentInventoryFromInventory(uuid.New(), assessmentID, job.Args.Name, false, *result),
 		}
 		if job.Args.FirstName != "" {
 			createForm.OwnerFirstName = &job.Args.FirstName
@@ -139,7 +134,12 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		// Assessment itself is updated to update the "update_at" field.
 		logger.Step("updating_assessment").Log()
 
-		subsetInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.AssessmentID, job.Args.Name, true, result)
+		invBytes, err := json.Marshal(result)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "marshal_inventory", err, fmt.Sprintf("failed to marshal inventory model: %v", err))
+		}
+
+		subsetInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.AssessmentID, job.Args.Name, true, invBytes)
 		if err != nil {
 			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
 		}
@@ -178,7 +178,12 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 			return w.failJob(ctx, logger, job.ID, "aggregate_inventories", err, fmt.Sprintf("failed to aggregate inventories: %v", err))
 		}
 
-		if err := w.store.Assessment().UpsertInventories(txCtx, mainInv); err != nil {
+		storeMainInv, err := mappers.AssessmentInventoryToStore(mainInv)
+		if err != nil {
+			return w.failJob(ctx, logger, job.ID, "aggregate_inventories", err, fmt.Sprintf("failed to convert aggregated inventory: %v", err))
+		}
+
+		if err := w.store.Assessment().UpsertInventories(txCtx, storeMainInv); err != nil {
 			return w.failJob(ctx, logger, job.ID, "upsert_main_inventory", err, fmt.Sprintf("failed to upsert main inventory: %v", err))
 		}
 
@@ -242,17 +247,17 @@ func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer
 	return err
 }
 
-func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) ([]byte, error) {
+func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) (*svcmodel.Inventory, error) {
 	// Ingest RVTools file using duckdb_parser
 	validationResult, err := parser.IngestRvTools(ctx, filepath)
 	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
 	// Check for validation errors
 	if validationResult.HasErrors() {
 		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
-		return []byte{}, validationErr
+		return nil, validationErr
 	}
 
 	// Log any warnings
@@ -264,17 +269,12 @@ func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Par
 	logger.Step("building_inventory").Log()
 	inv, err := parser.BuildInventory(ctx, nil)
 	if err != nil {
-		return []byte{}, err
-	}
-	inventory := converters.ToAPI(inv)
-
-	// Marshal inventory to JSON
-	inventoryJSON, err := json.Marshal(inventory)
-	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
-	return inventoryJSON, nil
+	r := mappers.DuckdbToModel(inv)
+
+	return r, nil
 }
 
 // updateJobStatus updates the job's metadata with the current status using job store.

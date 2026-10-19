@@ -8,6 +8,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
+	svcmappers "github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -15,10 +17,10 @@ import (
 
 type assessmentV2ServiceStub struct {
 	service.AssessmentServicer
-	assessment *model.Assessment
+	assessment *svcmodel.Assessment
 }
 
-func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	if id != s.assessment.ID {
 		return nil, service.NewErrAssessmentNotFound(id)
 	}
@@ -37,7 +39,7 @@ var _ = Describe("assessment v2 handler", func() {
 		return model.AssessmentInventory{
 			VCenterID: vcenterID,
 			IsSubset:  isSubset,
-			Version:   model.SnapshotVersionV2,
+			Version:   model.InventoryVersionV2,
 			Inventory: []byte(fmt.Sprintf(`{"vcenter_id":%q,"vcenter":{"vms":{"total":%d}},"clusters":{%q:{"vms":{"total":%d}}}}`,
 				vcenterID, totalVMs, clusterID.String(), totalVMs)),
 		}
@@ -46,12 +48,14 @@ var _ = Describe("assessment v2 handler", func() {
 	getAssessment := func(sourceType string, inventories []model.AssessmentInventory) server.GetAssessmentV2200JSONResponse {
 		GinkgoHelper()
 
-		assessment := &model.Assessment{
+		storeAssessment := model.Assessment{
 			ID:          uuid.New(),
 			SourceType:  sourceType,
 			Inventories: inventories,
 		}
-		handler := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: assessment}, nil, nil, nil, nil, nil, nil)
+		assessment, err := svcmappers.AssessmentFromStore(storeAssessment)
+		Expect(err).NotTo(HaveOccurred())
+		handler := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: &assessment}, nil, nil, nil, nil, nil, nil)
 
 		response, err := handler.GetAssessmentV2(context.Background(), server.GetAssessmentV2RequestObject{Id: assessment.ID})
 		Expect(err).NotTo(HaveOccurred())
@@ -60,15 +64,13 @@ var _ = Describe("assessment v2 handler", func() {
 	}
 
 	Context("GetAssessmentV2", func() {
-		DescribeTable("returns RVTools aggregate data and only the individual vCenters",
-			func(mainIndex int) {
-				main := inventory("", false, 30, uuid.Nil)
+		It("returns RVTools aggregate data and only the individual vCenters",
+			func() {
 				inventories := []model.AssessmentInventory{
+					inventory("", false, 30, uuid.Nil),
 					inventory(vcenterID1.String(), true, 10, clusterID1),
 					inventory(vcenterID2.String(), true, 20, clusterID2),
 				}
-				inventories = append(inventories[:mainIndex], append([]model.AssessmentInventory{main}, inventories[mainIndex:]...)...)
-
 				response := getAssessment(service.SourceTypeRvtools, inventories)
 
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
@@ -77,19 +79,13 @@ var _ = Describe("assessment v2 handler", func() {
 					HaveField("Id", vcenterID2.String()),
 				))
 			},
-			Entry("with the aggregate first", 0),
-			Entry("with the aggregate between subsets", 1),
-			Entry("with the aggregate last", 2),
 		)
 
-		DescribeTable("returns agent main inventory data with one vCenter subresource",
-			func(mainFirst bool) {
+		It("returns agent main inventory data with one vCenter subresource",
+			func() {
 				main := inventory(vcenterID1.String(), false, 30, clusterID1)
 				subset := inventory(vcenterID1.String(), true, 10, clusterID2)
-				inventories := []model.AssessmentInventory{subset, main}
-				if mainFirst {
-					inventories = []model.AssessmentInventory{main, subset}
-				}
+				inventories := []model.AssessmentInventory{main, subset}
 
 				response := getAssessment(service.SourceTypeAgent, inventories)
 
@@ -97,8 +93,6 @@ var _ = Describe("assessment v2 handler", func() {
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
 				Expect(response.Vcetners).To(ConsistOf(HaveField("Id", vcenterID1.String())))
 			},
-			Entry("with the main inventory before the subset", true),
-			Entry("with the main inventory after the subset", false),
 		)
 	})
 })

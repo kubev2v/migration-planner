@@ -9,11 +9,13 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+
+	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
@@ -52,10 +54,6 @@ func (m *MockStore) Source() store.Source {
 
 func (m *MockStore) SourceSubsetInventory() store.SourceSubsetInventory {
 	panic("MockStore.SourceSubsetInventory() called unexpectedly - not implemented for this test")
-}
-
-func (m *MockStore) AssessmentSubsetInventory() store.AssessmentSubsetInventory {
-	panic("MockStore.AssessmentSubsetInventory() called unexpectedly - not implemented for this test")
 }
 
 func (m *MockStore) Agent() store.Agent {
@@ -236,20 +234,20 @@ func createTestSizerServerWithRequestCapture(response *client.SizerResponse, hea
 }
 
 func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventoryData := api.InventoryData{
-		Vms: api.VMs{
+	inventoryData := svcmodel.InventoryData{
+		Vms: svcmodel.VMs{
 			Total: totalVMs,
-			CpuCores: api.VMResourceBreakdown{
+			CpuCores: svcmodel.VMResourceBreakdown{
 				Total: totalCPU,
 			},
-			RamGB: api.VMResourceBreakdown{
+			RamGB: svcmodel.VMResourceBreakdown{
 				Total: totalMemory,
 			},
 		},
 	}
-	inventory := api.Inventory{
+	inventory := svcmodel.Inventory{
 		Vcenter: &inventoryData,
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: inventoryData,
 		},
 	}
@@ -264,9 +262,9 @@ func createTestAssessment(id uuid.UUID, clusterID string, totalVMs, totalCPU, to
 		Name:     "test-assessment",
 		OrgID:    "test-org",
 		Username: "test-user",
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventory(clusterID, totalVMs, totalCPU, totalMemory),
 				AssessmentID: id,
@@ -328,15 +326,17 @@ func createTestSizerResponse(nodeCount, workerNodes, controlPlaneNodes, totalCPU
 
 var _ = Describe("sizer service", func() {
 	var (
-		mockStore    *MockStore
-		testServer   *httptest.Server
-		sizerClient  *client.SizerClient
-		sizerService *service.SizerService
-		ctx          context.Context
+		mockStore         *MockStore
+		assessmentService service.AssessmentServicer
+		testServer        *httptest.Server
+		sizerClient       *client.SizerClient
+		sizerService      *service.SizerService
+		ctx               context.Context
 	)
 
 	BeforeEach(func() {
 		mockStore = NewMockStore()
+		assessmentService = service.NewAssessmentService(mockStore, nil, nil)
 		ctx = context.Background()
 	})
 
@@ -373,7 +373,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -397,7 +397,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = createTestAssessment(assessmentID, clusterID, 10, 40, 80)
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -408,20 +408,20 @@ var _ = Describe("sizer service", func() {
 
 			It("aggregates a selected cluster list into one offer", func() {
 				request.ClusterIDs = []string{"east", "west"}
-				inventory := api.Inventory{Clusters: map[string]api.InventoryData{
+				inventory := svcmodel.Inventory{Clusters: map[string]svcmodel.InventoryData{
 					"east": {
-						Vms:                api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}},
-						ClusterUtilization: &api.ClusterUtilization{CpuMax: 50, MemMax: 25, Confidence: 80},
+						Vms:                svcmodel.VMs{Total: 10, CpuCores: svcmodel.VMResourceBreakdown{Total: 40}, RamGB: svcmodel.VMResourceBreakdown{Total: 80}},
+						ClusterUtilization: &svcmodel.ClusterUtilization{CpuMax: 50, MemMax: 25, Confidence: 80},
 					},
 					"west": {
-						Vms:                api.VMs{Total: 5, CpuCores: api.VMResourceBreakdown{Total: 20}, RamGB: api.VMResourceBreakdown{Total: 40}},
-						ClusterUtilization: &api.ClusterUtilization{CpuMax: 100, MemMax: 50, Confidence: 60},
+						Vms:                svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 20}, RamGB: svcmodel.VMResourceBreakdown{Total: 40}},
+						ClusterUtilization: &svcmodel.ClusterUtilization{CpuMax: 100, MemMax: 50, Confidence: 60},
 					},
 				}}
 				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 60, 120), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -439,13 +439,13 @@ var _ = Describe("sizer service", func() {
 			DescribeTable("rejects invalid selected cluster lists",
 				func(clusterIDs []string, expectedMessage string) {
 					request.ClusterIDs = clusterIDs
-					inventory := api.Inventory{Clusters: map[string]api.InventoryData{
-						"east": {Vms: api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}}},
+					inventory := svcmodel.Inventory{Clusters: map[string]svcmodel.InventoryData{
+						"east": {Vms: svcmodel.VMs{Total: 10, CpuCores: svcmodel.VMResourceBreakdown{Total: 40}, RamGB: svcmodel.VMResourceBreakdown{Total: 80}}},
 					}}
 					mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
 					testServer = createTestSizerServer(nil, http.StatusOK, false)
 					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-					sizerService = service.NewSizerService(sizerClient, mockStore)
+					sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 					_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -459,15 +459,15 @@ var _ = Describe("sizer service", func() {
 
 			It("rejects an empty clusterId without vCenter aggregate data", func() {
 				request.ClusterID = ""
-				inventory := api.Inventory{
-					Clusters: map[string]api.InventoryData{
-						clusterID: {Vms: api.VMs{Total: 10}},
+				inventory := svcmodel.Inventory{
+					Clusters: map[string]svcmodel.InventoryData{
+						clusterID: {Vms: svcmodel.VMs{Total: 10}},
 					},
 				}
 				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -481,7 +481,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -512,7 +512,7 @@ var _ = Describe("sizer service", func() {
 					w.WriteHeader(http.StatusNotFound)
 				}))
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -541,7 +541,7 @@ var _ = Describe("sizer service", func() {
 						mockStore.assessments[assessmentID] = assessment
 						testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 						sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-						sizerService = service.NewSizerService(sizerClient, mockStore)
+						sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 						result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 						Expect(err).To(BeNil())
@@ -569,7 +569,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -602,7 +602,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -635,7 +635,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -671,7 +671,7 @@ var _ = Describe("sizer service", func() {
 					w.WriteHeader(http.StatusNotFound)
 				}))
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -715,7 +715,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -746,7 +746,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -771,7 +771,7 @@ var _ = Describe("sizer service", func() {
 				var sizerReq client.SizerRequest
 				testServer = createTestSizerServerWithRequestCapture(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false, &sizerReq)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -808,7 +808,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -827,7 +827,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 2, 1, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -859,7 +859,7 @@ var _ = Describe("sizer service", func() {
 					}
 				}))
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -880,7 +880,7 @@ var _ = Describe("sizer service", func() {
 					mockStore.assessments[assessmentID] = assessment
 					testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 40, 80), http.StatusOK, false)
 					sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-					sizerService = service.NewSizerService(sizerClient, mockStore)
+					sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 					result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -914,7 +914,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(2, 1, 1, 1230, 2000), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -953,7 +953,7 @@ var _ = Describe("sizer service", func() {
 					w.WriteHeader(http.StatusNotFound)
 				}))
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -986,7 +986,7 @@ var _ = Describe("sizer service", func() {
 					},
 				}, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1003,7 +1003,7 @@ var _ = Describe("sizer service", func() {
 			It("returns error when assessment not found", func() {
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1018,7 +1018,7 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since store will error first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1027,30 +1027,30 @@ var _ = Describe("sizer service", func() {
 				Expect(err.Error()).To(ContainSubstring("failed to get assessment"))
 			})
 
-			It("returns error when assessment has no snapshots", func() {
+			It("returns error when assessment has no full inventory", func() {
 				assessment := &model.Assessment{
-					ID:        assessmentID,
-					Snapshots: []model.Snapshot{},
+					ID:          assessmentID,
+					Inventories: []model.AssessmentInventory{},
 				}
 				mockStore.assessments[assessmentID] = assessment
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("no snapshots"))
+				Expect(err.Error()).To(ContainSubstring("inventory has no clusters"))
 			})
 
-			It("returns error when snapshot has empty inventory", func() {
+			It("returns error when assessment inventory is empty", func() {
 				assessment := &model.Assessment{
 					ID: assessmentID,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte{},
 							AssessmentID: assessmentID,
@@ -1061,21 +1061,21 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("empty inventory"))
+				Expect(err.Error()).To(ContainSubstring("inventory has no clusters"))
 			})
 
 			It("returns error when inventory JSON is invalid", func() {
 				assessment := &model.Assessment{
 					ID: assessmentID,
-					Snapshots: []model.Snapshot{
+					Inventories: []model.AssessmentInventory{
 						{
-							ID:           1,
+							ID:           uuid.New(),
 							CreatedAt:    time.Now(),
 							Inventory:    []byte("{invalid json}"),
 							AssessmentID: assessmentID,
@@ -1086,13 +1086,13 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to parse inventory"))
+				Expect(err.Error()).To(ContainSubstring("failed to convert assessment"))
 			})
 
 			It("returns error when cluster not found in inventory", func() {
@@ -1101,7 +1101,7 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1120,7 +1120,7 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1137,7 +1137,7 @@ var _ = Describe("sizer service", func() {
 				// Create a dummy sizerService - it won't be used since validation will fail first
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1156,7 +1156,7 @@ var _ = Describe("sizer service", func() {
 				request.WorkerNodeMemory = 512
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1176,7 +1176,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(101, 98, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1191,7 +1191,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(nil, http.StatusInternalServerError, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 				// Simulate error by using nil response
 				// Note: The actual error will come from the sizer service call
 
@@ -1209,7 +1209,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(nil, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 				Expect(err).ToNot(BeNil())
@@ -1226,7 +1226,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				_, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 				Expect(err).To(BeNil())
@@ -1245,7 +1245,7 @@ var _ = Describe("sizer service", func() {
 		It("successfully returns nil when sizer service is healthy", func() {
 			testServer = createTestSizerServer(nil, http.StatusOK, false)
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			err := sizerService.Health(ctx)
 
@@ -1255,7 +1255,7 @@ var _ = Describe("sizer service", func() {
 		It("returns error when sizer service is unhealthy", func() {
 			testServer = createTestSizerServer(nil, http.StatusServiceUnavailable, true)
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			err := sizerService.Health(ctx)
 
@@ -1266,7 +1266,7 @@ var _ = Describe("sizer service", func() {
 		It("respects context timeout", func() {
 			testServer = createTestSizerServer(nil, http.StatusOK, false)
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 1*time.Millisecond)
 			defer cancel()
@@ -1299,7 +1299,7 @@ var _ = Describe("sizer service", func() {
 		})
 
 		It("returns error when sizer client is not configured", func() {
-			sizerService = service.NewSizerService(nil, mockStore)
+			sizerService = service.NewSizerService(nil, mockStore, assessmentService)
 			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
 			Expect(result).To(BeNil())
 			Expect(err).NotTo(BeNil())
@@ -1311,7 +1311,7 @@ var _ = Describe("sizer service", func() {
 				mutate(request)
 				testServer = createTestSizerServer(sizerResp, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
 
@@ -1336,7 +1336,7 @@ var _ = Describe("sizer service", func() {
 		It("successfully calculates cluster requirements from inline inventory", func() {
 			testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
 
@@ -1372,7 +1372,7 @@ var _ = Describe("sizer service", func() {
 				w.WriteHeader(http.StatusNotFound)
 			}))
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
 
@@ -1420,7 +1420,7 @@ var _ = Describe("sizer service", func() {
 				w.WriteHeader(http.StatusNotFound)
 			}))
 			sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 			result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, request)
 
@@ -1495,7 +1495,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1539,7 +1539,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1584,7 +1584,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1632,7 +1632,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1679,7 +1679,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1723,7 +1723,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1779,7 +1779,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -1831,7 +1831,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(response, http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2009,7 +2009,7 @@ var _ = Describe("sizer service", func() {
 			DeferCleanup(sizerServer.Close)
 
 			sizerClient = client.NewSizerClient(sizerServer.URL, 30*time.Second)
-			sizerService = service.NewSizerService(sizerClient, mockStore)
+			sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 		})
 
 		Context("with valid utilization data", func() {
@@ -2273,7 +2273,7 @@ var _ = Describe("sizer service", func() {
 				DeferCleanup(sizerServer.Close)
 
 				sizerClient = client.NewSizerClient(sizerServer.URL, 30*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 			})
 
 			It("returns baseline with calculation_error when optimized sizing fails", func() {
@@ -2345,7 +2345,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2372,7 +2372,7 @@ var _ = Describe("sizer service", func() {
 					&sizerPayload,
 				)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2414,7 +2414,7 @@ var _ = Describe("sizer service", func() {
 					&sizerPayload,
 				)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2449,7 +2449,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2467,7 +2467,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2484,7 +2484,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(1, 0, 1, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2501,7 +2501,7 @@ var _ = Describe("sizer service", func() {
 				mockStore.assessments[assessmentID] = assessment
 				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2520,7 +2520,7 @@ var _ = Describe("sizer service", func() {
 				// Sizer returns 5 nodes - workload is too large for compact mode
 				testServer = createTestSizerServer(createTestSizerResponse(5, 2, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2551,7 +2551,7 @@ var _ = Describe("sizer service", func() {
 					w.WriteHeader(http.StatusNotFound)
 				}))
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
 
@@ -2581,7 +2581,7 @@ var _ = Describe("sizer service", func() {
 
 				testServer = createTestSizerServer(createTestSizerResponse(3, 0, 3, 40, 80), http.StatusOK, false)
 				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
+				sizerService = service.NewSizerService(sizerClient, mockStore, assessmentService)
 
 				result, err := sizerService.CalculateStandaloneClusterRequirements(ctx, standaloneReq)
 
@@ -2599,38 +2599,38 @@ var _ = Describe("sizer service", func() {
 	})
 })
 
-func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) api.Inventory {
-	return api.Inventory{
+func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) svcmodel.Inventory {
+	return svcmodel.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: svcmodel.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: svcmodel.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: svcmodel.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []svcmodel.MigrationIssue{},
+					NotMigratableReasons: []svcmodel.MigrationIssue{},
+					DiskCount: svcmodel.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: svcmodel.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				ClusterUtilization: &api.ClusterUtilization{
+				ClusterUtilization: &svcmodel.ClusterUtilization{
 					CpuMax:     cpuMax,
 					MemMax:     memMax,
 					Confidence: confidence,
 				},
-				Infra: api.Infra{
+				Infra: svcmodel.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []svcmodel.Datastore{},
+					Networks:        []svcmodel.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2638,33 +2638,33 @@ func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence
 	}
 }
 
-func createInventoryWithoutUtilization(clusterID string) api.Inventory {
-	return api.Inventory{
+func createInventoryWithoutUtilization(clusterID string) svcmodel.Inventory {
+	return svcmodel.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: svcmodel.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: svcmodel.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: svcmodel.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []svcmodel.MigrationIssue{},
+					NotMigratableReasons: []svcmodel.MigrationIssue{},
+					DiskCount: svcmodel.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: svcmodel.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				Infra: api.Infra{
+				Infra: svcmodel.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []svcmodel.Datastore{},
+					Networks:        []svcmodel.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2672,14 +2672,14 @@ func createInventoryWithoutUtilization(clusterID string) api.Inventory {
 	}
 }
 
-func createAssessmentWithInventory(id uuid.UUID, inventory api.Inventory) *model.Assessment {
+func createAssessmentWithInventory(id uuid.UUID, inventory svcmodel.Inventory) *model.Assessment {
 	inventoryJSON, err := json.Marshal(inventory)
 	Expect(err).NotTo(HaveOccurred())
 	return &model.Assessment{
 		ID: id,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				AssessmentID: id,
 				Inventory:    inventoryJSON,
 				CreatedAt:    time.Now(),

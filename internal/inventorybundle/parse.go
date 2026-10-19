@@ -12,8 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/service/model"
+
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 )
 
@@ -221,7 +222,7 @@ func normalizeMainInventory(data []byte) ([]byte, string, error) {
 		}
 	}
 
-	var inv v1alpha1.Inventory
+	var inv model.Inventory
 	if err := json.Unmarshal(inventoryBytes, &inv); err != nil {
 		return nil, "", fmt.Errorf("invalid inventory JSON: %w", err)
 	}

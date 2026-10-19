@@ -10,7 +10,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -67,27 +66,27 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 		}
 	}
 
-	var mainInventory model.AssessmentInventory
-	vcenters := make([]api.SubResource, 0, len(assessment.Inventories))
+	vcenterIDs := make([]string, 0, len(assessment.SubsetInventories)+1)
+	vcenterIDs = append(vcenterIDs, assessment.MainInventory.VCenterID)
+	for _, inventory := range assessment.SubsetInventories {
+		vcenterIDs = append(vcenterIDs, inventory.VCenterID)
+	}
+
+	vcenters := make([]api.SubResource, 0, len(vcenterIDs))
 	seen := make(map[string]struct{})
 
-	for _, inventory := range assessment.Inventories {
-		if !inventory.IsSubset {
-			// Expect exactly one non subset inventory
-			mainInventory = inventory
-		}
-
-		if inventory.VCenterID == "" {
+	for _, vcenterID := range vcenterIDs {
+		if vcenterID == "" {
 			continue
 		}
 
-		if _, ok := seen[inventory.VCenterID]; ok {
+		if _, ok := seen[vcenterID]; ok {
 			continue
 		}
 
-		seen[inventory.VCenterID] = struct{}{}
+		seen[vcenterID] = struct{}{}
 
-		id, err := uuid.Parse(inventory.VCenterID)
+		id, err := uuid.Parse(vcenterID)
 		if err != nil {
 			return server.GetAssessmentV2500JSONResponse{
 				Message: fmt.Sprintf("failed to parse vcenter id: %v", err),
@@ -101,7 +100,7 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 		vcenters = append(vcenters, vcenter)
 	}
 
-	data, _, err := mappers.AssessmentInventoryToAPI(mainInventory)
+	data, _, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
@@ -137,11 +136,7 @@ func (h *ServiceHandler) GetVcenter(ctx context.Context, request server.GetVcent
 		}
 	}
 
-	row, ok := inventoryByVcenterID(assessment, request.Vid.String())
-	if !ok {
-		return server.GetVcenter404JSONResponse{Message: fmt.Sprintf("vcenter %s not found in assessment %s", request.Vid, request.Id)}, nil
-	}
-	vcenter, clusters, err := mappers.AssessmentInventoryToAPI(row)
+	vcenter, clusters, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.GetVcenter500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
@@ -176,11 +171,7 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		}
 	}
 
-	row, ok := inventoryByVcenterID(assessment, request.Vid.String())
-	if !ok {
-		return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("vcenter %s not found in assessment %s", request.Vid, request.Id)}, nil
-	}
-	_, clusters, err := mappers.AssessmentInventoryToAPI(row)
+	_, clusters, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
@@ -190,24 +181,4 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("cluster %s not found in vcenter %s", request.Cid, request.Vid)}, nil
 	}
 	return server.GetVcenterCluster200JSONResponse(cluster), nil
-}
-
-func inventoryByVcenterID(assessment *model.Assessment, id string) (model.AssessmentInventory, bool) {
-	inventories := assessment.Inventories
-
-	for _, inventory := range inventories {
-		if inventory.VCenterID != id {
-			continue
-		}
-
-		if assessment.SourceType != string(api.AssessmentSourceTypeRvtools) {
-			if inventory.IsSubset {
-				continue
-			}
-		}
-
-		return inventory, true
-	}
-
-	return model.AssessmentInventory{}, false
 }

@@ -57,9 +57,9 @@ func createTestAssessmentForComplexityHandler(id uuid.UUID, username, orgID, clu
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventoryForComplexityHandler(clusterID),
 				AssessmentID: id,
@@ -99,9 +99,9 @@ func createTestAssessmentForEstimationHandler(id uuid.UUID, username, orgID, clu
 		Name:     "test-assessment",
 		OrgID:    orgID,
 		Username: username,
-		Snapshots: []model.Snapshot{
+		Inventories: []model.AssessmentInventory{
 			{
-				ID:           1,
+				ID:           uuid.New(),
 				CreatedAt:    time.Now(),
 				Inventory:    createTestInventoryForEstimationHandler(clusterID, 10, 1000),
 				AssessmentID: id,
@@ -147,7 +147,7 @@ func createTestAssessmentForByComplexityHandler(id uuid.UUID, username, orgID, c
 	data, _ := json.Marshal(inventory)
 	return &model.Assessment{
 		ID: id, Name: "test", OrgID: orgID, Username: username,
-		Snapshots: []model.Snapshot{{ID: 1, Inventory: data, AssessmentID: id, Version: 2}},
+		Inventories: []model.AssessmentInventory{{ID: uuid.New(), Inventory: data, AssessmentID: id, Version: 2}},
 	}
 }
 
@@ -621,18 +621,18 @@ var _ = Describe("estimation handler", func() {
 				Expect(response.Message).To(ContainSubstring("not found"))
 			})
 
-			It("returns 500 when estimation service fails with no snapshots", func() {
+			It("returns 500 when estimation service fails with no full inventory", func() {
 				request := &api.MigrationEstimationRequest{
 					ClusterId: &clusterID,
 				}
 
-				// Create assessment without snapshots
+				// Create assessment without inventories
 				mockStore.assessments[assessmentID] = &model.Assessment{
-					ID:        assessmentID,
-					Name:      "test-assessment",
-					OrgID:     user.Organization,
-					Username:  user.Username,
-					Snapshots: []model.Snapshot{},
+					ID:          assessmentID,
+					Name:        "test-assessment",
+					OrgID:       user.Organization,
+					Username:    user.Username,
+					Inventories: []model.AssessmentInventory{},
 				}
 				handler = handlers.NewServiceHandler(
 					nil,
@@ -947,13 +947,13 @@ var _ = Describe("estimation handler", func() {
 				Expect(response.Message).To(ContainSubstring("not found"))
 			})
 
-			It("returns 500 when assessment has no snapshots", func() {
+			It("returns 500 when assessment has no full inventory", func() {
 				mockStore.assessments[assessmentID] = &model.Assessment{
-					ID:        assessmentID,
-					Name:      "test-assessment",
-					OrgID:     user.Organization,
-					Username:  user.Username,
-					Snapshots: []model.Snapshot{},
+					ID:          assessmentID,
+					Name:        "test-assessment",
+					OrgID:       user.Organization,
+					Username:    user.Username,
+					Inventories: []model.AssessmentInventory{},
 				}
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 

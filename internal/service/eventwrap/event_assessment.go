@@ -2,6 +2,7 @@ package eventwrap
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,8 +12,8 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	model "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
@@ -29,7 +30,7 @@ func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store, 
 	return &EventAssessmentService{inner: inner, store: s, outbox: NewOutboxService(s), accountsSvc: accountsSvc}
 }
 
-func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]model.Assessment, error) {
+func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]model.AssessmentSummary, error) {
 	assessments, err := e.inner.ListAssessments(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -70,10 +71,14 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
+	inventoryRaw, err := json.Marshal(assessment.MainInventory.Inventory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal inventory for event: %w", err)
+	}
+
 	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 		ID:         assessment.ID.String(),
-		SnapshotID: assessment.Snapshots[0].ID,
-		Inventory:  assessment.Snapshots[0].Inventory,
+		Inventory:  inventoryRaw,
 		Name:       assessment.Name,
 		OrgID:      assessment.OrgID,
 		OrgName:    accountIdentity.Name,
