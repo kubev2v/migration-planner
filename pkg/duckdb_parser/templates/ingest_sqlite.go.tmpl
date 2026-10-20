@@ -27,7 +27,7 @@ ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
 INSERT INTO vinfo (
     "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
-    "CPUs", "Memory",
+    "CPUs", "Memory", "NICs",
     "OS according to the configuration file", "OS according to the VMware Tools",
     "DNS Name", "Primary IP Address", "In Use MiB",
     "Template", "CBT", "EnableUUID",
@@ -49,6 +49,7 @@ SELECT
     CASE WHEN v.FaultToleranceEnabled = 1 THEN 'enabled' ELSE 'notConfigured' END,
     v.CpuCount,
     v.MemoryMB,
+    json_array_length(v.NICs),
     v.GuestName,
     v.GuestNameFromVmwareTools,
     v.HostName,
@@ -125,6 +126,9 @@ WITH nic_flat AS (
         v.GuestNetworks,
         nic.mac AS mac_addr,
         nic.network.id AS network_id,
+        (SELECT replace(device.kind, 'Virtual', '')
+         FROM unnest(from_json(v.Devices, '[{"kind":"VARCHAR","key":"INTEGER"}]')) AS d(device)
+         WHERE device.key = nic.deviceKey) AS adapter,
         h.Cluster AS cluster_id
     FROM src.VM v
     LEFT JOIN src.Host h ON v.Host = h.ID,
@@ -151,7 +155,7 @@ SELECT
     n.Name,
     nf.mac_addr,
     '',
-    '',
+    nf.adapter,
     COALESCE(n.DVSwitch->>'id', ''),
     true,
     true,
