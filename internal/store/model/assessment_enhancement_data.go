@@ -28,6 +28,8 @@ type AssessmentEnhancementData struct {
 	VsphereVmEncryptionEnabled *bool   `gorm:"column:vsphere_vm_encryption_enabled"`
 	VsphereVmEncryptionPolicy  *string `gorm:"column:vsphere_vm_encryption_policy"`
 	VsphereSrmEnabled          *bool   `gorm:"column:vsphere_srm_enabled"`
+	VsphereNiocEnabled         *bool   `gorm:"column:vsphere_nioc_enabled"`
+	VsphereNiocDetails         *string `gorm:"column:vsphere_nioc_details"`
 
 	// NSX / Aria
 	NsxFeatures            StringArray `gorm:"column:nsx_features;type:text[]"`

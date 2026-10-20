@@ -44,6 +44,8 @@ func (s *AssessmentEnhancementDataStore) Upsert(ctx context.Context, input model
 			"vsphere_vm_encryption_enabled",
 			"vsphere_vm_encryption_policy",
 			"vsphere_srm_enabled",
+			"vsphere_nioc_enabled",
+			"vsphere_nioc_details",
 			"nsx_features",
 			"aria_ops_features",
 			"aria_automation_features",

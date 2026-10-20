@@ -85,12 +85,28 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 				VmEncryptionEnabled: util.BoolPtr(true),
 				VmEncryptionPolicy:  util.ToStrPtr("strict"),
 				SrmEnabled:          util.BoolPtr(false),
+				NiocEnabled:         util.BoolPtr(true),
+				NiocDetails:         util.ToStrPtr("Storage traffic is prioritized."),
 			},
 		}, func(out api.EnhancementData) {
 			Expect(out.VsphereCore).NotTo(BeNil())
 			Expect(*out.VsphereCore.VmEncryptionEnabled).To(BeTrue())
 			Expect(*out.VsphereCore.VmEncryptionPolicy).To(Equal("strict"))
 			Expect(*out.VsphereCore.SrmEnabled).To(BeFalse())
+			Expect(out.VsphereCore.NiocEnabled).NotTo(BeNil())
+			Expect(*out.VsphereCore.NiocEnabled).To(BeTrue())
+			Expect(out.VsphereCore.NiocDetails).NotTo(BeNil())
+			Expect(*out.VsphereCore.NiocDetails).To(Equal("Storage traffic is prioritized."))
+		}),
+		Entry("NIOC-only disabled", api.EnhancementData{
+			VsphereCore: &api.VsphereCoreInput{
+				NiocEnabled: util.BoolPtr(false),
+			},
+		}, func(out api.EnhancementData) {
+			Expect(out.VsphereCore).NotTo(BeNil())
+			Expect(out.VsphereCore.NiocEnabled).NotTo(BeNil())
+			Expect(*out.VsphereCore.NiocEnabled).To(BeFalse())
+			Expect(out.VsphereCore.NiocDetails).To(BeNil())
 		}),
 		Entry("nsx features", api.EnhancementData{
 			Nsx: &api.NsxInput{
