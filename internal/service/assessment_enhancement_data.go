@@ -89,6 +89,8 @@ func enhancementDataAPIToModel(assessmentID uuid.UUID, data api.EnhancementData)
 		m.VsphereVmEncryptionEnabled = data.VsphereCore.VmEncryptionEnabled
 		m.VsphereVmEncryptionPolicy = data.VsphereCore.VmEncryptionPolicy
 		m.VsphereSrmEnabled = data.VsphereCore.SrmEnabled
+		m.VsphereNiocEnabled = data.VsphereCore.NiocEnabled
+		m.VsphereNiocDetails = data.VsphereCore.NiocDetails
 	}
 
 	if data.Nsx != nil {
@@ -144,11 +146,13 @@ func enhancementDataModelToAPI(m *model.AssessmentEnhancementData) api.Enhanceme
 	}
 
 	if m.VsphereVmEncryptionEnabled != nil || m.VsphereVmEncryptionPolicy != nil ||
-		m.VsphereSrmEnabled != nil {
+		m.VsphereSrmEnabled != nil || m.VsphereNiocEnabled != nil || m.VsphereNiocDetails != nil {
 		data.VsphereCore = &api.VsphereCoreInput{
 			VmEncryptionEnabled: m.VsphereVmEncryptionEnabled,
 			VmEncryptionPolicy:  m.VsphereVmEncryptionPolicy,
 			SrmEnabled:          m.VsphereSrmEnabled,
+			NiocEnabled:         m.VsphereNiocEnabled,
+			NiocDetails:         m.VsphereNiocDetails,
 		}
 	}
 

@@ -1523,6 +1523,11 @@ type VmNetwork struct {
 
 // VsphereCoreInput defines model for VsphereCoreInput.
 type VsphereCoreInput struct {
+	// NiocDetails How NIOC is configured and which traffic is prioritized
+	NiocDetails *string `json:"niocDetails,omitempty" validate:"omitempty,max=1000"`
+
+	// NiocEnabled Whether Network I/O Control is enabled
+	NiocEnabled         *bool   `json:"niocEnabled,omitempty"`
 	SrmEnabled          *bool   `json:"srmEnabled,omitempty"`
 	VmEncryptionEnabled *bool   `json:"vmEncryptionEnabled,omitempty"`
 	VmEncryptionPolicy  *string `json:"vmEncryptionPolicy,omitempty" validate:"omitempty,max=1000"`

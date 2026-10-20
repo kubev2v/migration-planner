@@ -4013,6 +4013,15 @@ components:
             validate: "omitempty,max=1000"
         srmEnabled:
           type: boolean
+        niocEnabled:
+          type: boolean
+          description: Whether Network I/O Control is enabled
+        niocDetails:
+          type: string
+          maxLength: 1000
+          description: How NIOC is configured and which traffic is prioritized
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,max=1000"
 
     NsxInput:
       type: object
