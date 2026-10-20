@@ -126,7 +126,7 @@ WITH nic_flat AS (
         v.GuestNetworks,
         nic.mac AS mac_addr,
         nic.network.id AS network_id,
-        (SELECT replace(device.kind, 'Virtual', '')
+        (SELECT regexp_replace(device.kind, '^Virtual', '')
          FROM unnest(from_json(v.Devices, '[{"kind":"VARCHAR","key":"INTEGER"}]')) AS d(device)
          WHERE device.key = nic.deviceKey) AS adapter,
         h.Cluster AS cluster_id
