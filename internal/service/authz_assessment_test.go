@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -300,13 +302,13 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			// Viewer sees only read
 			ctx = ctxWithUser("viewer-user", "org1")
 			assessment, err = svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission))
 		})
 
 		It("customer owner keeps share permission", func() {
@@ -321,7 +323,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.SharePermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM partners_customers")
 			gormdb.Exec("DELETE FROM groups")
@@ -339,7 +341,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM members")
 			gormdb.Exec("DELETE FROM groups")

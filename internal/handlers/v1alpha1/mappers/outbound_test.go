@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	model2 "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
@@ -155,19 +157,36 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 var _ = Describe("AssessmentInventoryToAPI", func() {
 	storedAt := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	collectedAt := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
+	vcenterVersion := "8.0.3.0"
 	for _, tc := range []struct {
 		id         int
 		name       string
 		version    uint
-		raw        string
+		raw        model2.Inventory
 		created    time.Time
 		apiVersion string
 	}{
 		{
-			id:         1,
-			name:       "v2 preserves collection metadata",
-			version:    model.InventoryVersionV2,
-			raw:        `{"vcenter_id":"vc-id","vcenter_version":"8.0.3.0","created_at":"2026-10-13T09:00:00Z","vcenter":{"vms":{"total":5}},"clusters":{"domain-c34":{"vms":{"total":2}}}}`,
+			id:      1,
+			name:    "v2 preserves collection metadata",
+			version: model.InventoryVersionV2,
+			raw: model2.Inventory{
+				VcenterId:      "vcenter-id",
+				VcenterVersion: &vcenterVersion,
+				CreatedAt:      &collectedAt,
+				Vcenter: &model2.InventoryData{
+					Vms: model2.VMs{
+						Total: 5,
+					},
+				},
+				Clusters: map[string]model2.InventoryData{
+					"domain-c34": {
+						Vms: model2.VMs{
+							Total: 2,
+						},
+					},
+				},
+			},
 			created:    collectedAt,
 			apiVersion: "8.0.3.0",
 		},
@@ -175,20 +194,35 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			id:      2,
 			name:    "v2 falls back to stored timestamp",
 			version: model.InventoryVersionV2,
-			raw:     `{"vcenter_id":"vc-id","vcenter":{"vms":{"total":5}},"clusters":{}}`,
+			raw: model2.Inventory{
+				VcenterId: "vc-id",
+				Vcenter: &model2.InventoryData{
+					Vms: model2.VMs{
+						Total: 5,
+					},
+				},
+			},
 			created: storedAt,
 		},
 		{
 			id:      3,
 			name:    "legacy inventory uses stored timestamp",
 			version: model.InventoryVersionV1,
-			raw:     `{"vcenter":{"id":"vc-id"},"vms":{"total":5}}`,
+			raw: model2.Inventory{
+				VcenterId: "vc-id",
+				Vcenter: &model2.InventoryData{
+					Vms: model2.VMs{
+						Total: 5,
+					},
+				},
+			},
 			created: storedAt,
 		},
 	} {
 		It(tc.name, func() {
-			data, clusters, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{
-				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: []byte(tc.raw),
+
+			data, clusters, err := mappers.AssessmentInventoryToAPI(model2.AssessmentInventory{
+				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: tc.raw,
 			})
 			Expect(err).NotTo(HaveOccurred())
 			raw, err := json.Marshal(data)
@@ -211,12 +245,4 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			}
 		})
 	}
-
-	DescribeTable("rejects malformed JSON", func(version uint) {
-		_, _, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{Version: version, Inventory: []byte(`{`)})
-		Expect(err).To(HaveOccurred())
-	},
-		Entry("for legacy inventory", uint(model.InventoryVersionV1)),
-		Entry("for v2 inventory", uint(model.InventoryVersionV2)),
-	)
 })
