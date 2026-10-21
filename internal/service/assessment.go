@@ -12,6 +12,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/helpers"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -19,9 +20,9 @@ import (
 
 type AssessmentServicer interface {
 	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error)
-	GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error)
+	GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error)
 	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error)
-	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error)
+	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
 	ShareAssessment(ctx context.Context, id uuid.UUID) error
 	UnshareAssessment(ctx context.Context, id uuid.UUID) error
@@ -88,7 +89,7 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 	return assessments, nil
 }
 
-func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("get_assessment").
 		WithUUID("assessment_id", id).
@@ -102,12 +103,17 @@ func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*
 		return nil, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
+	domainAssessment, err := mappers.AssessmentFromStore(*assessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment: %w", err)
+	}
+
 	tracer.Success().
 		WithString("assessment_name", assessment.Name).
 		WithString("source_type", assessment.SourceType).
 		WithBool("has_source_id", assessment.SourceID != nil).
 		Log()
-	return assessment, nil
+	return &domainAssessment, nil
 }
 
 func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
@@ -215,7 +221,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	return createdAssessment, nil
 }
 
-func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
+func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("update_assessment").
 		WithUUID("assessment_id", id).

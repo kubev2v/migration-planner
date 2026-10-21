@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
@@ -300,13 +301,13 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			// Viewer sees only read
 			ctx = ctxWithUser("viewer-user", "org1")
 			assessment, err = svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission))
 		})
 
 		It("customer owner keeps share permission", func() {
@@ -321,7 +322,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.SharePermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM partners_customers")
 			gormdb.Exec("DELETE FROM groups")
@@ -339,7 +340,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM members")
 			gormdb.Exec("DELETE FROM groups")
