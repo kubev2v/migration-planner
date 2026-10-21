@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"time"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -51,7 +53,7 @@ func (m *MockStore) Authz() store.Authz {
 // from all methods. Used to test handler 403 responses.
 type ForbiddenAssessmentService struct{}
 
-func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
@@ -63,7 +65,7 @@ func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappe
 	return nil, service.NewErrForbidden("assessment", "create")
 }
 
-func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 

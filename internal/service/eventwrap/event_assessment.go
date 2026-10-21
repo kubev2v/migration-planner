@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
@@ -47,7 +49,7 @@ func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *se
 	return assessments, nil
 }
 
-func (e *EventAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (e *EventAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	return e.inner.GetAssessment(ctx, id)
 }
 
@@ -105,7 +107,7 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 	return assessment, nil
 }
 
-func (e *EventAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
+func (e *EventAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error) {
 	return e.inner.UpdateAssessment(ctx, id, name)
 }
 

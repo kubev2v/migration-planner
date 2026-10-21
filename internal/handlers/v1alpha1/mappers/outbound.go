@@ -6,6 +6,8 @@ import (
 	"slices"
 	"sort"
 
+	model2 "github.com/kubev2v/migration-planner/internal/model"
+
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -18,17 +20,19 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-func unmarshalInventory(raw []byte, version uint) (api.Inventory, error) {
-	inventory, err := util.UnmarshalInventory(raw, version)
-	if err != nil {
-		return api.Inventory{}, err
+// normalizeDomainInventory converts a structured domain inventory to the API
+// model and normalizes nil collections so the response is free of null values.
+func normalizeDomainInventory(inv model2.Inventory) api.Inventory {
+	inventory := InventoryToAPI(inv)
+	if inventory.Clusters == nil {
+		inventory.Clusters = map[string]api.InventoryData{}
 	}
 	normalizeInventoryData(inventory.Vcenter)
 	for clusterID, data := range inventory.Clusters {
 		normalizeInventoryData(&data)
 		inventory.Clusters[clusterID] = data
 	}
-	return inventory, nil
+	return inventory
 }
 
 func normalizeInventoryData(data *api.InventoryData) {
@@ -272,7 +276,8 @@ func AgentToApi(a model.Agent) api.Agent {
 	}
 }
 
-func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
+func StoreAssessmentToApi(a model.Assessment) (api.Assessment, error) {
+	// Todo: to be replaced by AssessmentToApi
 	assessment := api.Assessment{
 		Id:             a.ID,
 		Name:           a.Name,
@@ -351,10 +356,84 @@ func AssessmentToApi(a model.Assessment) (api.Assessment, error) {
 	return assessment, nil
 }
 
+func AssessmentToApi(a model2.Assessment) (api.Assessment, error) {
+	assessment := api.Assessment{
+		Id:             a.ID,
+		Name:           a.Name,
+		OwnerFirstName: a.OwnerFirstName,
+		OwnerLastName:  a.OwnerLastName,
+		CreatedAt:      a.CreatedAt,
+	}
+
+	assessment.Snapshots = buildSnapshots(a.MainInventory, a.SubsetInventories)
+
+	// Set source type based on source field
+	sourceType := api.AssessmentSourceType(a.SourceType)
+	assessment.SourceType = sourceType
+	assessment.SourceId = a.SourceID
+
+	if len(a.Permissions) > 0 {
+		perms := make([]api.AssessmentPermissions, len(a.Permissions))
+		for i, p := range a.Permissions {
+			perms[i] = api.AssessmentPermissions(p)
+		}
+		assessment.Permissions = &perms
+	}
+
+	assessment.Sharing = sharingToApi(a.Sharing)
+
+	return assessment, nil
+}
+
+func buildSnapshots(mainInventory model2.AssessmentInventory, subsetInventories []model2.AssessmentInventory) []api.Snapshot {
+	if mainInventory.Inventory.Clusters == nil && mainInventory.Inventory.Vcenter == nil {
+		return []api.Snapshot{}
+	}
+
+	var subsets []api.AssessmentSubsetInventory
+	for _, inv := range subsetInventories {
+		subsets = append(subsets, api.AssessmentSubsetInventory{
+			Id:        inv.ID,
+			Name:      inv.Name,
+			VcenterId: inv.VCenterID,
+			VmsCount:  inv.VMsCount,
+			CreatedAt: inv.CreatedAt,
+			Inventory: normalizeDomainInventory(inv.Inventory),
+		})
+	}
+
+	snapshot := api.Snapshot{
+		CreatedAt: mainInventory.CreatedAt,
+		Inventory: normalizeDomainInventory(mainInventory.Inventory),
+	}
+	if len(subsets) > 0 {
+		snapshot.SubsetInventories = &subsets
+	}
+	return []api.Snapshot{snapshot}
+}
+
+// sharingToApi converts domain sharing to the API representation.
+func sharingToApi(s *model2.Sharing) *api.AssessmentSharing {
+	if s == nil {
+		return nil
+	}
+	sharing := api.AssessmentSharing{
+		IsShared:   s.IsShared,
+		SharedWith: make([]api.SharingSubject, len(s.SharedWith)),
+	}
+	for i, sub := range s.SharedWith {
+		sharing.SharedWith[i] = api.SharingSubject{Type: sub.Type, Id: sub.ID, Name: sub.Name}
+	}
+	if s.SharedBy != nil {
+		sharing.SharedBy = &api.SharingSubject{Type: s.SharedBy.Type, Id: s.SharedBy.ID, Name: s.SharedBy.Name}
+	}
+	return &sharing
+}
+
 func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, error) {
 	assessmentList := make([]api.Assessment, len(assessments))
 	for i, assessment := range assessments {
-		a, err := AssessmentToApi(assessment)
+		a, err := StoreAssessmentToApi(assessment)
 		if err != nil {
 			return api.AssessmentList{}, err
 		}
@@ -430,7 +509,36 @@ func AssessmentClustersToAPI(clusters map[string]api.InventoryData) []api.SubRes
 	return result
 }
 
-func AssessmentInventoryToAPI(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
+func AssessmentInventoryToAPI(inv model2.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
+	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
+	clusters := make(map[string]api.InventoryData)
+
+	inventory := InventoryToAPI(inv.Inventory)
+
+	if result.Id == "" {
+		result.Id = inventory.VcenterId
+	}
+
+	if inventory.CreatedAt != nil {
+		result.CreatedAt = inventory.CreatedAt
+	}
+
+	result.VcenterVersion = inventory.VcenterVersion
+
+	if inventory.Vcenter != nil {
+		result.Data = *inventory.Vcenter
+	}
+
+	normalizeInventoryData(&result.Data)
+
+	for id, cluster := range inventory.Clusters {
+		normalizeInventoryData(&cluster)
+		clusters[id] = cluster
+	}
+	return result, clusters, nil
+}
+
+func StoreAssessmentInventoryToAPI(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
 	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
 	clusters := make(map[string]api.InventoryData)
 	if inv.Version == model.InventoryVersionV1 {
@@ -647,4 +755,39 @@ func estimationDetailToAPI(est estimation.Estimation) api.EstimationDetail {
 		detail.Duration = &d
 	}
 	return detail
+}
+
+func unmarshalInventory(raw []byte, version uint) (api.Inventory, error) {
+	if len(raw) == 0 {
+		return api.Inventory{Clusters: make(map[string]api.InventoryData)}, nil
+	}
+	var inventory api.Inventory
+	switch version {
+	case model.InventoryVersionV1:
+		var invV1 api.InventoryData
+		if err := json.Unmarshal(raw, &invV1); err != nil {
+			return api.Inventory{}, err
+		}
+		normalizeInventoryData(&invV1)
+		inventory.Vcenter = &invV1
+		if invV1.Vcenter != nil {
+			inventory.VcenterId = invV1.Vcenter.Id
+		}
+		inventory.Clusters = make(map[string]api.InventoryData)
+	default:
+		if err := json.Unmarshal(raw, &inventory); err != nil {
+			return api.Inventory{}, err
+		}
+		if inventory.Clusters == nil {
+			inventory.Clusters = make(map[string]api.InventoryData)
+		}
+		if inventory.Vcenter != nil {
+			normalizeInventoryData(inventory.Vcenter)
+		}
+		for clusterID, clusterData := range inventory.Clusters {
+			normalizeInventoryData(&clusterData)
+			inventory.Clusters[clusterID] = clusterData
+		}
+	}
+	return inventory, nil
 }

@@ -121,7 +121,8 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			}
 		}
 
-		mainInv, _, err := mappers.AssessmentInventoryToAPI(inv)
+		mainInv, _, err := mappers.StoreAssessmentInventoryToAPI(inv)
+
 		if err != nil {
 			zap.S().Errorw("converting assessment", "id", assessment.ID, "error", err)
 			inventoryConvertErrors++

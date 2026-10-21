@@ -107,7 +107,7 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		WithString("source_type", assessment.SourceType).
 		Log()
 
-	apiAssessment, err := mappers.AssessmentToApi(*assessment)
+	apiAssessment, err := mappers.StoreAssessmentToApi(*assessment)
 	if err != nil {
 		return server.CreateAssessment500JSONResponse{Message: err.Error()}, nil
 	}
