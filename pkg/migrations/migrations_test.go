@@ -54,11 +54,11 @@ var _ = Describe("migrations", Ordered, func() {
 				return exists
 			}
 
-			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_subset_inventories", "assessment_cluster_sizing_inputs", "assessment_enhancement_data", "groups", "members", "assessment_inventories"} {
+			for _, table := range []string{"relations", "agents", "sources", "keys", "image_infras", "assessments", "assessment_cluster_sizing_inputs", "assessment_enhancement_data", "groups", "members", "assessment_inventories"} {
 				Expect(tableExists(table)).To(BeTrue())
 			}
 
-			// Verify foreign key constraint from assessment_subset_inventories.snapshot_id to snapshots.id with CASCADE DELETE
+			// Verify inventories retain their cascading assessment foreign key.
 			type FKInfo struct {
 				ConstraintName string
 				ChildColumn    string
@@ -78,14 +78,14 @@ var _ = Describe("migrations", Ordered, func() {
 				JOIN pg_attribute a_child ON a_child.attrelid = c.conrelid AND a_child.attnum = ANY(c.conkey)
 				JOIN pg_attribute a_parent ON a_parent.attrelid = c.confrelid AND a_parent.attnum = ANY(c.confkey)
 				WHERE c.contype = 'f'
-					AND child.relname = 'assessment_subset_inventories'
-					AND parent.relname = 'snapshots'
+					AND child.relname = 'assessment_inventories'
+					AND parent.relname = 'assessments'
 				LIMIT 1;
 			`).Scan(&fkInfo)
 			Expect(tx.Error).To(BeNil())
 			Expect(fkInfo.ConstraintName).NotTo(BeEmpty(), "FK constraint should exist")
-			Expect(fkInfo.ChildColumn).To(Equal("snapshot_id"), "FK should reference snapshot_id column")
-			Expect(fkInfo.ParentColumn).To(Equal("id"), "FK should reference snapshots.id column")
+			Expect(fkInfo.ChildColumn).To(Equal("assessment_id"), "FK should reference assessment_id column")
+			Expect(fkInfo.ParentColumn).To(Equal("id"), "FK should reference assessments.id column")
 			Expect(fkInfo.DeleteAction).To(Equal("c"), "FK should have ON DELETE CASCADE (confdeltype='c')")
 		})
 
