@@ -449,19 +449,8 @@ func TestBuildInventory_EmptyData(t *testing.T) {
 
 	ctx := context.Background()
 	result, err := parser.IngestRvTools(ctx, tmpFile)
-	require.NoError(t, err)
-
-	// Schema should have errors due to empty vInfo
-	if result.HasErrors() {
-		// Expected - empty data fails validation
-		return
-	}
-
-	// If no errors, inventory should still be valid but empty
-	inv, err := parser.BuildInventory(ctx, nil)
-	require.NoError(t, err)
-	require.NotNil(t, inv)
-	assert.Equal(t, 0, inv.VCenter.VMs.Total)
+	require.EqualError(t, err, "No VMs found in vInfo sheet - cannot build inventory without VM data")
+	require.True(t, result.HasErrors())
 }
 
 func TestValidation_ErrorCodes(t *testing.T) {
@@ -562,7 +551,7 @@ func TestValidation_ErrorCodes(t *testing.T) {
 			}
 
 			result, err := parser.IngestRvTools(context.Background(), tmpFile)
-			require.NoError(t, err)
+			require.Error(t, err)
 			require.True(t, result.HasErrors())
 
 			errorCodes := make(map[string]bool)
@@ -1353,6 +1342,9 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 			"Powerstate": "poweredOn", "Cluster": "cluster-b", "Datacenter": "dc-1",
 		},
 	}
+	for _, vm := range vms {
+		vm["VI SDK UUID"] = "test-vcenter-uuid"
+	}
 	hosts := []map[string]string{
 		{"Host": "host-1", "Cluster": "cluster-a", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
 		{"Host": "host-2", "Cluster": "cluster-b", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
@@ -1626,6 +1618,9 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 		{"VM": "vm-003", "VM ID": "vm-003", "Powerstate": "poweredOn", "CPUs": "8", "Memory": "16384", "Cluster": "Cluster-B", "Datacenter": "DC1", "OS according to the configuration file": "Windows Server 2019 (64-bit)", "Total disk capacity MiB": "200000", "In Use MiB": "100000"},
 		{"VM": "vm-004", "VM ID": "vm-004", "Powerstate": "poweredOff", "CPUs": "4", "Memory": "8192", "Cluster": "Cluster-B", "Datacenter": "DC1", "OS according to the configuration file": "CentOS 8 (64-bit)", "Total disk capacity MiB": "100000", "In Use MiB": "50000"},
 		{"VM": "vm-005", "VM ID": "vm-005", "Powerstate": "poweredOn", "CPUs": "2", "Memory": "4096", "Cluster": "Cluster-A", "Datacenter": "DC1", "OS according to the configuration file": "Ubuntu 22.04 (64-bit)", "Total disk capacity MiB": "50000", "In Use MiB": "25000"},
+	}
+	for _, vm := range vms {
+		vm["VI SDK UUID"] = "test-vcenter-uuid"
 	}
 	hosts := []map[string]string{
 		{"Datacenter": "DC1", "Cluster": "Cluster-A", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
@@ -2328,7 +2323,7 @@ func TestVCenterVersion(t *testing.T) {
 
 		ctx := context.Background()
 		_, err := parser.IngestRvTools(ctx, tmpFile)
-		require.NoError(t, err)
+		require.EqualError(t, err, "No VMs found in vInfo sheet - cannot build inventory without VM data")
 
 		version, err := parser.VCenterApiVersion(ctx)
 		require.NoError(t, err)
