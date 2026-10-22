@@ -83,7 +83,7 @@ WITH metadata AS (
         tag.value->>'name' AS value
     FROM src.VM v,
         json_each(COALESCE(to_json(v)->>'Tags', '[]')) tag
-    JOIN temp.main.tag_categories category ON category.id = (tag.value->>'categoryID')
+    JOIN tag_categories category ON category.id = (tag.value->>'categoryID')
     WHERE v.IsTemplate = 0 AND trim(tag.value->>'name') != '' AND trim(category.name) != ''
     UNION ALL
     SELECT v.ID AS id, def.value->>'name' AS key, val.value->>'value' AS value
