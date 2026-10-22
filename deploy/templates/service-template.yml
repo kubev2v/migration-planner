@@ -107,6 +107,19 @@ parameters:
     value: /dev/sda
   - name: INSECURE_REGISTRY
     value: "false"
+  # Appliance image config values
+  - name: APPLIANCE_IMAGE_REGISTRY
+    description: Container registry for the pre-built appliance image
+    value: "quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance"
+  - name: APPLIANCE_IMAGE_TAG
+    description: Tag of the appliance image to pull
+    value: "main"
+  - name: APPLIANCE_REFRESH_INTERVAL
+    description: How often to check the registry for a new appliance image version
+    value: "6h"
+  - name: APPLIANCE_TLS_VERIFY
+    description: Enable TLS verification for appliance image registry
+    value: "true"
   # Svc Config values
   - name: MIGRATION_PLANNER_ADDRESS
     value: ":13443"
@@ -703,14 +716,23 @@ objects:
                   name: backend-metrics
                 - containerPort: 13443
                   name: probe-port
+                - containerPort: 21443
+                  name: image-port-int
+              startupProbe:
+                httpGet:
+                  path: /health
+                  port: 21443
+                failureThreshold: 30
+                periodSeconds: 10
               livenessProbe:
-                tcpSocket:
-                  port: 13443
-                initialDelaySeconds: 30
+                httpGet:
+                  path: /health
+                  port: 21443
+                failureThreshold: 3
+                periodSeconds: 10
               readinessProbe:
                 tcpSocket:
-                  port: 17443
-                initialDelaySeconds: 30
+                  port: 21443
               env:
                 - name: CONFIG_SERVER
                   value: ${MIGRATION_PLANNER_URL}
@@ -849,11 +871,22 @@ objects:
                       name: ${IAM_CERT_SECRET_NAME}
                       key: ${IAM_CLIENT_KEY_SECRET_KEY}
                       optional: true
+                # Appliance image config values
+                - name: APPLIANCE_IMAGE_REGISTRY
+                  value: "${APPLIANCE_IMAGE_REGISTRY}"
+                - name: APPLIANCE_IMAGE_TAG
+                  value: "${APPLIANCE_IMAGE_TAG}"
+                - name: APPLIANCE_REFRESH_INTERVAL
+                  value: "${APPLIANCE_REFRESH_INTERVAL}"
+                - name: APPLIANCE_TLS_VERIFY
+                  value: "${APPLIANCE_TLS_VERIFY}"
               volumeMounts:
                 - name: migration-planner-dir
                   mountPath: "/.migration-planner"
                 - name: iso-storage
                   mountPath: /iso
+                - name: appliance-data
+                  mountPath: /data/appliance
                 - name: admin-group
                   mountPath: /etc/planner
                   readOnly: true
@@ -861,6 +894,9 @@ objects:
           volumes:
             - name: iso-storage
               emptyDir: {}
+            - name: appliance-data
+              emptyDir:
+                sizeLimit: 2Gi
             - name: migration-planner-dir
               emptyDir:
                 sizeLimit: 500Mi
