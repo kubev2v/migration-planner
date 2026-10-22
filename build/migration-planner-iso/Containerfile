@@ -1,6 +1,8 @@
 FROM --platform=linux/amd64 quay.io/centos/centos:stream9 AS builder
 
-ARG ISO_URL ISO_CHECKSUM AGENT_IMAGE TLS_VERIFY=true
+ARG ISO_URL ISO_CHECKSUM TLS_VERIFY=true
+ARG AGENT_IMAGE=quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance
+ARG AGENT_IMAGE_TAG=main
 
 USER root
 
@@ -10,13 +12,7 @@ COPY build/migration-planner-iso/build-ove-image.sh /tmp/
 RUN chmod +x /tmp/build-ove-image.sh
 
 RUN dnf -y update; micro-dnf -y reinstall shadow-utils; \
-dnf -y install podman runc ; \
 rm -rf /var/cache /var/log/dnf* /var/log/yum.*
-
-# Use runc as containers engine
-RUN mkdir -p /etc/containers/ && \
-  echo "[engine]" >> /etc/containers/containers.conf && \
-  echo "runtime=\"runc\"" >> /etc/containers/containers.conf
 
 # Do the postprocessing step to generate the OVE ISO
 RUN dnf install -y xorriso skopeo rsync syslinux \
@@ -36,7 +32,7 @@ RUN /tmp/build-ove-image.sh \
     --iso-file /initial-rhcos.iso \
     --dir / \
     --output-file /output/final.iso \
-    --agent-image ${AGENT_IMAGE} \
+    --agent-image ${AGENT_IMAGE}:${AGENT_IMAGE_TAG} \
     --tls-verify ${TLS_VERIFY} \
     && rm /initial-rhcos.iso && rm -rf /isomnt
 
