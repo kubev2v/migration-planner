@@ -1,17 +1,21 @@
 package config
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/kelseyhightower/envconfig"
 )
 
 var singleConfig *Config = nil
 
 type Config struct {
-	Database     *dbConfig
-	Service      *svcConfig
-	Kafka        *Kafka
-	Notification *Notification
-	IAM          *IAM
+	Database       *dbConfig
+	Service        *svcConfig
+	Kafka          *Kafka
+	Notification   *Notification
+	IAM            *IAM
+	ApplianceImage *ApplianceImage
 }
 
 type dbConfig struct {
@@ -80,6 +84,22 @@ type IAM struct {
 	ClientCert         string `envconfig:"IAM_CLIENT_CERT" default:""`
 	ClientKey          string `envconfig:"IAM_CLIENT_KEY" default:""`
 	InsecureSkipVerify bool   `envconfig:"IAM_INSECURE_SKIP_VERIFY" default:"false"`
+}
+
+// ApplianceImage configures the appliance container image used to build the
+// OVE ISO at runtime. The image server periodically checks the registry for
+// a newer version and rebuilds the ISO when one is detected.
+type ApplianceImage struct {
+	Registry        string        `envconfig:"APPLIANCE_IMAGE_REGISTRY" default:"quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance"`
+	Tag             string        `envconfig:"APPLIANCE_IMAGE_TAG" default:"main"`
+	RefreshInterval time.Duration `envconfig:"APPLIANCE_REFRESH_INTERVAL" default:"6h"`
+	TLSVerify       bool          `envconfig:"APPLIANCE_TLS_VERIFY" default:"true"`
+	DataDir         string        `envconfig:"APPLIANCE_DATA_DIR" default:"/data/appliance"`
+}
+
+// GetPullSpec returns the fully-qualified image reference (registry:tag).
+func (a *ApplianceImage) GetPullSpec() string {
+	return fmt.Sprintf("%s:%s", a.Registry, a.Tag)
 }
 
 func New() (*Config, error) {
