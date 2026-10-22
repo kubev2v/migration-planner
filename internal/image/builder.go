@@ -101,7 +101,14 @@ type ImageBuilder struct {
 	VmNetwork            VmNetwork
 }
 
+// NewImageBuilder creates a new ImageBuilder with default RHCOS ISO path
 func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
+	return NewImageBuilderWithISO(sourceID, util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage))
+}
+
+// NewImageBuilderWithISO creates a new ImageBuilder with a specified ISO path
+// This allows using a modified ISO (e.g., one with the appliance image embedded)
+func NewImageBuilderWithISO(sourceID uuid.UUID, isoPath string) *ImageBuilder {
 	imageBuilder := &ImageBuilder{
 		SourceID:             sourceID.String(),
 		DebugMode:            util.GetEnv("DEBUG_MODE", ""),
@@ -113,7 +120,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 		OvfFile:              defaultOvfFile,
 		OvfName:              defaultOvfName,
 		Template:             defaultTemplate,
-		RHCOSImage:           util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
+		RHCOSImage:           isoPath,
 		imageType:            OVAImageType,
 	}
 
@@ -185,14 +192,22 @@ func (b *ImageBuilder) Generate(ctx context.Context, w io.Writer) error {
 // (required for Akamai LFO). The caller must call Close() on the returned reader.
 // modTime is used for all TAR headers to ensure deterministic output across pods.
 func (b *ImageBuilder) OpenSeekableReader(modTime time.Time) (*SeekableTarReader, int64, error) {
+	reader, size, _, err := b.OpenSeekableReaderWithETag(modTime, "")
+	return reader, size, err
+}
+
+// OpenSeekableReaderWithETag returns the OVA reader and a strong validator built
+// from the published ISO digest and the exact small components of this OVA.
+// The ISO digest must describe the immutable file at b.RHCOSImage.
+func (b *ImageBuilder) OpenSeekableReaderWithETag(modTime time.Time, isoDigest string) (*SeekableTarReader, int64, string, error) {
 	ignitionContent, err := b.generateIgnition()
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
 	}
 
 	isoReader, err := isoeditor.NewRHCOSStreamReader(b.RHCOSImage, &isoeditor.IgnitionContent{Config: []byte(ignitionContent)}, nil, nil)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read rhcos iso: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to read rhcos iso: %w", err)
 	}
 
 	// Ensure isoReader is closed on any error path below
@@ -206,22 +221,22 @@ func (b *ImageBuilder) OpenSeekableReader(modTime time.Time) (*SeekableTarReader
 	// Get ISO size via seeking
 	isoSize, err := isoReader.Seek(0, io.SeekEnd)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to get iso size: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to get iso size: %w", err)
 	}
 	if _, err := isoReader.Seek(0, io.SeekStart); err != nil {
-		return nil, 0, fmt.Errorf("failed to reset iso reader: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to reset iso reader: %w", err)
 	}
 
 	// Read OVF (small file, ~7 KB)
 	ovfContent, err := os.ReadFile(b.OvfFile)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read ovf: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to read ovf: %w", err)
 	}
 
 	// Read VMDK (small file, ~143 KB)
 	diskContent, err := os.ReadFile(b.PersistentDiskImage)
 	if err != nil {
-		return nil, 0, fmt.Errorf("failed to read persistence disk: %w", err)
+		return nil, 0, "", fmt.Errorf("failed to read persistence disk: %w", err)
 	}
 
 	entries := []TarEntry{
@@ -250,10 +265,27 @@ func (b *ImageBuilder) OpenSeekableReader(modTime time.Time) (*SeekableTarReader
 
 	reader, total, err := NewSeekableTarReader(entries, isoReader)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, "", err
+	}
+	var etag string
+	if isoDigest != "" {
+		// Include the archive bytes so changes in CPIO/gzip encoding also
+		// invalidate the representation, even when the ignition JSON is stable.
+		archive, err := (&isoeditor.IgnitionContent{Config: []byte(ignitionContent)}).Archive()
+		if err != nil {
+			return nil, 0, "", err
+		}
+		ignitionArchive, err := io.ReadAll(archive)
+		if err != nil {
+			return nil, 0, "", err
+		}
+		etag, err = ovaETag(entries, isoDigest, ignitionArchive)
+		if err != nil {
+			return nil, 0, "", err
+		}
 	}
 	success = true
-	return reader, total, nil
+	return reader, total, etag, nil
 }
 
 func (b *ImageBuilder) Validate() error {

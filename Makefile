@@ -9,7 +9,8 @@ VERBOSE ?= false
 REGISTRY ?= quay.io
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
-MIGRATION_PLANNER_AGENT_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent
+APPLIANCE_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/oma-appliance
+APPLIANCE_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_API_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-api
 MIGRATION_PLANNER_ISO_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso
 MIGRATION_PLANNER_IMAGE_PULL_POLICY ?= Always
@@ -41,7 +42,7 @@ GO_BUILD_FLAGS += $(GO_LD_FLAGS)
 
 .EXPORT_ALL_VARIABLES:
 
-all: build build-containers
+all: build
 
 help:
 	@echo "Targets:"
@@ -189,15 +190,11 @@ stop-local:
 	@echo "✅ Database stopped and volume cleaned"
 
 # rebuild container only on source changes
-bin/.migration-planner-agent-container: bin submodules agent-v2/agent/Containerfile
-	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f agent-v2/agent/Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
-
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.api-debug -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
 
-migration-planner-api-container: bin/.migration-planner-api-container
-migration-planner-agent-container: bin/.migration-planner-agent-container
+build-api-container: bin/.migration-planner-api-container
 
 bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
 	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
@@ -205,7 +202,6 @@ bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile 
 	TLS_VERIFY=$${TLS_VERIFY:-true}; \
 	$(PODMAN) build . \
 		--network=host \
-		--build-arg AGENT_IMAGE=$(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) \
 		--build-arg ISO_URL=$$ISO_URL \
 		--build-arg ISO_CHECKSUM=$$ISO_CHECKSUM \
 		--build-arg FINAL_ISO_PATH=/rhcos.iso \
@@ -214,11 +210,7 @@ bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile 
 		$(if $(LABEL),--label "$(LABEL)") \
 		-t $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 
-migration-planner-iso-container: bin/.migration-planner-iso-container
-
-build-containers: migration-planner-api-container migration-planner-agent-container
-
-.PHONY: build-containers
+build-iso-container: bin/.migration-planner-iso-container
 
 quay-login:
 	@if [ ! -f $(DOCKER_AUTH_FILE) ] && [ $(QUAY_USER) ] && [ $(QUAY_TOKEN) ]; then \
@@ -227,21 +219,19 @@ quay-login:
 		$(PODMAN) login --authfile $(DOCKER_AUTH_FILE) -u=$(QUAY_USER) -p=$(QUAY_TOKEN) quay.io; \
 	fi;
 
-push-api-container: migration-planner-api-container quay-login
+push-api-container: quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
 		$(PODMAN) push --authfile $(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
 		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
-push-agent-container: migration-planner-agent-container quay-login
+push-iso-container: quay-login
 	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
+		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
+		$(PODMAN) push $(MIGRATION_PLANNER_ISO_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
-
-push-containers: push-api-container push-agent-container
 
 deploy-on-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
@@ -255,6 +245,10 @@ deploy-on-openshift: oc
        -p MIGRATION_PLANNER_IMAGE=$(MIGRATION_PLANNER_API_IMAGE) \
        -p MIGRATION_PLANNER_REPLICAS=${MIGRATION_PLANNER_REPLICAS} \
        -p IMAGE_TAG=$(MIGRATION_PLANNER_IMAGE_TAG) \
+       -p APPLIANCE_IMAGE=$(APPLIANCE_IMAGE) \
+       -p APPLIANCE_IMAGE_TAG=$(APPLIANCE_IMAGE_TAG) \
+       -p MIGRATION_PLANNER_AUTH=$(MIGRATION_PLANNER_AUTH) \
+	       -p IAM_ENABLED=false \
        -p SERVICE_API_PATH=$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_URL=http://planner-agent-$${openshift_project}.apps.$${openshift_base_url}$(SERVICE_API_PATH) \
        -p MIGRATION_PLANNER_UI_URL=http://planner-ui-$${openshift_project}.apps.$${openshift_base_url} \
