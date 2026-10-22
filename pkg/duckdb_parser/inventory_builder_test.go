@@ -81,6 +81,9 @@ func setupTestParser(t *testing.T, validator Validator) (*Parser, *sql.DB, func(
 
 	parser := New(db, validator)
 	require.NoError(t, parser.Init())
+	// SQLite callers provide the category lookup table, even when no names are available.
+	_, err = db.Exec(`CREATE TABLE tag_categories (id VARCHAR, name VARCHAR)`)
+	require.NoError(t, err)
 
 	cleanup := func() {
 		_ = db.Close()

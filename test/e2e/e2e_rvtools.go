@@ -294,7 +294,7 @@ var _ = Describe("e2e-rvtools", func() {
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 
-		It("should handle missing sheets", func() {
+		It("should handle missing sheets with metadata", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Create Excel file missing required sheets
@@ -308,10 +308,9 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("missing-sheets-test", tmpFile)
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
-
-			// Clean up if successful
-			err = svc.RemoveAssessment(assessment.Id)
-			Expect(err).To(BeNil())
+			DeferCleanup(svc.RemoveAssessment, assessment.Id)
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			Expect(assessment.Snapshots[0].Inventory.Vcenter.Vms.Total).To(Equal(1))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
