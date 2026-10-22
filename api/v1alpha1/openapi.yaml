@@ -3179,6 +3179,18 @@ components:
       properties:
         type:
           type: string
+        backingDeviceIds:
+          type: array
+          description: Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+          items:
+            type: string
+        filesystemType:
+          type: string
+          description: Filesystem type reported by the datastore, such as VMFS, NFS, or NFS41
+        filesystemMajorVersion:
+          type: integer
+          format: int32
+          description: VMFS major version when reported; omitted when unknown or not applicable
         storageProtocol:
           type: string
           description: Storage access category derived from Datastore.Type
@@ -3192,6 +3204,7 @@ components:
           type: integer
         vendor:
           type: string
+          description: Vendor reported by matching backing devices when available
         diskId:
           type: string
         hardwareAcceleratedMove:
@@ -3200,6 +3213,7 @@ components:
           type: string
         model:
           type: string
+          description: Model reported by matching backing devices when available
         hostId:
           type: string
           description: Identifier of the host where this datastore is attached

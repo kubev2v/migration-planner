@@ -20,7 +20,11 @@ func (p *Parser) VMs(ctx context.Context, filters Filters, options Options) ([]m
 	if err != nil {
 		return nil, err
 	}
-	q, err := p.builder.vmQuery(filters, options, metadataTable)
+	topology, err := StorageTopologyQuery(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	q, err := p.builder.vmQuery(filters, options, metadataTable, topology)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build vm query: %v", err)
 	}
@@ -42,7 +46,11 @@ func (p *Parser) VMCount(ctx context.Context, filters Filters) (int, error) {
 
 // Datastores returns datastores with optional filters and pagination.
 func (p *Parser) Datastores(ctx context.Context, filters Filters, options Options) ([]models.Datastore, error) {
-	q, err := p.builder.DatastoreQuery(filters, options)
+	topology, err := StorageTopologyQuery(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	q, err := p.builder.datastoreQuery(filters, options, topology)
 	if err != nil {
 		return nil, fmt.Errorf("building datastore query: %w", err)
 	}

@@ -5,13 +5,16 @@ Template Parameters:
   - ClusterFilter: filter by cluster name
   - VMListFilter: filter by list of VM IDs
 */ -}}
-WITH vm_disk_types AS (
+WITH {{.StorageTopology}},
+vm_disk_types AS (
     SELECT
         d."VM ID",
         ds."Type" AS disk_type,
         d."Capacity MiB"
     FROM vdisk d
-    JOIN vdatastore ds ON ds."Name" = REGEXP_EXTRACT(COALESCE(d."Path", d."Disk Path"), '\[([^\]]+)\]', 1)
+    JOIN storage_disk_datastores resolved
+        ON resolved."VM ID" = d."VM ID" AND resolved.disk_row_id = d.rowid
+    JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
     JOIN vinfo i ON d."VM ID" = i."VM ID"
     WHERE ds."Type" IS NOT NULL AND ds."Type" != ''
       AND COALESCE(i."migration_excluded", false) = false

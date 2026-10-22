@@ -329,46 +329,60 @@ func TestToAPIVMs_MigrationIssues(t *testing.T) {
 
 func TestAnonymizeNFSDatastore(t *testing.T) {
 	tests := []struct {
-		name             string
-		datastoreType    string
-		originalDiskId   string
-		originalProtocol string
-		expectAnonymized bool
+		name                 string
+		datastoreType        string
+		originalDiskId       string
+		originalProtocol     string
+		expectDiskIdRedacted bool
 	}{
 		{
-			name:             "NFS lowercase - should anonymize",
-			datastoreType:    "nfs",
-			originalDiskId:   "nfs://server/path",
-			originalProtocol: "NFS v3",
-			expectAnonymized: true,
+			name:                 "NFS with address and export path - redacts diskId",
+			datastoreType:        "NFS",
+			originalDiskId:       "10.46.29.166 /nfs-data/exports",
+			originalProtocol:     "NFS",
+			expectDiskIdRedacted: true,
 		},
 		{
-			name:             "NFS uppercase - should anonymize",
-			datastoreType:    "NFS",
-			originalDiskId:   "nfs://server/path",
-			originalProtocol: "NFS v4",
-			expectAnonymized: true,
+			name:                 "NFS lowercase with server and volume - redacts diskId",
+			datastoreType:        "nfs",
+			originalDiskId:       "server:/export/share",
+			originalProtocol:     "NFS v3",
+			expectDiskIdRedacted: true,
 		},
 		{
-			name:             "NFS mixed case - should anonymize",
-			datastoreType:    "Nfs",
-			originalDiskId:   "nfs://server/path",
-			originalProtocol: "NFS",
-			expectAnonymized: true,
+			name:                 "NFS with bare IPv4 address - redacts diskId",
+			datastoreType:        "NFS",
+			originalDiskId:       "10.46.29.166",
+			originalProtocol:     "NFS",
+			expectDiskIdRedacted: true,
 		},
 		{
-			name:             "VMFS - should NOT anonymize",
-			datastoreType:    "VMFS",
-			originalDiskId:   "vmfs-12345",
-			originalProtocol: "SCSI",
-			expectAnonymized: false,
+			name:                 "NFS with plain datastore name - keeps diskId",
+			datastoreType:        "Nfs",
+			originalDiskId:       "netappnfs",
+			originalProtocol:     "NFS41",
+			expectDiskIdRedacted: false,
 		},
 		{
-			name:             "VSAN - should NOT anonymize",
-			datastoreType:    "VSAN",
-			originalDiskId:   "vsan-uuid",
-			originalProtocol: "VSAN",
-			expectAnonymized: false,
+			name:                 "NFS with name containing dots - keeps diskId",
+			datastoreType:        "NFS",
+			originalDiskId:       "ds.prod.nfs",
+			originalProtocol:     "NFS",
+			expectDiskIdRedacted: false,
+		},
+		{
+			name:                 "VMFS - should NOT anonymize",
+			datastoreType:        "VMFS",
+			originalDiskId:       "vmfs-12345",
+			originalProtocol:     "SCSI",
+			expectDiskIdRedacted: false,
+		},
+		{
+			name:                 "VSAN - should NOT anonymize",
+			datastoreType:        "VSAN",
+			originalDiskId:       "vsan-uuid",
+			originalProtocol:     "VSAN",
+			expectDiskIdRedacted: false,
 		},
 	}
 
@@ -382,12 +396,12 @@ func TestAnonymizeNFSDatastore(t *testing.T) {
 
 			anonymizeNFSDatastore(ds)
 
-			if tt.expectAnonymized {
-				assert.Equal(t, "N/A", ds.DiskId, "DiskId should be anonymized for NFS")
-				assert.Equal(t, "N/A", ds.ProtocolType, "ProtocolType should be anonymized for NFS")
+			// The protocol label is never sensitive and must survive anonymization.
+			assert.Equal(t, tt.originalProtocol, ds.ProtocolType, "ProtocolType should never be anonymized")
+			if tt.expectDiskIdRedacted {
+				assert.Equal(t, "N/A", ds.DiskId, "DiskId should be redacted for address-like NFS identifiers")
 			} else {
-				assert.Equal(t, tt.originalDiskId, ds.DiskId, "DiskId should NOT be changed for non-NFS")
-				assert.Equal(t, tt.originalProtocol, ds.ProtocolType, "ProtocolType should NOT be changed for non-NFS")
+				assert.Equal(t, tt.originalDiskId, ds.DiskId, "DiskId should be kept for plain datastore names")
 			}
 		})
 	}
@@ -629,7 +643,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 			},
 		},
 		{
-			name:                "NFS datastore - should be anonymized",
+			name:                "NFS datastore with address-like diskId - should be redacted",
 			wantStorageProtocol: api.File,
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
@@ -642,6 +656,25 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 						HostId:          "",
 						Model:           "",
 						ProtocolType:    "NFS v3",
+						Vendor:          "",
+					},
+				},
+			},
+		},
+		{
+			name:                "NFS datastore with plain name - should be kept",
+			wantStorageProtocol: api.File,
+			input: inventory.InfraData{
+				Datastores: []inventory.Datastore{
+					{
+						DiskId:          "netappnfs",
+						FreeCapacityGB:  200.0,
+						TotalCapacityGB: 500.0,
+						Type:            "NFS",
+						StorageProtocol: inventory.StorageProtocolFile,
+						HostId:          "host-1",
+						Model:           "",
+						ProtocolType:    "NFS",
 						Vendor:          "",
 					},
 				},
@@ -672,10 +705,15 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 			for i, expected := range tt.input.Datastores {
 				actual := result.Datastores[i]
 
-				// Check NFS anonymization
+				// Check NFS redaction: address-like identifiers are redacted, the
+				// protocol label is never redacted.
 				if expected.Type == "NFS" || expected.Type == "nfs" {
-					assert.Equal(t, "N/A", actual.DiskId, "NFS DiskId should be anonymized")
-					assert.Equal(t, "N/A", actual.ProtocolType, "NFS ProtocolType should be anonymized")
+					assert.Equal(t, expected.ProtocolType, actual.ProtocolType, "NFS ProtocolType should never be anonymized")
+					if nfsDiskIdIsAddressLike(expected.DiskId) {
+						assert.Equal(t, "N/A", actual.DiskId, "address-like NFS DiskId should be redacted")
+					} else {
+						assert.Equal(t, expected.DiskId, actual.DiskId, "plain NFS DiskId should be kept")
+					}
 				} else {
 					assert.Equal(t, expected.DiskId, actual.DiskId)
 					assert.Equal(t, expected.ProtocolType, actual.ProtocolType)

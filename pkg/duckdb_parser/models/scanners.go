@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strings"
 )
 
 // Disks is a slice of Disk that implements sql.Scanner for DuckDB LIST type.
@@ -30,21 +31,32 @@ func (d *Disks) Scan(value interface{}) error {
 		controllerKey, bus := tracker.GetKeyAndBus(controller)
 
 		disk := Disk{
-			Key:           toString(m["Key"]),
-			UnitNumber:    toInt32(m["UnitNumber"]),
-			ControllerKey: controllerKey,
-			File:          toString(m["File"]),
-			Capacity:      toInt64(m["Capacity"]),
-			Shared:        toBool(m["Shared"]),
-			RDM:           toBool(m["RDM"]),
-			Bus:           bus,
-			Mode:          toString(m["Mode"]),
-			Serial:        toString(m["Serial"]),
-			Thin:          toString(m["Thin"]),
-			Controller:    controller,
-			Label:         toString(m["Label"]),
-			SCSIUnit:      toString(m["SCSIUnit"]),
-			Datastore:     Ref{ID: toString(m["Datastore"])},
+			Key:                             toString(m["Key"]),
+			UnitNumber:                      toInt32(m["UnitNumber"]),
+			ControllerKey:                   controllerKey,
+			File:                            toString(m["File"]),
+			Capacity:                        toInt64(m["Capacity"]),
+			Shared:                          toBool(m["Shared"]),
+			RDM:                             toBool(m["RDM"]),
+			Bus:                             bus,
+			Mode:                            toString(m["Mode"]),
+			Serial:                          toString(m["Serial"]),
+			Thin:                            toString(m["Thin"]),
+			Controller:                      controller,
+			Label:                           toString(m["Label"]),
+			SCSIUnit:                        toString(m["SCSIUnit"]),
+			Datastore:                       Ref{ID: toString(m["Datastore"])},
+			DatastoreName:                   toString(m["DatastoreName"]),
+			DatastoreType:                   toString(m["DatastoreType"]),
+			DatastoreFilesystemType:         toString(m["DatastoreFilesystemType"]),
+			DatastoreFilesystemMajorVersion: toInt32(m["DatastoreFilesystemMajorVersion"]),
+			DatastoreStorageProtocol:        toString(m["DatastoreStorageProtocol"]),
+			DatastoreBackingDeviceIDs:       toStringSlice(m["DatastoreBackingDeviceIDs"]),
+			DatastoreVendor:                 toString(m["DatastoreVendor"]),
+			DatastoreModel:                  toString(m["DatastoreModel"]),
+		}
+		if lunUUID := strings.TrimSpace(toString(m["RDMLunUUID"])); disk.RDM && lunUUID != "" {
+			disk.RDMBacking = &RDMBacking{LunUUID: lunUUID}
 		}
 		result = append(result, disk)
 	}
@@ -220,6 +232,30 @@ func toString(v interface{}) string {
 		return s
 	}
 	return fmt.Sprintf("%v", v)
+}
+
+func toStringSlice(v interface{}) []string {
+	if v == nil {
+		return nil
+	}
+	switch value := v.(type) {
+	case []string:
+		return append([]string(nil), value...)
+	case []interface{}:
+		result := make([]string, 0, len(value))
+		for _, item := range value {
+			if item != nil {
+				result = append(result, toString(item))
+			}
+		}
+		return result
+	case string:
+		var result []string
+		if err := json.Unmarshal([]byte(value), &result); err == nil {
+			return result
+		}
+	}
+	return nil
 }
 
 func toInt64(v interface{}) int64 {
