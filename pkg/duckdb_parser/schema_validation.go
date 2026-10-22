@@ -51,6 +51,17 @@ func (v ValidationResult) Error() error {
 	return fmt.Errorf("%s", msg)
 }
 
+// UserMessage combines the user-facing validation messages in their original order.
+func (v ValidationResult) UserMessage() string {
+	messages := make([]string, 0, len(v.Errors))
+	for _, issue := range v.Errors {
+		if issue.Message != "" {
+			messages = append(messages, issue.Message)
+		}
+	}
+	return strings.Join(messages, "\n")
+}
+
 // Validation codes for errors
 const (
 	CodeNoVMs                  = "NO_VMS"

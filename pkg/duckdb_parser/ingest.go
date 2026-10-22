@@ -45,6 +45,7 @@ func translateXLSXError(err error) error {
 	errStr := err.Error()
 	for pattern, message := range xlsxErrorMappings {
 		if strings.Contains(errStr, pattern) {
+			zap.S().Errorw("failed to read RVTools workbook", "error", err)
 			return fmt.Errorf("%s", message)
 		}
 	}
@@ -54,11 +55,12 @@ func translateXLSXError(err error) error {
 // IngestRvTools ingests data from an RVTools Excel file, runs VM validation if a validator
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
-// If ValidationResult.HasErrors() is true, the inventory cannot be built.
+// Recognized failures return readable messages; other errors retain their original context.
+// Structured validation details remain available in result.
 func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result ValidationResult, err error) {
 	metadata, err := readRVToolsMetadata(ctx, excelFile)
 	if err != nil {
-		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", err)
+		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", translateXLSXError(err))
 	}
 	var args []any
 	if len(metadata) > 0 {
@@ -83,7 +85,7 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 		}
 	}()
 	if err := p.executeStatements(ctx, query, args...); err != nil {
-		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
+		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", translateXLSXError(err))
 	}
 
 	// Validate schema against vinfo_raw (unfiltered RVTools data) for granular error reporting
@@ -93,15 +95,15 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 	if err := p.dropVinfoRaw(ctx); err != nil {
 		return result, fmt.Errorf("dropping vinfo_raw: %w", err)
 	}
+	if result.HasErrors() {
+		return result, fmt.Errorf("%s", result.UserMessage())
+	}
 
-	// Only run post-ingestion steps if schema is valid (we have VMs to process)
-	if result.IsValid() {
-		if err := p.populateComplexity(ctx); err != nil {
-			return result, fmt.Errorf("populating complexity: %w", err)
-		}
-		if err := p.validateVMs(ctx); err != nil {
-			return result, fmt.Errorf("validating VMs: %w", err)
-		}
+	if err := p.populateComplexity(ctx); err != nil {
+		return result, fmt.Errorf("populating complexity: %w", err)
+	}
+	if err := p.validateVMs(ctx); err != nil {
+		return result, fmt.Errorf("validating VMs: %w", err)
 	}
 
 	return result, nil
@@ -184,7 +186,7 @@ func (p *Parser) executeStatements(ctx context.Context, query string, args ...an
 		}
 		if _, err := p.db.ExecContext(ctx, stmt, stmtArgs...); err != nil {
 			if isCriticalStatement(stmt) {
-				return translateXLSXError(err)
+				return err
 			}
 			// Non-critical failures are logged but don't stop execution
 			zap.S().Debugw("non-critical statement failed", "error", err)
