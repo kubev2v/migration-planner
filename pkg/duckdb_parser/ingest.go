@@ -55,7 +55,7 @@ func translateXLSXError(err error) error {
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result ValidationResult, err error) {
+func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (ValidationResult, error) {
 	metadata, err := readRVToolsMetadata(ctx, excelFile)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", err)
@@ -72,22 +72,12 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
-	defer func() {
-		if err == nil {
-			return
-		}
-		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		if cleanupErr := p.dropVinfoRaw(cleanupCtx); cleanupErr != nil {
-			zap.S().Warnw("dropping vinfo_raw after failed import", "error", cleanupErr)
-		}
-	}()
 	if err := p.executeStatements(ctx, query, args...); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
 	}
 
 	// Validate schema against vinfo_raw (unfiltered RVTools data) for granular error reporting
-	result = p.ValidateSchema(ctx, "vinfo_raw")
+	result := p.ValidateSchema(ctx, "vinfo_raw")
 
 	// Drop vinfo_raw now that validation is complete
 	if err := p.dropVinfoRaw(ctx); err != nil {
@@ -111,14 +101,10 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-// Optional category names come from temp.main.tag_categories on the same connection.
 func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result ValidationResult, err error) {
 	defer func() {
 		p.cleanupSqliteImport(ctx, err)
 	}()
-	if err := p.setupTagCategories(ctx); err != nil {
-		return ValidationResult{}, fmt.Errorf("creating tag categories: %w", err)
-	}
 	query, err := p.builder.IngestSqliteQuery(sqliteFile)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
@@ -143,17 +129,9 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result Va
 	return result, nil
 }
 
-func (p *Parser) setupTagCategories(ctx context.Context) error {
-	_, err := p.db.ExecContext(ctx, "CREATE TEMP TABLE IF NOT EXISTS tag_categories (id VARCHAR, name VARCHAR)")
-	return err
-}
-
 func (p *Parser) cleanupSqliteImport(ctx context.Context, importErr error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	if _, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS temp.main.tag_categories"); err != nil {
-		zap.S().Warnw("dropping tag categories after import", "error", err)
-	}
 	if importErr != nil {
 		if _, err := p.db.ExecContext(ctx, "DETACH DATABASE IF EXISTS src"); err != nil {
 			zap.S().Warnw("detaching SQLite source after failed import", "error", err)
