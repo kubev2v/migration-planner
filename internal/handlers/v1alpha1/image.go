@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -23,23 +24,30 @@ import (
 )
 
 type ImageHandler struct {
-	store  store.Store
-	cfg    *config.Config
-	outbox *eventwrap.OutboxService
+	store          store.Store
+	cfg            *config.Config
+	outbox         *eventwrap.OutboxService
+	applianceCache *service.ApplianceImageCache
 }
 
 // Make sure we conform to servers Service interface
 var _ imageServer.Service = (*ImageHandler)(nil)
 
-func NewImageHandler(store store.Store, cfg *config.Config) *ImageHandler {
+func NewImageHandler(store store.Store, cfg *config.Config, applianceCache *service.ApplianceImageCache) *ImageHandler {
 	return &ImageHandler{
-		store:  store,
-		cfg:    cfg,
-		outbox: eventwrap.NewOutboxService(store),
+		store:          store,
+		cfg:            cfg,
+		outbox:         eventwrap.NewOutboxService(store),
+		applianceCache: applianceCache,
 	}
 }
 
 func (h *ImageHandler) Health(ctx context.Context, request imageServer.HealthRequestObject) (imageServer.HealthResponseObject, error) {
+	if h.applianceCache != nil {
+		if err := h.applianceCache.HealthCheck(); err != nil {
+			return nil, err
+		}
+	}
 	return nil, nil
 }
 
