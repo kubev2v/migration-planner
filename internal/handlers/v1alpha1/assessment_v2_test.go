@@ -2,7 +2,8 @@ package v1alpha1_test
 
 import (
 	"context"
-	"fmt"
+
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -15,10 +16,10 @@ import (
 
 type assessmentV2ServiceStub struct {
 	service.AssessmentServicer
-	assessment *model.Assessment
+	assessment *svcmodel.Assessment
 }
 
-func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	if id != s.assessment.ID {
 		return nil, service.NewErrAssessmentNotFound(id)
 	}
@@ -33,23 +34,37 @@ var _ = Describe("assessment v2 handler", func() {
 		clusterID2 = uuid.MustParse("44444444-4444-4444-8444-444444444444")
 	)
 
-	inventory := func(vcenterID string, isSubset bool, totalVMs int, clusterID uuid.UUID) model.AssessmentInventory {
-		return model.AssessmentInventory{
+	inventory := func(vcenterID string, isSubset bool, totalVMs int, clusterID uuid.UUID) svcmodel.AssessmentInventory {
+		return svcmodel.AssessmentInventory{
 			VCenterID: vcenterID,
 			IsSubset:  isSubset,
 			Version:   model.InventoryVersionV2,
-			Inventory: []byte(fmt.Sprintf(`{"vcenter_id":%q,"vcenter":{"vms":{"total":%d}},"clusters":{%q:{"vms":{"total":%d}}}}`,
-				vcenterID, totalVMs, clusterID.String(), totalVMs)),
+			Inventory: svcmodel.Inventory{
+				VcenterId: vcenterID,
+				Vcenter: &svcmodel.InventoryData{
+					Vms: svcmodel.VMs{
+						Total: totalVMs,
+					},
+				},
+				Clusters: map[string]svcmodel.InventoryData{
+					clusterID.String(): {
+						Vms: svcmodel.VMs{
+							Total: totalVMs,
+						},
+					},
+				},
+			},
 		}
 	}
 
-	getAssessment := func(sourceType string, inventories []model.AssessmentInventory) server.GetAssessmentV2200JSONResponse {
+	getAssessment := func(sourceType string, main svcmodel.AssessmentInventory, subset []svcmodel.AssessmentInventory) server.GetAssessmentV2200JSONResponse {
 		GinkgoHelper()
 
-		assessment := &model.Assessment{
-			ID:          uuid.New(),
-			SourceType:  sourceType,
-			Inventories: inventories,
+		assessment := &svcmodel.Assessment{
+			ID:                uuid.New(),
+			SourceType:        sourceType,
+			MainInventory:     main,
+			SubsetInventories: subset,
 		}
 		handler := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: assessment}, nil, nil, nil, nil, nil, nil)
 
@@ -62,12 +77,13 @@ var _ = Describe("assessment v2 handler", func() {
 	Context("GetAssessmentV2", func() {
 		It("returns RVTools aggregate data and only the individual vCenters",
 			func() {
-				inventories := []model.AssessmentInventory{
-					inventory("", false, 30, uuid.Nil),
+				main := inventory("", false, 30, uuid.Nil)
+				subset := []svcmodel.AssessmentInventory{
 					inventory(vcenterID1.String(), true, 10, clusterID1),
 					inventory(vcenterID2.String(), true, 20, clusterID2),
 				}
-				response := getAssessment(service.SourceTypeRvtools, inventories)
+
+				response := getAssessment(service.SourceTypeRvtools, main, subset)
 
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
 				Expect(response.Vcenters).To(ConsistOf(
@@ -80,10 +96,10 @@ var _ = Describe("assessment v2 handler", func() {
 		It("returns agent main inventory data with one vCenter subresource",
 			func() {
 				main := inventory(vcenterID1.String(), false, 30, clusterID1)
-				subset := inventory(vcenterID1.String(), true, 10, clusterID2)
-				inventories := []model.AssessmentInventory{main, subset}
 
-				response := getAssessment(service.SourceTypeAgent, inventories)
+				s1 := inventory(vcenterID1.String(), true, 10, clusterID2)
+
+				response := getAssessment(service.SourceTypeAgent, main, []svcmodel.AssessmentInventory{s1})
 
 				Expect(response.Data.Id).To(Equal(vcenterID1.String()))
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))

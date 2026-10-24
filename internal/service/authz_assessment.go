@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/service/model"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
@@ -97,7 +99,7 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 	return assessments, nil
 }
 
-func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
 	assessment, err := a.inner.GetAssessment(ctx, id)
@@ -110,11 +112,12 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
 	}
 
-	if !model.ReadPermission.In(resource.Permissions) {
+	permissions := mappers.PermissionsFromStore(resource.Permissions)
+	if !svcmodel.ReadPermission.In(permissions) {
 		return nil, NewErrForbidden("assessment", id.String())
 	}
 
-	assessment.Permissions = resource.Permissions
+	assessment.Permissions = permissions
 
 	if assessment.Username == user.Username {
 		rels, err := a.store.Authz().ListRelationships(ctx, model.NewAssessmentResource(id.String()))
@@ -125,24 +128,26 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		if err != nil {
 			return nil, err
 		}
-		assessment.Sharing = sharingM
+		// TODO buildOwnerSharing should return the domain Sharing
+		assessment.Sharing = mappers.SharingFromStore(sharingM)
 
 		identity, err := a.accountsSrv.GetIdentity(ctx, user)
 		if err != nil {
 			return nil, err
 		}
-		assessment.Permissions = slices.DeleteFunc(assessment.Permissions, func(s model.Permission) bool {
+		assessment.Permissions = slices.DeleteFunc(assessment.Permissions, func(s svcmodel.Permission) bool {
 			if identity.Kind == KindRegular || identity.Kind == KindPartner {
-				return s.String() == "share" || s.String() == "edit"
+				return s == svcmodel.SharePermission || s == svcmodel.EditPermission
 			}
-			return s.String() == "edit"
+			return s == svcmodel.EditPermission
 		})
 	} else {
 		ownerName := ""
 		if assessment.OwnerFirstName != nil && assessment.OwnerLastName != nil {
 			ownerName = fmt.Sprintf("%s %s", *assessment.OwnerFirstName, *assessment.OwnerLastName)
 		}
-		assessment.Sharing = a.buildViewerSharing(ownerName, assessment.Username)
+		// TODO buildViewerSharing should return the domain Sharing
+		assessment.Sharing = mappers.SharingFromStore(a.buildViewerSharing(ownerName, assessment.Username))
 	}
 
 	return assessment, nil
@@ -179,7 +184,7 @@ func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createFor
 	return assessment, nil
 }
 
-func (a *AuthzAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
+func (a *AuthzAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
 	_, err := a.inner.GetAssessment(ctx, id)
