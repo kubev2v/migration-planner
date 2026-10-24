@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -241,4 +242,38 @@ func buildZip(t *testing.T, main v1alpha1.Inventory, subsets map[string]agentAPI
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func TestParse_CollectionTime(t *testing.T) {
+	collected := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	inv := v1alpha1.Inventory{VcenterId: "vc-1", CollectionTime: &collected}
+	raw, err := json.Marshal(inv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupID := uuid.New()
+	for _, input := range [][]byte{
+		raw,
+		buildZip(t, inv, map[string]agentAPI.SourceSubsetUpdate{
+			groupID.String(): {Name: "group", Inventory: inv},
+		}),
+	} {
+		parsed, err := Parse(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		documents := [][]byte{parsed.MainInventory}
+		for _, subset := range parsed.Subsets {
+			documents = append(documents, subset.Inventory)
+		}
+		for _, document := range documents {
+			var got v1alpha1.Inventory
+			if err := json.Unmarshal(document, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.CollectionTime == nil || !got.CollectionTime.Equal(collected) {
+				t.Fatalf("collection time = %v, want %v", got.CollectionTime, collected)
+			}
+		}
+	}
 }
