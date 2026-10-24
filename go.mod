@@ -29,7 +29,7 @@ require (
 	github.com/onsi/ginkgo/v2 v2.28.0
 	github.com/onsi/gomega v1.39.1
 	github.com/open-policy-agent/opa v1.6.0
-	github.com/openshift/api v0.0.0-20261009034342-f9511d3fcb26
+	github.com/openshift/api v0.0.0-20261023091600-9809689a2448
 	github.com/openshift/assisted-image-service v0.0.0-20261014151939-adf89ceb50d7
 	github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece
 	github.com/pkg/errors v0.9.1
