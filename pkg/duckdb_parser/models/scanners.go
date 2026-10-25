@@ -130,6 +130,7 @@ func (n *NICs) Scan(value interface{}) error {
 			Type:            toString(m["Type"]),
 			IPv4Address:     toString(m["IPv4Address"]),
 			IPv6Address:     toString(m["IPv6Address"]),
+			VlanID:          toString(m["VlanID"]),
 		}
 		result = append(result, nic)
 	}

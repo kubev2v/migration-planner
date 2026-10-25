@@ -114,4 +114,5 @@ type NIC struct {
 	Type            string `json:"type" db:"Type"`
 	IPv4Address     string `json:"ipv4Address" db:"IPv4 Address"`
 	IPv6Address     string `json:"ipv6Address" db:"IPv6 Address"`
+	VlanID          string `json:"vlanId" db:"VLAN"`
 }
