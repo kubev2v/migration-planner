@@ -81,7 +81,8 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			CpuHotAddEnabled INTEGER, CpuHotRemoveEnabled INTEGER, CoresPerSocket INTEGER,
 			MemoryHotAddEnabled INTEGER, BalloonedMemory INTEGER,
 			GuestApps VARCHAR DEFAULT '[]',
-			GuestNetworks VARCHAR DEFAULT '[]'
+			GuestNetworks VARCHAR DEFAULT '[]',
+			Devices VARCHAR DEFAULT '[]'
 		)`,
 
 		// Network (referenced by ingest template; empty is fine for these tests)
@@ -829,4 +830,71 @@ func TestIngestSqlite_DatastoreOptionalStorageColumns(t *testing.T) {
 			require.Equal(t, []string{"naa.shared"}, disk.DatastoreBackingDeviceIDs)
 		})
 	}
+}
+
+func TestIngestSqlite_NICCountAndAdapterModels(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{{id: "domain-c1", name: "cluster1", datacenter: "dc1"}}
+	vms := []sqliteVM{
+		{id: "vm-nics", name: "with-nics", clusterName: "cluster1", nics: `[
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:01","deviceKey":100},
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:02","deviceKey":101},
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:03","deviceKey":102}]`},
+		{id: "vm-empty", name: "without-nics", clusterName: "cluster1"},
+		{id: "vm-null", name: "null-nics", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-nic-models", clusters, vms)
+	src, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = src.Close() }()
+	_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+	require.NoError(t, err)
+	_, err = src.Exec(`UPDATE dst.VM SET Devices = '[
+        {"key":101,"kind":"VirtualE1000"},
+        {"key":900,"kind":"VirtualSriovEthernetCard"},
+        {"key":100,"kind":"VirtualVmxnet3"},
+        {"key":100,"kind":"VirtualVmxnet3"}]' WHERE ID = 'vm-nics'`)
+	require.NoError(t, err)
+	_, err = src.Exec(`UPDATE dst.VM SET NICs = NULL WHERE ID = 'vm-null'`)
+	require.NoError(t, err)
+	_, err = src.Exec(`INSERT INTO dst.Network VALUES ('net-1', 'Production', NULL, '0')`)
+	require.NoError(t, err)
+	_, err = src.Exec("DETACH dst")
+	require.NoError(t, err)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-nics'`).Scan(&count))
+	assert.Equal(t, 3, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-empty'`).Scan(&count))
+	assert.Zero(t, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-null'`).Scan(&count))
+	assert.Zero(t, count)
+	var cpus, memory int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "CPUs", "Memory" FROM vinfo WHERE "VM ID" = 'vm-nics'`).Scan(&cpus, &memory))
+	assert.Equal(t, 4, cpus)
+	assert.Equal(t, 8192, memory)
+
+	rows, err := db.QueryContext(ctx, `SELECT "Mac Address", "Network", "Adapter" FROM vnetwork ORDER BY "Mac Address"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	var adapters []sql.NullString
+	for rows.Next() {
+		var mac, network string
+		var adapter sql.NullString
+		require.NoError(t, rows.Scan(&mac, &network, &adapter))
+		assert.Equal(t, "Production", network)
+		adapters = append(adapters, adapter)
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, adapters, 3)
+	assert.Equal(t, sql.NullString{String: "Vmxnet3", Valid: true}, adapters[0])
+	assert.Equal(t, sql.NullString{String: "E1000", Valid: true}, adapters[1])
+	assert.False(t, adapters[2].Valid, "missing device model must stay unknown")
 }
