@@ -39,16 +39,18 @@ func (v ValidationResult) IsValid() bool {
 	return !v.HasErrors()
 }
 
-// Error returns a combined error message if there are errors, nil otherwise.
+// Error combines validation messages in their original order, or returns nil if there are no errors.
 func (v ValidationResult) Error() error {
 	if !v.HasErrors() {
 		return nil
 	}
-	msg := "schema validation failed:"
-	for _, e := range v.Errors {
-		msg += fmt.Sprintf("\n  - [%s] %s", e.Code, e.Message)
+	messages := make([]string, 0, len(v.Errors))
+	for _, issue := range v.Errors {
+		if issue.Message != "" {
+			messages = append(messages, issue.Message)
+		}
 	}
-	return fmt.Errorf("%s", msg)
+	return fmt.Errorf("%s", strings.Join(messages, "\n"))
 }
 
 // Validation codes for errors
