@@ -64,23 +64,16 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		logger.Error(err).WithString("step", "update_parsing_status").Log()
 	}
 
-	parsingErr := NewRVToolParsingError()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	result, err := w.parseFile(ctx, parser, job.Args.File, logger)
 	if err != nil {
-		parsingErr.Add(job.Args.Name, err)
+		return w.failJob(ctx, logger, job.ID, "parse_files", err, err.Error())
 	}
-
-	if cleanupErr := parser.Cleanup(); cleanupErr != nil {
-		logger.Error(cleanupErr).WithString("step", "cleanup").WithString("file", job.Args.File).Log()
-		parsingErr.Add(job.Args.Name, err)
-	}
-
-	if parsingErr.HasErrors() {
-		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, parsingErr.Error())
+	if err := parser.Cleanup(); err != nil {
+		return w.failJob(ctx, logger, job.ID, "cleanup", err, err.Error())
 	}
 
 	// Check for cancellation before creating assessment
@@ -202,7 +195,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 			WithUUID("assessment_id", job.Args.AssessmentID).
 			Log()
 	default:
-		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, "invalid operation type")
+		return w.failJob(ctx, logger, job.ID, "parse_files", fmt.Errorf("invalid operation type"), "invalid operation type")
 	}
 
 	return nil
@@ -251,12 +244,6 @@ func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Par
 	validationResult, err := parser.IngestRvTools(ctx, filepath)
 	if err != nil {
 		return []byte{}, err
-	}
-
-	// Check for validation errors
-	if validationResult.HasErrors() {
-		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
-		return []byte{}, validationErr
 	}
 
 	// Log any warnings
