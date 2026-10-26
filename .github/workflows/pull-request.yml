@@ -32,7 +32,7 @@ jobs:
           echo 'bot-authors=["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]' >> $GITHUB_OUTPUT
 
       - name: Check out path filters
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Detect whether code validations are needed
         id: filter
@@ -67,7 +67,7 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       # Node required for setup-go post (cache save); needed when running with act
       - name: Set up Node
@@ -94,7 +94,7 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -119,7 +119,7 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -140,7 +140,7 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
     - name: Set up Node
       uses: actions/setup-node@v4
