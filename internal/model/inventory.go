@@ -225,9 +225,13 @@ type MigrationIssue struct {
 // OsInfoSupportTier is the OS support tier.
 type OsInfoSupportTier string
 
+// OsInfoMtvStatus is the migration verification status.
+type OsInfoMtvStatus string
+
 // OsInfo describes operating-system distribution information.
 type OsInfo struct {
 	Count                 int                `json:"count"`
+	MtvStatus             *OsInfoMtvStatus   `json:"mtvStatus,omitempty"`
 	SupportTier           *OsInfoSupportTier `json:"supportTier,omitempty"`
 	Supported             bool               `json:"supported"`
 	UpgradeRecommendation *string            `json:"upgradeRecommendation,omitempty"`

@@ -374,7 +374,7 @@ func migrationIssuesSlice(issues map[string]model.MigrationIssue) []model.Migrat
 }
 
 // mergeOsInfo sums Count and ANDs Supported, keeping the first-seen entry's
-// support tier and upgrade recommendation (inventories are ordered newest first).
+// support tier, MTV status and upgrade recommendation (inventories are ordered newest first).
 func mergeOsInfo(existing, incoming model.OsInfo) model.OsInfo {
 	existing.Count += incoming.Count
 	existing.Supported = existing.Supported && incoming.Supported
