@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -241,7 +242,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
 				ownerLastName := "Johnson"
-				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -251,7 +252,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: &ownerFirstName,
 					OwnerLastName:  &ownerLastName,
 					SourceType:     service.SourceTypeInventory,
-					Inventories:    []model.AssessmentInventory{inv},
+					MainInventory:  inv,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -263,7 +264,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.Username).To(Equal("user1"))
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeInventory))
 				Expect(assessment.SourceID).To(BeNil())
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(10))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 				// Verify owner fields are properly mapped from user context
 				Expect(assessment.OwnerFirstName).ToNot(BeNil())
 				Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
@@ -285,7 +288,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				})
 
 				testAssessmentID := uuid.New()
-				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -295,7 +298,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: nil, // Test nil values
 					OwnerLastName:  nil,
 					SourceType:     service.SourceTypeInventory,
-					Inventories:    []model.AssessmentInventory{inv},
+					MainInventory:  inv,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -325,15 +328,15 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Second creation with same name should fail via service (unique constraint)
-				inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), name, false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), name, false, inventoryJSON)
 				Expect(err).To(BeNil())
 				secondForm := mappers.AssessmentCreateForm{
-					ID:          uuid.New(),
-					Name:        name, // duplicate name
-					OrgID:       "org1",
-					Username:    "user1",
-					SourceType:  service.SourceTypeInventory,
-					Inventories: []model.AssessmentInventory{inv},
+					ID:            uuid.New(),
+					Name:          name, // duplicate name
+					OrgID:         "org1",
+					Username:      "user1",
+					SourceType:    service.SourceTypeInventory,
+					MainInventory: inv,
 				}
 
 				secondAssessment, secondErr := svc.CreateAssessment(context.TODO(), secondForm)
@@ -376,7 +379,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeAgent))
 				Expect(assessment.SourceID).ToNot(BeNil())
 				Expect(assessment.SourceID.String()).To(Equal(sourceID.String()))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(10))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 			})
 
 			It("fails when user orgID is different than source orgID", func() {
@@ -467,7 +472,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(100))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 
 				var inventoryVersion int
 				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
@@ -497,7 +504,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(200))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 
 				var inventoryVersion int
 				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
@@ -1243,22 +1252,23 @@ var _ = Describe("assessment service", Ordered, func() {
 				},
 			})
 
-			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
 			Expect(err).To(BeNil())
 
-			subset1, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
+			subset1, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
 			Expect(err).To(BeNil())
 
-			subset2, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
+			subset2, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
 			Expect(err).To(BeNil())
 
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "aggregate-test",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeRvtools,
-				Inventories: []model.AssessmentInventory{mainInv, subset1, subset2},
+				ID:                uuid.New(),
+				Name:              "aggregate-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        service.SourceTypeRvtools,
+				MainInventory:     mainInv,
+				SubsetInventories: []svcmodel.AssessmentInventory{subset1, subset2},
 			}
 			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
 			Expect(err).To(BeNil())
@@ -1295,19 +1305,20 @@ var _ = Describe("assessment service", Ordered, func() {
 				},
 			})
 
-			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
 			Expect(err).To(BeNil())
 
-			subset, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
+			subset, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
 			Expect(err).To(BeNil())
 
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "skip-main-test",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeRvtools,
-				Inventories: []model.AssessmentInventory{mainInv, subset},
+				ID:                uuid.New(),
+				Name:              "skip-main-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        service.SourceTypeRvtools,
+				MainInventory:     mainInv,
+				SubsetInventories: []svcmodel.AssessmentInventory{subset},
 			}
 			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
 			Expect(err).To(BeNil())
