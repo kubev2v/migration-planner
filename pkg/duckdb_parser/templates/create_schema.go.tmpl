@@ -113,6 +113,8 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     "Type" VARCHAR,
     "IPv4 Address" VARCHAR,
     "IPv6 Address" VARCHAR,
+    "IPv4 CIDR" VARCHAR,
+    "IPv6 CIDR" VARCHAR,
     "VLAN" VARCHAR,
     "Cluster" VARCHAR,
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")

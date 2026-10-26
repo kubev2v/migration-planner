@@ -62,6 +62,8 @@ func TestOMA2508RVToolsNetworkDetails(t *testing.T) {
 			for _, vm := range got {
 				for _, nic := range vm.NICs {
 					count++
+					assert.Empty(t, nic.IPv4CIDR)
+					assert.Empty(t, nic.IPv6CIDR)
 					wantVLAN := ""
 					if withPorts {
 						wantVLAN = map[string]string{"01": "0", "02": "200", "03": "10-20,30-40", "04": "100"}[nic.MAC]
@@ -110,14 +112,15 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 				{"network":{"id":"management"},"mac":"aa:05","deviceKey":105}
 			]`,
 			guestNetworks: `[
-				{"mac":"different-mac","ip":"10.0.0.2","prefix":24,"deviceConfigId":100},
+				{"mac":"different-mac","ip":"10.0.0.2","prefix":25,"deviceConfigId":100},
 				{"mac":"aa:01","ip":"10.0.0.1","prefix":24,"deviceConfigId":100},
 				{"mac":"aa:01","ip":"10.0.0.1","prefix":24,"deviceConfigId":100},
+				{"mac":"aa:01","ip":"10.0.0.3","deviceConfigId":100},
 				{"mac":"aa:01","ip":"fe80::1","prefix":64,"deviceConfigId":100},
 				{"mac":"aa:01","ip":"::ffff:192.0.2.1","prefix":128,"deviceConfigId":100},
-				{"mac":"AA:02","ip":"10.0.1.1","deviceConfigId":-1},
-				{"mac":"aa:02","ip":"10.0.9.9","deviceConfigId":999},
-				{"mac":"aa:04","ip":"10.0.4.1","deviceConfigId":-1}
+				{"mac":"AA:02","ip":"10.0.1.1","prefix":0,"deviceConfigId":-1},
+				{"mac":"aa:02","ip":"10.0.9.9","prefix":24,"deviceConfigId":999},
+				{"mac":"aa:04","ip":"10.0.4.1","prefix":24,"deviceConfigId":-1}
 			]`,
 		}})
 	src, err := sql.Open("duckdb", "")
@@ -142,30 +145,43 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	require.Len(t, got[0].NICs, 6)
+	gotMACs := make([]string, 0, len(got[0].NICs))
 	for _, nic := range got[0].NICs {
+		gotMACs = append(gotMACs, nic.MAC)
 		switch nic.MAC {
 		case "AA:01":
 			assert.Equal(t, "standard", nic.Type)
 			assert.Equal(t, "0", nic.VlanID)
-			assert.Equal(t, "10.0.0.1,10.0.0.2", nic.IPv4Address)
+			assert.Equal(t, "10.0.0.1,10.0.0.2,10.0.0.3", nic.IPv4Address)
 			assert.Equal(t, "::ffff:192.0.2.1,fe80::1", nic.IPv6Address)
+			assert.Equal(t, "10.0.0.1/24,10.0.0.2/25", nic.IPv4CIDR)
+			assert.Equal(t, "::ffff:192.0.2.1/128,fe80::1/64", nic.IPv6CIDR)
 		case "aa:02":
 			assert.Equal(t, "distributed", nic.Type)
 			assert.Equal(t, "10-20,30-40", nic.VlanID)
 			assert.Equal(t, "10.0.1.1", nic.IPv4Address)
 			assert.Empty(t, nic.IPv6Address)
+			assert.Equal(t, "10.0.1.1/0", nic.IPv4CIDR)
+			assert.Empty(t, nic.IPv6CIDR)
 		case "aa:03":
 			assert.Empty(t, nic.VlanID)
 			assert.Empty(t, nic.IPv4Address)
 			assert.Empty(t, nic.IPv6Address)
+			assert.Empty(t, nic.IPv4CIDR)
+			assert.Empty(t, nic.IPv6CIDR)
 		case "aa:05":
 			assert.Equal(t, "standard", nic.Type)
 			assert.Equal(t, "100", nic.VlanID)
 			assert.Empty(t, nic.IPv4Address)
 			assert.Empty(t, nic.IPv6Address)
+			assert.Empty(t, nic.IPv4CIDR)
+			assert.Empty(t, nic.IPv6CIDR)
 		case "aa:04":
 			assert.Equal(t, "0", nic.VlanID)
 			assert.Empty(t, nic.IPv4Address, "duplicate MACs must not receive ambiguous addresses")
+			assert.Empty(t, nic.IPv4CIDR)
+			assert.Empty(t, nic.IPv6CIDR)
 		}
 	}
+	assert.ElementsMatch(t, []string{"AA:01", "aa:02", "aa:03", "aa:04", "aa:04", "aa:05"}, gotMACs)
 }
