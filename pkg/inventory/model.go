@@ -106,6 +106,7 @@ type OSInfo struct {
 	Count                 int
 	IsSupported           bool
 	SupportTier           string
+	MTVStatus             string
 	UpgradeRecommendation string
 }
 

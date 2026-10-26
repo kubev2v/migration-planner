@@ -225,6 +225,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 						Count:                 10,
 						IsSupported:           true,
 						SupportTier:           inventory.TierCertified,
+						MTVStatus:             inventory.MTVStatusGreen,
 						UpgradeRecommendation: "Consider upgrading to RHEL 8 or 9",
 					},
 				},
@@ -265,6 +266,12 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 				assert.Equal(t, expected.IsSupported, actual.Supported)
 				expectedTier := api.OsInfoSupportTier(expected.SupportTier)
 				assert.Equal(t, &expectedTier, actual.SupportTier)
+				if expected.MTVStatus == "" {
+					assert.Nil(t, actual.MtvStatus)
+				} else {
+					require.NotNil(t, actual.MtvStatus)
+					assert.Equal(t, expected.MTVStatus, string(*actual.MtvStatus))
+				}
 
 				if expected.UpgradeRecommendation != "" {
 					require.NotNil(t, actual.UpgradeRecommendation)

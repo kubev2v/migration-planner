@@ -30,7 +30,13 @@ func TestClassifyOSTier(t *testing.T) {
 		{"Oracle Linux 8 (64-bit)", TierVendorSupported},
 		{"Oracle Linux 9 (64-bit)", TierVendorSupported},
 
+		{"SUSE Linux Enterprise 16 (64-bit)", TierVendorSupported},
+		{"Oracle Linux 10 (64-bit)", TierVendorSupported},
+
 		// Community Supported
+		{"AlmaLinux 9 (64-bit)", TierCommunitySupported},
+		{"AlmaLinux 10 (64-bit)", TierCommunitySupported},
+		{"openSUSE Leap 16 (64-bit)", TierCommunitySupported},
 		{"CentOS Stream 9 (64-bit)", TierCommunitySupported},
 		{"CentOS Stream 10 (64-bit)", TierCommunitySupported},
 		{"Debian GNU/Linux 12 (64-bit)", TierCommunitySupported},

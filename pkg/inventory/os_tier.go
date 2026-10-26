@@ -14,7 +14,7 @@ const (
 // ClassifyOS in pkg/estimations/complexity/complexity.go.
 //
 // Tier membership follows the Red Hat KCS article:
-// https://access.redhat.com/articles/4234591
+// https://access.redhat.com/articles/4234591 (Updated September 24 2026)
 var osTierMap = map[string]string{
 	// --- Certified ---
 	"Red Hat Enterprise Linux 7":  TierCertified,
@@ -30,6 +30,7 @@ var osTierMap = map[string]string{
 
 	// --- Commercial Vendor Supported ---
 	"SUSE Linux Enterprise 15": TierVendorSupported,
+	"SUSE Linux Enterprise 16": TierVendorSupported,
 	"Ubuntu Linux 18.04":       TierVendorSupported,
 	"Ubuntu Linux 20.04":       TierVendorSupported,
 	"Ubuntu Linux 22.04":       TierVendorSupported,
@@ -37,16 +38,20 @@ var osTierMap = map[string]string{
 	"Ubuntu Linux 25.04":       TierVendorSupported,
 	"Oracle Linux 8":           TierVendorSupported,
 	"Oracle Linux 9":           TierVendorSupported,
+	"Oracle Linux 10":          TierVendorSupported,
 
 	// --- Community Supported ---
+	"AlmaLinux 9":         TierCommunitySupported,
+	"AlmaLinux 10":        TierCommunitySupported,
 	"CentOS Stream 9":     TierCommunitySupported,
 	"CentOS Stream 10":    TierCommunitySupported,
 	"Debian GNU/Linux 11": TierCommunitySupported,
 	"Debian GNU/Linux 12": TierCommunitySupported,
 	"Debian GNU/Linux 13": TierCommunitySupported,
 	"Fedora":              TierCommunitySupported,
-	"openSUSE Leap 15":    TierCommunitySupported,
+	"openSUSE Leap 15.6":  TierCommunitySupported,
 	"openSUSE Tumbleweed": TierCommunitySupported,
+	"openSUSE Leap 16":    TierCommunitySupported,
 }
 
 // ClassifyOSTier returns the support tier for the given OS name.

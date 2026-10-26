@@ -91,6 +91,10 @@ func toAPIVMs(v *inventory.VMsData) api.VMs {
 			Supported:   os.IsSupported,
 			SupportTier: &tier,
 		}
+		if os.MTVStatus != "" {
+			status := api.OsInfoMtvStatus(os.MTVStatus)
+			info.MtvStatus = &status
+		}
 		if os.UpgradeRecommendation != "" {
 			rec := os.UpgradeRecommendation
 			info.UpgradeRecommendation = &rec

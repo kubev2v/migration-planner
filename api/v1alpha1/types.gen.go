@@ -276,6 +276,12 @@ const (
 	Vvs         VMwareSubscriptionInputLevel = "vvs"
 )
 
+// Defines values for OsInfoMtvStatus.
+const (
+	Blue  OsInfoMtvStatus = "blue"
+	Green OsInfoMtvStatus = "green"
+)
+
 // Defines values for OsInfoSupportTier.
 const (
 	Certified          OsInfoSupportTier = "certified"
@@ -1573,6 +1579,9 @@ type DiskTypeSummary struct {
 type OsInfo struct {
 	Count int `json:"count"`
 
+	// MtvStatus MTV verification per KCS 4234591 (Updated September 24 2026). Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+	MtvStatus *OsInfoMtvStatus `json:"mtvStatus,omitempty"`
+
 	// SupportTier OS support tier per Red Hat KCS article 4234591
 	SupportTier *OsInfoSupportTier `json:"supportTier,omitempty"`
 	Supported   bool               `json:"supported"`
@@ -1580,6 +1589,9 @@ type OsInfo struct {
 	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
+
+// OsInfoMtvStatus MTV verification per KCS 4234591 (Updated September 24 2026). Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+type OsInfoMtvStatus string
 
 // OsInfoSupportTier OS support tier per Red Hat KCS article 4234591
 type OsInfoSupportTier string
