@@ -109,7 +109,8 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 				{"network":{"id":"unknown"},"mac":"aa:03","deviceKey":102},
 				{"network":{"id":"standard"},"mac":"aa:04","deviceKey":103},
 				{"network":{"id":"standard"},"mac":"aa:04","deviceKey":104},
-				{"network":{"id":"management"},"mac":"aa:05","deviceKey":105}
+				{"network":{"id":"management"},"mac":"aa:05","deviceKey":105},
+				{"network":{"id":"ambiguous"},"mac":"aa:06","deviceKey":106}
 			]`,
 			guestNetworks: `[
 				{"mac":"different-mac","ip":"10.0.0.2","prefix":25,"deviceConfigId":100},
@@ -120,7 +121,8 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 				{"mac":"aa:01","ip":"::ffff:192.0.2.1","prefix":128,"deviceConfigId":100},
 				{"mac":"AA:02","ip":"10.0.1.1","prefix":0,"deviceConfigId":-1},
 				{"mac":"aa:02","ip":"10.0.9.9","prefix":24,"deviceConfigId":999},
-				{"mac":"aa:04","ip":"10.0.4.1","prefix":24,"deviceConfigId":-1}
+				{"mac":"aa:04","ip":"10.0.4.1","prefix":24,"deviceConfigId":-1},
+				{"mac":"aa:06","ip":"10.0.6.1","prefix":24,"deviceConfigId":106}
 			]`,
 		}})
 	src, err := sql.Open("duckdb", "")
@@ -128,13 +130,14 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 	defer func() { _ = src.Close() }()
 	_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
 	require.NoError(t, err)
-	_, err = src.Exec(`UPDATE dst.Host SET Network = '{"portGroups":[{"name":"shared","vlanId":0},{"name":"management","vlanId":100}]}'`)
+	_, err = src.Exec(`UPDATE dst.Host SET Network = '{"portGroups":[{"name":"shared","vlanId":0},{"name":"management","vlanId":100},{"name":"ambiguous","vlanId":200},{"name":"ambiguous","vlanId":300}]}'`)
 	require.NoError(t, err)
 	_, err = src.Exec(`INSERT INTO dst.Network VALUES
 		('standard', 'shared', '{"kind":"","id":""}', ''),
 		('distributed', 'shared', '{"id":"dvs-1"}', '10-20,30-40'),
 		('unknown', 'shared', '{"id":"dvs-2"}', ''),
-		('management', 'management', NULL, '')`)
+		('management', 'management', NULL, ''),
+		('ambiguous', 'ambiguous', NULL, '')`)
 	require.NoError(t, err)
 	_, err = src.Exec("DETACH dst")
 	require.NoError(t, err)
@@ -144,7 +147,7 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 	got, err := parser.VMs(ctx, Filters{}, Options{})
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	require.Len(t, got[0].NICs, 6)
+	require.Len(t, got[0].NICs, 7)
 	gotMACs := make([]string, 0, len(got[0].NICs))
 	for _, nic := range got[0].NICs {
 		gotMACs = append(gotMACs, nic.MAC)
@@ -181,7 +184,14 @@ func TestOMA2508ForkliftNetworkDetails(t *testing.T) {
 			assert.Empty(t, nic.IPv4Address, "duplicate MACs must not receive ambiguous addresses")
 			assert.Empty(t, nic.IPv4CIDR)
 			assert.Empty(t, nic.IPv6CIDR)
+		case "aa:06":
+			assert.Equal(t, "standard", nic.Type)
+			assert.Empty(t, nic.VlanID, "duplicate port-group names must leave VLAN unknown without dropping adapters")
+			assert.Equal(t, "10.0.6.1", nic.IPv4Address)
+			assert.Equal(t, "10.0.6.1/24", nic.IPv4CIDR)
+			assert.Empty(t, nic.IPv6Address)
+			assert.Empty(t, nic.IPv6CIDR)
 		}
 	}
-	assert.ElementsMatch(t, []string{"AA:01", "aa:02", "aa:03", "aa:04", "aa:04", "aa:05"}, gotMACs)
+	assert.ElementsMatch(t, []string{"AA:01", "aa:02", "aa:03", "aa:04", "aa:04", "aa:05", "aa:06"}, gotMACs)
 }

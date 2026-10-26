@@ -204,7 +204,7 @@ SELECT
     COALESCE(ips.ipv6_cidr, ''),
     CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN NULLIF(n.VlanId, '')
          ELSE (
-             SELECT CAST(pg.vlanId AS VARCHAR)
+             SELECT CASE WHEN COUNT(*) = 1 THEN CAST(MAX(pg.vlanId) AS VARCHAR) END
              FROM unnest(from_json(nf.host_network->>'portGroups',
                  '[{"name":"VARCHAR","vlanId":"INTEGER"}]')) AS t(pg)
              WHERE pg.name = n.Name
