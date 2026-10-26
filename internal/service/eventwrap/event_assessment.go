@@ -2,6 +2,7 @@ package eventwrap
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
@@ -31,7 +31,7 @@ func NewEventAssessmentService(inner service.AssessmentServicer, s store.Store, 
 	return &EventAssessmentService{inner: inner, store: s, outbox: NewOutboxService(s), accountsSvc: accountsSvc}
 }
 
-func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]model.Assessment, error) {
+func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	assessments, err := e.inner.ListAssessments(ctx, filter)
 	if err != nil {
 		return nil, err
@@ -53,7 +53,7 @@ func (e *EventAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 	return e.inner.GetAssessment(ctx, id)
 }
 
-func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	accountIdentity, err := e.accountsSvc.GetAccountIdentity(ctx, createForm.OrgID)
 	if err != nil {
 		zap.S().Named("assessment_events_service").Warnf("failed to get account identity %v", err)
@@ -72,17 +72,14 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
-	var main model.AssessmentInventory
-	for _, inv := range assessment.Inventories {
-		if !inv.IsSubset {
-			main = inv
-			break
-		}
+	inventory, err := json.Marshal(assessment.MainInventory.Inventory)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal assessment inventory: %w", err)
 	}
 
 	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
 		ID:         assessment.ID.String(),
-		Inventory:  main.Inventory,
+		Inventory:  inventory,
 		Name:       assessment.Name,
 		OrgID:      assessment.OrgID,
 		OrgName:    accountIdentity.Name,
@@ -221,7 +218,7 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 	return nil
 }
 
-func (e *EventAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+func (e *EventAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
 	return e.inner.AggregateInventories(ctx, assessmentID, clusterIDs...)
 }
 

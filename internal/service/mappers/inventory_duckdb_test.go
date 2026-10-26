@@ -1,21 +1,21 @@
-package converters
+package mappers
 
 import (
 	"encoding/json"
 	"testing"
 	"time"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestToAPI(t *testing.T) {
+func TestInventoryFromDuckDB(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    *inventory.Inventory
-		validate func(t *testing.T, result *api.Inventory)
+		validate func(t *testing.T, result *svcmodel.Inventory)
 	}{
 		{
 			name: "full inventory with vCenter and clusters",
@@ -46,7 +46,7 @@ func TestToAPI(t *testing.T) {
 					},
 				},
 			},
-			validate: func(t *testing.T, result *api.Inventory) {
+			validate: func(t *testing.T, result *svcmodel.Inventory) {
 				assert.Equal(t, "vcenter-123", result.VcenterId)
 				require.NotNil(t, result.Vcenter)
 				assert.Equal(t, 10, result.Vcenter.Vms.Total)
@@ -66,7 +66,7 @@ func TestToAPI(t *testing.T) {
 					},
 				},
 			},
-			validate: func(t *testing.T, result *api.Inventory) {
+			validate: func(t *testing.T, result *svcmodel.Inventory) {
 				assert.Equal(t, "vcenter-456", result.VcenterId)
 				assert.Nil(t, result.Vcenter)
 				assert.Len(t, result.Clusters, 1)
@@ -81,7 +81,7 @@ func TestToAPI(t *testing.T) {
 				},
 				Clusters: map[string]inventory.InventoryData{},
 			},
-			validate: func(t *testing.T, result *api.Inventory) {
+			validate: func(t *testing.T, result *svcmodel.Inventory) {
 				assert.Equal(t, "vcenter-789", result.VcenterId)
 				require.NotNil(t, result.Vcenter)
 				assert.Len(t, result.Clusters, 0)
@@ -94,7 +94,7 @@ func TestToAPI(t *testing.T) {
 				Clusters:  map[string]inventory.InventoryData{},
 				CreatedAt: timePtr(time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC)),
 			},
-			validate: func(t *testing.T, result *api.Inventory) {
+			validate: func(t *testing.T, result *svcmodel.Inventory) {
 				require.NotNil(t, result.CreatedAt)
 				assert.Equal(t, time.Date(2025, 6, 15, 10, 30, 0, 0, time.UTC), *result.CreatedAt)
 			},
@@ -105,7 +105,7 @@ func TestToAPI(t *testing.T) {
 				VCenterID: "vcenter-no-time",
 				Clusters:  map[string]inventory.InventoryData{},
 			},
-			validate: func(t *testing.T, result *api.Inventory) {
+			validate: func(t *testing.T, result *svcmodel.Inventory) {
 				assert.Nil(t, result.CreatedAt)
 			},
 		},
@@ -113,14 +113,14 @@ func TestToAPI(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ToAPI(tt.input)
+			result := InventoryFromDuckDB(tt.input)
 			require.NotNil(t, result)
 			tt.validate(t, result)
 		})
 	}
 }
 
-func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
+func TestVMsFromDuckDB_ResourceBreakdowns(t *testing.T) {
 	tests := []struct {
 		name  string
 		input inventory.VMsData
@@ -181,7 +181,7 @@ func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := vmsFromDuckDB(&tt.input)
 
 			// Verify shared-disks / RDM aggregate counts
 			require.NotNil(t, result.TotalWithSharedDisks)
@@ -212,7 +212,7 @@ func TestToAPIVMs_ResourceBreakdowns(t *testing.T) {
 	}
 }
 
-func TestToAPIVMs_OSInfo(t *testing.T) {
+func TestVMsFromDuckDB_OSInfo(t *testing.T) {
 	tests := []struct {
 		name  string
 		input inventory.VMsData
@@ -253,7 +253,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := vmsFromDuckDB(&tt.input)
 
 			require.NotNil(t, result.OsInfo)
 			osInfo := *result.OsInfo
@@ -263,7 +263,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 				require.True(t, exists, "OS %s should exist in result", name)
 				assert.Equal(t, expected.Count, actual.Count)
 				assert.Equal(t, expected.IsSupported, actual.Supported)
-				expectedTier := api.OsInfoSupportTier(expected.SupportTier)
+				expectedTier := svcmodel.OsInfoSupportTier(expected.SupportTier)
 				assert.Equal(t, &expectedTier, actual.SupportTier)
 
 				if expected.UpgradeRecommendation != "" {
@@ -277,7 +277,7 @@ func TestToAPIVMs_OSInfo(t *testing.T) {
 	}
 }
 
-func TestToAPIVMs_MigrationIssues(t *testing.T) {
+func TestVMsFromDuckDB_MigrationIssues(t *testing.T) {
 	tests := []struct {
 		name  string
 		input inventory.VMsData
@@ -305,7 +305,7 @@ func TestToAPIVMs_MigrationIssues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := vmsFromDuckDB(&tt.input)
 
 			assert.Len(t, result.MigrationWarnings, len(tt.input.MigrationWarnings))
 			assert.Len(t, result.NotMigratableReasons, len(tt.input.NotMigratableReasons))
@@ -389,7 +389,7 @@ func TestAnonymizeNFSDatastore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ds := &api.Datastore{
+			ds := &svcmodel.Datastore{
 				Type:         tt.datastoreType,
 				DiskId:       tt.originalDiskId,
 				ProtocolType: tt.originalProtocol,
@@ -408,28 +408,28 @@ func TestAnonymizeNFSDatastore(t *testing.T) {
 	}
 }
 
-func TestToAPIVMs_DiskComplexityTier(t *testing.T) {
+func TestVMsFromDuckDB_DiskComplexityTier(t *testing.T) {
 	tests := []struct {
 		name           string
 		input          inventory.VMsData
 		expectNilField bool
 	}{
 		{
-			name: "nil DiskComplexityTiers produces nil API field",
+			name: "nil DiskComplexityTiers produces nil service field",
 			input: inventory.VMsData{
 				DiskComplexityTiers: nil,
 			},
 			expectNilField: true,
 		},
 		{
-			name: "empty DiskComplexityTiers produces nil API field",
+			name: "empty DiskComplexityTiers produces nil service field",
 			input: inventory.VMsData{
 				DiskComplexityTiers: map[string]inventory.DiskSizeTierSummary{},
 			},
 			expectNilField: true,
 		},
 		{
-			name: "populated DiskComplexityTiers produces non-nil API field with correct values",
+			name: "populated DiskComplexityTiers produces non-nil service field with correct values",
 			input: inventory.VMsData{
 				DiskComplexityTiers: map[string]inventory.DiskSizeTierSummary{
 					"0-10TiB":  {VMCount: 50, TotalSizeTB: 3.5},
@@ -442,7 +442,7 @@ func TestToAPIVMs_DiskComplexityTier(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIVMs(&tt.input)
+			result := vmsFromDuckDB(&tt.input)
 
 			if tt.expectNilField {
 				assert.Nil(t, result.DiskComplexityTier,
@@ -460,7 +460,7 @@ func TestToAPIVMs_DiskComplexityTier(t *testing.T) {
 	}
 }
 
-func TestToAPIInfra_Hosts(t *testing.T) {
+func TestInfraFromDuckDB_Hosts(t *testing.T) {
 	tests := []struct {
 		name  string
 		input inventory.InfraData
@@ -502,7 +502,7 @@ func TestToAPIInfra_Hosts(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := infraFromDuckDB(&tt.input)
 
 			require.NotNil(t, result.Hosts)
 			hosts := *result.Hosts
@@ -546,7 +546,7 @@ func TestToAPIInfra_Hosts(t *testing.T) {
 	}
 }
 
-func TestToAPIInfra_Networks(t *testing.T) {
+func TestInfraFromDuckDB_Networks(t *testing.T) {
 	tests := []struct {
 		name  string
 		input inventory.InfraData
@@ -583,14 +583,14 @@ func TestToAPIInfra_Networks(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := infraFromDuckDB(&tt.input)
 
 			require.Len(t, result.Networks, len(tt.input.Networks))
 
 			for i, expected := range tt.input.Networks {
 				actual := result.Networks[i]
 				assert.Equal(t, expected.Name, actual.Name)
-				assert.Equal(t, api.NetworkType(expected.Type), actual.Type)
+				assert.Equal(t, svcmodel.NetworkType(expected.Type), actual.Type)
 
 				if expected.Dvswitch != "" {
 					require.NotNil(t, actual.Dvswitch)
@@ -617,16 +617,16 @@ func TestToAPIInfra_Networks(t *testing.T) {
 	}
 }
 
-func TestToAPIInfra_Datastores(t *testing.T) {
+func TestInfraFromDuckDB_Datastores(t *testing.T) {
 	tests := []struct {
 		name                string
 		input               inventory.InfraData
-		wantStorageProtocol api.DatastoreStorageProtocol
+		wantStorageProtocol svcmodel.DatastoreStorageProtocol
 		wantStorageMetadata string
 	}{
 		{
 			name:                "VMFS datastore with host",
-			wantStorageProtocol: api.Block,
+			wantStorageProtocol: svcmodel.DatastoreStorageProtocol("Block"),
 			wantStorageMetadata: `{"filesystemType":"VMFS","filesystemMajorVersion":6,"backingDeviceIds":["naa.123","naa.456"]}`,
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
@@ -650,7 +650,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 		},
 		{
 			name:                "NFS datastore with address-like diskId - should be redacted",
-			wantStorageProtocol: api.File,
+			wantStorageProtocol: svcmodel.DatastoreStorageProtocol("File"),
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
 					{
@@ -669,7 +669,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 		},
 		{
 			name:                "NFS datastore with plain name - should be kept",
-			wantStorageProtocol: api.File,
+			wantStorageProtocol: svcmodel.DatastoreStorageProtocol("File"),
 			input: inventory.InfraData{
 				Datastores: []inventory.Datastore{
 					{
@@ -704,7 +704,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := infraFromDuckDB(&tt.input)
 
 			require.Len(t, result.Datastores, len(tt.input.Datastores))
 
@@ -766,7 +766,7 @@ func TestToAPIInfra_Datastores(t *testing.T) {
 	}
 }
 
-func TestToAPIInfra_DatacenterInfo(t *testing.T) {
+func TestInfraFromDuckDB_DatacenterInfo(t *testing.T) {
 	tests := []struct {
 		name                string
 		input               inventory.InfraData
@@ -804,7 +804,7 @@ func TestToAPIInfra_DatacenterInfo(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := infraFromDuckDB(&tt.input)
 
 			if tt.expectDatacenters {
 				require.NotNil(t, result.TotalDatacenters)
@@ -823,7 +823,7 @@ func TestToAPIInfra_DatacenterInfo(t *testing.T) {
 	}
 }
 
-func TestToAPIInfra_Overcommitment(t *testing.T) {
+func TestInfraFromDuckDB_Overcommitment(t *testing.T) {
 	cpuRatio := 2.5
 	memRatio := 1.5
 
@@ -849,7 +849,7 @@ func TestToAPIInfra_Overcommitment(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&tt.input)
+			result := infraFromDuckDB(&tt.input)
 
 			if tt.input.CPUOverCommitment != nil {
 				require.NotNil(t, result.CpuOverCommitment)
@@ -868,7 +868,7 @@ func TestToAPIInfra_Overcommitment(t *testing.T) {
 	}
 }
 
-func TestToAPI_VMsPerHostAverage(t *testing.T) {
+func TestInventoryFromDuckDB_VMsPerHostAverage(t *testing.T) {
 	tests := []struct {
 		name       string
 		totalVMs   int
@@ -882,7 +882,7 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ToAPI(&inventory.Inventory{
+			result := InventoryFromDuckDB(&inventory.Inventory{
 				VCenter: &inventory.InventoryData{
 					VMs:   inventory.VMsData{Total: tt.totalVMs},
 					Infra: inventory.InfraData{TotalHosts: tt.totalHosts},
@@ -899,8 +899,8 @@ func TestToAPI_VMsPerHostAverage(t *testing.T) {
 	}
 }
 
-func TestToAPI_TotalWithFaultTolerance(t *testing.T) {
-	result := ToAPI(&inventory.Inventory{
+func TestInventoryFromDuckDB_TotalWithFaultTolerance(t *testing.T) {
+	result := InventoryFromDuckDB(&inventory.Inventory{
 		VCenter: &inventory.InventoryData{
 			VMs: inventory.VMsData{Total: 10, TotalWithFaultTolerance: 3},
 		},
@@ -910,7 +910,7 @@ func TestToAPI_TotalWithFaultTolerance(t *testing.T) {
 	assert.Equal(t, 3, *result.Vcenter.Vms.TotalWithFaultTolerance)
 }
 
-func TestToAPIInfra_StandaloneHostsDetected(t *testing.T) {
+func TestInfraFromDuckDB_StandaloneHostsDetected(t *testing.T) {
 	tests := []struct {
 		name  string
 		input bool
@@ -921,14 +921,14 @@ func TestToAPIInfra_StandaloneHostsDetected(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := toAPIInfra(&inventory.InfraData{StandaloneHostsDetected: tt.input})
+			result := infraFromDuckDB(&inventory.InfraData{StandaloneHostsDetected: tt.input})
 			require.NotNil(t, result.StandaloneHostsDetected)
 			assert.Equal(t, tt.input, *result.StandaloneHostsDetected)
 		})
 	}
 }
 
-func TestToAPIVMs_Distributions(t *testing.T) {
+func TestVMsFromDuckDB_Distributions(t *testing.T) {
 	input := inventory.VMsData{
 		DistributionByCPUTier:    map[string]int{"1-2": 10, "3-4": 20, "5+": 5},
 		DistributionByMemoryTier: map[string]int{"0-4GB": 5, "4-8GB": 15, "8GB+": 15},
@@ -948,7 +948,7 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 		},
 	}
 
-	result := toAPIVMs(&input)
+	result := vmsFromDuckDB(&input)
 
 	// Verify CPU tier distribution
 	require.NotNil(t, result.DistributionByCpuTier)
@@ -994,7 +994,7 @@ func TestToAPIVMs_Distributions(t *testing.T) {
 	}
 }
 
-func TestToAPI_ClusterUtilization(t *testing.T) {
+func TestInventoryFromDuckDB_ClusterUtilization(t *testing.T) {
 	t.Run("with cluster utilization data", func(t *testing.T) {
 		domainInv := &inventory.Inventory{
 			VCenterID: "test-vcenter",
@@ -1015,10 +1015,10 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		serviceInv := InventoryFromDuckDB(domainInv)
 
-		require.Contains(t, apiInv.Clusters, "cluster-1")
-		clusterData := apiInv.Clusters["cluster-1"]
+		require.Contains(t, serviceInv.Clusters, "cluster-1")
+		clusterData := serviceInv.Clusters["cluster-1"]
 		require.NotNil(t, clusterData.ClusterUtilization)
 
 		util := clusterData.ClusterUtilization
@@ -1042,10 +1042,10 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		serviceInv := InventoryFromDuckDB(domainInv)
 
-		require.Contains(t, apiInv.Clusters, "cluster-1")
-		assert.Nil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)
+		require.Contains(t, serviceInv.Clusters, "cluster-1")
+		assert.Nil(t, serviceInv.Clusters["cluster-1"].ClusterUtilization)
 	})
 
 	t.Run("with multiple clusters", func(t *testing.T) {
@@ -1071,13 +1071,13 @@ func TestToAPI_ClusterUtilization(t *testing.T) {
 			},
 		}
 
-		apiInv := ToAPI(domainInv)
+		serviceInv := InventoryFromDuckDB(domainInv)
 
-		assert.Len(t, apiInv.Clusters, 2)
-		assert.NotNil(t, apiInv.Clusters["cluster-1"].ClusterUtilization)
-		assert.NotNil(t, apiInv.Clusters["cluster-2"].ClusterUtilization)
-		assert.Equal(t, 45.2, apiInv.Clusters["cluster-1"].ClusterUtilization.CpuP95)
-		assert.Equal(t, 38.7, apiInv.Clusters["cluster-2"].ClusterUtilization.CpuP95)
+		assert.Len(t, serviceInv.Clusters, 2)
+		assert.NotNil(t, serviceInv.Clusters["cluster-1"].ClusterUtilization)
+		assert.NotNil(t, serviceInv.Clusters["cluster-2"].ClusterUtilization)
+		assert.Equal(t, 45.2, serviceInv.Clusters["cluster-1"].ClusterUtilization.CpuP95)
+		assert.Equal(t, 38.7, serviceInv.Clusters["cluster-2"].ClusterUtilization.CpuP95)
 	})
 }
 
@@ -1085,11 +1085,11 @@ func timePtr(t time.Time) *time.Time { return &t }
 
 func floatPtr(v float64) *float64 { return &v }
 
-func TestToAPI_CollectionTime(t *testing.T) {
+func TestInventoryFromDuckDB_CollectionTime(t *testing.T) {
 	collectionTime := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
 	createdAt := collectionTime.Add(24 * time.Hour)
 	for _, value := range []*time.Time{nil, &collectionTime} {
-		converted := ToAPI(&inventory.Inventory{CreatedAt: &createdAt, CollectionTime: value})
+		converted := InventoryFromDuckDB(&inventory.Inventory{CreatedAt: &createdAt, CollectionTime: value})
 		data, err := json.Marshal(converted)
 		require.NoError(t, err)
 		var fields map[string]json.RawMessage
@@ -1098,12 +1098,12 @@ func TestToAPI_CollectionTime(t *testing.T) {
 		if value == nil {
 			require.JSONEq(t, "null", string(fields["collection_time"]))
 		}
-		var roundTrip api.Inventory
+		var roundTrip svcmodel.Inventory
 		require.NoError(t, json.Unmarshal(data, &roundTrip))
 		require.Equal(t, value, roundTrip.CollectionTime)
 		require.Equal(t, &createdAt, roundTrip.CreatedAt)
 	}
-	var older api.Inventory
+	var older svcmodel.Inventory
 	require.NoError(t, json.Unmarshal([]byte(`{"vcenter_id":"vc-1","clusters":{}}`), &older))
 	require.Nil(t, older.CollectionTime)
 }

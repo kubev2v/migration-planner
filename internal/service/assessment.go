@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -20,14 +19,14 @@ import (
 )
 
 type AssessmentServicer interface {
-	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error)
+	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error)
 	GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error)
-	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error)
+	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error)
 	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
 	ShareAssessment(ctx context.Context, id uuid.UUID) error
 	UnshareAssessment(ctx context.Context, id uuid.UUID) error
-	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error)
+	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error)
 }
 
 const (
@@ -52,7 +51,7 @@ func NewAssessmentService(store store.Store, opaValidator *opa.Validator, accoun
 	}
 }
 
-func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]model.Assessment, error) {
+func (as *AssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	user := auth.MustHaveUser(ctx)
 
 	logger := as.logger.WithContext(ctx)
@@ -87,6 +86,7 @@ func (as *AssessmentService) ListAssessments(ctx context.Context, filter *Assess
 	}
 
 	tracer.Success().WithInt("count", len(assessments)).Log()
+
 	return assessments, nil
 }
 
@@ -104,20 +104,15 @@ func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*
 		return nil, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
-	domainAssessment, err := mappers.AssessmentFromStore(*assessment)
-	if err != nil {
-		return nil, fmt.Errorf("failed to convert assessment: %w", err)
-	}
-
 	tracer.Success().
 		WithString("assessment_name", assessment.Name).
 		WithString("source_type", assessment.SourceType).
 		WithBool("has_source_id", assessment.SourceID != nil).
 		Log()
-	return &domainAssessment, nil
+	return assessment, nil
 }
 
-func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	logger := as.logger.WithContext(ctx)
 	tracer := logger.Operation("create_assessment").
 		WithString("org_id", createForm.OrgID).
@@ -129,15 +124,10 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 	assessment := createForm.ToModel()
 	tracer.Step("convert_form_to_model").WithUUID("assessment_id", assessment.ID).Log()
 
-	var assessmentInventories []model.AssessmentInventory
-
 	switch createForm.SourceType {
 	case SourceTypeRvtools, SourceTypeInventory:
-		tracer.Step("using_provided_inventories").WithInt("count", len(createForm.Inventories)).Log()
-		for i := range createForm.Inventories {
-			createForm.Inventories[i].AssessmentID = assessment.ID
-		}
-		assessmentInventories = createForm.Inventories
+		inventoryCount := len(assessment.SubsetInventories) + 1
+		tracer.Step("using_provided_inventories").WithInt("count", inventoryCount).Log()
 
 	case "agent":
 		tracer.Step("process_source").Log()
@@ -152,7 +142,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
 
-		mainInv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, false, source.Inventory)
+		mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, assessment.Name, false, source.Inventory)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read source inventory: %w", err)
 		}
@@ -162,8 +152,8 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrInventoryHasNoVMs()
 		}
 
-		mainInv.AssessmentID = assessment.ID
-		assessmentInventories = append(assessmentInventories, mainInv)
+		assessment.MainInventory = mainInv
+		assessment.SubsetInventories = nil
 
 		sourceSubsetFilter := store.NewSourceSubsetInventoryQueryFilter().BySourceID(*assessment.SourceID)
 		sourceSubsets, err := as.store.SourceSubsetInventory().List(ctx, sourceSubsetFilter)
@@ -173,20 +163,16 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		tracer.Step("found_source_subsets").WithInt("count", len(sourceSubsets)).Log()
 
 		for _, ss := range sourceSubsets {
-			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, ss.Name, true, ss.Inventory)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, ss.Name, true, ss.Inventory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read subset inventory %q: %w", ss.Name, err)
 			}
-			inv.IsSubset = true
-			inv.AssessmentID = assessment.ID
-			assessmentInventories = append(assessmentInventories, inv)
+			assessment.SubsetInventories = append(assessment.SubsetInventories, inv)
 		}
 
 	default:
 		return nil, fmt.Errorf("assessment must have either inventories or a source ID")
 	}
-
-	assessment.Inventories = assessmentInventories
 
 	ctx, err := as.store.NewTransactionContext(ctx)
 	if err != nil {
@@ -206,7 +192,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 
 	tracer.Step("assessment_created_in_db").
 		WithUUID("created_assessment_id", createdAssessment.ID).
-		WithInt("inventory_count", len(assessmentInventories)).
+		WithInt("inventory_count", 1+len(assessment.SubsetInventories)).
 		Log()
 
 	if _, err := store.Commit(ctx); err != nil {
@@ -255,9 +241,9 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 		}
 		tracer.Step("source_retrieved").WithUUID("source_id", source.ID).Log()
 
-		var inventories []model.AssessmentInventory
+		var inventories []svcmodel.AssessmentInventory
 		if source.Inventory != nil {
-			inv, err := model.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, true, source.Inventory)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, assessment.Name, true, source.Inventory)
 			if err != nil {
 				return nil, fmt.Errorf("failed to read source inventory: %w", err)
 			}
@@ -443,47 +429,25 @@ func (f *AssessmentFilter) WithLimit(limit int) *AssessmentFilter {
 	return f
 }
 
-func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+func (as *AssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
 	assessment, err := as.store.Assessment().Get(ctx, assessmentID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			return model.AssessmentInventory{}, NewErrAssessmentNotFound(assessmentID)
+			return svcmodel.AssessmentInventory{}, NewErrAssessmentNotFound(assessmentID)
 		}
-		return model.AssessmentInventory{}, fmt.Errorf("failed to get assessment: %w", err)
+		return svcmodel.AssessmentInventory{}, fmt.Errorf("failed to get assessment: %w", err)
 	}
 
-	var subsets []model.AssessmentInventory
-	for _, inv := range assessment.Inventories {
-		if !inv.IsSubset {
-			continue
-		}
-		subsets = append(subsets, inv)
-	}
-
-	aggregated, err := helpers.Aggregate(subsets)
+	aggregated, err := helpers.Aggregate(assessment.SubsetInventories)
 	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to aggregate inventories: %w", err)
+		return svcmodel.AssessmentInventory{}, fmt.Errorf("failed to aggregate inventories: %w", err)
 	}
 
-	raw, err := json.Marshal(aggregated)
-	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to marshal aggregated inventory: %w", err)
+	inventoryID := assessment.MainInventory.ID
+	if inventoryID == uuid.Nil {
+		inventoryID = uuid.New()
 	}
-
-	inventoryID := uuid.New()
-	for _, inv := range assessment.Inventories {
-		if !inv.IsSubset {
-			inventoryID = inv.ID
-			break
-		}
-	}
-
-	result, err := model.NewAssessmentInventory(inventoryID, assessmentID, assessment.Name, false, raw)
-	if err != nil {
-		return model.AssessmentInventory{}, fmt.Errorf("failed to build aggregated inventory model: %w", err)
-	}
-
-	return result, nil
+	return svcmodel.NewAssessmentInventory(inventoryID, assessmentID, assessment.Name, svcmodel.InventoryVersionV2, false, aggregated), nil
 }
 
 func (f *AssessmentFilter) WithOffset(offset int) *AssessmentFilter {

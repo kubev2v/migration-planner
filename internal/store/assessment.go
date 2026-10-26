@@ -3,13 +3,16 @@ package store
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/store/mappers"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 )
 
 type Assessment interface {
@@ -33,11 +36,8 @@ func NewAssessmentStore(db *gorm.DB) Assessment {
 }
 
 func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilter) (model.AssessmentList, error) {
-	var assessments model.AssessmentList
-	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC").
-		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
-			return db.Order("assessment_inventories.created_at DESC")
-		})
+	var assessments storemodel.AssessmentList
+	tx := a.getDB(ctx).Model(&assessments).Order("created_at DESC")
 
 	if filter != nil {
 		for _, fn := range filter.QueryFn {
@@ -49,11 +49,11 @@ func (a *AssessmentStore) List(ctx context.Context, filter *AssessmentQueryFilte
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return assessments, nil
+	return mappers.AssessmentSummaryListFromStore(assessments), nil
 }
 
 func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
-	var assessment model.Assessment
+	var assessment storemodel.Assessment
 	result := a.getDB(ctx).
 		Preload("Inventories", func(db *gorm.DB) *gorm.DB {
 			return db.Order("assessment_inventories.created_at DESC")
@@ -66,11 +66,19 @@ func (a *AssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessm
 		}
 		return nil, result.Error
 	}
-	return &assessment, nil
+	domainAssessment, err := mappers.AssessmentFromStore(&assessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment: %w", err)
+	}
+	return &domainAssessment, nil
 }
 
 func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error) {
-	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&assessment)
+	storedAssessment, err := mappers.AssessmentToStore(assessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment for storage: %w", err)
+	}
+	result := a.getDB(ctx).Clauses(clause.Returning{}).Create(&storedAssessment)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateKey
@@ -82,7 +90,7 @@ func (a *AssessmentStore) Create(ctx context.Context, assessment model.Assessmen
 }
 
 func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
-	var assessment model.Assessment
+	var assessment storemodel.Assessment
 	if err := a.getDB(ctx).First(&assessment, "id = ?", assessmentID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrRecordNotFound
@@ -94,8 +102,13 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		assessment.Name = *name
 	}
 
-	if len(inventories) > 0 {
-		if err := a.getDB(ctx).Create(&inventories).Error; err != nil {
+	stored, err := mappers.AssessmentInventoriesToStore(inventories...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert inventories to store: %w", err)
+	}
+
+	if len(stored) > 0 {
+		if err := a.getDB(ctx).Create(&stored).Error; err != nil {
 			return nil, err
 		}
 	}
@@ -106,20 +119,28 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 		return nil, err
 	}
 
-	return &assessment, nil
+	domainAssessment, err := mappers.AssessmentFromStore(&assessment)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert assessment: %w", err)
+	}
+	return &domainAssessment, nil
 }
 
 func (a *AssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
-	for _, i := range inventories {
-		if err := a.getDB(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&i).Error; err != nil {
-			return err
-		}
+	stored, err := mappers.AssessmentInventoriesToStore(inventories...)
+	if err != nil {
+		return fmt.Errorf("failed to convert inventories to store: %w", err)
 	}
+
+	if err := a.getDB(ctx).Clauses(clause.OnConflict{UpdateAll: true}).Create(&stored).Error; err != nil {
+		return err
+	}
+
 	return nil
 }
 
 func (a *AssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
-	result := a.getDB(ctx).Unscoped().Delete(&model.Assessment{}, "id = ?", id.String())
+	result := a.getDB(ctx).Unscoped().Delete(&storemodel.Assessment{}, "id = ?", id.String())
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		return result.Error
 	}

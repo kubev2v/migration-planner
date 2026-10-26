@@ -19,7 +19,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
@@ -138,7 +137,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 			}
 
 			// Viewer sees only read
@@ -147,7 +146,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err = svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
-			Expect(assessments[0].Permissions).To(ConsistOf(model.ReadPermission))
+			Expect(assessments[0].Permissions).To(ConsistOf(svcmodel.ReadPermission))
 		})
 
 		It("customer owner keeps share permission", func() {
@@ -162,7 +161,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.SharePermission, svcmodel.DeletePermission))
 			}
 
 			gormdb.Exec("DELETE FROM partners_customers")
@@ -181,7 +180,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 			}
 
 			gormdb.Exec("DELETE FROM members")
@@ -206,7 +205,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 
-			var shared *model.Assessment
+			var shared *svcmodel.AssessmentSummary
 			for i, a := range assessments {
 				if a.ID.String() == resourceID {
 					shared = &assessments[i]
@@ -408,15 +407,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			})
 
 			testID := uuid.New()
-			inv, err := model.NewAssessmentInventory(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          testID,
-				Name:        "Authz Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:            testID,
+				Name:          "Authz Assessment",
+				OrgID:         "org1",
+				Username:      "user1",
+				SourceType:    service.SourceTypeInventory,
+				MainInventory: inv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -441,15 +440,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 				},
 			})
 
-			inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "Visible Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:            uuid.New(),
+				Name:          "Visible Assessment",
+				OrgID:         "org1",
+				Username:      "user1",
+				SourceType:    service.SourceTypeInventory,
+				MainInventory: inv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
