@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/metrics"
 
@@ -77,13 +78,23 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		apiserver.WithResponseWriter,
 	)
 
-	h := handlers.NewImageHandler(s.store, s.cfg)
+	// Initialize the appliance image cache if configuration is present.
+	var applianceCache *service.ApplianceImageCache
+	if s.cfg.ApplianceImage != nil {
+		applianceCache = service.NewApplianceImageCache(s.cfg.ApplianceImage, s.cfg.Service.IsoPath)
+		applianceCache.Start()
+	}
+
+	h := handlers.NewImageHandler(s.store, s.cfg, applianceCache)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {
 		<-ctx.Done()
 		zap.S().Named("image_server").Infof("Shutdown signal received: %s", ctx.Err())
+		if applianceCache != nil {
+			applianceCache.Stop()
+		}
 		ctxTimeout, cancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 		defer cancel()
 
