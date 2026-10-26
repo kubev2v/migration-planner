@@ -12,6 +12,7 @@ import (
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/client"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -203,7 +204,7 @@ func noUtilizationData(confidence float64) UtilizationContext {
 }
 
 func extractUtilizationFromInventory(
-	inventory *api.Inventory,
+	inventory *svcmodel.Inventory,
 	clusterIDs []string,
 ) UtilizationContext {
 	if inventory == nil {
@@ -215,7 +216,7 @@ func extractUtilizationFromInventory(
 	return aggregateClusterUtilization(inventory, clusterIDs)
 }
 
-func extractUtilizationFromData(clusterData *api.InventoryData) UtilizationContext {
+func extractUtilizationFromData(clusterData *svcmodel.InventoryData) UtilizationContext {
 	if clusterData == nil {
 		return noUtilizationData(0)
 	}
@@ -252,7 +253,7 @@ func extractUtilizationFromData(clusterData *api.InventoryData) UtilizationConte
 	}
 }
 
-func aggregateClusterUtilization(inventory *api.Inventory, clusterIDs []string) UtilizationContext {
+func aggregateClusterUtilization(inventory *svcmodel.Inventory, clusterIDs []string) UtilizationContext {
 	var totalCPU, totalMemory, weightedCPU, weightedMemory, weightedConfidence float64
 	for _, clusterID := range clusterIDs {
 		data, exists := inventory.Clusters[clusterID]
@@ -298,30 +299,30 @@ func normalizeClusterIDs(req *mappers.ClusterRequirementsRequestForm) ([]string,
 	return req.ClusterIDs, nil
 }
 
-func resolveSizingInventoryData(inventory api.Inventory, assessmentID uuid.UUID, clusterIDs []string) (api.InventoryData, error) {
+func resolveSizingInventoryData(inventory svcmodel.Inventory, assessmentID uuid.UUID, clusterIDs []string) (svcmodel.InventoryData, error) {
 	if usesVCenterAggregate(clusterIDs) {
 		if inventory.Vcenter == nil {
-			return api.InventoryData{}, NewErrInvalidClusterInventory("vcenter", "inventory has no vcenter-level data")
+			return svcmodel.InventoryData{}, NewErrInvalidClusterInventory("vcenter", "inventory has no vcenter-level data")
 		}
 		return *inventory.Vcenter, nil
 	}
 
-	var result api.InventoryData
+	var result svcmodel.InventoryData
 	seen := make(map[string]struct{}, len(clusterIDs))
 	for _, clusterID := range clusterIDs {
 		if clusterID == "" {
-			return api.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain an empty value")
+			return svcmodel.InventoryData{}, NewErrInvalidRequest("cluster IDs cannot contain an empty value")
 		}
 		if _, exists := seen[clusterID]; exists {
-			return api.InventoryData{}, NewErrInvalidRequest(fmt.Sprintf("cluster %s was selected more than once", clusterID))
+			return svcmodel.InventoryData{}, NewErrInvalidRequest(fmt.Sprintf("cluster %s was selected more than once", clusterID))
 		}
 		seen[clusterID] = struct{}{}
 		data, exists := inventory.Clusters[clusterID]
 		if !exists {
-			return api.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
+			return svcmodel.InventoryData{}, NewErrClusterNotFound(clusterID, assessmentID)
 		}
 		if data.Vms.Total == 0 || data.Vms.CpuCores.Total == 0 || data.Vms.RamGB.Total == 0 {
-			return api.InventoryData{}, NewErrInvalidClusterInventory(clusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
+			return svcmodel.InventoryData{}, NewErrInvalidClusterInventory(clusterID, "cluster has no VMs or no CPU/Memory resources and cannot be used for migration planning")
 		}
 		result.Vms.Total += data.Vms.Total
 		result.Vms.CpuCores.Total += data.Vms.CpuCores.Total
