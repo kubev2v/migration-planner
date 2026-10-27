@@ -1,6 +1,11 @@
 module github.com/kubev2v/migration-planner
 
-go 1.27.0
+// Keep the Go major/minor version aligned with the UBI9 builder image in Containerfile.api.
+// The required patch version must not exceed the image's installed Go version,
+// otherwise GOTOOLCHAIN=auto attempts a download that fails in hermetic builds.
+// Check the toolchain in a freshly pulled builder image (requires network access):
+// podman run --rm --pull=always --platform=linux/amd64 --env GOTOOLCHAIN=local registry.access.redhat.com/ubi9/go-toolset go version
+go 1.26.0
 
 require (
 	github.com/MicahParks/jwkset v0.11.3
