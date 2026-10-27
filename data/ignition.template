@@ -82,8 +82,19 @@ storage:
         name: core
       group:
         name: core
+    - path: /home/core/.config/systemd/user/default.target.wants/planner-agent-image-update.path
+      target: /home/core/.config/systemd/user/planner-agent-image-update.path
+      user:
+        name: core
+      group:
+        name: core
   directories:
     - path: /var/lib/data/agent
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/lib/data/agent/updates
       user:
         name: core
       group:
@@ -198,11 +209,67 @@ storage:
             exit 1
           fi
 
+          # Skip if image was already updated (preserves updates across reboots)
+          if podman image exists "{{.AgentImage}}" 2>/dev/null; then
+            echo "Image {{.AgentImage}} already exists in storage, skipping ISO copy"
+            exit 0
+          fi
+
           mkdir -p /var/lib/data/tmp
 
           exec skopeo copy --tmpdir /var/lib/data/tmp/ \
             "oci-archive:${IMAGE_TAR}" \
-            "containers-storage:localhost/migration-planner-agent:latest"
+            "containers-storage:{{.AgentImage}}"
+    - path: /usr/local/sbin/update-planner-agent-image.sh
+      mode: 0755
+      contents:
+        inline: |
+          #!/usr/bin/bash
+          set -euo pipefail
+
+          readonly UPDATE_DIR=/var/lib/data/agent/updates
+
+          for tar in "${UPDATE_DIR}"/*.tar; do
+            [ -f "$tar" ] || continue
+            echo "Loading agent image from ${tar}..." >&2
+            if skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
+              echo "Successfully loaded ${tar}, removing..." >&2
+              rm -f "$tar"
+            else
+              echo "Failed to load ${tar}, renaming to ${tar}.failed" >&2
+              mv "$tar" "${tar}.failed"
+            fi
+          done
+    - path: /home/core/.config/systemd/user/planner-agent-image-update.path
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [Unit]
+          Description=Watch for agent image updates
+
+          [Path]
+          PathExistsGlob=/var/lib/data/agent/updates/*.tar
+
+          [Install]
+          WantedBy=default.target
+    - path: /home/core/.config/systemd/user/planner-agent-image-update.service
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [Unit]
+          Description=Load updated migration planner agent image
+
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/sbin/update-planner-agent-image.sh
     - path: /home/core/.config/systemd/user/planner-agent-image-load.service
       mode: 0644
       user:
@@ -280,8 +347,9 @@ storage:
           Requires=planner-agent-image-load.service
 
           [Container]
-          Image=localhost/migration-planner-agent:latest
+          Image={{.AgentImage}}
           ContainerName=planner-agent
+          Label=io.containers.autoupdate=local
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
