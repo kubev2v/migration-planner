@@ -3,4 +3,4 @@ ISO_URL=https://mirror.openshift.com/pub/openshift-v4/dependencies/rhcos/4.19/4.
 ISO_CHECKSUM=7a47d0c7a9bf5edb143d52809e793af2d74731567b95d91c6225171a1c49b5ab
 AGENT_IMAGE=quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance
 AGENT_IMAGE_TAG=main
-AGENT_UI_IMAGE_TAG=3358ee415e14191f076778440a1af8f81b0ef824
+AGENT_UI_IMAGE_TAG=b35ce83c4546cde11c9c914c6be3173be8bec447
