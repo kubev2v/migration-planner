@@ -91,28 +91,14 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 
 // The interface specification for the client above.
 type ClientInterface interface {
-	// ListAssessments request
-	ListAssessments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// CreateAssessmentWithBody request with any body
-	CreateAssessmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	CreateAssessment(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// CancelJob request
 	CancelJob(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetJob request
 	GetJob(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateRVToolsAssessmentWithBody request with any body
-	CreateRVToolsAssessmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
-
 	// DeleteAssessment request
 	DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
-
-	// GetAssessment request
-	GetAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateAssessmentWithBody request with any body
 	UpdateAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -288,42 +274,6 @@ type ClientInterface interface {
 	Health(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-func (c *Client) ListAssessments(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAssessmentsRequest(c.Server)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateAssessmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateAssessmentRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) CreateAssessment(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateAssessmentRequest(c.Server, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) CancelJob(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewCancelJobRequest(c.Server, id)
 	if err != nil {
@@ -348,32 +298,8 @@ func (c *Client) GetJob(ctx context.Context, id int64, reqEditors ...RequestEdit
 	return c.Client.Do(req)
 }
 
-func (c *Client) CreateRVToolsAssessmentWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewCreateRVToolsAssessmentRequestWithBody(c.Server, contentType, body)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
 func (c *Client) DeleteAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewDeleteAssessmentRequest(c.Server, id)
-	if err != nil {
-		return nil, err
-	}
-	req = req.WithContext(ctx)
-	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
-		return nil, err
-	}
-	return c.Client.Do(req)
-}
-
-func (c *Client) GetAssessment(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAssessmentRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -1140,73 +1066,6 @@ func (c *Client) Health(ctx context.Context, reqEditors ...RequestEditorFn) (*ht
 	return c.Client.Do(req)
 }
 
-// NewListAssessmentsRequest generates requests for ListAssessments
-func NewListAssessmentsRequest(server string) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/assessments")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewCreateAssessmentRequest calls the generic CreateAssessment builder with application/json body
-func NewCreateAssessmentRequest(server string, body CreateAssessmentJSONRequestBody) (*http.Request, error) {
-	var bodyReader io.Reader
-	buf, err := json.Marshal(body)
-	if err != nil {
-		return nil, err
-	}
-	bodyReader = bytes.NewReader(buf)
-	return NewCreateAssessmentRequestWithBody(server, "application/json", bodyReader)
-}
-
-// NewCreateAssessmentRequestWithBody generates requests for CreateAssessment with any type of body
-func NewCreateAssessmentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/assessments")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewCancelJobRequest generates requests for CancelJob
 func NewCancelJobRequest(server string, id int64) (*http.Request, error) {
 	var err error
@@ -1275,35 +1134,6 @@ func NewGetJobRequest(server string, id int64) (*http.Request, error) {
 	return req, nil
 }
 
-// NewCreateRVToolsAssessmentRequestWithBody generates requests for CreateRVToolsAssessment with any type of body
-func NewCreateRVToolsAssessmentRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
-	var err error
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/assessments/rvtools")
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("POST", queryURL.String(), body)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Content-Type", contentType)
-
-	return req, nil
-}
-
 // NewDeleteAssessmentRequest generates requests for DeleteAssessment
 func NewDeleteAssessmentRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -1331,40 +1161,6 @@ func NewDeleteAssessmentRequest(server string, id openapi_types.UUID) (*http.Req
 	}
 
 	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return req, nil
-}
-
-// NewGetAssessmentRequest generates requests for GetAssessment
-func NewGetAssessmentRequest(server string, id openapi_types.UUID) (*http.Request, error) {
-	var err error
-
-	var pathParam0 string
-
-	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
-	if err != nil {
-		return nil, err
-	}
-
-	serverURL, err := url.Parse(server)
-	if err != nil {
-		return nil, err
-	}
-
-	operationPath := fmt.Sprintf("/api/v1/assessments/%s", pathParam0)
-	if operationPath[0] == '/' {
-		operationPath = "." + operationPath
-	}
-
-	queryURL, err := serverURL.Parse(operationPath)
-	if err != nil {
-		return nil, err
-	}
-
-	req, err := http.NewRequest("GET", queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -3243,28 +3039,14 @@ func WithBaseURL(baseURL string) ClientOption {
 
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
-	// ListAssessmentsWithResponse request
-	ListAssessmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error)
-
-	// CreateAssessmentWithBodyWithResponse request with any body
-	CreateAssessmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error)
-
-	CreateAssessmentWithResponse(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error)
-
 	// CancelJobWithResponse request
 	CancelJobWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*CancelJobResponse, error)
 
 	// GetJobWithResponse request
 	GetJobWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*GetJobResponse, error)
 
-	// CreateRVToolsAssessmentWithBodyWithResponse request with any body
-	CreateRVToolsAssessmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRVToolsAssessmentResponse, error)
-
 	// DeleteAssessmentWithResponse request
 	DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error)
-
-	// GetAssessmentWithResponse request
-	GetAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentResponse, error)
 
 	// UpdateAssessmentWithBodyWithResponse request with any body
 	UpdateAssessmentWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAssessmentResponse, error)
@@ -3440,55 +3222,6 @@ type ClientWithResponsesInterface interface {
 	HealthWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*HealthResponse, error)
 }
 
-type ListAssessmentsResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *AssessmentList
-	JSON401      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r ListAssessmentsResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r ListAssessmentsResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type CreateAssessmentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON201      *Assessment
-	JSON400      *Error
-	JSON401      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateAssessmentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateAssessmentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type CancelJobResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3544,31 +3277,6 @@ func (r GetJobResponse) StatusCode() int {
 	return 0
 }
 
-type CreateRVToolsAssessmentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON202      *Job
-	JSON400      *Error
-	JSON401      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r CreateRVToolsAssessmentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r CreateRVToolsAssessmentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
 type DeleteAssessmentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -3590,33 +3298,6 @@ func (r DeleteAssessmentResponse) Status() string {
 
 // StatusCode returns HTTPResponse.StatusCode
 func (r DeleteAssessmentResponse) StatusCode() int {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.StatusCode
-	}
-	return 0
-}
-
-type GetAssessmentResponse struct {
-	Body         []byte
-	HTTPResponse *http.Response
-	JSON200      *Assessment
-	JSON400      *Error
-	JSON401      *Error
-	JSON403      *Error
-	JSON404      *Error
-	JSON500      *Error
-}
-
-// Status returns HTTPResponse.Status
-func (r GetAssessmentResponse) Status() string {
-	if r.HTTPResponse != nil {
-		return r.HTTPResponse.Status
-	}
-	return http.StatusText(0)
-}
-
-// StatusCode returns HTTPResponse.StatusCode
-func (r GetAssessmentResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -4841,32 +4522,6 @@ func (r HealthResponse) StatusCode() int {
 	return 0
 }
 
-// ListAssessmentsWithResponse request returning *ListAssessmentsResponse
-func (c *ClientWithResponses) ListAssessmentsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsResponse, error) {
-	rsp, err := c.ListAssessments(ctx, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseListAssessmentsResponse(rsp)
-}
-
-// CreateAssessmentWithBodyWithResponse request with arbitrary body returning *CreateAssessmentResponse
-func (c *ClientWithResponses) CreateAssessmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error) {
-	rsp, err := c.CreateAssessmentWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateAssessmentResponse(rsp)
-}
-
-func (c *ClientWithResponses) CreateAssessmentWithResponse(ctx context.Context, body CreateAssessmentJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateAssessmentResponse, error) {
-	rsp, err := c.CreateAssessment(ctx, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateAssessmentResponse(rsp)
-}
-
 // CancelJobWithResponse request returning *CancelJobResponse
 func (c *ClientWithResponses) CancelJobWithResponse(ctx context.Context, id int64, reqEditors ...RequestEditorFn) (*CancelJobResponse, error) {
 	rsp, err := c.CancelJob(ctx, id, reqEditors...)
@@ -4885,15 +4540,6 @@ func (c *ClientWithResponses) GetJobWithResponse(ctx context.Context, id int64, 
 	return ParseGetJobResponse(rsp)
 }
 
-// CreateRVToolsAssessmentWithBodyWithResponse request with arbitrary body returning *CreateRVToolsAssessmentResponse
-func (c *ClientWithResponses) CreateRVToolsAssessmentWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRVToolsAssessmentResponse, error) {
-	rsp, err := c.CreateRVToolsAssessmentWithBody(ctx, contentType, body, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseCreateRVToolsAssessmentResponse(rsp)
-}
-
 // DeleteAssessmentWithResponse request returning *DeleteAssessmentResponse
 func (c *ClientWithResponses) DeleteAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteAssessmentResponse, error) {
 	rsp, err := c.DeleteAssessment(ctx, id, reqEditors...)
@@ -4901,15 +4547,6 @@ func (c *ClientWithResponses) DeleteAssessmentWithResponse(ctx context.Context, 
 		return nil, err
 	}
 	return ParseDeleteAssessmentResponse(rsp)
-}
-
-// GetAssessmentWithResponse request returning *GetAssessmentResponse
-func (c *ClientWithResponses) GetAssessmentWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentResponse, error) {
-	rsp, err := c.GetAssessment(ctx, id, reqEditors...)
-	if err != nil {
-		return nil, err
-	}
-	return ParseGetAssessmentResponse(rsp)
 }
 
 // UpdateAssessmentWithBodyWithResponse request with arbitrary body returning *UpdateAssessmentResponse
@@ -5463,93 +5100,6 @@ func (c *ClientWithResponses) HealthWithResponse(ctx context.Context, reqEditors
 	return ParseHealthResponse(rsp)
 }
 
-// ParseListAssessmentsResponse parses an HTTP response from a ListAssessmentsWithResponse call
-func ParseListAssessmentsResponse(rsp *http.Response) (*ListAssessmentsResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &ListAssessmentsResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest AssessmentList
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseCreateAssessmentResponse parses an HTTP response from a CreateAssessmentWithResponse call
-func ParseCreateAssessmentResponse(rsp *http.Response) (*CreateAssessmentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateAssessmentResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
-		var dest Assessment
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON201 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseCancelJobResponse parses an HTTP response from a CancelJobWithResponse call
 func ParseCancelJobResponse(rsp *http.Response) (*CancelJobResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5679,53 +5229,6 @@ func ParseGetJobResponse(rsp *http.Response) (*GetJobResponse, error) {
 	return response, nil
 }
 
-// ParseCreateRVToolsAssessmentResponse parses an HTTP response from a CreateRVToolsAssessmentWithResponse call
-func ParseCreateRVToolsAssessmentResponse(rsp *http.Response) (*CreateRVToolsAssessmentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &CreateRVToolsAssessmentResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
-		var dest Job
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON202 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
 // ParseDeleteAssessmentResponse parses an HTTP response from a DeleteAssessmentWithResponse call
 func ParseDeleteAssessmentResponse(rsp *http.Response) (*DeleteAssessmentResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -5735,67 +5238,6 @@ func ParseDeleteAssessmentResponse(rsp *http.Response) (*DeleteAssessmentRespons
 	}
 
 	response := &DeleteAssessmentResponse{
-		Body:         bodyBytes,
-		HTTPResponse: rsp,
-	}
-
-	switch {
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
-		var dest Assessment
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON200 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON400 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON401 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON403 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON404 = &dest
-
-	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
-		var dest Error
-		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
-			return nil, err
-		}
-		response.JSON500 = &dest
-
-	}
-
-	return response, nil
-}
-
-// ParseGetAssessmentResponse parses an HTTP response from a GetAssessmentWithResponse call
-func ParseGetAssessmentResponse(rsp *http.Response) (*GetAssessmentResponse, error) {
-	bodyBytes, err := io.ReadAll(rsp.Body)
-	defer func() { _ = rsp.Body.Close() }()
-	if err != nil {
-		return nil, err
-	}
-
-	response := &GetAssessmentResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}

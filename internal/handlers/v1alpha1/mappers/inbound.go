@@ -1,15 +1,8 @@
 package mappers
 
 import (
-	"encoding/json"
-	"time"
-
-	"github.com/google/uuid"
-
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -163,49 +156,4 @@ func ClusterRequirementsRequestToForm(apiReq v1alpha1.ClusterRequirementsRequest
 	}
 
 	return form
-}
-
-func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User) mappers.AssessmentCreateForm {
-	form := mappers.AssessmentCreateForm{
-		ID:         uuid.New(),
-		Name:       resource.Name,
-		OrgID:      user.Organization,
-		Username:   user.Username,
-		SourceType: resource.SourceType,
-	}
-
-	// Set owner fields from user context (like username)
-	if user.FirstName != "" {
-		form.OwnerFirstName = &user.FirstName
-	}
-	if user.LastName != "" {
-		form.OwnerLastName = &user.LastName
-	}
-
-	// Set source ID if provided
-	if resource.SourceId != nil {
-		form.SourceID = resource.SourceId
-	}
-
-	// Build inventories if inline inventory is provided
-	if resource.Inventory != nil {
-		if resource.Inventory.CreatedAt == nil {
-			now := time.Now().UTC()
-			resource.Inventory.CreatedAt = &now
-		}
-		data, _ := json.Marshal(resource.Inventory)
-		form.Inventory = data
-		inv, err := model.NewAssessmentInventory(uuid.New(), form.ID, resource.Name, false, data)
-		if err == nil {
-			form.Inventories = []model.AssessmentInventory{inv}
-		}
-	}
-
-	return form
-}
-
-func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
-	return mappers.InventoryForm{
-		Data: inventory,
-	}
 }

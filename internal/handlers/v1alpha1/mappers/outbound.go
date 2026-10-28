@@ -276,86 +276,6 @@ func AgentToApi(a model.Agent) api.Agent {
 	}
 }
 
-func StoreAssessmentToApi(a model.Assessment) (api.Assessment, error) {
-	// Todo: to be replaced by AssessmentToApi
-	assessment := api.Assessment{
-		Id:             a.ID,
-		Name:           a.Name,
-		OwnerFirstName: a.OwnerFirstName,
-		OwnerLastName:  a.OwnerLastName,
-		CreatedAt:      a.CreatedAt,
-	}
-
-	// Build API snapshots from assessment inventories
-	var mainInventory *model.AssessmentInventory
-	var subsets []api.AssessmentSubsetInventory
-	for i := range a.Inventories {
-		inv := &a.Inventories[i]
-		if inv.IsSubset {
-			parsedInv, err := unmarshalInventory(inv.Inventory, inv.Version)
-			if err != nil {
-				return api.Assessment{}, fmt.Errorf("failed to unmarshal subset inventory %q: %w", inv.Name, err)
-			}
-			subsets = append(subsets, api.AssessmentSubsetInventory{
-				Id:        inv.ID,
-				Name:      inv.Name,
-				VcenterId: inv.VCenterID,
-				VmsCount:  inv.VMsCount,
-				CreatedAt: inv.CreatedAt,
-				Inventory: parsedInv,
-			})
-		} else if mainInventory == nil {
-			mainInventory = inv
-		}
-	}
-
-	if mainInventory != nil {
-		parsedInv, err := unmarshalInventory(mainInventory.Inventory, mainInventory.Version)
-		if err != nil {
-			return api.Assessment{}, err
-		}
-		snapshot := api.Snapshot{
-			CreatedAt: mainInventory.CreatedAt,
-			Inventory: parsedInv,
-		}
-		if len(subsets) > 0 {
-			snapshot.SubsetInventories = &subsets
-		}
-		assessment.Snapshots = []api.Snapshot{snapshot}
-	} else {
-		assessment.Snapshots = []api.Snapshot{}
-	}
-
-	// Set source type based on source field
-	sourceType := api.AssessmentSourceType(a.SourceType)
-	assessment.SourceType = sourceType
-	assessment.SourceId = a.SourceID
-
-	if len(a.Permissions) > 0 {
-		perms := make([]api.AssessmentPermissions, len(a.Permissions))
-		for i, p := range a.Permissions {
-			perms[i] = api.AssessmentPermissions(p)
-		}
-		assessment.Permissions = &perms
-	}
-
-	if a.Sharing != nil {
-		sharing := api.AssessmentSharing{
-			IsShared:   a.Sharing.IsShared,
-			SharedWith: make([]api.SharingSubject, len(a.Sharing.SharedWith)),
-		}
-		for i, s := range a.Sharing.SharedWith {
-			sharing.SharedWith[i] = api.SharingSubject{Type: s.Type, Id: s.ID, Name: s.Name}
-		}
-		if a.Sharing.SharedBy != nil {
-			sharing.SharedBy = &api.SharingSubject{Type: a.Sharing.SharedBy.Type, Id: a.Sharing.SharedBy.ID, Name: a.Sharing.SharedBy.Name}
-		}
-		assessment.Sharing = &sharing
-	}
-
-	return assessment, nil
-}
-
 func AssessmentToApi(a model2.Assessment) (api.Assessment, error) {
 	assessment := api.Assessment{
 		Id:             a.ID,
@@ -428,18 +348,6 @@ func sharingToApi(s *model2.Sharing) *api.AssessmentSharing {
 		sharing.SharedBy = &api.SharingSubject{Type: s.SharedBy.Type, Id: s.SharedBy.ID, Name: s.SharedBy.Name}
 	}
 	return &sharing
-}
-
-func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, error) {
-	assessmentList := make([]api.Assessment, len(assessments))
-	for i, assessment := range assessments {
-		a, err := StoreAssessmentToApi(assessment)
-		if err != nil {
-			return api.AssessmentList{}, err
-		}
-		assessmentList[i] = a
-	}
-	return assessmentList, nil
 }
 
 func AssessmentV2ToApi(a model.Assessment) api.AssessmentV2Summary {
