@@ -104,6 +104,82 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/image/bytoken/{token}/agent-image:
+    get:
+      tags:
+        - image
+      description: Download the latest agent image as an OCI archive via URL
+      operationId: getAgentImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The agent image as an OCI archive; the ETag header holds its manifest digest
+          content:
+            application/x-tar:
+              schema:
+                type: string
+                format: binary
+        "304":
+          description: Not Modified, the agent image matches If-None-Match
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "503":
+          description: The agent image is not cached yet
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+    head:
+      tags:
+        - image
+      description: Get the latest agent image digest in the ETag header via URL
+      operationId: headAgentImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The ETag header holds the agent image manifest digest
+        "304":
+          description: Not Modified, the agent image matches If-None-Match
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "503":
+          description: The agent image is not cached yet
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /health:
     get:
       tags:

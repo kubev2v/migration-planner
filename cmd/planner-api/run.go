@@ -23,6 +23,7 @@ import (
 
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/events"
@@ -135,16 +136,23 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("creating pgx pool", "error", err)
 		}
 
+		// Shared by the image server (OVA) and the agent server (agent image updates).
+		applianceCache := service.NewApplianceImageCache(cfg.ApplianceImage, cfg.Service.IsoPath, zap.L().Named("appliance_cache"))
+		if err := applianceCache.Start(); err != nil {
+			zap.S().Fatalw("starting appliance image cache", "error", err)
+		}
+		defer applianceCache.Stop()
+
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
 			return apiserver.New(cfg, store, l, opaValidator, pool)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {
-			return agentserver.New(cfg, store, l)
+			return agentserver.New(cfg, store, l, applianceCache)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.ImageEndpointAddress, "image_server", func(l net.Listener) Server {
-			return imageserver.New(cfg, store, l)
+			return imageserver.New(cfg, store, l, applianceCache)
 		})
 
 		runServer(ctx, &wg, cancel, "0.0.0.0:8080", "metrics_server", func(l net.Listener) Server {

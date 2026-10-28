@@ -3,7 +3,9 @@ package v1alpha1
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
@@ -16,16 +18,54 @@ import (
 )
 
 type AgentHandler struct {
-	srv *service.AgentService
+	srv            *service.AgentService
+	applianceCache *service.ApplianceImageCache
 }
 
 // Make sure we conform to servers Service interface
 var _ agentServer.Service = (*AgentHandler)(nil)
 
-func NewAgentHandler(srv *service.AgentService) *AgentHandler {
+func NewAgentHandler(srv *service.AgentService, applianceCache *service.ApplianceImageCache) *AgentHandler {
 	return &AgentHandler{
-		srv: srv,
+		srv:            srv,
+		applianceCache: applianceCache,
 	}
+}
+
+// HEAD shares GET's representation so agents get the digest ETag without the archive.
+func (h *AgentHandler) HeadAgentImage(ctx context.Context, request agentServer.HeadAgentImageRequestObject) (agentServer.HeadAgentImageResponseObject, error) {
+	response, err := h.GetAgentImage(ctx, agentServer.GetAgentImageRequestObject(request))
+	if response == nil {
+		return nil, err
+	}
+	return headAgentImageResponse{response}, err
+}
+
+type headAgentImageResponse struct {
+	agentServer.GetAgentImageResponseObject
+}
+
+func (response headAgentImageResponse) VisitHeadAgentImageResponse(writer http.ResponseWriter) error {
+	return response.VisitGetAgentImageResponse(writer)
+}
+
+func (h *AgentHandler) GetAgentImage(ctx context.Context, request agentServer.GetAgentImageRequestObject) (agentServer.GetAgentImageResponseObject, error) {
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Id.String() {
+		return agentServer.GetAgentImage403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to access source %s", request.Id),
+		}, nil
+	}
+
+	if err := serveAgentImage(ctx, h.applianceCache); err != nil {
+		if errors.Is(err, errAgentImageNotCached) {
+			return agentServer.GetAgentImage503JSONResponse{Message: err.Error()}, nil
+		}
+		return agentServer.GetAgentImage500JSONResponse{Message: err.Error()}, nil
+	}
+
+	// http.ServeContent already wrote the response.
+	return nil, nil
 }
 
 func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentServer.UpdateSourceInventoryRequestObject) (agentServer.UpdateSourceInventoryResponseObject, error) {

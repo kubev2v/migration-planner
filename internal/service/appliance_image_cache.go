@@ -22,6 +22,7 @@ type ApplianceImageCache struct {
 	cacheMutex        sync.RWMutex
 	refreshMutex      sync.Mutex
 	imageTarPath      string
+	imageDigest       string
 	modifiedISOPath   string
 	modifiedISODigest string
 	baseISOPath       string
@@ -111,6 +112,19 @@ func (c *ApplianceImageCache) GetModifiedISO() (string, string, error) {
 	}
 
 	return c.modifiedISOPath, c.modifiedISODigest, nil
+}
+
+// GetImage returns the published appliance image OCI archive path and its
+// manifest digest together, so a concurrent refresh cannot mix generations.
+func (c *ApplianceImageCache) GetImage() (string, string, error) {
+	c.cacheMutex.RLock()
+	defer c.cacheMutex.RUnlock()
+
+	if _, err := os.Stat(c.imageTarPath); err != nil {
+		return "", "", fmt.Errorf("cached appliance image not found: %w", err)
+	}
+
+	return c.imageTarPath, c.imageDigest, nil
 }
 
 // RefreshNow forces an immediate refresh of the cached image and ISO
@@ -213,6 +227,7 @@ func (c *ApplianceImageCache) pullAndBuildISO() error {
 	}
 	c.modifiedISODigest = digest
 	c.imageTarPath = candidate.imageTarPath
+	c.imageDigest = candidate.imageDigest
 	c.modifiedISOPath = candidate.modifiedISOPath
 	c.lastPullTime = candidate.lastPullTime
 	c.cacheMutex.Unlock()
@@ -431,12 +446,14 @@ func (c *ApplianceImageCache) pullImage() error {
 	c.logger.Info("Pulling appliance image", zap.String("pullSpec", pullSpec))
 
 	tempTarPath := c.imageTarPath + ".tmp"
+	digestPath := c.imageTarPath + ".digest"
 
 	// Build skopeo command
 	args := []string{
 		"--override-os", "linux", "--override-arch", "amd64",
 		"copy",
 		"-q", // quiet mode
+		"--digestfile", digestPath,
 	}
 
 	if !c.cfg.TLSVerify {
@@ -453,6 +470,13 @@ func (c *ApplianceImageCache) pullImage() error {
 	if err != nil {
 		return fmt.Errorf("skopeo copy failed: %w, output: %s", err, string(output))
 	}
+
+	// Manifest digest of the archived image; agents compare it with their running image.
+	digest, err := os.ReadFile(digestPath)
+	if err != nil {
+		return fmt.Errorf("failed to read appliance image digest: %w", err)
+	}
+	c.imageDigest = strings.TrimSpace(string(digest))
 
 	// Atomically move temp file to final location
 	if err := os.Rename(tempTarPath, c.imageTarPath); err != nil {

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -158,6 +160,69 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	// Return nil — http.ServeContent already wrote the response.
 	// Returning a response object would cause a duplicate WriteHeader.
 	return nil, nil
+}
+
+// HEAD shares GET's representation so clients get the digest ETag without the archive.
+func (h *ImageHandler) HeadAgentImageByToken(ctx context.Context, req imageServer.HeadAgentImageByTokenRequestObject) (imageServer.HeadAgentImageByTokenResponseObject, error) {
+	response, err := h.GetAgentImageByToken(ctx, imageServer.GetAgentImageByTokenRequestObject(req))
+	if response == nil {
+		return nil, err
+	}
+	return headAgentImageByTokenResponse{response}, err
+}
+
+type headAgentImageByTokenResponse struct {
+	imageServer.GetAgentImageByTokenResponseObject
+}
+
+func (response headAgentImageByTokenResponse) VisitHeadAgentImageByTokenResponse(writer http.ResponseWriter) error {
+	return response.VisitGetAgentImageByTokenResponse(writer)
+}
+
+func (h *ImageHandler) GetAgentImageByToken(ctx context.Context, req imageServer.GetAgentImageByTokenRequestObject) (imageServer.GetAgentImageByTokenResponseObject, error) {
+	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
+		return imageServer.GetAgentImageByToken401JSONResponse{Message: err.Error()}, nil
+	}
+
+	if err := serveAgentImage(ctx, h.applianceCache); err != nil {
+		if errors.Is(err, errAgentImageNotCached) {
+			return imageServer.GetAgentImageByToken503JSONResponse{Message: err.Error()}, nil
+		}
+		return imageServer.GetAgentImageByToken500JSONResponse{Message: err.Error()}, nil
+	}
+
+	// http.ServeContent already wrote the response.
+	return nil, nil
+}
+
+var errAgentImageNotCached = errors.New("agent image is not cached yet")
+
+// serveAgentImage streams the cached agent image OCI archive. Its ETag is the image
+// manifest digest, so agents compare it with their running image via HEAD or If-None-Match.
+func serveAgentImage(ctx context.Context, cache *service.ApplianceImageCache) error {
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return errors.New("error creating the HTTP stream")
+	}
+	httpReq, ok := ctx.Value(image.RequestKey).(*http.Request)
+	if !ok {
+		return errors.New("error creating the HTTP stream")
+	}
+
+	path, digest, err := cache.GetImage()
+	if err != nil {
+		return fmt.Errorf("%w: %v", errAgentImageNotCached, err)
+	}
+	// The generation stays readable once open, even if a refresh expires it.
+	archive, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("%w: %v", errAgentImageNotCached, err)
+	}
+	defer func() { _ = archive.Close() }()
+
+	writer.Header().Set("Content-Type", "application/x-tar")
+	image.ServeOVA(writer, httpReq, "agent-image.tar", strconv.Quote(digest), archive)
+	return nil
 }
 
 func generateAndSetAgentToken(ctx context.Context, source *model.Source, storeInstance store.Store, imageBuilder *image.ImageBuilder) error {

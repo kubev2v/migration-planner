@@ -400,6 +400,57 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+  /api/v1/sources/{id}/agent-image-url:
+    get:
+      tags:
+        - image
+      description: Get a presigned URL to download the latest agent image
+      operationId: GetSourceAgentImageURL
+      parameters:
+        - name: id
+          in: path
+          description: Source id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: URL to download the agent image
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/presigned-url"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v1/sources/{id}/image:
     head:
       tags:

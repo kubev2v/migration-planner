@@ -31,6 +31,15 @@ const (
 )
 
 func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
+	return generateURLByToken(baseUrl, source, source.Name+".ova")
+}
+
+// GenerateAgentImageURLByToken signs a URL for the agent image OCI archive with the source image key.
+func GenerateAgentImageURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
+	return generateURLByToken(baseUrl, source, "agent-image")
+}
+
+func generateURLByToken(baseUrl string, source *model.Source, name string) (string, *strfmt.DateTime, error) {
 	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String(), uuid.NewString())
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to sign image URL")
@@ -41,7 +50,7 @@ func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *
 		return "", nil, err
 	}
 
-	path := fmt.Sprintf("%s/%s/%s.ova", "/api/v1/image/bytoken/", token, source.Name)
+	path := fmt.Sprintf("%s/%s/%s", "/api/v1/image/bytoken/", token, name)
 	shortURL, err := buildURL(baseUrl, path, false, map[string]string{})
 	if err != nil {
 		return "", nil, err

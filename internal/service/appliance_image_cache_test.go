@@ -35,6 +35,7 @@ var _ = ginkgo.Describe("Appliance image cache", func() {
 	ginkgo.It("makes extracted ISO files writable without following symlinks", func() { testMakeISOFilesWritable(ginkgo.GinkgoT()) })
 	ginkgo.It("keeps the last good generation when pulling or building fails", func() { testApplianceRefreshKeepsLastGoodGeneration(ginkgo.GinkgoT()) })
 	ginkgo.It("keeps downloads available during a refresh", func() { testApplianceRefreshDoesNotBlockDownloads(ginkgo.GinkgoT()) })
+	ginkgo.It("publishes the appliance image archive with its digest", func() { testApplianceCachePublishesImage(ginkgo.GinkgoT()) })
 	ginkgo.It("rejects invalid refresh intervals", func() { testApplianceCacheRejectsInvalidIntervals(ginkgo.GinkgoT()) })
 	ginkgo.It("preserves open readers when expired generations are removed", func() { testExpiredCacheGenerationDoesNotInterruptOpenReader(ginkgo.GinkgoT()) })
 })
@@ -126,7 +127,12 @@ if [ -f "$CACHE_TEST_ROOT/block" ]; then
  touch "$CACHE_TEST_ROOT/pulling"
  while [ -f "$CACHE_TEST_ROOT/block" ]; do sleep 0.05; done
 fi
-for arg do target="$arg"; done
+previous=""
+for arg do
+ if [ "$previous" = "--digestfile" ]; then printf 'sha256:%s\n' "$(tr ' ' - < "$CACHE_TEST_ROOT/image")" > "$arg"; fi
+ previous="$arg"
+ target="$arg"
+done
 cat "$CACHE_TEST_ROOT/image" > "${target#oci-archive:}"
 `,
 		"osirrox": `
@@ -166,6 +172,31 @@ cat "$work/images/migration-planner-agent.tar" > "$4"
 	cache := NewApplianceImageCache(&config.ApplianceImage{Image: "test/appliance", Tag: "latest", CachePath: filepath.Join(root, "cache"), RefreshInterval: "24h", TLSVerify: true}, "base.iso", zap.NewNop())
 	t.Cleanup(cache.Stop)
 	return cache, root
+}
+
+func testApplianceCachePublishesImage(t cacheTestingT) {
+	cache, root := newTestApplianceCache(t)
+	path, digest, err := cache.GetImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(path); err != nil || string(content) != "image one" || digest != "sha256:image-one" {
+		t.Fatalf("unexpected image %q (%v) with digest %q", content, err, digest)
+	}
+
+	if err := os.WriteFile(filepath.Join(root, "image"), []byte("image two"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.RefreshNow(); err != nil {
+		t.Fatal(err)
+	}
+	newPath, newDigest, err := cache.GetImage()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if content, err := os.ReadFile(newPath); err != nil || string(content) != "image two" || newDigest != "sha256:image-two" {
+		t.Fatalf("unexpected refreshed image %q (%v) with digest %q", content, err, newDigest)
+	}
 }
 
 func testApplianceRefreshKeepsLastGoodGeneration(t cacheTestingT) {

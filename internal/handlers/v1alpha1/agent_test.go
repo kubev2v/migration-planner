@@ -53,7 +53,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -100,7 +100,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -134,7 +134,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -180,7 +180,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -208,7 +208,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -250,7 +250,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -293,7 +293,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			// first agent request
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -349,7 +349,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: secondSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -375,7 +375,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -418,7 +418,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{

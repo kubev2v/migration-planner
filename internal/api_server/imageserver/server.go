@@ -40,11 +40,13 @@ func New(
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
+	applianceCache *service.ApplianceImageCache,
 ) *ImageServer {
 	return &ImageServer{
-		cfg:      cfg,
-		store:    store,
-		listener: listener,
+		cfg:            cfg,
+		store:          store,
+		listener:       listener,
+		applianceCache: applianceCache,
 	}
 }
 
@@ -54,21 +56,6 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 
 func (s *ImageServer) Run(ctx context.Context) error {
 	zap.S().Named("image_server").Info("Initializing Image-side API server")
-
-	// Initialize appliance image cache
-	baseISOPath := s.cfg.Service.IsoPath
-	s.applianceCache = service.NewApplianceImageCache(s.cfg.ApplianceImage, baseISOPath, zap.L().Named("appliance_cache"))
-
-	// Cancel an in-flight pull/build as soon as the server context ends.
-	stopCancellation := context.AfterFunc(ctx, s.applianceCache.Stop)
-	defer stopCancellation()
-	defer s.applianceCache.Stop()
-
-	zap.S().Named("image_server").Info("Starting appliance image cache service")
-	if err := s.applianceCache.Start(); err != nil {
-		return fmt.Errorf("failed to start appliance image cache: %w", err)
-	}
-
 	swagger, err := api.GetSwagger()
 	if err != nil {
 		return fmt.Errorf("failed to load swagger spec: %w", err)

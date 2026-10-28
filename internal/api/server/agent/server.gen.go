@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -25,6 +26,12 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (GET /api/v1/sources/{id}/agent-image)
+	GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (HEAD /api/v1/sources/{id}/agent-image)
+	HeadAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -47,6 +54,16 @@ func (_ Unimplemented) UpdateAgentStatus(w http.ResponseWriter, r *http.Request,
 
 // (PUT /api/v1/sources/{id})
 func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/sources/{id}/agent-image)
+func (_ Unimplemented) GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (HEAD /api/v1/sources/{id}/agent-image)
+func (_ Unimplemented) HeadAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -117,6 +134,58 @@ func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateSource(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// GetAgentImage operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentImage(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// HeadAgentImage operation middleware
+func (siw *ServerInterfaceWrapper) HeadAgentImage(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.HeadAgentImage(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -342,6 +411,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSource)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/agent-image", wrapper.GetAgentImage)
+	})
+	r.Group(func(r chi.Router) {
+		r.Head(options.BaseURL+"/api/v1/sources/{id}/agent-image", wrapper.HeadAgentImage)
+	})
+	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.UpdateSourceInventory)
 	})
 	r.Group(func(r chi.Router) {
@@ -483,6 +558,137 @@ type UpdateSource500JSONResponse externalRef0.Error
 func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImageRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAgentImageResponseObject interface {
+	VisitGetAgentImageResponse(w http.ResponseWriter) error
+}
+
+type GetAgentImage200ApplicationxTarResponse struct {
+	Body          io.Reader
+	ContentLength int64
+}
+
+func (response GetAgentImage200ApplicationxTarResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/x-tar")
+	if response.ContentLength != 0 {
+		w.Header().Set("Content-Length", fmt.Sprint(response.ContentLength))
+	}
+	w.WriteHeader(200)
+
+	if closer, ok := response.Body.(io.ReadCloser); ok {
+		defer closer.Close()
+	}
+	_, err := io.Copy(w, response.Body)
+	return err
+}
+
+type GetAgentImage304Response struct {
+}
+
+func (response GetAgentImage304Response) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type GetAgentImage401JSONResponse externalRef0.Error
+
+func (response GetAgentImage401JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImage403JSONResponse externalRef0.Error
+
+func (response GetAgentImage403JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImage500JSONResponse externalRef0.Error
+
+func (response GetAgentImage500JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImage503JSONResponse externalRef0.Error
+
+func (response GetAgentImage503JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadAgentImageRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type HeadAgentImageResponseObject interface {
+	VisitHeadAgentImageResponse(w http.ResponseWriter) error
+}
+
+type HeadAgentImage200Response struct {
+}
+
+func (response HeadAgentImage200Response) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type HeadAgentImage304Response struct {
+}
+
+func (response HeadAgentImage304Response) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.WriteHeader(304)
+	return nil
+}
+
+type HeadAgentImage401JSONResponse externalRef0.Error
+
+func (response HeadAgentImage401JSONResponse) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadAgentImage403JSONResponse externalRef0.Error
+
+func (response HeadAgentImage403JSONResponse) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadAgentImage500JSONResponse externalRef0.Error
+
+func (response HeadAgentImage500JSONResponse) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type HeadAgentImage503JSONResponse externalRef0.Error
+
+func (response HeadAgentImage503JSONResponse) VisitHeadAgentImageResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(503)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -694,6 +900,12 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(ctx context.Context, request UpdateSourceRequestObject) (UpdateSourceResponseObject, error)
 
+	// (GET /api/v1/sources/{id}/agent-image)
+	GetAgentImage(ctx context.Context, request GetAgentImageRequestObject) (GetAgentImageResponseObject, error)
+
+	// (HEAD /api/v1/sources/{id}/agent-image)
+	HeadAgentImage(ctx context.Context, request HeadAgentImageRequestObject) (HeadAgentImageResponseObject, error)
+
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(ctx context.Context, request UpdateSourceInventoryRequestObject) (UpdateSourceInventoryResponseObject, error)
 
@@ -792,6 +1004,58 @@ func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateSourceResponseObject); ok {
 		if err := validResponse.VisitUpdateSourceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentImage operation middleware
+func (sh *strictHandler) GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAgentImageRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentImage(ctx, request.(GetAgentImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentImageResponseObject); ok {
+		if err := validResponse.VisitGetAgentImageResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// HeadAgentImage operation middleware
+func (sh *strictHandler) HeadAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request HeadAgentImageRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.HeadAgentImage(ctx, request.(HeadAgentImageRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "HeadAgentImage")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(HeadAgentImageResponseObject); ok {
+		if err := validResponse.VisitHeadAgentImageResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

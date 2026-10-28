@@ -15,6 +15,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	server "github.com/kubev2v/migration-planner/internal/api/server/agent"
+	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
@@ -29,9 +30,10 @@ const (
 )
 
 type AgentServer struct {
-	cfg      *config.Config
-	store    store.Store
-	listener net.Listener
+	cfg            *config.Config
+	store          store.Store
+	listener       net.Listener
+	applianceCache *service.ApplianceImageCache
 }
 
 // New returns a new instance of a migration-planner server.
@@ -39,11 +41,13 @@ func New(
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
+	applianceCache *service.ApplianceImageCache,
 ) *AgentServer {
 	return &AgentServer{
-		cfg:      cfg,
-		store:    store,
-		listener: listener,
+		cfg:            cfg,
+		store:          store,
+		listener:       listener,
+		applianceCache: applianceCache,
 	}
 }
 
@@ -78,9 +82,10 @@ func (s *AgentServer) Run(ctx context.Context) error {
 	router.Use(
 		middleware.Recoverer,
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
+		apiserver.WithResponseWriter,
 	)
 
-	h := handlers.NewAgentHandler(service.NewAgentService(s.store))
+	h := handlers.NewAgentHandler(service.NewAgentService(s.store), s.applianceCache)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
