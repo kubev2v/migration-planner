@@ -171,7 +171,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		{
 			id:      1,
 			name:    "v2 preserves collection metadata",
-			version: model.InventoryVersionV2,
+			version: model2.InventoryVersionV2,
 			raw: model2.Inventory{
 				VcenterId:      "vcenter-id",
 				VcenterVersion: &vcenterVersion,
@@ -197,7 +197,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		{
 			id:      2,
 			name:    "v2 falls back to stored timestamp",
-			version: model.InventoryVersionV2,
+			version: model2.InventoryVersionV2,
 			raw: model2.Inventory{
 				VcenterId: "vc-id",
 				Vcenter: &model2.InventoryData{
@@ -211,7 +211,7 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 		{
 			id:      3,
 			name:    "legacy inventory uses stored timestamp",
-			version: model.InventoryVersionV1,
+			version: model2.InventoryVersionV1,
 			raw: model2.Inventory{
 				VcenterId: "vc-id",
 				Vcenter: &model2.InventoryData{
@@ -278,22 +278,10 @@ var _ = Describe("Inventory collection time", func() {
 			Inventories: []model.AssessmentInventory{main, group},
 		})
 		Expect(err).NotTo(HaveOccurred())
-		assessment := mappers.AssessmentToApi(domainAssessment)
-		Expect(assessment.CreatedAt).To(Equal(createdAt))
-		Expect(assessment.Snapshots).To(HaveLen(1))
-		snapshot := assessment.Snapshots[0]
-		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
-		Expect(snapshot.SubsetInventories).NotTo(BeNil())
-		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
-		assessment = mappers.AssessmentToApi(model2.Assessment{
-			MainInventory:     model2.AssessmentInventory{Inventory: domain},
-			SubsetInventories: []model2.AssessmentInventory{{Inventory: domain}},
-		})
-		Expect(assessment.Snapshots).To(HaveLen(1))
-		snapshot = assessment.Snapshots[0]
-		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
-		Expect(snapshot.SubsetInventories).NotTo(BeNil())
-		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+		snap, _, err := mappers.AssessmentInventoryToAPI(domainAssessment.MainInventory)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(snap.CreatedAt).To(Equal(createdAt))
+		Expect(snap.CollectionTime).To(Equal(&want))
 	})
 })
 

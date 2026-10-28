@@ -67,7 +67,6 @@ type AssessmentInventory struct {
 	AssessmentID    uuid.UUID
 }
 
-// NewAssessmentInventory builds a snapshot and derives its resource counts.
 func NewAssessmentInventory(id, assessmentID uuid.UUID, name string, version uint, isSubset bool, inventory Inventory) AssessmentInventory {
 	result := AssessmentInventory{
 		ID: id, AssessmentID: assessmentID, Name: name, IsSubset: isSubset,

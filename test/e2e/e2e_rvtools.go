@@ -20,7 +20,7 @@ import (
 var _ = Describe("e2e-rvtools", func() {
 	var (
 		svc        PlannerService
-		assessment *v1alpha1.Assessment
+		assessment *v1alpha1.AssessmentV2Summary
 		err        error
 		startTime  time.Time
 	)
@@ -61,17 +61,17 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(assessment).NotTo(BeNil())
 
 			// Change The Assessment name
-			assessment, err = svc.UpdateAssessment(assessment.Id, "assessment1")
+			updatedAssessment, err := svc.UpdateAssessment(assessment.Id, "assessment1")
 			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment1"))
+			Expect(updatedAssessment.Name).To(Equal("assessment1"))
 
 			// Delete the Assessment
 			err = svc.RemoveAssessment(assessment.Id)
 			Expect(err).To(BeNil())
 
 			// Verify deletion
-			_, err = svc.GetAssessment(assessment.Id)
-			Expect(err).To(MatchError(ContainSubstring("status: 404")))
+			_, err = svc.GetAssessmentV2(assessment.Id)
+			Expect(err).To(MatchError(ContainSubstring("status code: 404")))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -309,8 +309,9 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
 			DeferCleanup(svc.RemoveAssessment, assessment.Id)
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			Expect(assessment.Snapshots[0].Inventory.Vcenter.Vms.Total).To(Equal(1))
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
+			Expect(inventory.Vcenter.Vms.Total).To(Equal(1))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
@@ -413,7 +414,7 @@ var _ = Describe("e2e-rvtools", func() {
 
 				// Create multiple assessments concurrently (simulate concurrent uploads)
 				done := make(chan bool, 3)
-				var assessments []*v1alpha1.Assessment
+				var assessments []*v1alpha1.AssessmentV2Summary
 				var errors []error
 
 				for i := 0; i < 3; i++ {
@@ -459,9 +460,9 @@ var _ = Describe("e2e-rvtools", func() {
 			Expect(assessment).NotTo(BeNil())
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
-			// Verify inventory (accessed via Snapshots)
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			// Verify the v2 inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			Expect(inventory.Vcenter).NotTo(BeNil())
 			Expect(inventory.Vcenter.Vms.Total).To(Equal(2))
 
@@ -483,8 +484,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Verify power states (1 poweredOn, 1 poweredOff from CreateValidTestExcel)
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			powerStates := inventory.Vcenter.Vms.PowerStates
 			Expect(powerStates).NotTo(BeNil())
 			Expect(powerStates["poweredOn"]).To(Equal(1))
@@ -508,8 +509,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Verify infrastructure data
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			infra := inventory.Vcenter.Infra
 			Expect(infra.TotalHosts).To(Equal(2))
 			Expect(infra.Hosts).NotTo(BeNil())
@@ -536,8 +537,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Verify resource breakdowns (4 + 2 = 6 CPUs from CreateValidTestExcel)
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			vms := inventory.Vcenter.Vms
 			Expect(vms.CpuCores.Total).To(Equal(6))
 			// RAM: 8192 + 4096 = 12288 MB = 12 GB
@@ -563,8 +564,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Verify vCenter total matches sum of cluster VMs
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			Expect(inventory.Vcenter.Vms.Total).To(Equal(4))
 
 			// Verify clusters are populated
@@ -595,8 +596,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Each cluster should have 2 VMs
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			for clusterID, cluster := range inventory.Clusters {
 				Expect(cluster.Vms.Total).To(Equal(2), fmt.Sprintf("Cluster %s should have 2 VMs", clusterID))
 			}
@@ -621,8 +622,8 @@ var _ = Describe("e2e-rvtools", func() {
 			defer func() { _ = svc.RemoveAssessment(assessment.Id) }()
 
 			// Verify total VMs (template VM is excluded at ingestion)
-			Expect(assessment.Snapshots).NotTo(BeEmpty())
-			inventory := assessment.Snapshots[0].Inventory
+			inventory, err := svc.GetAssessmentInventory(assessment.Id)
+			Expect(err).To(BeNil())
 			Expect(inventory.Vcenter.Vms.Total).To(Equal(2))
 
 			// Verify that migratable count and total are not equal when concerns exist

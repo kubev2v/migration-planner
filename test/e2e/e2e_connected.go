@@ -485,9 +485,9 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
 
-			assessment, err = svc.GetAssessment(assessment.Id)
+			assessmentSummary, err := svc.GetAssessmentSummary(assessment.Id)
 			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment"))
+			Expect(assessmentSummary.Name).To(Equal("assessment"))
 
 			assessment, err = svc.UpdateAssessment(assessment.Id, "assessment1")
 			Expect(err).To(BeNil())

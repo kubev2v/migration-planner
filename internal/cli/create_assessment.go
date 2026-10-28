@@ -90,7 +90,7 @@ func (o *CreateAssessmentOptions) Run(ctx context.Context, args []string) error 
 		return fmt.Errorf("closing multipart writer: %w", err)
 	}
 
-	response, err := c.CreateRVToolsAssessmentWithBodyWithResponse(ctx, writer.FormDataContentType(), body)
+	response, err := c.CreateRVToolsAssessmentV2WithBodyWithResponse(ctx, writer.FormDataContentType(), body)
 	if err != nil {
 		return fmt.Errorf("failed to create assessment: %w", err)
 	}
