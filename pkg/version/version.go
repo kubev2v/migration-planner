@@ -67,7 +67,7 @@ func Get() Info {
 }
 
 // IsValidAgentVersion reports whether ver is usable for agent version comparison and persistence.
-// Empty string and "unknown" are treated as missing.
+// Empty string, "unknown" and the agent's unset build default "v0.0.0" are treated as missing.
 func IsValidAgentVersion(ver string) bool {
-	return ver != "" && ver != "unknown"
+	return ver != "" && ver != "unknown" && ver != "v0.0.0"
 }

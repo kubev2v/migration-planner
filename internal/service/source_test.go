@@ -826,7 +826,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 
 	Context("CheckAgentVersionWarning", func() {
 		It("returns nil when imageInfra is nil", func() {
-			result := service.CheckAgentVersionWarning(nil)
+			result := service.CheckAgentVersionWarning(nil, "")
 			Expect(result).To(BeNil())
 		})
 
@@ -834,7 +834,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			imageInfra := &model.ImageInfra{
 				AgentVersion: nil,
 			}
-			result := service.CheckAgentVersionWarning(imageInfra)
+			result := service.CheckAgentVersionWarning(imageInfra, "")
 			Expect(result).To(BeNil())
 		})
 
@@ -844,7 +844,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr(""),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).NotTo(BeNil())
 				Expect(*result).To(ContainSubstring("No version information"))
 				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
@@ -859,7 +859,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr("v0.5.1"),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).To(BeNil())
 			} else {
 				Skip("Skipping test: build version is available (cannot test unavailable version scenario)")
@@ -872,7 +872,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).To(BeNil())
 			} else {
 				Skip("Skipping test: build version not available (run 'make build' to set version)")
@@ -885,7 +885,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr("v0.1.0-test"),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).NotTo(BeNil())
 				Expect(*result).To(ContainSubstring("version mismatch"))
 				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
@@ -899,7 +899,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			imageInfra := &model.ImageInfra{
 				AgentVersion: util.ToStrPtr("unknown"),
 			}
-			result := service.CheckAgentVersionWarning(imageInfra)
+			result := service.CheckAgentVersionWarning(imageInfra, "")
 			Expect(result).To(BeNil())
 		})
 
@@ -909,7 +909,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr("dev-build"),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).NotTo(BeNil())
 				Expect(*result).To(ContainSubstring("version mismatch"))
 				Expect(*result).To(ContainSubstring("dev-build"))
@@ -925,13 +925,54 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 				imageInfra := &model.ImageInfra{
 					AgentVersion: util.ToStrPtr("v0.5.0"),
 				}
-				result := service.CheckAgentVersionWarning(imageInfra)
+				result := service.CheckAgentVersionWarning(imageInfra, "")
 				Expect(result).NotTo(BeNil())
 				Expect(*result).To(ContainSubstring("version mismatch"))
 				Expect(*result).To(ContainSubstring("v0.5.0"))
 				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
 			} else {
 				Skip("Skipping test: current version is v0.5.0 or not available")
+			}
+		})
+
+		It("returns warning when reported agent version differs, even if stored version matches", func() {
+			versionInfo := version.Get()
+			if version.IsValidAgentVersion(versionInfo.AgentVersionName) && versionInfo.AgentVersionName != "v0.1.0-test" {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra, "v0.1.0-test")
+				Expect(result).NotTo(BeNil())
+				Expect(*result).To(ContainSubstring("agent is running version v0.1.0-test"))
+				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
+			}
+		})
+
+		It("returns nil when reported agent version matches, even if stored version differs", func() {
+			versionInfo := version.Get()
+			if version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr("v0.1.0-test"),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra, versionInfo.AgentVersionName)
+				Expect(result).To(BeNil())
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
+			}
+		})
+
+		It("falls back to stored version when reported agent version is the unset default v0.0.0", func() {
+			versionInfo := version.Get()
+			if version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+				imageInfra := &model.ImageInfra{
+					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
+				}
+				result := service.CheckAgentVersionWarning(imageInfra, "v0.0.0")
+				Expect(result).To(BeNil())
+			} else {
+				Skip("Skipping test: build version not available (run 'make build' to set version)")
 			}
 		})
 	})
