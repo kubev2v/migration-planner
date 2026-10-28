@@ -51,11 +51,11 @@ func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uui
 	return parsed.JSON201, nil
 }
 
-func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error) {
+func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.AssessmentV2Summary, error) {
 	zap.S().Infof("[PlannerService] Create assessment from RVTools (async) [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
 	// Create the async job
-	job, err := s.CreateRVToolsJob(name, filepath)
+	job, err := s.CreateRVToolsV2Job(name, filepath)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1
 			if job.AssessmentId == nil {
 				return nil, fmt.Errorf("job completed but no assessment ID returned")
 			}
-			return s.GetAssessment(*job.AssessmentId)
+			return s.GetAssessmentSummary(*job.AssessmentId)
 		case v1alpha1.JobStatusFailed:
 			errMsg := "unknown error"
 			if job.Error != nil {
@@ -94,28 +94,6 @@ func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1
 	}
 
 	return nil, fmt.Errorf("job timed out after %d seconds", maxRetries)
-}
-
-// CreateRVToolsJob creates a new async RVTools processing job
-func (s *plannerService) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job, error) {
-	zap.S().Infof("[PlannerService] Create RVTools job [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
-
-	res, err := s.api.MultipartRequest(apiV1AssessmentsRVToolsPath, filepath, name)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = res.Body.Close() }()
-
-	parsed, err := internalclient.ParseCreateRVToolsAssessmentResponse(res)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create RVTools job. status: %d, err: %v", res.StatusCode, err)
-	}
-
-	if parsed.HTTPResponse.StatusCode != http.StatusAccepted {
-		return nil, fmt.Errorf("failed to create RVTools job. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
-	}
-
-	return parsed.JSON202, nil
 }
 
 // GetJob retrieves a job by ID
@@ -159,38 +137,17 @@ func (s *plannerService) CancelJob(id int64) (*v1alpha1.Job, error) {
 	return parsed.JSON200, nil
 }
 
-// GetAssessment retrieves a specific assessment by ID
-func (s *plannerService) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, error) {
-	zap.S().Infof("[PlannerService] Get assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
-
-	res, err := s.api.GetRequest(path.Join(apiV1AssessmentsPath, id.String()))
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = res.Body.Close() }()
-
-	parsed, err := internalclient.ParseGetAssessmentResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get assessment. status: %d", res.StatusCode)
-	}
-
-	if parsed.HTTPResponse.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
-	}
-	return parsed.JSON200, nil
-}
-
 // GetAssessments lists all assessments
-func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentList, error) {
+func (s *plannerService) GetAssessments() (*[]v1alpha1.AssessmentV2Summary, error) {
 	zap.S().Infof("[PlannerService] Get assessments [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.GetRequest(apiV1AssessmentsPath)
+	res, err := s.api.GetRequest(apiV2AssessmentsPath)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	parsed, err := internalclient.ParseListAssessmentsResponse(res)
+	parsed, err := internalclient.ParseListAssessmentsV2Response(res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assessments. status: %d", res.StatusCode)
 	}

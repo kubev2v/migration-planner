@@ -430,18 +430,6 @@ func sharingToApi(s *model2.Sharing) *api.AssessmentSharing {
 	return &sharing
 }
 
-func AssessmentListToApi(assessments []model.Assessment) (api.AssessmentList, error) {
-	assessmentList := make([]api.Assessment, len(assessments))
-	for i, assessment := range assessments {
-		a, err := StoreAssessmentToApi(assessment)
-		if err != nil {
-			return api.AssessmentList{}, err
-		}
-		assessmentList[i] = a
-	}
-	return assessmentList, nil
-}
-
 func AssessmentV2ToApi(a model.Assessment) api.AssessmentV2Summary {
 	result := api.AssessmentV2Summary{
 		Id:             a.ID,

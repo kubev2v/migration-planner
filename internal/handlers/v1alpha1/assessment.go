@@ -13,33 +13,6 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
-// (GET /api/v1/assessments)
-func (h *ServiceHandler) ListAssessments(ctx context.Context, request server.ListAssessmentsRequestObject) (server.ListAssessmentsResponseObject, error) {
-	user := auth.MustHaveUser(ctx)
-
-	logger := log.NewDebugLogger("assessment_handler").
-		WithContext(ctx).
-		Operation("list_assessments").
-		Build()
-
-	logger.Step("list_assessments").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
-
-	assessments, err := h.assessmentSrv.ListAssessments(ctx, service.NewAssessmentFilter())
-	if err != nil {
-		logger.Error(err).Log()
-		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
-	}
-
-	logger.Success().WithInt("count", len(assessments)).Log()
-
-	apiAssessments, err := mappers.AssessmentListToApi(assessments)
-	if err != nil {
-		return server.ListAssessments500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
-	}
-
-	return server.ListAssessments200JSONResponse(apiAssessments), nil
-}
-
 // (POST /api/v1/assessments)
 func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.CreateAssessmentRequestObject) (server.CreateAssessmentResponseObject, error) {
 	logger := log.NewDebugLogger("assessment_handler").
@@ -113,41 +86,6 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 	}
 
 	return server.CreateAssessment201JSONResponse(apiAssessment), nil
-}
-
-// (GET /api/v1/assessments/{id})
-func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAssessmentRequestObject) (server.GetAssessmentResponseObject, error) {
-	logger := log.NewDebugLogger("assessment_handler").
-		WithContext(ctx).
-		Operation("get_assessment").
-		WithUUID("assessment_id", request.Id).
-		Build()
-
-	assessmentID := request.Id
-
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
-	if err != nil {
-		switch err.(type) {
-		case *service.ErrResourceNotFound:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.GetAssessment404JSONResponse{Message: err.Error()}, nil
-		case *service.ErrForbidden:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.GetAssessment403JSONResponse{Message: err.Error()}, nil
-		default:
-			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
-			return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
-		}
-	}
-
-	logger.Success().WithString("assessment_name", assessment.Name).WithString("source_type", assessment.SourceType).Log()
-
-	apiAssessment, err := mappers.AssessmentToApi(*assessment)
-	if err != nil {
-		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
-	}
-
-	return server.GetAssessment200JSONResponse(apiAssessment), nil
 }
 
 // (PUT /api/v1/assessments/{id})
