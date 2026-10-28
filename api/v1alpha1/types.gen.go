@@ -379,9 +379,6 @@ type AssessmentForm struct {
 	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent"`
 }
 
-// AssessmentList defines model for AssessmentList.
-type AssessmentList = []Assessment
-
 // AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
 type AssessmentRvtoolsForm struct {
 	// File File upload for assessment data
@@ -1610,9 +1607,6 @@ type UploadRvtoolsToAssessmentMultipartBody struct {
 
 // CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
 type CreateAssessmentJSONRequestBody = AssessmentForm
-
-// CreateRVToolsAssessmentMultipartRequestBody defines body for CreateRVToolsAssessment for multipart/form-data ContentType.
-type CreateRVToolsAssessmentMultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
 type UpdateAssessmentJSONRequestBody = AssessmentUpdate

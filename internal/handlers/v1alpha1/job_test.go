@@ -85,7 +85,7 @@ var _ = Describe("job handler", Ordered, func() {
 		})
 	})
 
-	Context("CreateRVToolsAssessment - name validation", func() {
+	Context("CreateRVToolsAssessmentV2 - name validation", func() {
 		var user auth.User
 		var ctx context.Context
 		var srv *handlers.ServiceHandler
@@ -124,13 +124,13 @@ var _ = Describe("job handler", Ordered, func() {
 		It("returns 400 when name is empty", func() {
 			reader := createMultipartReader("", "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
@@ -138,13 +138,13 @@ var _ = Describe("job handler", Ordered, func() {
 		It("returns 400 when name contains spaces", func() {
 			reader := createMultipartReader("invalid name with spaces", "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
@@ -152,13 +152,13 @@ var _ = Describe("job handler", Ordered, func() {
 		It("returns 400 when name contains special characters", func() {
 			reader := createMultipartReader("invalid@name#with$special%chars", "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
@@ -168,13 +168,13 @@ var _ = Describe("job handler", Ordered, func() {
 			longName := strings.Repeat("a", 101)
 			reader := createMultipartReader(longName, "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
@@ -182,13 +182,13 @@ var _ = Describe("job handler", Ordered, func() {
 		It("returns 400 when name contains slash", func() {
 			reader := createMultipartReader("invalid/name", "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
@@ -196,13 +196,13 @@ var _ = Describe("job handler", Ordered, func() {
 		It("returns 400 when name contains backslash", func() {
 			reader := createMultipartReader("invalid\\name", "file content")
 
-			resp, err := srv.CreateRVToolsAssessment(ctx, server.CreateRVToolsAssessmentRequestObject{
+			resp, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{
 				Body: reader,
 			})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessment400JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.CreateRVToolsAssessmentV2400JSONResponse{}).String()))
 
-			errorResp := resp.(server.CreateRVToolsAssessment400JSONResponse)
+			errorResp := resp.(server.CreateRVToolsAssessmentV2400JSONResponse)
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})

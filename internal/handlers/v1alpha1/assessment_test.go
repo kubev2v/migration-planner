@@ -93,11 +93,11 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
+			resp, err := srv.ListAssessmentsV2(ctx, server.ListAssessmentsV2RequestObject{})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessmentsV2200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			assessmentList := resp.(server.ListAssessmentsV2200JSONResponse)
 			Expect(assessmentList).To(HaveLen(3))
 			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID1)))
 			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID2)))
@@ -113,11 +113,11 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
+			resp, err := srv.ListAssessmentsV2(ctx, server.ListAssessmentsV2RequestObject{})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessmentsV2200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			assessmentList := resp.(server.ListAssessmentsV2200JSONResponse)
 			Expect(assessmentList).To(HaveLen(0))
 		})
 
@@ -158,11 +158,11 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.ListAssessments(ctx, server.ListAssessmentsRequestObject{})
+			resp, err := srv.ListAssessmentsV2(ctx, server.ListAssessmentsV2RequestObject{})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessments200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.ListAssessmentsV2200JSONResponse{}).String()))
 
-			assessmentList := resp.(server.ListAssessments200JSONResponse)
+			assessmentList := resp.(server.ListAssessmentsV2200JSONResponse)
 			Expect(assessmentList).To(HaveLen(3))
 			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID1)))
 			Expect(assessmentList).To(ContainElement(HaveField("Id", assessmentID2)))
@@ -695,14 +695,12 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
+			resp, err := srv.GetAssessmentV2(ctx, server.GetAssessmentV2RequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment200JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessmentV2200JSONResponse{}).String()))
 
-			assessment := resp.(server.GetAssessment200JSONResponse)
-			Expect(assessment.Id).To(Equal(assessmentID))
-			Expect(assessment.Name).To(Equal("test-assessment"))
-			Expect(assessment.Snapshots).To(HaveLen(1))
+			assessment := resp.(server.GetAssessmentV2200JSONResponse)
+			Expect(assessment.Vcenters).To(HaveLen(1))
 		})
 
 		It("returns 404 for non-existent assessment", func() {
@@ -716,9 +714,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: nonExistentID})
+			resp, err := srv.GetAssessmentV2(ctx, server.GetAssessmentV2RequestObject{Id: nonExistentID})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment404JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessmentV2404JSONResponse{}).String()))
 		})
 
 		It("returns 403 for assessment owned by different user", func() {
@@ -732,9 +730,9 @@ var _ = Describe("assessment handler", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
 			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), &ForbiddenAssessmentService{}, nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
-			resp, err := srv.GetAssessment(ctx, server.GetAssessmentRequestObject{Id: assessmentID})
+			resp, err := srv.GetAssessmentV2(ctx, server.GetAssessmentV2RequestObject{Id: assessmentID})
 			Expect(err).To(BeNil())
-			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessment403JSONResponse{}).String()))
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAssessmentV2403JSONResponse{}).String()))
 		})
 
 		AfterEach(func() {
