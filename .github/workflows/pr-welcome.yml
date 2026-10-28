@@ -8,7 +8,7 @@ on:
 
 jobs:
   welcome:
-    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-welcome.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-welcome.yml@b91113e8d6564d7997350b279129e43bbc1f3a19 # main
     with:
       skip-authors: '["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]'
     permissions:

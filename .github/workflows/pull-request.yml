@@ -32,11 +32,13 @@ jobs:
           echo 'bot-authors=["red-hat-konflux[bot]","dependabot[bot]","migration-planner-sync[bot]"]' >> $GITHUB_OUTPUT
 
       - name: Check out path filters
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
 
       - name: Detect whether code validations are needed
         id: filter
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3
         with:
           filters: .github/path-filters.yml
           predicate-quantifier: 'every'
@@ -44,7 +46,7 @@ jobs:
   # Validate commit messages
   validate-commits:
     needs: config
-    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-commit-messages.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-commit-messages.yml@b91113e8d6564d7997350b279129e43bbc1f3a19 # main
     with:
       types: ${{ needs.config.outputs.allowed-types }}
       jira-pattern: ${{ needs.config.outputs.jira-pattern }}
@@ -54,7 +56,7 @@ jobs:
   # Validate PR title and description
   validate-pr-title:
     needs: config
-    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-pr-title-description.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/validate-pr-title-description.yml@b91113e8d6564d7997350b279129e43bbc1f3a19 # main
     with:
       allowed-types: ${{ needs.config.outputs.allowed-types }}
       jira-pattern: ${{ needs.config.outputs.jira-pattern }}
@@ -67,16 +69,16 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Node required for setup-go post (cache save); needed when running with act
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: 'go.mod'
 
@@ -94,15 +96,15 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: 'go.mod'
 
@@ -119,15 +121,15 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
           go-version-file: 'go.mod'
 
@@ -140,15 +142,15 @@ jobs:
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
     - name: Check out code
-      uses: actions/checkout@v4
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
     - name: Set up Node
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
       with:
         node-version: '20'
 
     - name: Set up Go
-      uses: actions/setup-go@v5
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
       with:
         go-version-file: 'go.mod'
 
