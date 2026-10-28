@@ -54,6 +54,11 @@ func (api *ServiceApi) PutRequest(path string, body []byte) (*http.Response, err
 	return api.request(http.MethodPut, path, body)
 }
 
+// PatchRequest updates selected fields of a resource.
+func (api *ServiceApi) PatchRequest(path string, body []byte) (*http.Response, error) {
+	return api.request(http.MethodPatch, path, body)
+}
+
 // DeleteRequest makes an HTTP DELETE request to the specified path with the provided token
 // for authorization, returning the HTTP response.
 func (api *ServiceApi) DeleteRequest(path string) (*http.Response, error) {
@@ -64,7 +69,7 @@ func (api *ServiceApi) prepareRequest(method string, path string, body []byte) (
 	var req *http.Request
 	var err error
 
-	// Always expect a full API-relative path (e.g. "/api/v1/sources/...", "/api/v1/assessments/...")
+	// Always expect a full API-relative path (e.g. "/api/v1/sources/...", "/api/v2/assessments/...")
 	queryPath := strings.TrimRight(fmt.Sprintf("%s%s", api.baseURL, path), "/")
 
 	switch method {
@@ -74,6 +79,8 @@ func (api *ServiceApi) prepareRequest(method string, path string, body []byte) (
 		req, err = http.NewRequest(http.MethodPost, queryPath, bytes.NewReader(body))
 	case http.MethodPut:
 		req, err = http.NewRequest(http.MethodPut, queryPath, bytes.NewReader(body))
+	case http.MethodPatch:
+		req, err = http.NewRequest(http.MethodPatch, queryPath, bytes.NewReader(body))
 	case http.MethodDelete:
 		req, err = http.NewRequest(http.MethodDelete, queryPath, nil)
 	default:
@@ -88,7 +95,7 @@ func (api *ServiceApi) prepareRequest(method string, path string, body []byte) (
 	return req, nil
 }
 
-// request is a helper function that performs an HTTP request based on the method (GET, POST, PUT, DELETE),
+// request is a helper function that performs an HTTP request based on the method (GET, POST, PUT, PATCH, DELETE),
 // path, body, and JWT token, returning the HTTP response.
 func (api *ServiceApi) request(method string, path string, body []byte) (*http.Response, error) {
 	req, err := api.prepareRequest(method, path, body)

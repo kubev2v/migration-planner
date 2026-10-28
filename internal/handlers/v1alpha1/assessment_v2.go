@@ -17,6 +17,76 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
+// (POST /api/v1/assessments)
+func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.CreateAssessmentRequestObject) (server.CreateAssessmentResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_handler").
+		WithContext(ctx).
+		Operation("create_assessment").
+		WithRequestBody("request_body", request.Body).
+		Build()
+
+	user := auth.MustHaveUser(ctx)
+	logger.Step("extract_user").WithString("org_id", user.Organization).WithString("username", user.Username).Log()
+
+	if request.Body == nil {
+		logger.Error(fmt.Errorf("empty request body")).Log()
+		return server.CreateAssessment400JSONResponse{Message: "empty body"}, nil
+	}
+
+	form := *request.Body
+
+	// Validate name first for better error message
+	if err := validator.ValidateName(form.Name); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+	}
+
+	if err := validateAssessmentData(form); err != nil {
+		logger.Error(err).WithString("step", "validation").Log()
+		return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+	}
+
+	createForm := mappers.AssessmentFormToCreateForm(form, user)
+	logger.Step("mapped_form").WithString("source_type", createForm.SourceType).Log()
+
+	logger.Step("create_assessment").
+		WithUUID("id", createForm.ID).
+		WithString("name", createForm.Name).
+		WithString("org_id", createForm.OrgID).
+		WithString("source", createForm.SourceType).
+		WithUUIDPtr("source_id", createForm.SourceID).
+		Log()
+
+	assessment, err := h.assessmentSrv.CreateAssessment(ctx, createForm)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrAssessmentCreationForbidden:
+			logger.Error(err).WithString("step", "authorization").Log()
+			return server.CreateAssessment401JSONResponse{Message: err.Error()}, nil
+		case *service.ErrSourceHasNoInventory:
+			logger.Error(err).WithString("step", "inventory_check").Log()
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+		case *service.ErrInventoryHasNoVMs:
+			logger.Error(err).WithString("step", "inventory_validation").Log()
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+		case *service.ErrDuplicateKey:
+			logger.Error(err).WithString("step", "validate_input").Log()
+			return server.CreateAssessment400JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.CreateAssessment500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	logger.Success().
+		WithUUID("assessment_id", assessment.ID).
+		WithString("assessment_name", assessment.Name).
+		WithString("source_type", assessment.SourceType).
+		Log()
+
+	return server.CreateAssessment201JSONResponse(mappers.AssessmentToV2API(assessment)), nil
+}
+
 // CreateRVToolsAssessmentV2 (POST /api/v2/assessments/rvtools)
 func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request server.CreateRVToolsAssessmentV2RequestObject) (server.CreateRVToolsAssessmentV2ResponseObject, error) {
 	logger := log.NewDebugLogger("job_handler").
@@ -306,18 +376,12 @@ func (h *ServiceHandler) UpdateAssessmentV2(ctx context.Context, request server.
 		}
 	}
 
-	response, err := mappers.AssessmentToV2API(updatedAssessment)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.UpdateAssessmentV2500JSONResponse{Message: err.Error()}, nil
-	}
-
 	logger.Success().
 		WithString("updated_name", updatedAssessment.Name).
 		WithString("source_type", updatedAssessment.SourceType).
 		Log()
 
-	return server.UpdateAssessmentV2200JSONResponse(response), nil
+	return server.UpdateAssessmentV2200JSONResponse(mappers.AssessmentToV2API(updatedAssessment)), nil
 }
 
 // GetAssessmentV2 (GET /api/v2/assessments/{id})
@@ -341,13 +405,7 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 		}
 	}
 
-	response, err := mappers.AssessmentToV2API(assessment)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
-	}
-
-	return server.GetAssessmentV2200JSONResponse(response), nil
+	return server.GetAssessmentV2200JSONResponse(mappers.AssessmentToV2API(assessment)), nil
 }
 
 // GetVcenter (GET /api/v2/assessments/{id}/vcenters/{vid})
@@ -404,6 +462,7 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 	return server.GetVcenterCluster200JSONResponse(mappers.ClusterInventoryToAPI(*clusterInv)), nil
 }
 
+// DeleteVCenter (DELETE /api/v2/assessments/{id}/vcenters/{vid}
 func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.DeleteVCenterRequestObject) (server.DeleteVCenterResponseObject, error) {
 	logger := log.NewDebugLogger("assessment_v2_handler").
 		WithContext(ctx).
@@ -426,4 +485,93 @@ func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.Delet
 
 	logger.Success().Log()
 	return server.DeleteVCenter204Response{}, nil
+}
+
+// (DELETE /api/v2/assessments/{id})
+func (h *ServiceHandler) DeleteAssessment(ctx context.Context, request server.DeleteAssessmentRequestObject) (server.DeleteAssessmentResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_handler").
+		WithContext(ctx).
+		Operation("delete_assessment").
+		WithUUID("assessment_id", request.Id).
+		Build()
+
+	assessmentID := request.Id
+
+	if err := h.assessmentSrv.DeleteAssessment(ctx, assessmentID); err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.DeleteAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.DeleteAssessment403JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
+			return server.DeleteAssessment500JSONResponse{Message: fmt.Sprintf("failed to delete assessment: %v", err)}, nil
+		}
+	}
+
+	logger.Success().WithUUID("assessment_id", assessmentID).Log()
+	return server.DeleteAssessment200JSONResponse{}, nil
+}
+
+// (POST /api/v2/assessments/{id}/share)
+func (h *ServiceHandler) ShareAssessment(ctx context.Context, request server.ShareAssessmentRequestObject) (server.ShareAssessmentResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_handler").
+		WithContext(ctx).
+		Operation("share_assessment").
+		WithUUID("assessment_id", request.Id).
+		Build()
+
+	if err := h.assessmentSrv.ShareAssessment(ctx, request.Id); err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.ShareAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.ShareAssessment403JSONResponse{Message: err.Error()}, nil
+		case *service.ErrNotACustomer:
+			return server.ShareAssessment400JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.ShareAssessment500JSONResponse{Message: fmt.Sprintf("failed to share assessment: %v", err)}, nil
+		}
+	}
+
+	logger.Success().Log()
+	return server.ShareAssessment200JSONResponse{Message: strPtr("assessment shared with partner")}, nil
+}
+
+// (DELETE /api/v2/assessments/{id}/share)
+func (h *ServiceHandler) UnshareAssessment(ctx context.Context, request server.UnshareAssessmentRequestObject) (server.UnshareAssessmentResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_handler").
+		WithContext(ctx).
+		Operation("unshare_assessment").
+		WithUUID("assessment_id", request.Id).
+		Build()
+
+	if err := h.assessmentSrv.UnshareAssessment(ctx, request.Id); err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UnshareAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.UnshareAssessment403JSONResponse{Message: err.Error()}, nil
+		case *service.ErrNotACustomer:
+			return server.UnshareAssessment400JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.UnshareAssessment500JSONResponse{Message: fmt.Sprintf("failed to unshare assessment: %v", err)}, nil
+		}
+	}
+
+	logger.Success().Log()
+	return server.UnshareAssessment200JSONResponse{Message: strPtr("assessment unshared from partner")}, nil
+}
+
+func strPtr(s string) *string { return &s }
+
+func validateAssessmentData(data interface{}) error {
+	v := validator.NewValidator()
+	v.Register(validator.NewAssessmentValidationRules()...)
+	v.RegisterStructValidation(validator.AssessmentFormValidator(), api.AssessmentForm{})
+	return v.Struct(data)
 }

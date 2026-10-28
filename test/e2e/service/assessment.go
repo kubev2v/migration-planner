@@ -16,7 +16,7 @@ import (
 )
 
 // CreateAssessment creates a new assessment per the OpenAPI spec
-func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error) {
+func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.AssessmentV2, error) {
 	zap.S().Infof("[PlannerService] Create assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
 	body := v1alpha1.CreateAssessmentJSONRequestBody{
@@ -34,7 +34,7 @@ func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uui
 		return nil, err
 	}
 
-	res, err := s.api.PostRequest(apiV1AssessmentsPath, reqBody)
+	res, err := s.api.PostRequest(apiV2AssessmentsPath, reqBody)
 	if err != nil {
 		return nil, err
 	}
@@ -48,10 +48,11 @@ func (s *plannerService) CreateAssessment(name, sourceType string, sourceId *uui
 	if parsed.HTTPResponse.StatusCode != http.StatusCreated {
 		return nil, fmt.Errorf("failed to create assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
+
 	return parsed.JSON201, nil
 }
 
-func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error) {
+func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.AssessmentV2, error) {
 	zap.S().Infof("[PlannerService] Create assessment from RVTools (async) [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
 	// Create the async job
@@ -75,7 +76,7 @@ func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1
 			if job.AssessmentId == nil {
 				return nil, fmt.Errorf("job completed but no assessment ID returned")
 			}
-			return s.GetAssessment(*job.AssessmentId)
+			return s.GetAssessment(job.AssessmentId.String())
 		case v1alpha1.JobStatusFailed:
 			errMsg := "unknown error"
 			if job.Error != nil {
@@ -100,13 +101,12 @@ func (s *plannerService) CreateAssessmentFromRvtools(name, filepath string) (*v1
 func (s *plannerService) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job, error) {
 	zap.S().Infof("[PlannerService] Create RVTools job [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.MultipartRequest(apiV1AssessmentsRVToolsPath, filepath, name)
+	res, err := s.api.MultipartRequest(apiV2AssessmentsRVToolsPath, filepath, name)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
-
-	parsed, err := internalclient.ParseCreateRVToolsAssessmentResponse(res)
+	parsed, err := internalclient.ParseCreateRVToolsAssessmentV2Response(res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create RVTools job. status: %d, err: %v", res.StatusCode, err)
 	}
@@ -114,13 +114,12 @@ func (s *plannerService) CreateRVToolsJob(name, filepath string) (*v1alpha1.Job,
 	if parsed.HTTPResponse.StatusCode != http.StatusAccepted {
 		return nil, fmt.Errorf("failed to create RVTools job. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
-
 	return parsed.JSON202, nil
 }
 
 // GetJob retrieves a job by ID
 func (s *plannerService) GetJob(id int64) (*v1alpha1.Job, error) {
-	res, err := s.api.GetRequest(fmt.Sprintf("%s/%d", apiV1AssessmentsJobsPath, id))
+	res, err := s.api.GetRequest(fmt.Sprintf("%s/%d", apiV2AssessmentsJobsPath, id))
 	if err != nil {
 		return nil, err
 	}
@@ -142,7 +141,7 @@ func (s *plannerService) GetJob(id int64) (*v1alpha1.Job, error) {
 func (s *plannerService) CancelJob(id int64) (*v1alpha1.Job, error) {
 	zap.S().Infof("[PlannerService] Cancel job %d [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.DeleteRequest(fmt.Sprintf("%s/%d", apiV1AssessmentsJobsPath, id))
+	res, err := s.api.DeleteRequest(fmt.Sprintf("%s/%d", apiV2AssessmentsJobsPath, id))
 	if err != nil {
 		return nil, err
 	}
@@ -159,38 +158,38 @@ func (s *plannerService) CancelJob(id int64) (*v1alpha1.Job, error) {
 	return parsed.JSON200, nil
 }
 
-// GetAssessment retrieves a specific assessment by ID
-func (s *plannerService) GetAssessment(id uuid.UUID) (*v1alpha1.Assessment, error) {
+func (s *plannerService) GetAssessment(id string) (*v1alpha1.AssessmentV2, error) {
 	zap.S().Infof("[PlannerService] Get assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.GetRequest(path.Join(apiV1AssessmentsPath, id.String()))
+	res, err := s.api.GetRequest(path.Join(apiV2AssessmentsPath, id))
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	parsed, err := internalclient.ParseGetAssessmentResponse(res)
-	if err != nil || parsed.HTTPResponse.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to get assessment. status: %d", res.StatusCode)
+	parsed, err := internalclient.ParseGetAssessmentV2Response(res)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get assessment. status: %d, err: %v", res.StatusCode, err)
 	}
 
 	if parsed.HTTPResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to get assessment. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
+
 	return parsed.JSON200, nil
 }
 
 // GetAssessments lists all assessments
-func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentList, error) {
+func (s *plannerService) GetAssessments() ([]v1alpha1.AssessmentV2Summary, error) {
 	zap.S().Infof("[PlannerService] Get assessments [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.GetRequest(apiV1AssessmentsPath)
+	res, err := s.api.GetRequest(apiV2AssessmentsPath)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	parsed, err := internalclient.ParseListAssessmentsResponse(res)
+	parsed, err := internalclient.ParseListAssessmentsV2Response(res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list assessments. status: %d", res.StatusCode)
 	}
@@ -198,14 +197,14 @@ func (s *plannerService) GetAssessments() (*v1alpha1.AssessmentList, error) {
 	if parsed.HTTPResponse.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("failed to list assessments. bad res status code: %d. res body: %v", res.StatusCode, string(parsed.Body))
 	}
-	return parsed.JSON200, nil
+	return *parsed.JSON200, nil
 }
 
 // UpdateAssessment updates an assessment's name
-func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.Assessment, error) {
+func (s *plannerService) UpdateAssessment(id string, name string) (*v1alpha1.AssessmentV2, error) {
 	zap.S().Infof("[PlannerService] Update assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	body := v1alpha1.UpdateAssessmentJSONRequestBody{
+	body := v1alpha1.UpdateAssessmentV2JSONRequestBody{
 		Name: &name,
 	}
 	reqBody, err := json.Marshal(body)
@@ -213,13 +212,13 @@ func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.
 		return nil, err
 	}
 
-	res, err := s.api.PutRequest(path.Join(apiV1AssessmentsPath, id.String()), reqBody)
+	res, err := s.api.PatchRequest(path.Join(apiV2AssessmentsPath, id), reqBody)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	parsed, err := internalclient.ParseUpdateAssessmentResponse(res)
+	parsed, err := internalclient.ParseUpdateAssessmentV2Response(res)
 	if err != nil {
 		return nil, fmt.Errorf("failed to update assessment. status: %d", res.StatusCode)
 	}
@@ -231,10 +230,10 @@ func (s *plannerService) UpdateAssessment(id uuid.UUID, name string) (*v1alpha1.
 }
 
 // ShareAssessment shares an assessment with the user's partner organization
-func (s *plannerService) ShareAssessment(id uuid.UUID) (int, error) {
+func (s *plannerService) ShareAssessment(id string) (int, error) {
 	zap.S().Infof("[PlannerService] Share assessment %s [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.PostRequest(path.Join(apiV1AssessmentsPath, id.String(), "share"), nil)
+	res, err := s.api.PostRequest(path.Join(apiV2AssessmentsPath, id, "share"), nil)
 	if err != nil {
 		return 0, err
 	}
@@ -248,10 +247,10 @@ func (s *plannerService) ShareAssessment(id uuid.UUID) (int, error) {
 }
 
 // UnshareAssessment unshares an assessment from the user's partner organization
-func (s *plannerService) UnshareAssessment(id uuid.UUID) (int, error) {
+func (s *plannerService) UnshareAssessment(id string) (int, error) {
 	zap.S().Infof("[PlannerService] Unshare assessment %s [user: %s, organization: %s]", id, s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.DeleteRequest(path.Join(apiV1AssessmentsPath, id.String(), "share"))
+	res, err := s.api.DeleteRequest(path.Join(apiV2AssessmentsPath, id, "share"))
 	if err != nil {
 		return 0, err
 	}
@@ -265,10 +264,10 @@ func (s *plannerService) UnshareAssessment(id uuid.UUID) (int, error) {
 }
 
 // RemoveAssessment deletes a specific assessment by ID
-func (s *plannerService) RemoveAssessment(id uuid.UUID) error {
+func (s *plannerService) RemoveAssessment(id string) error {
 	zap.S().Infof("[PlannerService] Delete assessment [user: %s, organization: %s]", s.credentials.Username, s.credentials.Organization)
 
-	res, err := s.api.DeleteRequest(path.Join(apiV1AssessmentsPath, id.String()))
+	res, err := s.api.DeleteRequest(path.Join(apiV2AssessmentsPath, id))
 	if err != nil {
 		return err
 	}
@@ -280,4 +279,99 @@ func (s *plannerService) RemoveAssessment(id uuid.UUID) error {
 		return fmt.Errorf("failed to delete assessment. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(b)))
 	}
 	return nil
+}
+
+// GetAssessmentSummary retrieves assessment metadata from the v2 list endpoint.
+func (s *plannerService) GetAssessmentSummary(id string) (*v1alpha1.AssessmentV2Summary, error) {
+	assessments, err := s.GetAssessments()
+	if err != nil {
+		return nil, err
+	}
+	for _, assessment := range assessments {
+		if assessment.Id.String() == id {
+			return &assessment, nil
+		}
+	}
+	return nil, fmt.Errorf("assessment %s not found in v2 assessment list", id)
+}
+
+// UploadRVToolsToAssessment uploads another vCenter inventory to an assessment through the v2 API.
+func (s *plannerService) UploadRVToolsToAssessment(id string, filepath string) (*v1alpha1.Job, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, id, "rvtools")
+	res, err := s.api.MultipartPutRequest(endpoint, filepath)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() { _ = res.Body.Close() }()
+
+	body, err := io.ReadAll(res.Body)
+	if err != nil {
+		return nil, fmt.Errorf("upload RVTools to assessment: failed to read response: %w", err)
+	}
+	if res.StatusCode != http.StatusAccepted {
+		return nil, fmt.Errorf("upload RVTools to assessment: unexpected status code: %d. response body: %s", res.StatusCode, string(body))
+	}
+
+	var job v1alpha1.Job
+	if err := json.Unmarshal(body, &job); err != nil {
+		return nil, fmt.Errorf("upload RVTools to assessment: failed to decode job response: %w", err)
+	}
+	return &job, nil
+}
+
+func (s *plannerService) GetVCenter(assessmentID string, vcenterID string) (*v1alpha1.AssessmentVCenterV2, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, assessmentID, "vcenters", vcenterID)
+	res, err := s.api.GetRequest(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("failed to get vCenter. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	parsed, err := internalclient.ParseGetVcenterResponse(res)
+	if err != nil {
+		return nil, err
+	}
+	return parsed.JSON200, nil
+}
+
+func (s *plannerService) GetVCenterCluster(assessmentID, vcenterID, clusterId string) (*v1alpha1.InventoryData, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, assessmentID, "vcenters", vcenterID, "clusters", clusterId)
+	res, err := s.api.GetRequest(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return nil, fmt.Errorf("failed to get vCenter. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	parsed, err := internalclient.ParseGetVcenterClusterResponse(res)
+	if err != nil {
+		return nil, err
+	}
+
+	return parsed.JSON200, nil
+}
+
+func (s *plannerService) DeleteVCenterInventory(assessmentID string, vcenterID string) (int, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, assessmentID, "vcenters", vcenterID)
+	res, err := s.api.DeleteRequest(endpoint)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(res.Body)
+		return res.StatusCode, fmt.Errorf("failed to delete vCenter inventory. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return res.StatusCode, nil
 }

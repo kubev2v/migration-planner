@@ -17,13 +17,14 @@ import (
 
 var _ = Describe("e2e-share", func() {
 	var (
-		adminSvc    PlannerService
-		customerSvc PlannerService
-		partnerSvc  PlannerService
-		group       *v1alpha1.Group
-		assessment  *v1alpha1.Assessment
-		err         error
-		startTime   time.Time
+		adminSvc     PlannerService
+		customerSvc  PlannerService
+		partnerSvc   PlannerService
+		group        *v1alpha1.Group
+		assessment   *v1alpha1.AssessmentV2
+		assessmentID string
+		err          error
+		startTime    time.Time
 	)
 
 	inventory := &v1alpha1.Inventory{
@@ -59,6 +60,7 @@ var _ = Describe("e2e-share", func() {
 
 	BeforeEach(func() {
 		startTime = time.Now()
+		assessmentID = ""
 
 		// Admin service for setup
 		adminSvc, err = DefaultPlannerService()
@@ -115,14 +117,25 @@ var _ = Describe("e2e-share", func() {
 		assessment, err = customerSvc.CreateAssessment("share-test-assessment", "inventory", nil, inventory)
 		Expect(err).To(BeNil())
 		Expect(assessment).ToNot(BeNil())
+
+		assessments, err := customerSvc.GetAssessments()
+		Expect(err).To(BeNil())
+		Expect(assessments).ToNot(BeNil())
+		for _, summary := range assessments {
+			if summary.Name == "share-test-assessment" {
+				assessmentID = summary.Id.String()
+				break
+			}
+		}
+		Expect(assessmentID).ToNot(BeEmpty(), "Created assessment must appear in the assessment list")
 	})
 
 	AfterEach(func() {
 		zap.S().Info("Cleaning up after share test...")
 
 		// Clean up assessment
-		if assessment != nil {
-			_ = customerSvc.RemoveAssessment(assessment.Id)
+		if assessmentID != "" {
+			_ = customerSvc.RemoveAssessment(assessmentID)
 		}
 
 		// Clean up partner relationship
@@ -147,10 +160,10 @@ var _ = Describe("e2e-share", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Before sharing, customer sees owner permissions and isShared=false
-			customerAssessment, err := customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err := customerSvc.GetAssessmentSummary(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Permissions).ToNot(BeNil())
-			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentPermissionsRead, v1alpha1.AssessmentPermissionsShare, v1alpha1.AssessmentPermissionsDelete))
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.Read, v1alpha1.Share, v1alpha1.Delete))
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
 			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
@@ -158,20 +171,20 @@ var _ = Describe("e2e-share", func() {
 			// Partner cannot see the assessment before sharing
 			partnerAssessments, err := partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
+			Expect(findAssessment(partnerAssessments, assessmentID)).To(BeFalse())
 
 			// Customer shares the assessment
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
 			// Partner can now see the assessment with read permission
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
+			Expect(findAssessment(partnerAssessments, assessmentID)).To(BeTrue())
 
 			// Owner sees sharing state after sharing
-			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err = customerSvc.GetAssessmentSummary(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeTrue())
@@ -179,20 +192,20 @@ var _ = Describe("e2e-share", func() {
 			Expect(customerAssessment.Sharing.SharedWith[0].Type).To(Equal("group"))
 
 			// Customer unshares the assessment
-			statusCode, err = customerSvc.UnshareAssessment(assessment.Id)
+			statusCode, err = customerSvc.UnshareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
 			// Partner can no longer see the assessment
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
+			Expect(findAssessment(partnerAssessments, assessmentID)).To(BeFalse())
 
 			// After unsharing, customer still sees owner permissions and isShared=false
-			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err = customerSvc.GetAssessmentSummary(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Permissions).ToNot(BeNil())
-			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentPermissionsRead, v1alpha1.AssessmentPermissionsShare, v1alpha1.AssessmentPermissionsDelete))
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.Read, v1alpha1.Share, v1alpha1.Delete))
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
 			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
@@ -203,11 +216,11 @@ var _ = Describe("e2e-share", func() {
 		It("share is idempotent", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
-			statusCode, err = customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err = customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
@@ -217,7 +230,7 @@ var _ = Describe("e2e-share", func() {
 		It("unshare is idempotent", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, err := customerSvc.UnshareAssessment(assessment.Id)
+			statusCode, err := customerSvc.UnshareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
@@ -231,11 +244,11 @@ var _ = Describe("e2e-share", func() {
 		It("partner calls complexity-estimation on shared assessment", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
-			code, err := partnerSvc.CalculateMigrationComplexity(assessment.Id, clusterID)
+			code, err := partnerSvc.CalculateMigrationComplexity(assessmentID, clusterID)
 			Expect(err).To(BeNil())
 			Expect(code).To(Equal(http.StatusOK))
 
@@ -245,11 +258,11 @@ var _ = Describe("e2e-share", func() {
 		It("partner calls migration-estimation on shared assessment", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
-			code, err := partnerSvc.CalculateMigrationEstimation(assessment.Id, clusterID)
+			code, err := partnerSvc.CalculateMigrationEstimation(assessmentID, clusterID)
 			Expect(err).To(BeNil())
 			Expect(code).To(Equal(http.StatusOK))
 
@@ -259,11 +272,11 @@ var _ = Describe("e2e-share", func() {
 		It("partner calls migration-estimation/by-complexity on shared assessment", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
-			code, err := partnerSvc.CalculateMigrationEstimationByComplexity(assessment.Id, clusterID)
+			code, err := partnerSvc.CalculateMigrationEstimationByComplexity(assessmentID, clusterID)
 			Expect(err).To(BeNil())
 			Expect(code).To(Equal(http.StatusOK))
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
@@ -275,14 +288,14 @@ var _ = Describe("e2e-share", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Customer shares the assessment
-			statusCode, err := customerSvc.ShareAssessment(assessment.Id)
+			statusCode, err := customerSvc.ShareAssessment(assessmentID)
 			Expect(err).To(BeNil())
 			Expect(statusCode).To(Equal(http.StatusOK))
 
 			// Partner can see the assessment
 			partnerAssessments, err := partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
+			Expect(findAssessment(partnerAssessments, assessmentID)).To(BeTrue())
 
 			// Customer leaves the partner
 			err = customerSvc.LeavePartner(group.Id)
@@ -291,7 +304,7 @@ var _ = Describe("e2e-share", func() {
 			// Partner can no longer see the assessment
 			partnerAssessments, err = partnerSvc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
+			Expect(findAssessment(partnerAssessments, assessmentID)).To(BeFalse())
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 	})
@@ -307,12 +320,18 @@ var _ = Describe("e2e-share", func() {
 			// Regular user creates their own assessment
 			regularAssessment, err := regularSvc.CreateAssessment("regular-assessment", "inventory", nil, inventory)
 			Expect(err).To(BeNil())
+			Expect(regularAssessment).ToNot(BeNil())
+			regularAssessments, err := regularSvc.GetAssessments()
+			Expect(err).To(BeNil())
+			Expect(regularAssessments).ToNot(BeNil())
+			Expect(regularAssessments).To(HaveLen(1))
+			regularAssessmentID := (regularAssessments)[0].Id.String()
 			DeferCleanup(func() {
-				_ = regularSvc.RemoveAssessment(regularAssessment.Id)
+				_ = regularSvc.RemoveAssessment(regularAssessmentID)
 			})
 
 			// Regular user tries to share — should get 400 (not a customer)
-			statusCode, _ := regularSvc.ShareAssessment(regularAssessment.Id)
+			statusCode, _ := regularSvc.ShareAssessment(regularAssessmentID)
 			Expect(statusCode).To(Equal(http.StatusBadRequest))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
@@ -321,7 +340,7 @@ var _ = Describe("e2e-share", func() {
 		It("share non-existent assessment — returns 404", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
-			statusCode, _ := customerSvc.ShareAssessment(uuid.New())
+			statusCode, _ := customerSvc.ShareAssessment(uuid.NewString())
 			Expect(statusCode).To(Equal(http.StatusNotFound))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
@@ -329,12 +348,12 @@ var _ = Describe("e2e-share", func() {
 	})
 })
 
-func findAssessment(list *v1alpha1.AssessmentList, id uuid.UUID) bool {
+func findAssessment(list []v1alpha1.AssessmentV2Summary, id string) bool {
 	if list == nil {
 		return false
 	}
-	for _, a := range *list {
-		if a.Id == id {
+	for _, a := range list {
+		if a.Id.String() == id {
 			return true
 		}
 	}

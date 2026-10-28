@@ -3,13 +3,12 @@ package mappers
 import (
 	"time"
 
-	"github.com/kubev2v/migration-planner/internal/service"
-
 	"github.com/google/uuid"
-
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/service"
+
+	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
@@ -214,10 +213,4 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 	}
 
 	return form
-}
-
-func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
-	return mappers.InventoryForm{
-		Data: inventory,
-	}
 }
