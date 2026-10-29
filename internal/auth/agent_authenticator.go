@@ -11,6 +11,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"go.uber.org/zap"
@@ -21,7 +22,7 @@ const (
 	AgentTokenHeader        = "X-Agent-Token"
 )
 
-func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
+func GenerateAgentJWTAndKey(source *svcmodel.Source) (*model.Key, string, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		return nil, "", fmt.Errorf("failed to generate agent private key: %s", err)
@@ -42,7 +43,7 @@ func GenerateAgentJWTAndKey(source *model.Source) (*model.Key, string, error) {
 	return key, token, nil
 }
 
-func GenerateAgentJWT(signingKey *model.Key, source *model.Source) (string, error) {
+func GenerateAgentJWT(signingKey *model.Key, source *svcmodel.Source) (string, error) {
 	type jwtToken struct {
 		SourceID string `json:"source_id"`
 		jwt.RegisteredClaims

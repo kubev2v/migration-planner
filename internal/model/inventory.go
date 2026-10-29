@@ -1,4 +1,4 @@
-// Package model defines the service-layer domain model for assessments.
+// Package model defines the service-layer domain models for sources and assessments.
 //
 // Unlike the persistence model in internal/store/model, the inventory here is a
 // fully structured domain type (Inventory) rather than a raw jsonb blob. The
@@ -22,7 +22,7 @@ const (
 	ClusterFeaturesDrsModePartiallyAutomated ClusterFeaturesDrsMode = "Partially Automated"
 )
 
-// Inventory is the top-level structured inventory for an assessment.
+// Inventory is the top-level structured inventory for a source or assessment.
 type Inventory struct {
 	Clusters       map[string]InventoryData `json:"clusters"`
 	CollectionTime *time.Time               `json:"collection_time"`

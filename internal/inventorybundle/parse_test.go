@@ -24,6 +24,15 @@ func TestParse_JSON(t *testing.T) {
 	if parsed.VCenterID != "vc-1" {
 		t.Errorf("VCenterID = %q, want vc-1", parsed.VCenterID)
 	}
+	if parsed.MainInventory.VcenterId != "vc-1" {
+		t.Errorf("inventory VcenterId = %q, want vc-1", parsed.MainInventory.VcenterId)
+	}
+	if parsed.MainInventory.CreatedAt == nil {
+		t.Error("inventory CreatedAt is nil, want generated timestamp")
+	}
+	if parsed.MainInventory.Clusters == nil {
+		t.Error("inventory Clusters is nil, want empty map")
+	}
 	if parsed.Subsets == nil {
 		t.Fatal("Subsets is nil, want empty slice for JSON")
 	}
@@ -116,7 +125,10 @@ func TestParse_Zip(t *testing.T) {
 			Name:      "group-a",
 			VcenterId: &vcenter,
 			VmsCount:  &vms,
-			Inventory: v1alpha1.Inventory{VcenterId: "vc-a"},
+			Inventory: v1alpha1.Inventory{
+				VcenterId: "vc-a",
+				Vcenter:   &v1alpha1.InventoryData{Vms: v1alpha1.VMs{Total: 3}},
+			},
 		},
 	})
 
@@ -138,6 +150,16 @@ func TestParse_Zip(t *testing.T) {
 	}
 	if parsed.Subsets[0].VMsCount != 3 {
 		t.Errorf("VMsCount = %d, want 3", parsed.Subsets[0].VMsCount)
+	}
+	if parsed.Subsets[0].VCenterID != "vc-a" {
+		t.Errorf("subset VCenterID = %q, want vc-a", parsed.Subsets[0].VCenterID)
+	}
+	inv := parsed.Subsets[0].Inventory
+	if inv.VcenterId != "vc-a" || inv.Vcenter == nil || inv.Vcenter.Vms.Total != 3 {
+		t.Errorf("subset inventory = %+v, want vc-a with 3 VMs", inv)
+	}
+	if inv.Clusters == nil {
+		t.Error("subset inventory Clusters is nil, want empty map")
 	}
 }
 
@@ -317,15 +339,11 @@ func TestParse_CollectionTime(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		documents := [][]byte{parsed.MainInventory}
+		documents := []v1alpha1.Inventory{parsed.MainInventory}
 		for _, subset := range parsed.Subsets {
 			documents = append(documents, subset.Inventory)
 		}
-		for _, document := range documents {
-			var got v1alpha1.Inventory
-			if err := json.Unmarshal(document, &got); err != nil {
-				t.Fatal(err)
-			}
+		for _, got := range documents {
 			if got.CollectionTime == nil || !got.CollectionTime.Equal(collected) {
 				t.Fatalf("collection time = %v, want %v", got.CollectionTime, collected)
 			}

@@ -12,7 +12,6 @@ import (
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
 
-	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -231,19 +230,18 @@ var _ = Describe("assessment service", Ordered, func() {
 	Context("CreateAssessment", func() {
 		Context("with inventory source", func() {
 			It("successfully creates assessment with inventory", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON := svcmodel.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &svcmodel.InventoryData{
+						Vms:   svcmodel.VMs{Total: 10},
+						Infra: svcmodel.Infra{TotalHosts: 5},
 					},
-				})
+				}
 
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
 				ownerLastName := "Johnson"
-				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
-				Expect(err).To(BeNil())
+				inv := svcmodel.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment", svcmodel.InventoryVersionV2, false, inventoryJSON)
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
 					Name:           "Test Assessment",
@@ -279,17 +277,16 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("successfully creates assessment without owner fields (nil values)", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON := svcmodel.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &svcmodel.InventoryData{
+						Vms:   svcmodel.VMs{Total: 10},
+						Infra: svcmodel.Infra{TotalHosts: 5},
 					},
-				})
+				}
 
 				testAssessmentID := uuid.New()
-				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
-				Expect(err).To(BeNil())
+				inv := svcmodel.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment No Owner", svcmodel.InventoryVersionV2, false, inventoryJSON)
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
 					Name:           "Test Assessment No Owner",
@@ -313,13 +310,13 @@ var _ = Describe("assessment service", Ordered, func() {
 			})
 
 			It("fails to create assessment when name already exists (duplicate key constraint)", func() {
-				inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+				inventoryJSON := svcmodel.Inventory{
 					VcenterId: "test-vcenter",
-					Vcenter: &v1alpha1.InventoryData{
-						Vms:   v1alpha1.VMs{Total: 10},
-						Infra: v1alpha1.Infra{TotalHosts: 5},
+					Vcenter: &svcmodel.InventoryData{
+						Vms:   svcmodel.VMs{Total: 10},
+						Infra: svcmodel.Infra{TotalHosts: 5},
 					},
-				})
+				}
 
 				name := "Duplicate Assessment"
 				// Insert first assessment directly via DB
@@ -328,8 +325,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Second creation with same name should fail via service (unique constraint)
-				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), name, false, inventoryJSON)
-				Expect(err).To(BeNil())
+				inv := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), name, svcmodel.InventoryVersionV2, false, inventoryJSON)
 				secondForm := mappers.AssessmentCreateForm{
 					ID:            uuid.New(),
 					Name:          name, // duplicate name
@@ -1224,42 +1220,39 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		It("aggregates subset inventories and returns main inventory with correct counts", func() {
-			mainJSON, _ := json.Marshal(v1alpha1.Inventory{
+			mainJSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
-				Clusters:  map[string]v1alpha1.InventoryData{},
-				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 1},
-					Infra:   v1alpha1.Infra{TotalHosts: 1},
+				Clusters:  map[string]svcmodel.InventoryData{},
+				Vcenter: &svcmodel.InventoryData{
+					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
+					Vms:     svcmodel.VMs{Total: 1},
+					Infra:   svcmodel.Infra{TotalHosts: 1},
 				},
-			})
-			inv1JSON, _ := json.Marshal(v1alpha1.Inventory{
+			}
+			inv1JSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
-				Clusters:  map[string]v1alpha1.InventoryData{},
-				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 3, CpuCores: v1alpha1.VMResourceBreakdown{Total: 6}},
-					Infra:   v1alpha1.Infra{TotalHosts: 1, Datastores: []v1alpha1.Datastore{{DiskId: "ds-1"}}, Networks: []v1alpha1.Network{{Name: "net-1"}}},
+				Clusters:  map[string]svcmodel.InventoryData{},
+				Vcenter: &svcmodel.InventoryData{
+					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
+					Vms:     svcmodel.VMs{Total: 3, CpuCores: svcmodel.VMResourceBreakdown{Total: 6}},
+					Infra:   svcmodel.Infra{TotalHosts: 1, Datastores: []svcmodel.Datastore{{DiskId: "ds-1"}}, Networks: []svcmodel.Network{{Name: "net-1"}}},
 				},
-			})
-			inv2JSON, _ := json.Marshal(v1alpha1.Inventory{
+			}
+			inv2JSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
-				Clusters:  map[string]v1alpha1.InventoryData{},
-				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 5, CpuCores: v1alpha1.VMResourceBreakdown{Total: 10}},
-					Infra:   v1alpha1.Infra{TotalHosts: 2, Datastores: []v1alpha1.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []v1alpha1.Network{{Name: "net-2"}}},
+				Clusters:  map[string]svcmodel.InventoryData{},
+				Vcenter: &svcmodel.InventoryData{
+					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
+					Vms:     svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 10}},
+					Infra:   svcmodel.Infra{TotalHosts: 2, Datastores: []svcmodel.Datastore{{DiskId: "ds-2"}, {DiskId: "ds-3"}}, Networks: []svcmodel.Network{{Name: "net-2"}}},
 				},
-			})
+			}
 
-			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
-			Expect(err).To(BeNil())
+			mainInv := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), "main", svcmodel.InventoryVersionV2, false, mainJSON)
 
-			subset1, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
-			Expect(err).To(BeNil())
+			subset1 := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), "file-1", svcmodel.InventoryVersionV2, true, inv1JSON)
 
-			subset2, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
-			Expect(err).To(BeNil())
+			subset2 := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), "file-2", svcmodel.InventoryVersionV2, true, inv2JSON)
 
 			createForm := mappers.AssessmentCreateForm{
 				ID:                uuid.New(),
@@ -1286,30 +1279,28 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 
 		It("skips non-subset inventories", func() {
-			mainJSON, _ := json.Marshal(v1alpha1.Inventory{
+			mainJSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
-				Clusters:  map[string]v1alpha1.InventoryData{},
-				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 100},
-					Infra:   v1alpha1.Infra{TotalHosts: 50},
+				Clusters:  map[string]svcmodel.InventoryData{},
+				Vcenter: &svcmodel.InventoryData{
+					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
+					Vms:     svcmodel.VMs{Total: 100},
+					Infra:   svcmodel.Infra{TotalHosts: 50},
 				},
-			})
-			subsetJSON, _ := json.Marshal(v1alpha1.Inventory{
+			}
+			subsetJSON := svcmodel.Inventory{
 				VcenterId: "vc-1",
-				Clusters:  map[string]v1alpha1.InventoryData{},
-				Vcenter: &v1alpha1.InventoryData{
-					Vcenter: &v1alpha1.VCenter{Id: "vc-1"},
-					Vms:     v1alpha1.VMs{Total: 7},
-					Infra:   v1alpha1.Infra{TotalHosts: 2},
+				Clusters:  map[string]svcmodel.InventoryData{},
+				Vcenter: &svcmodel.InventoryData{
+					Vcenter: &svcmodel.VCenter{Id: "vc-1"},
+					Vms:     svcmodel.VMs{Total: 7},
+					Infra:   svcmodel.Infra{TotalHosts: 2},
 				},
-			})
+			}
 
-			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
-			Expect(err).To(BeNil())
+			mainInv := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), "main", svcmodel.InventoryVersionV2, false, mainJSON)
 
-			subset, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
-			Expect(err).To(BeNil())
+			subset := svcmodel.NewAssessmentInventory(uuid.New(), uuid.New(), "subset-1", svcmodel.InventoryVersionV2, true, subsetJSON)
 
 			createForm := mappers.AssessmentCreateForm{
 				ID:                uuid.New(),
