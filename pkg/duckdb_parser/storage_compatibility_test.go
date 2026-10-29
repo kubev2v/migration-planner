@@ -10,8 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Snapshot of the schema before storage metadata was introduced; intentionally
-// independent of the current schema initializer.
+// Storage columns remain pre-metadata; unrelated network columns match the current VM query.
 func newPreStorageDatabase(t *testing.T, path string) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("duckdb", path)

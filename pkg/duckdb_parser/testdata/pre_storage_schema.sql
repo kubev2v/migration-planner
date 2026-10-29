@@ -96,8 +96,9 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     "Connected" BOOLEAN DEFAULT false,
     "Starts Connected" BOOLEAN DEFAULT false,
     "Type" VARCHAR,
-    "IPv4 Address" VARCHAR,
-    "IPv6 Address" VARCHAR,
+    "IPv4 Address" VARCHAR[] DEFAULT [],
+    "IPv6 Address" VARCHAR[] DEFAULT [],
+    "VLAN" VARCHAR,
     "Cluster" VARCHAR,
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
