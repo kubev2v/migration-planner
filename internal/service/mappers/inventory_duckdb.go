@@ -92,7 +92,7 @@ func vmsFromDuckDB(v *inventory.VMsData) svcmodel.VMs {
 			SupportTier: &tier,
 		}
 		if os.MTVStatus != "" {
-			status := api.OsInfoMtvStatus(os.MTVStatus)
+			status := svcmodel.OsInfoMtvStatus(os.MTVStatus)
 			info.MtvStatus = &status
 		}
 		if os.UpgradeRecommendation != "" {
