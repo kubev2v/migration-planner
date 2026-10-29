@@ -211,6 +211,11 @@ SELECT
     a.InstanceUuid
 FROM src.About a;
 
+INSERT INTO vnic ("Host", "Network Device", "Speed")
+SELECT h.ID, nic.value->>'key',
+    NULLIF(TRY_CAST(nic.value->>'linkSpeed' AS INTEGER), 0)
+FROM src.Host h, json_each(h.Network->'pNICs') nic;
+
 INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
     "VMotion support", "Storage VMotion support")
 SELECT

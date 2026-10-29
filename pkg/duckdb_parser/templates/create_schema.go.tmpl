@@ -117,6 +117,12 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
+CREATE TABLE IF NOT EXISTS vnic (
+    "Host" VARCHAR,
+    "Network Device" VARCHAR,
+    "Speed" INTEGER
+);
+
 CREATE TABLE IF NOT EXISTS vhost (
     "Datacenter" VARCHAR,
     "Cluster" VARCHAR,
