@@ -187,6 +187,53 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 	return sqlitePath
 }
 
+func TestIngestSqlite_Annotation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hasColumn  bool
+		annotation sql.NullString
+	}{
+		{name: "reported annotation", hasColumn: true, annotation: sql.NullString{String: "  SAP production application's: 東京 / Finance!\nOwner: Финансы.  ", Valid: true}},
+		{name: "literal VM annotation", hasColumn: true, annotation: sql.NullString{String: "VM", Valid: true}},
+		{name: "empty annotation", hasColumn: true, annotation: sql.NullString{Valid: true}},
+		{name: "NULL annotation", hasColumn: true},
+		{name: "legacy snapshot without annotation column"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vcenter-1",
+				[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "test-vm", clusterName: "cluster1"}},
+			)
+			if tc.hasColumn {
+				_, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS annotation_source (TYPE sqlite)", escapeSQLString(sqlitePath)))
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `ALTER TABLE annotation_source.VM ADD COLUMN Annotation VARCHAR`)
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `UPDATE annotation_source.VM SET Annotation = ? WHERE ID = ?`, tc.annotation, "vm-1")
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, "DETACH annotation_source")
+				require.NoError(t, err)
+			}
+
+			result, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "SQLite validation failed: %v", result.Errors)
+
+			var annotation sql.NullString
+			var name, folder, host string
+			err = db.QueryRowContext(ctx, `SELECT "Annotation", "VM", "Folder ID", "Host" FROM vinfo WHERE "VM ID" = ?`, "vm-1").Scan(&annotation, &name, &folder, &host)
+			require.NoError(t, err)
+			require.Equal(t, tc.annotation, annotation)
+			require.Equal(t, "test-vm", name)
+			require.Equal(t, "folder-1", folder)
+			require.Equal(t, "host-1", host)
+		})
+	}
+}
+
 func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
 	ctx := context.Background()
 	parser, db, cleanup := setupTestParser(t, &testValidator{})
