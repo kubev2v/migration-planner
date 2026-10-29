@@ -6,7 +6,7 @@ require (
 	github.com/MicahParks/jwkset v0.11.3
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/cloudevents/sdk-go/v2 v2.16.2
-	github.com/coreos/butane v0.25.1
+	github.com/coreos/butane v0.29.0
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/getkin/kin-openapi v0.145.0
 	github.com/go-chi/chi v1.5.5
@@ -72,7 +72,7 @@ require (
 	github.com/coreos/go-json v0.0.0-20231102161613-e49c8866685a // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.7.0 // indirect
-	github.com/coreos/ignition/v2 v2.24.0 // indirect
+	github.com/coreos/ignition/v2 v2.26.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20260306102053-7a68b5426c74 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/diskfs/go-diskfs v1.7.1-0.20251217162235-58541aa8f559 // indirect
