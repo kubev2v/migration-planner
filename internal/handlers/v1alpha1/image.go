@@ -162,23 +162,6 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	return nil, nil
 }
 
-// HEAD shares GET's representation so clients get the digest ETag without the archive.
-func (h *ImageHandler) HeadAgentImageByToken(ctx context.Context, req imageServer.HeadAgentImageByTokenRequestObject) (imageServer.HeadAgentImageByTokenResponseObject, error) {
-	response, err := h.GetAgentImageByToken(ctx, imageServer.GetAgentImageByTokenRequestObject(req))
-	if response == nil {
-		return nil, err
-	}
-	return headAgentImageByTokenResponse{response}, err
-}
-
-type headAgentImageByTokenResponse struct {
-	imageServer.GetAgentImageByTokenResponseObject
-}
-
-func (response headAgentImageByTokenResponse) VisitHeadAgentImageByTokenResponse(writer http.ResponseWriter) error {
-	return response.VisitGetAgentImageByTokenResponse(writer)
-}
-
 func (h *ImageHandler) GetAgentImageByToken(ctx context.Context, req imageServer.GetAgentImageByTokenRequestObject) (imageServer.GetAgentImageByTokenResponseObject, error) {
 	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
 		return imageServer.GetAgentImageByToken401JSONResponse{Message: err.Error()}, nil

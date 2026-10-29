@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
@@ -30,23 +29,6 @@ func NewAgentHandler(srv *service.AgentService, applianceCache *service.Applianc
 		srv:            srv,
 		applianceCache: applianceCache,
 	}
-}
-
-// HEAD shares GET's representation so agents get the digest ETag without the archive.
-func (h *AgentHandler) HeadAgentImage(ctx context.Context, request agentServer.HeadAgentImageRequestObject) (agentServer.HeadAgentImageResponseObject, error) {
-	response, err := h.GetAgentImage(ctx, agentServer.GetAgentImageRequestObject(request))
-	if response == nil {
-		return nil, err
-	}
-	return headAgentImageResponse{response}, err
-}
-
-type headAgentImageResponse struct {
-	agentServer.GetAgentImageResponseObject
-}
-
-func (response headAgentImageResponse) VisitHeadAgentImageResponse(writer http.ResponseWriter) error {
-	return response.VisitGetAgentImageResponse(writer)
 }
 
 func (h *AgentHandler) GetAgentImage(ctx context.Context, request agentServer.GetAgentImageRequestObject) (agentServer.GetAgentImageResponseObject, error) {

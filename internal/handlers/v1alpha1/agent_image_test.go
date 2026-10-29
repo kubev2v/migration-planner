@@ -86,18 +86,6 @@ var _ = Describe("agent image handlers", func() {
 		Expect(recorder.Body.String()).To(Equal("agent image"))
 	})
 
-	It("returns the digest without the archive on HEAD", func() {
-		srv := handlers.NewAgentHandler(nil, newApplianceCache(true))
-		ctx, recorder := agentImageRequest(http.MethodHead, sourceID, nil)
-
-		resp, err := srv.HeadAgentImage(ctx, agentServer.HeadAgentImageRequestObject{Id: sourceID})
-		Expect(err).To(BeNil())
-		Expect(resp).To(BeNil())
-		Expect(recorder.Code).To(Equal(http.StatusOK))
-		Expect(recorder.Header().Get("ETag")).To(Equal(`"sha256:test"`))
-		Expect(recorder.Body.Len()).To(BeZero())
-	})
-
 	It("returns 304 when the agent already runs the cached image", func() {
 		srv := handlers.NewAgentHandler(nil, newApplianceCache(true))
 		ctx, recorder := agentImageRequest(http.MethodGet, sourceID, http.Header{"If-None-Match": {`"sha256:test"`}})
@@ -141,12 +129,10 @@ var _ = Describe("agent image handlers", func() {
 		router, err := gorillamux.NewRouter(swagger)
 		Expect(err).To(BeNil())
 
-		for method, operationID := range map[string]string{http.MethodGet: "GetAgentImageByToken", http.MethodHead: "HeadAgentImageByToken"} {
-			route, _, err := router.FindRoute(httptest.NewRequest(method, "/api/v1/image/bytoken/token/agent-image", nil))
-			Expect(err).To(BeNil())
-			Expect(route.Operation.OperationID).To(Equal(operationID))
-		}
-		route, _, err := router.FindRoute(httptest.NewRequest(http.MethodGet, "/api/v1/image/bytoken/token/source.ova", nil))
+		route, _, err := router.FindRoute(httptest.NewRequest(http.MethodGet, "/api/v1/image/bytoken/token/agent-image", nil))
+		Expect(err).To(BeNil())
+		Expect(route.Operation.OperationID).To(Equal("GetAgentImageByToken"))
+		route, _, err = router.FindRoute(httptest.NewRequest(http.MethodGet, "/api/v1/image/bytoken/token/source.ova", nil))
 		Expect(err).To(BeNil())
 		Expect(route.Operation.OperationID).To(Equal("GetImageByToken"))
 	})
