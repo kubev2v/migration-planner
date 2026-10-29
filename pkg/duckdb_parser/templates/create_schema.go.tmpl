@@ -111,8 +111,9 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     "Connected" BOOLEAN DEFAULT false,
     "Starts Connected" BOOLEAN DEFAULT false,
     "Type" VARCHAR,
-    "IPv4 Address" VARCHAR,
-    "IPv6 Address" VARCHAR,
+    "IPv4 Address" VARCHAR[] DEFAULT [],
+    "IPv6 Address" VARCHAR[] DEFAULT [],
+    "VLAN" VARCHAR,
     "Cluster" VARCHAR,
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
@@ -194,6 +195,13 @@ CREATE TABLE IF NOT EXISTS dvport (
     "Port" VARCHAR,
     "VLAN" VARCHAR,
     "Switch" VARCHAR
+);
+
+CREATE TABLE IF NOT EXISTS vport (
+    "Host" VARCHAR,
+    "Port Group" VARCHAR,
+    "Switch" VARCHAR,
+    "VLAN" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS dvswitch (

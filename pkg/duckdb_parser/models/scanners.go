@@ -128,8 +128,17 @@ func (n *NICs) Scan(value interface{}) error {
 			Connected:       toBool(m["Connected"]),
 			StartsConnected: toBool(m["StartsConnected"]),
 			Type:            toString(m["Type"]),
-			IPv4Address:     toString(m["IPv4Address"]),
-			IPv6Address:     toString(m["IPv6Address"]),
+			VlanID:          toString(m["VlanID"]),
+		}
+		for name, dest := range map[string]*[]string{
+			"IPv4Address": &nic.IPv4Address,
+			"IPv6Address": &nic.IPv6Address,
+		} {
+			var values Networks
+			if err := values.Scan(m[name]); err != nil {
+				return fmt.Errorf("NICs.Scan: %s: %w", name, err)
+			}
+			*dest = append([]string{}, values...)
 		}
 		result = append(result, nic)
 	}

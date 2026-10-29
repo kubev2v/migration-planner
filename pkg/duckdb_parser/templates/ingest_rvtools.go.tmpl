@@ -514,6 +514,7 @@ DROP TABLE IF EXISTS rvtools_host_map;
 DROP TABLE IF EXISTS vMultiPath_normalized;
 DROP TABLE IF EXISTS vMultiPath_raw;
 
+-- DuckDB may read empty XLSX cells as 'VM'; exclude them from address lists.
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
     "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"
@@ -528,8 +529,16 @@ SELECT
     CASE WHEN LOWER(n."Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     CASE WHEN LOWER(n."Starts Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Starts Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     n."Type",
-    n."IPv4 Address",
-    n."IPv6 Address",
+    COALESCE((
+        SELECT LIST(DISTINCT TRIM(ip) ORDER BY TRIM(ip))
+        FROM unnest(string_split(n."IPv4 Address", ',')) AS t(ip)
+        WHERE TRIM(ip) NOT IN ('', 'VM')
+    ), []),
+    COALESCE((
+        SELECT LIST(DISTINCT TRIM(ip) ORDER BY TRIM(ip))
+        FROM unnest(string_split(n."IPv6 Address", ',')) AS t(ip)
+        WHERE TRIM(ip) NOT IN ('', 'VM')
+    ), []),
     n."Cluster"
 FROM read_xlsx('{{.FilePath}}', sheet='vNetwork', all_varchar=true) n
 WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
@@ -537,6 +546,35 @@ WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
 INSERT INTO dvport ("Port", "VLAN", "Switch")
 SELECT "Port", "VLAN", "Switch"
 FROM read_xlsx('{{.FilePath}}', sheet='dvPort', all_varchar=true);
+
+INSERT INTO vport ("Host", "Port Group", "Switch", "VLAN")
+SELECT "Host", "Port Group", "Switch", "VLAN"
+FROM read_xlsx('{{.FilePath}}', sheet='vPort', all_varchar=true);
+
+-- Each adapter should match either a standard or a distributed port group, not both.
+-- DuckDB may read empty XLSX cells as 'VM'; treat them as unknown VLANs.
+-- Conflicting rows for the same port group leave its VLAN unknown.
+UPDATE vnetwork n SET "VLAN" = p."VLAN"
+FROM vinfo v
+JOIN (
+    SELECT "Host", "Port Group", "Switch", MIN("VLAN") AS "VLAN"
+    FROM vport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Host", "Port Group", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p ON p."Host" = v."Host"
+WHERE n."VM ID" = v."VM ID"
+  AND p."Port Group" = n."Network" AND p."Switch" = n."Switch";
+
+UPDATE vnetwork n SET "VLAN" = p."VLAN"
+FROM (
+    SELECT "Port", "Switch", MIN("VLAN") AS "VLAN"
+    FROM dvport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Port", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p
+WHERE p."Port" = n."Network" AND p."Switch" = n."Switch";
 
 INSERT INTO dvswitch ("Name")
 SELECT DISTINCT "Name"
