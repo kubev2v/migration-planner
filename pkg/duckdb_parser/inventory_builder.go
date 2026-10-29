@@ -279,6 +279,7 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 				Count:                 os.Count,
 				IsSupported:           os.Supported,
 				SupportTier:           inventory.ClassifyOSTier(os.Name),
+				MTVStatus:             inventory.ClassifyOSMTVStatus(os.Name),
 				UpgradeRecommendation: upgradeRec,
 			}
 		}

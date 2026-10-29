@@ -3061,6 +3061,12 @@ components:
             - community_supported
             - special_handling
           description: OS support tier per Red Hat KCS article 4234591
+        mtvStatus:
+          type: string
+          enum:
+            - green
+            - blue
+          description: MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
         upgradeRecommendation:
           type: string
           description: Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
