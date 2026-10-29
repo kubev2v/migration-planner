@@ -16,9 +16,8 @@ Before proceeding, ensure you have the following:
 
 Export the necessary environment variables:
 ```
-export DEBUG_MODE=true # Using a special debug Container file for both the API and the agent  
+export DEBUG_MODE=true # Build the API image with debugger support
 export MIGRATION_PLANNER_API_IMAGE=quay.io/<QUAY-USERNAME>/migration-planner-api  
-export MIGRATION_PLANNER_AGENT_IMAGE=quay.io/<QUAY-USERNAME>/migration-planner-agent 
 export QUAY_USER="YOUR_QUAY_USERNAME"
 export QUAY_TOKEN="YOUR_QUAY_TOKEN"
 ```

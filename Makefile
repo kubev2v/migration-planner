@@ -9,7 +9,6 @@ VERBOSE ?= false
 REGISTRY ?= quay.io
 MIGRATION_PLANNER_IMAGE_TAG ?= latest
 MIGRATION_PLANNER_IMAGE_TAG := $(MIGRATION_PLANNER_IMAGE_TAG)$(if $(DEBUG_MODE),-debug)
-MIGRATION_PLANNER_AGENT_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent
 MIGRATION_PLANNER_API_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-api
 MIGRATION_PLANNER_ISO_IMAGE ?= $(REGISTRY)/redhat-user-workloads/assisted-migration-tenant/migration-planner-rhcos-iso
 MIGRATION_PLANNER_IMAGE_PULL_POLICY ?= Always
@@ -104,26 +103,6 @@ run: $(AIR) image
 	MIGRATION_PLANNER_OPA_POLICIES_FOLDER=$(MIGRATION_PLANNER_OPA_POLICIES_FOLDER) \
 	$(AIR) --build.cmd "make build" --build.bin "./bin/planner-api" --build.args_bin "run" --build.include_dir "cmd,internal,pkg,api"
 
-run-agent: build-agent
-	@echo "Running agent from agent-v2 submodule..."
-	$(MAKE) -C agent-v2 run
-
-# Build agent-v2 container image (includes UI)
-build-agent-image: submodules
-	@echo "Building agent-v2 container image..."
-	$(MAKE) -C agent-v2 image
-
-# Run agent-v2 container image locally
-# Usage: make run-agent-image AGENT_ID=<uuid> SOURCE_ID=<uuid>
-run-agent-image: submodules
-	@echo "Running agent-v2 container image..."
-	$(MAKE) -C agent-v2 run.image AGENT_ID=$(AGENT_ID) SOURCE_ID=$(SOURCE_ID)
-
-# Run agent-v2 UI dev server
-run-agent-ui: submodules
-	@echo "Starting agent-v2 UI dev server..."
-	$(MAKE) -C agent-v2 run.ui
-
 run-sizer:
 	@echo "🚀 Starting sizer service container on port $(SIZER_PORT)..."
 	@$(PODMAN) rm -f migration-planner-sizer-local 2>/dev/null || true
@@ -148,11 +127,6 @@ build: bin
 
 build-api: bin
 	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner-api
-
-build-agent: bin submodules
-	@echo "Building agent from agent-v2 submodule..."
-	$(MAKE) -C agent-v2 build
-	@echo "Agent binary built at agent-v2/bin/agent"
 
 build-cli: bin
 	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
@@ -189,15 +163,11 @@ stop-local:
 	@echo "✅ Database stopped and volume cleaned"
 
 # rebuild container only on source changes
-bin/.migration-planner-agent-container: bin submodules agent-v2/agent/Containerfile
-	$(PODMAN) build agent-v2/ $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f agent-v2/agent/Containerfile $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
-
 bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_FILES)
 	$(PODMAN) build . $(if $(DEBUG_MODE),--build-arg GCFLAGS="all=-N -l") -f Containerfile.api $(if $(LABEL),--label "$(LABEL)") -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG)
 	if [ "$(DEBUG_MODE)" = "true" ]; then $(PODMAN) build . --build-arg BASE_IMAGE=$(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG) -f Containerfile.api-debug -t $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); fi
 
 migration-planner-api-container: bin/.migration-planner-api-container
-migration-planner-agent-container: bin/.migration-planner-agent-container
 
 bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
 	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
@@ -219,7 +189,7 @@ bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile 
 
 migration-planner-iso-container: bin/.migration-planner-iso-container
 
-build-containers: migration-planner-api-container migration-planner-agent-container
+build-containers: migration-planner-api-container
 
 .PHONY: build-containers
 
@@ -237,14 +207,7 @@ push-api-container: migration-planner-api-container quay-login
 		$(PODMAN) push $(MIGRATION_PLANNER_API_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
 	fi;
 
-push-agent-container: migration-planner-agent-container quay-login
-	if [ -f $(DOCKER_AUTH_FILE) ]; then \
-		$(PODMAN) push --authfile=$(DOCKER_AUTH_FILE) $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
-	else \
-		$(PODMAN) push $(MIGRATION_PLANNER_AGENT_IMAGE):$(MIGRATION_PLANNER_IMAGE_TAG); \
-	fi;
-
-push-containers: push-api-container push-agent-container
+push-containers: push-api-container
 
 deploy-on-openshift: oc
 	@openshift_base_url=$$(oc whoami --show-server | sed -E 's~https?://api\.~~; s~:[0-9]+/?$$~~'); \
@@ -300,12 +263,6 @@ undeploy-local-obs:
 bin:
 	mkdir -p bin
 
-# Initialize git submodules if needed
-submodules:
-	@if [ -f .gitmodules ]; then \
-		git submodule update --init --recursive || true; \
-	fi
-
 clean:
 	- rm -f -r bin
 
@@ -347,10 +304,10 @@ $(MOQ):
 	@go install github.com/matryer/moq@latest
 	@echo "✅ 'moq' installed successfully."
 
-# Code generation (exclude agent-v2 submodule)
+# Code generation
 generate: $(MOQ)
 	@echo "⚙️ Running go generate..."
-	@PATH="$(GOBIN):$$PATH" go generate -v $(shell go list ./... | grep -v 'agent-v2' || true)
+	@PATH="$(GOBIN):$$PATH" go generate -v ./...
 	@echo "⚙️ Running mockgen script..."
 	@hack/mockgen.sh
 	@$(MAKE) format
@@ -388,10 +345,9 @@ check-format: format
 
 ##################### tests support start ##########################
 GINKGO := $(GOBIN)/ginkgo
-# Exclude agent-v2 from parent tests (it has its own module and runs separately via test-agent-v2 target)
-# Use explicit package paths to avoid agent-v2 submodule
+# Packages covered by the unit test suite
 UNIT_TEST_PACKAGES := ./cmd/... ./internal/... ./pkg/... ./api/...
-UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e --skip-package=agent-v2
+UNIT_TEST_GINKGO_OPTIONS ?= --skip e2e
 
 # Install ginkgo if not already available
 $(GINKGO):
@@ -399,21 +355,15 @@ $(GINKGO):
 	@go install -v github.com/onsi/ginkgo/v2/ginkgo@v2.22.0
 	@echo "✅ 'ginkgo' installed successfully."
 
-.PHONY: test test-agent-v2
+.PHONY: test
 # Run unit tests using ginkgo
 test: $(GINKGO)
 	@echo "🧪 Running Unit tests..."
 	@$(GINKGO) --cover -output-dir=. -coverprofile=cover.out -v --show-node-events $(if $(GO_TAGS),--tags $(GO_TAGS)) $(UNIT_TEST_GINKGO_OPTIONS) $(UNIT_TEST_PACKAGES)
 	@echo "✅ All Unit tests passed successfully."
 
-# Run agent-v2 tests separately in its own module context
-test-agent-v2: submodules
-	@echo "🧪 Running agent-v2 Unit tests..."
-	@cd agent-v2 && $(MAKE) test
-	@echo "✅ All agent-v2 Unit tests passed successfully."
-
 # Full unit test cycle: build, prepare DB, run tests, and clean up
-unit-test: build kill-db deploy-db migrate test test-agent-v2 kill-db
+unit-test: build kill-db deploy-db migrate test kill-db
 
 # Build standalone e2e test binary
 build-e2e:
