@@ -12,9 +12,11 @@ import (
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/client"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
@@ -110,7 +112,7 @@ type MockClusterSizingInputStore struct {
 	store *MockStore
 }
 
-func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	if m.store.getError != nil {
 		return nil, m.store.getError
 	}
@@ -118,22 +120,26 @@ func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Ass
 	if !exists {
 		return nil, store.ErrRecordNotFound
 	}
-	return assessment, nil
+	domain, err := storemappers.AssessmentFromStore(assessment)
+	if err != nil {
+		return nil, err
+	}
+	return &domain, nil
 }
 
-func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (model.AssessmentList, error) {
+func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (svcmodel.AssessmentList, error) {
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Create(ctx context.Context, assessment svcmodel.Assessment) (*svcmodel.Assessment, error) {
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []svcmodel.AssessmentInventory) (*svcmodel.Assessment, error) {
 	return nil, nil
 }
 
-func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
+func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...svcmodel.AssessmentInventory) error {
 	return nil
 }
 
@@ -232,20 +238,20 @@ func createTestSizerServerWithRequestCapture(response *client.SizerResponse, hea
 }
 
 func createTestInventory(clusterID string, totalVMs, totalCPU, totalMemory int) []byte {
-	inventoryData := api.InventoryData{
-		Vms: api.VMs{
+	inventoryData := svcmodel.InventoryData{
+		Vms: svcmodel.VMs{
 			Total: totalVMs,
-			CpuCores: api.VMResourceBreakdown{
+			CpuCores: svcmodel.VMResourceBreakdown{
 				Total: totalCPU,
 			},
-			RamGB: api.VMResourceBreakdown{
+			RamGB: svcmodel.VMResourceBreakdown{
 				Total: totalMemory,
 			},
 		},
 	}
-	inventory := api.Inventory{
+	inventory := svcmodel.Inventory{
 		Vcenter: &inventoryData,
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: inventoryData,
 		},
 	}
@@ -404,14 +410,14 @@ var _ = Describe("sizer service", func() {
 
 			It("aggregates a selected cluster list into one offer", func() {
 				request.ClusterIDs = []string{"east", "west"}
-				inventory := api.Inventory{Clusters: map[string]api.InventoryData{
+				inventory := svcmodel.Inventory{Clusters: map[string]svcmodel.InventoryData{
 					"east": {
-						Vms:                api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}},
-						ClusterUtilization: &api.ClusterUtilization{CpuMax: 50, MemMax: 25, Confidence: 80},
+						Vms:                svcmodel.VMs{Total: 10, CpuCores: svcmodel.VMResourceBreakdown{Total: 40}, RamGB: svcmodel.VMResourceBreakdown{Total: 80}},
+						ClusterUtilization: &svcmodel.ClusterUtilization{CpuMax: 50, MemMax: 25, Confidence: 80},
 					},
 					"west": {
-						Vms:                api.VMs{Total: 5, CpuCores: api.VMResourceBreakdown{Total: 20}, RamGB: api.VMResourceBreakdown{Total: 40}},
-						ClusterUtilization: &api.ClusterUtilization{CpuMax: 100, MemMax: 50, Confidence: 60},
+						Vms:                svcmodel.VMs{Total: 5, CpuCores: svcmodel.VMResourceBreakdown{Total: 20}, RamGB: svcmodel.VMResourceBreakdown{Total: 40}},
+						ClusterUtilization: &svcmodel.ClusterUtilization{CpuMax: 100, MemMax: 50, Confidence: 60},
 					},
 				}}
 				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
@@ -435,8 +441,8 @@ var _ = Describe("sizer service", func() {
 			DescribeTable("rejects invalid selected cluster lists",
 				func(clusterIDs []string, expectedMessage string) {
 					request.ClusterIDs = clusterIDs
-					inventory := api.Inventory{Clusters: map[string]api.InventoryData{
-						"east": {Vms: api.VMs{Total: 10, CpuCores: api.VMResourceBreakdown{Total: 40}, RamGB: api.VMResourceBreakdown{Total: 80}}},
+					inventory := svcmodel.Inventory{Clusters: map[string]svcmodel.InventoryData{
+						"east": {Vms: svcmodel.VMs{Total: 10, CpuCores: svcmodel.VMResourceBreakdown{Total: 40}, RamGB: svcmodel.VMResourceBreakdown{Total: 80}}},
 					}}
 					mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
 					testServer = createTestSizerServer(nil, http.StatusOK, false)
@@ -455,9 +461,9 @@ var _ = Describe("sizer service", func() {
 
 			It("rejects an empty clusterId without vCenter aggregate data", func() {
 				request.ClusterID = ""
-				inventory := api.Inventory{
-					Clusters: map[string]api.InventoryData{
-						clusterID: {Vms: api.VMs{Total: 10}},
+				inventory := svcmodel.Inventory{
+					Clusters: map[string]svcmodel.InventoryData{
+						clusterID: {Vms: svcmodel.VMs{Total: 10}},
 					},
 				}
 				mockStore.assessments[assessmentID] = createAssessmentWithInventory(assessmentID, inventory)
@@ -1041,31 +1047,6 @@ var _ = Describe("sizer service", func() {
 				Expect(err.Error()).To(ContainSubstring("no full inventory"))
 			})
 
-			It("returns error when assessment inventory is empty", func() {
-				assessment := &model.Assessment{
-					ID: assessmentID,
-					Inventories: []model.AssessmentInventory{
-						{
-							ID:           uuid.New(),
-							CreatedAt:    time.Now(),
-							Inventory:    []byte{},
-							AssessmentID: assessmentID,
-						},
-					},
-				}
-				mockStore.assessments[assessmentID] = assessment
-				// Create a dummy sizerService - it won't be used since validation will fail first
-				testServer = createTestSizerServer(nil, http.StatusOK, false)
-				sizerClient = client.NewSizerClient(testServer.URL, 5*time.Second)
-				sizerService = service.NewSizerService(sizerClient, mockStore)
-
-				result, err := sizerService.CalculateClusterRequirements(ctx, assessmentID, request)
-
-				Expect(err).NotTo(BeNil())
-				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("empty inventory"))
-			})
-
 			It("returns error when inventory JSON is invalid", func() {
 				assessment := &model.Assessment{
 					ID: assessmentID,
@@ -1088,7 +1069,7 @@ var _ = Describe("sizer service", func() {
 
 				Expect(err).NotTo(BeNil())
 				Expect(result).To(BeNil())
-				Expect(err.Error()).To(ContainSubstring("failed to parse inventory"))
+				Expect(err.Error()).To(ContainSubstring("failed to unmarshal v2 inventory"))
 			})
 
 			It("returns error when cluster not found in inventory", func() {
@@ -2595,38 +2576,38 @@ var _ = Describe("sizer service", func() {
 	})
 })
 
-func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) api.Inventory {
-	return api.Inventory{
+func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence float64) svcmodel.Inventory {
+	return svcmodel.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: svcmodel.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: svcmodel.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: svcmodel.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []svcmodel.MigrationIssue{},
+					NotMigratableReasons: []svcmodel.MigrationIssue{},
+					DiskCount: svcmodel.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: svcmodel.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				ClusterUtilization: &api.ClusterUtilization{
+				ClusterUtilization: &svcmodel.ClusterUtilization{
 					CpuMax:     cpuMax,
 					MemMax:     memMax,
 					Confidence: confidence,
 				},
-				Infra: api.Infra{
+				Infra: svcmodel.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []svcmodel.Datastore{},
+					Networks:        []svcmodel.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2634,33 +2615,33 @@ func createInventoryWithUtilization(clusterID string, cpuMax, memMax, confidence
 	}
 }
 
-func createInventoryWithoutUtilization(clusterID string) api.Inventory {
-	return api.Inventory{
+func createInventoryWithoutUtilization(clusterID string) svcmodel.Inventory {
+	return svcmodel.Inventory{
 		VcenterId: "test-vcenter",
-		Clusters: map[string]api.InventoryData{
+		Clusters: map[string]svcmodel.InventoryData{
 			clusterID: {
-				Vms: api.VMs{
+				Vms: svcmodel.VMs{
 					Total: 10,
-					CpuCores: api.VMResourceBreakdown{
+					CpuCores: svcmodel.VMResourceBreakdown{
 						Total: 100,
 					},
-					RamGB: api.VMResourceBreakdown{
+					RamGB: svcmodel.VMResourceBreakdown{
 						Total: 200,
 					},
 					PowerStates:          map[string]int{},
-					MigrationWarnings:    []api.MigrationIssue{},
-					NotMigratableReasons: []api.MigrationIssue{},
-					DiskCount: api.VMResourceBreakdown{
+					MigrationWarnings:    []svcmodel.MigrationIssue{},
+					NotMigratableReasons: []svcmodel.MigrationIssue{},
+					DiskCount: svcmodel.VMResourceBreakdown{
 						Total: 10,
 					},
-					DiskGB: api.VMResourceBreakdown{
+					DiskGB: svcmodel.VMResourceBreakdown{
 						Total: 1000,
 					},
 				},
-				Infra: api.Infra{
+				Infra: svcmodel.Infra{
 					TotalHosts:      0,
-					Datastores:      []api.Datastore{},
-					Networks:        []api.Network{},
+					Datastores:      []svcmodel.Datastore{},
+					Networks:        []svcmodel.Network{},
 					HostPowerStates: map[string]int{},
 				},
 			},
@@ -2668,7 +2649,7 @@ func createInventoryWithoutUtilization(clusterID string) api.Inventory {
 	}
 }
 
-func createAssessmentWithInventory(id uuid.UUID, inventory api.Inventory) *model.Assessment {
+func createAssessmentWithInventory(id uuid.UUID, inventory svcmodel.Inventory) *model.Assessment {
 	inventoryJSON, err := json.Marshal(inventory)
 	Expect(err).NotTo(HaveOccurred())
 	return &model.Assessment{

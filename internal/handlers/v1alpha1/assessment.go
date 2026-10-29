@@ -107,12 +107,7 @@ func (h *ServiceHandler) CreateAssessment(ctx context.Context, request server.Cr
 		WithString("source_type", assessment.SourceType).
 		Log()
 
-	apiAssessment, err := mappers.StoreAssessmentToApi(*assessment)
-	if err != nil {
-		return server.CreateAssessment500JSONResponse{Message: err.Error()}, nil
-	}
-
-	return server.CreateAssessment201JSONResponse(apiAssessment), nil
+	return server.CreateAssessment201JSONResponse(mappers.AssessmentToApi(*assessment)), nil
 }
 
 // (GET /api/v1/assessments/{id})
@@ -142,12 +137,7 @@ func (h *ServiceHandler) GetAssessment(ctx context.Context, request server.GetAs
 
 	logger.Success().WithString("assessment_name", assessment.Name).WithString("source_type", assessment.SourceType).Log()
 
-	apiAssessment, err := mappers.AssessmentToApi(*assessment)
-	if err != nil {
-		return server.GetAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
-	}
-
-	return server.GetAssessment200JSONResponse(apiAssessment), nil
+	return server.GetAssessment200JSONResponse(mappers.AssessmentToApi(*assessment)), nil
 }
 
 // (PUT /api/v1/assessments/{id})
@@ -189,12 +179,7 @@ func (h *ServiceHandler) UpdateAssessment(ctx context.Context, request server.Up
 		WithString("source_type", updatedAssessment.SourceType).
 		Log()
 
-	apiAssessment, err := mappers.AssessmentToApi(*updatedAssessment)
-	if err != nil {
-		return server.UpdateAssessment500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err)}, nil
-	}
-
-	return server.UpdateAssessment200JSONResponse(apiAssessment), nil
+	return server.UpdateAssessment200JSONResponse(mappers.AssessmentToApi(*updatedAssessment)), nil
 }
 
 // (DELETE /api/v1/assessments/{id})
