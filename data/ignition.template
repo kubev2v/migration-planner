@@ -70,12 +70,6 @@ storage:
       label: "DATA"
 
   links:
-    - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
-      target: /usr/lib/systemd/user/podman-auto-update.timer
-      user:
-        name: core
-      group:
-        name: core
     - path: /home/core/.config/systemd/user/default.target.wants/planner-agent-image-load.service
       target: /home/core/.config/systemd/user/planner-agent-image-load.service
       user:
@@ -95,6 +89,11 @@ storage:
       group:
         name: core
     - path: /var/lib/data/agent/updates
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/lib/data/agent/updates/.staging
       user:
         name: core
       group:
@@ -227,17 +226,108 @@ storage:
           #!/usr/bin/bash
           set -euo pipefail
 
+          # The agent stages archives in updates/.staging/ and renames them here once validated,
+          # so every *.tar in this directory is complete and approved for installation.
           readonly UPDATE_DIR=/var/lib/data/agent/updates
 
+          # Preserve stdout for JSON reports; retain the last 4096 stderr bytes for the
+          # journal and status.json. pipefail preserves the command's failure.
+          run_with_diagnostics() {
+            "$@" 2>&1 1>&3 | tail -c 4096 | tee "$diagnostics" >&2
+          } 3>&1
+
+          command_error() {
+            local detail
+            detail=$(cat "$diagnostics") || detail=""
+            printf '%s%s' "$1" "${detail:+: $detail}"
+          }
+
+          # Inspect the running container, not the mutable image tag: a rollback can retag it.
+          running_image() {
+            local container image
+            container=$(podman container inspect planner-agent) || return 1
+            image=$(jq -er '.[0] | select(.State.Running == true) | .Image' <<< "$container") || return 1
+            podman image inspect "$image" | jq -ce '
+              .[0] | {digest: .Digest, version: .Labels["org.opencontainers.image.version"]}
+              | select((.digest | type == "string" and length > 0)
+                and (.version | type == "string" and length > 0))'
+          }
+
+          # Publish the attempt and running image atomically. Failed/unchanged attempts retain
+          # the last successful update, including its image identity and completion time.
+          write_status() {
+            local previous=/dev/null tmp
+            [[ ! -f "${UPDATE_DIR}/status.json" ]] || previous="${UPDATE_DIR}/status.json"
+            tmp=$(mktemp "${UPDATE_DIR}/.status.XXXXXX") || return 1
+            if jq -n --arg file "$name" --arg result "$1" --arg error "$2" --arg error_stage "$4" \
+                --arg time "$(date -u +%FT%TZ)" --argjson running "$3" \
+                --slurpfile previous "$previous" '
+                {file: $file, result: $result, time: $time, error: $error, error_stage: $error_stage,
+                 running_image: $running,
+                 last_successful_update: (if $result == "applied" then $running + {time: $time}
+                   else ($previous[0].last_successful_update // null) end)}' > "$tmp" \
+                && mv -f "$tmp" "${UPDATE_DIR}/status.json"; then
+              return 0
+            fi
+            echo "Failed to publish update status for ${name}" >&2
+            rm -f "$tmp"
+            return 1
+          }
+
+          # Require JSON encoding before loading an image; see doc/appliance-host-updates.md.
+          command -v jq >/dev/null
+          mkdir -p /var/lib/data/tmp
+          diagnostics=$(mktemp "${UPDATE_DIR}/.diagnostics.XXXXXX")
+          trap 'rm -f "$diagnostics"' EXIT
           for tar in "${UPDATE_DIR}"/*.tar; do
             [ -f "$tar" ] || continue
+            name=$(basename "$tar")
             echo "Loading agent image from ${tar}..." >&2
-            if skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
-              echo "Successfully loaded ${tar}, removing..." >&2
+            if ! run_with_diagnostics skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
+              echo "Failed to load ${tar}" >&2
+              error=$(command_error "Failed to load archive")
+              running=$(running_image) || running=null
+              write_status failed "$error" "$running" load
               rm -f "$tar"
+              continue
+            fi
+
+            # Restart now; podman rolls back to the previous image if the new container never becomes healthy.
+            result=failed
+            error=""
+            error_stage=""
+            if report=$(run_with_diagnostics podman auto-update --format json); then
+              # Other auto-updated units must never determine this appliance's outcome.
+              if ! result=$(run_with_diagnostics jq -er '[.[] | select(.Unit == "planner-agent.service") | .Updated]
+                  | if length == 1 then .[0] else error("Expected one planner-agent report") end' <<< "$report"); then
+                result=failed
+                error_stage=report
+                error=$(command_error "Invalid planner-agent update report")
+              fi
             else
-              echo "Failed to load ${tar}, renaming to ${tar}.failed" >&2
-              mv "$tar" "${tar}.failed"
+              error_stage=restart
+              error=$(command_error "podman auto-update failed")
+            fi
+            case "$result" in
+              true) outcome=applied ;;
+              "rolled back") outcome=rolled-back ;;
+              false) outcome=unchanged ;;
+              failed) outcome=failed; error_stage=${error_stage:-restart}; error=${error:-"planner-agent update failed"} ;;
+              *) outcome=failed; error_stage=report; error="Unexpected planner-agent update result: ${result:0:256}" ;;
+            esac
+            if ! running=$(run_with_diagnostics running_image); then
+              running=null
+              if [[ "$outcome" == applied ]]; then
+                outcome=failed
+                error_stage=metadata
+                error=$(command_error "Cannot determine running image digest and version")
+              fi
+            fi
+            write_status "$outcome" "$error" "$running" "$error_stage"
+            rm -f "$tar"
+            if [[ "$outcome" == applied ]]; then
+              # Free the previous image only after health and status publication succeed.
+              podman image prune -f >/dev/null 2>&1 || true
             fi
           done
     - path: /home/core/.config/systemd/user/planner-agent-image-update.path
@@ -350,6 +440,13 @@ storage:
           Image={{.AgentImage}}
           ContainerName=planner-agent
           Label=io.containers.autoupdate=local
+          # Health-gated start: podman auto-update rolls back when the new image never becomes healthy.
+          # This checks API startup, not the readability of every collection or database rollback safety.
+          HealthCmd=curl -fsk https://localhost:3333/api/v2/version
+          HealthInterval=10s
+          HealthRetries=6
+          HealthStartPeriod=30s
+          Notify=healthy
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
@@ -360,8 +457,8 @@ storage:
           UserNS=keep-id:uid=1001
 
           [Service]
-          # Extend timeout for pulling the image
-          TimeoutStartSec=600
+          # The image is local; a start that never becomes healthy fails and is rolled back.
+          TimeoutStartSec=300
           Restart=on-failure
           RestartSec=5
           ExecStartPre=/bin/bash -c 'echo "AGENT_AGENT_ID=$(cat /var/lib/data/agent/agent_id)" >> /home/core/.migration-planner/agent.env'
