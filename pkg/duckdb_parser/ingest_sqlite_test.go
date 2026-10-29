@@ -399,7 +399,10 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -409,8 +412,8 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "10.0.0.1", nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
-	assert.Equal(t, "10.0.0.2", nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
+	assert.Equal(t, []interface{}{"10.0.0.1/24"}, nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
+	assert.Equal(t, []interface{}{"10.0.0.2/24"}, nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
 }
 
 func TestIngestSqlite_NICsDoNotUsePrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
@@ -445,7 +448,10 @@ func TestIngestSqlite_NICsDoNotUsePrimaryIPWhenGuestNetworksEmpty(t *testing.T) 
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -455,8 +461,8 @@ func TestIngestSqlite_NICsDoNotUsePrimaryIPWhenGuestNetworksEmpty(t *testing.T) 
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "", nics[0].ipv4, "missing guest data must not borrow the VM primary IP")
-	assert.Equal(t, "", nics[1].ipv4, "missing guest data must not borrow the VM primary IP")
+	assert.Empty(t, nics[0].ipv4, "missing guest data must not borrow the VM primary IP")
+	assert.Empty(t, nics[1].ipv4, "missing guest data must not borrow the VM primary IP")
 }
 
 func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {

@@ -155,7 +155,8 @@ WITH nic_flat AS (
         nic.deviceKey AS device_key,
         nic.network.id AS network_id,
         h.Cluster AS cluster_id,
-        h.Network AS host_network,
+        -- Missing host network data must not prevent importing adapters and addresses.
+        to_json(h)->>'Network' AS host_network,
         COUNT(*) OVER (PARTITION BY v.ID, LOWER(nic.mac)) AS same_mac_count
     FROM src.VM v
     LEFT JOIN src.Host h ON v.Host = h.ID,
@@ -166,14 +167,12 @@ nic_ips AS (
     SELECT
         nf.vm_id,
         nf.device_key,
-        string_agg(DISTINCT gn.ip, ',' ORDER BY gn.ip)
+        list(DISTINCT COALESCE(gn.ip || '/' || gn.prefix, gn.ip)
+            ORDER BY COALESCE(gn.ip || '/' || gn.prefix, gn.ip))
             FILTER (WHERE gn.ip NOT LIKE '%:%' AND gn.ip LIKE '%.%') AS ipv4,
-        string_agg(DISTINCT gn.ip, ',' ORDER BY gn.ip)
-            FILTER (WHERE gn.ip LIKE '%:%') AS ipv6,
-        string_agg(DISTINCT gn.ip || '/' || gn.prefix, ',' ORDER BY gn.ip || '/' || gn.prefix)
-            FILTER (WHERE gn.ip NOT LIKE '%:%' AND gn.ip LIKE '%.%') AS ipv4_cidr,
-        string_agg(DISTINCT gn.ip || '/' || gn.prefix, ',' ORDER BY gn.ip || '/' || gn.prefix)
-            FILTER (WHERE gn.ip LIKE '%:%') AS ipv6_cidr
+        list(DISTINCT COALESCE(gn.ip || '/' || gn.prefix, gn.ip)
+            ORDER BY COALESCE(gn.ip || '/' || gn.prefix, gn.ip))
+            FILTER (WHERE gn.ip LIKE '%:%') AS ipv6
     FROM nic_flat nf,
     LATERAL unnest(from_json(COALESCE(NULLIF(nf.GuestNetworks, ''), '[]'),
         '[{"mac":"VARCHAR","ip":"VARCHAR","prefix":"INTEGER","deviceConfigId":"INTEGER"}]'
@@ -186,7 +185,7 @@ nic_ips AS (
 )
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
-    "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "IPv4 CIDR", "IPv6 CIDR", "VLAN", "Cluster"
+    "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "VLAN", "Cluster"
 )
 SELECT
     nf.vm_id,
@@ -198,10 +197,8 @@ SELECT
     true,
     true,
     CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN 'distributed' ELSE 'standard' END,
-    COALESCE(ips.ipv4, ''),
-    COALESCE(ips.ipv6, ''),
-    COALESCE(ips.ipv4_cidr, ''),
-    COALESCE(ips.ipv6_cidr, ''),
+    COALESCE(ips.ipv4, []),
+    COALESCE(ips.ipv6, []),
     CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN NULLIF(n.VlanId, '')
          ELSE (
              SELECT CASE WHEN COUNT(*) = 1 THEN CAST(MAX(pg.vlanId) AS VARCHAR) END

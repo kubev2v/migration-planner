@@ -68,10 +68,8 @@ nics AS (
             'StartsConnected': "Starts Connected",
             'Type': "Type",
             'VlanID': "VLAN",
-            'IPv4Address': CASE WHEN "IPv4 Address" = 'VM' OR "IPv4 Address" IS NULL THEN '' ELSE "IPv4 Address" END,
-            'IPv6Address': CASE WHEN "IPv6 Address" = 'VM' OR "IPv6 Address" IS NULL THEN '' ELSE "IPv6 Address" END,
-            'IPv4CIDR': "IPv4 CIDR",
-            'IPv6CIDR': "IPv6 CIDR"
+            'IPv4Address': "IPv4 Address",
+            'IPv6Address': "IPv6 Address"
         }) AS nics
     FROM vnetwork
     GROUP BY "VM ID"

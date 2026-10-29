@@ -104,17 +104,15 @@ type Disk struct {
 
 // NIC represents a network interface from the vnetwork table.
 type NIC struct {
-	Network         Ref    `json:"network"` // Changed from string to Ref
-	MAC             string `json:"mac" db:"Mac Address"`
-	Label           string `json:"label" db:"NIC label"`
-	Adapter         string `json:"adapter" db:"Adapter"`
-	Switch          string `json:"switch" db:"Switch"`
-	Connected       bool   `json:"connected" db:"Connected"`
-	StartsConnected bool   `json:"startsConnected" db:"Starts Connected"`
-	Type            string `json:"type" db:"Type"`
-	IPv4Address     string `json:"ipv4Address" db:"IPv4 Address"`
-	IPv6Address     string `json:"ipv6Address" db:"IPv6 Address"`
-	IPv4CIDR        string `json:"ipv4Cidr" db:"IPv4 CIDR"`
-	IPv6CIDR        string `json:"ipv6Cidr" db:"IPv6 CIDR"`
-	VlanID          string `json:"vlanId" db:"VLAN"`
+	Network         Ref      `json:"network"` // Changed from string to Ref
+	MAC             string   `json:"mac" db:"Mac Address"`
+	Label           string   `json:"label" db:"NIC label"`
+	Adapter         string   `json:"adapter" db:"Adapter"`
+	Switch          string   `json:"switch" db:"Switch"`
+	Connected       bool     `json:"connected" db:"Connected"`
+	StartsConnected bool     `json:"startsConnected" db:"Starts Connected"`
+	Type            string   `json:"type" db:"Type"`
+	IPv4Address     []string `json:"ipv4Address" db:"IPv4 Address"`
+	IPv6Address     []string `json:"ipv6Address" db:"IPv6 Address"`
+	VlanID          string   `json:"vlanId" db:"VLAN"`
 }
