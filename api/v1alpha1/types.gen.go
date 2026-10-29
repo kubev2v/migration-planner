@@ -1579,7 +1579,7 @@ type DiskTypeSummary struct {
 type OsInfo struct {
 	Count int `json:"count"`
 
-	// MtvStatus MTV verification per KCS 4234591 (Updated September 24 2026). Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+	// MtvStatus MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
 	MtvStatus *OsInfoMtvStatus `json:"mtvStatus,omitempty"`
 
 	// SupportTier OS support tier per Red Hat KCS article 4234591
@@ -1590,7 +1590,7 @@ type OsInfo struct {
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
 
-// OsInfoMtvStatus MTV verification per KCS 4234591 (Updated September 24 2026). Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+// OsInfoMtvStatus MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
 type OsInfoMtvStatus string
 
 // OsInfoSupportTier OS support tier per Red Hat KCS article 4234591

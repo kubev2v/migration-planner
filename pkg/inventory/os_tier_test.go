@@ -49,6 +49,7 @@ func TestClassifyOSTier(t *testing.T) {
 		{"CentOS 7 (64-bit)", TierSpecialHandling},
 		{"Microsoft Windows 7 (64-bit)", TierSpecialHandling},
 		{"Microsoft Windows Server 2012 R2 (64-bit)", TierSpecialHandling},
+		{"openSUSE Leap 15.5 (64-bit)", TierSpecialHandling},
 		{"Oracle Solaris 11 (64-bit)", TierSpecialHandling},
 		{"Unknown OS", TierSpecialHandling},
 	}
