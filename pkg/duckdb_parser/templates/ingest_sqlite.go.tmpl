@@ -27,7 +27,7 @@ Standalone hosts:
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
 
 INSERT INTO vinfo (
-    "VM ID", "VM", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
+    "VM ID", "VM", "Annotation", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
     "CPUs", "Memory",
     "OS according to the configuration file", "OS according to the VMware Tools",
@@ -40,6 +40,7 @@ INSERT INTO vinfo (
 SELECT
     v.ID,
     v.Name,
+    to_json(v)->>'Annotation',
     v.Folder,
     v.Folder,
     v.Host,
