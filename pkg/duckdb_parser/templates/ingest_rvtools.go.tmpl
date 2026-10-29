@@ -279,6 +279,11 @@ UPDATE vdatastore_raw SET
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "# Extents" VARCHAR;
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Major Version" VARCHAR;
 
+INSERT INTO vnic ("Host", "Network Device", "Speed")
+SELECT "Host", "Network Device",
+    NULLIF(TRY_CAST("Speed" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vNIC', all_varchar=true);
+
 CREATE TABLE vhost_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "VMotion support" VARCHAR;
