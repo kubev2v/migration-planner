@@ -154,14 +154,38 @@ type StorageIoConfiguration struct {
 
 // Host describes a single ESXi host.
 type Host struct {
-	CpuCores                *int    `json:"cpuCores"`
-	CpuSockets              *int    `json:"cpuSockets"`
-	Id                      *string `json:"id,omitempty"`
-	MemoryMB                *int64  `json:"memoryMB"`
-	Model                   string  `json:"model"`
-	StorageVmotionSupported *bool   `json:"storageVmotionSupported,omitempty"`
-	Vendor                  string  `json:"vendor"`
-	VmotionSupported        *bool   `json:"vmotionSupported,omitempty"`
+	CpuCores                *int                  `json:"cpuCores"`
+	CpuSockets              *int                  `json:"cpuSockets"`
+	Id                      *string               `json:"id,omitempty"`
+	MemoryMB                *int64                `json:"memoryMB"`
+	Model                   string                `json:"model"`
+	StorageVmotionSupported *bool                 `json:"storageVmotionSupported,omitempty"`
+	StorageAdapters         *[]HostStorageAdapter `json:"storageAdapters,omitempty"`
+	StorageLuns             *[]HostStorageLun     `json:"storageLuns,omitempty"`
+	Vendor                  string                `json:"vendor"`
+	VmotionSupported        *bool                 `json:"vmotionSupported,omitempty"`
+}
+
+// HostStorageAdapter preserves optional adapter facts in assessment snapshots.
+type HostStorageAdapter struct {
+	Device   *string `json:"device,omitempty"`
+	Driver   *string `json:"driver,omitempty"`
+	Key      *string `json:"key,omitempty"`
+	Model    *string `json:"model,omitempty"`
+	NodeWwn  *string `json:"nodeWwn,omitempty"`
+	PortWwn  *string `json:"portWwn,omitempty"`
+	Protocol *string `json:"protocol,omitempty"`
+	Type     *string `json:"type,omitempty"`
+}
+
+// HostStorageLun preserves host-visible LUN facts and adapter associations.
+type HostStorageLun struct {
+	AdapterDevices *[]string `json:"adapterDevices,omitempty"`
+	CanonicalName  *string   `json:"canonicalName,omitempty"`
+	Key            *string   `json:"key,omitempty"`
+	LunUuid        *string   `json:"lunUuid,omitempty"`
+	Model          *string   `json:"model,omitempty"`
+	Vendor         *string   `json:"vendor,omitempty"`
 }
 
 // NetworkType is the type of a network.
