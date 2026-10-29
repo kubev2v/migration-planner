@@ -2,15 +2,12 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
-	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+	svcmappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/events"
@@ -113,45 +110,24 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			getAssessmentsErrors++
 			continue
 		}
-		if assessment.MainInventory.ID == uuid.Nil {
+		if assessment.MainInventory.ID == uuid.Nil || assessment.MainInventory.Inventory.Vcenter == nil {
 			zap.S().Warnw("skipping assessment with no inventories", "id", assessment.ID)
 			noInventoriesErrors++
 			continue
 		}
 
-		mainInv, _, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
-
-		if err != nil {
-			zap.S().Errorw("converting assessment", "id", assessment.ID, "error", err)
-			getAssessmentsErrors++
-			continue
-		}
-
-		var contract v1alpha1.Inventory
-		contract.Vcenter = &mainInv.Data
-		contract.VcenterId = mainInv.Id
-		contract.VcenterVersion = mainInv.VcenterVersion
-		contract.CreatedAt = mainInv.CreatedAt
-
-		inventory, err := json.Marshal(contract)
-		if err != nil {
-			zap.S().Errorw("marshaling inventory", "id", assessment.ID, "error", err)
-			getAssessmentsErrors++
-			continue
-		}
-
 		partner := partners[assessment.ID.String()]
 		payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
-			ID:          assessment.ID.String(),
-			Inventory:   inventory,
-			Name:        assessment.Name,
-			OrgID:       assessment.OrgID,
-			Username:    assessment.Username,
-			SourceType:  assessment.SourceType,
-			PartnerID:   partner.ID,
-			PartnerName: partner.Name,
-			CreatedAt:   assessment.CreatedAt,
-			UpdatedAt:   assessment.UpdatedAt,
+			ID:            assessment.ID.String(),
+			MainInventory: svcmappers.ToStreamerModel(assessment.MainInventory.Inventory),
+			Name:          assessment.Name,
+			OrgID:         assessment.OrgID,
+			Username:      assessment.Username,
+			SourceType:    assessment.SourceType,
+			PartnerID:     partner.ID,
+			PartnerName:   partner.Name,
+			CreatedAt:     assessment.CreatedAt,
+			UpdatedAt:     assessment.UpdatedAt,
 		})
 
 		ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)

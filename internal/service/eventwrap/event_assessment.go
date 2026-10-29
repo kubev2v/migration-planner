@@ -78,16 +78,17 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 	}
 
 	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
-		ID:         assessment.ID.String(),
-		Inventory:  inventory,
-		Name:       assessment.Name,
-		OrgID:      assessment.OrgID,
-		OrgName:    accountIdentity.Name,
-		OrgType:    accountIdentity.Type,
-		Username:   assessment.Username,
-		SourceType: assessment.SourceType,
-		CreatedAt:  assessment.CreatedAt,
-		UpdatedAt:  assessment.UpdatedAt,
+		ID:            assessment.ID.String(),
+		Inventory:     inventory, // Todo: deprecated to be removed
+		MainInventory: mappers.ToStreamerModel(assessment.MainInventory.Inventory),
+		Name:          assessment.Name,
+		OrgID:         assessment.OrgID,
+		OrgName:       accountIdentity.Name,
+		OrgType:       accountIdentity.Type,
+		Username:      assessment.Username,
+		SourceType:    assessment.SourceType,
+		CreatedAt:     assessment.CreatedAt,
+		UpdatedAt:     assessment.UpdatedAt,
 	})
 	ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)
 	if err != nil {
