@@ -553,17 +553,28 @@ FROM read_xlsx('{{.FilePath}}', sheet='vPort', all_varchar=true);
 
 -- Each adapter should match either a standard or a distributed port group, not both.
 -- DuckDB may read empty XLSX cells as 'VM'; treat them as unknown VLANs.
+-- Conflicting rows for the same port group leave its VLAN unknown.
 UPDATE vnetwork n SET "VLAN" = p."VLAN"
 FROM vinfo v
-JOIN vport p ON p."Host" = v."Host"
+JOIN (
+    SELECT "Host", "Port Group", "Switch", MIN("VLAN") AS "VLAN"
+    FROM vport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Host", "Port Group", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p ON p."Host" = v."Host"
 WHERE n."VM ID" = v."VM ID"
-  AND p."Port Group" = n."Network" AND p."Switch" = n."Switch"
-  AND p."VLAN" NOT IN ('', 'VM');
+  AND p."Port Group" = n."Network" AND p."Switch" = n."Switch";
 
 UPDATE vnetwork n SET "VLAN" = p."VLAN"
-FROM dvport p
-WHERE p."Port" = n."Network" AND p."Switch" = n."Switch"
-  AND p."VLAN" NOT IN ('', 'VM');
+FROM (
+    SELECT "Port", "Switch", MIN("VLAN") AS "VLAN"
+    FROM dvport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Port", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p
+WHERE p."Port" = n."Network" AND p."Switch" = n."Switch";
 
 INSERT INTO dvswitch ("Name")
 SELECT DISTINCT "Name"

@@ -33,6 +33,8 @@ func TestOMA2508RVToolsNetworkDetails(t *testing.T) {
 				{"VM ID": "vm-1", "Network": "shared", "Mac Address": "03", "Switch": "dvs-1"},
 				{"VM ID": "vm-1", "Network": "management", "Mac Address": "04", "Switch": "dvs-1"},
 				{"VM ID": "vm-1", "Network": "unknown", "Mac Address": "05", "Switch": "dvs-1", "IPv4 Address": "VM"},
+				{"VM ID": "vm-1", "Network": "ambiguous-standard", "Mac Address": "06", "Switch": "vSwitch0"},
+				{"VM ID": "vm-1", "Network": "ambiguous-distributed", "Mac Address": "07", "Switch": "dvs-1"},
 			}
 			sheets := []ExcelSheet{
 				NewExcelSheet("vInfo", vInfoHeaders, vms),
@@ -42,13 +44,19 @@ func TestOMA2508RVToolsNetworkDetails(t *testing.T) {
 				sheets = append(sheets,
 					NewExcelSheet("vPort", []string{"Host", "Port Group", "Switch", "VLAN"}, []map[string]string{
 						{"Host": "host-1", "Port Group": "shared", "Switch": "vSwitch0", "VLAN": "0"},
+						{"Host": "host-1", "Port Group": "shared", "Switch": "vSwitch0", "VLAN": "0"},
 						{"Host": "host-2", "Port Group": "shared", "Switch": "vSwitch0", "VLAN": "200"},
+						{"Host": "host-1", "Port Group": "ambiguous-standard", "Switch": "vSwitch0", "VLAN": "10"},
+						{"Host": "host-1", "Port Group": "ambiguous-standard", "Switch": "vSwitch0", "VLAN": "20"},
 					}),
 					NewExcelSheet("dvPort", []string{"Port", "Switch", "VLAN"}, []map[string]string{
 						{"Port": "shared", "Switch": "dvs-1", "VLAN": "10-20,30-40"},
 						{"Port": "shared", "Switch": "dvs-2", "VLAN": "300"},
 						{"Port": "management", "Switch": "dvs-1", "VLAN": "100"},
+						{"Port": "management", "Switch": "dvs-1", "VLAN": "VM"},
 						{"Port": "unknown", "Switch": "dvs-1", "VLAN": ""},
+						{"Port": "ambiguous-distributed", "Switch": "dvs-1", "VLAN": "30"},
+						{"Port": "ambiguous-distributed", "Switch": "dvs-1", "VLAN": "40"},
 					}),
 				)
 			}
@@ -76,7 +84,7 @@ func TestOMA2508RVToolsNetworkDetails(t *testing.T) {
 					}
 				}
 			}
-			assert.Equal(t, 5, count, "VLAN lookup must not multiply or remove NICs")
+			assert.Equal(t, 7, count, "VLAN lookup must not multiply or remove NICs")
 
 			require.NoError(t, parser.Cleanup())
 			result, err = parser.IngestRvTools(ctx, createTestExcel(t, sheets[:2]...))
