@@ -834,12 +834,66 @@ type Host struct {
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`
 
+	// StorageAdapters Available host storage adapters. Omitted when no records are available; this does not imply a complete empty inventory.
+	StorageAdapters *[]HostStorageAdapter `json:"storageAdapters,omitempty"`
+
+	// StorageLuns Available host-visible LUNs and adapter associations, without per-path state or VM disk placement.
+	StorageLuns *[]HostStorageLun `json:"storageLuns,omitempty"`
+
 	// StorageVmotionSupported Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)
 	StorageVmotionSupported *bool  `json:"storageVmotionSupported,omitempty"`
 	Vendor                  string `json:"vendor"`
 
 	// VmotionSupported Whether vMotion is supported on this host (HostSystem.capability.vmotionSupported)
 	VmotionSupported *bool `json:"vmotionSupported,omitempty"`
+}
+
+// HostStorageAdapter Source-provided adapter facts. Missing or conflicting values are omitted.
+type HostStorageAdapter struct {
+	// Device Host-local adapter device name.
+	Device *string `json:"device,omitempty"`
+
+	// Driver Adapter driver.
+	Driver *string `json:"driver,omitempty"`
+
+	// Key Source adapter key; distinct from device name.
+	Key *string `json:"key,omitempty"`
+
+	// Model Adapter model.
+	Model *string `json:"model,omitempty"`
+
+	// NodeWwn Node WWN as identifier text, preserving leading zeros.
+	NodeWwn *string `json:"nodeWwn,omitempty"`
+
+	// PortWwn Port WWN as identifier text, preserving leading zeros.
+	PortWwn *string `json:"portWwn,omitempty"`
+
+	// Protocol Adapter protocol as supplied by the source.
+	Protocol *string `json:"protocol,omitempty"`
+
+	// Type Adapter type as supplied by the source.
+	Type *string `json:"type,omitempty"`
+}
+
+// HostStorageLun A host-visible LUN; missing or conflicting identity/metadata fields are omitted.
+type HostStorageLun struct {
+	// AdapterDevices Distinct sorted adapter device names associated with this LUN, including names whose adapter metadata is unavailable.
+	AdapterDevices *[]string `json:"adapterDevices,omitempty"`
+
+	// CanonicalName Canonical device name, distinct from the LUN UUID.
+	CanonicalName *string `json:"canonicalName,omitempty"`
+
+	// Key Source SCSI disk key.
+	Key *string `json:"key,omitempty"`
+
+	// LunUuid Source-provided LUN UUID; never inferred from the device name or key.
+	LunUuid *string `json:"lunUuid,omitempty"`
+
+	// Model LUN model.
+	Model *string `json:"model,omitempty"`
+
+	// Vendor LUN vendor.
+	Vendor *string `json:"vendor,omitempty"`
 }
 
 // Identity defines model for Identity.

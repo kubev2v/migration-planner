@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"go.uber.org/zap"
@@ -29,8 +30,14 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 		canPersistClusterIDs = false
 	}
 
+	// Resolve ownership globally once per build. Load lazily so inventories
+	// without hosts skip storage queries, and later builds read fresh data.
+	loadStorage := sync.OnceValues(func() (map[string]hostStorageFacts, error) {
+		return p.hostStorage(ctx)
+	})
+
 	// Build vcenter-level inventory (no cluster filter, optional VM list filter)
-	vcenterData, err := p.buildInventoryData(ctx, Filters{VMList: vmList})
+	vcenterData, err := p.buildInventoryData(ctx, Filters{VMList: vmList}, loadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("building vcenter inventory: %w", err)
 	}
@@ -69,7 +76,7 @@ func (p *Parser) BuildInventory(ctx context.Context, vmList []string) (*inventor
 	clusterInventories := make(map[string]inventory.InventoryData)
 	for _, clusterName := range clusters {
 		clusterFilters := Filters{Cluster: clusterName, VMList: vmList}
-		clusterInv, err := p.buildInventoryData(ctx, clusterFilters)
+		clusterInv, err := p.buildInventoryData(ctx, clusterFilters, loadStorage)
 		if err != nil {
 			zap.S().Named("duckdb_parser").Warnf("Failed to build inventory for cluster %s: %v", clusterName, err)
 			continue
@@ -170,7 +177,10 @@ func (p *Parser) persistClusterID(ctx context.Context, name, id string) error {
 }
 
 // buildInventoryData constructs an InventoryData for a given filter set.
-func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inventory.InventoryData, error) {
+func (p *Parser) buildInventoryData(
+	ctx context.Context, filters Filters,
+	loadStorage func() (map[string]hostStorageFacts, error),
+) (*inventory.InventoryData, error) {
 	// Build VMs section
 	vms, err := p.buildVMsData(ctx, filters)
 	if err != nil {
@@ -178,7 +188,7 @@ func (p *Parser) buildInventoryData(ctx context.Context, filters Filters) (*inve
 	}
 
 	// Build Infra section
-	infra, err := p.buildInfraData(ctx, filters)
+	infra, err := p.buildInfraData(ctx, filters, loadStorage)
 	if err != nil {
 		return nil, fmt.Errorf("building infra: %w", err)
 	}
@@ -426,7 +436,10 @@ func (p *Parser) buildVMsData(ctx context.Context, filters Filters) (*inventory.
 }
 
 // buildInfraData constructs the Infra section of InventoryData.
-func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventory.InfraData, error) {
+func (p *Parser) buildInfraData(
+	ctx context.Context, filters Filters,
+	loadStorage func() (map[string]hostStorageFacts, error),
+) (*inventory.InfraData, error) {
 	infraData := &inventory.InfraData{
 		Hosts:                 []inventory.Host{},
 		HostPowerStates:       make(map[string]int),
@@ -436,7 +449,7 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 	}
 
 	// Get hosts
-	hostModels, err := p.Hosts(ctx, filters, Options{})
+	hostModels, err := p.hosts(ctx, filters, Options{}, loadStorage)
 	if err == nil {
 		hosts := make([]inventory.Host, 0, len(hostModels))
 		standaloneDetected := false
@@ -453,13 +466,15 @@ func (p *Parser) buildInfraData(ctx context.Context, filters Filters) (*inventor
 				MemoryMB:                h.MemoryMB,
 				VMotionSupported:        h.VMotionSupported,
 				StorageVMotionSupported: h.StorageVMotionSupported,
+				StorageAdapters:         h.StorageAdapters,
+				StorageLuns:             h.StorageLuns,
 			})
 		}
 		infraData.Hosts = hosts
 		infraData.TotalHosts = len(hosts)
 		infraData.StandaloneHostsDetected = standaloneDetected
 	} else {
-		zap.S().Named("duckdb_parser").Warnf("Failed to get hosts: %v", err)
+		return nil, fmt.Errorf("getting hosts: %w", err)
 	}
 
 	// Get host power states
