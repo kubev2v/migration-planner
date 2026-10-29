@@ -1274,7 +1274,7 @@ type Source struct {
 	// AgentVersion Agent version (version tag) stored when OVA was downloaded
 	AgentVersion *string `json:"agentVersion"`
 
-	// AgentVersionWarning Warning message if stored agent version differs from current agent version
+	// AgentVersionWarning Warning message if the agent version (reported by the agent, or stored when OVA was downloaded) differs from current agent version
 	AgentVersionWarning *string            `json:"agentVersionWarning"`
 	CreatedAt           time.Time          `json:"createdAt"`
 	Id                  openapi_types.UUID `json:"id"`

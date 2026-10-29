@@ -345,13 +345,32 @@ func WithOrgID(orgID string) SourceFilterFunc {
 	}
 }
 
-// CheckAgentVersionWarning compares stored agent version with current and returns warning if they differ.
-func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
+// AgentUpdateAvailable returns the latest agent version and whether the reported one differs from it.
+// Versions are compared for equality, not ordered: non-release builds are "main-release-X-<sha>".
+func AgentUpdateAvailable(reportedVersion string) (latest string, available bool) {
+	latest = version.Get().AgentVersionName
+	return latest, version.IsValidAgentVersion(latest) && version.IsValidAgentVersion(reportedVersion) && reportedVersion != latest
+}
+
+// CheckAgentVersionWarning compares the agent version with current and returns warning if they differ.
+// The version reported by the agent (connected flow) takes precedence over the version stored
+// when the OVA was downloaded (disconnected flow).
+func CheckAgentVersionWarning(imageInfra *model.ImageInfra, reportedVersion string) *string {
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
 		return nil
 	}
 	currentVersion := versionInfo.AgentVersionName
+
+	if version.IsValidAgentVersion(reportedVersion) {
+		if _, available := AgentUpdateAvailable(reportedVersion); !available {
+			return nil
+		}
+		message := "Agent version mismatch detected. The agent is running version " + reportedVersion +
+			", but the current system version is " + currentVersion +
+			". Consider updating the agent to the latest version."
+		return &message
+	}
 
 	// Handle missing version (edge case if migration hasn't run)
 	if imageInfra == nil || imageInfra.AgentVersion == nil || *imageInfra.AgentVersion == "" {

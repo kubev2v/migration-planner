@@ -2598,7 +2598,7 @@ components:
         agentVersionWarning:
           type: string
           nullable: true
-          description: Warning message if stored agent version differs from current agent version
+          description: Warning message if the agent version (reported by the agent, or stored when OVA was downloaded) differs from current agent version
         updateType:
           type: string
           enum: [auto, manual]

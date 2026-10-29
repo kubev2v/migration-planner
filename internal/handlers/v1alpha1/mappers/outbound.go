@@ -184,11 +184,25 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		}
 	}
 
-	// Map agent version and warning (from ImageInfra, independent of agents)
+	slices.SortFunc(s.Agents, func(a model.Agent, b model.Agent) int {
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.After(b.CreatedAt) {
+			return 1
+		}
+		return 0
+	})
+
+	// Map agent version (stored at OVA download) and warning (prefers the version reported by the agent)
 	if s.ImageInfra.AgentVersion != nil {
 		source.AgentVersion = s.ImageInfra.AgentVersion
 	}
-	if warning := service.CheckAgentVersionWarning(&s.ImageInfra); warning != nil {
+	reportedVersion := ""
+	if len(s.Agents) > 0 {
+		reportedVersion = s.Agents[0].Version
+	}
+	if warning := service.CheckAgentVersionWarning(&s.ImageInfra, reportedVersion); warning != nil {
 		source.AgentVersionWarning = warning
 	}
 
@@ -201,15 +215,6 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		return source, nil
 	}
 
-	slices.SortFunc(s.Agents, func(a model.Agent, b model.Agent) int {
-		if a.CreatedAt.Before(b.CreatedAt) {
-			return -1
-		}
-		if a.CreatedAt.After(b.CreatedAt) {
-			return 1
-		}
-		return 0
-	})
 	agent := AgentToApi(s.Agents[0])
 	source.Agent = &agent
 
