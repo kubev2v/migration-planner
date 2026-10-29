@@ -8,7 +8,7 @@ require (
 	github.com/cloudevents/sdk-go/v2 v2.16.2
 	github.com/coreos/butane v0.29.0
 	github.com/georgysavva/scany/v2 v2.1.4
-	github.com/getkin/kin-openapi v0.145.0
+	github.com/getkin/kin-openapi v0.152.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/go-chi/cors v1.2.2
