@@ -23,6 +23,7 @@ type ApplianceImageCache struct {
 	refreshMutex      sync.Mutex
 	imageTarPath      string
 	imageDigest       string
+	imageVersion      string
 	modifiedISOPath   string
 	modifiedISODigest string
 	baseISOPath       string
@@ -114,17 +115,24 @@ func (c *ApplianceImageCache) GetModifiedISO() (string, string, error) {
 	return c.modifiedISOPath, c.modifiedISODigest, nil
 }
 
-// GetImage returns the published appliance image OCI archive path and its
-// manifest digest together, so a concurrent refresh cannot mix generations.
-func (c *ApplianceImageCache) GetImage() (string, string, error) {
+// CachedImage is one published appliance image generation.
+type CachedImage struct {
+	Path    string // OCI archive
+	Digest  string // manifest digest
+	Version string // org.opencontainers.image.version label, empty if unset
+}
+
+// GetImage returns the published appliance image archive, digest and version
+// together, so a concurrent refresh cannot mix generations.
+func (c *ApplianceImageCache) GetImage() (CachedImage, error) {
 	c.cacheMutex.RLock()
 	defer c.cacheMutex.RUnlock()
 
 	if _, err := os.Stat(c.imageTarPath); err != nil {
-		return "", "", fmt.Errorf("cached appliance image not found: %w", err)
+		return CachedImage{}, fmt.Errorf("cached appliance image not found: %w", err)
 	}
 
-	return c.imageTarPath, c.imageDigest, nil
+	return CachedImage{Path: c.imageTarPath, Digest: c.imageDigest, Version: c.imageVersion}, nil
 }
 
 // RefreshNow forces an immediate refresh of the cached image and ISO
@@ -228,6 +236,7 @@ func (c *ApplianceImageCache) pullAndBuildISO() error {
 	c.modifiedISODigest = digest
 	c.imageTarPath = candidate.imageTarPath
 	c.imageDigest = candidate.imageDigest
+	c.imageVersion = candidate.imageVersion
 	c.modifiedISOPath = candidate.modifiedISOPath
 	c.lastPullTime = candidate.lastPullTime
 	c.cacheMutex.Unlock()
@@ -478,6 +487,11 @@ func (c *ApplianceImageCache) pullImage() error {
 	}
 	c.imageDigest = strings.TrimSpace(string(digest))
 
+	c.imageVersion, err = c.inspectVersion(c.imageDigest)
+	if err != nil {
+		return err
+	}
+
 	// Atomically move temp file to final location
 	if err := os.Rename(tempTarPath, c.imageTarPath); err != nil {
 		return fmt.Errorf("failed to move temp file to cache: %w", err)
@@ -490,6 +504,28 @@ func (c *ApplianceImageCache) pullImage() error {
 		zap.Time("pullTime", c.lastPullTime))
 
 	return nil
+}
+
+// inspectVersion reads the version label of the pulled image from the registry by
+// digest: cheap, and pinned to the exact image in the archive.
+func (c *ApplianceImageCache) inspectVersion(digest string) (string, error) {
+	args := []string{"--override-os", "linux", "--override-arch", "amd64", "inspect",
+		"--format", `{{index .Labels "org.opencontainers.image.version"}}`}
+	if !c.cfg.TLSVerify {
+		args = append(args, "--tls-verify=false")
+	}
+	args = append(args, fmt.Sprintf("docker://%s@%s", c.cfg.Image, digest))
+
+	output, err := exec.CommandContext(c.ctx, "skopeo", args...).Output()
+	if err != nil {
+		return "", fmt.Errorf("skopeo inspect failed: %w", err)
+	}
+	version := strings.TrimSpace(string(output))
+	if version == "<no value>" {
+		c.logger.Warn("Appliance image has no version label", zap.String("digest", digest))
+		return "", nil
+	}
+	return version, nil
 }
 
 // GetLastPullTime returns the timestamp of the last successful image pull

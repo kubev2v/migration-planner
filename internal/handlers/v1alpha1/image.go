@@ -209,19 +209,19 @@ func serveAgentImage(ctx context.Context, cache *service.ApplianceImageCache) er
 		return errors.New("error creating the HTTP stream")
 	}
 
-	path, digest, err := cache.GetImage()
+	img, err := cache.GetImage()
 	if err != nil {
 		return fmt.Errorf("%w: %v", errAgentImageNotCached, err)
 	}
 	// The generation stays readable once open, even if a refresh expires it.
-	archive, err := os.Open(path)
+	archive, err := os.Open(img.Path)
 	if err != nil {
 		return fmt.Errorf("%w: %v", errAgentImageNotCached, err)
 	}
 	defer func() { _ = archive.Close() }()
 
 	writer.Header().Set("Content-Type", "application/x-tar")
-	image.ServeOVA(writer, httpReq, "agent-image.tar", strconv.Quote(digest), archive)
+	image.ServeOVA(writer, httpReq, "agent-image.tar", strconv.Quote(img.Digest), archive)
 	return nil
 }
 

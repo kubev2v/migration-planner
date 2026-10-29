@@ -25,7 +25,8 @@ import (
 
 // Fake tools let the real cache publish an image without a registry or ISO tooling.
 var fakeApplianceTools = map[string]string{
-	"skopeo": `previous=""
+	"skopeo": `for arg do if [ "$arg" = "inspect" ]; then echo v0.31.0; exit 0; fi; done
+previous=""
 for arg do
  if [ "$previous" = "--digestfile" ]; then printf 'sha256:test\n' > "$arg"; fi
  previous="$arg"
@@ -51,7 +52,7 @@ func newApplianceCache(start bool) *service.ApplianceImageCache {
 	DeferCleanup(cache.Stop)
 	if start {
 		Expect(cache.Start()).To(Succeed())
-		Eventually(func() error { _, _, err := cache.GetImage(); return err }, "10s").Should(Succeed())
+		Eventually(func() error { _, err := cache.GetImage(); return err }, "10s").Should(Succeed())
 	}
 	return cache
 }

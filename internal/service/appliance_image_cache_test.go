@@ -121,6 +121,12 @@ func newUnstartedTestApplianceCache(t cacheTestingT) (*ApplianceImageCache, stri
 	}
 	commands := map[string]string{
 		"skopeo": `
+for arg do
+ if [ "$arg" = "inspect" ]; then
+  if [ -f "$CACHE_TEST_ROOT/version" ]; then cat "$CACHE_TEST_ROOT/version"; else echo "<no value>"; fi
+  exit 0
+ fi
+done
 touch "$CACHE_TEST_ROOT/pull-attempted"
 if [ -f "$CACHE_TEST_ROOT/fail-pull" ]; then touch "$CACHE_TEST_ROOT/failed-pull"; exit 1; fi
 if [ -f "$CACHE_TEST_ROOT/block" ]; then
@@ -176,26 +182,29 @@ cat "$work/images/migration-planner-agent.tar" > "$4"
 
 func testApplianceCachePublishesImage(t cacheTestingT) {
 	cache, root := newTestApplianceCache(t)
-	path, digest, err := cache.GetImage()
+	img, err := cache.GetImage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if content, err := os.ReadFile(path); err != nil || string(content) != "image one" || digest != "sha256:image-one" {
-		t.Fatalf("unexpected image %q (%v) with digest %q", content, err, digest)
+	if content, err := os.ReadFile(img.Path); err != nil || string(content) != "image one" || img.Digest != "sha256:image-one" || img.Version != "" {
+		t.Fatalf("unexpected image %q (%v): %+v", content, err, img)
 	}
 
 	if err := os.WriteFile(filepath.Join(root, "image"), []byte("image two"), 0644); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, "version"), []byte("v0.31.0\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	if err := cache.RefreshNow(); err != nil {
 		t.Fatal(err)
 	}
-	newPath, newDigest, err := cache.GetImage()
+	img, err = cache.GetImage()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if content, err := os.ReadFile(newPath); err != nil || string(content) != "image two" || newDigest != "sha256:image-two" {
-		t.Fatalf("unexpected refreshed image %q (%v) with digest %q", content, err, newDigest)
+	if content, err := os.ReadFile(img.Path); err != nil || string(content) != "image two" || img.Digest != "sha256:image-two" || img.Version != "v0.31.0" {
+		t.Fatalf("unexpected refreshed image %q (%v): %+v", content, err, img)
 	}
 }
 
