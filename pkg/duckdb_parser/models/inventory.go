@@ -1,5 +1,7 @@
 package models
 
+import "github.com/kubev2v/migration-planner/pkg/inventory"
+
 // Datastore represents a VMware datastore.
 type Datastore struct {
 	Cluster                 string           `db:"cluster" json:"-"`
@@ -31,15 +33,17 @@ type Os struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
-	Cluster                 string `db:"cluster" json:"-"`
-	CpuCores                int    `db:"cpuCores" json:"cpuCores"`
-	CpuSockets              int    `db:"cpuSockets" json:"cpuSockets"`
-	Id                      string `db:"id" json:"id"`
-	MemoryMB                int    `db:"memoryMB" json:"memoryMB"`
-	Model                   string `db:"model" json:"model"`
-	Vendor                  string `db:"vendor" json:"vendor"`
-	VMotionSupported        *bool  `db:"vmotionSupported" json:"vmotionSupported"`
-	StorageVMotionSupported *bool  `db:"storageVmotionSupported" json:"storageVmotionSupported"`
+	Cluster                 string                         `db:"cluster" json:"-"`
+	CpuCores                int                            `db:"cpuCores" json:"cpuCores"`
+	CpuSockets              int                            `db:"cpuSockets" json:"cpuSockets"`
+	Id                      string                         `db:"id" json:"id"`
+	MemoryMB                int                            `db:"memoryMB" json:"memoryMB"`
+	Model                   string                         `db:"model" json:"model"`
+	Vendor                  string                         `db:"vendor" json:"vendor"`
+	VMotionSupported        *bool                          `db:"vmotionSupported" json:"vmotionSupported"`
+	StorageVMotionSupported *bool                          `db:"storageVmotionSupported" json:"storageVmotionSupported"`
+	StorageAdapters         []inventory.HostStorageAdapter `db:"-" json:"storageAdapters,omitempty"`
+	StorageLuns             []inventory.HostStorageLun     `db:"-" json:"storageLuns,omitempty"`
 }
 
 // Network represents a VMware network.
