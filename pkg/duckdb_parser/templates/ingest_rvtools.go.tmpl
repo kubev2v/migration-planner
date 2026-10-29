@@ -285,7 +285,7 @@ ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "VMotion support" VARCHAR;
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Storage VMotion support" VARCHAR;
 
 INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
-    "VMotion support", "Storage VMotion support")
+    "VMotion support", "Storage VMotion support", "VI SDK UUID")
 SELECT
     "Datacenter",
     "Cluster",
@@ -298,8 +298,14 @@ SELECT
     "Host",
     COALESCE(NULLIF("Config status", ''), 'green'),
     CASE WHEN LOWER(TRIM(COALESCE("VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
-    CASE WHEN LOWER(TRIM(COALESCE("Storage VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END
-FROM vhost_raw;
+    CASE WHEN LOWER(TRIM(COALESCE("Storage VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    COALESCE(
+        NULLIF(NULLIF(LOWER(TRIM(to_json(h)->>'VI SDK UUID')), ''), 'vm'),
+        NULLIF(NULLIF(LOWER(TRIM(to_json(h)->>'vCenter UUID')), ''), 'vm'),
+        (SELECT CASE WHEN COUNT(DISTINCT source_id) = 1 THEN MIN(source_id) END
+         FROM (SELECT NULLIF(NULLIF(LOWER(TRIM("VI SDK UUID")), ''), 'vm') AS source_id FROM vinfo_raw))
+    )
+FROM vhost_raw h;
 
 DROP TABLE vhost_raw;
 

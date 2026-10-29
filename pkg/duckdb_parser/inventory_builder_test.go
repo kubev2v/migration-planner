@@ -2741,3 +2741,138 @@ func clearSharedStringIndex(t *testing.T, filePath, sheetPath string) {
 	require.NoError(t, f.Close())
 	require.NoError(t, os.WriteFile(filePath, buf.Bytes(), 0600))
 }
+
+type hostStorageTestInterceptor struct {
+	store.QueryInterceptor
+	queries int
+	err     error
+}
+
+func (q *hostStorageTestInterceptor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if strings.HasPrefix(query, "WITH owners AS (") {
+		q.queries++
+		if q.err != nil {
+			return nil, q.err
+		}
+	}
+	return q.QueryInterceptor.QueryContext(ctx, query, args...)
+}
+
+func TestBuildInventory_HostStoragePerBuild(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		vmIDs       []string
+		noHosts     bool
+		noStorage   bool
+		ambiguous   bool
+		wantQueries int
+	}{
+		{name: "all VMs", wantQueries: 1},
+		{name: "selected VMs", vmIDs: []string{"vm-1"}, wantQueries: 1},
+		{name: "no storage records", noStorage: true, wantQueries: 1},
+		{name: "ambiguous owners across clusters", ambiguous: true, wantQueries: 1},
+		{name: "no hosts", noHosts: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			_, err := db.Exec(`INSERT INTO about ("InstanceUuid", "APIVersion", "Product") VALUES ('vc-1', '8.0', 'vCenter');
+INSERT INTO vcluster ("Name", "Object ID") VALUES ('cluster1', 'domain-c1'), ('cluster2', 'domain-c2');
+INSERT INTO vinfo ("VM ID", "VM", "Cluster", "Datacenter", "VI SDK UUID", "CPUs", "Memory") VALUES
+('vm-1', 'vm-1', 'cluster1', 'dc1', 'vc-1', 2, 4096), ('vm-2', 'vm-2', 'cluster2', 'dc1', 'vc-1', 2, 4096);`)
+			require.NoError(t, err)
+			if !tc.noHosts {
+				_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES
+('host-1', 'esxi1', 'cluster1', 'vc-1'), ('host-2', 'esxi2', 'cluster2', 'vc-1');`)
+				require.NoError(t, err)
+			}
+			if !tc.noStorage {
+				_, err = db.Exec(`INSERT INTO vhba ("Host ID", "Device", "Model") VALUES
+('host-1', 'vmhba1', 'initial'), ('host-2', 'vmhba1', 'initial');
+INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Model", "HBA Device") VALUES
+('host-1', 'naa.host-1', 'initial', 'vmhba1'), ('host-2', 'naa.host-2', 'initial', 'vmhba1');`)
+				require.NoError(t, err)
+			}
+			if tc.ambiguous {
+				_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES
+('host-1', 'other1', 'cluster2', 'vc-2'), ('host-2', 'other2', 'cluster1', 'vc-2');`)
+				require.NoError(t, err)
+			}
+			recorder := &hostStorageTestInterceptor{QueryInterceptor: p.db}
+			p.db = recorder
+			checkStorage := func(id string, adapters []inventory.HostStorageAdapter, luns []inventory.HostStorageLun, model string) {
+				t.Helper()
+				if tc.noStorage || tc.ambiguous {
+					require.Empty(t, adapters)
+					require.Empty(t, luns)
+					return
+				}
+				require.Equal(t, []inventory.HostStorageAdapter{{Device: "vmhba1", Model: model}}, adapters)
+				require.Equal(t, []inventory.HostStorageLun{{CanonicalName: "naa." + id, Model: model, AdapterDevices: []string{"vmhba1"}}}, luns)
+			}
+			checkInventory := func(inv *inventory.Inventory, model string) {
+				t.Helper()
+				wantHosts := 2
+				if tc.noHosts {
+					wantHosts = 0
+				} else if tc.ambiguous {
+					wantHosts = 4
+				}
+				require.Len(t, inv.VCenter.Infra.Hosts, wantHosts)
+				for _, host := range inv.VCenter.Infra.Hosts {
+					checkStorage(host.ID, host.StorageAdapters, host.StorageLuns, model)
+				}
+				require.Len(t, inv.Clusters, 2)
+				for _, id := range []string{"domain-c1", "domain-c2"} {
+					require.Contains(t, inv.Clusters, id)
+					require.Len(t, inv.Clusters[id].Infra.Hosts, wantHosts/2)
+					for _, host := range inv.Clusters[id].Infra.Hosts {
+						checkStorage(host.ID, host.StorageAdapters, host.StorageLuns, model)
+					}
+				}
+			}
+
+			ctx := context.Background()
+			first, err := p.BuildInventory(ctx, tc.vmIDs)
+			require.NoError(t, err)
+			checkInventory(first, "initial")
+			require.Equal(t, tc.wantQueries, recorder.queries, "aggregate globally once for the vCenter and all clusters")
+
+			_, err = db.Exec(`UPDATE vhba SET "Model" = 'updated'; UPDATE vhostscsi SET "LUN Model" = 'updated';`)
+			require.NoError(t, err)
+			hosts, err := p.Hosts(ctx, Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, hosts, len(first.VCenter.Infra.Hosts))
+			for _, host := range hosts {
+				checkStorage(host.Id, host.StorageAdapters, host.StorageLuns, "updated")
+			}
+			require.Equal(t, 2*tc.wantQueries, recorder.queries, "standalone Hosts calls must read fresh storage")
+
+			second, err := p.BuildInventory(ctx, tc.vmIDs)
+			require.NoError(t, err)
+			checkInventory(second, "updated")
+			checkInventory(first, "initial")
+			require.Equal(t, 3*tc.wantQueries, recorder.queries, "each inventory build must read fresh storage")
+		})
+	}
+}
+
+func TestBuildInventory_HostStorageErrorRecovery(t *testing.T) {
+	p, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
+INSERT INTO vhba ("Host ID", "Device") VALUES ('host-1', 'vmhba1');`)
+	require.NoError(t, err)
+	recorder := &hostStorageTestInterceptor{QueryInterceptor: p.db, err: fmt.Errorf("storage query failed")}
+	p.db = recorder
+	_, err = p.BuildInventory(context.Background(), nil)
+	require.ErrorIs(t, err, recorder.err)
+	require.Equal(t, 1, recorder.queries)
+
+	recorder.err = nil
+	inv, err := p.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, inv.VCenter.Infra.Hosts, 1)
+	require.Equal(t, []inventory.HostStorageAdapter{{Device: "vmhba1"}}, inv.VCenter.Infra.Hosts[0].StorageAdapters)
+	require.Equal(t, 2, recorder.queries, "a failed build must not poison subsequent builds")
+}

@@ -125,15 +125,18 @@ func TestPreStorageCollectionInitUpgrade(t *testing.T) {
 	require.NoError(t, p.Init())
 	require.NoError(t, p.Init())
 	assertPreStorageQueries(t, db, "", "")
-	var fsType, protocol, hbaType sql.NullString
+	var fsType, protocol, hbaType, hostSource sql.NullString
 	var version sql.NullInt32
 	require.NoError(t, db.QueryRow(`SELECT "Filesystem Type", "Filesystem Major Version", "Storage Protocol" FROM vdatastore`).Scan(&fsType, &version, &protocol))
 	require.False(t, fsType.Valid)
 	require.False(t, version.Valid)
 	require.False(t, protocol.Valid)
+	require.NoError(t, db.QueryRow(`SELECT "VI SDK UUID" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&hostSource))
+	require.False(t, hostSource.Valid, "upgrading must not invent a host source")
 	require.NoError(t, db.QueryRow(`SELECT "Type" FROM vhba WHERE "Device"='vmhba64'`).Scan(&hbaType))
 	require.Equal(t, "ISCSI", hbaType.String)
-	_, err := db.Exec(`UPDATE vdatastore SET "Filesystem Type"='VMFS', "Filesystem Major Version"=6, "Storage Protocol"='iSCSI';
+	_, err := db.Exec(`UPDATE vhost SET "VI SDK UUID" = 'vc-1';
+UPDATE vdatastore SET "Filesystem Type"='VMFS', "Filesystem Major Version"=6, "Storage Protocol"='iSCSI';
 UPDATE vhba SET "Host ID"='host-1', "HBA Key"='hba-key', "Protocol"='iSCSI', "Model"='adapter', "Driver"='driver', "Node WWN"='node', "Port WWN"='port';`)
 	require.NoError(t, err)
 	require.NoError(t, p.Init())
@@ -141,6 +144,8 @@ UPDATE vhba SET "Host ID"='host-1', "HBA Key"='hba-key', "Protocol"='iSCSI', "Mo
 	require.Equal(t, "VMFS", fsType.String)
 	require.Equal(t, int32(6), version.Int32)
 	require.Equal(t, "iSCSI", protocol.String)
+	require.NoError(t, db.QueryRow(`SELECT "VI SDK UUID" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&hostSource))
+	require.Equal(t, "vc-1", hostSource.String)
 }
 
 func TestPreStorageCollectionInitUpgradesMigrationHBA(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
@@ -77,6 +78,15 @@ func (p *Parser) Networks(ctx context.Context, filters Filters, options Options)
 
 // Hosts returns hosts with optional filters and pagination.
 func (p *Parser) Hosts(ctx context.Context, filters Filters, options Options) ([]models.Host, error) {
+	return p.hosts(ctx, filters, options, func() (map[string]hostStorageFacts, error) {
+		return p.hostStorage(ctx)
+	})
+}
+
+func (p *Parser) hosts(
+	ctx context.Context, filters Filters, options Options,
+	loadStorage func() (map[string]hostStorageFacts, error),
+) ([]models.Host, error) {
 	q, err := p.builder.HostQuery(filters, options)
 	if err != nil {
 		return nil, fmt.Errorf("building host query: %w", err)
@@ -84,6 +94,18 @@ func (p *Parser) Hosts(ctx context.Context, filters Filters, options Options) ([
 	var results []models.Host
 	if err := sqlscan.Select(ctx, p.db, &results, q); err != nil {
 		return nil, fmt.Errorf("scanning hosts: %w", err)
+	}
+	if len(results) == 0 {
+		return results, nil
+	}
+	storage, err := loadStorage()
+	if err != nil {
+		return nil, fmt.Errorf("reading host storage: %w", err)
+	}
+	for i := range results {
+		facts := storage[strings.TrimSpace(results[i].Id)]
+		results[i].StorageAdapters = facts.adapters
+		results[i].StorageLuns = facts.luns
 	}
 	return results, nil
 }
