@@ -21,20 +21,15 @@ The release spans 4 repositories, all under `kubev2v`:
 | Repository | Role | How Included in Release |
 |---|---|---|
 | `migration-planner` | Backend, API, orchestration | Main repo — release tagged here |
-| `assisted-migration-agent` | Discovery/assessment agent | Git submodule at `agent-v2/` |
+| `assisted-migration-agent` | Discovery/assessment agent | Separately built `oma-appliance` image consumed by the ISO |
 | `migration-planner-agent-ui` | Agent UI (credential collection, status) | SHA pinned in `build/migration-planner-iso/config` as `AGENT_UI_IMAGE_TAG` |
 | `migration-planner-ui-app` | SaaS web UI | Tagged with the same version as migration-planner |
 
 ### Source of Truth: migration-planner
 
-The `migration-planner` repo is the **source of truth** for what's included in a release:
+Use the `migration-planner` release tags and the shipped appliance's build provenance to determine what's included in a release:
 
-- **Agent changes**: Only included if the submodule SHA at `agent-v2/` was updated between the two release tags. To find the range of agent commits in a release:
-  ```
-  git ls-tree <previous-tag> agent-v2   # → old SHA
-  git ls-tree <target-tag> agent-v2     # → new SHA
-  ```
-  Then compare those SHAs in the `assisted-migration-agent` repo.
+- **Agent changes**: Resolve the source revisions of the `oma-appliance` images shipped in the previous and target releases from their image metadata or build provenance. Compare those revisions in the `assisted-migration-agent` repo. The image repository and tag are configured in `build/migration-planner-iso/config` and may be overridden by the ISO pipeline. Mutable tags such as `main` do not identify an exact source revision; if the shipped revisions cannot be resolved, state that limitation instead of inferring the range from backend release tags.
 
 - **Agent UI changes**: Only included if `AGENT_UI_IMAGE_TAG` in `build/migration-planner-iso/config` changed between tags:
   ```
@@ -52,7 +47,7 @@ The `migration-planner` repo is the **source of truth** for what's included in a
 
 1. **Determine SHA ranges for each repo:**
    - `migration-planner`: `git log --oneline --no-merges <prev-tag>..<target-tag>`
-   - `assisted-migration-agent`: Compare submodule SHAs (see above)
+   - `assisted-migration-agent`: Compare source revisions of the shipped appliance images (see above)
    - `migration-planner-agent-ui`: Compare `AGENT_UI_IMAGE_TAG` values (see above)
    - `migration-planner-ui-app`: Compare same version tags
 
@@ -79,7 +74,7 @@ The `migration-planner` repo is the **source of truth** for what's included in a
 - Agent-only changes (data collection, internal processing) **unless** they affect what shows up in the UI
 - Dependency updates, CI/CD changes, build system changes
 - Internal refactors, code cleanup, test changes
-- Submodule/SHA bump commits themselves (e.g., "Update submodule to reflect the SHA: ...")
+- Image/SHA bump commits themselves
 - Commits with `NO-JIRA` prefix that are purely infrastructure
 - Renovate/Dependabot automated commits
 

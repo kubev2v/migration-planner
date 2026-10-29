@@ -25,8 +25,7 @@ oc new-project assisted-migration
 You can override the default image sources by exporting the following environment variables before deployment:
 ```sh
 export MIGRATION_PLANNER_API_IMAGE=<api_image_source>           # Default: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-api  
-export MIGRATION_PLANNER_AGENT_IMAGE=<agent_image_source>       # Default: quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent  
-export MIGRATION_PLANNER_IMAGE_TAG=<agent_and_api_image_tag>    # Default: latest  
+export MIGRATION_PLANNER_IMAGE_TAG=<api_and_iso_image_tag>      # Default: latest
 export MIGRATION_PLANNER_UI_IMAGE=<ui_image_source>             # Default: quay.io/kubev2v/migration-planner-ui  
 export MIGRATION_PLANNER_UI_IMAGE_TAG=<ui_image_tag>            # Default: latest  
 export MIGRATION_PLANNER_REPLICAS=<replica_count>               # Default: 1  

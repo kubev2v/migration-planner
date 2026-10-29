@@ -1,3 +1,0 @@
-[submodule "agent-v2"]
-	path = agent-v2
-	url = https://github.com/kubev2v/assisted-migration-agent.git

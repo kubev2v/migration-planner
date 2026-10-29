@@ -56,7 +56,6 @@ an active clone of those repos and ask the user either to clone them, or give yo
 
 1. Validate version format (must follow semver, e.g. v0.13.2)
 2. Check working directory status for **migration-planner** and **migration-planner-ui-app** repos:
-   - Ignore git submodules (they may show as modified)
    - If there are uncommitted changes (tracked files), inform the user and ask them to either commit, stash, or confirm to proceed
    - Untracked files can be ignored
 3. Ensure the content of migration-planner/.github/release-config.txt reflects the version provided:

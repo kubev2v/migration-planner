@@ -3,7 +3,6 @@ version: "2"
 linters:
   exclusions:
     paths:
-      - agent-v2
       - bin
     rules:
       - path: "test/e2e/"
