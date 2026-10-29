@@ -33,8 +33,8 @@ type SourceCreateForm struct {
 	NetworkConfigType *string
 }
 
-func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string) model.ImageInfra {
-	imageInfra := model.ImageInfra{
+func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string) svcmodel.ImageInfra {
+	imageInfra := svcmodel.ImageInfra{
 		SourceID:         sourceID,
 		ImageTokenKey:    imageTokenKey,
 		SshPublicKey:     s.SshPublicKey,
@@ -61,16 +61,16 @@ func (s SourceCreateForm) ToImageInfra(sourceID uuid.UUID, imageTokenKey string)
 	return imageInfra
 }
 
-func (s SourceCreateForm) ToSource() model.Source {
-	source := model.Source{
+func (s SourceCreateForm) ToSource() svcmodel.Source {
+	source := svcmodel.Source{
 		ID:       uuid.New(),
 		Username: s.Username,
 		OrgID:    s.OrgID,
 		Name:     s.Name,
-		Labels:   make([]model.Label, 0),
+		Labels:   make([]svcmodel.Label, 0),
 	}
 	for k, v := range s.Labels {
-		source.Labels = append(source.Labels, model.Label{Key: k, Value: v, SourceID: source.ID.String()})
+		source.Labels = append(source.Labels, svcmodel.Label{Key: k, Value: v, SourceID: source.ID.String()})
 	}
 
 	if s.EmailDomain != "" {
@@ -84,7 +84,8 @@ type InventoryUpdateForm struct {
 	SourceID  uuid.UUID
 	AgentID   uuid.UUID
 	VCenterID string
-	Inventory []byte
+	Inventory svcmodel.Inventory
+	Version   uint
 	// Subsets contains the subset inventories to replace.
 	// SourceService.UpdateInventory replaces all existing subsets with this value.
 	// Nil or empty input clears all subsets.
@@ -95,7 +96,8 @@ type InventoryUpdateForm struct {
 type SourceInventoryUpdateForm struct {
 	SourceID  uuid.UUID
 	VCenterID string
-	Inventory []byte
+	Inventory svcmodel.Inventory
+	Version   uint
 }
 
 type SourceSubsetUpdateForm struct {
@@ -104,7 +106,8 @@ type SourceSubsetUpdateForm struct {
 	SourceID  uuid.UUID
 	VCenterID string
 	VMsCount  int
-	Inventory []byte
+	Inventory svcmodel.Inventory
+	Version   uint
 }
 
 type AgentUpdateForm struct {
@@ -127,8 +130,9 @@ func (f *AgentUpdateForm) ToModel() model.Agent {
 	}
 }
 
-func UpdateSourceFromApi(m *model.Source, vCenterID string, inventory []byte) *model.Source {
-	m.Inventory = inventory
+func UpdateSourceFromApi(m *svcmodel.Source, vCenterID string, inventory svcmodel.Inventory, version uint) *svcmodel.Source {
+	m.Inventory = &inventory
+	m.Version = version
 	m.VCenterID = vCenterID
 	return m
 }
@@ -149,13 +153,13 @@ type SourceUpdateForm struct {
 	NetworkConfigType *string
 }
 
-func (f *SourceUpdateForm) ToSource(source *model.Source) {
+func (f *SourceUpdateForm) ToSource(source *svcmodel.Source) {
 	if f.Name != nil {
 		source.Name = *f.Name
 	}
 }
 
-func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
+func (f *SourceUpdateForm) ToImageInfra(imageInfra *svcmodel.ImageInfra) {
 	if f.EnableProxy != nil && !*f.EnableProxy {
 		imageInfra.HttpProxyUrl = ""
 		imageInfra.HttpsProxyUrl = ""
@@ -196,13 +200,13 @@ func (f *SourceUpdateForm) ToImageInfra(imageInfra *model.ImageInfra) {
 	}
 }
 
-func (f *SourceUpdateForm) ToLabels() []model.Label {
+func (f *SourceUpdateForm) ToLabels() []svcmodel.Label {
 	if f.Labels == nil {
 		return nil
 	}
-	labels := make([]model.Label, len(f.Labels))
+	labels := make([]svcmodel.Label, len(f.Labels))
 	for i, label := range f.Labels {
-		labels[i] = model.Label{Key: label.Key, Value: label.Value}
+		labels[i] = svcmodel.Label{Key: label.Key, Value: label.Value}
 	}
 	return labels
 }

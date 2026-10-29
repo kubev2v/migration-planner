@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/internal/util"
+
 	"github.com/kubev2v/migration-planner/internal/model"
 	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 )
@@ -181,4 +183,104 @@ func SharingFromStore(sharing *storemodel.Sharing) *model.Sharing {
 		}
 	}
 	return result
+}
+
+// SourceFromStore decodes the optional inventory at the persistence boundary.
+func SourceFromStore(s storemodel.Source) (model.Source, error) {
+	result := model.Source{
+		ID:          s.ID,
+		Name:        s.Name,
+		VCenterID:   s.VCenterID,
+		Username:    s.Username,
+		OrgID:       s.OrgID,
+		OnPremises:  s.OnPremises,
+		UpdateType:  s.UpdateType,
+		EmailDomain: s.EmailDomain,
+		CreatedAt:   s.CreatedAt, UpdatedAt: s.UpdatedAt,
+		ImageInfra: ImageInfraFromStore(s.ImageInfra),
+	}
+	if len(s.Inventory) > 0 {
+		result.Version = uint(util.GetInventoryVersion(s.Inventory))
+		inventory, err := UnmarshalInventory(s.Inventory, result.Version)
+		if err != nil {
+			return model.Source{}, fmt.Errorf("failed to decode source %s inventory: %w", s.ID, err)
+		}
+		result.Inventory = &inventory
+	}
+	if s.Agents != nil {
+		result.Agents = make([]model.Agent, len(s.Agents))
+		for i, agent := range s.Agents {
+			result.Agents[i] = AgentFromStore(agent)
+		}
+	}
+	if s.Labels != nil {
+		result.Labels = make([]model.Label, len(s.Labels))
+		for i, label := range s.Labels {
+			result.Labels[i] = LabelFromStore(label)
+		}
+	}
+	return result, nil
+}
+
+// SourceSubsetInventoryFromStore decodes a stored subset inventory.
+func SourceSubsetInventoryFromStore(s storemodel.SourceSubsetInventory) (model.SourceSubsetInventory, error) {
+	version := uint(util.GetInventoryVersion(s.Inventory))
+	inventory, err := UnmarshalInventory(s.Inventory, version)
+	if err != nil {
+		return model.SourceSubsetInventory{}, fmt.Errorf("failed to decode subset %q inventory: %w", s.Name, err)
+	}
+	return model.SourceSubsetInventory{
+		ID:         s.ID,
+		Name:       s.Name,
+		SourceID:   s.SourceID,
+		VCenterID:  s.VCenterID,
+		VMsCount:   s.VMsCount,
+		UpdateType: s.UpdateType,
+		CreatedAt:  s.CreatedAt, UpdatedAt: s.UpdatedAt,
+		Version: version, Inventory: inventory,
+	}, nil
+}
+
+// AgentFromStore converts stored source metadata to domain values.
+func AgentFromStore(s storemodel.Agent) model.Agent {
+	return model.Agent{
+		ID:         s.ID,
+		Status:     s.Status,
+		StatusInfo: s.StatusInfo,
+		CredUrl:    s.CredUrl,
+		Version:    s.Version,
+		SourceID:   s.SourceID,
+		CreatedAt:  s.CreatedAt,
+		UpdatedAt:  s.UpdatedAt,
+	}
+}
+
+// ImageInfraFromStore converts stored source metadata to domain values.
+func ImageInfraFromStore(s storemodel.ImageInfra) model.ImageInfra {
+	return model.ImageInfra{
+		SourceID:         s.SourceID,
+		HttpProxyUrl:     s.HttpProxyUrl,
+		HttpsProxyUrl:    s.HttpsProxyUrl,
+		NoProxyDomains:   s.NoProxyDomains,
+		CertificateChain: s.CertificateChain,
+		SshPublicKey:     s.SshPublicKey,
+		ImageTokenKey:    s.ImageTokenKey,
+		IpAddress:        s.IpAddress,
+		SubnetMask:       s.SubnetMask,
+		DefaultGateway:   s.DefaultGateway,
+		Dns:              s.Dns,
+		AgentVersion:     s.AgentVersion,
+		AgentToken:       s.AgentToken,
+		CreatedAt:        s.CreatedAt, UpdatedAt: s.UpdatedAt,
+		ID: s.ID,
+	}
+}
+
+// LabelFromStore converts stored source metadata to domain values.
+func LabelFromStore(s storemodel.Label) model.Label {
+	return model.Label{
+		Key:      s.Key,
+		Value:    s.Value,
+		SourceID: s.SourceID,
+	}
 }

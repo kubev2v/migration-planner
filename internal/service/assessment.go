@@ -130,7 +130,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		inventoryCount := len(assessment.SubsetInventories) + 1
 		tracer.Step("using_provided_inventories").WithInt("count", inventoryCount).Log()
 
-	case "agent":
+	case SourceTypeAgent:
 		tracer.Step("process_source").Log()
 		source, err := as.store.Source().Get(ctx, *assessment.SourceID)
 		if err != nil {
@@ -143,10 +143,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 			return nil, NewErrSourceHasNoInventory(source.ID)
 		}
 
-		mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, assessment.Name, false, source.Inventory)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read source inventory: %w", err)
-		}
+		mainInv := svcmodel.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, source.Version, false, *source.Inventory)
 
 		// TODO: move this validation to the source handler when inventory is pushed by the agent
 		if mainInv.VMsCount == 0 {
@@ -164,10 +161,7 @@ func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm ma
 		tracer.Step("found_source_subsets").WithInt("count", len(sourceSubsets)).Log()
 
 		for _, ss := range sourceSubsets {
-			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, ss.Name, true, ss.Inventory)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read subset inventory %q: %w", ss.Name, err)
-			}
+			inv := svcmodel.NewAssessmentInventory(uuid.New(), assessment.ID, ss.Name, ss.Version, true, ss.Inventory)
 			assessment.SubsetInventories = append(assessment.SubsetInventories, inv)
 		}
 
@@ -244,10 +238,7 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 		var inventories []svcmodel.AssessmentInventory
 		if source.Inventory != nil {
-			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), assessment.ID, assessment.Name, true, source.Inventory)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read source inventory: %w", err)
-			}
+			inv := svcmodel.NewAssessmentInventory(uuid.New(), assessment.ID, assessment.Name, source.Version, true, *source.Inventory)
 			inventories = append(inventories, inv)
 		}
 

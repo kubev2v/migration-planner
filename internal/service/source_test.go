@@ -2,7 +2,6 @@ package service_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -12,10 +11,10 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
@@ -286,9 +285,9 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON := model.Inventory{
 				VcenterId: "vcenter",
-			})
+			}
 
 			srv := service.NewSourceService(s, nil)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -296,6 +295,7 @@ var _ = Describe("source handler", Ordered, func() {
 				AgentID:   uuid.New(),
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
+				Version:   model.InventoryVersionV2,
 			})
 			Expect(err).To(BeNil())
 
@@ -327,9 +327,9 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventoryJSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventoryJSON := model.Inventory{
 				VcenterId: "vcenter",
-			})
+			}
 
 			srv := service.NewSourceService(s, nil)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -337,6 +337,7 @@ var _ = Describe("source handler", Ordered, func() {
 				AgentID:   uuid.New(),
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
+				Version:   model.InventoryVersionV2,
 			})
 			Expect(err).To(BeNil())
 
@@ -355,6 +356,7 @@ var _ = Describe("source handler", Ordered, func() {
 				AgentID:   uuid.New(),
 				VCenterID: "vcenter",
 				Inventory: inventoryJSON,
+				Version:   model.InventoryVersionV2,
 			})
 			Expect(err).To(BeNil())
 		})
@@ -364,9 +366,9 @@ var _ = Describe("source handler", Ordered, func() {
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, firstSourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
 
-			inventory1JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory1JSON := model.Inventory{
 				VcenterId: "vcenter",
-			})
+			}
 
 			srv := service.NewSourceService(s, nil)
 			_, err := srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -374,12 +376,13 @@ var _ = Describe("source handler", Ordered, func() {
 				AgentID:   uuid.New(),
 				VCenterID: "vcenter",
 				Inventory: inventory1JSON,
+				Version:   model.InventoryVersionV2,
 			})
 			Expect(err).To(BeNil())
 
-			inventory2JSON, _ := json.Marshal(v1alpha1.Inventory{
+			inventory2JSON := model.Inventory{
 				VcenterId: "another-vcenter-id",
-			})
+			}
 
 			// Now try to update with a different vCenter ID
 			_, err = srv.UpdateInventory(context.TODO(), mappers.InventoryUpdateForm{
@@ -387,6 +390,7 @@ var _ = Describe("source handler", Ordered, func() {
 				AgentID:   uuid.New(),
 				VCenterID: "another-vcenter-id",
 				Inventory: inventory2JSON,
+				Version:   model.InventoryVersionV2,
 			})
 			Expect(err).ToNot(BeNil())
 			_, ok := err.(*service.ErrInvalidVCenterID)

@@ -2,7 +2,6 @@ package v1alpha1
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	apiMappers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 )
@@ -45,15 +45,11 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		request.Body.Inventory.CreatedAt = &now
 	}
 
-	data, err := json.Marshal(request.Body.Inventory)
-	if err != nil {
-		return agentServer.UpdateSourceInventory500JSONResponse{Message: err.Error()}, nil
-	}
-
 	updatedSource, err := h.srv.UpdateSourceInventory(ctx, mappers.InventoryUpdateForm{
 		SourceID:  request.Id,
 		AgentID:   request.Body.AgentId,
-		Inventory: data,
+		Inventory: apiMappers.InventoryFromAPI(request.Body.Inventory),
+		Version:   model.InventoryVersionV2,
 		VCenterID: request.Body.Inventory.VcenterId,
 	})
 	if err != nil {
@@ -101,14 +97,10 @@ func (h *AgentHandler) UpdateSource(ctx context.Context, request agentServer.Upd
 		inventory.CreatedAt = &now
 	}
 
-	data, err := json.Marshal(inventory)
-	if err != nil {
-		return agentServer.UpdateSource500JSONResponse{Message: err.Error()}, nil
-	}
-
 	updatedSource, err := h.srv.UpdateSource(ctx, mappers.SourceInventoryUpdateForm{
 		SourceID:  request.Id,
-		Inventory: data,
+		Inventory: apiMappers.InventoryFromAPI(inventory),
+		Version:   model.InventoryVersionV2,
 		VCenterID: inventory.VcenterId,
 	})
 	if err != nil {
@@ -156,11 +148,6 @@ func (h *AgentHandler) UpdateSourceSubset(ctx context.Context, request agentServ
 		inventory.CreatedAt = &now
 	}
 
-	data, err := json.Marshal(inventory)
-	if err != nil {
-		return agentServer.UpdateSourceSubset500JSONResponse{Message: err.Error()}, nil
-	}
-
 	vmsCount := 0
 	if request.Body.VmsCount != nil {
 		vmsCount = *request.Body.VmsCount
@@ -172,7 +159,8 @@ func (h *AgentHandler) UpdateSourceSubset(ctx context.Context, request agentServ
 		SourceID:  request.Id,
 		VCenterID: inventory.VcenterId,
 		VMsCount:  vmsCount,
-		Inventory: data,
+		Inventory: apiMappers.InventoryFromAPI(inventory),
+		Version:   model.InventoryVersionV2,
 	})
 
 	if err != nil {

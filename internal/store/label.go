@@ -5,7 +5,9 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/store/mappers"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 )
 
@@ -23,7 +25,7 @@ func NewLabelStore(db *gorm.DB) Label {
 }
 
 func (l *labelStore) DeleteBySourceID(ctx context.Context, sourceID string) error {
-	return l.getDB(ctx).WithContext(ctx).Where("source_id = ?", sourceID).Delete(&model.Label{}).Error
+	return l.getDB(ctx).WithContext(ctx).Where("source_id = ?", sourceID).Delete(&storemodel.Label{}).Error
 }
 
 func (l *labelStore) UpdateLabels(ctx context.Context, sourceID uuid.UUID, labels []model.Label) error {
@@ -43,7 +45,8 @@ func (l *labelStore) UpdateLabels(ctx context.Context, sourceID uuid.UUID, label
 	for i := range labels {
 		// Ensure source ID is set correctly
 		labels[i].SourceID = sourceIDStr
-		if err := db.Create(&labels[i]).Error; err != nil {
+		stored := mappers.LabelToStore(labels[i])
+		if err := db.Create(&stored).Error; err != nil {
 			return fmt.Errorf("failed to create label with key '%s': %w", labels[i].Key, err)
 		}
 	}

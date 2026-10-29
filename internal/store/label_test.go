@@ -6,8 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -75,7 +76,7 @@ var _ = Describe("label store", Ordered, func() {
 			err = s.Label().UpdateLabels(context.TODO(), sourceID, updated)
 			Expect(err).To(BeNil())
 
-			var labels []model.Label
+			var labels []storemodel.Label
 			tx = gormdb.WithContext(context.TODO()).Where("source_id = ?", sourceID.String()).Find(&labels)
 			Expect(tx.Error).To(BeNil())
 			Expect(labels).To(HaveLen(1))

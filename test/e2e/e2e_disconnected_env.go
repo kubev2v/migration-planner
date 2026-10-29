@@ -125,13 +125,10 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			Expect(so.Agent).To(BeNil())
 
 			// Get inventory
-			// TODO Remove the retry after the agent collector behave correctly
-			// Inventory status must not be "collected" before the DB is ready (ECOPROJECT-5318)
-			var inventory *v1alpha1.Inventory
-			Eventually(func() error {
-				inventory, err = e2eAgent.Api.Inventory()
-				return err
-			}, "1m", "2s").Should(BeNil())
+			inventory, err := e2eAgent.Api.Inventory()
+			Expect(err).To(BeNil())
+			Expect(inventory).NotTo(BeNil())
+			Expect(inventory.Vcenter).NotTo(BeNil())
 
 			// Manually upload the collected inventory data
 			err = svc.UpdateSource(source.Id, inventory)
@@ -143,7 +140,13 @@ var _ = Describe("e2e-disconnected-environment", func() {
 			Expect(source.Agent).To(Not(BeNil()))
 			Expect(source.Agent.Status).Should(Equal(v1alpha1.AgentStatusNotConnected))
 			Expect(source.Agent.CredentialUrl).Should(BeEmpty())
-			Expect(source.Inventory).To(Equal(inventory))
+			Expect(source.Inventory).NotTo(BeNil())
+			Expect(source.Inventory.Vcenter).NotTo(BeNil())
+			// Check arbitrary inventory fields without comparing deprecated values
+			Expect(source.Inventory.VcenterId).To(Equal(inventory.VcenterId), "vCenter ID")
+			Expect(source.Inventory.Vcenter.Vms.Total).To(Equal(inventory.Vcenter.Vms.Total), "total VMs")
+			Expect(source.Inventory.Vcenter.Vms.TotalMigratable).To(Equal(inventory.Vcenter.Vms.TotalMigratable), "migratable VMs")
+			Expect(source.Inventory.Vcenter.Infra.TotalHosts).To(Equal(inventory.Vcenter.Infra.TotalHosts), "total hosts")
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

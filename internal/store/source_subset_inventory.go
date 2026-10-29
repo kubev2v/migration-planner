@@ -5,7 +5,9 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/store/mappers"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -33,7 +35,7 @@ func NewSourceSubsetInventory(db *gorm.DB) SourceSubsetInventory {
 }
 
 func (s *SourceSubsetInventoryStore) List(ctx context.Context, filter *SourceSubsetInventoryQueryFilter) (model.SourceSubsetInventoryList, error) {
-	var sourceInventories model.SourceSubsetInventoryList
+	var sourceInventories storemodel.SourceSubsetInventoryList
 	tx := s.getDB(ctx).Model(&sourceInventories).Order("id")
 
 	if filter != nil {
@@ -46,11 +48,23 @@ func (s *SourceSubsetInventoryStore) List(ctx context.Context, filter *SourceSub
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return sourceInventories, nil
+	inventories := make(model.SourceSubsetInventoryList, 0, len(sourceInventories))
+	for _, stored := range sourceInventories {
+		mapped, err := mappers.SourceSubsetInventoryFromStore(stored)
+		if err != nil {
+			return nil, err
+		}
+		inventories = append(inventories, mapped)
+	}
+	return inventories, nil
 }
 
 func (s *SourceSubsetInventoryStore) Create(ctx context.Context, sourceInventory model.SourceSubsetInventory) (*model.SourceSubsetInventory, error) {
-	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&sourceInventory)
+	stored, err := mappers.SourceSubsetInventoryToStore(sourceInventory)
+	if err != nil {
+		return nil, err
+	}
+	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&stored)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateKey
@@ -59,11 +73,15 @@ func (s *SourceSubsetInventoryStore) Create(ctx context.Context, sourceInventory
 		return nil, result.Error
 	}
 
-	return &sourceInventory, nil
+	mapped, err := mappers.SourceSubsetInventoryFromStore(stored)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceSubsetInventoryStore) Get(ctx context.Context, id uuid.UUID) (*model.SourceSubsetInventory, error) {
-	sourceInventory := model.SourceSubsetInventory{ID: id}
+	sourceInventory := storemodel.SourceSubsetInventory{ID: id}
 	result := s.getDB(ctx).First(&sourceInventory)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -71,11 +89,15 @@ func (s *SourceSubsetInventoryStore) Get(ctx context.Context, id uuid.UUID) (*mo
 		}
 		return nil, result.Error
 	}
-	return &sourceInventory, nil
+	mapped, err := mappers.SourceSubsetInventoryFromStore(sourceInventory)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceSubsetInventoryStore) Delete(ctx context.Context, id uuid.UUID) error {
-	sourceInventory := model.SourceSubsetInventory{ID: id}
+	sourceInventory := storemodel.SourceSubsetInventory{ID: id}
 	result := s.getDB(ctx).Unscoped().Delete(&sourceInventory)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		zap.S().Named("source_subset_inventory_store").Infof("ERROR: %v", result.Error)
@@ -85,7 +107,7 @@ func (s *SourceSubsetInventoryStore) Delete(ctx context.Context, id uuid.UUID) e
 }
 
 func (s *SourceSubsetInventoryStore) DeleteBySourceID(ctx context.Context, sourceID uuid.UUID) error {
-	result := s.getDB(ctx).Unscoped().Where("source_id = ?", sourceID).Delete(&model.SourceSubsetInventory{})
+	result := s.getDB(ctx).Unscoped().Where("source_id = ?", sourceID).Delete(&storemodel.SourceSubsetInventory{})
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		zap.S().Named("source_subset_inventory_store").Infof("ERROR: %v", result.Error)
 		return result.Error
@@ -97,7 +119,15 @@ func (s *SourceSubsetInventoryStore) CreateMany(ctx context.Context, sourceInven
 	if len(sourceInventories) == 0 {
 		return nil
 	}
-	result := s.getDB(ctx).Create(&sourceInventories)
+	stored := make([]storemodel.SourceSubsetInventory, 0, len(sourceInventories))
+	for _, inventory := range sourceInventories {
+		mapped, err := mappers.SourceSubsetInventoryToStore(inventory)
+		if err != nil {
+			return err
+		}
+		stored = append(stored, mapped)
+	}
+	result := s.getDB(ctx).Create(&stored)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 			return ErrDuplicateKey
@@ -108,12 +138,16 @@ func (s *SourceSubsetInventoryStore) CreateMany(ctx context.Context, sourceInven
 }
 
 func (s *SourceSubsetInventoryStore) Update(ctx context.Context, sourceInventory model.SourceSubsetInventory) (*model.SourceSubsetInventory, error) {
+	stored, err := mappers.SourceSubsetInventoryToStore(sourceInventory)
+	if err != nil {
+		return nil, err
+	}
 	// Use Select to explicitly update all fields, including zero-value fields like VMsCount=0 or VCenterID=""
 	// Without Select, GORM's Updates() skips zero-value fields, causing stale data
-	result := s.getDB(ctx).Model(&sourceInventory).
+	result := s.getDB(ctx).Model(&stored).
 		Select("name", "source_id", "v_center_id", "vms_count", "inventory", "update_type", "updated_at").
 		Clauses(clause.Returning{}).
-		Updates(&sourceInventory)
+		Updates(&stored)
 	if result.Error != nil {
 		return nil, result.Error
 	}
@@ -122,7 +156,11 @@ func (s *SourceSubsetInventoryStore) Update(ctx context.Context, sourceInventory
 		return nil, ErrRecordNotFound
 	}
 
-	return &sourceInventory, nil
+	mapped, err := mappers.SourceSubsetInventoryFromStore(stored)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceSubsetInventoryStore) getDB(ctx context.Context) *gorm.DB {

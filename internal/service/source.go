@@ -12,9 +12,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/image"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/version"
 )
@@ -246,7 +247,7 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 	}
 
 	if agent == nil {
-		newAgent := model.NewAgentForSource(form.AgentID, *source)
+		newAgent := storemodel.Agent{ID: form.AgentID, SourceID: source.ID}
 		if _, err := s.store.Agent().Create(ctx, newAgent); err != nil {
 			return model.Source{}, err
 		}
@@ -259,7 +260,8 @@ func (s *SourceService) UpdateInventory(ctx context.Context, form mappers.Invent
 
 	source.OnPremises = true
 	source.VCenterID = form.VCenterID
-	source.Inventory = form.Inventory
+	source.Inventory = &form.Inventory
+	source.Version = form.Version
 	source.UpdateType = "manual" // Set update_type to manual for user updates
 
 	if _, err = s.store.Source().Update(ctx, *source); err != nil {
@@ -296,6 +298,7 @@ func (s *SourceService) replaceSourceSubsets(ctx context.Context, sourceID uuid.
 				VCenterID:  subset.VCenterID,
 				VMsCount:   subset.VMsCount,
 				Inventory:  subset.Inventory,
+				Version:    subset.Version,
 				UpdateType: "manual",
 			}
 		}
