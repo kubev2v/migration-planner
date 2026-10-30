@@ -70,12 +70,6 @@ storage:
       label: "DATA"
 
   links:
-    - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
-      target: /usr/lib/systemd/user/podman-auto-update.timer
-      user:
-        name: core
-      group:
-        name: core
     - path: /home/core/.config/systemd/user/default.target.wants/planner-agent-image-load.service
       target: /home/core/.config/systemd/user/planner-agent-image-load.service
       user:
@@ -95,6 +89,11 @@ storage:
       group:
         name: core
     - path: /var/lib/data/agent/updates
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/lib/data/agent/updates/.staging
       user:
         name: core
       group:
@@ -225,20 +224,45 @@ storage:
       contents:
         inline: |
           #!/usr/bin/bash
-          set -euo pipefail
+          set -uo pipefail
 
+          # The agent stages archives in updates/.staging/ and renames them here once validated,
+          # so every *.tar in this directory is complete and approved for installation.
           readonly UPDATE_DIR=/var/lib/data/agent/updates
 
+          # status.json tells the agent the outcome: applied, rolled-back, failed or unchanged.
+          write_status() {
+            local file=${1//\\/\\\\}
+            file=${file//\"/\\\"}
+            printf '{"file":"%s","result":"%s","time":"%s"}\n' "$file" "$2" "$(date -u +%FT%TZ)" > "${UPDATE_DIR}/.status.tmp"
+            mv -f "${UPDATE_DIR}/.status.tmp" "${UPDATE_DIR}/status.json"
+          }
+
+          mkdir -p /var/lib/data/tmp
           for tar in "${UPDATE_DIR}"/*.tar; do
             [ -f "$tar" ] || continue
+            name=$(basename "$tar")
             echo "Loading agent image from ${tar}..." >&2
-            if skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
-              echo "Successfully loaded ${tar}, removing..." >&2
+            if ! skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
+              echo "Failed to load ${tar}" >&2
               rm -f "$tar"
-            else
-              echo "Failed to load ${tar}, renaming to ${tar}.failed" >&2
-              mv "$tar" "${tar}.failed"
+              write_status "$name" failed
+              continue
             fi
+            rm -f "$tar"
+
+            # Restart now; podman rolls back to the previous image if the new container never becomes healthy.
+            result=$(podman auto-update --format '{{"{{"}}.Updated{{"}}"}}' 2>&1 | tail -n1)
+            echo "podman auto-update: ${result}" >&2
+            case "$result" in
+              true)
+                # Free the previous image only after the new one is healthy; the data disk is small.
+                podman image prune -f >/dev/null 2>&1 || true
+                write_status "$name" applied ;;
+              "rolled back") write_status "$name" rolled-back ;;
+              false) write_status "$name" unchanged ;;
+              *) write_status "$name" failed ;;
+            esac
           done
     - path: /home/core/.config/systemd/user/planner-agent-image-update.path
       mode: 0644
@@ -350,6 +374,12 @@ storage:
           Image={{.AgentImage}}
           ContainerName=planner-agent
           Label=io.containers.autoupdate=local
+          # Health-gated start: podman auto-update rolls back when the new image never becomes healthy.
+          HealthCmd=curl -fsk https://localhost:3333/api/v2/version
+          HealthInterval=10s
+          HealthRetries=6
+          HealthStartPeriod=30s
+          Notify=healthy
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
@@ -360,8 +390,8 @@ storage:
           UserNS=keep-id:uid=1001
 
           [Service]
-          # Extend timeout for pulling the image
-          TimeoutStartSec=600
+          # The image is local; a start that never becomes healthy fails and is rolled back.
+          TimeoutStartSec=300
           Restart=on-failure
           RestartSec=5
           ExecStartPre=/bin/bash -c 'echo "AGENT_AGENT_ID=$(cat /var/lib/data/agent/agent_id)" >> /home/core/.migration-planner/agent.env'
