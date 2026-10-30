@@ -268,8 +268,16 @@ paths:
       responses:
         "200":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatusUpdateResponse'
         "201":
           description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentStatusUpdateResponse'
         "400":
           description: Bad Request
           content:
@@ -302,6 +310,18 @@ paths:
                 $ref: '../openapi.yaml#/components/schemas/Error'
 components:
   schemas:
+    AgentStatusUpdateResponse:
+      type: object
+      description: Tells a connected agent whether a newer appliance image is available.
+      properties:
+        updateAvailable:
+          type: boolean
+          description: True when the reported agent version differs from the appliance image the service serves.
+        latestVersion:
+          type: string
+          description: Version of the appliance image the service serves.
+      required:
+        - updateAvailable
     SourceStatusUpdate:
       type: object
       properties:

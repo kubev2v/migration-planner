@@ -363,20 +363,22 @@ type UpdateAgentStatusResponseObject interface {
 	VisitUpdateAgentStatusResponse(w http.ResponseWriter) error
 }
 
-type UpdateAgentStatus200Response struct {
-}
+type UpdateAgentStatus200JSONResponse AgentStatusUpdateResponse
 
-func (response UpdateAgentStatus200Response) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+func (response UpdateAgentStatus200JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+
+	return json.NewEncoder(w).Encode(response)
 }
 
-type UpdateAgentStatus201Response struct {
-}
+type UpdateAgentStatus201JSONResponse AgentStatusUpdateResponse
 
-func (response UpdateAgentStatus201Response) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+func (response UpdateAgentStatus201JSONResponse) VisitUpdateAgentStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(201)
-	return nil
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type UpdateAgentStatus400JSONResponse externalRef0.Error

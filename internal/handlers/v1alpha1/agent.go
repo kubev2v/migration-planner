@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/pkg/version"
 )
 
 type AgentHandler struct {
@@ -259,8 +260,13 @@ func (h *AgentHandler) UpdateAgentStatus(ctx context.Context, request agentServe
 		}
 	}
 
-	if created {
-		return agentServer.UpdateAgentStatus201Response{}, nil
+	latest, available := service.AgentUpdateAvailable(request.Body.Version)
+	resp := v1alpha1.AgentStatusUpdateResponse{UpdateAvailable: available}
+	if version.IsValidAgentVersion(latest) {
+		resp.LatestVersion = &latest
 	}
-	return agentServer.UpdateAgentStatus200Response{}, nil
+	if created {
+		return agentServer.UpdateAgentStatus201JSONResponse(resp), nil
+	}
+	return agentServer.UpdateAgentStatus200JSONResponse(resp), nil
 }

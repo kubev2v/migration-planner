@@ -25,6 +25,15 @@ type AgentStatusUpdate struct {
 	Version       string             `json:"version" validate:"required,max=20"`
 }
 
+// AgentStatusUpdateResponse Tells a connected agent whether a newer appliance image is available.
+type AgentStatusUpdateResponse struct {
+	// LatestVersion Version of the appliance image the service serves.
+	LatestVersion *string `json:"latestVersion,omitempty"`
+
+	// UpdateAvailable True when the reported agent version differs from the appliance image the service serves.
+	UpdateAvailable bool `json:"updateAvailable"`
+}
+
 // SourceStatusUpdate defines model for SourceStatusUpdate.
 type SourceStatusUpdate struct {
 	AgentId   openapi_types.UUID     `json:"agentId"`

@@ -3,6 +3,7 @@ package version
 import (
 	"fmt"
 	"runtime"
+	"sync/atomic"
 )
 
 var (
@@ -49,6 +50,21 @@ func (info Info) String() string {
 	return info.GitVersion
 }
 
+// servedAgentVersion is the version label of the appliance image the API currently serves.
+// The appliance is built from another repository, so it is the real latest agent version;
+// the build-time agentVersionFromGit is only a fallback until the first image is cached.
+var servedAgentVersion atomic.Pointer[string]
+
+// SetAgentVersion records the version of the appliance image currently served.
+func SetAgentVersion(v string) { servedAgentVersion.Store(&v) }
+
+func agentVersion() string {
+	if v := servedAgentVersion.Load(); v != nil && IsValidAgentVersion(*v) {
+		return *v
+	}
+	return agentVersionFromGit
+}
+
 func Get() Info {
 	return Info{
 		Major:            majorFromGit,
@@ -62,12 +78,12 @@ func Get() Info {
 		Platform:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		Patch:            patchFromGit,
 		AgentGitCommit:   agentCommitFromGit,
-		AgentVersionName: agentVersionFromGit,
+		AgentVersionName: agentVersion(),
 	}
 }
 
 // IsValidAgentVersion reports whether ver is usable for agent version comparison and persistence.
-// Empty string and "unknown" are treated as missing.
+// Empty string, "unknown" and the agent's unset build default "v0.0.0" are treated as missing.
 func IsValidAgentVersion(ver string) bool {
-	return ver != "" && ver != "unknown"
+	return ver != "" && ver != "unknown" && ver != "v0.0.0"
 }

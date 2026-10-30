@@ -15,6 +15,7 @@ import (
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -42,6 +43,8 @@ var _ = Describe("agent service", Ordered, func() {
 
 	Context("Update agent status", func() {
 		It("successfully creates the agent", func() {
+			version.SetAgentVersion("v0.31.0")
+			DeferCleanup(version.SetAgentVersion, "")
 			sourceID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
 			Expect(tx.Error).To(BeNil())
@@ -65,7 +68,8 @@ var _ = Describe("agent service", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus201Response{}))
+			latest := "v0.31.0"
+			Expect(resp).To(Equal(server.UpdateAgentStatus201JSONResponse{UpdateAvailable: true, LatestVersion: &latest}))
 
 			count := -1
 			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)
@@ -121,6 +125,8 @@ var _ = Describe("agent service", Ordered, func() {
 		})
 
 		It("successfully updates the agent", func() {
+			version.SetAgentVersion("version-1")
+			DeferCleanup(version.SetAgentVersion, "")
 			sourceID := uuid.New()
 			agentID := uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
@@ -146,7 +152,8 @@ var _ = Describe("agent service", Ordered, func() {
 				},
 			})
 			Expect(err).To(BeNil())
-			Expect(resp).To(Equal(server.UpdateAgentStatus200Response{}))
+			latest := "version-1"
+			Expect(resp).To(Equal(server.UpdateAgentStatus200JSONResponse{UpdateAvailable: false, LatestVersion: &latest}))
 
 			count := -1
 			tx = gormdb.Raw("SELECT COUNT(*) FROM agents;").Scan(&count)

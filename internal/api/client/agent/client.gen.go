@@ -530,6 +530,8 @@ type ClientWithResponsesInterface interface {
 type UpdateAgentStatusResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *AgentStatusUpdateResponse
+	JSON201      *AgentStatusUpdateResponse
 	JSON400      *externalRef0.Error
 	JSON401      *externalRef0.Error
 	JSON403      *externalRef0.Error
@@ -752,6 +754,20 @@ func ParseUpdateAgentStatusResponse(rsp *http.Response) (*UpdateAgentStatusRespo
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentStatusUpdateResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest AgentStatusUpdateResponse
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
