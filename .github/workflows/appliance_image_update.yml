@@ -1,0 +1,44 @@
+name: React to released appliance images
+
+on:
+  repository_dispatch:
+    types: [appliance_image_updated]
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    if: >-
+      github.event.client_payload.repo == 'kubev2v/assisted-migration-agent' &&
+      (github.event.client_payload.target_branch == 'main' || github.event.client_payload.target_branch == 'stable')
+    uses: kubev2v/migration-planner-workflows/.github/workflows/repo-dispatch-update.yml@main
+    with:
+      sha: ${{ github.event.client_payload.sha }}
+      image-tag: ${{ github.event.client_payload.image_tag }}
+      target-branch: ${{ github.event.client_payload.target_branch }}
+      source-repo: ${{ github.event.client_payload.repo }}
+      component-name: Appliance image tag
+      pr-branch-prefix: update-appliance-image
+      update-command: |
+        set -euo pipefail
+        [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo "ERROR: invalid agent commit SHA"; exit 1; }
+        SOURCE_BRANCH=$(git branch --show-current)
+        case "$SOURCE_BRANCH" in
+          main) CONFIG_KEY=AGENT_IMAGE_TAG_MAIN ;;
+          stable) CONFIG_KEY=AGENT_IMAGE_TAG_STABLE ;;
+          *) echo "ERROR: unsupported agent source branch: $SOURCE_BRANCH"; exit 1 ;;
+        esac
+        [[ "$IMAGE_TAG" =~ ^${SOURCE_BRANCH}-release-[0-9]+\.[0-9]+-${SHA:0:7}$ ]] || { echo "ERROR: invalid appliance image tag for agent branch/commit"; exit 1; }
+        SOURCE_URL=https://github.com/kubev2v/assisted-migration-agent.git
+        SOURCE_HEAD=$(git ls-remote --exit-code "$SOURCE_URL" "refs/heads/$SOURCE_BRANCH" | cut -f1)
+        if [[ "$SHA" != "$SOURCE_HEAD" ]]; then
+          echo "ERROR: rejecting stale agent notification $SHA; $SOURCE_BRANCH is at $SOURCE_HEAD"
+          exit 1
+        fi
+        CONFIG_FILE=build/migration-planner-iso/config
+        sed -i "s/^${CONFIG_KEY}=.*/${CONFIG_KEY}=${IMAGE_TAG}/" "$CONFIG_FILE"
+        grep -Fxq "${CONFIG_KEY}=${IMAGE_TAG}" "$CONFIG_FILE" || { echo "ERROR: tag update failed"; exit 1; }
+    secrets:
+      APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
