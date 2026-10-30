@@ -87,6 +87,14 @@ var standaloneFieldNames = map[string]string{
 	"memoryOverCommitRatio":   "Memory over-commit ratio",
 }
 
+var manualCountFieldLabels = map[string]string{
+	"perpetualLicensesCount": "Number of perpetual licenses",
+	"coresLicensingCount":    "Number of cores licensing",
+	"environmentCount":       "Number of environments",
+	"otherNodesCount":        "Number of other nodes",
+	"physicalLocationsCount": "Number of physical locations/datacenters",
+}
+
 func parseStandaloneValidationError(message string) (string, bool) {
 	for fieldName, friendlyName := range standaloneFieldNames {
 		fieldPattern := fmt.Sprintf(`Error at "/%s":`, fieldName)
@@ -112,6 +120,27 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	}
 
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
+}
+
+func requestErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
+	var decodeErr *json.UnmarshalTypeError
+	if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/enhancement-data") &&
+		errors.As(err, &decodeErr) && strings.HasPrefix(decodeErr.Value, "number ") {
+		field := decodeErr.Field
+		if dot := strings.LastIndexByte(field, '.'); dot >= 0 {
+			field = field[dot+1:]
+		}
+		if label, ok := manualCountFieldLabels[field]; ok {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(api.Error{
+				Message: fmt.Sprintf("%s must be a whole number within the supported range", label),
+			})
+			return
+		}
+	}
+
+	http.Error(w, err.Error(), http.StatusBadRequest)
 }
 
 // detectOldSchemaMiddleware checks for old inventory schema format before OpenAPI validation.
@@ -295,7 +324,12 @@ func (s *Server) Run(ctx context.Context) error {
 		enhancementDataSvc,
 	)
 
-	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
+	server.HandlerFromMux(server.NewStrictHandlerWithOptions(h, nil, server.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: requestErrorHandler,
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+		},
+	}), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {

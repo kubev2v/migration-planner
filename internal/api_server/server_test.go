@@ -1,11 +1,89 @@
 package apiserver
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 )
+
+func TestRequestErrorHandlerOutOfRangeManualCounts(t *testing.T) {
+	tests := []struct {
+		name      string
+		container string
+		field     string
+		label     string
+	}{
+		{
+			name:      "perpetual licenses",
+			container: "vmwareVersionCounts",
+			field:     "perpetualLicensesCount",
+			label:     "Number of perpetual licenses",
+		},
+		{
+			name:      "cores licensing",
+			container: "vmwareVersionCounts",
+			field:     "coresLicensingCount",
+			label:     "Number of cores licensing",
+		},
+		{
+			name:      "environments",
+			container: "vmwareVersionCounts",
+			field:     "environmentCount",
+			label:     "Number of environments",
+		},
+		{
+			name:      "other nodes",
+			container: "vmwareVersionCounts",
+			field:     "otherNodesCount",
+			label:     "Number of other nodes",
+		},
+		{
+			name:      "physical locations",
+			container: "customerDetails",
+			field:     "physicalLocationsCount",
+			label:     "Number of physical locations/datacenters",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := []byte(fmt.Sprintf(`{"%s":{"%s":1.1111111111111113e+21}}`, tt.container, tt.field))
+			var requestBody api.SaveAssessmentEnhancementDataJSONRequestBody
+			decodeErr := json.Unmarshal(body, &requestBody)
+			if decodeErr == nil {
+				t.Fatal("expected an out-of-range count to fail decoding")
+			}
+
+			request := httptest.NewRequest(http.MethodPost, "/api/v1/assessments/assessment-id/enhancement-data", nil)
+			response := httptest.NewRecorder()
+			requestErrorHandler(response, request, fmt.Errorf("can't decode JSON body: %w", decodeErr))
+
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+			}
+			if contentType := response.Header().Get("Content-Type"); contentType != "application/json" {
+				t.Errorf("Content-Type = %q, want application/json", contentType)
+			}
+
+			var got api.Error
+			if err := json.Unmarshal(response.Body.Bytes(), &got); err != nil {
+				t.Fatalf("response body is not JSON: %v", err)
+			}
+			wantMessage := fmt.Sprintf("%s must be a whole number within the supported range", tt.label)
+			if got.Message != wantMessage {
+				t.Errorf("message = %q, want %q", got.Message, wantMessage)
+			}
+			if strings.Contains(response.Body.String(), "json: cannot unmarshal") {
+				t.Errorf("response exposed raw JSON decoder detail: %s", response.Body.String())
+			}
+		})
+	}
+}
 
 func TestParseStandaloneValidationError(t *testing.T) {
 	tests := []struct {
