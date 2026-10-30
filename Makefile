@@ -173,7 +173,7 @@ bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile 
 	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	ISO_CHECKSUM=$$(grep '^ISO_CHECKSUM=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	AGENT_IMAGE=$$(grep '^AGENT_IMAGE=' build/migration-planner-iso/config | cut -d'=' -f2); \
-	AGENT_IMAGE_TAG=$$(grep '^AGENT_IMAGE_TAG=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	AGENT_IMAGE_TAG=$$(grep '^AGENT_IMAGE_TAG_MAIN=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	TLS_VERIFY=$${TLS_VERIFY:-true}; \
 	$(PODMAN) build . \
 		--network=host \

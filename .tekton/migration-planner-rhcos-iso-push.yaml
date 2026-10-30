@@ -213,7 +213,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
-        - AGENT_IMAGE_TAG={{target_branch}}
+        - AGENT_IMAGE_BRANCH={{target_branch}}
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL
