@@ -3,6 +3,7 @@ package duckdb_parser
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 )
 
 func TestIngestSqlite_StorageTopology(t *testing.T) {
@@ -84,6 +86,12 @@ func TestIngestSqlite_StorageTopology(t *testing.T) {
 	result, err := parser.IngestSqlite(ctx, sqlitePath)
 	require.NoError(t, err)
 	require.True(t, result.IsValid(), "%v", result.Errors)
+	assertHostStorage(t, parser, Filters{}, "host-1",
+		`[{"device":"vmhba1","key":"hba-unused","protocol":"FibreChannel","model":"FC Adapter","nodeWwn":"2000000000000001","portWwn":"2100000000000001"},{"device":"vmhba64","key":"hba-1","protocol":"iSCSI","model":"Software Adapter","driver":"iscsi_vmk"},{"device":"vmhba65","key":"hba-2","protocol":"iSCSI","model":"Second Adapter"},{"device":"vmhba66","key":"hba-unknown","model":"Unknown Protocol Adapter"}]`,
+		`[{"canonicalName":"naa.orphan","key":"lun-orphan","vendor":"PURE","model":"FlashArray"},{"canonicalName":"naa.shared","key":"lun-1","vendor":"NETAPP","model":"LUN C-Mode","adapterDevices":["vmhba64","vmhba65"]},{"canonicalName":"naa.unknown","key":"lun-unknown","vendor":"UNKNOWN","model":"Unknown Device","adapterDevices":["vmhba66"]}]`)
+	var source string
+	require.NoError(t, db.QueryRow(`SELECT "VI SDK UUID" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&source))
+	require.Equal(t, "vcenter-1", source)
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM vhba`).Scan(&count))
 	require.Equal(t, 6, count, "adapters without topology must also be collected")
@@ -276,6 +284,10 @@ func TestIngestRvTools_StorageMetadataAndTopology(t *testing.T) {
 	result, err := parser.IngestRvTools(context.Background(), workbook)
 	require.NoError(t, err)
 	require.True(t, result.IsValid(), "%v", result.Errors)
+
+	assertHostStorage(t, parser, Filters{Cluster: "cluster1"}, "host-1",
+		`[{"device":"vmhba0","model":"Local Controller"},{"device":"vmhba64","type":"ISCSI","protocol":"iSCSI","model":"iSCSI Software Adapter","driver":"iscsi_vmk"},{"device":"vmhba65","type":"Fibre Channel","protocol":"FibreChannel","model":"QLE2742","driver":"qla2xxx","nodeWwn":"2000000000000001","portWwn":"2100000000000001"}]`,
+		`[{"canonicalName":"naa.600a0980383139544924583130314c41","lunUuid":"lun-uuid-1","vendor":"NETAPP","model":"LUN C-Mode","adapterDevices":["vmhba64","vmhba65"]},{"canonicalName":"naa.orphan","lunUuid":"lun-uuid-orphan","vendor":"PURE","model":"FlashArray"}]`)
 
 	type adapterRow struct {
 		hostID, device, adapterType, protocol, model, driver, nodeWWN, portWWN string
@@ -928,6 +940,249 @@ func TestIngestSqlite_NFSProtocolAliases(t *testing.T) {
 			require.Len(t, vms, 1)
 			require.Len(t, vms[0].Disks, 1)
 			require.Equal(t, "NFS", vms[0].Disks[0].DatastoreStorageProtocol)
+		})
+	}
+}
+
+func assertHostStorage(t *testing.T, p *Parser, filters Filters, id, adapters, luns string) {
+	t.Helper()
+	infra, err := p.buildInfraData(context.Background(), filters, func() (map[string]hostStorageFacts, error) {
+		return p.hostStorage(context.Background())
+	})
+	require.NoError(t, err, "host %q (filters: %+v)", id, filters)
+	public := converters.ToAPI(&inventory.Inventory{VCenter: &inventory.InventoryData{Infra: *infra}})
+	require.NotNil(t, public.Vcenter.Infra.Hosts, "host %q: hosts missing (filters: %+v)", id, filters)
+	for _, host := range *public.Vcenter.Infra.Hosts {
+		if host.Id == nil || *host.Id != id {
+			continue
+		}
+		data, err := json.Marshal(host)
+		require.NoError(t, err, "host %q (filters: %+v)", id, filters)
+		var fields map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(data, &fields))
+		for name, want := range map[string]string{"storageAdapters": adapters, "storageLuns": luns} {
+			if want == "" {
+				require.NotContains(t, fields, name, "host %q: %s should be omitted (filters: %+v)", id, name, filters)
+			} else {
+				require.Contains(t, fields, name, "host %q: %s missing (filters: %+v)", id, name, filters)
+				require.JSONEq(t, want, string(fields[name]), "host %q: %s mismatch (filters: %+v)", id, name, filters)
+			}
+		}
+		return
+	}
+	t.Fatalf("host %q missing (filters: %+v)", id, filters)
+}
+
+func TestHosts_StorageAggregation(t *testing.T) {
+	p, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster") VALUES ('host-1', 'esxi1', 'cluster1'), ('host-2', 'esxi2', 'cluster2');
+INSERT INTO vhba ("Host ID", "Device", "HBA Key", "Type", "Protocol", "Model", "Driver", "Node WWN", "Port WWN") VALUES
+('host-1', ' vmhba1 ', 'hba-1', 'FC', 'FibreChannel', 'adapter', 'driver', '000123', '000456'),
+('host-1', 'vmhba1', 'hba-1', 'FC', 'FibreChannel', 'conflicting model', 'driver', '000123', '000456'),
+('host-1', 'vmhba2', 'hba-2', NULL, 'iSCSI', NULL, NULL, NULL, NULL),
+('host-1', NULL, 'fallback', NULL, NULL, NULL, NULL, NULL, NULL),
+('host-1', NULL, NULL, NULL, NULL, 'anonymous', NULL, NULL, NULL),
+('host-2', 'vmhba1', 'hba-1', NULL, 'iSCSI', 'other host', NULL, NULL, NULL);
+INSERT INTO vhostscsi ("Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model", "LUN UUID") VALUES
+('host-1', 'vmhba2', 'lun-1', ' naa.001 ', 'NETAPP', 'model', '000uuid'),
+('host-1', 'vmhba1', 'lun-1', 'naa.001', 'NETAPP', 'model', '000uuid'),
+('host-1', 'vmhba1', 'lun-1', 'naa.001', 'NETAPP', 'model', '000uuid'),
+('host-1', 'unresolved', 'lun-1', 'naa.001', 'NETAPP', 'other model', '000uuid'),
+('host-1', NULL, 'orphan', NULL, 'PURE', 'orphan model', NULL),
+('host-1', NULL, NULL, NULL, NULL, NULL, 'uuid-only'),
+('host-1', NULL, NULL, NULL, 'anonymous', 'anonymous', NULL),
+('host-2', 'vmhba9', 'lun-1', 'naa.001', 'OTHER', NULL, NULL);`)
+	require.NoError(t, err)
+	for _, filters := range []Filters{{}, {Cluster: "cluster1"}, {VMList: []string{"vm-selected"}}} {
+		assertHostStorage(t, p, filters, "host-1",
+			`[{"key":"fallback"},{"device":"vmhba1","key":"hba-1","type":"FC","protocol":"FibreChannel","driver":"driver","nodeWwn":"000123","portWwn":"000456"},{"device":"vmhba2","key":"hba-2","protocol":"iSCSI"}]`,
+			`[{"canonicalName":"naa.001","key":"lun-1","lunUuid":"000uuid","vendor":"NETAPP","adapterDevices":["unresolved","vmhba1","vmhba2"]},{"key":"orphan","vendor":"PURE","model":"orphan model"},{"lunUuid":"uuid-only"}]`)
+	}
+	assertHostStorage(t, p, Filters{Cluster: "cluster2"}, "host-2", `[{"device":"vmhba1","key":"hba-1","protocol":"iSCSI","model":"other host"}]`, `[{"canonicalName":"naa.001","key":"lun-1","vendor":"OTHER","adapterDevices":["vmhba9"]}]`)
+	hosts, err := p.Hosts(context.Background(), Filters{}, Options{})
+	require.NoError(t, err)
+	require.Len(t, hosts, 2, "child joins must not multiply hosts")
+	hosts, err = p.Hosts(context.Background(), Filters{Cluster: "cluster1"}, Options{})
+	require.NoError(t, err)
+	require.Len(t, hosts, 1)
+}
+
+func TestHosts_StorageOwnershipIsResolvedBeforeFiltering(t *testing.T) {
+	p, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES ('host-1', 'esxi1', 'cluster1', 'vc-1');
+INSERT INTO vhba ("Host ID", "Device", "Protocol") VALUES ('host-1', 'vmhba1', 'iSCSI');
+INSERT INTO vhostscsi ("Host ID", "Canonical Name") VALUES ('host-1', 'naa.001');`)
+	require.NoError(t, err)
+	// Identical normalized owner rows are not ambiguous.
+	_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES ('host-1', ' ESXI1 ', 'cluster1', 'vc-1')`)
+	require.NoError(t, err)
+	assertHostStorage(t, p, Filters{Cluster: "cluster1"}, "host-1", `[{"device":"vmhba1","protocol":"iSCSI"}]`, `[{"canonicalName":"naa.001"}]`)
+	// A different owner with a reused raw ID makes the children ambiguous globally.
+	_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster") VALUES ('host-1', 'esxi2', 'cluster2')`)
+	require.NoError(t, err)
+	for _, filters := range []Filters{{}, {Cluster: "cluster1"}, {Cluster: "cluster2"}} {
+		assertHostStorage(t, p, filters, "host-1", "", "")
+	}
+}
+
+func TestHosts_StorageReadOnlyCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name          string
+		minimal       bool
+		duplicateHost bool
+		adapters      string
+		luns          string
+	}{
+		{name: "no optional storage tables"},
+		{name: "minimal storage tables", minimal: true, adapters: `[{"device":"vmhba1","protocol":"iSCSI"}]`, luns: `[{"canonicalName":"naa.001"}]`},
+		{name: "duplicate legacy hosts without source identity", minimal: true, duplicateHost: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "collection.duckdb")
+			db := newPreStorageDatabase(t, path)
+			_, err := db.Exec(`DROP TABLE vhba`)
+			require.NoError(t, err)
+			if tc.minimal {
+				_, err = db.Exec(`CREATE TABLE vhba ("Host ID" VARCHAR, "Device" VARCHAR, "Protocol" VARCHAR);
+INSERT INTO vhba VALUES ('host-1', 'vmhba1', 'iSCSI');
+CREATE TABLE vhostscsi ("Host ID" VARCHAR, "Canonical Name" VARCHAR);
+INSERT INTO vhostscsi VALUES ('host-1', 'naa.001');`)
+				require.NoError(t, err)
+			}
+			if tc.duplicateHost {
+				_, err = db.Exec(`INSERT INTO vhost SELECT * FROM vhost`)
+				require.NoError(t, err)
+			}
+			require.NoError(t, db.Close())
+			readonly, err := sql.Open("duckdb", path+"?access_mode=READ_ONLY")
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = readonly.Close() })
+			assertHostStorage(t, New(readonly, nil), Filters{}, "host-1", tc.adapters, tc.luns)
+		})
+	}
+}
+
+func TestHosts_StorageQueryErrorsAreNotMissingMetadata(t *testing.T) {
+	p, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
+DROP TABLE vhba;
+CREATE VIEW vhba AS SELECT 'host-1' AS "Host ID", error('storage source failed') AS "Device";`)
+	require.NoError(t, err)
+	_, err = p.Hosts(context.Background(), Filters{}, Options{})
+	require.ErrorContains(t, err, "storage source failed")
+	_, err = p.buildInfraData(context.Background(), Filters{}, func() (map[string]hostStorageFacts, error) {
+		return p.hostStorage(context.Background())
+	})
+	require.ErrorContains(t, err, "storage source failed")
+}
+
+func TestHosts_StorageOwnershipIgnoresConfigStatus(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		firstSource  string
+		secondSource string
+		status       any
+		wantStorage  bool
+	}{
+		{name: "yellow status", firstSource: "vc-1", secondSource: "vc-1", status: "yellow", wantStorage: true},
+		{name: "red status", firstSource: "vc-1", secondSource: "vc-1", status: "red", wantStorage: true},
+		{name: "gray status", firstSource: "vc-1", secondSource: "vc-1", status: "gray", wantStorage: true},
+		{name: "missing status", firstSource: "vc-1", secondSource: "vc-1", wantStorage: true},
+		{name: "empty status", firstSource: "vc-1", secondSource: "vc-1", status: "", wantStorage: true},
+		{name: "different vCenters", firstSource: "vc-1", secondSource: "vc-2", status: "yellow"},
+		{name: "unknown source", status: "yellow"},
+		{name: "one unknown source", firstSource: "vc-1", status: "yellow"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID", "Config status") VALUES
+('host-1', 'esxi1', 'cluster1', ?, 'green'), ('host-1', 'esxi1', 'cluster1', ?, ?);`, tc.firstSource, tc.secondSource, tc.status)
+			require.NoError(t, err)
+			_, err = db.Exec(`INSERT INTO vhba ("Host ID", "Device") VALUES ('host-1', 'vmhba1');
+INSERT INTO vhostscsi ("Host ID", "Canonical Name") VALUES ('host-1', 'naa.001');`)
+			require.NoError(t, err)
+			var adapters, luns string
+			if tc.wantStorage {
+				adapters = `[{"device":"vmhba1"}]`
+				luns = `[{"canonicalName":"naa.001"}]`
+			}
+			assertHostStorage(t, p, Filters{Cluster: "cluster1"}, "host-1", adapters, luns)
+		})
+	}
+}
+
+func TestHosts_StorageOwnershipRejectsDifferentHostFacts(t *testing.T) {
+	for _, change := range []string{`"Model" = 'different'`, `"Vendor" = 'different'`, `"# Cores" = 64`, `"# CPU" = 8`, `"# Memory" = 1024`, `"VMotion support" = true`, `"Storage VMotion support" = true`} {
+		t.Run(change, func(t *testing.T) {
+			p, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "Datacenter", "VI SDK UUID") VALUES ('host-1', 'host-1', 'cluster1', 'dc1', 'vc-1');
+INSERT INTO vhost SELECT * FROM vhost;
+INSERT INTO vhba ("Host ID", "Device") VALUES ('host-1', 'vmhba1');
+INSERT INTO vhostscsi ("Host ID", "Canonical Name") VALUES ('host-1', 'naa.001');
+UPDATE vhost SET ` + change + ` WHERE rowid = (SELECT MAX(rowid) FROM vhost);`)
+			require.NoError(t, err)
+			assertHostStorage(t, p, Filters{Cluster: "cluster1"}, "host-1", "", "")
+		})
+	}
+}
+
+func TestIngestRvTools_HostStorageSourceOwnership(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		sources      []string
+		sourceHeader string
+		wantStorage  bool
+	}{
+		{name: "different vCenters with identical host facts", sources: []string{"vc-1", "vc-2"}},
+		{name: "same vCenter duplicate host", sources: []string{"vc-1", "vc-1"}, wantStorage: true},
+		{name: "source UUID from vHost", sources: []string{"vc-1", "vc-2"}, sourceHeader: "VI SDK UUID"},
+		{name: "legacy source UUID from vHost", sources: []string{"vc-1", "vc-2"}, sourceHeader: "vCenter UUID"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			for i, source := range tc.sources {
+				vmSource := source
+				headers := append([]string(nil), vHostHeaders...)
+				host := map[string]string{"Host": "esxi1", "Object ID": "host-1", "Cluster": "cluster1", "Datacenter": "dc1"}
+				if tc.sourceHeader != "" {
+					headers = append(headers, tc.sourceHeader)
+					host[tc.sourceHeader] = source
+					vmSource = "vc-metadata"
+				}
+				workbook := createTestExcel(t,
+					NewExcelSheet("vInfo", vInfoHeaders, []map[string]string{{"VM ID": fmt.Sprintf("vm-%d", i), "VM": fmt.Sprintf("vm%d", i), "VI SDK UUID": vmSource, "Host": "esxi1", "Cluster": "cluster1"}}),
+					NewExcelSheet("vHost", headers, []map[string]string{host}),
+					NewExcelSheet("vHBA", []string{"Host", "Device", "Type", "WWN"}, []map[string]string{{"Host": "esxi1", "Device": "vmhba1", "Type": "Fibre Channel", "WWN": fmt.Sprintf("%016x %016x", i*2+1, i*2+2)}}),
+					NewExcelSheet("vMultiPath", []string{"Host", "Disk", "UUID", "Path 1"}, []map[string]string{{"Host": "esxi1", "Disk": "naa.001", "UUID": fmt.Sprintf("lun-%d", i), "Path 1": "vmhba1:C0:T0:L0"}}),
+				)
+				result, err := p.IngestRvTools(context.Background(), workbook)
+				require.NoError(t, err)
+				require.True(t, result.IsValid(), "%v", result.Errors)
+				var hostSource string
+				require.NoError(t, db.QueryRow(`SELECT "VI SDK UUID" FROM vhost ORDER BY rowid DESC LIMIT 1`).Scan(&hostSource))
+				require.Equal(t, source, hostSource, "explicit host source takes precedence over workbook fallback")
+			}
+			for _, filters := range []Filters{{}, {Cluster: "cluster1"}} {
+				hosts, err := p.Hosts(context.Background(), filters, Options{})
+				require.NoError(t, err)
+				require.Len(t, hosts, 2, "storage enrichment preserves host membership")
+				for _, host := range hosts {
+					if tc.wantStorage {
+						require.Len(t, host.StorageAdapters, 1)
+						require.Equal(t, "0000000000000001", host.StorageAdapters[0].NodeWWN)
+						require.Len(t, host.StorageLuns, 1)
+					} else {
+						require.Empty(t, host.StorageAdapters, "storage must not cross unknown or different source owners")
+						require.Empty(t, host.StorageLuns, "storage must not cross unknown or different source owners")
+					}
+				}
+			}
 		})
 	}
 }

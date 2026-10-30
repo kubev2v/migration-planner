@@ -247,6 +247,35 @@ func toAPIInfra(i *inventory.InfraData) api.Infra {
 		}
 		host.VmotionSupported = h.VMotionSupported
 		host.StorageVmotionSupported = h.StorageVMotionSupported
+
+		if len(h.StorageAdapters) > 0 {
+			adapters := make([]api.HostStorageAdapter, 0, len(h.StorageAdapters))
+			for _, a := range h.StorageAdapters {
+				adapters = append(adapters, api.HostStorageAdapter{
+					Device: optionalStorageString(a.Device), Key: optionalStorageString(a.Key),
+					Type: optionalStorageString(a.Type), Protocol: optionalStorageString(a.Protocol),
+					Model: optionalStorageString(a.Model), Driver: optionalStorageString(a.Driver),
+					NodeWwn: optionalStorageString(a.NodeWWN), PortWwn: optionalStorageString(a.PortWWN),
+				})
+			}
+			host.StorageAdapters = &adapters
+		}
+		if len(h.StorageLuns) > 0 {
+			luns := make([]api.HostStorageLun, 0, len(h.StorageLuns))
+			for _, l := range h.StorageLuns {
+				lun := api.HostStorageLun{
+					CanonicalName: optionalStorageString(l.CanonicalName), Key: optionalStorageString(l.Key),
+					LunUuid: optionalStorageString(l.LunUUID), Vendor: optionalStorageString(l.Vendor),
+					Model: optionalStorageString(l.Model),
+				}
+				if len(l.AdapterDevices) > 0 {
+					devices := append([]string(nil), l.AdapterDevices...)
+					lun.AdapterDevices = &devices
+				}
+				luns = append(luns, lun)
+			}
+			host.StorageLuns = &luns
+		}
 		hosts = append(hosts, host)
 	}
 
@@ -378,4 +407,11 @@ func vmsPerHostAverage(totalVMs, totalHosts int) *float64 {
 	}
 	avg := math.Round(float64(totalVMs*100)/float64(totalHosts)) / 100
 	return &avg
+}
+
+func optionalStorageString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
 }

@@ -241,7 +241,7 @@ func storageIoConfigurationFromAPI(s api.StorageIoConfiguration) svcmodel.Storag
 }
 
 func hostFromAPI(h api.Host) svcmodel.Host {
-	return svcmodel.Host{
+	result := svcmodel.Host{
 		CpuCores:                h.CpuCores,
 		CpuSockets:              h.CpuSockets,
 		Id:                      h.Id,
@@ -251,6 +251,21 @@ func hostFromAPI(h api.Host) svcmodel.Host {
 		Vendor:                  h.Vendor,
 		VmotionSupported:        h.VmotionSupported,
 	}
+	if h.StorageAdapters != nil {
+		adapters := make([]svcmodel.HostStorageAdapter, 0, len(*h.StorageAdapters))
+		for _, adapter := range *h.StorageAdapters {
+			adapters = append(adapters, svcmodel.HostStorageAdapter(adapter))
+		}
+		result.StorageAdapters = &adapters
+	}
+	if h.StorageLuns != nil {
+		luns := make([]svcmodel.HostStorageLun, 0, len(*h.StorageLuns))
+		for _, lun := range *h.StorageLuns {
+			luns = append(luns, svcmodel.HostStorageLun(lun))
+		}
+		result.StorageLuns = &luns
+	}
+	return result
 }
 
 func networkFromAPI(n api.Network) svcmodel.Network {

@@ -130,8 +130,12 @@ CREATE TABLE IF NOT EXISTS vhost (
     "Host" VARCHAR,
     "Config status" VARCHAR DEFAULT 'green',
     "VMotion support" BOOLEAN DEFAULT false,
-    "Storage VMotion support" BOOLEAN DEFAULT false
+    "Storage VMotion support" BOOLEAN DEFAULT false,
+    "VI SDK UUID" VARCHAR
 );
+
+-- Retain source identity for host storage ownership in writable collections.
+ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
 
 CREATE TABLE IF NOT EXISTS vdatastore (
     "Hosts" VARCHAR,

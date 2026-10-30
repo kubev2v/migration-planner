@@ -217,7 +217,7 @@ SELECT
 FROM src.About a;
 
 INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
-    "VMotion support", "Storage VMotion support")
+    "VMotion support", "Storage VMotion support", "VI SDK UUID")
 SELECT
     d.Name,
     CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END,
@@ -230,7 +230,9 @@ SELECT
     h.ID,
     'green',
     COALESCE(h.VMotionSupported, false),
-    COALESCE(h.StorageVMotionSupported, false)
+    COALESCE(h.StorageVMotionSupported, false),
+    (SELECT CASE WHEN COUNT(DISTINCT source_id) = 1 THEN MIN(source_id) END
+     FROM (SELECT NULLIF(LOWER(TRIM(InstanceUuid)), '') AS source_id FROM src.About))
 FROM src.Host h
 -- Keep standalone-host ancestry to resolve its datacenter, but blank the cluster name.
 LEFT JOIN src.Cluster c ON h.Cluster = c.ID

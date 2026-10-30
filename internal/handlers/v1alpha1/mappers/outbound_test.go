@@ -323,3 +323,25 @@ var _ = Describe("Inventory datastore storage metadata", func() {
 		Expect(output.Clusters["cluster-1"].Infra.Datastores).To(Equal(input.Clusters["cluster-1"].Infra.Datastores))
 	})
 })
+
+var _ = Describe("Inventory host storage metadata", func() {
+	DescribeTable("preserves hosts through service mapping and persisted assessment inventory", func(hostJSON string) {
+		raw := []byte(`{"vcenter_id":"vc1","vcenter":{"infra":{"hosts":[` + hostJSON + `]}},"clusters":{"cluster1":{"infra":{"hosts":[` + hostJSON + `]}}}}`)
+		var input api.Inventory
+		Expect(json.Unmarshal(raw, &input)).To(Succeed())
+		domain := mappers.InventoryFromAPI(input)
+		mapped, err := json.Marshal(domain)
+		Expect(err).NotTo(HaveOccurred())
+		// Assessments are also loaded directly from raw collection JSON.
+		for _, data := range [][]byte{mapped, raw} {
+			var restored model2.Inventory
+			Expect(json.Unmarshal(data, &restored)).To(Succeed())
+			output := mappers.InventoryToAPI(restored)
+			Expect(output.Vcenter.Infra.Hosts).To(Equal(input.Vcenter.Infra.Hosts))
+			Expect(output.Clusters["cluster1"].Infra.Hosts).To(Equal(input.Clusters["cluster1"].Infra.Hosts))
+		}
+	},
+		Entry("all fields and orphan LUNs", `{"id":"host1","vendor":"host vendor","model":"host model","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
+		Entry("historical inventory without storage", `{"id":"host1","vendor":"vendor","model":"model"}`),
+	)
+})

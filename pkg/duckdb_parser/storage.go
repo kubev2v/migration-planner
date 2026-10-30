@@ -2,8 +2,10 @@ package duckdb_parser
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
@@ -24,6 +26,14 @@ func DatastoreResolutionQuery() string {
 }
 
 func storageTopology(ctx context.Context, db store.QueryInterceptor, vmOnly bool) (string, error) {
+	hba, scsi, err := storageTables(ctx, db)
+	if err != nil {
+		return "", err
+	}
+	return storageTopologyQuery(hba, scsi, vmOnly), nil
+}
+
+func storageTables(ctx context.Context, db store.QueryInterceptor) (string, string, error) {
 	var hasHBA, hasSCSI bool
 	if err := db.QueryRowContext(ctx, `SELECT
     EXISTS (SELECT 1 FROM information_schema.tables
@@ -31,7 +41,7 @@ func storageTopology(ctx context.Context, db store.QueryInterceptor, vmOnly bool
     EXISTS (SELECT 1 FROM information_schema.tables
         WHERE table_catalog = current_database() AND table_schema = 'main' AND table_name = 'vhostscsi')
 `).Scan(&hasHBA, &hasSCSI); err != nil {
-		return "", fmt.Errorf("checking storage topology tables: %w", err)
+		return "", "", fmt.Errorf("checking storage topology tables: %w", err)
 	}
 	hba, scsi := "vhba", "vhostscsi"
 	const emptyTable = "(SELECT NULL::VARCHAR AS placeholder WHERE false)"
@@ -41,7 +51,7 @@ func storageTopology(ctx context.Context, db store.QueryInterceptor, vmOnly bool
 	if !hasSCSI {
 		scsi = emptyTable
 	}
-	return storageTopologyQuery(hba, scsi, vmOnly), nil
+	return hba, scsi, nil
 }
 
 func storageTopologyQuery(hba, scsi string, vmOnly bool) string {
@@ -152,4 +162,120 @@ storage_disk_datastores AS (
         OR (host_match AND COUNT(*) FILTER (WHERE host_match)
             OVER (PARTITION BY "VM ID", disk_row_id) = 1)
 )`, filter)
+}
+
+type hostStorageFacts struct {
+	adapters []inventory.HostStorageAdapter
+	luns     []inventory.HostStorageLun
+}
+
+// hostStorage resolves owners globally, before the caller filters or paginates
+// hosts. Duplicate rows must have matching host facts and a known source to
+// share children; legacy duplicates without source identity remain unassigned.
+// Configuration status is transient and does not distinguish host owners.
+// Independently aggregate adapters and LUNs to avoid a Cartesian join.
+// Row JSON keeps absent optional columns readable without upgrading old files.
+func (p *Parser) hostStorage(ctx context.Context) (map[string]hostStorageFacts, error) {
+	hba, scsi, err := storageTables(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	query := fmt.Sprintf(`WITH owners AS (
+    SELECT DISTINCT TRIM("Object ID") AS host_id, LOWER(TRIM("Host")) AS host_name,
+        COALESCE("Cluster", '') AS cluster,
+        COALESCE(to_json(h)->>'Datacenter', '') AS datacenter,
+        COALESCE(NULLIF(LOWER(TRIM(to_json(h)->>'VI SDK UUID')), 'vm'), '') AS source,
+        COUNT(*) OVER (PARTITION BY TRIM("Object ID")) AS host_rows,
+        COALESCE(h."Model", 'N/A') AS model,
+        COALESCE(h."Vendor", 'N/A') AS vendor,
+        COALESCE(h."# Cores", 0) AS cpu_cores,
+        COALESCE(h."# CPU", 0) AS cpu_sockets,
+        COALESCE(h."# Memory", 0) AS memory,
+        COALESCE(h."VMotion support", false) AS vmotion,
+        COALESCE(h."Storage VMotion support", false) AS storage_vmotion
+    FROM vhost h
+), unique_owners AS (
+    SELECT host_id FROM owners WHERE host_id != ''
+    GROUP BY host_id HAVING COUNT(*) = 1
+        AND (MIN(source) != '' OR MAX(host_rows) = 1)
+), adapters AS (
+    SELECT TRIM(to_json(h)->>'Host ID') AS host_id,
+        NULLIF(TRIM(to_json(h)->>'Device'), '') AS device,
+        NULLIF(TRIM(to_json(h)->>'HBA Key'), '') AS key,
+        NULLIF(TRIM(to_json(h)->>'Type'), '') AS type,
+        NULLIF(TRIM(to_json(h)->>'Protocol'), '') AS protocol,
+        NULLIF(TRIM(to_json(h)->>'Model'), '') AS model,
+        NULLIF(TRIM(to_json(h)->>'Driver'), '') AS driver,
+        NULLIF(TRIM(to_json(h)->>'Node WWN'), '') AS nodeWwn,
+        NULLIF(TRIM(to_json(h)->>'Port WWN'), '') AS portWwn
+    FROM %s h
+), adapter_records AS (
+    SELECT host_id, COALESCE('device:' || device, 'key:' || key) AS identity,
+        CASE WHEN COUNT(DISTINCT device) = 1 THEN MIN(device) END AS device,
+        CASE WHEN COUNT(DISTINCT key) = 1 THEN MIN(key) END AS key,
+        CASE WHEN COUNT(DISTINCT type) = 1 THEN MIN(type) END AS type,
+        CASE WHEN COUNT(DISTINCT protocol) = 1 THEN MIN(protocol) END AS protocol,
+        CASE WHEN COUNT(DISTINCT model) = 1 THEN MIN(model) END AS model,
+        CASE WHEN COUNT(DISTINCT driver) = 1 THEN MIN(driver) END AS driver,
+        CASE WHEN COUNT(DISTINCT nodeWwn) = 1 THEN MIN(nodeWwn) END AS nodeWwn,
+        CASE WHEN COUNT(DISTINCT portWwn) = 1 THEN MIN(portWwn) END AS portWwn
+    FROM adapters WHERE device IS NOT NULL OR key IS NOT NULL
+    GROUP BY host_id, identity
+), host_adapters AS (
+    SELECT host_id, to_json(list(struct_pack(device := device, key := key,
+        type := type, protocol := protocol, model := model, driver := driver,
+        nodeWwn := nodeWwn, portWwn := portWwn)
+        ORDER BY COALESCE(device, key), identity)) AS records
+    FROM adapter_records GROUP BY host_id
+), luns AS (
+    SELECT TRIM(to_json(s)->>'Host ID') AS host_id,
+        NULLIF(TRIM(to_json(s)->>'Canonical Name'), '') AS canonicalName,
+        NULLIF(TRIM(to_json(s)->>'SCSI Disk Key'), '') AS key,
+        NULLIF(TRIM(to_json(s)->>'LUN UUID'), '') AS lunUuid,
+        NULLIF(TRIM(to_json(s)->>'LUN Vendor'), '') AS vendor,
+        NULLIF(TRIM(to_json(s)->>'LUN Model'), '') AS model,
+        NULLIF(TRIM(to_json(s)->>'HBA Device'), '') AS adapter
+    FROM %s s
+), lun_records AS (
+    SELECT host_id, COALESCE('name:' || canonicalName, 'key:' || key, 'uuid:' || lunUuid) AS identity,
+        CASE WHEN COUNT(DISTINCT canonicalName) = 1 THEN MIN(canonicalName) END AS canonicalName,
+        CASE WHEN COUNT(DISTINCT key) = 1 THEN MIN(key) END AS key,
+        CASE WHEN COUNT(DISTINCT lunUuid) = 1 THEN MIN(lunUuid) END AS lunUuid,
+        CASE WHEN COUNT(DISTINCT vendor) = 1 THEN MIN(vendor) END AS vendor,
+        CASE WHEN COUNT(DISTINCT model) = 1 THEN MIN(model) END AS model,
+        list(DISTINCT adapter ORDER BY adapter) FILTER (WHERE adapter IS NOT NULL) AS adapterDevices
+    FROM luns WHERE canonicalName IS NOT NULL OR key IS NOT NULL OR lunUuid IS NOT NULL
+    GROUP BY host_id, identity
+), host_luns AS (
+    SELECT host_id, to_json(list(struct_pack(canonicalName := canonicalName,
+        key := key, lunUuid := lunUuid, vendor := vendor, model := model,
+        adapterDevices := adapterDevices)
+        ORDER BY COALESCE(canonicalName, key, lunUuid), identity)) AS records
+    FROM lun_records GROUP BY host_id
+)
+SELECT owner.host_id, COALESCE(a.records, '[]')::VARCHAR, COALESCE(l.records, '[]')::VARCHAR
+FROM unique_owners owner
+LEFT JOIN host_adapters a ON a.host_id = owner.host_id
+LEFT JOIN host_luns l ON l.host_id = owner.host_id`, hba, scsi)
+	rows, err := p.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	result := make(map[string]hostStorageFacts)
+	for rows.Next() {
+		var id, adapters, luns string
+		if err := rows.Scan(&id, &adapters, &luns); err != nil {
+			return nil, err
+		}
+		var facts hostStorageFacts
+		if err := json.Unmarshal([]byte(adapters), &facts.adapters); err != nil {
+			return nil, fmt.Errorf("decoding host adapters: %w", err)
+		}
+		if err := json.Unmarshal([]byte(luns), &facts.luns); err != nil {
+			return nil, fmt.Errorf("decoding host LUNs: %w", err)
+		}
+		result[id] = facts
+	}
+	return result, rows.Err()
 }
