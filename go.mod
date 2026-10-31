@@ -42,7 +42,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/twmb/franz-go v1.21.0
+	github.com/twmb/franz-go v1.22.2
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.0
 	go.uber.org/zap v1.27.1
