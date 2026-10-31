@@ -18,7 +18,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
-	github.com/jackc/pgx/v5 v5.10.0
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
@@ -33,7 +33,7 @@ require (
 	github.com/openshift/assisted-image-service v0.0.0-20261014151939-adf89ceb50d7
 	github.com/openshift/library-go v0.0.0-20260715193157-1a5091f58ece
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.23.2
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
@@ -221,6 +221,6 @@ require (
 replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.29.0
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
