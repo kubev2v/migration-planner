@@ -26,8 +26,8 @@ require (
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.1.2
-	github.com/onsi/ginkgo/v2 v2.28.0
-	github.com/onsi/gomega v1.39.1
+	github.com/onsi/ginkgo/v2 v2.33.1
+	github.com/onsi/gomega v1.40.0
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20261030121411-4ee683d000e5
 	github.com/openshift/assisted-image-service v0.0.0-20261014151939-adf89ceb50d7
