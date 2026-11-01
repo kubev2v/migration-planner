@@ -103,15 +103,18 @@ type Disk struct {
 }
 
 // NIC represents a network interface from the vnetwork table.
+// IPv4Addresses and IPv6Addresses treat reported values as adapter IP addresses.
+// An IP address may also contain a CIDR suffix; values are not parsed as network ranges.
 type NIC struct {
-	Network         Ref    `json:"network"` // Changed from string to Ref
-	MAC             string `json:"mac" db:"Mac Address"`
-	Label           string `json:"label" db:"NIC label"`
-	Adapter         string `json:"adapter" db:"Adapter"`
-	Switch          string `json:"switch" db:"Switch"`
-	Connected       bool   `json:"connected" db:"Connected"`
-	StartsConnected bool   `json:"startsConnected" db:"Starts Connected"`
-	Type            string `json:"type" db:"Type"`
-	IPv4Address     string `json:"ipv4Address" db:"IPv4 Address"`
-	IPv6Address     string `json:"ipv6Address" db:"IPv6 Address"`
+	Network         Ref      `json:"network"` // Changed from string to Ref
+	MAC             string   `json:"mac" db:"Mac Address"`
+	Label           string   `json:"label" db:"NIC label"`
+	Adapter         string   `json:"adapter" db:"Adapter"`
+	Switch          string   `json:"switch" db:"Switch"`
+	Connected       bool     `json:"connected" db:"Connected"`
+	StartsConnected bool     `json:"startsConnected" db:"Starts Connected"`
+	Type            string   `json:"type" db:"Type"`
+	IPv4Addresses   []string `json:"ipv4Addresses" db:"IPv4 Addresses"`
+	IPv6Addresses   []string `json:"ipv6Addresses" db:"IPv6 Addresses"`
+	VlanID          string   `json:"vlanId" db:"VLAN"`
 }
