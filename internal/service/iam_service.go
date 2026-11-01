@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 )
 
 // IAMServicer provides user and account information from the IAM service.
@@ -26,9 +27,21 @@ func NewIAMService(client iam.Client) *IAMService {
 }
 
 func (s *IAMService) GetUserInfo(ctx context.Context, username string) (*iam.UserInfo, error) {
-	return s.client.FindUser(ctx, username)
+	info, err := s.client.FindUser(ctx, username)
+	result := metrics.IntegrationResultSuccess
+	if err != nil {
+		result = metrics.IntegrationResultFailure
+	}
+	metrics.RecordIntegrationResult("iam", result)
+	return info, err
 }
 
 func (s *IAMService) GetAccountInfo(ctx context.Context, accountID string) (*iam.AccountInfo, error) {
-	return s.client.FindAccount(ctx, accountID)
+	info, err := s.client.FindAccount(ctx, accountID)
+	result := metrics.IntegrationResultSuccess
+	if err != nil {
+		result = metrics.IntegrationResultFailure
+	}
+	metrics.RecordIntegrationResult("iam", result)
+	return info, err
 }

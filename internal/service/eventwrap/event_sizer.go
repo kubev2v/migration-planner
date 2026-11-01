@@ -3,13 +3,14 @@ package eventwrap
 import (
 	"context"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations"
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
 type EventSizerService struct {
@@ -42,7 +43,7 @@ func (e *EventSizerService) CalculateClusterRequirements(
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, integrations.EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 

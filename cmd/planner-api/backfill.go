@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations"
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 
 	"github.com/google/uuid"
@@ -12,14 +15,12 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-type backfillFunc func(context.Context, store.Store, events.Writer, func()) error
+type backfillFunc func(context.Context, store.Store, integrations.Writer, func()) error
 
 type assessmentPartner struct {
 	ID   *string
@@ -89,7 +90,7 @@ func runBackfill(backfill backfillFunc) error {
 	return nil
 }
 
-func backfillAssessments(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+func backfillAssessments(ctx context.Context, s store.Store, writer integrations.Writer, writerClose func()) error {
 	defer writerClose()
 
 	assessments, err := s.Assessment().List(ctx, nil)
@@ -186,7 +187,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 	return nil
 }
 
-func backfillPartnerCustomers(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+func backfillPartnerCustomers(ctx context.Context, s store.Store, writer integrations.Writer, writerClose func()) error {
 	defer writerClose()
 
 	partnerCustomers, err := s.PartnerCustomer().List(ctx, nil)

@@ -7,6 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations"
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
@@ -16,8 +19,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
@@ -124,7 +125,7 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 		ceBytes, err := kafka.BuildCloudEvent(kafka.DownloadOVAEventType, payload)
 		if err != nil {
 			zap.S().Warnw("failed to build download event", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
-		} else if err := h.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+		} else if err := h.outbox.Insert(ctx, integrations.EventTypeKafka, ceBytes); err != nil {
 			zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
 		}
 	}
