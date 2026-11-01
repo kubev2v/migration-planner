@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -326,13 +327,13 @@ func TestAgentUpdateFormValidators(t *testing.T) {
 			shouldFail: false,
 		},
 		{
-			name: "validation ko -- version has more than 20 characters",
+			name: "validation ko -- version has more than 50 characters",
 			form: agentApi.AgentStatusUpdate{
 				SourceId:      uuid.New(),
 				Status:        "waiting-for-credentials",
 				StatusInfo:    "someinfo",
 				CredentialUrl: "http://agent.com",
-				Version:       string(make([]byte, 0, 21)),
+				Version:       strings.Repeat("v", 51),
 			},
 			shouldFail: true,
 		},
@@ -409,6 +410,40 @@ func TestAgentUpdateFormValidators(t *testing.T) {
 			if (err != nil) != tt.shouldFail {
 				t.Errorf("validation: error = %v, shouldValidate = %v", err, tt.shouldFail)
 				return
+			}
+		})
+	}
+}
+
+func TestAgentUpdateVersionValidation(t *testing.T) {
+	tests := []struct {
+		name       string
+		version    string
+		shouldFail bool
+	}{
+		{name: "production", version: "v0.31.0"},
+		{name: "dev", version: "main-release-0.31-3c425d1"},
+		{name: "stage", version: "stable-release-0.31-3c425d1"},
+		{name: "maximum length", version: strings.Repeat("v", 50)},
+		{name: "too long", version: strings.Repeat("v", 51), shouldFail: true},
+		{name: "missing", version: "", shouldFail: true},
+	}
+
+	v := NewValidator()
+	v.Register(NewAgentValidationRules()...)
+	v.RegisterStructValidation(AgentStatusUpdateValidator(), agentApi.AgentStatusUpdate{})
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			form := agentApi.AgentStatusUpdate{
+				SourceId:      uuid.New(),
+				Status:        "waiting-for-credentials",
+				StatusInfo:    "someinfo",
+				CredentialUrl: "http://agent.com",
+				Version:       tt.version,
+			}
+			if err := v.Struct(form); (err != nil) != tt.shouldFail {
+				t.Errorf("version %q: error = %v, shouldFail = %v", tt.version, err, tt.shouldFail)
 			}
 		})
 	}
