@@ -155,7 +155,7 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 	})
 })
 
-var _ = Describe("AssessmentInventoryToAPI", func() {
+var _ = Describe("InventoryToV2API", func() {
 	storedAt := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	collectedAt := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 	vcenterVersion := "8.0.3.0"
@@ -170,32 +170,6 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 	}{
 		{
 			id:      1,
-			name:    "v2 preserves collection metadata",
-			version: model.InventoryVersionV2,
-			raw: model2.Inventory{
-				VcenterId:      "vcenter-id",
-				VcenterVersion: &vcenterVersion,
-				CreatedAt:      &collectedAt,
-				CollectionTime: &collectedAt,
-				Vcenter: &model2.InventoryData{
-					Vms: model2.VMs{
-						Total: 5,
-					},
-				},
-				Clusters: map[string]model2.InventoryData{
-					"domain-c34": {
-						Vms: model2.VMs{
-							Total: 2,
-						},
-					},
-				},
-			},
-			created:    collectedAt,
-			apiVersion: "8.0.3.0",
-			collection: &collectedAt,
-		},
-		{
-			id:      2,
 			name:    "v2 falls back to stored timestamp",
 			version: model.InventoryVersionV2,
 			raw: model2.Inventory{
@@ -209,26 +183,29 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			created: storedAt,
 		},
 		{
-			id:      3,
+			id:      2,
 			name:    "legacy inventory uses stored timestamp",
 			version: model.InventoryVersionV1,
 			raw: model2.Inventory{
-				VcenterId: "vc-id",
+				VcenterId:      "vc-id",
+				CollectionTime: &collectedAt,
+				VcenterVersion: &vcenterVersion,
 				Vcenter: &model2.InventoryData{
 					Vms: model2.VMs{
 						Total: 5,
 					},
 				},
 			},
-			created: storedAt,
+			created:    storedAt,
+			apiVersion: "8.0.3.0",
+			collection: &collectedAt,
 		},
 	} {
 		It(tc.name, func() {
 
-			data, clusters, err := mappers.AssessmentInventoryToAPI(model2.AssessmentInventory{
+			data := mappers.InventoryToV2API(model2.AssessmentInventory{
 				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: tc.raw,
 			})
-			Expect(err).NotTo(HaveOccurred())
 			raw, err := json.Marshal(data)
 			Expect(err).NotTo(HaveOccurred())
 			var result api.InventoryV2
@@ -243,11 +220,6 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			}
 			Expect(result.Data.Infra.Datastores).NotTo(BeNil(), "inventory collections must be normalized")
 			Expect(result.Data.Vms.PowerStates).NotTo(BeNil(), "inventory collections must be normalized")
-
-			if tc.id == 1 {
-				Expect(clusters).To(HaveKey("domain-c34"))
-				Expect(clusters["domain-c34"].Vms.Total).To(Equal(2))
-			}
 		})
 	}
 })

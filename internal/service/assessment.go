@@ -21,6 +21,8 @@ import (
 type AssessmentServicer interface {
 	ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error)
 	GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error)
+	GetClusterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID, clusterId string) (*svcmodel.InventoryData, error)
+	GetVcetnerInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID) (*svcmodel.AssessmentInventory, error)
 	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error)
 	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
@@ -110,6 +112,46 @@ func (as *AssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*
 		WithBool("has_source_id", assessment.SourceID != nil).
 		Log()
 	return assessment, nil
+}
+
+func (as *AssessmentService) GetClusterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID, clusterId string) (*svcmodel.InventoryData, error) {
+	vi, err := as.GetVcetnerInventory(ctx, assessmentId, vcenterID)
+	if err != nil {
+		return nil, err
+	}
+	cluster, ok := vi.Inventory.Clusters[clusterId]
+	if !ok {
+		return nil, NewErrClusterNotFound(clusterId, assessmentId)
+	}
+	return &cluster, nil
+}
+
+func (as *AssessmentService) GetVcetnerInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	assessment, err := as.GetAssessment(ctx, assessmentId)
+	if err != nil {
+		return nil, err
+	}
+
+	var result svcmodel.AssessmentInventory
+
+	switch assessment.SourceType {
+	case SourceTypeRvtools:
+		vcenterInv, err := assessment.GetSubsetInventory(vcenterID)
+		if err != nil {
+			return nil, err
+		}
+		result = vcenterInv
+	default:
+		// For agent and manual uploads, subset inventories are treated as groups.
+		// Currently, separate groups do not represent separate vCenters.
+		// In addition, Must have exactly one main inventory for the whole vcenter
+		result = assessment.MainInventory
+	}
+
+	if result.VCenterID != vcenterID.String() {
+		return nil, NewErrResourceNotFound(vcenterID, "vcenter")
+	}
+	return &result, nil
 }
 
 func (as *AssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
