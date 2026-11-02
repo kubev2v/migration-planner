@@ -4,8 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

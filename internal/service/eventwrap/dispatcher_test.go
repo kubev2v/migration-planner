@@ -9,7 +9,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
+	"github.com/kubev2v/migration-planner/pkg/integrations"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -99,9 +99,11 @@ func (m *mockStore) Close() error                                               
 type mockWriter struct {
 	written  [][]byte
 	writeErr error
+	calls    int
 }
 
 func (m *mockWriter) Write(_ context.Context, data []byte) error {
+	m.calls++
 	if m.writeErr != nil {
 		return m.writeErr
 	}
@@ -125,9 +127,9 @@ var _ = Describe("OutboxDispatcher", func() {
 	})
 
 	runOneTick := func() {
-		writerRegistry := map[string][]events.Writer{
-			events.EventTypeKafka:        {kafkaWriter},
-			events.EventTypeNotification: {notifWriter},
+		writerRegistry := map[string][]integrations.Writer{
+			integrations.EventTypeKafka:        {kafkaWriter},
+			integrations.EventTypeNotification: {notifWriter},
 		}
 		dispatcher := eventwrap.NewOutboxDispatcher(s, writerRegistry, 10*time.Millisecond)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -137,7 +139,7 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes events and deletes them from outbox", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: 1, EventType: integrations.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
 
 		runOneTick()
@@ -157,7 +159,7 @@ var _ = Describe("OutboxDispatcher", func() {
 	It("backs off events that fail to write and retains them", func() {
 		id := 17
 		outbox.events = []model.OutboxEvent{
-			{ID: id, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: id, EventType: integrations.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
 		kafkaWriter.writeErr = fmt.Errorf("kafka unavailable")
 
@@ -169,25 +171,26 @@ var _ = Describe("OutboxDispatcher", func() {
 		Expect(outbox.failedIDs).To(ContainElement(id))
 	})
 
-	It("drops events that exceeded the max retry count without writing them", func() {
+	It("deletes events when the final allowed write attempt fails without scheduling another retry", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("poison"), RetryCount: 15},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("fresh")},
+			{ID: 1, EventType: integrations.EventTypeKafka, Payload: []byte("poison"), RetryCount: 9},
+			{ID: 2, EventType: integrations.EventTypeNotification, Payload: []byte("fresh")},
 		}
+		kafkaWriter.writeErr = fmt.Errorf("kafka unavailable")
 
 		runOneTick()
 
-		Expect(kafkaWriter.written).To(HaveLen(1))
-		Expect(kafkaWriter.written[0]).To(Equal([]byte("fresh")))
-		Expect(outbox.deletedIDs).To(ContainElement(1))
+		Expect(kafkaWriter.calls).To(Equal(1))
+		Expect(notifWriter.written).To(Equal([][]byte{[]byte("fresh")}))
+		Expect(outbox.deletedIDs).To(ConsistOf(1, 2))
 		Expect(outbox.failedIDs).To(BeEmpty())
 		Expect(outbox.events).To(BeEmpty())
 	})
 
 	It("writes multiple events and bulk-deletes", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data-2")},
+			{ID: 1, EventType: integrations.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: 2, EventType: integrations.EventTypeKafka, Payload: []byte("event-data-2")},
 		}
 
 		runOneTick()
@@ -198,8 +201,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("routes notification-service events to the notifier, not the Kafka writer", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeNotification, Payload: []byte("notification-data")},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data")},
+			{ID: 1, EventType: integrations.EventTypeNotification, Payload: []byte("notification-data")},
+			{ID: 2, EventType: integrations.EventTypeKafka, Payload: []byte("event-data")},
 		}
 
 		runOneTick()

@@ -4,13 +4,14 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations"
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
 type EventEstimationService struct {
@@ -90,7 +91,7 @@ func (e *EventEstimationService) publishUserAction(ctx context.Context, assessme
 	if err != nil {
 		return err
 	}
-	return e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes)
+	return e.outbox.Insert(ctx, integrations.EventTypeKafka, ceBytes)
 }
 
 func buildEstimationPayload(eventType, username, assessmentID string) (kafka.UserActionEventPayload, error) {

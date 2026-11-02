@@ -13,3 +13,7 @@ type OutboxEvent struct {
 func (OutboxEvent) TableName() string {
 	return "outbox_events"
 }
+
+func (o OutboxEvent) Exceeds(maxRetry int) bool {
+	return o.RetryCount >= maxRetry
+}
