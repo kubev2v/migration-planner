@@ -359,6 +359,29 @@ func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.Assessme
 			SourceType: api.AssessmentSourceType(assessment.SourceType), SourceId: assessment.SourceID,
 			Snapshots: []api.Snapshot{}, Sharing: sharingToApi(assessment.Sharing),
 		}
+		inventory := api.Inventory{
+			Clusters: map[string]api.InventoryData{},
+			Vcenter: &api.InventoryData{
+				Infra: api.Infra{
+					TotalHosts: assessment.HostsCount,
+					Networks:   make([]api.Network, assessment.NetworksCount),
+					Datastores: make([]api.Datastore, assessment.DatastoresCount),
+				},
+				Vms: api.VMs{Total: assessment.VMsCount},
+			},
+		}
+		// Network constraints require name and type
+		for j := range inventory.Vcenter.Infra.Networks {
+			inventory.Vcenter.Infra.Networks[j] = api.Network{
+				Type: api.Unsupported,
+				Name: "unknown",
+			}
+		}
+		normalizeInventoryData(inventory.Vcenter)
+		result[i].Snapshots = []api.Snapshot{{
+			CreatedAt: assessment.CreatedAt,
+			Inventory: inventory,
+		}}
 		if len(assessment.Permissions) > 0 {
 			permissions := make([]api.AssessmentPermissions, len(assessment.Permissions))
 			for j, permission := range assessment.Permissions {
