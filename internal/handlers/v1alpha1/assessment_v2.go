@@ -384,7 +384,20 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		}
 	}
 
-	_, clusters, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
+	var vcenterInv svcmodel.AssessmentInventory
+
+	switch assessment.SourceType {
+	case string(api.AssessmentSourceTypeRvtools):
+		inv, found := firstInventoryByID(assessment.SubsetInventories, request.Vid.String())
+		if !found {
+			return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("vcenter id: %s has not found", request.Vid)}, nil
+		}
+		vcenterInv = inv
+	default:
+		vcenterInv = assessment.MainInventory
+	}
+
+	_, clusters, err := mappers.AssessmentInventoryToAPI(vcenterInv)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
