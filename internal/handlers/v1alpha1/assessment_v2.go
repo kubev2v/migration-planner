@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 
-	svcmodel "github.com/kubev2v/migration-planner/internal/model"
-
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -300,14 +298,8 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 		})
 	}
 
-	data, _, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
-	}
-
 	return server.GetAssessmentV2200JSONResponse{
-		Data:     data,
+		Data:     mappers.InventoryToV2API(assessment.MainInventory),
 		Vcenters: vcenters,
 	}, nil
 }
@@ -321,7 +313,7 @@ func (h *ServiceHandler) GetVcenter(ctx context.Context, request server.GetVcent
 		WithUUID("vcenter_id", request.Vid).
 		Build()
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
+	inv, err := h.assessmentSrv.GetVcenterInventory(ctx, request.Id, request.Vid)
 	if err != nil {
 		logger.Error(err).Log()
 		var errResourceNotFound *service.ErrResourceNotFound
@@ -336,27 +328,10 @@ func (h *ServiceHandler) GetVcenter(ctx context.Context, request server.GetVcent
 		}
 	}
 
-	var vcenterInv svcmodel.AssessmentInventory
-
-	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
-		inv, found := firstInventoryByID(assessment.SubsetInventories, request.Vid.String())
-		if !found {
-			return server.GetVcenter404JSONResponse{Message: fmt.Sprintf("vcenter id: %s has not found", request.Vid)}, nil
-		}
-		vcenterInv = inv
-	default:
-		vcenterInv = assessment.MainInventory
-	}
-
-	vcenter, clusters, err := mappers.AssessmentInventoryToAPI(vcenterInv)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetVcenter500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
-	}
-
-	clusterList := mappers.AssessmentClustersToAPI(clusters)
-	return server.GetVcenter200JSONResponse{Data: vcenter, Clusters: clusterList}, nil
+	return server.GetVcenter200JSONResponse{
+		Data:     mappers.InventoryToV2API(*inv),
+		Clusters: mappers.AssessmentClustersToAPI(inv.Inventory.Clusters),
+	}, nil
 }
 
 // GetVcenterCluster (GET /api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid})
@@ -369,7 +344,7 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		WithString("cluster_id", request.Cid).
 		Build()
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
+	clusterInv, err := h.assessmentSrv.GetClusterInventory(ctx, request.Id, request.Vid, request.Cid)
 	if err != nil {
 		logger.Error(err).Log()
 		var errResourceNotFound *service.ErrResourceNotFound
@@ -384,29 +359,7 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		}
 	}
 
-	var vcenterInv svcmodel.AssessmentInventory
-
-	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
-		inv, found := firstInventoryByID(assessment.SubsetInventories, request.Vid.String())
-		if !found {
-			return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("vcenter id: %s has not found", request.Vid)}, nil
-		}
-		vcenterInv = inv
-	default:
-		vcenterInv = assessment.MainInventory
-	}
-
-	_, clusters, err := mappers.AssessmentInventoryToAPI(vcenterInv)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
-	}
-	cluster, ok := clusters[request.Cid]
-	if !ok {
-		return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("cluster %s not found in vcenter %s", request.Cid, request.Vid)}, nil
-	}
-	return server.GetVcenterCluster200JSONResponse(cluster), nil
+	return server.GetVcenterCluster200JSONResponse(mappers.ClusterInventoryToAPI(*clusterInv)), nil
 }
 
 func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.DeleteVCenterRequestObject) (server.DeleteVCenterResponseObject, error) {
@@ -431,13 +384,4 @@ func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.Delet
 
 	logger.Success().Log()
 	return server.DeleteVCenter204Response{}, nil
-}
-
-func firstInventoryByID(inventories []svcmodel.AssessmentInventory, id string) (svcmodel.AssessmentInventory, bool) {
-	for _, inv := range inventories {
-		if inv.VCenterID == id {
-			return inv, true
-		}
-	}
-	return svcmodel.AssessmentInventory{}, false
 }
