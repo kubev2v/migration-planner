@@ -152,6 +152,44 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 	return assessment, nil
 }
 
+func (a *AuthzAssessmentService) GetClusterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID, clusterId string) (*svcmodel.InventoryData, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if _, err := a.inner.GetAssessment(ctx, assessmentId); err != nil {
+		return nil, err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentId.String()))
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.ReadPermission.In(resource.Permissions) {
+		return nil, NewErrForbidden("assessment", assessmentId.String())
+	}
+
+	return a.inner.GetClusterInventory(ctx, assessmentId, vcenterID, clusterId)
+}
+
+func (a *AuthzAssessmentService) GetVcenterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if _, err := a.inner.GetAssessment(ctx, assessmentId); err != nil {
+		return nil, err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentId.String()))
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.ReadPermission.In(resource.Permissions) {
+		return nil, NewErrForbidden("assessment", assessmentId.String())
+	}
+
+	return a.inner.GetVcenterInventory(ctx, assessmentId, vcenterID)
+}
+
 func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 

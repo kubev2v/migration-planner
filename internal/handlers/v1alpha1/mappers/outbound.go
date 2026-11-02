@@ -430,7 +430,7 @@ func AssessmentV2ToApi(a svcmodel.AssessmentSummary) api.AssessmentV2Summary {
 	return result
 }
 
-func AssessmentClustersToAPI(clusters map[string]api.InventoryData) []api.SubResource {
+func AssessmentClustersToAPI(clusters map[string]svcmodel.InventoryData) []api.SubResource {
 	result := make([]api.SubResource, 0, len(clusters))
 	for id := range clusters {
 		result = append(result, api.SubResource{Id: id})
@@ -439,71 +439,21 @@ func AssessmentClustersToAPI(clusters map[string]api.InventoryData) []api.SubRes
 	return result
 }
 
-func AssessmentInventoryToAPI(inv svcmodel.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
-	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
-	clusters := make(map[string]api.InventoryData)
-
-	inventory := InventoryToAPI(inv.Inventory)
-
-	if result.Id == "" {
-		result.Id = inventory.VcenterId
+func InventoryToV2API(ai svcmodel.AssessmentInventory) api.InventoryV2 {
+	result := api.InventoryV2{
+		Id:             ai.VCenterID,
+		CreatedAt:      &ai.CreatedAt,
+		CollectionTime: ai.Inventory.CollectionTime,
+		VcenterVersion: ai.Inventory.VcenterVersion,
 	}
 
-	if inventory.CreatedAt != nil {
-		result.CreatedAt = inventory.CreatedAt
-	}
-
-	result.VcenterVersion = inventory.VcenterVersion
-	result.CollectionTime = inventory.CollectionTime
-
-	if inventory.Vcenter != nil {
-		result.Data = *inventory.Vcenter
+	if ai.Inventory.Vcenter != nil {
+		result.Data = inventoryDataToAPI(*ai.Inventory.Vcenter)
 	}
 
 	normalizeInventoryData(&result.Data)
 
-	for id, cluster := range inventory.Clusters {
-		normalizeInventoryData(&cluster)
-		clusters[id] = cluster
-	}
-	return result, clusters, nil
-}
-
-func StoreAssessmentInventoryToAPI(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
-	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
-	clusters := make(map[string]api.InventoryData)
-	if inv.Version == model.InventoryVersionV1 {
-		if err := json.Unmarshal(inv.Inventory, &result.Data); err != nil {
-			return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
-		}
-		if result.Id == "" && result.Data.Vcenter != nil {
-			result.Id = result.Data.Vcenter.Id
-		}
-		normalizeInventoryData(&result.Data)
-		return result, clusters, nil
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
-		return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
-	}
-	if result.Id == "" {
-		result.Id = inventory.VcenterId
-	}
-	if inventory.CreatedAt != nil {
-		result.CreatedAt = inventory.CreatedAt
-	}
-	result.VcenterVersion = inventory.VcenterVersion
-	result.CollectionTime = inventory.CollectionTime
-	if inventory.Vcenter != nil {
-		result.Data = *inventory.Vcenter
-	}
-	normalizeInventoryData(&result.Data)
-	for id, cluster := range inventory.Clusters {
-		normalizeInventoryData(&cluster)
-		clusters[id] = cluster
-	}
-	return result, clusters, nil
+	return result
 }
 
 func ClusterRequirementsResponseFormToAPI(form api.ClusterRequirementsResponse) api.ClusterRequirementsResponse {

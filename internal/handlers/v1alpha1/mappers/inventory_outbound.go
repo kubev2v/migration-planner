@@ -31,6 +31,12 @@ func InventoryToAPI(inv svcmodel.Inventory) api.Inventory {
 	return result
 }
 
+func ClusterInventoryToAPI(d svcmodel.InventoryData) api.InventoryData {
+	result := inventoryDataToAPI(d)
+	normalizeInventoryData(&result)
+	return result
+}
+
 func inventoryDataToAPI(d svcmodel.InventoryData) api.InventoryData {
 	result := api.InventoryData{
 		Infra: infraToAPI(d.Infra),
