@@ -44,7 +44,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 		mockIAMClient := &iam.MockClient{}
 		iamService := service.NewIAMService(mockIAMClient)
 		accountsSvc := service.NewAccountsService(s, iamService)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), accountsSvc, nil)
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), accountsSvc, nil, nil)
 	})
 
 	AfterAll(func() {
@@ -684,7 +684,7 @@ var _ = Describe("accounts handler", Ordered, func() {
 			iamService := service.NewIAMService(mockIAMClient)
 			accountsSvc := service.NewAccountsService(s, iamService)
 			authzAccountsSvc := service.NewAuthzAccountsService(accountsSvc)
-			authzSrv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), authzAccountsSvc, nil)
+			authzSrv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, service.NewPartnerService(s, accountsSvc), authzAccountsSvc, nil, nil)
 		})
 
 		nonAdminCtx := func() context.Context {

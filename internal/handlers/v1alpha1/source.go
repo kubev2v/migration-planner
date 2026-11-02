@@ -40,7 +40,7 @@ func (h *ServiceHandler) ListSources(ctx context.Context, request server.ListSou
 		return server.ListSources500JSONResponse{}, nil
 	}
 
-	return server.ListSources200JSONResponse(mappers.SourceListToApi(sources)), nil
+	return server.ListSources200JSONResponse(mappers.SourceListToApi(servedApplianceVersion(h.applianceCache), sources)), nil
 }
 
 // (POST /api/v1/sources)
@@ -69,7 +69,7 @@ func (h *ServiceHandler) CreateSource(ctx context.Context, request server.Create
 		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to create source: %v", err)}, nil
 	}
 
-	response, err := mappers.SourceToApi(source)
+	response, err := mappers.SourceToApi(source, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return server.CreateSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
@@ -120,7 +120,7 @@ func (h *ServiceHandler) GetSource(ctx context.Context, request server.GetSource
 		return server.GetSource403JSONResponse{Message: message}, nil
 	}
 
-	response, err := mappers.SourceToApi(*source)
+	response, err := mappers.SourceToApi(*source, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return server.GetSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
@@ -167,7 +167,7 @@ func (h *ServiceHandler) UpdateSource(ctx context.Context, request server.Update
 		}
 	}
 
-	response, err := mappers.SourceToApi(*updatedSource)
+	response, err := mappers.SourceToApi(*updatedSource, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return server.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
@@ -277,7 +277,7 @@ func (h *ServiceHandler) inventoryUpdateResponse(ctx context.Context, sourceID u
 		}
 	}
 
-	response, err := mappers.SourceToApi(updatedSource)
+	response, err := mappers.SourceToApi(updatedSource, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return nil, &inventoryUpdateError{code: http.StatusInternalServerError, message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}

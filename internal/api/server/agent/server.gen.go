@@ -38,6 +38,9 @@ type ServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/subset/{subsetId})
 	UpdateSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID)
+
+	// (GET /api/v1/sources/{id}/update-status)
+	GetAgentUpdateStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -71,6 +74,11 @@ func (_ Unimplemented) DeleteSourceSubset(w http.ResponseWriter, r *http.Request
 
 // (PUT /api/v1/sources/{id}/subset/{subsetId})
 func (_ Unimplemented) UpdateSourceSubset(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, subsetId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (GET /api/v1/sources/{id}/update-status)
+func (_ Unimplemented) GetAgentUpdateStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -257,6 +265,32 @@ func (siw *ServerInterfaceWrapper) UpdateSourceSubset(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// GetAgentUpdateStatus operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentUpdateStatus(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentUpdateStatus(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -387,6 +421,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/subset/{subsetId}", wrapper.UpdateSourceSubset)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/update-status", wrapper.GetAgentUpdateStatus)
 	})
 
 	return r
@@ -794,6 +831,59 @@ func (response UpdateSourceSubset500JSONResponse) VisitUpdateSourceSubsetRespons
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetAgentUpdateStatusRequestObject struct {
+	Id openapi_types.UUID `json:"id"`
+}
+
+type GetAgentUpdateStatusResponseObject interface {
+	VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error
+}
+
+type GetAgentUpdateStatus200JSONResponse AgentUpdateStatus
+
+func (response GetAgentUpdateStatus200JSONResponse) VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentUpdateStatus401JSONResponse externalRef0.Error
+
+func (response GetAgentUpdateStatus401JSONResponse) VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentUpdateStatus403JSONResponse externalRef0.Error
+
+func (response GetAgentUpdateStatus403JSONResponse) VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentUpdateStatus404JSONResponse externalRef0.Error
+
+func (response GetAgentUpdateStatus404JSONResponse) VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentUpdateStatus500JSONResponse externalRef0.Error
+
+func (response GetAgentUpdateStatus500JSONResponse) VisitGetAgentUpdateStatusResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -814,6 +904,9 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v1/sources/{id}/subset/{subsetId})
 	UpdateSourceSubset(ctx context.Context, request UpdateSourceSubsetRequestObject) (UpdateSourceSubsetResponseObject, error)
+
+	// (GET /api/v1/sources/{id}/update-status)
+	GetAgentUpdateStatus(ctx context.Context, request GetAgentUpdateStatusRequestObject) (GetAgentUpdateStatusResponseObject, error)
 }
 
 type StrictHandlerFunc = strictnethttp.StrictHTTPHandlerFunc
@@ -1024,6 +1117,32 @@ func (sh *strictHandler) UpdateSourceSubset(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateSourceSubsetResponseObject); ok {
 		if err := validResponse.VisitUpdateSourceSubsetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAgentUpdateStatus operation middleware
+func (sh *strictHandler) GetAgentUpdateStatus(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAgentUpdateStatusRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentUpdateStatus(ctx, request.(GetAgentUpdateStatusRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentUpdateStatus")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentUpdateStatusResponseObject); ok {
+		if err := validResponse.VisitGetAgentUpdateStatusResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

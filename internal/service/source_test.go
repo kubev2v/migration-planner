@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -17,7 +18,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -419,7 +419,7 @@ var _ = Describe("source handler", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 			newName := "updated-name"
 			newLabels := []v1alpha1.Label{
 				{Key: "env", Value: "prod"},
@@ -488,7 +488,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.New(),
 				Body: &v1alpha1.SourceUpdate{},
@@ -508,7 +508,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
 				Id:   uuid.MustParse(sourceID),
 				Body: &v1alpha1.SourceUpdate{},
@@ -535,7 +535,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			// First set initial labels
 			initialLabels := []v1alpha1.Label{
@@ -608,7 +608,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			newSshKey := "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCk83ddeteALlqCbO43E3ardbavFPboYIoFnlQZ3zVi+ls96c1x3P9DDWkNhuOgpQurull2y55Wm7HWLLK5hlk49s6tUuBDftH3XXfGMAmncBH9apGHxl0O+k/X1MrfhoEXHmmEwXTv+X6vC3BsZiazSOkKbIozHgnD7y1z83wuYWbbW0NYvgwhaoOtkWteKSJWwPxNaTwGCpj+RQ6xWygt5EbMSf7U3Ih2P1hcsa615zD5P2GSLxtLwWnHgWCylT/krdyIYlR1pqW9e/Iv2MKlGX6W1DSUxUz5BNxzCA8O53C0NSCeDFAhn9T8VE9U/RkGDtXBFJ8JVcmtM6S9buq5HZ12+0E0VCGFdmnvNT8XxdYrN0ff8f3DQI7ERgHEKQiqjrSPDv2+OMdv3nr3n5+tOBvQEn6aYDbnybILyrUP76UvLvjfgDTnnRxlkpw2Y43EtgtdeIUUo/VBSE9qfzRa21Pz3gBh6ZJE9xF+u6DstgvFigNJ7nMJoSktH5mzuBM= test@test"
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -649,7 +649,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			initialLabels := []v1alpha1.Label{
 				{Key: "env", Value: "dev"},
@@ -699,7 +699,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			enableProxy := false
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -738,7 +738,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			enableProxy := true
 			httpUrl := "http://proxy.example.com"
@@ -784,7 +784,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			}
 			ctx := auth.NewTokenContext(context.TODO(), user)
 
-			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 
 			networkConfigType := v1alpha1.SourceUpdateNetworkConfigTypeDhcp
 			resp, err := srv.UpdateSource(ctx, server.UpdateSourceRequestObject{
@@ -825,114 +825,85 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 	})
 
 	Context("CheckAgentVersionWarning", func() {
-		It("returns nil when imageInfra is nil", func() {
-			result := service.CheckAgentVersionWarning(nil)
+		latest := "main-release-0.31-25fcb31"
+
+		It("returns nil when the latest version is not valid", func() {
+			Expect(service.CheckAgentVersionWarning(nil, "", "")).To(BeNil())
+			Expect(service.CheckAgentVersionWarning(nil, "main-release-0.30-1111111", "unknown")).To(BeNil())
+		})
+
+		It("returns the no-version warning when imageInfra is nil and nothing was reported", func() {
+			result := service.CheckAgentVersionWarning(nil, "", latest)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("No version information"))
+		})
+
+		It("returns warning when no version is stored or reported", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("")}
+			result := service.CheckAgentVersionWarning(imageInfra, "", latest)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("No version information"))
+			Expect(*result).To(ContainSubstring(latest))
+		})
+
+		It("prefers the agent-reported version over the stored one", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("main-release-0.30-1111111")}
+			result := service.CheckAgentVersionWarning(imageInfra, latest, latest)
 			Expect(result).To(BeNil())
 		})
 
-		It("returns nil when AgentVersion is nil", func() {
-			imageInfra := &model.ImageInfra{
-				AgentVersion: nil,
-			}
-			result := service.CheckAgentVersionWarning(imageInfra)
+		It("returns warning when the reported version differs", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("main-release-0.31-25fcb31")}
+			result := service.CheckAgentVersionWarning(imageInfra, "main-release-0.30-1111111", latest)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("version mismatch"))
+			Expect(*result).To(ContainSubstring("main-release-0.30-1111111"))
+			Expect(*result).To(ContainSubstring(latest))
+		})
+
+		It("returns nil when the reported version is invalid but the stored one matches", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr(latest)}
+			result := service.CheckAgentVersionWarning(imageInfra, "v0.0.0", latest)
 			Expect(result).To(BeNil())
 		})
 
-		It("returns warning when AgentVersion is empty and current version is available", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr(""),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("No version information"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
-			}
+		It("returns warning when the stored version differs (disconnected flow)", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("main-release-0.30-1111111")}
+			result := service.CheckAgentVersionWarning(imageInfra, "", latest)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("version mismatch"))
+			Expect(*result).To(ContainSubstring("main-release-0.30-1111111"))
 		})
 
-		It("returns nil when current version is not available", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName == "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.5.1"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).To(BeNil())
-			} else {
-				Skip("Skipping test: build version is available (cannot test unavailable version scenario)")
-			}
+		It("returns nil when the stored version is invalid", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("unknown")}
+			Expect(service.CheckAgentVersionWarning(imageInfra, "", latest)).To(BeNil())
+			imageInfra = &model.ImageInfra{AgentVersion: util.ToStrPtr("v0.0.0")}
+			Expect(service.CheckAgentVersionWarning(imageInfra, "", latest)).To(BeNil())
 		})
 
-		It("returns nil when versions match", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).To(BeNil())
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
-			}
+		It("returns nil for versions from a different channel", func() {
+			imageInfra := &model.ImageInfra{AgentVersion: util.ToStrPtr("main-release-0.31-25fcb31")}
+			Expect(service.CheckAgentVersionWarning(imageInfra, "v0.30.9", latest)).To(BeNil())
+			Expect(service.CheckAgentVersionWarning(imageInfra, "stable-release-0.31-25fcb31", latest)).To(BeNil())
+		})
+	})
+
+	Context("ReportedAgentVersion", func() {
+		It("returns empty when the source has no agents", func() {
+			Expect(service.ReportedAgentVersion(model.Source{})).To(Equal(""))
 		})
 
-		It("returns warning when versions differ", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.1.0-test"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-				Expect(*result).To(ContainSubstring("v0.1.0-test"))
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
+		It("returns the first agent's version by created-at", func() {
+			older := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+			newer := time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)
+			source := model.Source{
+				Agents: []model.Agent{
+					{Version: "main-release-0.31-25fcb31", CreatedAt: newer},
+					{Version: "main-release-0.30-1111111", CreatedAt: older},
+				},
 			}
-		})
-
-		It("returns nil when stored version is 'unknown'", func() {
-			imageInfra := &model.ImageInfra{
-				AgentVersion: util.ToStrPtr("unknown"),
-			}
-			result := service.CheckAgentVersionWarning(imageInfra)
-			Expect(result).To(BeNil())
-		})
-
-		It("returns warning when stored version differs from current (opaque tag)", func() {
-			versionInfo := version.Get()
-			if version.IsValidAgentVersion(versionInfo.AgentVersionName) && versionInfo.AgentVersionName != "dev-build" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("dev-build"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring("dev-build"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: build version empty, unknown, or dev-build")
-			}
-		})
-
-		It("returns warning when stored version is baseline v0.5.0 and current is newer", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" && versionInfo.AgentVersionName != "v0.5.0" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.5.0"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring("v0.5.0"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: current version is v0.5.0 or not available")
-			}
+			Expect(service.ReportedAgentVersion(source)).To(Equal("main-release-0.30-1111111"))
 		})
 	})
 })

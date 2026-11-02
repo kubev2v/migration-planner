@@ -442,4 +442,55 @@ var _ = Describe("agent service", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
+	Context("Get agent update status", func() {
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM agents;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+
+		It("reports no update and empty latest version when the cache is cold", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			agentJWT := auth.AgentJWT{OrgID: "admin", SourceID: sourceID.String()}
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
+			resp, err := srv.GetAgentUpdateStatus(ctx, server.GetAgentUpdateStatusRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			ok, cast := resp.(server.GetAgentUpdateStatus200JSONResponse)
+			Expect(cast).To(BeTrue())
+			Expect(ok.UpdateAvailable).To(BeFalse())
+			Expect(ok.LatestVersion).To(Equal(""))
+			Expect(ok.CurrentVersion).To(BeNil())
+		})
+
+		It("rejects an agent from another source", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+
+			agentJWT := auth.AgentJWT{OrgID: "admin", SourceID: uuid.New().String()}
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
+			resp, err := srv.GetAgentUpdateStatus(ctx, server.GetAgentUpdateStatusRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			_, cast := resp.(server.GetAgentUpdateStatus403JSONResponse)
+			Expect(cast).To(BeTrue())
+		})
+
+		It("returns not found for a missing source", func() {
+			sourceID := uuid.New()
+			agentJWT := auth.AgentJWT{OrgID: "admin", SourceID: sourceID.String()}
+			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
+
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
+			resp, err := srv.GetAgentUpdateStatus(ctx, server.GetAgentUpdateStatusRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			_, cast := resp.(server.GetAgentUpdateStatus404JSONResponse)
+			Expect(cast).To(BeTrue())
+		})
+	})
 })

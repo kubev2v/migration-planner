@@ -152,7 +152,7 @@ var _ = Describe("disconnected inventory upload", Ordered, func() {
 			EmailDomain:  "admin.example.com",
 		}
 		ctx = auth.NewTokenContext(context.TODO(), user)
-		srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+		srv = handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil, nil)
 	})
 
 	AfterEach(func() {

@@ -117,6 +117,9 @@ type ClientInterface interface {
 	UpdateSourceSubsetWithBody(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	UpdateSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetAgentUpdateStatus request
+	GetAgentUpdateStatus(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
 func (c *Client) UpdateAgentStatusWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -229,6 +232,18 @@ func (c *Client) UpdateSourceSubsetWithBody(ctx context.Context, id openapi_type
 
 func (c *Client) UpdateSourceSubset(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUpdateSourceSubsetRequest(c.Server, id, subsetId, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) GetAgentUpdateStatus(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentUpdateStatusRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -509,6 +524,40 @@ func NewUpdateSourceSubsetRequestWithBody(server string, id openapi_types.UUID, 
 	return req, nil
 }
 
+// NewGetAgentUpdateStatusRequest generates requests for GetAgentUpdateStatus
+func NewGetAgentUpdateStatusRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/update-status", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("GET", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
 	for _, r := range c.RequestEditors {
 		if err := r(ctx, req); err != nil {
@@ -577,6 +626,9 @@ type ClientWithResponsesInterface interface {
 	UpdateSourceSubsetWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error)
 
 	UpdateSourceSubsetWithResponse(ctx context.Context, id openapi_types.UUID, subsetId openapi_types.UUID, body UpdateSourceSubsetJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceSubsetResponse, error)
+
+	// GetAgentUpdateStatusWithResponse request
+	GetAgentUpdateStatusWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentUpdateStatusResponse, error)
 }
 
 type UpdateAgentStatusResponse struct {
@@ -738,6 +790,32 @@ func (r UpdateSourceSubsetResponse) StatusCode() int {
 	return 0
 }
 
+type GetAgentUpdateStatusResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AgentUpdateStatus
+	JSON401      *externalRef0.Error
+	JSON403      *externalRef0.Error
+	JSON404      *externalRef0.Error
+	JSON500      *externalRef0.Error
+}
+
+// Status returns HTTPResponse.Status
+func (r GetAgentUpdateStatusResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetAgentUpdateStatusResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 // UpdateAgentStatusWithBodyWithResponse request with arbitrary body returning *UpdateAgentStatusResponse
 func (c *ClientWithResponses) UpdateAgentStatusWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAgentStatusResponse, error) {
 	rsp, err := c.UpdateAgentStatusWithBody(ctx, id, contentType, body, reqEditors...)
@@ -822,6 +900,15 @@ func (c *ClientWithResponses) UpdateSourceSubsetWithResponse(ctx context.Context
 		return nil, err
 	}
 	return ParseUpdateSourceSubsetResponse(rsp)
+}
+
+// GetAgentUpdateStatusWithResponse request returning *GetAgentUpdateStatusResponse
+func (c *ClientWithResponses) GetAgentUpdateStatusWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentUpdateStatusResponse, error) {
+	rsp, err := c.GetAgentUpdateStatus(ctx, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetAgentUpdateStatusResponse(rsp)
 }
 
 // ParseUpdateAgentStatusResponse parses an HTTP response from a UpdateAgentStatusWithResponse call
@@ -1135,6 +1222,60 @@ func ParseUpdateSourceSubsetResponse(rsp *http.Response) (*UpdateSourceSubsetRes
 			return nil, err
 		}
 		response.JSON400 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetAgentUpdateStatusResponse parses an HTTP response from a GetAgentUpdateStatusWithResponse call
+func ParseGetAgentUpdateStatusResponse(rsp *http.Response) (*GetAgentUpdateStatusResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetAgentUpdateStatusResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AgentUpdateStatus
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest externalRef0.Error

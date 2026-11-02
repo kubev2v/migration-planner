@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -366,17 +367,49 @@ func WithOrgID(orgID string) SourceFilterFunc {
 	}
 }
 
-// CheckAgentVersionWarning compares stored agent version with current and returns warning if they differ.
-func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
-	versionInfo := version.Get()
-	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+// ReportedAgentVersion returns the version reported by the source's first
+// agent (by created-at, matching the source-to-API mapping), or "" when no
+// agent has connected.
+func ReportedAgentVersion(s model.Source) string {
+	if len(s.Agents) == 0 {
+		return ""
+	}
+	agents := append([]model.Agent(nil), s.Agents...)
+	slices.SortFunc(agents, func(a, b model.Agent) int {
+		if a.CreatedAt.Before(b.CreatedAt) {
+			return -1
+		}
+		if a.CreatedAt.After(b.CreatedAt) {
+			return 1
+		}
+		return 0
+	})
+	return agents[0].Version
+}
+
+// CheckAgentVersionWarning returns a warning when the source's deployed
+// appliance version differs from latestVersion, the version of the appliance
+// image the service currently serves. The version reported by the agent
+// (connected flow) takes precedence over the version stored when the OVA was
+// downloaded (disconnected flow).
+func CheckAgentVersionWarning(imageInfra *model.ImageInfra, reportedVersion, latestVersion string) *string {
+	if !version.IsValidAgentVersion(latestVersion) {
 		return nil
 	}
-	currentVersion := versionInfo.AgentVersionName
 
-	// Handle missing version (edge case if migration hasn't run)
+	if version.IsValidAgentVersion(reportedVersion) {
+		if !version.AgentUpdateAvailable(latestVersion, reportedVersion) {
+			return nil
+		}
+		message := "Agent version mismatch detected. The agent is running version " + reportedVersion +
+			", but the current system version is " + latestVersion +
+			". Consider updating the agent to the latest version."
+		return &message
+	}
+
+	// Handle missing version (edge case if the OVA predates version stamping)
 	if imageInfra == nil || imageInfra.AgentVersion == nil || *imageInfra.AgentVersion == "" {
-		message := "No version information available for this OVA. Current system version: " + currentVersion +
+		message := "No version information available for this OVA. Current system version: " + latestVersion +
 			". Consider downloading a new OVA to ensure compatibility."
 		return &message
 	}
@@ -386,12 +419,12 @@ func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
 		return nil
 	}
 
-	if storedVersion == currentVersion {
+	if !version.AgentUpdateAvailable(latestVersion, storedVersion) {
 		return nil
 	}
 
 	message := "Agent version mismatch detected. The OVA was downloaded with version " + storedVersion +
-		", but the current system version is " + currentVersion +
+		", but the current system version is " + latestVersion +
 		". Consider downloading a new OVA to ensure compatibility."
 	return &message
 }

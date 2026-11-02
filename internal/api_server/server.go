@@ -44,12 +44,13 @@ const (
 )
 
 type Server struct {
-	cfg          *config.Config
-	store        store.Store
-	listener     net.Listener
-	opaValidator *opa.Validator
-	jobsClient   *jobs.Client
-	pool         *pgxpool.Pool
+	cfg            *config.Config
+	store          store.Store
+	listener       net.Listener
+	opaValidator   *opa.Validator
+	jobsClient     *jobs.Client
+	pool           *pgxpool.Pool
+	applianceCache *service.ApplianceImageCache
 }
 
 // New returns a new instance of a migration-planner server.
@@ -59,13 +60,15 @@ func New(
 	listener net.Listener,
 	opaValidator *opa.Validator,
 	pool *pgxpool.Pool,
+	applianceCache *service.ApplianceImageCache,
 ) *Server {
 	return &Server{
-		cfg:          cfg,
-		store:        store,
-		listener:     listener,
-		opaValidator: opaValidator,
-		pool:         pool,
+		cfg:            cfg,
+		store:          store,
+		listener:       listener,
+		opaValidator:   opaValidator,
+		pool:           pool,
+		applianceCache: applianceCache,
 	}
 }
 
@@ -293,6 +296,7 @@ func (s *Server) Run(ctx context.Context) error {
 		partnerSvc,
 		accountsSvc,
 		enhancementDataSvc,
+		s.applianceCache,
 	)
 
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)

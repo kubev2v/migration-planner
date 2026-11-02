@@ -14,6 +14,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/pkg/version"
 )
 
 type AgentHandler struct {
@@ -91,7 +92,7 @@ func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentS
 		}
 	}
 
-	response, err := apiMappers.SourceToApi(*updatedSource)
+	response, err := apiMappers.SourceToApi(*updatedSource, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return agentServer.UpdateSourceInventory500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
@@ -146,7 +147,7 @@ func (h *AgentHandler) UpdateSource(ctx context.Context, request agentServer.Upd
 		}
 	}
 
-	response, err := apiMappers.SourceToApi(*updatedSource)
+	response, err := apiMappers.SourceToApi(*updatedSource, servedApplianceVersion(h.applianceCache))
 	if err != nil {
 		return agentServer.UpdateSource500JSONResponse{Message: fmt.Sprintf("failed to map source to api: %v", err)}, nil
 	}
@@ -243,6 +244,45 @@ func (h *AgentHandler) DeleteSourceSubset(ctx context.Context, request agentServ
 	}
 
 	return agentServer.DeleteSourceSubset204Response{}, nil
+}
+
+// GetAgentUpdateStatus tells a connected agent whether its appliance version
+// differs from the appliance image the service currently serves.
+func (h *AgentHandler) GetAgentUpdateStatus(ctx context.Context, request agentServer.GetAgentUpdateStatusRequestObject) (agentServer.GetAgentUpdateStatusResponseObject, error) {
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Id.String() {
+		return agentServer.GetAgentUpdateStatus403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to access source %s", request.Id),
+		}, nil
+	}
+
+	source, err := h.srv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return agentServer.GetAgentUpdateStatus404JSONResponse{Message: err.Error()}, nil
+		default:
+			return agentServer.GetAgentUpdateStatus500JSONResponse{Message: err.Error()}, nil
+		}
+	}
+
+	latest := servedApplianceVersion(h.applianceCache)
+
+	// The agent-reported version wins; fall back to the version stored when
+	// the OVA was downloaded (disconnected flow).
+	current := service.ReportedAgentVersion(*source)
+	if current == "" && source.ImageInfra.AgentVersion != nil {
+		current = *source.ImageInfra.AgentVersion
+	}
+
+	response := agentServer.GetAgentUpdateStatus200JSONResponse{
+		UpdateAvailable: version.AgentUpdateAvailable(latest, current),
+		LatestVersion:   latest,
+	}
+	if current != "" {
+		response.CurrentVersion = &current
+	}
+	return response, nil
 }
 
 // UpdateAgentStatus updates or creates a new agent resource

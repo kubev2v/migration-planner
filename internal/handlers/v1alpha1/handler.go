@@ -11,6 +11,7 @@ type ServiceHandler struct {
 	partnerSrv         service.PartnerServicer
 	accountsSrv        service.AccountsServicer
 	enhancementDataSrv service.AssessmentEnhancementDataServicer
+	applianceCache     *service.ApplianceImageCache
 }
 
 func NewServiceHandler(
@@ -22,6 +23,7 @@ func NewServiceHandler(
 	partner service.PartnerServicer,
 	accounts service.AccountsServicer,
 	enhancementData service.AssessmentEnhancementDataServicer,
+	applianceCache *service.ApplianceImageCache,
 ) *ServiceHandler {
 	return &ServiceHandler{
 		sourceSrv:          sourceService,
@@ -32,5 +34,19 @@ func NewServiceHandler(
 		accountsSrv:        accounts,
 		partnerSrv:         partner,
 		enhancementDataSrv: enhancementData,
+		applianceCache:     applianceCache,
 	}
+}
+
+// servedApplianceVersion returns the version of the appliance image the
+// service currently serves, or "" when the cache has none.
+func servedApplianceVersion(cache *service.ApplianceImageCache) string {
+	if cache == nil {
+		return ""
+	}
+	image, err := cache.GetImage()
+	if err != nil {
+		return ""
+	}
+	return image.Version
 }

@@ -46,7 +46,7 @@ var _ = Describe("partner handler", Ordered, func() {
 		iamService := service.NewIAMService(mockIAMClient)
 		accountsSvc := service.NewAccountsService(s, iamService)
 		partnerSvc := service.NewAuthzPartnerService(service.NewPartnerService(s, accountsSvc), accountsSvc, s)
-		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, partnerSvc, accountsSvc, nil)
+		srv = handlers.NewServiceHandler(nil, nil, nil, nil, nil, partnerSvc, accountsSvc, nil, nil)
 	})
 
 	AfterAll(func() {

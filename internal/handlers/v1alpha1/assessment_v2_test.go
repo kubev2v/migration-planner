@@ -66,7 +66,7 @@ var _ = Describe("assessment v2 handler", func() {
 			MainInventory:     main,
 			SubsetInventories: subset,
 		}
-		handler := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: assessment}, nil, nil, nil, nil, nil, nil)
+		handler := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: assessment}, nil, nil, nil, nil, nil, nil, nil)
 
 		response, err := handler.GetAssessmentV2(context.Background(), server.GetAssessmentV2RequestObject{Id: assessment.ID})
 		Expect(err).NotTo(HaveOccurred())

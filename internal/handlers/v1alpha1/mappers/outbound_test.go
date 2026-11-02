@@ -31,7 +31,7 @@ var _ = Describe("SourceToApi", func() {
 			Name:       "test-source",
 			UpdateType: "auto",
 		}
-		result, err := mappers.SourceToApi(source)
+		result, err := mappers.SourceToApi(source, "")
 		Expect(err).To(BeNil())
 		Expect(result.UpdateType).NotTo(BeNil())
 		Expect(*result.UpdateType).To(Equal(api.SourceUpdateType("auto")))
@@ -43,7 +43,7 @@ var _ = Describe("SourceToApi", func() {
 			Name:       "test-source",
 			UpdateType: "",
 		}
-		result, err := mappers.SourceToApi(source)
+		result, err := mappers.SourceToApi(source, "")
 		Expect(err).To(BeNil())
 		Expect(result.UpdateType).To(BeNil())
 	})
@@ -260,7 +260,7 @@ var _ = Describe("Inventory collection time", func() {
 		domain := mappers.InventoryFromAPI(input)
 		Expect(domain.CollectionTime).To(Equal(&want))
 		Expect(mappers.InventoryToAPI(domain).CollectionTime).To(Equal(&want))
-		source, err := mappers.SourceToApi(model.Source{Inventory: raw})
+		source, err := mappers.SourceToApi(model.Source{Inventory: raw}, "")
 		Expect(err).NotTo(HaveOccurred())
 		Expect(source.Inventory.CollectionTime).To(Equal(&want))
 		subset, err := mappers.SourceInventoryToApi(model.SourceSubsetInventory{Inventory: raw})

@@ -136,7 +136,7 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("creating pgx pool", "error", err)
 		}
 
-		// Shared by the image server (OVA) and the agent server (agent image updates).
+		// Shared by the API, image (OVA) and agent servers.
 		applianceCache := service.NewApplianceImageCache(cfg.ApplianceImage, cfg.Service.IsoPath, zap.L().Named("appliance_cache"))
 		if err := applianceCache.Start(); err != nil {
 			zap.S().Fatalw("starting appliance image cache", "error", err)
@@ -144,7 +144,7 @@ var runCmd = &cobra.Command{
 		defer applianceCache.Stop()
 
 		runServer(ctx, &wg, cancel, cfg.Service.Address, "api_server", func(l net.Listener) Server {
-			return apiserver.New(cfg, store, l, opaValidator, pool)
+			return apiserver.New(cfg, store, l, opaValidator, pool, applianceCache)
 		})
 
 		runServer(ctx, &wg, cancel, cfg.Service.AgentEndpointAddress, "agent_server", func(l net.Listener) Server {

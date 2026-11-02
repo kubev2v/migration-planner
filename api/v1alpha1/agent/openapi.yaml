@@ -294,6 +294,51 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/sources/{id}/update-status:
+    get:
+      tags:
+        - agent
+      description: Tells a connected agent whether its appliance version differs from the appliance image the service currently serves
+      operationId: getAgentUpdateStatus
+      parameters:
+        - name: id
+          in: path
+          description: ID the agent
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentUpdateStatus'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /api/v1/agents/{id}/status:
     put:
       tags:
@@ -350,6 +395,22 @@ paths:
                 $ref: '../openapi.yaml#/components/schemas/Error'
 components:
   schemas:
+    AgentUpdateStatus:
+      type: object
+      description: Tells a connected agent whether its appliance version differs from the appliance image the service serves.
+      properties:
+        updateAvailable:
+          type: boolean
+          description: True when the agent's reported version differs from the served appliance image.
+        latestVersion:
+          type: string
+          description: Version of the appliance image the service serves; empty when the cache has no version.
+        currentVersion:
+          type: string
+          description: Version the agent reported, or the version stored when the OVA was downloaded; omitted when neither is known.
+      required:
+        - updateAvailable
+        - latestVersion
     SourceStatusUpdate:
       type: object
       properties:

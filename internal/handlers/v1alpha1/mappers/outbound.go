@@ -84,7 +84,10 @@ func normalizeInventoryData(data *api.InventoryData) {
 	}
 }
 
-func SourceToApi(s model.Source) (api.Source, error) {
+// SourceToApi maps a source to its API shape. latestAgentVersion is the
+// version of the appliance image the service currently serves, used to compute
+// agentVersionWarning; pass "" when unknown to omit the warning.
+func SourceToApi(s model.Source, latestAgentVersion string) (api.Source, error) {
 	source := api.Source{
 		Id:         s.ID,
 		Inventory:  nil,
@@ -184,11 +187,13 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		}
 	}
 
-	// Map agent version and warning (from ImageInfra, independent of agents)
+	// Map agent version (stored at OVA download) and warning. The warning
+	// prefers the version reported by the agent (connected flow) over the
+	// stored one (disconnected flow).
 	if s.ImageInfra.AgentVersion != nil {
 		source.AgentVersion = s.ImageInfra.AgentVersion
 	}
-	if warning := service.CheckAgentVersionWarning(&s.ImageInfra); warning != nil {
+	if warning := service.CheckAgentVersionWarning(&s.ImageInfra, service.ReportedAgentVersion(s), latestAgentVersion); warning != nil {
 		source.AgentVersionWarning = warning
 	}
 
@@ -216,11 +221,11 @@ func SourceToApi(s model.Source) (api.Source, error) {
 	return source, nil
 }
 
-func SourceListToApi(sources ...model.SourceList) api.SourceList {
+func SourceListToApi(latestAgentVersion string, sources ...model.SourceList) api.SourceList {
 	sourceList := []api.Source{}
 	for _, source := range sources {
 		for _, s := range source {
-			apiSource, err := SourceToApi(s)
+			apiSource, err := SourceToApi(s, latestAgentVersion)
 			if err != nil {
 				continue
 			}

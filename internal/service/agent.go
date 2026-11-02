@@ -20,6 +20,20 @@ func NewAgentService(store store.Store) *AgentService {
 	return &AgentService{store: store}
 }
 
+// GetSource returns the source with its agents and image infra, for handlers
+// that need the source's reported and stored appliance versions.
+func (as *AgentService) GetSource(ctx context.Context, id uuid.UUID) (*model.Source, error) {
+	source, err := as.store.Source().Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return nil, NewErrSourceNotFound(id)
+		}
+		return nil, err
+	}
+
+	return source, nil
+}
+
 /*
 UpdateSourceInventory updates source inventory
 

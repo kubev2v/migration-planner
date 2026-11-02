@@ -51,6 +51,7 @@ var _ = Describe("enhancement data handler", func() {
 			nil,
 			nil,
 			service.NewAssessmentEnhancementDataService(mockStore),
+			nil,
 		)
 	})
 
@@ -144,6 +145,7 @@ var _ = Describe("enhancement data handler", func() {
 				&ForbiddenAssessmentService{},
 				nil, nil, nil, nil, nil,
 				service.NewAssessmentEnhancementDataService(mockStore),
+				nil,
 			)
 
 			request := &api.EnhancementData{}
@@ -251,6 +253,7 @@ var _ = Describe("enhancement data handler", func() {
 				&ForbiddenAssessmentService{},
 				nil, nil, nil, nil, nil,
 				service.NewAssessmentEnhancementDataService(mockStore),
+				nil,
 			)
 
 			resp, err := forbiddenHandler.GetAssessmentEnhancementData(ctx, server.GetAssessmentEnhancementDataRequestObject{
