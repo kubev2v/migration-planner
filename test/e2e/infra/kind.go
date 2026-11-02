@@ -29,15 +29,12 @@ import (
 	kindcluster "sigs.k8s.io/kind/pkg/cluster"
 )
 
-const (
-	waitForDeploymentTimeout = 2 * time.Minute
-	waitForAllPodsTimeout    = 3 * time.Minute
-)
+const waitForDeploymentTimeout = 2 * time.Minute
 
 type KindInfraManager struct {
 	cfg           config.InfraConfig
 	provider      *kindcluster.Provider
-	clientset     *kubernetes.Clientset
+	clientset     kubernetes.Interface
 	dynamicClient dynamic.Interface
 	restConfig    *rest.Config
 	mapper        meta.RESTMapper
@@ -465,40 +462,45 @@ func (k *KindInfraManager) waitForDeployment(name string) error {
 }
 
 func (k *KindInfraManager) waitForAllDeployments() error {
-	ctx, cancel := context.WithTimeout(context.Background(), waitForAllPodsTimeout)
+	ctx, cancel := context.WithTimeout(context.Background(), k.cfg.DeploymentReadyTimeout)
 	defer cancel()
 
-	zap.S().Info("Waiting for all deployments to be ready")
+	zap.S().Infof("Waiting up to %s for all deployments to be ready", k.cfg.DeploymentReadyTimeout)
+	lastUnready := "no deployment status observed"
 	for {
 		deploys, err := k.clientset.AppsV1().Deployments(k.cfg.Namespace).List(ctx, metav1.ListOptions{})
 		if err != nil {
 			select {
 			case <-ctx.Done():
-				return fmt.Errorf("timed out listing deployments: %w", err)
+				return fmt.Errorf("timed out listing deployments (last unready: %s): %w; last list error: %w", lastUnready, ctx.Err(), err)
 			case <-time.After(5 * time.Second):
 				continue
 			}
 		}
 
-		allReady := true
+		var unready []string
 		for _, d := range deploys.Items {
 			desired := int32(1)
 			if d.Spec.Replicas != nil {
 				desired = *d.Spec.Replicas
 			}
 			if d.Status.ReadyReplicas < desired {
-				allReady = false
-				break
+				unready = append(unready, fmt.Sprintf("%s (%d/%d ready)", d.Name, d.Status.ReadyReplicas, desired))
 			}
 		}
 
-		if allReady {
+		if len(unready) == 0 {
 			return nil
 		}
+		status := strings.Join(unready, ", ")
+		if status != lastUnready {
+			zap.S().Infof("Waiting for deployments: %s", status)
+		}
+		lastUnready = status
 
 		select {
 		case <-ctx.Done():
-			return fmt.Errorf("timed out waiting for all deployments to be ready")
+			return fmt.Errorf("timed out after %s waiting for deployments: %s: %w", k.cfg.DeploymentReadyTimeout, lastUnready, ctx.Err())
 		case <-time.After(5 * time.Second):
 		}
 	}

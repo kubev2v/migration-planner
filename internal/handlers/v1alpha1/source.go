@@ -425,6 +425,31 @@ func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
 }
 
+// (GET /api/v1/sources/{id}/agent-image-url)
+func (h *ServiceHandler) GetSourceAgentImageURL(ctx context.Context, request server.GetSourceAgentImageURLRequestObject) (server.GetSourceAgentImageURLResponseObject, error) {
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.GetSourceAgentImageURL404JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.GetSourceAgentImageURL500JSONResponse{Message: fmt.Sprintf("failed to load source %s: %v", request.Id, err)}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Username != source.Username || user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to access source %s by user with org_id %s", request.Id, user.Organization)
+		return server.GetSourceAgentImageURL403JSONResponse{Message: message}, nil
+	}
+
+	url, expireAt, err := h.sourceSrv.GetSourceAgentImageURL(ctx, request.Id)
+	if err != nil {
+		return server.GetSourceAgentImageURL500JSONResponse{Message: fmt.Sprintf("failed to get agent image URL for source %s: %v", request.Id, err)}, nil
+	}
+	return server.GetSourceAgentImageURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
+}
+
 // (GET /health)
 func (h *ServiceHandler) Health(ctx context.Context, request server.HealthRequestObject) (server.HealthResponseObject, error) {
 	return server.Health200Response{}, nil

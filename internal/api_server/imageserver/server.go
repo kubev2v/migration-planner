@@ -18,6 +18,7 @@ import (
 	apiserver "github.com/kubev2v/migration-planner/internal/api_server"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	oapimiddleware "github.com/oapi-codegen/nethttp-middleware"
 	"go.uber.org/zap"
@@ -28,9 +29,10 @@ const (
 )
 
 type ImageServer struct {
-	cfg      *config.Config
-	store    store.Store
-	listener net.Listener
+	cfg            *config.Config
+	store          store.Store
+	listener       net.Listener
+	applianceCache *service.ApplianceImageCache
 }
 
 // New returns a new instance of a migration-planner server.
@@ -38,11 +40,13 @@ func New(
 	cfg *config.Config,
 	store store.Store,
 	listener net.Listener,
+	applianceCache *service.ApplianceImageCache,
 ) *ImageServer {
 	return &ImageServer{
-		cfg:      cfg,
-		store:    store,
-		listener: listener,
+		cfg:            cfg,
+		store:          store,
+		listener:       listener,
+		applianceCache: applianceCache,
 	}
 }
 
@@ -77,7 +81,7 @@ func (s *ImageServer) Run(ctx context.Context) error {
 		apiserver.WithResponseWriter,
 	)
 
-	h := handlers.NewImageHandler(s.store, s.cfg)
+	h := handlers.NewImageHandler(s.store, s.cfg, s.applianceCache)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
