@@ -49,6 +49,27 @@ func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *
 	return shortURL, exp, err
 }
 
+// GenerateAgentImageDownloadURLByToken returns a presigned URL for the
+// appliance image tar, using the same signing and expiry as the OVA URL.
+func GenerateAgentImageDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
+	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String(), uuid.NewString())
+	if err != nil {
+		return "", nil, errors.Wrap(err, "failed to sign image URL")
+	}
+
+	exp, err := ParseExpiration(token)
+	if err != nil {
+		return "", nil, err
+	}
+
+	path := fmt.Sprintf("%s/%s/appliance", "/api/v1/image/bytoken/", token)
+	shortURL, err := buildURL(baseUrl, path, false, map[string]string{})
+	if err != nil {
+		return "", nil, err
+	}
+	return shortURL, exp, err
+}
+
 func JWTForSymmetricKey(key []byte, expiration time.Duration, sub, downloadURLID string) (string, error) {
 	exp := time.Now().Add(expiration).Unix()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

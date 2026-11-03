@@ -58,6 +58,25 @@ func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) 
 	return url, time.Time(*expireAt), err
 }
 
+func (s *SourceService) GetAgentImageDownloadURL(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
+	source, err := s.store.Source().Get(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return "", time.Now(), NewErrSourceNotFound(id)
+		}
+		return "", time.Time{}, err
+	}
+
+	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
+
+	url, expireAt, err := image.GenerateAgentImageDownloadURLByToken(baseUrl, source)
+	if err != nil {
+		return "", time.Time{}, err
+	}
+
+	return url, time.Time(*expireAt), err
+}
+
 // ensureAgentToken generates and stores the agent JWT if it's missing or near expiration.
 func (s *SourceService) ensureAgentToken(ctx context.Context, source *model.Source) error {
 	if source.ImageInfra.AgentToken != nil && !isTokenNearExpiry(*source.ImageInfra.AgentToken) {

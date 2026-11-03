@@ -104,6 +104,46 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/image/bytoken/{token}/appliance:
+    get:
+      tags:
+        - image
+      description: Get the appliance image tar via URL
+      operationId: getAgentImageByToken
+      parameters:
+        - name: token
+          in: path
+          description: User token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The appliance image OCI archive (application/x-tar); supports Range and conditional requests
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
   /health:
     get:
       tags:
