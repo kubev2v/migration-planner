@@ -300,6 +300,47 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/sources/{id}/agent-image:
+    get:
+      tags:
+        - source
+      description: Download the appliance (agent) image tar served with the current ISO, for in-place agent updates
+      operationId: getAgentImage
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The appliance image OCI archive (application/x-tar); supports Range and conditional requests
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "503":
+          description: The appliance image tar is not available yet
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
 components:
   schemas:
     SourceStatusUpdate:
