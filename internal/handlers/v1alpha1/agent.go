@@ -4,28 +4,63 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
 	"time"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/config"
 	apiMappers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	"go.uber.org/zap"
 )
 
 type AgentHandler struct {
 	srv *service.AgentService
+	cfg *config.Config
 }
 
 // Make sure we conform to servers Service interface
 var _ agentServer.Service = (*AgentHandler)(nil)
 
-func NewAgentHandler(srv *service.AgentService) *AgentHandler {
+func NewAgentHandler(srv *service.AgentService, cfg *config.Config) *AgentHandler {
 	return &AgentHandler{
 		srv: srv,
+		cfg: cfg,
 	}
+}
+
+// (GET /api/v1/sources/{id}/agent-image)
+func (h *AgentHandler) GetAgentImage(ctx context.Context, request agentServer.GetAgentImageRequestObject) (agentServer.GetAgentImageResponseObject, error) {
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Id.String() {
+		return agentServer.GetAgentImage403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to access source %s", request.Id),
+		}, nil
+	}
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return agentServer.GetAgentImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+	httpReq, ok := ctx.Value(image.RequestKey).(*http.Request)
+	if !ok {
+		return agentServer.GetAgentImage500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+	if err := image.ServeAgentImageTar(writer, httpReq, h.cfg.Service.IsoPath); err != nil {
+		if os.IsNotExist(err) {
+			zap.S().Named("agent_handler").Warnw("agent image tar not available", "source_id", request.Id, "error", err)
+			return agentServer.GetAgentImage503JSONResponse{Message: "agent image not available yet"}, nil
+		}
+		zap.S().Named("agent_handler").Errorw("failed to serve agent image", "source_id", request.Id, "error", err)
+		return agentServer.GetAgentImage500JSONResponse{Message: "failed to serve agent image"}, nil
+	}
+	// ServeAgentImageTar already wrote the response.
+	return nil, nil
 }
 
 func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentServer.UpdateSourceInventoryRequestObject) (agentServer.UpdateSourceInventoryResponseObject, error) {
