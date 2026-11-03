@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,9 +15,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/xuri/excelize/v2"
+
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/store"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMetadataSQLite(t *testing.T) {
@@ -577,4 +580,58 @@ func TestParserCleanup(t *testing.T) {
 	require.Len(t, datastores, 1)
 	require.Equal(t, "N/A", datastores[0].Vendor, "previous LUN metadata must not survive parser reuse")
 	require.Equal(t, "N/A", datastores[0].Model)
+}
+
+func TestRVToolsValidationErrorDetails(t *testing.T) {
+	require.NoError(t, (ValidationResult{}).Error())
+	require.NoError(t, (ValidationResult{Warnings: []ValidationIssue{{Message: "warning"}}}).Error())
+	result := ValidationResult{Errors: []ValidationIssue{
+		{Code: CodeMissingVMID, Message: "First issue: missing VM ID"},
+		{Code: CodeColumnValidationFailed, Message: "SELECT private_column FROM /private/database"},
+		{Code: CodeMissingVMName, Message: "Second issue: missing name"},
+	}}
+	err := fmt.Errorf("ingesting: %w", result.Error())
+	var validation *SchemaValidationError
+	require.False(t, errors.As(err, &validation), "technical issues must use the caller's fallback")
+	require.Contains(t, err.Error(), "private_column")
+	require.Contains(t, err.Error(), "First issue: missing VM ID")
+	require.Contains(t, err.Error(), "Second issue: missing name")
+	require.Len(t, result.Errors, 3)
+}
+
+func TestRVToolsWorkbookErrorMessages(t *testing.T) {
+	for _, tc := range []struct {
+		name, sheet, content string
+		truncate             bool
+	}{
+		{name: "JSON", content: "{}"},
+		{name: "empty"},
+		{name: "missing vInfo", sheet: "vHost"},
+		{name: "truncated", sheet: "vInfo", truncate: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "private.xlsx")
+			if tc.sheet == "" {
+				require.NoError(t, os.WriteFile(path, []byte(tc.content), 0600))
+			} else {
+				path = createTestExcel(t, NewExcelSheet(tc.sheet, []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}, nil))
+				if tc.truncate {
+					data, err := os.ReadFile(path)
+					require.NoError(t, err)
+					require.NoError(t, os.Truncate(path, int64(len(data)/2)))
+				}
+			}
+			_, err := readRVToolsMetadata(context.Background(), path)
+			require.Error(t, err)
+			if tc.sheet == "" || tc.truncate {
+				require.ErrorIs(t, err, zip.ErrFormat)
+			} else {
+				var missing excelize.ErrSheetNotExist
+				require.ErrorAs(t, err, &missing)
+				require.Equal(t, "vInfo", missing.SheetName)
+			}
+		})
+	}
+	_, err := readRVToolsMetadata(context.Background(), "/does/not/exist/private.xlsx")
+	require.ErrorIs(t, err, os.ErrNotExist)
 }
