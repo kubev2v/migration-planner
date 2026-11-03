@@ -10,7 +10,6 @@ jobs:
     with:
       user_path_permissions: |
         migration-planner-sync[bot]:
-          - 'agent-v2'
           - 'build/migration-planner-iso/config'
         '*':
           - '.github/release-config.txt'

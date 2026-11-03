@@ -22,7 +22,7 @@ type AgentStatusUpdate struct {
 	SourceId      openapi_types.UUID `json:"sourceId" validate:"required,sourceId"`
 	Status        string             `json:"status" validate:"required,status"`
 	StatusInfo    string             `json:"statusInfo" validate:"required,max=200"`
-	Version       string             `json:"version" validate:"required,max=20"`
+	Version       string             `json:"version" validate:"required,max=50"`
 }
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.

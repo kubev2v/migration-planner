@@ -167,7 +167,7 @@ jobs:
 
   # Always runs so branch protection can require this single check.
   # Do not require lint/unit-test directly if you want docs-only PRs to merge:
-  # those jobs are skipped when only documentation/image files change.
+  # those jobs are skipped when only documentation/static assets change.
   # Skipped jobs count as success, but a failed commit check would also skip
   # them — this job fails unless commit/title checks passed and, when code
   # changed, the code validations passed.

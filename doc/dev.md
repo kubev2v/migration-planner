@@ -2,13 +2,15 @@
 
 ## Image Creation and Push to Quay.io
 
-These instructions will guide you on how to build images for the API, agent, and UI containers and then push them to Quay manually.
+These instructions will guide you on how to build images for the API and UI containers and then push them to Quay manually.
+
+The agent appliance is built in the [assisted-migration-agent repository](https://github.com/kubev2v/assisted-migration-agent). The ISO build consumes the `oma-appliance` image configured in [build/migration-planner-iso/config](../build/migration-planner-iso/config).
 
 ### 1. Create Dedicated Repositories in Your Quay Environment
 
 For debugging purposes, you may need to update the containers and push them to your own Quay registry.
 To do this, start by creating dedicated repositories in your Quay environment to serve as the new destinations for 
-the `migration-planner-agent`, `migration-planner-ui`, and `migration-planner-api` images.
+the `migration-planner-ui` and `migration-planner-api` images.
 
 ### 2. Log in to Quay
 
@@ -24,7 +26,7 @@ It should look like: `podman login -u='<QUAY_USERNAME>' -p='<SOME_GENERATED_PASS
 
 ### 3. Build and Push Images
 
-### migration-planner-agent and migration-planner-api:
+### migration-planner-api:
 
 Create a directory named: **migration-planner**
 
@@ -35,8 +37,6 @@ Open a terminal session and navigate to the migration-planner directory
 Run: 
 
 ```
-export MIGRATION_PLANNER_AGENT_IMAGE=quay.io/<REPLACE_WITH_YOUR_QUAY_USERNAME>/migration-planner-agent
-
 export MIGRATION_PLANNER_API_IMAGE=quay.io/<REPLACE_WITH_YOUR_QUAY_USERNAME>/migration-planner-api
 
 make build-containers

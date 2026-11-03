@@ -119,6 +119,13 @@ func (n *NICs) Scan(value interface{}) error {
 		if !ok {
 			continue
 		}
+		var ipv4, ipv6 Networks
+		if err := ipv4.Scan(m["IPv4Addresses"]); err != nil {
+			return fmt.Errorf("NICs.Scan: IPv4Addresses: %w", err)
+		}
+		if err := ipv6.Scan(m["IPv6Addresses"]); err != nil {
+			return fmt.Errorf("NICs.Scan: IPv6Addresses: %w", err)
+		}
 		nic := NIC{
 			Network:         Ref{ID: toString(m["Network"])},
 			MAC:             toString(m["MAC"]),
@@ -128,8 +135,9 @@ func (n *NICs) Scan(value interface{}) error {
 			Connected:       toBool(m["Connected"]),
 			StartsConnected: toBool(m["StartsConnected"]),
 			Type:            toString(m["Type"]),
-			IPv4Address:     toString(m["IPv4Address"]),
-			IPv6Address:     toString(m["IPv6Address"]),
+			VlanID:          toString(m["VlanID"]),
+			IPv4Addresses:   append([]string{}, ipv4...),
+			IPv6Addresses:   append([]string{}, ipv6...),
 		}
 		result = append(result, nic)
 	}

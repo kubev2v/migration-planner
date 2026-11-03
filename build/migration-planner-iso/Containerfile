@@ -2,7 +2,10 @@ FROM --platform=linux/amd64 quay.io/centos/centos:stream9 AS builder
 
 ARG ISO_URL ISO_CHECKSUM TLS_VERIFY=true
 ARG AGENT_IMAGE=quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance
-ARG AGENT_IMAGE_TAG=main
+ARG AGENT_IMAGE_TAG
+ARG AGENT_IMAGE_BRANCH=main
+ARG AGENT_IMAGE_TAG_MAIN=main
+ARG AGENT_IMAGE_TAG_STABLE=stable
 
 USER root
 
@@ -28,7 +31,14 @@ RUN echo "${ISO_CHECKSUM}  /initial-rhcos.iso" | sha256sum -c -
 RUN mkdir -p /output
 
 # Run the build script with the downloaded ISO file and config values
-RUN /tmp/build-ove-image.sh \
+RUN if [ -z "${AGENT_IMAGE_TAG}" ]; then \
+      case "${AGENT_IMAGE_BRANCH}" in \
+        main) AGENT_IMAGE_TAG="${AGENT_IMAGE_TAG_MAIN}" ;; \
+        stable) AGENT_IMAGE_TAG="${AGENT_IMAGE_TAG_STABLE}" ;; \
+        *) echo "Unsupported agent image branch: ${AGENT_IMAGE_BRANCH}" >&2; exit 1 ;; \
+      esac; \
+    fi \
+    && /tmp/build-ove-image.sh \
     --iso-file /initial-rhcos.iso \
     --dir / \
     --output-file /output/final.iso \

@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+// Todo: change the Inventory from json.RawMessage into a custom struct
+
 type AssessmentEventPayload struct {
 	Assessment AssessmentData `json:"assessment"`
 }

@@ -384,7 +384,7 @@ components:
         version:
           type: string
           x-oapi-codegen-extra-tags:
-            validate: "required,max=20"
+            validate: "required,max=50"
         sourceId:
           type: string
           format: uuid

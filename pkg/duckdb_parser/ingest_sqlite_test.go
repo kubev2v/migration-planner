@@ -67,7 +67,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '', Variant VARCHAR DEFAULT 'ClusterComputeResource')`,
 
 		// Host
-		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false, Network VARCHAR DEFAULT '{}', HbaDiskInfo VARCHAR DEFAULT '[]', HostScsiTopology VARCHAR DEFAULT '[]', HostScsiDisks VARCHAR DEFAULT '[]')`,
+		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false, HbaDiskInfo VARCHAR DEFAULT '[]', HostScsiTopology VARCHAR DEFAULT '[]', HostScsiDisks VARCHAR DEFAULT '[]', Network VARCHAR DEFAULT '{}')`,
 
 		// VM
 		`CREATE TABLE dst.VM (
@@ -132,7 +132,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		// Insert one host per cluster so Host→Cluster join resolves.
 		hostID := fmt.Sprintf("host-%d", i+1)
 		_, err = db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+			`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`,
 			escapeSQLString(hostID), escapeSQLString(c.id),
 		))
 		require.NoError(t, err)
@@ -185,6 +185,53 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 	require.NoError(t, err)
 
 	return sqlitePath
+}
+
+func TestIngestSqlite_Annotation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hasColumn  bool
+		annotation sql.NullString
+	}{
+		{name: "reported annotation", hasColumn: true, annotation: sql.NullString{String: "  SAP production application's: 東京 / Finance!\nOwner: Финансы.  ", Valid: true}},
+		{name: "literal VM annotation", hasColumn: true, annotation: sql.NullString{String: "VM", Valid: true}},
+		{name: "empty annotation", hasColumn: true, annotation: sql.NullString{Valid: true}},
+		{name: "NULL annotation", hasColumn: true},
+		{name: "legacy snapshot without annotation column"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vcenter-1",
+				[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "test-vm", clusterName: "cluster1"}},
+			)
+			if tc.hasColumn {
+				_, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS annotation_source (TYPE sqlite)", escapeSQLString(sqlitePath)))
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `ALTER TABLE annotation_source.VM ADD COLUMN Annotation VARCHAR`)
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `UPDATE annotation_source.VM SET Annotation = ? WHERE ID = ?`, tc.annotation, "vm-1")
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, "DETACH annotation_source")
+				require.NoError(t, err)
+			}
+
+			result, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "SQLite validation failed: %v", result.Errors)
+
+			var annotation sql.NullString
+			var name, folder, host string
+			err = db.QueryRowContext(ctx, `SELECT "Annotation", "VM", "Folder ID", "Host" FROM vinfo WHERE "VM ID" = ?`, "vm-1").Scan(&annotation, &name, &folder, &host)
+			require.NoError(t, err)
+			require.Equal(t, tc.annotation, annotation)
+			require.Equal(t, "test-vm", name)
+			require.Equal(t, "folder-1", folder)
+			require.Equal(t, "host-1", host)
+		})
+	}
 }
 
 func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
@@ -396,11 +443,14 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.True(t, result.IsValid())
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-001' ORDER BY "Mac Address"`)
+		`SELECT "Mac Address", "IPv4 Addresses" FROM vnetwork WHERE "VM ID" = 'vm-001' ORDER BY "Mac Address"`)
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -410,11 +460,11 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "10.0.0.1", nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
-	assert.Equal(t, "10.0.0.2", nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
+	assert.Equal(t, []interface{}{"10.0.0.1/24"}, nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
+	assert.Equal(t, []interface{}{"10.0.0.2/24"}, nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
 }
 
-func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
+func TestIngestSqlite_NICsDoNotUsePrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
 	ctx := context.Background()
 	parser, db, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()
@@ -432,7 +482,7 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:01","order":0,"deviceKey":200},` +
 				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:02","order":1,"deviceKey":201}` +
 				`]`,
-			// guestNetworks intentionally empty — should fall back to v.IpAddress
+			// Guest data is absent; the VM primary IP does not identify an adapter.
 		},
 	}
 	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
@@ -442,11 +492,14 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 	require.True(t, result.IsValid())
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-002' ORDER BY "Mac Address"`)
+		`SELECT "Mac Address", "IPv4 Addresses" FROM vnetwork WHERE "VM ID" = 'vm-002' ORDER BY "Mac Address"`)
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -456,8 +509,8 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "192.168.1.50", nics[0].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
-	assert.Equal(t, "192.168.1.50", nics[1].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
+	assert.Empty(t, nics[0].ipv4, "missing guest data must not borrow the VM primary IP")
+	assert.Empty(t, nics[1].ipv4, "missing guest data must not borrow the VM primary IP")
 }
 
 func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
@@ -514,7 +567,7 @@ func TestIngestSqlite_StandaloneHostDetection(t *testing.T) {
 				require.NoError(t, err)
 				_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 				require.NoError(t, err)
-				_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+				_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`)
 				require.NoError(t, err)
 				require.NoError(t, func() error { _, err := sdb.Exec("DETACH dst"); return err }())
 			}
@@ -544,7 +597,7 @@ func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 	require.NoError(t, err)
-	_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+	_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`)
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.VM (
 		ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,

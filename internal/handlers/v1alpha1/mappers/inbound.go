@@ -1,15 +1,14 @@
 package mappers
 
 import (
-	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -193,12 +192,8 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 			now := time.Now().UTC()
 			resource.Inventory.CreatedAt = &now
 		}
-		data, _ := json.Marshal(resource.Inventory)
-		form.Inventory = data
-		inv, err := model.NewAssessmentInventory(uuid.New(), form.ID, resource.Name, false, data)
-		if err == nil {
-			form.Inventories = []model.AssessmentInventory{inv}
-		}
+		inventory := InventoryFromAPI(*resource.Inventory)
+		form.MainInventory = model.NewAssessmentInventory(uuid.New(), form.ID, resource.Name, model.InventoryVersionV2, false, inventory)
 	}
 
 	return form

@@ -15,6 +15,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
+	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 )
 
 const (
@@ -219,6 +221,10 @@ func normalizeMainInventory(data []byte) ([]byte, string, error) {
 		if err := json.Unmarshal(inventoryBytes, &nested); err == nil && len(nested.Inventory) > 0 {
 			inventoryBytes = nested.Inventory
 		}
+	}
+
+	if util.GetInventoryVersion(inventoryBytes) != model.InventoryVersionV2 {
+		return nil, "", fmt.Errorf("only v2 inventories are supported")
 	}
 
 	var inv v1alpha1.Inventory

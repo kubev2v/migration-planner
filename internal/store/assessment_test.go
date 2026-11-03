@@ -6,7 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -100,22 +102,34 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(assessments[0].SourceType).To(Equal("rvtools"))
 		})
 
-		It("successfully list assessments with inventories", func() {
+		It("lists counts from each assessment's main inventory and ignores subsets", func() {
 			assessmentID := uuid.New()
 
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "assessment1", "org1", "user1", "John", "Doe", "inventory", "NULL"))
 			Expect(tx.Error).To(BeNil())
 
-			// Add inventories
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter": {"id": "test"}}`))
-			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter": {"id": "test2"}}`))
+			inventories := []model.AssessmentInventory{
+				{ID: uuid.New(), AssessmentID: assessmentID, Name: "main", VMsCount: 10, HostsCount: 20, NetworksCount: 30, DatastoresCount: 40},
+				{ID: uuid.New(), AssessmentID: assessmentID, Name: "subset-a", IsSubset: true, VMsCount: 100, HostsCount: 200, NetworksCount: 300, DatastoresCount: 400},
+				{ID: uuid.New(), AssessmentID: assessmentID, Name: "subset-b", IsSubset: true, VMsCount: 1, HostsCount: 2, NetworksCount: 3, DatastoresCount: 4},
+			}
+			for i := range inventories {
+				inventories[i].Inventory = []byte(`{"vcenter": {"id": "test"}}`)
+			}
+			tx = gormdb.Create(&inventories)
 			Expect(tx.Error).To(BeNil())
 
 			assessments, err := s.Assessment().List(context.TODO(), store.NewAssessmentQueryFilter())
 			Expect(err).To(BeNil())
-			Expect(assessments).To(HaveLen(1))
-			Expect(assessments[0].Inventories).To(HaveLen(2))
+			Expect(assessments).To(ConsistOf(
+				And(HaveField("ID", assessmentID), HaveField("VMsCount", 10), HaveField("HostsCount", 20), HaveField("NetworksCount", 30), HaveField("DatastoresCount", 40)),
+			))
+
+			assessment, err := s.Assessment().Get(context.TODO(), assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.MainInventory.ID).To(Equal(inventories[0].ID))
+			Expect(assessment.MainInventory.Inventory.Vcenter).NotTo(BeNil())
+			Expect(assessment.SubsetInventories).To(HaveLen(2))
 		})
 
 		It("list assessments - no assessments", func() {
@@ -170,7 +184,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(assessment.OrgID).To(Equal("org1"))
 			Expect(assessment.Username).To(Equal("testuser"))
 			Expect(assessment.SourceType).To(Equal("inventory"))
-			Expect(assessment.Inventories).To(HaveLen(1))
+			Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
 		})
 
 		It("failed to get assessment - assessment does not exist", func() {
@@ -205,12 +219,12 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
 			Expect(created.Name).To(Equal("test-assessment"))
-			Expect(created.Inventories).To(HaveLen(1))
+			Expect(created.MainInventory.ID).NotTo(Equal(uuid.Nil))
 
 			// Verify in database
 			var count int
@@ -242,7 +256,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -283,7 +297,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 			Expect(created).ToNot(BeNil())
 			Expect(created.ID).To(Equal(assessmentID))
@@ -301,14 +315,14 @@ var _ = Describe("assessment store", Ordered, func() {
 					{ID: uuid.New(), Name: "subset-b", IsSubset: true, VCenterID: "vc", VMsCount: 7, Inventory: []byte(`{"vms":{"total":7}}`), Version: 1},
 				},
 			}
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).NotTo(HaveOccurred())
-			Expect(created.Inventories).To(ConsistOf(
+			Expect(append([]svcmodel.AssessmentInventory{created.MainInventory}, created.SubsetInventories...)).To(ConsistOf(
 				And(HaveField("Name", "main"), HaveField("IsSubset", false)),
 				And(HaveField("Name", "subset-a"), HaveField("IsSubset", true), HaveField("VMsCount", 3)),
 				And(HaveField("Name", "subset-b"), HaveField("IsSubset", true), HaveField("VMsCount", 7)),
 			))
-			for _, inventory := range created.Inventories {
+			for _, inventory := range append([]svcmodel.AssessmentInventory{created.MainInventory}, created.SubsetInventories...) {
 				Expect(inventory.AssessmentID).To(Equal(assessmentID))
 			}
 			var count int
@@ -317,7 +331,7 @@ var _ = Describe("assessment store", Ordered, func() {
 			Expect(count).To(Equal(2))
 			retrieved, err := s.Assessment().Get(context.TODO(), assessmentID)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(retrieved.Inventories).To(HaveLen(3))
+			Expect(append([]svcmodel.AssessmentInventory{retrieved.MainInventory}, retrieved.SubsetInventories...)).To(HaveLen(3))
 		})
 
 		It("fails to create assessment with non-existent source_id", func() {
@@ -336,7 +350,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).ToNot(BeNil())
 			Expect(err.Error()).To(ContainSubstring("foreign key constraint"))
 		})
@@ -356,7 +370,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment1))
 			Expect(err).To(BeNil())
 
 			// Try to create another assessment with same name in same org
@@ -370,7 +384,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2)
+			_, err = s.Assessment().Create(context.TODO(), toDomainAssessment(assessment2))
 			Expect(err).ToNot(BeNil())
 		})
 
@@ -390,7 +404,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment1)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment1))
 			Expect(err).To(BeNil())
 
 			// Create assessment with same name but different org
@@ -405,7 +419,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err = s.Assessment().Create(context.TODO(), assessment2)
+			_, err = s.Assessment().Create(context.TODO(), toDomainAssessment(assessment2))
 			Expect(err).To(BeNil())
 
 			var count int
@@ -445,7 +459,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				{ID: uuid.New(), Name: "test", Inventory: inventoryJSON, Version: 1},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 			Expect(created.SourceID).ToNot(BeNil())
 			Expect(created.SourceID.String()).To(Equal(sourceID.String()))
@@ -483,7 +497,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 
 			newName := "updated-name"
@@ -508,9 +522,9 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			created, err := s.Assessment().Create(context.TODO(), assessment)
+			created, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
-			Expect(created.Inventories).To(HaveLen(1))
+			Expect(created.MainInventory.ID).NotTo(Equal(uuid.Nil))
 
 			// Add new inventory
 			inventory2JSON := []byte(`{"vcenter":{"id":"test-vcenter-2"},"vms":{"total":15},"infra":{"totalHosts":7}}`)
@@ -524,7 +538,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				AssessmentID: assessmentID,
 			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, []model.AssessmentInventory{newInventory})
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, nil, []svcmodel.AssessmentInventory{toDomainInventory(newInventory)})
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 
@@ -549,7 +563,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 
 			// Update both name and add inventory
@@ -565,7 +579,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				AssessmentID: assessmentID,
 			}
 
-			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, []model.AssessmentInventory{newInventory})
+			updated, err := s.Assessment().Update(context.TODO(), assessmentID, &newName, []svcmodel.AssessmentInventory{toDomainInventory(newInventory)})
 			Expect(err).To(BeNil())
 			Expect(updated).ToNot(BeNil())
 			Expect(updated.Name).To(Equal("updated-name"))
@@ -611,7 +625,7 @@ var _ = Describe("assessment store", Ordered, func() {
 				{ID: uuid.New(), Name: "test", Inventory: inventoryJSON, Version: 1},
 			}
 
-			_, err := s.Assessment().Create(context.TODO(), assessment)
+			_, err := s.Assessment().Create(context.TODO(), toDomainAssessment(assessment))
 			Expect(err).To(BeNil())
 
 			// Verify assessment and inventory exist
@@ -708,3 +722,15 @@ var _ = Describe("assessment store", Ordered, func() {
 		})
 	})
 })
+
+func toDomainAssessment(assessment model.Assessment) svcmodel.Assessment {
+	result, err := storemappers.AssessmentFromStore(&assessment)
+	Expect(err).NotTo(HaveOccurred())
+	return result
+}
+
+func toDomainInventory(inventory model.AssessmentInventory) svcmodel.AssessmentInventory {
+	result, err := storemappers.AssessmentInventoryFromStore(inventory)
+	Expect(err).NotTo(HaveOccurred())
+	return result
+}

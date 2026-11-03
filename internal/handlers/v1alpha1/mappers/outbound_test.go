@@ -11,6 +11,7 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
@@ -272,22 +273,22 @@ var _ = Describe("Inventory collection time", func() {
 		group, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "group", true, raw)
 		Expect(err).NotTo(HaveOccurred())
 		createdAt := want.Add(24 * time.Hour)
-		assessment, err := mappers.StoreAssessmentToApi(model.Assessment{
+		domainAssessment, err := storemappers.AssessmentFromStore(&model.Assessment{
 			CreatedAt:   createdAt,
 			Inventories: []model.AssessmentInventory{main, group},
 		})
 		Expect(err).NotTo(HaveOccurred())
+		assessment := mappers.AssessmentToApi(domainAssessment)
 		Expect(assessment.CreatedAt).To(Equal(createdAt))
 		Expect(assessment.Snapshots).To(HaveLen(1))
 		snapshot := assessment.Snapshots[0]
 		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
 		Expect(snapshot.SubsetInventories).NotTo(BeNil())
 		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
-		assessment, err = mappers.AssessmentToApi(model2.Assessment{
+		assessment = mappers.AssessmentToApi(model2.Assessment{
 			MainInventory:     model2.AssessmentInventory{Inventory: domain},
 			SubsetInventories: []model2.AssessmentInventory{{Inventory: domain}},
 		})
-		Expect(err).NotTo(HaveOccurred())
 		Expect(assessment.Snapshots).To(HaveLen(1))
 		snapshot = assessment.Snapshots[0]
 		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))

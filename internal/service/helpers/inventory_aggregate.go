@@ -1,28 +1,26 @@
 package helpers
 
 import (
-	"encoding/json"
 	"math"
 	"time"
 
-	api "github.com/kubev2v/migration-planner/api/v1alpha1"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
 )
 
-func Aggregate(inventories []model.AssessmentInventory) (api.Inventory, error) {
+func Aggregate(inventories []model.AssessmentInventory) (model.Inventory, error) {
 	now := time.Now().UTC()
-	result := api.Inventory{Clusters: map[string]api.InventoryData{}, CreatedAt: &now}
+	result := model.Inventory{Clusters: map[string]model.InventoryData{}, CreatedAt: &now}
 	if len(inventories) == 0 {
 		return result, nil
 	}
 
-	dataSlice := make([]api.InventoryData, 0, len(inventories))
+	dataSlice := make([]model.InventoryData, 0, len(inventories))
 	for _, inv := range inventories {
-		d, err := UnmarshalInventoryData(inv)
-		if err != nil {
-			return api.Inventory{}, err
+		data := model.InventoryData{}
+		if inv.Inventory.Vcenter != nil {
+			data = *inv.Inventory.Vcenter
 		}
-		dataSlice = append(dataSlice, d)
+		dataSlice = append(dataSlice, data)
 	}
 
 	aggregated := AggregateInventoryData(dataSlice)
@@ -33,30 +31,30 @@ func Aggregate(inventories []model.AssessmentInventory) (api.Inventory, error) {
 	return result, nil
 }
 
-func AggregateInventoryData(inventories []api.InventoryData) api.InventoryData {
+func AggregateInventoryData(inventories []model.InventoryData) model.InventoryData {
 	vms := aggregateVMs(inventories)
 
-	var vcenter *api.VCenter
+	var vcenter *model.VCenter
 	if vID, ok := vcenterID(inventories); ok {
-		vcenter = &api.VCenter{Id: vID}
+		vcenter = &model.VCenter{Id: vID}
 	}
 
-	return api.InventoryData{
+	return model.InventoryData{
 		Infra:   aggregateInfra(inventories, vms),
 		Vcenter: vcenter,
 		Vms:     vms,
 	}
 }
 
-func aggregateVMs(inventories []api.InventoryData) api.VMs {
-	result := api.VMs{PowerStates: map[string]int{}}
+func aggregateVMs(inventories []model.InventoryData) model.VMs {
+	result := model.VMs{PowerStates: map[string]int{}}
 
-	var complexityDistribution, diskComplexityTier, diskSizeTier map[string]api.DiskSizeTierSummary
-	var diskTypes map[string]api.DiskTypeSummary
-	var osInfo map[string]api.OsInfo
+	var complexityDistribution, diskComplexityTier, diskSizeTier map[string]model.DiskSizeTierSummary
+	var diskTypes map[string]model.DiskTypeSummary
+	var osInfo map[string]model.OsInfo
 	var distributionByCpuTier, distributionByMemoryTier, distributionByNicCount map[string]int
 
-	var nicCount api.VMResourceBreakdown
+	var nicCount model.VMResourceBreakdown
 	var nicCountSeen bool
 
 	for _, inventory := range inventories {
@@ -112,14 +110,14 @@ func aggregateVMs(inventories []api.InventoryData) api.VMs {
 	return result
 }
 
-func aggregateInfra(inventories []api.InventoryData, vms api.VMs) api.Infra {
-	result := api.Infra{
-		Datastores:      make([]api.Datastore, 0),
+func aggregateInfra(inventories []model.InventoryData, vms model.VMs) model.Infra {
+	result := model.Infra{
+		Datastores:      make([]model.Datastore, 0),
 		HostPowerStates: map[string]int{},
-		Networks:        make([]api.Network, 0),
+		Networks:        make([]model.Network, 0),
 	}
 
-	var hosts []api.Host
+	var hosts []model.Host
 	var hostsPresent bool
 	var totalDatacenters *int
 	for _, inventory := range inventories {
@@ -151,13 +149,13 @@ func aggregateInfra(inventories []api.InventoryData, vms api.VMs) api.Infra {
 	return result
 }
 
-func addDiskSizeTierSummary(a, b api.DiskSizeTierSummary) api.DiskSizeTierSummary {
+func addDiskSizeTierSummary(a, b model.DiskSizeTierSummary) model.DiskSizeTierSummary {
 	a.TotalSizeTB += b.TotalSizeTB
 	a.VmCount += b.VmCount
 	return a
 }
 
-func addDiskTypeSummary(a, b api.DiskTypeSummary) api.DiskTypeSummary {
+func addDiskTypeSummary(a, b model.DiskTypeSummary) model.DiskTypeSummary {
 	a.TotalSizeTB += b.TotalSizeTB
 	a.VmCount += b.VmCount
 	return a
@@ -178,7 +176,7 @@ func addOptionalInt(acc, value *int) *int {
 	return &sum
 }
 
-func addVMResourceBreakdown(a, b api.VMResourceBreakdown) api.VMResourceBreakdown {
+func addVMResourceBreakdown(a, b model.VMResourceBreakdown) model.VMResourceBreakdown {
 	a.Total += b.Total
 	a.TotalForMigratable += b.TotalForMigratable
 	a.TotalForMigratableWithWarnings += b.TotalForMigratableWithWarnings
@@ -186,7 +184,7 @@ func addVMResourceBreakdown(a, b api.VMResourceBreakdown) api.VMResourceBreakdow
 	return a
 }
 
-func aggregateClustersPerDatacenter(inventories []api.InventoryData) []int {
+func aggregateClustersPerDatacenter(inventories []model.InventoryData) []int {
 	var result []int
 	seen := false
 	for _, inventory := range inventories {
@@ -203,7 +201,7 @@ func aggregateClustersPerDatacenter(inventories []api.InventoryData) []int {
 	return result
 }
 
-func aggregateCPUOverCommitment(inventories []api.InventoryData, totalAllocated int) *float64 {
+func aggregateCPUOverCommitment(inventories []model.InventoryData, totalAllocated int) *float64 {
 	var physicalCores float64
 	complete := true
 	for _, inventory := range inventories {
@@ -232,8 +230,8 @@ func aggregateCPUOverCommitment(inventories []api.InventoryData, totalAllocated 
 	return nil
 }
 
-func aggregateIssuesBreakdown(inventories []api.InventoryData) *api.IssuesBreakdown {
-	result := &api.IssuesBreakdown{}
+func aggregateIssuesBreakdown(inventories []model.InventoryData) *model.IssuesBreakdown {
+	result := &model.IssuesBreakdown{}
 	seen := false
 	for _, inventory := range inventories {
 		issues := inventory.Vms.IssuesBreakdown
@@ -253,7 +251,7 @@ func aggregateIssuesBreakdown(inventories []api.InventoryData) *api.IssuesBreakd
 	return result
 }
 
-func aggregateMemoryOverCommitment(inventories []api.InventoryData, totalAllocatedGB int) *float64 {
+func aggregateMemoryOverCommitment(inventories []model.InventoryData, totalAllocatedGB int) *float64 {
 	var physicalMemoryMB float64
 	complete := true
 	for _, inventory := range inventories {
@@ -282,23 +280,23 @@ func aggregateMemoryOverCommitment(inventories []api.InventoryData, totalAllocat
 	return nil
 }
 
-func aggregateMigrationWarnings(inventories []api.InventoryData) []api.MigrationIssue {
-	result := make(map[string]api.MigrationIssue)
+func aggregateMigrationWarnings(inventories []model.InventoryData) []model.MigrationIssue {
+	result := make(map[string]model.MigrationIssue)
 	for _, inventory := range inventories {
 		mergeMigrationIssues(result, inventory.Vms.MigrationWarnings)
 	}
 	return migrationIssuesSlice(result)
 }
 
-func aggregateNotMigratableReasons(inventories []api.InventoryData) []api.MigrationIssue {
-	result := make(map[string]api.MigrationIssue)
+func aggregateNotMigratableReasons(inventories []model.InventoryData) []model.MigrationIssue {
+	result := make(map[string]model.MigrationIssue)
 	for _, inventory := range inventories {
 		mergeMigrationIssues(result, inventory.Vms.NotMigratableReasons)
 	}
 	return migrationIssuesSlice(result)
 }
 
-func aggregateStandaloneHostFlag(inventories []api.InventoryData) *bool {
+func aggregateStandaloneHostFlag(inventories []model.InventoryData) *bool {
 	var known, anyTrue bool
 	for _, inventory := range inventories {
 		value := inventory.Infra.StandaloneHostsDetected
@@ -352,7 +350,7 @@ func mergeMap[T any](dst map[string]T, src *map[string]T, combine func(existing,
 
 // mergeMigrationIssues folds incoming issues with an ID into result, summing
 // Count for issues that share the same ID. Issues without an ID are discarded.
-func mergeMigrationIssues(result map[string]api.MigrationIssue, incoming []api.MigrationIssue) {
+func mergeMigrationIssues(result map[string]model.MigrationIssue, incoming []model.MigrationIssue) {
 	for _, issue := range incoming {
 		if issue.Id == nil || *issue.Id == "" {
 			continue
@@ -367,8 +365,8 @@ func mergeMigrationIssues(result map[string]api.MigrationIssue, incoming []api.M
 	}
 }
 
-func migrationIssuesSlice(issues map[string]api.MigrationIssue) []api.MigrationIssue {
-	result := make([]api.MigrationIssue, 0, len(issues))
+func migrationIssuesSlice(issues map[string]model.MigrationIssue) []model.MigrationIssue {
+	result := make([]model.MigrationIssue, 0, len(issues))
 	for _, issue := range issues {
 		result = append(result, issue)
 	}
@@ -377,7 +375,7 @@ func migrationIssuesSlice(issues map[string]api.MigrationIssue) []api.MigrationI
 
 // mergeOsInfo sums Count and ANDs Supported, keeping the first-seen entry's
 // support tier and upgrade recommendation (inventories are ordered newest first).
-func mergeOsInfo(existing, incoming api.OsInfo) api.OsInfo {
+func mergeOsInfo(existing, incoming model.OsInfo) model.OsInfo {
 	existing.Count += incoming.Count
 	existing.Supported = existing.Supported && incoming.Supported
 	return existing
@@ -392,25 +390,7 @@ func optionalMap[V any](m map[string]V) *map[string]V {
 	return &m
 }
 
-func UnmarshalInventoryData(inv model.AssessmentInventory) (api.InventoryData, error) {
-	if inv.Version == model.InventoryVersionV2 {
-		var inventory api.Inventory
-		if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
-			return api.InventoryData{}, err
-		}
-		if inventory.Vcenter != nil {
-			return *inventory.Vcenter, nil
-		}
-		return api.InventoryData{}, nil
-	}
-	var invData api.InventoryData
-	if err := json.Unmarshal(inv.Inventory, &invData); err != nil {
-		return api.InventoryData{}, err
-	}
-	return invData, nil
-}
-
-func vcenterID(inventories []api.InventoryData) (string, bool) {
+func vcenterID(inventories []model.InventoryData) (string, bool) {
 	if len(inventories) == 0 || inventories[0].Vcenter == nil {
 		return "", false
 	}
