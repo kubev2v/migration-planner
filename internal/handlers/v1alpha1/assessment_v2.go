@@ -7,13 +7,12 @@ import (
 	"io"
 	"os"
 
-	svcmodel "github.com/kubev2v/migration-planner/internal/model"
-
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
@@ -57,7 +56,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 				break
 			}
 			logger.Error(err).WithString("step", "parse_multipart").Log()
-			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err)}, nil
+			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to parse form"}, nil
 		}
 
 		switch part.FormName() {
@@ -66,7 +65,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 			_ = part.Close()
 			if err != nil {
 				logger.Error(err).WithString("step", "read_name").Log()
-				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to read name: %v", err)}, nil
+				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to read name"}, nil
 			}
 			name = string(nameBytes)
 		case "file":
@@ -76,7 +75,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 
 			if copyErr != nil {
 				logger.Error(copyErr).WithString("step", "write_temp_file").Log()
-				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to read file: %v", copyErr)}, nil
+				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to read file"}, nil
 			}
 
 			if closeErr != nil {
@@ -106,7 +105,11 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 
 	if err := validateXLSXFile(tmpFile.Name()); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessmentV2400JSONResponse{Message: err.Error()}, nil
+		var invalid *validator.ErrInvalidFile
+		if errors.As(err, &invalid) {
+			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: invalid.Error()}, nil
+		}
+		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	logger.Step("file_received").WithInt("file_size", int(fileSize)).Log()
@@ -124,7 +127,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
+		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: "failed to create job"}, nil
 	}
 	canCleanup = false
 
@@ -150,11 +153,11 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 		var errForbidden *service.ErrForbidden
 		switch {
 		case errors.As(err, &errResourceNotFound):
-			return server.UploadRvtoolsToAssessment404JSONResponse{Message: err.Error()}, nil
+			return server.UploadRvtoolsToAssessment404JSONResponse{Message: errResourceNotFound.Error()}, nil
 		case errors.As(err, &errForbidden):
-			return server.UploadRvtoolsToAssessment403JSONResponse{Message: err.Error()}, nil
+			return server.UploadRvtoolsToAssessment403JSONResponse{Message: errForbidden.Error()}, nil
 		default:
-			return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
+			return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to get assessment"}, nil
 		}
 	}
 
@@ -166,18 +169,18 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	part, err := request.Body.NextPart()
 	if err != nil {
 		logger.Error(err).WithString("step", "parse_multipart").Log()
-		return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err)}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to parse form"}, nil
 	}
 
 	if part.FormName() != "file" {
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: fmt.Sprintf("failed to process uploaded file. Unknown part: %s", part.FormName())}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "file is required"}, nil
 	}
 
 	tmpFile, err := os.CreateTemp("", "rvtools-upload-*.xlsx")
 	if err != nil {
 		_ = part.Close()
 		logger.Error(err).WithString("step", "create_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to create temp file"}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to create temp file"}, nil
 	}
 	cleanup := true
 	defer func() {
@@ -191,12 +194,12 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	partCloseErr := part.Close()
 	if copyErr != nil {
 		logger.Error(copyErr).WithString("step", "write_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: fmt.Sprintf("failed to read file: %v", copyErr)}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	if closeErr != nil {
 		logger.Error(closeErr).WithString("step", "close_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to write temp file"}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to write temp file"}, nil
 	}
 
 	if partCloseErr != nil {
@@ -216,7 +219,11 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 
 	if err := validateXLSXFile(tmpFile.Name()); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: err.Error()}, nil
+		var invalid *validator.ErrInvalidFile
+		if errors.As(err, &invalid) {
+			return server.UploadRvtoolsToAssessment400JSONResponse{Message: invalid.Error()}, nil
+		}
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	logger.Step("file_received").WithInt("file_size", int(n)).Log()
@@ -234,7 +241,7 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to create job"}, nil
 	}
 	cleanup = false
 
