@@ -24,7 +24,11 @@ func main() {
 	flag.StringVar(&config.Cfg.Infra.PrivateKeyPath, "private-key-path", "/etc/planner/e2e", "Path to private key directory")
 	flag.BoolVar(&config.Cfg.Infra.KeepEnv, "keep-env", false, "Keep the Kind cluster after tests complete")
 	flag.BoolVar(&config.Cfg.Infra.SkipSetup, "skip-setup", false, "Skip infra setup, run tests against existing cluster and deployments")
+	flag.DurationVar(&config.Cfg.Infra.DeploymentReadyTimeout, "deployment-ready-timeout", config.Cfg.Infra.DeploymentReadyTimeout, "Timeout waiting for all deployments to become ready")
 	flag.Parse()
+	if config.Cfg.Infra.DeploymentReadyTimeout <= 0 {
+		log.Fatal("deployment-ready-timeout must be positive")
+	}
 
 	ip, err := detectLocalIP()
 	if err != nil {
