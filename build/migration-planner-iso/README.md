@@ -15,14 +15,25 @@ The `config` file defines build arguments that are provided to Konflux for build
 - `FINAL_ISO_PATH` - Path where ISO will be placed in final image (default: `/rhcos.iso`)
 - `ISO_URL` - RHCOS ISO download URL
 - `ISO_CHECKSUM` - SHA256 checksum for ISO verification
-- `AGENT_IMAGE` - Agent image repository (without a tag)
-- `AGENT_IMAGE_TAG_MAIN` - Dev appliance tag (default: `main`)
-- `AGENT_IMAGE_TAG_STABLE` - Stage appliance tag (default: `stable`)
+- `AGENT_IMAGE` - Agent image repository (without a tag, used by the pipeline's resolve task)
+- `AGENT_IMAGE_TAG_MAIN` - Dev appliance tag (used by the pipeline to resolve the full pullspec for `main` branch builds)
+- `AGENT_IMAGE_TAG_STABLE` - Stage appliance tag (used by the pipeline to resolve the full pullspec for `stable` branch builds)
 
-Push builds select the configured tag using `AGENT_IMAGE_BRANCH` (`main` or
-`stable`). Local `make migration-planner-iso-container` builds use the dev tag.
-An explicit `AGENT_IMAGE_TAG` build argument overrides this selection; production
-tag builds continue to use `AGENT_IMAGE_TAG=prod`.
+### Containerfile ARGs
+
+- `AGENT_IMAGE` - Full agent image pullspec including tag (e.g. `quay.io/.../oma-appliance:main-release-0.32-d689d7b`). The pipeline's `resolve-appliance-version` task constructs this from the config file values and passes it as a build arg. For local builds the Makefile constructs it from the config file.
+- `APPLIANCE_VERSION` - Version extracted from the appliance image's `org.opencontainers.image.version` OCI label. Set by the pipeline's `resolve-appliance-version` task via `skopeo inspect`; defaults to `local-dev` for local Makefile builds. Applied as the `io.kubev2v.oma.appliance-version` LABEL on the final image.
+
+### Pipeline image resolution
+
+The `resolve-appliance-version` inline Tekton task runs before the container
+build. It reads the config file, resolves the agent image tag from the branch
+context (push: `main` or `stable` from `{{target_branch}}`; PR: `main`; tag:
+`prod`), constructs the full `AGENT_IMAGE` pullspec, and uses `skopeo inspect`
+to extract the `org.opencontainers.image.version` label as `APPLIANCE_VERSION`.
+
+Local `make migration-planner-iso-container` builds construct the full pullspec
+from `AGENT_IMAGE` and `AGENT_IMAGE_TAG_MAIN` in the config file.
 
 Pushes to `main` and `stable` in `kubev2v/assisted-migration-agent` wait up to two
 hours for the released `oma-appliance` image in Quay, then dispatch an
