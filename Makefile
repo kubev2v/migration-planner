@@ -177,8 +177,8 @@ bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile 
 	TLS_VERIFY=$${TLS_VERIFY:-true}; \
 	$(PODMAN) build . \
 		--network=host \
-		--build-arg AGENT_IMAGE=$$AGENT_IMAGE \
-		--build-arg AGENT_IMAGE_TAG=$$AGENT_IMAGE_TAG \
+		--build-arg AGENT_IMAGE=$$AGENT_IMAGE:$$AGENT_IMAGE_TAG \
+		--build-arg APPLIANCE_VERSION=$${APPLIANCE_VERSION:-local-dev} \
 		--build-arg ISO_URL=$$ISO_URL \
 		--build-arg ISO_CHECKSUM=$$ISO_CHECKSUM \
 		--build-arg FINAL_ISO_PATH=/rhcos.iso \
