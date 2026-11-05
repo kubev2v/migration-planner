@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
@@ -57,6 +58,56 @@ func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.Hea
 	}
 
 	return imageServer.HeadImageByToken200Response{}, nil
+}
+
+// (GET /api/v1/image/bytoken/{token}/appliance)
+func (h *ImageHandler) GetAgentImageByToken(ctx context.Context, req imageServer.GetAgentImageByTokenRequestObject) (imageServer.GetAgentImageByTokenResponseObject, error) {
+	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
+	if !ok {
+		return imageServer.GetAgentImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+	httpReq, ok := ctx.Value(image.RequestKey).(*http.Request)
+	if !ok {
+		return imageServer.GetAgentImageByToken500JSONResponse{Message: "error creating the HTTP stream"}, nil
+	}
+
+	if err := image.ValidateToken(ctx, req.Token, h.getSourceKey); err != nil {
+		return imageServer.GetAgentImageByToken401JSONResponse{Message: err.Error()}, nil
+	}
+
+	sourceId, err := image.IdFromJWT(req.Token)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create the HTTP stream: %v", err)
+	}
+	source, err := h.getSource(ctx, sourceId)
+	if err != nil {
+		return imageServer.GetAgentImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
+	}
+
+	if err := image.ServeAgentImageTar(writer, httpReq, h.cfg.Service.IsoPath); err != nil {
+		if os.IsNotExist(err) {
+			return imageServer.GetAgentImageByToken404JSONResponse{Message: "agent image not available yet"}, nil
+		}
+		zap.S().Named("image_service").Errorw("failed to serve agent image", "source_id", source.ID, "error", err)
+		return imageServer.GetAgentImageByToken500JSONResponse{Message: "failed to serve agent image"}, nil
+	}
+
+	// Record the served version for disconnected sources (they never report
+	// back), mirroring the OVA download; the value comes from the ISO's
+	// agent-version file (OMA-1941).
+	versionInfo := version.Get()
+	if version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+		persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
+			zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
+		}
+	} else {
+		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName)
+	}
+
+	// ServeAgentImageTar already wrote the response.
+	return nil, nil
 }
 
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {

@@ -1189,4 +1189,48 @@ var _ = Describe("source handler", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
+
+	Context("GetSourceAgentImageURL", func() {
+		It("returns an agent image URL for an owned source", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO image_infras (source_id) VALUES ('%s');", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{Username: "admin", Organization: "admin", EmailDomain: "admin.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceAgentImageURL(ctx, server.GetSourceAgentImageURLRequestObject{Id: sourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceAgentImageURL200JSONResponse{}).String()))
+
+			result := resp.(server.GetSourceAgentImageURL200JSONResponse)
+			Expect(result.Url).To(ContainSubstring("/appliance"))
+			Expect(result.ExpiresAt).NotTo(BeNil())
+		})
+
+		It("returns 403 when accessing another org's source", func() {
+			victimSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, victimSourceID, "batman", "batman"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO image_infras (source_id) VALUES ('%s');", victimSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			attackerUser := auth.User{Username: "joker", Organization: "joker", EmailDomain: "joker.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceAgentImageURL(ctx, server.GetSourceAgentImageURLRequestObject{Id: victimSourceID})
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceAgentImageURL403JSONResponse{}).String()))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM keys;")
+			gormdb.Exec("DELETE FROM image_infras;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
 })

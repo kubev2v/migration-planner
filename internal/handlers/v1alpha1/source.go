@@ -20,6 +20,7 @@ import (
 	srvMappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
+	"go.uber.org/zap"
 )
 
 // validateSourceData validates the source data using the source validation rules
@@ -423,6 +424,33 @@ func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 		return server.GetSourceDownloadURL500JSONResponse{Message: fmt.Sprintf("failed to get download URL for source %s: %v", request.Id, err)}, nil
 	}
 	return server.GetSourceDownloadURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
+}
+
+// (GET /api/v1/sources/{id}/agent-image-url)
+func (h *ServiceHandler) GetSourceAgentImageURL(ctx context.Context, request server.GetSourceAgentImageURLRequestObject) (server.GetSourceAgentImageURLResponseObject, error) {
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.GetSourceAgentImageURL404JSONResponse{Message: err.Error()}, nil
+		default:
+			zap.S().Named("source_handler").Errorw("failed to load source", "source_id", request.Id, "error", err)
+			return server.GetSourceAgentImageURL500JSONResponse{Message: fmt.Sprintf("failed to load source %s", request.Id)}, nil
+		}
+	}
+
+	user := auth.MustHaveUser(ctx)
+	if user.Username != source.Username || user.Organization != source.OrgID {
+		message := fmt.Sprintf("forbidden to access source %s by user with org_id %s", request.Id, user.Organization)
+		return server.GetSourceAgentImageURL403JSONResponse{Message: message}, nil
+	}
+
+	url, expireAt, err := h.sourceSrv.GetAgentImageDownloadURL(ctx, request.Id)
+	if err != nil {
+		zap.S().Named("source_handler").Errorw("failed to get agent image download URL", "source_id", request.Id, "error", err)
+		return server.GetSourceAgentImageURL500JSONResponse{Message: fmt.Sprintf("failed to get agent image download URL for source %s", request.Id)}, nil
+	}
+	return server.GetSourceAgentImageURL200JSONResponse{Url: url, ExpiresAt: &expireAt}, nil
 }
 
 // (GET /health)

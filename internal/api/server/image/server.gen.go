@@ -19,6 +19,9 @@ import (
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
 
+	// (GET /api/v1/image/bytoken/{token}/appliance)
+	GetAgentImageByToken(w http.ResponseWriter, r *http.Request, token string)
+
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string)
 
@@ -32,6 +35,11 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// (GET /api/v1/image/bytoken/{token}/appliance)
+func (_ Unimplemented) GetAgentImageByToken(w http.ResponseWriter, r *http.Request, token string) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // (GET /api/v1/image/bytoken/{token}/{name})
 func (_ Unimplemented) GetImageByToken(w http.ResponseWriter, r *http.Request, token string, name string) {
@@ -56,6 +64,32 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// GetAgentImageByToken operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentImageByToken(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "token" -------------
+	var token string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "token", chi.URLParam(r, "token"), &token, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "token", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAgentImageByToken(w, r, token)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
 
 // GetImageByToken operation middleware
 func (siw *ServerInterfaceWrapper) GetImageByToken(w http.ResponseWriter, r *http.Request) {
@@ -256,6 +290,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	}
 
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/v1/image/bytoken/{token}/appliance", wrapper.GetAgentImageByToken)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v1/image/bytoken/{token}/{name}", wrapper.GetImageByToken)
 	})
 	r.Group(func(r chi.Router) {
@@ -266,6 +303,58 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 
 	return r
+}
+
+type GetAgentImageByTokenRequestObject struct {
+	Token string `json:"token"`
+}
+
+type GetAgentImageByTokenResponseObject interface {
+	VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error
+}
+
+type GetAgentImageByToken200Response struct {
+}
+
+func (response GetAgentImageByToken200Response) VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error {
+	w.WriteHeader(200)
+	return nil
+}
+
+type GetAgentImageByToken400JSONResponse externalRef0.Error
+
+func (response GetAgentImageByToken400JSONResponse) VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImageByToken401JSONResponse externalRef0.Error
+
+func (response GetAgentImageByToken401JSONResponse) VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImageByToken404JSONResponse externalRef0.Error
+
+func (response GetAgentImageByToken404JSONResponse) VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImageByToken500JSONResponse externalRef0.Error
+
+func (response GetAgentImageByToken500JSONResponse) VisitGetAgentImageByTokenResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type GetImageByTokenRequestObject struct {
@@ -403,6 +492,9 @@ func (response Health200Response) VisitHealthResponse(w http.ResponseWriter) err
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
+	// (GET /api/v1/image/bytoken/{token}/appliance)
+	GetAgentImageByToken(ctx context.Context, request GetAgentImageByTokenRequestObject) (GetAgentImageByTokenResponseObject, error)
+
 	// (GET /api/v1/image/bytoken/{token}/{name})
 	GetImageByToken(ctx context.Context, request GetImageByTokenRequestObject) (GetImageByTokenResponseObject, error)
 
@@ -440,6 +532,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// GetAgentImageByToken operation middleware
+func (sh *strictHandler) GetAgentImageByToken(w http.ResponseWriter, r *http.Request, token string) {
+	var request GetAgentImageByTokenRequestObject
+
+	request.Token = token
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAgentImageByToken(ctx, request.(GetAgentImageByTokenRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAgentImageByToken")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAgentImageByTokenResponseObject); ok {
+		if err := validResponse.VisitGetAgentImageByTokenResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // GetImageByToken operation middleware
