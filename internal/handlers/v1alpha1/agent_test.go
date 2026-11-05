@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"reflect"
 
 	"github.com/google/uuid"
@@ -13,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	. "github.com/onsi/ginkgo/v2"
@@ -53,7 +58,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -100,7 +105,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -134,7 +139,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -180,7 +185,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: uuid.New(),
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -208,7 +213,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateAgentStatus(ctx, server.UpdateAgentStatusRequestObject{
 				Id: agentID,
 				Body: &apiAgent.UpdateAgentStatusJSONRequestBody{
@@ -250,7 +255,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -293,7 +298,7 @@ var _ = Describe("agent service", Ordered, func() {
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
 			// first agent request
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -349,7 +354,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: secondSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -375,7 +380,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: firstSourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -418,7 +423,7 @@ var _ = Describe("agent service", Ordered, func() {
 			}
 			ctx := auth.NewTokenContext(context.TODO(), agentJWT)
 
-			srv := handlers.NewAgentHandler(service.NewAgentService(s))
+			srv := handlers.NewAgentHandler(service.NewAgentService(s), nil)
 			resp, err := srv.UpdateSourceInventory(ctx, server.UpdateSourceInventoryRequestObject{
 				Id: sourceID,
 				Body: &apiAgent.SourceStatusUpdate{
@@ -441,5 +446,52 @@ var _ = Describe("agent service", Ordered, func() {
 			gormdb.Exec("DELETE FROM agents;")
 			gormdb.Exec("DELETE FROM sources;")
 		})
+	})
+})
+
+var _ = Describe("agent image download", func() {
+	imageCtx := func(sourceID uuid.UUID) (context.Context, *httptest.ResponseRecorder, *http.Request) {
+		ctx := auth.NewTokenContext(context.TODO(), auth.AgentJWT{SourceID: sourceID.String()})
+		w := httptest.NewRecorder()
+		r := httptest.NewRequest(http.MethodGet, "/api/v1/sources/"+sourceID.String()+"/agent-image", nil)
+		ctx = context.WithValue(ctx, image.ResponseWriterKey, w)
+		ctx = context.WithValue(ctx, image.RequestKey, r)
+		return ctx, w, r
+	}
+
+	It("serves the appliance image tar to the owning agent", func() {
+		dir := GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(dir, "migration-planner-agent.tar"), []byte("oci"), 0o644)).To(Succeed())
+		cfg, err := config.New()
+		Expect(err).NotTo(HaveOccurred())
+		cfg.Service.IsoPath = filepath.Join(dir, "agent.iso")
+		h := handlers.NewAgentHandler(service.NewAgentService(nil), cfg)
+
+		sourceID := uuid.New()
+		ctx, w, _ := imageCtx(sourceID)
+		resp, err := h.GetAgentImage(ctx, server.GetAgentImageRequestObject{Id: sourceID})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(resp).To(BeNil())
+		Expect(w.Code).To(Equal(http.StatusOK))
+		Expect(w.Body.String()).To(Equal("oci"))
+		Expect(w.Header().Get("ETag")).NotTo(BeEmpty())
+	})
+
+	It("rejects a foreign source and reports a missing tar", func() {
+		cfg, err := config.New()
+		Expect(err).NotTo(HaveOccurred())
+		cfg.Service.IsoPath = filepath.Join(GinkgoT().TempDir(), "agent.iso")
+		h := handlers.NewAgentHandler(service.NewAgentService(nil), cfg)
+
+		ctx, _, _ := imageCtx(uuid.New())
+		resp, err := h.GetAgentImage(ctx, server.GetAgentImageRequestObject{Id: uuid.New()})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAgentImage403JSONResponse{}).String()))
+
+		sourceID := uuid.New()
+		ctx, _, _ = imageCtx(sourceID)
+		resp, err = h.GetAgentImage(ctx, server.GetAgentImageRequestObject{Id: sourceID})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetAgentImage503JSONResponse{}).String()))
 	})
 })
