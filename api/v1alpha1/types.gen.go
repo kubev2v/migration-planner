@@ -1746,5 +1746,8 @@ type UploadSourceInventoryFileMultipartRequestBody = SourceInventoryFileForm
 // CreateRVToolsAssessmentV2MultipartRequestBody defines body for CreateRVToolsAssessmentV2 for multipart/form-data ContentType.
 type CreateRVToolsAssessmentV2MultipartRequestBody = AssessmentRvtoolsForm
 
+// UpdateAssessmentV2JSONRequestBody defines body for UpdateAssessmentV2 for application/json ContentType.
+type UpdateAssessmentV2JSONRequestBody = AssessmentUpdate
+
 // UploadRvtoolsToAssessmentMultipartRequestBody defines body for UploadRvtoolsToAssessment for multipart/form-data ContentType.
 type UploadRvtoolsToAssessmentMultipartRequestBody UploadRvtoolsToAssessmentMultipartBody

@@ -393,7 +393,30 @@ func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.Assessme
 	return result, nil
 }
 
-func AssessmentV2ToApi(a svcmodel.AssessmentSummary) api.AssessmentV2Summary {
+func AssessmentToV2API(assessment *svcmodel.Assessment) (api.AssessmentV2, error) {
+	vcenters := make([]api.SubResource, 0, len(assessment.SubsetInventories))
+	switch assessment.SourceType {
+	case string(api.AssessmentSourceTypeRvtools):
+		for _, inv := range assessment.SubsetInventories {
+			vcenters = append(vcenters, api.SubResource{
+				Id: inv.VCenterID,
+			})
+		}
+	default:
+		vcenters = append(vcenters, api.SubResource{
+			Id: assessment.MainInventory.VCenterID,
+		})
+	}
+
+	data := InventoryToV2API(assessment.MainInventory)
+
+	return api.AssessmentV2{
+		Data:     data,
+		Vcenters: vcenters,
+	}, nil
+}
+
+func AssessmentSummaryToApi(a svcmodel.AssessmentSummary) api.AssessmentV2Summary {
 	result := api.AssessmentV2Summary{
 		Id:             a.ID,
 		Name:           a.Name,

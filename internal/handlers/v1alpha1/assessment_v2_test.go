@@ -7,6 +7,7 @@ import (
 	model2 "github.com/kubev2v/migration-planner/internal/model"
 
 	"github.com/google/uuid"
+	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -18,6 +19,9 @@ import (
 type assessmentV2ServiceStub struct {
 	service.AssessmentServicer
 	assessment          *model2.Assessment
+	updateErr           error
+	updatedAssessmentID uuid.UUID
+	updatedName         *string
 	deleteErr           error
 	deletedAssessmentID uuid.UUID
 	deletedVCenterID    uuid.UUID
@@ -28,6 +32,12 @@ func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID)
 		return nil, service.NewErrAssessmentNotFound(id)
 	}
 	return s.assessment, nil
+}
+
+func (s *assessmentV2ServiceStub) UpdateAssessment(_ context.Context, id uuid.UUID, name *string) (*model2.Assessment, error) {
+	s.updatedAssessmentID = id
+	s.updatedName = name
+	return s.assessment, s.updateErr
 }
 
 func (s *assessmentV2ServiceStub) DeleteVCenterInventory(_ context.Context, assessmentID, vcenterID uuid.UUID) error {
@@ -115,6 +125,52 @@ var _ = Describe("assessment v2 handler", func() {
 				Expect(response.Data.Data.Vms.Total).To(Equal(30))
 				Expect(response.Vcenters).To(ConsistOf(HaveField("Id", vcenterID1.String())))
 			},
+		)
+	})
+
+	Context("UpdateAssessmentV2", func() {
+		name := "updated-assessment"
+		invalidName := "invalid name"
+		body := &api.AssessmentUpdate{Name: &name}
+
+		DescribeTable("returns the expected response",
+			func(body *api.AssessmentUpdate, serviceErr error, expected server.UpdateAssessmentV2ResponseObject) {
+				assessment := &model2.Assessment{
+					ID:            uuid.New(),
+					Name:          name,
+					SourceType:    service.SourceTypeAgent,
+					MainInventory: inventory(vcenterID1.String(), false, 30, clusterID1),
+				}
+				stub := &assessmentV2ServiceStub{assessment: assessment, updateErr: serviceErr}
+				handler := handlers.NewServiceHandler(nil, stub, nil, nil, nil, nil, nil, nil)
+
+				response, err := handler.UpdateAssessmentV2(context.Background(), server.UpdateAssessmentV2RequestObject{
+					Id: assessment.ID, Body: body,
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response).To(BeAssignableToTypeOf(expected))
+
+				if body != nil && body.Name != nil && *body.Name == name {
+					Expect(stub.updatedAssessmentID).To(Equal(assessment.ID))
+					Expect(stub.updatedName).To(Equal(body.Name))
+				} else {
+					Expect(stub.updatedAssessmentID).To(Equal(uuid.Nil))
+				}
+
+				if success, ok := response.(server.UpdateAssessmentV2200JSONResponse); ok {
+					Expect(success.Data.Id).To(Equal(vcenterID1.String()))
+					Expect(success.Data.Data.Vms.Total).To(Equal(30))
+					Expect(success.Vcenters).To(ConsistOf(HaveField("Id", vcenterID1.String())))
+				}
+			},
+			Entry("nil body returns 400", nil, nil, server.UpdateAssessmentV2400JSONResponse{}),
+			Entry("nil name returns 400", &api.AssessmentUpdate{}, nil, server.UpdateAssessmentV2400JSONResponse{}),
+			Entry("invalid name returns 400", &api.AssessmentUpdate{Name: &invalidName}, nil, server.UpdateAssessmentV2400JSONResponse{}),
+			Entry("resource not found returns 404", body, service.NewErrAssessmentNotFound(uuid.Nil), server.UpdateAssessmentV2404JSONResponse{}),
+			Entry("forbidden returns 403", body, service.NewErrForbidden("assessment", uuid.Nil.String()), server.UpdateAssessmentV2403JSONResponse{}),
+			Entry("duplicate name returns 400", body, service.NewErrAssessmentDuplicateName(name), server.UpdateAssessmentV2400JSONResponse{}),
+			Entry("unexpected service error returns 500", body, errors.New("database unavailable"), server.UpdateAssessmentV2500JSONResponse{}),
+			Entry("success returns 200", body, nil, server.UpdateAssessmentV2200JSONResponse{}),
 		)
 	})
 
