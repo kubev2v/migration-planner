@@ -629,8 +629,22 @@ objects:
               command: ["/bin/bash", "-c"]
               args:
                 - |
+                  set -e
                   cp /rhcos.iso ${MIGRATION_PLANNER_ISO_PATH}
                   chmod 0644 ${MIGRATION_PLANNER_ISO_PATH}
+                  # Extract the appliance image tar embedded in the ISO so it can be
+                  # served to agents; not fatal on older ISOs without it. Extract to
+                  # a temp name and rename only on success so a failed extraction can
+                  # never leave a truncated tar to be served.
+                  tar_dst=$(dirname ${MIGRATION_PLANNER_ISO_PATH})/migration-planner-agent.tar
+                  if bsdtar -x -f /rhcos.iso -O images/migration-planner-agent.tar > "$tar_dst.tmp" \
+                    && chmod 0644 "$tar_dst.tmp" \
+                    && mv "$tar_dst.tmp" "$tar_dst"; then
+                    :
+                  else
+                    rm -f "$tar_dst.tmp"
+                    echo "warning: no agent image tar in ISO, agent-image downloads disabled"
+                  fi
               volumeMounts:
                 - name: iso-storage
                   mountPath: /iso

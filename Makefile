@@ -172,13 +172,13 @@ migration-planner-api-container: bin/.migration-planner-api-container
 bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
 	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	ISO_CHECKSUM=$$(grep '^ISO_CHECKSUM=' build/migration-planner-iso/config | cut -d'=' -f2); \
-	AGENT_IMAGE=$$(grep '^AGENT_IMAGE=' build/migration-planner-iso/config | cut -d'=' -f2); \
-	AGENT_IMAGE_TAG=$$(grep '^AGENT_IMAGE_TAG_MAIN=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	APPLIANCE_IMAGE=$$(grep '^APPLIANCE_IMAGE=' build/migration-planner-iso/config | cut -d'=' -f2); \
+	APPLIANCE_VERSION=$${APPLIANCE_VERSION:-$$(grep '^APPLIANCE_VERSION=' build/migration-planner-iso/config | cut -d'=' -f2)}; \
 	TLS_VERIFY=$${TLS_VERIFY:-true}; \
 	$(PODMAN) build . \
 		--network=host \
-		--build-arg AGENT_IMAGE=$$AGENT_IMAGE \
-		--build-arg AGENT_IMAGE_TAG=$$AGENT_IMAGE_TAG \
+		--build-arg APPLIANCE_IMAGE=$$APPLIANCE_IMAGE \
+		--build-arg APPLIANCE_VERSION=$$APPLIANCE_VERSION \
 		--build-arg ISO_URL=$$ISO_URL \
 		--build-arg ISO_CHECKSUM=$$ISO_CHECKSUM \
 		--build-arg FINAL_ISO_PATH=/rhcos.iso \

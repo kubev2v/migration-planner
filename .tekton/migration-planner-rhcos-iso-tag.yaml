@@ -213,7 +213,7 @@ spec:
       - name: BUILD_ARGS
         value:
         - $(params.build-args[*])
-        - AGENT_IMAGE_TAG=prod
+        - APPLIANCE_VERSION={{git_tag}}
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: SOURCE_URL

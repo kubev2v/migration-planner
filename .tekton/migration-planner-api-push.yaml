@@ -212,7 +212,6 @@ spec:
         value:
         - $(params.build-args[*])
         - SOURCE_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
         - TARGET_BRANCH={{target_branch}}
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)

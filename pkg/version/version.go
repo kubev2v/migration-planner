@@ -22,12 +22,12 @@ var (
 	buildDate string
 	// state of git tree, either "clean" or "dirty"
 	gitTreeState string
-	// agentCommitFromGit is a constant representing the agent git commit SHA
-	// that generated this build. It should be set during build via -ldflags.
-	agentCommitFromGit string
-	// agentVersionFromGit is a constant representing the agent version tag
-	// that generated this build. It should be set during build via -ldflags.
-	agentVersionFromGit string
+	// applianceCommit is the agent commit the embedded appliance image was built
+	// from, empty for release tags. It should be set during build via -ldflags.
+	applianceCommit string
+	// applianceVersion is the version of the appliance image embedded in the ISO
+	// this build serves. It should be set during build via -ldflags.
+	applianceVersion string
 )
 
 type Info struct {
@@ -61,8 +61,8 @@ func Get() Info {
 		Compiler:         runtime.Compiler,
 		Platform:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
 		Patch:            patchFromGit,
-		AgentGitCommit:   agentCommitFromGit,
-		AgentVersionName: agentVersionFromGit,
+		AgentGitCommit:   applianceCommit,
+		AgentVersionName: applianceVersion,
 	}
 }
 

@@ -35,31 +35,16 @@ if [ -z "$SOURCE_GIT_TAG" ]; then
     fi
 fi
 
-# Get agent git commit
-# If AGENT_GIT_COMMIT is already set (from build args), use it
-# Otherwise, default to SOURCE_GIT_COMMIT
-if [ -z "$AGENT_GIT_COMMIT" ]; then
-    export AGENT_GIT_COMMIT="$SOURCE_GIT_COMMIT"
+# The appliance version is the tag of the appliance image the ISO embeds, taken
+# from the same config file the ISO build uses, so both report the same release.
+# It is never derived from this repo's git: the appliance is built elsewhere.
+if [ -z "${APPLIANCE_VERSION:-}" ] && [ -f "build/migration-planner-iso/config" ]; then
+    APPLIANCE_VERSION=$(sed -n 's/^APPLIANCE_VERSION=//p' build/migration-planner-iso/config)
 fi
+export APPLIANCE_VERSION
 
-# Calculate short commit from agent commit
-if [ -n "$AGENT_GIT_COMMIT" ]; then
-    export AGENT_GIT_COMMIT_SHORT="${AGENT_GIT_COMMIT:0:7}"
-else
-    export AGENT_GIT_COMMIT_SHORT=""
-fi
-
-# Get agent git tag
-# If AGENT_GIT_TAG is already set (from build args), use it
-# Otherwise, construct from release config or default to SOURCE_GIT_TAG
-if [ -z "$AGENT_GIT_TAG" ]; then
-    if [ -n "$TARGET_BRANCH" ] && [ -f ".github/release-config.txt" ]; then
-        RELEASE_BRANCH=$(cat .github/release-config.txt | tr -d '\n\r ')
-        export AGENT_GIT_TAG="${TARGET_BRANCH}-${RELEASE_BRANCH}-${AGENT_GIT_COMMIT_SHORT}"
-    else
-        export AGENT_GIT_TAG="$SOURCE_GIT_TAG"
-    fi
-fi
+# Release tags (v0.31.0) carry no commit; branch builds end in the agent's short SHA.
+export APPLIANCE_COMMIT=$(echo "$APPLIANCE_VERSION" | sed -n 's/.*-\([0-9a-f]\{7\}\)$/\1/p')
 
 # Get git tree state
 if [ ! -d ".git/" ] || git diff --quiet 2>/dev/null; then
@@ -85,5 +70,5 @@ export GO_LDFLAGS="\
 -X github.com/kubev2v/migration-planner/pkg/version.commitFromGit=${SOURCE_GIT_COMMIT} \
 -X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=${SOURCE_GIT_TREE_STATE} \
 -X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP} \
--X github.com/kubev2v/migration-planner/pkg/version.agentCommitFromGit=${AGENT_GIT_COMMIT} \
--X github.com/kubev2v/migration-planner/pkg/version.agentVersionFromGit=${AGENT_GIT_TAG}"
+-X github.com/kubev2v/migration-planner/pkg/version.applianceCommit=${APPLIANCE_COMMIT} \
+-X github.com/kubev2v/migration-planner/pkg/version.applianceVersion=${APPLIANCE_VERSION}"
