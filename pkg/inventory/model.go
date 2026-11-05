@@ -141,6 +141,30 @@ type Host struct {
 	MemoryMB                int
 	VMotionSupported        *bool
 	StorageVMotionSupported *bool
+	StorageAdapters         []HostStorageAdapter
+	StorageLuns             []HostStorageLun
+}
+
+// HostStorageAdapter contains the available source facts for one host adapter.
+type HostStorageAdapter struct {
+	Device   string `json:"device,omitempty"`
+	Key      string `json:"key,omitempty"`
+	Type     string `json:"type,omitempty"`
+	Protocol string `json:"protocol,omitempty"`
+	Model    string `json:"model,omitempty"`
+	Driver   string `json:"driver,omitempty"`
+	NodeWWN  string `json:"nodeWwn,omitempty"`
+	PortWWN  string `json:"portWwn,omitempty"`
+}
+
+// HostStorageLun is a host-visible LUN, not an array or a complete multipath record.
+type HostStorageLun struct {
+	CanonicalName  string   `json:"canonicalName,omitempty"`
+	Key            string   `json:"key,omitempty"`
+	LunUUID        string   `json:"lunUuid,omitempty"`
+	Vendor         string   `json:"vendor,omitempty"`
+	Model          string   `json:"model,omitempty"`
+	AdapterDevices []string `json:"adapterDevices,omitempty"`
 }
 
 // StorageIoConfiguration represents VMware Storage I/O Control settings for a datastore.

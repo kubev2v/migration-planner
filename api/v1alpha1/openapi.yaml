@@ -3159,6 +3159,71 @@ components:
           type: boolean
           description: "Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)"
 
+        storageAdapters:
+          type: array
+          description: Available host storage adapters. Omitted when no records are available; this does not imply a complete empty inventory.
+          items:
+            $ref: '#/components/schemas/HostStorageAdapter'
+        storageLuns:
+          type: array
+          description: Available host-visible LUNs and adapter associations, without per-path state or VM disk placement.
+          items:
+            $ref: '#/components/schemas/HostStorageLun'
+
+    HostStorageAdapter:
+      type: object
+      description: Source-provided adapter facts. Missing or conflicting values are omitted.
+      properties:
+        device:
+          type: string
+          description: Host-local adapter device name.
+        key:
+          type: string
+          description: Source adapter key; distinct from device name.
+        type:
+          type: string
+          description: Adapter type as supplied by the source.
+        protocol:
+          type: string
+          description: Adapter protocol as supplied by the source.
+        model:
+          type: string
+          description: Adapter model.
+        driver:
+          type: string
+          description: Adapter driver.
+        nodeWwn:
+          type: string
+          description: Node WWN as identifier text, preserving leading zeros.
+        portWwn:
+          type: string
+          description: Port WWN as identifier text, preserving leading zeros.
+
+    HostStorageLun:
+      type: object
+      description: A host-visible LUN; missing or conflicting identity/metadata fields are omitted.
+      properties:
+        canonicalName:
+          type: string
+          description: Canonical device name, distinct from the LUN UUID.
+        key:
+          type: string
+          description: Source SCSI disk key.
+        lunUuid:
+          type: string
+          description: Source-provided LUN UUID; never inferred from the device name or key.
+        vendor:
+          type: string
+          description: LUN vendor.
+        model:
+          type: string
+          description: LUN model.
+        adapterDevices:
+          type: array
+          description: Distinct sorted adapter device names associated with this LUN, including names whose adapter metadata is unavailable.
+          items:
+            type: string
+
     Network:
       type: object
       required:
