@@ -117,8 +117,8 @@ func TestIngestRvTools_NetworkDetails(t *testing.T) {
 }
 
 func TestIngestSqlite_NetworkDetails(t *testing.T) {
-	for _, hostNetwork := range []bool{true, false} {
-		t.Run(fmt.Sprintf("hostNetwork=%t", hostNetwork), func(t *testing.T) {
+	for _, hostNetwork := range []string{"present", "null", "empty", "missing-host"} {
+		t.Run(hostNetwork, func(t *testing.T) {
 			ctx := context.Background()
 			parser, _, cleanup := setupTestParser(t, &testValidator{})
 			defer cleanup()
@@ -161,21 +161,31 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 		('management', 'management', NULL, ''),
 		('ambiguous', 'ambiguous', NULL, '')`)
 			require.NoError(t, err)
-			if !hostNetwork {
-				_, err = src.Exec(`ALTER TABLE dst.Host DROP COLUMN Network`)
-				require.NoError(t, err)
+			switch hostNetwork {
+			case "null":
+				_, err = src.Exec(`UPDATE dst.Host SET Network = NULL`)
+			case "empty":
+				_, err = src.Exec(`UPDATE dst.Host SET Network = '{}'`)
+			case "missing-host":
+				_, err = src.Exec(`UPDATE dst.VM SET Host = 'missing-host'`)
 			}
+			require.NoError(t, err)
 			_, err = src.Exec("DETACH dst")
 			require.NoError(t, err)
 			result, err := parser.IngestSqlite(ctx, sqlitePath)
 			require.NoError(t, err)
-			require.True(t, result.IsValid(), "%+v", result.Errors)
+			if hostNetwork == "missing-host" {
+				require.Len(t, result.Errors, 1)
+				require.Equal(t, CodeMissingCluster, result.Errors[0].Code)
+			} else {
+				require.True(t, result.IsValid(), "%+v", result.Errors)
+			}
 			got, err := parser.VMs(ctx, Filters{}, Options{})
 			require.NoError(t, err)
 			require.Len(t, got, 1)
 			require.Len(t, got[0].NICs, 7)
 			standardVLAN := ""
-			if hostNetwork {
+			if hostNetwork == "present" {
 				standardVLAN = "0"
 			}
 			gotMACs := make([]string, 0, len(got[0].NICs))
@@ -198,7 +208,7 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 					assert.Empty(t, nic.IPv6Addresses)
 				case "aa:05":
 					assert.Equal(t, "standard", nic.Type)
-					if hostNetwork {
+					if hostNetwork == "present" {
 						assert.Equal(t, "100", nic.VlanID)
 					} else {
 						assert.Empty(t, nic.VlanID)
