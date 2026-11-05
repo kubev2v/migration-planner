@@ -281,11 +281,6 @@ UPDATE vdatastore_raw SET
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "# Extents" VARCHAR;
 ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Major Version" VARCHAR;
 
-INSERT INTO vnic ("Host", "Network Device", "Speed")
-SELECT "Host", "Network Device",
-    NULLIF(TRY_CAST("Speed" AS INTEGER), 0)
-FROM read_xlsx('{{.FilePath}}', sheet='vNIC', all_varchar=true);
-
 CREATE TABLE vhost_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "VMotion support" VARCHAR;
@@ -323,6 +318,18 @@ WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
       GROUP BY LOWER(TRIM("Host"))
       HAVING COUNT(*) = 1
   );
+
+-- Resolve VM host IDs; missing or ambiguous host names remain NULL.
+UPDATE vinfo SET "Host ID" = (
+    SELECT h."Host ID" FROM rvtools_host_map h
+    WHERE h.source_key = LOWER(TRIM(vinfo."Host"))
+);
+
+INSERT INTO vnic ("Host", "Host ID", "Network Device", "Speed")
+SELECT n."Host", h."Host ID", n."Network Device",
+    NULLIF(TRY_CAST(n."Speed" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vNIC', all_varchar=true) n
+LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(n."Host"));
 
 -- vHBA is optional in partial RVTools exports.
 CREATE OR REPLACE TEMP TABLE vhba_raw AS
