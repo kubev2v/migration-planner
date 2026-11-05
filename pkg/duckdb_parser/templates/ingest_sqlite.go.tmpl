@@ -161,8 +161,7 @@ WITH nic_flat AS (
          WHERE device.key = nic.deviceKey
          LIMIT 1) AS adapter,
         h.Cluster AS cluster_id,
-        -- Missing host network data must not prevent importing adapters and addresses.
-        to_json(h)->>'Network' AS host_network,
+        h.Network AS host_network,
         COUNT(*) OVER (PARTITION BY v.ID, LOWER(nic.mac)) AS same_mac_count
     FROM src.VM v
     LEFT JOIN src.Host h ON v.Host = h.ID,
