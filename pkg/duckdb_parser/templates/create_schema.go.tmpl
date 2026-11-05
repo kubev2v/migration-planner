@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS vinfo (
     "Folder ID" VARCHAR,
     "Folder" VARCHAR,
     "Host" VARCHAR,
+    "Host ID" VARCHAR,
     "SMBIOS UUID" VARCHAR,
     "VM UUID" VARCHAR,
     "Firmware" VARCHAR,
@@ -121,6 +122,7 @@ CREATE TABLE IF NOT EXISTS vnetwork (
 
 CREATE TABLE IF NOT EXISTS vnic (
     "Host" VARCHAR,
+    "Host ID" VARCHAR,
     "Network Device" VARCHAR,
     "Speed" INTEGER
 );
