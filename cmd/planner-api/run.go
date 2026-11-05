@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"sync"
 	"syscall"
@@ -87,6 +88,12 @@ var runCmd = &cobra.Command{
 			zap.S().Fatalw("validate iso", "error", err)
 			return err
 		}
+
+		// The version of the appliance image embedded in the served ISO — what
+		// users actually download. The build-time ldflag records what the planner
+		// build knew, which can drift from the appliance image the ISO build
+		// embedded (separate pipelines, different times).
+		version.SetAgentVersionName(readAgentVersionFile(filepath.Join(filepath.Dir(cfg.Service.IsoPath), "agent-version")))
 
 		// Initialize OPA validator for policy validation
 		zap.S().Info("initializing OPA validator...")
@@ -239,6 +246,21 @@ func ensureIsoExist(path string) error {
 		return err
 	}
 	return nil
+}
+
+// readAgentVersionFile reads the agent version recorded next to the served ISO.
+// A missing or unreadable file is not fatal: it only disables agent version reporting.
+func readAgentVersionFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			zap.S().Infow("agent version file not found; agent version reporting disabled", "path", path)
+		} else {
+			zap.S().Warnw("failed to read agent version file", "path", path, "error", err)
+		}
+		return ""
+	}
+	return strings.TrimSpace(string(data))
 }
 
 func runServer(ctx context.Context, wg *sync.WaitGroup, cancel context.CancelFunc,

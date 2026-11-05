@@ -631,6 +631,10 @@ objects:
                 - |
                   cp /rhcos.iso ${MIGRATION_PLANNER_ISO_PATH}
                   chmod 0644 ${MIGRATION_PLANNER_ISO_PATH}
+                  if [ -f /agent-version ]; then
+                    cp /agent-version $(dirname ${MIGRATION_PLANNER_ISO_PATH})/agent-version
+                    chmod 0644 $(dirname ${MIGRATION_PLANNER_ISO_PATH})/agent-version
+                  fi
               volumeMounts:
                 - name: iso-storage
                   mountPath: /iso

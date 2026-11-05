@@ -71,3 +71,9 @@ func Get() Info {
 func IsValidAgentVersion(ver string) bool {
 	return ver != "" && ver != "unknown"
 }
+
+// SetAgentVersionName overrides the build-time agent version with the one
+// shipped alongside the served ISO, which is the version users actually download.
+func SetAgentVersionName(ver string) {
+	agentVersionFromGit = ver
+}
