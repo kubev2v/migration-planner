@@ -51,6 +51,7 @@ var osClassMap = map[string]osClass{
 	"Debian GNU/Linux 12": {TierCommunitySupported, ""},
 	"Debian GNU/Linux 13": {TierCommunitySupported, ""},
 	"Fedora":              {TierCommunitySupported, ""},
+	// openSUSE Leap 15.6 only; earlier 15.x fall to special_handling per the Sep 2026 matrix.
 	"openSUSE Leap 15.6":  {TierCommunitySupported, ""},
 	"openSUSE Tumbleweed": {TierCommunitySupported, ""},
 	"openSUSE Leap 16":    {TierCommunitySupported, ""},
