@@ -4,20 +4,21 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
+
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	"github.com/kubev2v/migration-planner/internal/config"
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	svcmappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 
-type backfillFunc func(context.Context, store.Store, events.Writer, func()) error
+type backfillFunc func(context.Context, store.Store, eventwrap.Writer, func()) error
 
 type assessmentPartner struct {
 	ID   *string
@@ -87,7 +88,7 @@ func runBackfill(backfill backfillFunc) error {
 	return nil
 }
 
-func backfillAssessments(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+func backfillAssessments(ctx context.Context, s store.Store, writer eventwrap.Writer, writerClose func()) error {
 	defer writerClose()
 
 	assessments, err := s.Assessment().List(ctx, nil)
@@ -117,7 +118,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 		}
 
 		partner := partners[assessment.ID.String()]
-		payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
+		payload := events.NewAssessmentCreatedPayload(events.AssessmentData{
 			ID:            assessment.ID.String(),
 			MainInventory: svcmappers.ToStreamerModel(assessment.MainInventory.Inventory),
 			Name:          assessment.Name,
@@ -130,7 +131,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 			UpdatedAt:     assessment.UpdatedAt,
 		})
 
-		ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)
+		ceBytes, err := events.BuildCloudEvent(events.AssessmentCreatedEventType, payload)
 		if err != nil {
 			zap.S().Errorw("building cloud event", "id", assessment.ID, "error", err)
 			eventBuildErrors++
@@ -160,7 +161,7 @@ func backfillAssessments(ctx context.Context, s store.Store, writer events.Write
 	return nil
 }
 
-func backfillPartnerCustomers(ctx context.Context, s store.Store, writer events.Writer, writerClose func()) error {
+func backfillPartnerCustomers(ctx context.Context, s store.Store, writer eventwrap.Writer, writerClose func()) error {
 	defer writerClose()
 
 	partnerCustomers, err := s.PartnerCustomer().List(ctx, nil)
@@ -172,7 +173,7 @@ func backfillPartnerCustomers(ctx context.Context, s store.Store, writer events.
 
 	var success, eventBuildErrors, publishErrors int
 	for _, partnerCustomer := range partnerCustomers {
-		payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+		payload := events.NewPartnerCustomerPayload(events.PartnerCustomerData{
 			ID:               partnerCustomer.ID.String(),
 			CustomerUsername: partnerCustomer.Username,
 			PartnerID:        partnerCustomer.PartnerID,
@@ -184,7 +185,7 @@ func backfillPartnerCustomers(ctx context.Context, s store.Store, writer events.
 			CreatedAt:        partnerCustomer.CreatedAt,
 		})
 
-		ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+		ceBytes, err := events.BuildCloudEvent(events.PartnerCustomerEventType, payload)
 		if err != nil {
 			zap.S().Errorw("building cloud event", "id", partnerCustomer.ID, "error", err)
 			eventBuildErrors++

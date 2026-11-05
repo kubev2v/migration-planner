@@ -5,13 +5,12 @@ import (
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
 	"go.uber.org/zap"
 )
 
 type OutboxDispatcher struct {
 	store    store.Store
-	writers  map[string][]events.Writer
+	writers  map[string][]Writer
 	interval time.Duration
 }
 
@@ -21,7 +20,7 @@ const (
 	outboxBackoffCapSeconds = 3 * 60 * 60 // 3h
 )
 
-func NewOutboxDispatcher(s store.Store, writerRegistry map[string][]events.Writer, interval time.Duration) *OutboxDispatcher {
+func NewOutboxDispatcher(s store.Store, writerRegistry map[string][]Writer, interval time.Duration) *OutboxDispatcher {
 	return &OutboxDispatcher{
 		store:    s,
 		writers:  writerRegistry,

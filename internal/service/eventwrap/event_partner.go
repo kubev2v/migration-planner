@@ -7,12 +7,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
@@ -48,7 +47,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		return nil, err
 	}
 
-	payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+	payload := events.NewPartnerCustomerPayload(events.PartnerCustomerData{
 		ID:               created.ID.String(),
 		CustomerUsername: created.Username,
 		PartnerID:        created.PartnerID,
@@ -59,11 +58,11 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		TerminatedAt:     created.TerminatedAt,
 		CreatedAt:        created.CreatedAt,
 	})
-	ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+	ceBytes, err := events.BuildCloudEvent(events.PartnerCustomerEventType, payload)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -86,7 +85,7 @@ func (e *EventPartnerService) CreateRequest(ctx context.Context, user auth.User,
 		if err != nil {
 			return nil, fmt.Errorf("failed to build notification for partnership request event: %w", err)
 		}
-		if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
+		if err := e.outbox.Insert(ctx, EventTypeNotification, notificationBytes); err != nil {
 			return nil, err
 		}
 	}
@@ -116,7 +115,7 @@ func (e *EventPartnerService) CancelRequest(ctx context.Context, user auth.User,
 		return err
 	}
 
-	payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+	payload := events.NewPartnerCustomerPayload(events.PartnerCustomerData{
 		ID:               pc.ID.String(),
 		CustomerUsername: pc.Username,
 		PartnerID:        pc.PartnerID,
@@ -127,11 +126,11 @@ func (e *EventPartnerService) CancelRequest(ctx context.Context, user auth.User,
 		TerminatedAt:     pc.TerminatedAt,
 		CreatedAt:        pc.CreatedAt,
 	})
-	ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+	ceBytes, err := events.BuildCloudEvent(events.PartnerCustomerEventType, payload)
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -167,7 +166,7 @@ func (e *EventPartnerService) LeavePartner(ctx context.Context, user auth.User, 
 			return err
 		}
 
-		payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+		payload := events.NewPartnerCustomerPayload(events.PartnerCustomerData{
 			ID:               refreshed.ID.String(),
 			CustomerUsername: refreshed.Username,
 			PartnerID:        refreshed.PartnerID,
@@ -178,11 +177,11 @@ func (e *EventPartnerService) LeavePartner(ctx context.Context, user auth.User, 
 			TerminatedAt:     refreshed.TerminatedAt,
 			CreatedAt:        refreshed.CreatedAt,
 		})
-		ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+		ceBytes, err := events.BuildCloudEvent(events.PartnerCustomerEventType, payload)
 		if err != nil {
 			return err
 		}
-		if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+		if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 			return err
 		}
 	}
@@ -212,7 +211,7 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 		return nil, err
 	}
 
-	payload := kafka.NewPartnerCustomerPayload(kafka.PartnerCustomerData{
+	payload := events.NewPartnerCustomerPayload(events.PartnerCustomerData{
 		ID:               updated.ID.String(),
 		CustomerUsername: updated.Username,
 		PartnerID:        updated.PartnerID,
@@ -223,11 +222,11 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 		TerminatedAt:     updated.TerminatedAt,
 		CreatedAt:        updated.CreatedAt,
 	})
-	ceBytes, err := kafka.BuildCloudEvent(kafka.PartnerCustomerEventType, payload)
+	ceBytes, err := events.BuildCloudEvent(events.PartnerCustomerEventType, payload)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -251,7 +250,7 @@ func (e *EventPartnerService) UpdateRequest(ctx context.Context, user auth.User,
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeNotification, notificationBytes); err != nil {
 		return nil, err
 	}
 

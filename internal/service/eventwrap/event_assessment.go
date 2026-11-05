@@ -11,12 +11,11 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
@@ -38,12 +37,12 @@ func (e *EventAssessmentService) ListAssessments(ctx context.Context, filter *se
 	}
 
 	user := auth.MustHaveUser(ctx)
-	payload := kafka.NewVisitorPayload(user.Username, user.Organization)
-	ceBytes, err := kafka.BuildCloudEvent(kafka.VisitorEventType, payload)
+	payload := events.NewVisitorPayload(user.Username, user.Organization)
+	ceBytes, err := events.BuildCloudEvent(events.VisitorEventType, payload)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 	return assessments, nil
@@ -77,7 +76,7 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, fmt.Errorf("failed to marshal assessment inventory: %w", err)
 	}
 
-	payload := kafka.NewAssessmentCreatedPayload(kafka.AssessmentData{
+	payload := events.NewAssessmentCreatedPayload(events.AssessmentData{
 		ID:            assessment.ID.String(),
 		Inventory:     inventory, // Todo: deprecated to be removed
 		MainInventory: mappers.ToStreamerModel(assessment.MainInventory.Inventory),
@@ -90,11 +89,11 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		CreatedAt:     assessment.CreatedAt,
 		UpdatedAt:     assessment.UpdatedAt,
 	})
-	ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentCreatedEventType, payload)
+	ceBytes, err := events.BuildCloudEvent(events.AssessmentCreatedEventType, payload)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 
@@ -129,12 +128,12 @@ func (e *EventAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 		return err
 	}
 
-	payload := kafka.NewAssessmentDeletedPayload(assessment.ID.String(), deletedAt)
-	ceBytes, err := kafka.BuildCloudEvent(kafka.AssessmentDeletedEventType, payload)
+	payload := events.NewAssessmentDeletedPayload(assessment.ID.String(), deletedAt)
+	ceBytes, err := events.BuildCloudEvent(events.AssessmentDeletedEventType, payload)
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -176,12 +175,12 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		return err
 	}
 
-	payload := kafka.NewShareAssessmentPayload(user.Username, id.String(), partnerID, partner.Name)
-	ceBytes, err := kafka.BuildCloudEvent(kafka.ShareAssessmentEventType, payload)
+	payload := events.NewShareAssessmentPayload(user.Username, id.String(), partnerID, partner.Name)
+	ceBytes, err := events.BuildCloudEvent(events.ShareAssessmentEventType, payload)
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 
@@ -207,7 +206,7 @@ func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UU
 		if err != nil {
 			return fmt.Errorf("failed to build notification for shared assessment event: %w", err)
 		}
-		if err := e.outbox.Insert(ctx, events.EventTypeNotification, notificationBytes); err != nil {
+		if err := e.outbox.Insert(ctx, EventTypeNotification, notificationBytes); err != nil {
 			return err
 		}
 	}
@@ -238,12 +237,12 @@ func (e *EventAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 		return err
 	}
 
-	payload := kafka.NewUnshareAssessmentPayload(user.Username, id.String())
-	ceBytes, err := kafka.BuildCloudEvent(kafka.UnshareAssessmentEventType, payload)
+	payload := events.NewUnshareAssessmentPayload(user.Username, id.String())
+	ceBytes, err := events.BuildCloudEvent(events.UnshareAssessmentEventType, payload)
 	if err != nil {
 		return err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return err
 	}
 

@@ -9,7 +9,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -125,9 +124,9 @@ var _ = Describe("OutboxDispatcher", func() {
 	})
 
 	runOneTick := func() {
-		writerRegistry := map[string][]events.Writer{
-			events.EventTypeKafka:        {kafkaWriter},
-			events.EventTypeNotification: {notifWriter},
+		writerRegistry := map[string][]eventwrap.Writer{
+			eventwrap.EventTypeKafka:        {kafkaWriter},
+			eventwrap.EventTypeNotification: {notifWriter},
 		}
 		dispatcher := eventwrap.NewOutboxDispatcher(s, writerRegistry, 10*time.Millisecond)
 		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -137,7 +136,7 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes events and deletes them from outbox", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: 1, EventType: eventwrap.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
 
 		runOneTick()
@@ -157,7 +156,7 @@ var _ = Describe("OutboxDispatcher", func() {
 	It("backs off events that fail to write and retains them", func() {
 		id := 17
 		outbox.events = []model.OutboxEvent{
-			{ID: id, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: id, EventType: eventwrap.EventTypeKafka, Payload: []byte("event-data-1")},
 		}
 		kafkaWriter.writeErr = fmt.Errorf("kafka unavailable")
 
@@ -171,8 +170,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("drops events that exceeded the max retry count without writing them", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("poison"), RetryCount: 15},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("fresh")},
+			{ID: 1, EventType: eventwrap.EventTypeKafka, Payload: []byte("poison"), RetryCount: 15},
+			{ID: 2, EventType: eventwrap.EventTypeKafka, Payload: []byte("fresh")},
 		}
 
 		runOneTick()
@@ -186,8 +185,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("writes multiple events and bulk-deletes", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeKafka, Payload: []byte("event-data-1")},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data-2")},
+			{ID: 1, EventType: eventwrap.EventTypeKafka, Payload: []byte("event-data-1")},
+			{ID: 2, EventType: eventwrap.EventTypeKafka, Payload: []byte("event-data-2")},
 		}
 
 		runOneTick()
@@ -198,8 +197,8 @@ var _ = Describe("OutboxDispatcher", func() {
 
 	It("routes notification-service events to the notifier, not the Kafka writer", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: events.EventTypeNotification, Payload: []byte("notification-data")},
-			{ID: 2, EventType: events.EventTypeKafka, Payload: []byte("event-data")},
+			{ID: 1, EventType: eventwrap.EventTypeNotification, Payload: []byte("notification-data")},
+			{ID: 2, EventType: eventwrap.EventTypeKafka, Payload: []byte("event-data")},
 		}
 
 		runOneTick()
