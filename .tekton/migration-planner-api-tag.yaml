@@ -213,8 +213,7 @@ spec:
         - $(params.build-args[*])
         - SOURCE_GIT_COMMIT=$(tasks.clone-repository.results.commit)
         - SOURCE_GIT_TAG={{git_tag}}
-        - AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - AGENT_GIT_TAG={{git_tag}}
+        - APPLIANCE_VERSION={{git_tag}}
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: BUILDAH_FORMAT

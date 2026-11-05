@@ -216,8 +216,6 @@ spec:
         - $(params.build-args[*])
         - SOURCE_GIT_COMMIT=$(tasks.clone-repository.results.commit)
         - SOURCE_GIT_TAG={{target_branch}}-pull-request
-        - AGENT_GIT_COMMIT=$(tasks.clone-repository.results.commit)
-        - AGENT_GIT_TAG={{target_branch}}-pull-request
       - name: PRIVILEGED_NESTED
         value: $(params.privileged-nested)
       - name: BUILDAH_FORMAT

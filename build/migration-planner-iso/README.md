@@ -15,14 +15,21 @@ The `config` file defines build arguments that are provided to Konflux for build
 - `FINAL_ISO_PATH` - Path where ISO will be placed in final image (default: `/rhcos.iso`)
 - `ISO_URL` - RHCOS ISO download URL
 - `ISO_CHECKSUM` - SHA256 checksum for ISO verification
-- `AGENT_IMAGE` - Agent image repository (without a tag)
-- `AGENT_IMAGE_TAG_MAIN` - Dev appliance tag (default: `main`)
-- `AGENT_IMAGE_TAG_STABLE` - Stage appliance tag (default: `stable`)
+- `APPLIANCE_IMAGE` - Appliance image repository (without a tag)
+- `APPLIANCE_VERSION` - Appliance release to embed, which is both the image tag
+  and the version the service reports
 
-Push builds select the configured tag using `AGENT_IMAGE_BRANCH` (`main` or
-`stable`). Local `make migration-planner-iso-container` builds use the dev tag.
-An explicit `AGENT_IMAGE_TAG` build argument overrides this selection; production
-tag builds continue to use `AGENT_IMAGE_TAG=prod`.
+`APPLIANCE_VERSION` holds one value per branch — the branch itself selects the
+appliance, so `main` and `stable` each pin their own. The appliance publishes
+every release under a tag named after its version, so the same string serves as
+the pull tag and as the reported version; CI checks that the tag's
+`org.opencontainers.image.version` label agrees with it.
+
+The API build reads the same value from this file and stamps it into the binary,
+so the version the service reports is the appliance it actually serves. Tag
+builds pass `APPLIANCE_VERSION={{git_tag}}` instead: the release process tags
+this repo and `assisted-migration-agent` together, so the release tag is the
+appliance release.
 
 Pushes to `main` and `stable` in `kubev2v/assisted-migration-agent` wait up to two
 hours for the released `oma-appliance` image in Quay, then dispatch an
@@ -48,4 +55,5 @@ source notification workflow on those branches.
 ## How It Works
 
 1. **Builder stage**: Downloads RHCOS ISO, verifies checksum, extracts contents, embeds agent image, creates bootable ISO
-2. **Final stage**: Minimal image containing only the final ISO at `${FINAL_ISO_PATH}`
+2. **Final stage**: Minimal image containing the final ISO at `${FINAL_ISO_PATH}`, plus
+   `xorriso` so the deployment can extract the embedded appliance image tar from it
