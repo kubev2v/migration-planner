@@ -147,10 +147,10 @@ var _ = Describe("e2e-share", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Before sharing, customer sees owner permissions and isShared=false
-			customerAssessment, err := customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err := customerSvc.GetAssessmentSummary(assessment.Id)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Permissions).ToNot(BeNil())
-			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentPermissionsRead, v1alpha1.AssessmentPermissionsShare, v1alpha1.AssessmentPermissionsDelete))
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentV2SummaryPermissionsRead, v1alpha1.AssessmentV2SummaryPermissionsShare, v1alpha1.AssessmentV2SummaryPermissionsDelete))
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
 			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
@@ -171,7 +171,7 @@ var _ = Describe("e2e-share", func() {
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeTrue())
 
 			// Owner sees sharing state after sharing
-			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err = customerSvc.GetAssessmentSummary(assessment.Id)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeTrue())
@@ -189,10 +189,10 @@ var _ = Describe("e2e-share", func() {
 			Expect(findAssessment(partnerAssessments, assessment.Id)).To(BeFalse())
 
 			// After unsharing, customer still sees owner permissions and isShared=false
-			customerAssessment, err = customerSvc.GetAssessment(assessment.Id)
+			customerAssessment, err = customerSvc.GetAssessmentSummary(assessment.Id)
 			Expect(err).To(BeNil())
 			Expect(customerAssessment.Permissions).ToNot(BeNil())
-			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentPermissionsRead, v1alpha1.AssessmentPermissionsShare, v1alpha1.AssessmentPermissionsDelete))
+			Expect(*customerAssessment.Permissions).To(ContainElements(v1alpha1.AssessmentV2SummaryPermissionsRead, v1alpha1.AssessmentV2SummaryPermissionsShare, v1alpha1.AssessmentV2SummaryPermissionsDelete))
 			Expect(customerAssessment.Sharing).ToNot(BeNil())
 			Expect(customerAssessment.Sharing.IsShared).To(BeFalse())
 			Expect(customerAssessment.Sharing.SharedWith).To(BeEmpty())
@@ -329,7 +329,7 @@ var _ = Describe("e2e-share", func() {
 	})
 })
 
-func findAssessment(list *v1alpha1.AssessmentList, id uuid.UUID) bool {
+func findAssessment(list *[]v1alpha1.AssessmentV2Summary, id uuid.UUID) bool {
 	if list == nil {
 		return false
 	}
