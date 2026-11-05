@@ -319,6 +319,18 @@ WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
       HAVING COUNT(*) = 1
   );
 
+-- Resolve VM host IDs; missing or ambiguous host names remain NULL.
+UPDATE vinfo SET "Host ID" = (
+    SELECT h."Host ID" FROM rvtools_host_map h
+    WHERE h.source_key = LOWER(TRIM(vinfo."Host"))
+);
+
+INSERT INTO vnic ("Host", "Host ID", "Network Device", "Speed")
+SELECT n."Host", h."Host ID", n."Network Device",
+    NULLIF(TRY_CAST(n."Speed" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vNIC', all_varchar=true) n
+LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(n."Host"));
+
 -- vHBA is optional in partial RVTools exports.
 CREATE OR REPLACE TEMP TABLE vhba_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHBA', all_varchar=true);

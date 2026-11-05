@@ -27,7 +27,7 @@ Standalone hosts:
 ATTACH '{{.FilePath}}' AS src (TYPE sqlite);
 
 INSERT INTO vinfo (
-    "VM ID", "VM", "Annotation", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
+    "VM ID", "VM", "Annotation", "Folder ID", "Folder", "Host", "Host ID", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
     "NICs", "CPUs", "Memory",
     "OS according to the configuration file", "OS according to the VMware Tools",
@@ -43,6 +43,7 @@ SELECT
     to_json(v)->>'Annotation',
     v.Folder,
     v.Folder,
+    v.Host,
     v.Host,
     v.UUID,
     v.UUID,
@@ -224,6 +225,11 @@ SELECT
     a.Product,
     a.InstanceUuid
 FROM src.About a;
+
+INSERT INTO vnic ("Host", "Host ID", "Network Device", "Speed")
+SELECT h.ID, h.ID, nic.value->>'key',
+    NULLIF(TRY_CAST(nic.value->>'linkSpeed' AS INTEGER), 0)
+FROM src.Host h, json_each(COALESCE(NULLIF(h.Network->'pNICs', 'null'::JSON), '[]'::JSON)) nic;
 
 INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
     "VMotion support", "Storage VMotion support")
