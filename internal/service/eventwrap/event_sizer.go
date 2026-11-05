@@ -4,12 +4,11 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
 type EventSizerService struct {
@@ -37,12 +36,12 @@ func (e *EventSizerService) CalculateClusterRequirements(
 		return nil, err
 	}
 
-	payload := kafka.NewSizingPayload(assessment.Username, assessmentID.String())
-	ceBytes, err := kafka.BuildCloudEvent(kafka.SizingEventType, payload)
+	payload := events.NewSizingPayload(assessment.Username, assessmentID.String())
+	ceBytes, err := events.BuildCloudEvent(events.SizingEventType, payload)
 	if err != nil {
 		return nil, err
 	}
-	if err := e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+	if err := e.outbox.Insert(ctx, EventTypeKafka, ceBytes); err != nil {
 		return nil, err
 	}
 

@@ -14,7 +14,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
-	"github.com/kubev2v/migration-planner/pkg/events"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -270,7 +269,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(result.ComplexityByOS).To(HaveLen(5))
 				Expect(result.ComplexityByDisk).To(HaveLen(4))
 
-				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)
 				Expect(outboxCount).To(Equal(1))
 			})
 
@@ -655,7 +654,7 @@ var _ = Describe("EstimationService", func() {
 					ctx, assessmentID, []string{firstCluster, "", firstCluster, secondCluster}, schemas, nil,
 				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)).To(Equal(1))
+				Expect(countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)).To(Equal(1))
 				expected, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{combined}, schemas, nil)
 				Expect(err).NotTo(HaveOccurred())
 				Expect(listResults).To(Equal(expected))
@@ -696,7 +695,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(results).To(BeNil())
 				var notFound *service.ErrResourceNotFound
 				Expect(errors.As(err, &notFound)).To(BeTrue())
-				Expect(countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)).To(BeZero())
+				Expect(countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)).To(BeZero())
 			})
 
 			It("successfully calculates estimation with valid data", func() {
@@ -715,7 +714,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(results[engines.SchemaNetworkBased].MaxTotalDuration).To(BeNumerically(">=", results[engines.SchemaNetworkBased].MinTotalDuration))
 				Expect(results[engines.SchemaNetworkBased].Breakdown).NotTo(BeEmpty())
 
-				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, events.EventTypeKafka)
+				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)
 				Expect(outboxCount).To(Equal(1))
 			})
 
