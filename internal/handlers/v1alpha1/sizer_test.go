@@ -74,6 +74,10 @@ func (f *ForbiddenAssessmentService) DeleteAssessment(_ context.Context, id uuid
 	return service.NewErrForbidden("assessment", id.String())
 }
 
+func (f *ForbiddenAssessmentService) DeleteVCenterInventory(_ context.Context, id, _ uuid.UUID) error {
+	return service.NewErrForbidden("assessment", id.String())
+}
+
 func (f *ForbiddenAssessmentService) ShareAssessment(_ context.Context, id uuid.UUID) error {
 	return service.NewErrForbidden("assessment", id.String())
 }
@@ -179,6 +183,10 @@ func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID
 
 func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...svcmodel.AssessmentInventory) error {
 	panic("UpsertInventories() not implemented in MockAssessmentStore for this test")
+}
+
+func (m *MockAssessmentStore) DeleteInventory(ctx context.Context, assessmentID, inventoryID uuid.UUID) error {
+	panic("DeleteInventory() not implemented in MockAssessmentStore for this test")
 }
 
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {

@@ -33,6 +33,21 @@ const (
 	countOutboxEventsStm         = "SELECT COUNT(*) FROM outbox_events;"
 )
 
+type failingInventoryUpsert struct{ store.Assessment }
+
+func (f failingInventoryUpsert) UpsertInventories(context.Context, ...svcmodel.AssessmentInventory) error {
+	return errors.New("forced inventory upsert failure")
+}
+
+type storeWithAssessmentOverride struct {
+	store.Store
+	assessment store.Assessment
+}
+
+func (s storeWithAssessmentOverride) Assessment() store.Assessment {
+	return s.assessment
+}
+
 var _ = Describe("assessment service", Ordered, func() {
 	var (
 		s             store.Store
@@ -1212,6 +1227,146 @@ var _ = Describe("assessment service", Ordered, func() {
 			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessment_inventories;")
 			gormdb.Exec("DELETE FROM assessments;")
+		})
+	})
+
+	Context("DeleteVCenterInventory", func() {
+		createFixture := func(sourceType string, counts ...int) (uuid.UUID, []uuid.UUID, uuid.UUID) {
+			GinkgoHelper()
+			assessmentID := uuid.New()
+			mainID := uuid.New()
+			vcenterIDs := make([]uuid.UUID, len(counts))
+			subsets := make([]svcmodel.AssessmentInventory, len(counts))
+			total := 0
+
+			newInventory := func(id uuid.UUID, vcenterID string, isSubset bool, vmCount int) svcmodel.AssessmentInventory {
+				data, err := json.Marshal(v1alpha1.Inventory{
+					VcenterId: vcenterID,
+					Clusters:  map[string]v1alpha1.InventoryData{},
+					Vcenter: &v1alpha1.InventoryData{
+						Vms: v1alpha1.VMs{Total: vmCount},
+						Infra: v1alpha1.Infra{
+							TotalHosts: vmCount,
+							Networks:   make([]v1alpha1.Network, vmCount),
+							Datastores: make([]v1alpha1.Datastore, vmCount),
+						},
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				inventory, err := mappers.AssessmentInventoryFromJSON(id, assessmentID, "inventory", isSubset, data)
+				Expect(err).NotTo(HaveOccurred())
+				return inventory
+			}
+
+			for i, count := range counts {
+				vcenterIDs[i] = uuid.New()
+				subsets[i] = newInventory(uuid.New(), vcenterIDs[i].String(), true, count)
+				total += count
+			}
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			_, err := assessmentSvc.CreateAssessment(context.TODO(), mappers.AssessmentCreateForm{
+				ID:                assessmentID,
+				Name:              "delete-vcenter-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        sourceType,
+				MainInventory:     newInventory(mainID, "", false, total),
+				SubsetInventories: subsets,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			return assessmentID, vcenterIDs, mainID
+		}
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
+			gormdb.Exec("DELETE FROM assessments;")
+		})
+
+		It("removes the vcenter subset and reaggregates the main inventory", func() {
+			assessmentID, vcenterIDs, mainID := createFixture(service.SourceTypeRvtools, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])
+			Expect(err).To(BeNil())
+
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.SubsetInventories).To(HaveLen(1))
+			Expect(assessment.SubsetInventories[0].VCenterID).To(Equal(vcenterIDs[1].String()))
+			Expect(assessment.MainInventory.ID).To(Equal(mainID))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(5))
+			Expect(assessment.MainInventory.HostsCount).To(Equal(5))
+			Expect(assessment.MainInventory.NetworksCount).To(Equal(5))
+			Expect(assessment.MainInventory.DatastoresCount).To(Equal(5))
+			Expect(assessment.UpdatedAt).NotTo(BeNil())
+
+			ctx := auth.NewTokenContext(context.TODO(), auth.User{Username: "user1", Organization: "org1"})
+			summaries, err := assessmentSvc.ListAssessments(ctx, service.NewAssessmentFilter().WithIDs([]uuid.UUID{assessmentID}))
+			Expect(err).To(BeNil())
+			Expect(summaries).To(HaveLen(1))
+			Expect(summaries[0].VMsCount).To(Equal(5))
+			Expect(summaries[0].HostsCount).To(Equal(5))
+			Expect(summaries[0].NetworksCount).To(Equal(5))
+			Expect(summaries[0].DatastoresCount).To(Equal(5))
+		})
+
+		It("leaves an empty aggregate after deleting the last subset", func() {
+			assessmentID, vcenterIDs, mainID := createFixture(service.SourceTypeRvtools, 3)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			Expect(assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])).To(Succeed())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(BeEmpty())
+			Expect(assessment.MainInventory.ID).To(Equal(mainID))
+			Expect(assessment.MainInventory.VMsCount).To(BeZero())
+		})
+
+		It("returns not found without changing the assessment for an unknown vCenter", func() {
+			assessmentID, _, _ := createFixture(service.SourceTypeRvtools, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, uuid.New())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(2))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(8))
+		})
+
+		It("deletes a subset on a non-RVTools assessment", func() {
+			assessmentID, vcenterIDs, _ := createFixture(service.SourceTypeInventory, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			Expect(assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])).To(Succeed())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(1))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(5))
+		})
+
+		It("rolls back the deletion when saving the aggregate fails", func() {
+			assessmentID, vcenterIDs, _ := createFixture(service.SourceTypeRvtools, 3, 5)
+			brokenStore := storeWithAssessmentOverride{
+				Store:      s,
+				assessment: failingInventoryUpsert{Assessment: s.Assessment()},
+			}
+			assessmentSvc := service.NewAssessmentService(&brokenStore, nil, nil)
+
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])
+			Expect(err).To(MatchError(ContainSubstring("forced inventory upsert failure")))
+
+			assessment, err := s.Assessment().Get(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(2))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(8))
+		})
+
+		It("returns not found for an unknown assessment", func() {
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), uuid.New(), uuid.New())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
 		})
 	})
 

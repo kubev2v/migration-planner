@@ -409,6 +409,30 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 	return server.GetVcenterCluster200JSONResponse(cluster), nil
 }
 
+func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.DeleteVCenterRequestObject) (server.DeleteVCenterResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_v2_handler").
+		WithContext(ctx).
+		Operation("delete_vcenter_inventory").
+		WithUUID("assessment_id", request.Id).
+		WithUUID("vcenter_id", request.Vid).
+		Build()
+
+	if err := h.assessmentSrv.DeleteVCenterInventory(ctx, request.Id, request.Vid); err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.DeleteVCenter404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.DeleteVCenter403JSONResponse{Message: err.Error()}, nil
+		default:
+			logger.Error(err).Log()
+			return server.DeleteVCenter500JSONResponse{Message: "failed to delete vcenter inventory"}, nil
+		}
+	}
+
+	logger.Success().Log()
+	return server.DeleteVCenter204Response{}, nil
+}
+
 func firstInventoryByID(inventories []svcmodel.AssessmentInventory, id string) (svcmodel.AssessmentInventory, bool) {
 	for _, inv := range inventories {
 		if inv.VCenterID == id {

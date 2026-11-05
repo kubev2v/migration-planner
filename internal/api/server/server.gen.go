@@ -173,6 +173,9 @@ type ServerInterface interface {
 	// (PUT /api/v2/assessments/{id}/rvtools)
 	UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
+	// (DELETE /api/v2/assessments/{id}/vcenters/{vid})
+	DeleteVCenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID)
+
 	// (GET /api/v2/assessments/{id}/vcenters/{vid})
 	GetVcenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID)
 
@@ -439,6 +442,11 @@ func (_ Unimplemented) GetAssessmentV2(w http.ResponseWriter, r *http.Request, i
 
 // (PUT /api/v2/assessments/{id}/rvtools)
 func (_ Unimplemented) UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (DELETE /api/v2/assessments/{id}/vcenters/{vid})
+func (_ Unimplemented) DeleteVCenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1692,6 +1700,41 @@ func (siw *ServerInterfaceWrapper) UploadRvtoolsToAssessment(w http.ResponseWrit
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
+// DeleteVCenter operation middleware
+func (siw *ServerInterfaceWrapper) DeleteVCenter(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "vid" -------------
+	var vid openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "vid", chi.URLParam(r, "vid"), &vid, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "vid", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteVCenter(w, r, id, vid)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
 // GetVcenter operation middleware
 func (siw *ServerInterfaceWrapper) GetVcenter(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
@@ -2051,6 +2094,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v2/assessments/{id}/rvtools", wrapper.UploadRvtoolsToAssessment)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/v2/assessments/{id}/vcenters/{vid}", wrapper.DeleteVCenter)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v2/assessments/{id}/vcenters/{vid}", wrapper.GetVcenter)
@@ -4876,6 +4922,59 @@ func (response UploadRvtoolsToAssessment500JSONResponse) VisitUploadRvtoolsToAss
 	return json.NewEncoder(w).Encode(response)
 }
 
+type DeleteVCenterRequestObject struct {
+	Id  openapi_types.UUID `json:"id"`
+	Vid openapi_types.UUID `json:"vid"`
+}
+
+type DeleteVCenterResponseObject interface {
+	VisitDeleteVCenterResponse(w http.ResponseWriter) error
+}
+
+type DeleteVCenter204Response struct {
+}
+
+func (response DeleteVCenter204Response) VisitDeleteVCenterResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteVCenter401JSONResponse Error
+
+func (response DeleteVCenter401JSONResponse) VisitDeleteVCenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteVCenter403JSONResponse Error
+
+func (response DeleteVCenter403JSONResponse) VisitDeleteVCenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteVCenter404JSONResponse Error
+
+func (response DeleteVCenter404JSONResponse) VisitDeleteVCenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteVCenter500JSONResponse Error
+
+func (response DeleteVCenter500JSONResponse) VisitDeleteVCenterResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetVcenterRequestObject struct {
 	Id  openapi_types.UUID `json:"id"`
 	Vid openapi_types.UUID `json:"vid"`
@@ -5155,6 +5254,9 @@ type StrictServerInterface interface {
 
 	// (PUT /api/v2/assessments/{id}/rvtools)
 	UploadRvtoolsToAssessment(ctx context.Context, request UploadRvtoolsToAssessmentRequestObject) (UploadRvtoolsToAssessmentResponseObject, error)
+
+	// (DELETE /api/v2/assessments/{id}/vcenters/{vid})
+	DeleteVCenter(ctx context.Context, request DeleteVCenterRequestObject) (DeleteVCenterResponseObject, error)
 
 	// (GET /api/v2/assessments/{id}/vcenters/{vid})
 	GetVcenter(ctx context.Context, request GetVcenterRequestObject) (GetVcenterResponseObject, error)
@@ -6636,6 +6738,33 @@ func (sh *strictHandler) UploadRvtoolsToAssessment(w http.ResponseWriter, r *htt
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadRvtoolsToAssessmentResponseObject); ok {
 		if err := validResponse.VisitUploadRvtoolsToAssessmentResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteVCenter operation middleware
+func (sh *strictHandler) DeleteVCenter(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, vid openapi_types.UUID) {
+	var request DeleteVCenterRequestObject
+
+	request.Id = id
+	request.Vid = vid
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteVCenter(ctx, request.(DeleteVCenterRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteVCenter")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteVCenterResponseObject); ok {
+		if err := validResponse.VisitDeleteVCenterResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -244,6 +244,27 @@ func (a *AuthzAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 	return nil
 }
 
+func (a *AuthzAssessmentService) DeleteVCenterInventory(ctx context.Context, assessmentID uuid.UUID, vcenterID uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	// get assessment first to capture the 404 if any
+	_, err := a.inner.GetAssessment(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentID.String()))
+	if err != nil {
+		return fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.DeletePermission.In(resource.Permissions) {
+		return NewErrForbidden("assessment", assessmentID.String())
+	}
+
+	return a.inner.DeleteVCenterInventory(ctx, assessmentID, vcenterID)
+}
+
 func (a *AuthzAssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) error {
 	user := auth.MustHaveUser(ctx)
 

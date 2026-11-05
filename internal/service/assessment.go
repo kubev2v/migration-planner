@@ -24,6 +24,7 @@ type AssessmentServicer interface {
 	CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error)
 	UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error)
 	DeleteAssessment(ctx context.Context, id uuid.UUID) error
+	DeleteVCenterInventory(ctx context.Context, assessmentID uuid.UUID, vcenterID uuid.UUID) error
 	ShareAssessment(ctx context.Context, id uuid.UUID) error
 	UnshareAssessment(ctx context.Context, id uuid.UUID) error
 	AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error)
@@ -299,6 +300,61 @@ func (as *AssessmentService) DeleteAssessment(ctx context.Context, id uuid.UUID)
 		return fmt.Errorf("failed to delete assessment: %w", err)
 	}
 	tracer.Success().WithString("deleted_assessment_name", assessment.Name).Log()
+	return nil
+}
+
+func (as *AssessmentService) DeleteVCenterInventory(ctx context.Context, assessmentID uuid.UUID, vcenterID uuid.UUID) error {
+	logger := as.logger.WithContext(ctx)
+	tracer := logger.Operation("delete_vcenter_inventory").
+		WithUUID("assessment_id", assessmentID).
+		WithUUID("vcenter_id", vcenterID).
+		Build()
+
+	ctx, err := as.store.NewTransactionContext(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_, _ = store.Rollback(ctx)
+	}()
+
+	assessment, err := as.store.Assessment().Get(ctx, assessmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrRecordNotFound) {
+			return NewErrAssessmentNotFound(assessmentID)
+		}
+		return fmt.Errorf("failed to get assessment: %w", err)
+	}
+
+	// need to be sure vcenterID is not mainInventory ID
+	inv, err := assessment.GetSubsetInventory(vcenterID)
+	if err != nil {
+		return NewErrResourceNotFound(vcenterID, "vcenter")
+	}
+
+	if err := as.store.Assessment().DeleteInventory(ctx, assessmentID, inv.ID); err != nil {
+		return fmt.Errorf("failed to delete vcenter inventory: %w", err)
+	}
+
+	mainInventory, err := as.AggregateInventories(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
+
+	if err := as.store.Assessment().UpsertInventories(ctx, mainInventory); err != nil {
+		return fmt.Errorf("failed to save aggregated inventory: %w", err)
+	}
+
+	if _, err := as.store.Assessment().Update(ctx, assessmentID, nil, nil); err != nil {
+		return fmt.Errorf("failed to update assessment: %w", err)
+	}
+
+	if _, err := store.Commit(ctx); err != nil {
+		return err
+	}
+
+	tracer.Success().Log()
+
 	return nil
 }
 

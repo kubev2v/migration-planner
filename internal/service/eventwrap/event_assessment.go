@@ -144,6 +144,10 @@ func (e *EventAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 	return nil
 }
 
+func (e *EventAssessmentService) DeleteVCenterInventory(ctx context.Context, assessmentID, vcenterID uuid.UUID) error {
+	return e.inner.DeleteVCenterInventory(ctx, assessmentID, vcenterID)
+}
+
 func (e *EventAssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) error {
 	user := auth.MustHaveUser(ctx)
 
