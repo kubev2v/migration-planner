@@ -15,6 +15,7 @@ var hostNICInputs struct {
 	rvtools           string
 	additionalRVTools string
 	withoutNICs       string
+	ambiguousHosts    string
 	forklift          string
 }
 
@@ -22,27 +23,48 @@ func prepareHostNICInputs(t *testing.T) {
 	t.Helper()
 	hostNICInputs.rvtools = createTestExcel(t,
 		NewExcelSheet("vInfo", vInfoHeaders, []map[string]string{
-			{"VM ID": "vm-1", "VM": "vm", "Host": "host-1", "Cluster": "cluster", "VI SDK UUID": "vc"},
+			{"VM ID": "vm-1", "VM": "vm", "Host": "esxi-1", "Cluster": "cluster", "VI SDK UUID": "vc"},
+		}),
+		NewExcelSheet("vHost", vHostHeaders, []map[string]string{
+			{"Host": "esxi-1", "Object ID": "host-1"},
+			{"Host": "esxi-2", "Object ID": "host-2"},
 		}),
 		NewExcelSheet("vNIC", []string{"Host", "Network Device", "Speed"}, []map[string]string{
-			{"Host": "host-1", "Network Device": "vmnic0", "Speed": "10000"},
-			{"Host": "host-1", "Network Device": "vmnic1", "Speed": "0"},
-			{"Host": "host-1", "Network Device": "vmnic2", "Speed": ""},
-			{"Host": "host-1", "Network Device": "vmnic3", "Speed": "invalid"},
-			{"Host": "host-2", "Network Device": "vmnic0", "Speed": "25000"},
+			{"Host": "esxi-1", "Network Device": "vmnic0", "Speed": "10000"},
+			{"Host": "esxi-1", "Network Device": "vmnic1", "Speed": "0"},
+			{"Host": "esxi-1", "Network Device": "vmnic2", "Speed": ""},
+			{"Host": "esxi-1", "Network Device": "vmnic3", "Speed": "invalid"},
+			{"Host": "esxi-2", "Network Device": "vmnic0", "Speed": "25000"},
 		}),
 	)
 	hostNICInputs.additionalRVTools = createTestExcel(t,
 		NewExcelSheet("vInfo", vInfoHeaders, []map[string]string{
-			{"VM ID": "vm-second", "VM": "second", "Host": "host-3", "Cluster": "cluster", "VI SDK UUID": "vc"},
+			{"VM ID": "vm-second", "VM": "second", "Host": "esxi-3", "Cluster": "cluster", "VI SDK UUID": "vc"},
+		}),
+		NewExcelSheet("vHost", vHostHeaders, []map[string]string{
+			{"Host": "esxi-3", "Object ID": "host-3"},
 		}),
 		NewExcelSheet("vNIC", []string{"Host", "Network Device", "Speed"}, []map[string]string{
-			{"Host": "host-3", "Network Device": "vmnic0", "Speed": "1000"},
+			{"Host": "esxi-3", "Network Device": "vmnic0", "Speed": "1000"},
 		}),
 	)
 	hostNICInputs.withoutNICs = createTestExcelWithCustomHeaders(t,
 		[]string{"VM ID", "VM", "Cluster", "VI SDK UUID"},
 		[]map[string]string{{"VM ID": "vm-2", "VM": "new", "Cluster": "cluster", "VI SDK UUID": "vc"}},
+	)
+	hostNICInputs.ambiguousHosts = createTestExcel(t,
+		NewExcelSheet("vInfo", vInfoHeaders, []map[string]string{
+			{"VM ID": "vm-ambiguous", "VM": "ambiguous", "Host": "shared-name", "Cluster": "cluster", "VI SDK UUID": "vc"},
+			{"VM ID": "vm-unresolved", "VM": "unresolved", "Host": "missing-host", "Cluster": "cluster", "VI SDK UUID": "vc"},
+		}),
+		NewExcelSheet("vHost", vHostHeaders, []map[string]string{
+			{"Host": "shared-name", "Object ID": "host-10"},
+			{"Host": "shared-name", "Object ID": "host-20"},
+		}),
+		NewExcelSheet("vNIC", []string{"Host", "Network Device", "Speed"}, []map[string]string{
+			{"Host": "shared-name", "Network Device": "vmnic0", "Speed": "10000"},
+			{"Host": "missing-host", "Network Device": "vmnic1", "Speed": "1000"},
+		}),
 	)
 	hostNICInputs.forklift = createTestSQLite(t, "vc",
 		[]sqliteCluster{{id: "cluster", name: "cluster", datacenter: "dc"}},
@@ -63,7 +85,8 @@ func prepareHostNICInputs(t *testing.T) {
         INSERT INTO fixture.Host (ID, Network) VALUES
             ('host-2', '{"pNICs":[{"key":"vmnic0","linkSpeed":25000}]}'),
             ('host-3', '{"pNICs":[]}'),
-            ('host-4', '{}');
+            ('host-4', '{}'),
+            ('host-5', '{"pNICs":null}');
     `)
 	require.NoError(t, err)
 	_, err = db.Exec("DETACH fixture")
@@ -89,6 +112,17 @@ var _ = Describe("Host physical NIC ingestion", func() {
 		Expect(err).NotTo(HaveOccurred())
 	})
 
+	It("keeps ambiguous and missing RVTools host identities unknown", func() {
+		result, err := parser.IngestRvTools(ctx, hostNICInputs.ambiguousHosts)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(result.IsValid()).To(BeTrue(), "%v", result.Errors)
+		var count int
+		Expect(db.QueryRow(`SELECT COUNT(*) FROM vnic WHERE "Host ID" IS NULL AND "Host" IN ('shared-name', 'missing-host')`).Scan(&count)).To(Succeed())
+		Expect(count).To(Equal(2))
+		Expect(db.QueryRow(`SELECT COUNT(*) FROM vinfo WHERE "Host ID" IS NULL`).Scan(&count)).To(Succeed())
+		Expect(count).To(Equal(2))
+	})
+
 	for _, source := range []string{"RVTools", "Forklift"} {
 		Context(source, func() {
 			BeforeEach(func() {
@@ -104,7 +138,7 @@ var _ = Describe("Host physical NIC ingestion", func() {
 			})
 
 			It("retains host and NIC identities and stores unavailable speeds as NULL", func() {
-				rows, err := db.Query(`SELECT "Host", "Network Device", "Speed" FROM vnic ORDER BY "Host", "Network Device"`)
+				rows, err := db.Query(`SELECT "Host ID", "Network Device", "Speed" FROM vnic ORDER BY "Host ID", "Network Device"`)
 				Expect(err).NotTo(HaveOccurred())
 				DeferCleanup(rows.Close)
 
@@ -128,6 +162,12 @@ var _ = Describe("Host physical NIC ingestion", func() {
 				}))
 			})
 
+			It("retains the VM's owning host ID", func() {
+				var hostID string
+				Expect(db.QueryRow(`SELECT "Host ID" FROM vinfo WHERE "VM ID" = 'vm-1'`).Scan(&hostID)).To(Succeed())
+				Expect(hostID).To(Equal("host-1"))
+			})
+
 			It("clears NICs before importing a workbook without a vNIC sheet", func() {
 				Expect(parser.Cleanup()).To(Succeed())
 				result, err := parser.IngestRvTools(ctx, hostNICInputs.withoutNICs)
@@ -139,6 +179,14 @@ var _ = Describe("Host physical NIC ingestion", func() {
 				Expect(count).To(BeZero())
 			})
 
+			if source == "Forklift" {
+				It("does not create NIC records for empty, missing, or null pNIC lists", func() {
+					var count int
+					Expect(db.QueryRow(`SELECT COUNT(*) FROM vnic WHERE "Host ID" IN ('host-3', 'host-4', 'host-5')`).Scan(&count)).To(Succeed())
+					Expect(count).To(BeZero())
+				})
+			}
+
 			if source == "RVTools" {
 				It("keeps existing NICs when importing another workbook", func() {
 					result, err := parser.IngestRvTools(ctx, hostNICInputs.additionalRVTools)
@@ -148,7 +196,7 @@ var _ = Describe("Host physical NIC ingestion", func() {
 					var count, speed int
 					Expect(db.QueryRow(`SELECT COUNT(*) FROM vnic`).Scan(&count)).To(Succeed())
 					Expect(count).To(Equal(6))
-					Expect(db.QueryRow(`SELECT "Speed" FROM vnic WHERE "Host" = 'host-3'`).Scan(&speed)).To(Succeed())
+					Expect(db.QueryRow(`SELECT "Speed" FROM vnic WHERE "Host ID" = 'host-3'`).Scan(&speed)).To(Succeed())
 					Expect(speed).To(Equal(1000))
 				})
 			}
