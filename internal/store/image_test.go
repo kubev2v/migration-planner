@@ -6,8 +6,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/config"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -161,7 +162,7 @@ var _ = Describe("image infra store", Ordered, func() {
 			Expect(upd.CertificateChain).To(Equal("cert2"))
 
 			// verify in DB
-			var fetched model.ImageInfra
+			var fetched storemodel.ImageInfra
 			gormdb.WithContext(context.TODO()).Where("source_id = ?", sourceID).First(&fetched)
 			Expect(fetched.HttpProxyUrl).To(Equal("http2"))
 			Expect(fetched.HttpsProxyUrl).To(Equal("https2"))

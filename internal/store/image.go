@@ -3,7 +3,9 @@ package store
 import (
 	"context"
 
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/store/mappers"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	"gorm.io/gorm"
 )
 
@@ -23,26 +25,30 @@ func NewImageInfraStore(db *gorm.DB) ImageInfra {
 }
 
 func (i *ImageInfraStore) Create(ctx context.Context, image model.ImageInfra) (*model.ImageInfra, error) {
-	if err := i.getDB(ctx).WithContext(ctx).Create(&image).Error; err != nil {
+	stored := mappers.ImageInfraToStore(image)
+	if err := i.getDB(ctx).WithContext(ctx).Create(&stored).Error; err != nil {
 		return nil, err
 	}
 
-	return &image, nil
+	mapped := mappers.ImageInfraFromStore(stored)
+	return &mapped, nil
 }
 
 func (i *ImageInfraStore) Update(ctx context.Context, image model.ImageInfra) (*model.ImageInfra, error) {
+	stored := mappers.ImageInfraToStore(image)
 	// Exclude agent_version and agent_token to prevent overwriting concurrent updates
-	if err := i.getDB(ctx).WithContext(ctx).Omit("agent_version", "agent_token").Save(&image).Error; err != nil {
+	if err := i.getDB(ctx).WithContext(ctx).Omit("agent_version", "agent_token").Save(&stored).Error; err != nil {
 		return nil, err
 	}
-	return &image, nil
+	mapped := mappers.ImageInfraFromStore(stored)
+	return &mapped, nil
 }
 
 // UpdateAgentVersion atomically updates only the agent_version field for a given source_id.
 // This prevents race conditions when multiple concurrent downloads occur.
 func (i *ImageInfraStore) UpdateAgentVersion(ctx context.Context, sourceID string, agentVersion string) error {
 	result := i.getDB(ctx).WithContext(ctx).
-		Model(&model.ImageInfra{}).
+		Model(&storemodel.ImageInfra{}).
 		Where("source_id = ?", sourceID).
 		Update("agent_version", agentVersion)
 
@@ -60,7 +66,7 @@ func (i *ImageInfraStore) UpdateAgentVersion(ctx context.Context, sourceID strin
 // UpdateAgentToken atomically updates only the agent_token field for a given source_id.
 func (i *ImageInfraStore) UpdateAgentToken(ctx context.Context, sourceID string, agentToken string) error {
 	result := i.getDB(ctx).WithContext(ctx).
-		Model(&model.ImageInfra{}).
+		Model(&storemodel.ImageInfra{}).
 		Where("source_id = ?", sourceID).
 		Update("agent_token", agentToken)
 

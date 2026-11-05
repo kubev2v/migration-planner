@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
@@ -30,7 +31,7 @@ This implements the SingleModel logic:
 - don't allow updates if source is missing. (i.g the source is created as per MultiSource logic). It fails anyway because an agent always has a source.
 - if the source has no inventory yet, set the vCenterID and AssociatedAgentID to this source.
 */
-func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm mappers.InventoryUpdateForm) (*model.Source, error) {
+func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm mappers.InventoryUpdateForm) (*svcmodel.Source, error) {
 	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -60,7 +61,7 @@ func (as *AgentService) UpdateSourceInventory(ctx context.Context, updateForm ma
 		return nil, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.VCenterID)
 	}
 
-	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
+	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory, updateForm.Version)
 	source.UpdateType = "auto"
 	updatedSource, err := as.store.Source().Update(ctx, *source)
 	if err != nil {
@@ -80,7 +81,7 @@ This implements the same logic as UpdateSourceInventory but sets update_type to 
 - don't allow updates if source is missing
 - if the source has no inventory yet, set the vCenterID
 */
-func (as *AgentService) UpdateSource(ctx context.Context, updateForm mappers.SourceInventoryUpdateForm) (*model.Source, error) {
+func (as *AgentService) UpdateSource(ctx context.Context, updateForm mappers.SourceInventoryUpdateForm) (*svcmodel.Source, error) {
 	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -94,7 +95,7 @@ func (as *AgentService) UpdateSource(ctx context.Context, updateForm mappers.Sou
 		return nil, NewErrInvalidVCenterID(updateForm.SourceID, updateForm.VCenterID)
 	}
 
-	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory)
+	source = mappers.UpdateSourceFromApi(source, updateForm.VCenterID, updateForm.Inventory, updateForm.Version)
 	source.UpdateType = "auto" // Set update_type to auto for agent updates
 
 	updatedSource, err := as.store.Source().Update(ctx, *source)
@@ -114,7 +115,7 @@ Validates:
 - vCenterID matches source vCenterID (if set)
 Sets update_type to 'auto' for agent updates
 */
-func (as *AgentService) UpdateSourceSubset(ctx context.Context, updateForm mappers.SourceSubsetUpdateForm) (*model.SourceSubsetInventory, bool, error) {
+func (as *AgentService) UpdateSourceSubset(ctx context.Context, updateForm mappers.SourceSubsetUpdateForm) (*svcmodel.SourceSubsetInventory, bool, error) {
 	// Validate source exists
 	source, err := as.store.Source().Get(ctx, updateForm.SourceID)
 	if err != nil {
@@ -126,7 +127,7 @@ func (as *AgentService) UpdateSourceSubset(ctx context.Context, updateForm mappe
 
 	// Validate source has main inventory before allowing subsets
 	// Enforces ordering: main inventory must be created first, then subsets
-	if len(source.Inventory) == 0 {
+	if source.Inventory == nil {
 		return nil, false, NewErrSourceInventoryRequired(updateForm.SourceID)
 	}
 
@@ -141,17 +142,18 @@ func (as *AgentService) UpdateSourceSubset(ctx context.Context, updateForm mappe
 		return nil, false, fmt.Errorf("failed to fetch source inventory: %w", err)
 	}
 
-	subset := model.SourceSubsetInventory{
+	subset := svcmodel.SourceSubsetInventory{
 		ID:         updateForm.ID,
 		Name:       updateForm.Name,
 		SourceID:   updateForm.SourceID,
 		VCenterID:  updateForm.VCenterID,
 		VMsCount:   updateForm.VMsCount,
 		Inventory:  updateForm.Inventory,
+		Version:    updateForm.Version,
 		UpdateType: "auto", // Set update_type to auto for agent updates
 	}
 
-	var result *model.SourceSubsetInventory
+	var result *svcmodel.SourceSubsetInventory
 	var wasCreated bool
 	if existingSubset != nil {
 		// Update existing subset
