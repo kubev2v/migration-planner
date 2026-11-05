@@ -263,6 +263,53 @@ func (h *ServiceHandler) ListAssessmentsV2(ctx context.Context, _ server.ListAss
 	return server.ListAssessmentsV2200JSONResponse(response), nil
 }
 
+// UpdateAssessmentV2 (PATCH /api/v2/assessments/{id})
+func (h *ServiceHandler) UpdateAssessmentV2(ctx context.Context, request server.UpdateAssessmentV2RequestObject) (server.UpdateAssessmentV2ResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_v2_handler").
+		WithContext(ctx).
+		Operation("update_assessment").
+		WithUUID("assessment_id", request.Id).
+		WithRequestBody("request_body", request.Body).
+		Build()
+
+	if request.Body == nil {
+		logger.Error(fmt.Errorf("empty request body")).Log()
+		return server.UpdateAssessmentV2400JSONResponse{Message: "empty body"}, nil
+	}
+
+	updatedAssessment, err := h.assessmentSrv.UpdateAssessment(ctx, request.Id, request.Body.Name)
+	if err != nil {
+		logger.Error(err).Log()
+		var errResourceNotFound *service.ErrResourceNotFound
+		var errForbidden *service.ErrForbidden
+		var errAgentUpdateForbidden *service.ErrAgentUpdateForbidden
+		var errDuplicateKey *service.ErrDuplicateKey
+		switch {
+		case errors.As(err, &errResourceNotFound):
+			return server.UpdateAssessmentV2404JSONResponse{Message: err.Error()}, nil
+		case errors.As(err, &errForbidden):
+			return server.UpdateAssessmentV2403JSONResponse{Message: err.Error()}, nil
+		case errors.As(err, &errAgentUpdateForbidden), errors.As(err, &errDuplicateKey):
+			return server.UpdateAssessmentV2400JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.UpdateAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err)}, nil
+		}
+	}
+
+	response, err := assessmentToV2API(updatedAssessment)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.UpdateAssessmentV2500JSONResponse{Message: err.Error()}, nil
+	}
+
+	logger.Success().
+		WithString("updated_name", updatedAssessment.Name).
+		WithString("source_type", updatedAssessment.SourceType).
+		Log()
+
+	return server.UpdateAssessmentV2200JSONResponse(response), nil
+}
+
 // GetAssessmentV2 (GET /api/v2/assessments/{id})
 func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.GetAssessmentV2RequestObject) (server.GetAssessmentV2ResponseObject, error) {
 	logger := log.NewDebugLogger("assessment_v2_handler").
@@ -286,6 +333,16 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 		}
 	}
 
+	response, err := assessmentToV2API(assessment)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
+	}
+
+	return server.GetAssessmentV2200JSONResponse(response), nil
+}
+
+func assessmentToV2API(assessment *svcmodel.Assessment) (api.AssessmentV2, error) {
 	vcenters := make([]api.SubResource, 0, len(assessment.SubsetInventories))
 	switch assessment.SourceType {
 	case string(api.AssessmentSourceTypeRvtools):
@@ -302,11 +359,10 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 
 	data, _, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
 	if err != nil {
-		logger.Error(err).Log()
-		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
+		return api.AssessmentV2{}, err
 	}
 
-	return server.GetAssessmentV2200JSONResponse{
+	return api.AssessmentV2{
 		Data:     data,
 		Vcenters: vcenters,
 	}, nil
