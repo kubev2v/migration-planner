@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +23,18 @@ type Assessment struct {
 	SubsetInventories []AssessmentInventory
 	Permissions       []Permission
 	Sharing           *Sharing
+}
+
+func (a Assessment) GetSubsetInventory(id uuid.UUID) (AssessmentInventory, error) {
+	for _, inventory := range a.SubsetInventories {
+		if !inventory.IsSubset {
+			continue
+		}
+		if inventory.VCenterID == id.String() {
+			return inventory, nil
+		}
+	}
+	return AssessmentInventory{}, fmt.Errorf("inventory %s not found", id)
 }
 
 // AssessmentSummary is a lightweight projection of an assessment used by list

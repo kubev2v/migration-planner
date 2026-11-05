@@ -143,6 +143,10 @@ func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories
 	return nil
 }
 
+func (m *MockAssessmentStore) DeleteInventory(ctx context.Context, assessmentID, inventoryID uuid.UUID) error {
+	return nil
+}
+
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {
 	return nil
 }

@@ -2,6 +2,7 @@ package v1alpha1_test
 
 import (
 	"context"
+	"errors"
 
 	model2 "github.com/kubev2v/migration-planner/internal/model"
 
@@ -16,7 +17,10 @@ import (
 
 type assessmentV2ServiceStub struct {
 	service.AssessmentServicer
-	assessment *model2.Assessment
+	assessment          *model2.Assessment
+	deleteErr           error
+	deletedAssessmentID uuid.UUID
+	deletedVCenterID    uuid.UUID
 }
 
 func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*model2.Assessment, error) {
@@ -24,6 +28,12 @@ func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID)
 		return nil, service.NewErrAssessmentNotFound(id)
 	}
 	return s.assessment, nil
+}
+
+func (s *assessmentV2ServiceStub) DeleteVCenterInventory(_ context.Context, assessmentID, vcenterID uuid.UUID) error {
+	s.deletedAssessmentID = assessmentID
+	s.deletedVCenterID = vcenterID
+	return s.deleteErr
 }
 
 var _ = Describe("assessment v2 handler", func() {
@@ -106,5 +116,48 @@ var _ = Describe("assessment v2 handler", func() {
 				Expect(response.Vcenters).To(ConsistOf(HaveField("Id", vcenterID1.String())))
 			},
 		)
+	})
+
+	Context("DeleteVCenterInventory", func() {
+		var assessmentID uuid.UUID
+		var stub *assessmentV2ServiceStub
+		var handler *handlers.ServiceHandler
+
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			stub = &assessmentV2ServiceStub{}
+			handler = handlers.NewServiceHandler(nil, stub, nil, nil, nil, nil, nil, nil)
+		})
+
+		deleteVCenter := func() server.DeleteVCenterResponseObject {
+			GinkgoHelper()
+			response, err := handler.DeleteVCenter(context.Background(), server.DeleteVCenterRequestObject{
+				Id: assessmentID, Vid: vcenterID1,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			return response
+		}
+
+		It("passes both IDs to the service and returns 204", func() {
+			response := deleteVCenter()
+			Expect(response).To(BeAssignableToTypeOf(server.DeleteVCenter204Response{}))
+			Expect(stub.deletedAssessmentID).To(Equal(assessmentID))
+			Expect(stub.deletedVCenterID).To(Equal(vcenterID1))
+		})
+
+		It("returns 404 when the service cannot find the vCenter", func() {
+			stub.deleteErr = service.NewErrResourceNotFound(vcenterID1, "vcenter")
+			Expect(deleteVCenter()).To(BeAssignableToTypeOf(server.DeleteVCenter404JSONResponse{}))
+		})
+
+		It("returns 403 when deletion is forbidden", func() {
+			stub.deleteErr = service.NewErrForbidden("assessment", assessmentID.String())
+			Expect(deleteVCenter()).To(BeAssignableToTypeOf(server.DeleteVCenter403JSONResponse{}))
+		})
+
+		It("returns 500 for an unexpected service error", func() {
+			stub.deleteErr = errors.New("database unavailable")
+			Expect(deleteVCenter()).To(BeAssignableToTypeOf(server.DeleteVCenter500JSONResponse{}))
+		})
 	})
 })

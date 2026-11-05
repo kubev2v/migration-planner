@@ -278,6 +278,9 @@ type ClientInterface interface {
 	// UploadRvtoolsToAssessmentWithBody request with any body
 	UploadRvtoolsToAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// DeleteVCenter request
+	DeleteVCenter(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// GetVcenter request
 	GetVcenter(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
@@ -1094,6 +1097,18 @@ func (c *Client) GetAssessmentV2(ctx context.Context, id openapi_types.UUID, req
 
 func (c *Client) UploadRvtoolsToAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadRvtoolsToAssessmentRequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) DeleteVCenter(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteVCenterRequest(c.Server, id, vid)
 	if err != nil {
 		return nil, err
 	}
@@ -3084,6 +3099,47 @@ func NewUploadRvtoolsToAssessmentRequestWithBody(server string, id openapi_types
 	return req, nil
 }
 
+// NewDeleteVCenterRequest generates requests for DeleteVCenter
+func NewDeleteVCenterRequest(server string, id openapi_types.UUID, vid openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithLocation("simple", false, "vid", runtime.ParamLocationPath, vid)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/assessments/%s/vcenters/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("DELETE", queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewGetVcenterRequest generates requests for GetVcenter
 func NewGetVcenterRequest(server string, id openapi_types.UUID, vid openapi_types.UUID) (*http.Request, error) {
 	var err error
@@ -3429,6 +3485,9 @@ type ClientWithResponsesInterface interface {
 
 	// UploadRvtoolsToAssessmentWithBodyWithResponse request with any body
 	UploadRvtoolsToAssessmentWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsToAssessmentResponse, error)
+
+	// DeleteVCenterWithResponse request
+	DeleteVCenterWithResponse(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteVCenterResponse, error)
 
 	// GetVcenterWithResponse request
 	GetVcenterWithResponse(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetVcenterResponse, error)
@@ -4768,6 +4827,31 @@ func (r UploadRvtoolsToAssessmentResponse) StatusCode() int {
 	return 0
 }
 
+type DeleteVCenterResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteVCenterResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteVCenterResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type GetVcenterResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5434,6 +5518,15 @@ func (c *ClientWithResponses) UploadRvtoolsToAssessmentWithBodyWithResponse(ctx 
 		return nil, err
 	}
 	return ParseUploadRvtoolsToAssessmentResponse(rsp)
+}
+
+// DeleteVCenterWithResponse request returning *DeleteVCenterResponse
+func (c *ClientWithResponses) DeleteVCenterWithResponse(ctx context.Context, id openapi_types.UUID, vid openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteVCenterResponse, error) {
+	rsp, err := c.DeleteVCenter(ctx, id, vid, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteVCenterResponse(rsp)
 }
 
 // GetVcenterWithResponse request returning *GetVcenterResponse
@@ -8195,6 +8288,53 @@ func ParseUploadRvtoolsToAssessmentResponse(rsp *http.Response) (*UploadRvtoolsT
 		}
 		response.JSON400 = &dest
 
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteVCenterResponse parses an HTTP response from a DeleteVCenterWithResponse call
+func ParseDeleteVCenterResponse(rsp *http.Response) (*DeleteVCenterResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteVCenterResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {

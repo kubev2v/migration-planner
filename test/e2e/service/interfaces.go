@@ -35,6 +35,8 @@ type assessmentApi interface {
 	CreateRVToolsV2Job(name, filepath string) (*v1alpha1.Job, error)
 	UploadRVToolsToAssessment(uuid.UUID, string) (*v1alpha1.Job, error)
 	GetAssessmentV2(uuid.UUID) (*v1alpha1.AssessmentV2, error)
+	GetVCenterV2(uuid.UUID, uuid.UUID) (int, error)
+	DeleteVCenterInventory(uuid.UUID, uuid.UUID) (int, error)
 	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
 	GetAssessments() (*v1alpha1.AssessmentList, error)
 	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)

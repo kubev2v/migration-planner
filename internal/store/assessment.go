@@ -21,6 +21,7 @@ type Assessment interface {
 	Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error)
 	Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error)
 	UpsertInventories(ctx context.Context, inventory ...model.AssessmentInventory) error
+	DeleteInventory(ctx context.Context, assessmentID, inventoryID uuid.UUID) error
 	Delete(ctx context.Context, id uuid.UUID) error
 }
 
@@ -143,6 +144,14 @@ func (a *AssessmentStore) UpsertInventories(ctx context.Context, inventories ...
 		return err
 	}
 
+	return nil
+}
+
+func (a *AssessmentStore) DeleteInventory(ctx context.Context, assessmentID, inventoryID uuid.UUID) error {
+	result := a.getDB(ctx).Unscoped().Delete(&storemodel.AssessmentInventory{}, "id = ? AND assessment_id = ?", inventoryID, assessmentID)
+	if result.Error != nil {
+		return result.Error
+	}
 	return nil
 }
 
