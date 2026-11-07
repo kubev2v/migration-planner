@@ -44,11 +44,17 @@ func (v ValidationResult) Error() error {
 	if !v.HasErrors() {
 		return nil
 	}
-	msg := "schema validation failed:"
-	for _, e := range v.Errors {
-		msg += fmt.Sprintf("\n  - [%s] %s", e.Code, e.Message)
+	for _, issue := range v.Errors {
+		switch issue.Code {
+		case CodeNoVMs, CodeMissingVMID, CodeMissingVMName, CodeMissingCluster, CodeMissingVISDKUUID:
+			if issue.Message != "" {
+				continue
+			}
+		}
+		// Query failures and unrecognized issues remain diagnostic errors for the caller.
+		return fmt.Errorf("schema validation failed: %v", v.Errors)
 	}
-	return fmt.Errorf("%s", msg)
+	return &SchemaValidationError{Result: v}
 }
 
 // Validation codes for errors

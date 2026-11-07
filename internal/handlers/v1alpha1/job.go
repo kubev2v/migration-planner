@@ -2,6 +2,7 @@ package v1alpha1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -145,7 +146,10 @@ func validateXLSXFile(path string) error {
 
 	header := make([]byte, 4)
 	if _, err := io.ReadFull(f, header); err != nil {
-		return validator.NewErrInvalidFile("file is not a valid Excel file")
+		if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return validator.NewErrInvalidFile("file is not a valid Excel file")
+		}
+		return fmt.Errorf("reading file signature: %w", err)
 	}
 	return validator.ValidateXLSXMagicBytes(header)
 }
@@ -172,7 +176,7 @@ func (h *ServiceHandler) GetJob(ctx context.Context, request server.GetJobReques
 			return server.GetJob403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.GetJob500JSONResponse{Message: fmt.Sprintf("failed to get job: %v", err)}, nil
+			return server.GetJob500JSONResponse{Message: "failed to get job"}, nil
 		}
 	}
 
@@ -203,7 +207,7 @@ func (h *ServiceHandler) CancelJob(ctx context.Context, request server.CancelJob
 			return server.CancelJob403JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
-			return server.CancelJob500JSONResponse{Message: fmt.Sprintf("failed to cancel job: %v", err)}, nil
+			return server.CancelJob500JSONResponse{Message: "failed to cancel job"}, nil
 		}
 	}
 
