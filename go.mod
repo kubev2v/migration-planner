@@ -22,7 +22,7 @@ require (
 	github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
-	github.com/minio/minio-go/v7 v7.0.95
+	github.com/minio/minio-go/v7 v7.4.1
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.1.2
 	github.com/oapi-codegen/runtime v1.8.0
@@ -222,7 +222,7 @@ require (
 
 replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
-	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
+	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.4.1
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
