@@ -28,7 +28,7 @@ require (
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
-	github.com/open-policy-agent/opa v1.6.0
+	github.com/open-policy-agent/opa v1.22.0
 	github.com/openshift/api v0.0.0-20261107000926-248dd91956ce
 	github.com/openshift/assisted-image-service v0.0.0-20261031020327-e0b16b6ec041
 	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
