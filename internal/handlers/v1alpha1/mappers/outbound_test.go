@@ -346,3 +346,19 @@ var _ = Describe("Inventory host storage metadata", func() {
 		Entry("historical inventory without storage", `{"id":"host1","vendor":"vendor","model":"model"}`),
 	)
 })
+
+var _ = DescribeTable("Inventory OS MTV status preserves through the service model and persisted inventory",
+	func(status *api.OsInfoMtvStatus) {
+		osInfo := map[string]api.OsInfo{"guest": {Count: 1, Supported: true, MtvStatus: status}}
+		input := api.Inventory{Vcenter: &api.InventoryData{Vms: api.VMs{OsInfo: &osInfo}}}
+		data, err := json.Marshal(mappers.InventoryFromAPI(input))
+		Expect(err).NotTo(HaveOccurred())
+		var restored model2.Inventory
+		Expect(json.Unmarshal(data, &restored)).To(Succeed())
+		output := mappers.InventoryToAPI(restored)
+		Expect((*output.Vcenter.Vms.OsInfo)["guest"].MtvStatus).To(Equal(status))
+	},
+	Entry("unreported", nil),
+	Entry("green", new(api.Green)),
+	Entry("blue", new(api.Blue)),
+)

@@ -1604,6 +1604,8 @@ func TestInventory_ExcludesMigrationExcludedVMs(t *testing.T) {
 
 	// Verify OS distribution excludes excluded VMs
 	assert.Equal(t, 2, inv.VCenter.VMs.OSInfo["Red Hat Enterprise Linux 8 (64-bit)"].Count, "RHEL 8 count should exclude excluded VMs")
+	assert.Equal(t, inventory.MTVStatusGreen, inv.VCenter.VMs.OSInfo["Red Hat Enterprise Linux 8 (64-bit)"].MTVStatus)
+	assert.Empty(t, inv.VCenter.VMs.OSInfo["CentOS 7 (64-bit)"].MTVStatus)
 	assert.Equal(t, 1, inv.VCenter.VMs.OSInfo["CentOS 7 (64-bit)"].Count, "CentOS 7 count should exclude excluded VMs")
 	assert.NotContains(t, inv.VCenter.VMs.OSInfo, "Windows Server 2019 (64-bit)", "Windows should not appear as all Windows VMs are excluded")
 

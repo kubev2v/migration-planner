@@ -91,6 +91,10 @@ func vmsFromDuckDB(v *inventory.VMsData) svcmodel.VMs {
 			Supported:   os.IsSupported,
 			SupportTier: &tier,
 		}
+		if os.MTVStatus != "" {
+			status := svcmodel.OsInfoMtvStatus(os.MTVStatus)
+			info.MtvStatus = &status
+		}
 		if os.UpgradeRecommendation != "" {
 			rec := os.UpgradeRecommendation
 			info.UpgradeRecommendation = &rec
