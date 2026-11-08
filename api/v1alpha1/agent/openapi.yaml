@@ -300,12 +300,12 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
-  /api/v1/sources/{id}/agent-image:
+  /api/v1/sources/{id}/agent-image-url:
     get:
       tags:
         - source
-      description: Download the appliance (agent) image tar served with the current ISO, for in-place agent updates
-      operationId: getAgentImage
+      description: Get a presigned URL to download the appliance (agent) image tar served with the current ISO, for in-place agent updates
+      operationId: getAgentImageURL
       parameters:
         - name: id
           in: path
@@ -316,7 +316,11 @@ paths:
             format: uuid
       responses:
         "200":
-          description: The appliance image OCI archive (application/x-tar); supports Range and conditional requests
+          description: Presigned URL to download the appliance image tar
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/presigned-url'
         "401":
           description: Unauthorized
           content:
@@ -325,6 +329,12 @@ paths:
                 $ref: '../openapi.yaml#/components/schemas/Error'
         "403":
           description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: NotFound
           content:
             application/json:
               schema:

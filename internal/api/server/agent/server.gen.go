@@ -26,8 +26,8 @@ type ServerInterface interface {
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
-	// (GET /api/v1/sources/{id}/agent-image)
-	GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	// (GET /api/v1/sources/{id}/agent-image-url)
+	GetAgentImageURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -53,8 +53,8 @@ func (_ Unimplemented) UpdateSource(w http.ResponseWriter, r *http.Request, id o
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// (GET /api/v1/sources/{id}/agent-image)
-func (_ Unimplemented) GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+// (GET /api/v1/sources/{id}/agent-image-url)
+func (_ Unimplemented) GetAgentImageURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -134,8 +134,8 @@ func (siw *ServerInterfaceWrapper) UpdateSource(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r.WithContext(ctx))
 }
 
-// GetAgentImage operation middleware
-func (siw *ServerInterfaceWrapper) GetAgentImage(w http.ResponseWriter, r *http.Request) {
+// GetAgentImageURL operation middleware
+func (siw *ServerInterfaceWrapper) GetAgentImageURL(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var err error
@@ -150,7 +150,7 @@ func (siw *ServerInterfaceWrapper) GetAgentImage(w http.ResponseWriter, r *http.
 	}
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetAgentImage(w, r, id)
+		siw.Handler.GetAgentImageURL(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -376,7 +376,7 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/v1/sources/{id}", wrapper.UpdateSource)
 	})
 	r.Group(func(r chi.Router) {
-		r.Get(options.BaseURL+"/api/v1/sources/{id}/agent-image", wrapper.GetAgentImage)
+		r.Get(options.BaseURL+"/api/v1/sources/{id}/agent-image-url", wrapper.GetAgentImageURL)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v1/sources/{id}/status", wrapper.UpdateSourceInventory)
@@ -524,52 +524,62 @@ func (response UpdateSource500JSONResponse) VisitUpdateSourceResponse(w http.Res
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAgentImageRequestObject struct {
+type GetAgentImageURLRequestObject struct {
 	Id openapi_types.UUID `json:"id"`
 }
 
-type GetAgentImageResponseObject interface {
-	VisitGetAgentImageResponse(w http.ResponseWriter) error
+type GetAgentImageURLResponseObject interface {
+	VisitGetAgentImageURLResponse(w http.ResponseWriter) error
 }
 
-type GetAgentImage200Response struct {
-}
+type GetAgentImageURL200JSONResponse externalRef0.PresignedUrl
 
-func (response GetAgentImage200Response) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+func (response GetAgentImageURL200JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
-	return nil
+
+	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAgentImage401JSONResponse externalRef0.Error
+type GetAgentImageURL401JSONResponse externalRef0.Error
 
-func (response GetAgentImage401JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+func (response GetAgentImageURL401JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(401)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAgentImage403JSONResponse externalRef0.Error
+type GetAgentImageURL403JSONResponse externalRef0.Error
 
-func (response GetAgentImage403JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+func (response GetAgentImageURL403JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(403)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAgentImage500JSONResponse externalRef0.Error
+type GetAgentImageURL404JSONResponse externalRef0.Error
 
-func (response GetAgentImage500JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+func (response GetAgentImageURL404JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAgentImageURL500JSONResponse externalRef0.Error
+
+func (response GetAgentImageURL500JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetAgentImage503JSONResponse externalRef0.Error
+type GetAgentImageURL503JSONResponse externalRef0.Error
 
-func (response GetAgentImage503JSONResponse) VisitGetAgentImageResponse(w http.ResponseWriter) error {
+func (response GetAgentImageURL503JSONResponse) VisitGetAgentImageURLResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(503)
 
@@ -783,8 +793,8 @@ type StrictServerInterface interface {
 	// (PUT /api/v1/sources/{id})
 	UpdateSource(ctx context.Context, request UpdateSourceRequestObject) (UpdateSourceResponseObject, error)
 
-	// (GET /api/v1/sources/{id}/agent-image)
-	GetAgentImage(ctx context.Context, request GetAgentImageRequestObject) (GetAgentImageResponseObject, error)
+	// (GET /api/v1/sources/{id}/agent-image-url)
+	GetAgentImageURL(ctx context.Context, request GetAgentImageURLRequestObject) (GetAgentImageURLResponseObject, error)
 
 	// (PUT /api/v1/sources/{id}/status)
 	UpdateSourceInventory(ctx context.Context, request UpdateSourceInventoryRequestObject) (UpdateSourceInventoryResponseObject, error)
@@ -891,25 +901,25 @@ func (sh *strictHandler) UpdateSource(w http.ResponseWriter, r *http.Request, id
 	}
 }
 
-// GetAgentImage operation middleware
-func (sh *strictHandler) GetAgentImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
-	var request GetAgentImageRequestObject
+// GetAgentImageURL operation middleware
+func (sh *strictHandler) GetAgentImageURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request GetAgentImageURLRequestObject
 
 	request.Id = id
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
-		return sh.ssi.GetAgentImage(ctx, request.(GetAgentImageRequestObject))
+		return sh.ssi.GetAgentImageURL(ctx, request.(GetAgentImageURLRequestObject))
 	}
 	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetAgentImage")
+		handler = middleware(handler, "GetAgentImageURL")
 	}
 
 	response, err := handler(r.Context(), w, r, request)
 
 	if err != nil {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
-	} else if validResponse, ok := response.(GetAgentImageResponseObject); ok {
-		if err := validResponse.VisitGetAgentImageResponse(w); err != nil {
+	} else if validResponse, ok := response.(GetAgentImageURLResponseObject); ok {
+		if err := validResponse.VisitGetAgentImageURLResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

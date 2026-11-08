@@ -102,8 +102,8 @@ type ClientInterface interface {
 
 	UpdateSource(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetAgentImage request
-	GetAgentImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	// GetAgentImageURL request
+	GetAgentImageURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateSourceInventoryWithBody request with any body
 	UpdateSourceInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -167,8 +167,8 @@ func (c *Client) UpdateSource(ctx context.Context, id openapi_types.UUID, body U
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetAgentImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetAgentImageRequest(c.Server, id)
+func (c *Client) GetAgentImageURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetAgentImageURLRequest(c.Server, id)
 	if err != nil {
 		return nil, err
 	}
@@ -333,8 +333,8 @@ func NewUpdateSourceRequestWithBody(server string, id openapi_types.UUID, conten
 	return req, nil
 }
 
-// NewGetAgentImageRequest generates requests for GetAgentImage
-func NewGetAgentImageRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+// NewGetAgentImageURLRequest generates requests for GetAgentImageURL
+func NewGetAgentImageURLRequest(server string, id openapi_types.UUID) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -349,7 +349,7 @@ func NewGetAgentImageRequest(server string, id openapi_types.UUID) (*http.Reques
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/v1/sources/%s/agent-image", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/sources/%s/agent-image-url", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -562,8 +562,8 @@ type ClientWithResponsesInterface interface {
 
 	UpdateSourceWithResponse(ctx context.Context, id openapi_types.UUID, body UpdateSourceJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSourceResponse, error)
 
-	// GetAgentImageWithResponse request
-	GetAgentImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentImageResponse, error)
+	// GetAgentImageURLWithResponse request
+	GetAgentImageURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentImageURLResponse, error)
 
 	// UpdateSourceInventoryWithBodyWithResponse request with any body
 	UpdateSourceInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSourceInventoryResponse, error)
@@ -632,17 +632,19 @@ func (r UpdateSourceResponse) StatusCode() int {
 	return 0
 }
 
-type GetAgentImageResponse struct {
+type GetAgentImageURLResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
+	JSON200      *externalRef0.PresignedUrl
 	JSON401      *externalRef0.Error
 	JSON403      *externalRef0.Error
+	JSON404      *externalRef0.Error
 	JSON500      *externalRef0.Error
 	JSON503      *externalRef0.Error
 }
 
 // Status returns HTTPResponse.Status
-func (r GetAgentImageResponse) Status() string {
+func (r GetAgentImageURLResponse) Status() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Status
 	}
@@ -650,7 +652,7 @@ func (r GetAgentImageResponse) Status() string {
 }
 
 // StatusCode returns HTTPResponse.StatusCode
-func (r GetAgentImageResponse) StatusCode() int {
+func (r GetAgentImageURLResponse) StatusCode() int {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.StatusCode
 	}
@@ -772,13 +774,13 @@ func (c *ClientWithResponses) UpdateSourceWithResponse(ctx context.Context, id o
 	return ParseUpdateSourceResponse(rsp)
 }
 
-// GetAgentImageWithResponse request returning *GetAgentImageResponse
-func (c *ClientWithResponses) GetAgentImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentImageResponse, error) {
-	rsp, err := c.GetAgentImage(ctx, id, reqEditors...)
+// GetAgentImageURLWithResponse request returning *GetAgentImageURLResponse
+func (c *ClientWithResponses) GetAgentImageURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAgentImageURLResponse, error) {
+	rsp, err := c.GetAgentImageURL(ctx, id, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
-	return ParseGetAgentImageResponse(rsp)
+	return ParseGetAgentImageURLResponse(rsp)
 }
 
 // UpdateSourceInventoryWithBodyWithResponse request with arbitrary body returning *UpdateSourceInventoryResponse
@@ -939,20 +941,27 @@ func ParseUpdateSourceResponse(rsp *http.Response) (*UpdateSourceResponse, error
 	return response, nil
 }
 
-// ParseGetAgentImageResponse parses an HTTP response from a GetAgentImageWithResponse call
-func ParseGetAgentImageResponse(rsp *http.Response) (*GetAgentImageResponse, error) {
+// ParseGetAgentImageURLResponse parses an HTTP response from a GetAgentImageURLWithResponse call
+func ParseGetAgentImageURLResponse(rsp *http.Response) (*GetAgentImageURLResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
 	defer func() { _ = rsp.Body.Close() }()
 	if err != nil {
 		return nil, err
 	}
 
-	response := &GetAgentImageResponse{
+	response := &GetAgentImageURLResponse{
 		Body:         bodyBytes,
 		HTTPResponse: rsp,
 	}
 
 	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest externalRef0.PresignedUrl
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest externalRef0.Error
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
@@ -966,6 +975,13 @@ func ParseGetAgentImageResponse(rsp *http.Response) (*GetAgentImageResponse, err
 			return nil, err
 		}
 		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest externalRef0.Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
 		var dest externalRef0.Error
