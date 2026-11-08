@@ -5,7 +5,9 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/model"
+	"github.com/kubev2v/migration-planner/internal/store/mappers"
+	storemodel "github.com/kubev2v/migration-planner/internal/store/model"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -31,7 +33,7 @@ func NewSource(db *gorm.DB) Source {
 }
 
 func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (model.SourceList, error) {
-	var sources model.SourceList
+	var sources storemodel.SourceList
 	tx := s.getDB(ctx).Model(&sources).Order("id").Preload("Agents").Preload("ImageInfra").Preload("Labels")
 
 	if filter != nil {
@@ -44,11 +46,23 @@ func (s *SourceStore) List(ctx context.Context, filter *SourceQueryFilter) (mode
 	if result.Error != nil {
 		return nil, result.Error
 	}
-	return sources, nil
+	resultSources := make(model.SourceList, 0, len(sources))
+	for _, source := range sources {
+		mapped, err := mappers.SourceFromStore(source)
+		if err != nil {
+			return nil, err
+		}
+		resultSources = append(resultSources, mapped)
+	}
+	return resultSources, nil
 }
 
 func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.Source, error) {
-	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&source)
+	stored, err := mappers.SourceToStore(source)
+	if err != nil {
+		return nil, err
+	}
+	result := s.getDB(ctx).Clauses(clause.Returning{}).Create(&stored)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrDuplicatedKey) {
 			return nil, ErrDuplicateKey
@@ -57,11 +71,15 @@ func (s *SourceStore) Create(ctx context.Context, source model.Source) (*model.S
 		return nil, result.Error
 	}
 
-	return &source, nil
+	mapped, err := mappers.SourceFromStore(stored)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, error) {
-	source := model.Source{ID: id}
+	source := storemodel.Source{ID: id}
 	result := s.getDB(ctx).Preload("Agents").Preload("ImageInfra").Preload("Labels").First(&source)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
@@ -69,11 +87,15 @@ func (s *SourceStore) Get(ctx context.Context, id uuid.UUID) (*model.Source, err
 		}
 		return nil, result.Error
 	}
-	return &source, nil
+	mapped, err := mappers.SourceFromStore(source)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
-	source := model.Source{ID: id}
+	source := storemodel.Source{ID: id}
 	result := s.getDB(ctx).Unscoped().Delete(&source)
 	if result.Error != nil && !errors.Is(result.Error, gorm.ErrRecordNotFound) {
 		zap.S().Named("source_store").Infof("ERROR: %v", result.Error)
@@ -83,12 +105,20 @@ func (s *SourceStore) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 func (s *SourceStore) Update(ctx context.Context, source model.Source) (*model.Source, error) {
-	result := s.getDB(ctx).Model(&source).Clauses(clause.Returning{}).Updates(&source)
+	stored, err := mappers.SourceToStore(source)
+	if err != nil {
+		return nil, err
+	}
+	result := s.getDB(ctx).Model(&stored).Clauses(clause.Returning{}).Updates(&stored)
 	if result.Error != nil {
 		return nil, result.Error
 	}
 
-	return &source, nil
+	mapped, err := mappers.SourceFromStore(stored)
+	if err != nil {
+		return nil, err
+	}
+	return &mapped, nil
 }
 
 func (s *SourceStore) getDB(ctx context.Context) *gorm.DB {

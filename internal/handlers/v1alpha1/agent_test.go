@@ -2,7 +2,6 @@ package v1alpha1_test
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"reflect"
 
@@ -267,9 +266,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
-			err = json.Unmarshal(source.Inventory, &inventory)
-			Expect(err).To(BeNil())
+			inventory := source.Inventory
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
 		})
 
@@ -310,9 +307,7 @@ var _ = Describe("agent service", Ordered, func() {
 			source, err := s.Source().Get(ctx, sourceID)
 			Expect(err).To(BeNil())
 
-			var inventory v1alpha1.Inventory
-			err = json.Unmarshal(source.Inventory, &inventory)
-			Expect(err).To(BeNil())
+			inventory := source.Inventory
 			Expect(inventory.VcenterId).To(Equal("vcenter"))
 
 			// second agent request

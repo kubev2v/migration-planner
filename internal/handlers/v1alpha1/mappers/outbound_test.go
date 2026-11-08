@@ -27,7 +27,7 @@ func TestMappers(t *testing.T) {
 
 var _ = Describe("SourceToApi", func() {
 	It("maps UpdateType when set", func() {
-		source := model.Source{
+		source := model2.Source{
 			ID:         uuid.New(),
 			Name:       "test-source",
 			UpdateType: "auto",
@@ -39,7 +39,7 @@ var _ = Describe("SourceToApi", func() {
 	})
 
 	It("omits UpdateType when empty", func() {
-		source := model.Source{
+		source := model2.Source{
 			ID:         uuid.New(),
 			Name:       "test-source",
 			UpdateType: "",
@@ -261,10 +261,10 @@ var _ = Describe("Inventory collection time", func() {
 		domain := mappers.InventoryFromAPI(input)
 		Expect(domain.CollectionTime).To(Equal(&want))
 		Expect(mappers.InventoryToAPI(domain).CollectionTime).To(Equal(&want))
-		source, err := mappers.SourceToApi(model.Source{Inventory: raw})
+		source, err := mappers.SourceToApi(model2.Source{Version: model2.InventoryVersionV2, Inventory: &domain})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(source.Inventory.CollectionTime).To(Equal(&want))
-		subset, err := mappers.SourceInventoryToApi(model.SourceSubsetInventory{Inventory: raw})
+		subset, err := mappers.SourceInventoryToApi(model2.SourceSubsetInventory{Version: model2.InventoryVersionV2, Inventory: domain})
 		Expect(err).NotTo(HaveOccurred())
 		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
 		assessmentID := uuid.New()

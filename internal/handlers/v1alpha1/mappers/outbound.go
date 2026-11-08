@@ -1,7 +1,6 @@
 package mappers
 
 import (
-	"encoding/json"
 	"fmt"
 	"slices"
 	"sort"
@@ -12,7 +11,6 @@ import (
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
@@ -84,7 +82,7 @@ func normalizeInventoryData(data *api.InventoryData) {
 	}
 }
 
-func SourceToApi(s model.Source) (api.Source, error) {
+func SourceToApi(s svcmodel.Source) (api.Source, error) {
 	source := api.Source{
 		Id:         s.ID,
 		Inventory:  nil,
@@ -99,43 +97,9 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		source.UpdateType = &ut
 	}
 
-	if len(s.Inventory) > 0 {
-		v := util.GetInventoryVersion(s.Inventory)
-		switch v {
-		case model.InventoryVersionV1:
-			i := api.InventoryData{}
-			if err := json.Unmarshal(s.Inventory, &i); err != nil {
-				return api.Source{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
-			}
-			if i.Vcenter == nil {
-				return api.Source{}, fmt.Errorf("v1 inventory missing vcenter data")
-			}
-			// Normalize to prevent null values from database
-			normalizeInventoryData(&i)
-			source.Inventory = &api.Inventory{
-				Vcenter:   &i,
-				VcenterId: i.Vcenter.Id,
-				Clusters:  map[string]api.InventoryData{},
-			}
-		default:
-			v2 := api.Inventory{}
-			if err := json.Unmarshal(s.Inventory, &v2); err != nil {
-				return api.Source{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
-			}
-			// Ensure clusters map is never nil (fix for null values from database)
-			if v2.Clusters == nil {
-				v2.Clusters = make(map[string]api.InventoryData)
-			}
-			// Normalize vcenter and all cluster inventories to prevent null values
-			if v2.Vcenter != nil {
-				normalizeInventoryData(v2.Vcenter)
-			}
-			for clusterID, clusterData := range v2.Clusters {
-				normalizeInventoryData(&clusterData)
-				v2.Clusters[clusterID] = clusterData
-			}
-			source.Inventory = &v2
-		}
+	if s.Inventory != nil {
+		inventory := normalizeDomainInventory(*s.Inventory)
+		source.Inventory = &inventory
 	}
 
 	if len(s.Labels) > 0 {
@@ -201,7 +165,7 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		return source, nil
 	}
 
-	slices.SortFunc(s.Agents, func(a model.Agent, b model.Agent) int {
+	slices.SortFunc(s.Agents, func(a svcmodel.Agent, b svcmodel.Agent) int {
 		if a.CreatedAt.Before(b.CreatedAt) {
 			return -1
 		}
@@ -216,7 +180,7 @@ func SourceToApi(s model.Source) (api.Source, error) {
 	return source, nil
 }
 
-func SourceListToApi(sources ...model.SourceList) api.SourceList {
+func SourceListToApi(sources ...svcmodel.SourceList) api.SourceList {
 	sourceList := []api.Source{}
 	for _, source := range sources {
 		for _, s := range source {
@@ -230,7 +194,7 @@ func SourceListToApi(sources ...model.SourceList) api.SourceList {
 	return sourceList
 }
 
-func SourceInventoryToApi(si model.SourceSubsetInventory) (agentAPI.SourceSubset, error) {
+func SourceInventoryToApi(si svcmodel.SourceSubsetInventory) (agentAPI.SourceSubset, error) {
 	// Convert UUIDs to openapi_types.UUID pointers
 	id := openapi_types.UUID(si.ID)
 	sourceId := openapi_types.UUID(si.SourceID)
@@ -252,19 +216,13 @@ func SourceInventoryToApi(si model.SourceSubsetInventory) (agentAPI.SourceSubset
 	updateType := agentAPI.SourceSubsetUpdateType(si.UpdateType)
 	subset.UpdateType = &updateType
 
-	// Unmarshal inventory
-	if len(si.Inventory) > 0 {
-		var inventory api.Inventory
-		if err := json.Unmarshal(si.Inventory, &inventory); err != nil {
-			return agentAPI.SourceSubset{}, fmt.Errorf("failed to unmarshal inventory: %w", err)
-		}
-		subset.Inventory = &inventory
-	}
+	inventory := InventoryToAPI(si.Inventory)
+	subset.Inventory = &inventory
 
 	return subset, nil
 }
 
-func AgentToApi(a model.Agent) api.Agent {
+func AgentToApi(a svcmodel.Agent) api.Agent {
 	return api.Agent{
 		Id:            a.ID,
 		Status:        api.StringToAgentStatus(a.Status),
@@ -462,43 +420,6 @@ func AssessmentInventoryToAPI(inv svcmodel.AssessmentInventory) (api.InventoryV2
 
 	normalizeInventoryData(&result.Data)
 
-	for id, cluster := range inventory.Clusters {
-		normalizeInventoryData(&cluster)
-		clusters[id] = cluster
-	}
-	return result, clusters, nil
-}
-
-func StoreAssessmentInventoryToAPI(inv model.AssessmentInventory) (api.InventoryV2, map[string]api.InventoryData, error) {
-	result := api.InventoryV2{Id: inv.VCenterID, CreatedAt: &inv.CreatedAt}
-	clusters := make(map[string]api.InventoryData)
-	if inv.Version == model.InventoryVersionV1 {
-		if err := json.Unmarshal(inv.Inventory, &result.Data); err != nil {
-			return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
-		}
-		if result.Id == "" && result.Data.Vcenter != nil {
-			result.Id = result.Data.Vcenter.Id
-		}
-		normalizeInventoryData(&result.Data)
-		return result, clusters, nil
-	}
-
-	var inventory api.Inventory
-	if err := json.Unmarshal(inv.Inventory, &inventory); err != nil {
-		return api.InventoryV2{}, nil, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
-	}
-	if result.Id == "" {
-		result.Id = inventory.VcenterId
-	}
-	if inventory.CreatedAt != nil {
-		result.CreatedAt = inventory.CreatedAt
-	}
-	result.VcenterVersion = inventory.VcenterVersion
-	result.CollectionTime = inventory.CollectionTime
-	if inventory.Vcenter != nil {
-		result.Data = *inventory.Vcenter
-	}
-	normalizeInventoryData(&result.Data)
 	for id, cluster := range inventory.Clusters {
 		normalizeInventoryData(&cluster)
 		clusters[id] = cluster

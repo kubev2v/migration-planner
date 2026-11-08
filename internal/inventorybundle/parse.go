@@ -14,8 +14,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
-	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
-	"github.com/kubev2v/migration-planner/internal/store/model"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -32,18 +31,18 @@ const (
 
 // Subset is one group inventory from a disconnected ZIP bundle.
 type Subset struct {
-	ID        uuid.UUID
-	Name      string
-	VCenterID string
-	VMsCount  int
-	Inventory []byte
+	ID        uuid.UUID          `json:"-"`
+	Name      string             `json:"name"`
+	VCenterID string             `json:"vcenterId,omitempty"`
+	VMsCount  int                `json:"vmsCount,omitempty"`
+	Inventory v1alpha1.Inventory `json:"inventory"`
 }
 
 // Parsed is the result of Parse. It is the full new inventory state from the
 // uploaded file: main inventory plus exactly the subsets present in the file
 // (none for JSON or a ZIP without subsets/).
 type Parsed struct {
-	MainInventory []byte
+	MainInventory v1alpha1.Inventory
 	VCenterID     string
 	AgentID       *uuid.UUID
 	Subsets       []Subset
@@ -127,13 +126,13 @@ func parseZip(data []byte) (Parsed, error) {
 			return Parsed{}, fmt.Errorf("zip archive contains duplicate subset %s", subsetID)
 		}
 		seenSubsets[subsetID] = struct{}{}
-		var update agentAPI.SourceSubsetUpdate
-		if err := json.Unmarshal(content, &update); err != nil {
+		var subset Subset
+		if err := json.Unmarshal(content, &subset); err != nil {
 			return Parsed{}, fmt.Errorf("invalid subset inventory %q: %w", name, err)
 		}
-		subset, err := subsetFromUpdate(subsetID, update)
-		if err != nil {
-			return Parsed{}, fmt.Errorf("invalid subset inventory %q: %w", name, err)
+		subset.ID = subsetID
+		if subset.Inventory.Clusters == nil {
+			subset.Inventory.Clusters = make(map[string]v1alpha1.InventoryData)
 		}
 		subsets = append(subsets, subset)
 	}
@@ -178,25 +177,6 @@ func subsetIDFromName(name string) (uuid.UUID, error) {
 	return id, nil
 }
 
-func subsetFromUpdate(id uuid.UUID, update agentAPI.SourceSubsetUpdate) (Subset, error) {
-	inventoryBytes, err := json.Marshal(update.Inventory)
-	if err != nil {
-		return Subset{}, fmt.Errorf("failed to encode subset inventory: %w", err)
-	}
-	subset := Subset{
-		ID:        id,
-		Name:      update.Name,
-		Inventory: inventoryBytes,
-	}
-	if update.VcenterId != nil {
-		subset.VCenterID = *update.VcenterId
-	}
-	if update.VmsCount != nil {
-		subset.VMsCount = *update.VmsCount
-	}
-	return subset, nil
-}
-
 func extractAgentID(data []byte) *uuid.UUID {
 	var probe struct {
 		AgentId *uuid.UUID `json:"agentId"`
@@ -207,7 +187,7 @@ func extractAgentID(data []byte) *uuid.UUID {
 	return probe.AgentId
 }
 
-func normalizeMainInventory(data []byte) ([]byte, string, error) {
+func normalizeMainInventory(data []byte) (v1alpha1.Inventory, string, error) {
 	var probe struct {
 		Inventory json.RawMessage `json:"inventory"`
 	}
@@ -223,24 +203,23 @@ func normalizeMainInventory(data []byte) ([]byte, string, error) {
 		}
 	}
 
-	if util.GetInventoryVersion(inventoryBytes) != model.InventoryVersionV2 {
-		return nil, "", fmt.Errorf("only v2 inventories are supported")
+	if util.GetInventoryVersion(inventoryBytes) != svcmodel.InventoryVersionV2 {
+		return v1alpha1.Inventory{}, "", fmt.Errorf("only v2 inventories are supported")
 	}
 
 	var inv v1alpha1.Inventory
 	if err := json.Unmarshal(inventoryBytes, &inv); err != nil {
-		return nil, "", fmt.Errorf("invalid inventory JSON: %w", err)
+		return v1alpha1.Inventory{}, "", fmt.Errorf("invalid inventory JSON: %w", err)
 	}
 	if inv.CreatedAt == nil {
 		now := time.Now().UTC()
 		inv.CreatedAt = &now
 	}
 
-	out, err := json.Marshal(inv)
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to re-encode inventory: %w", err)
+	if inv.Clusters == nil {
+		inv.Clusters = make(map[string]v1alpha1.InventoryData)
 	}
-	return out, inv.VcenterId, nil
+	return inv, inv.VcenterId, nil
 }
 
 func checkDecompressedSize(name string, uncompressed uint64, totalRead int64) error {
