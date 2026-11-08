@@ -333,6 +333,10 @@ func osInfoFromAPI(o api.OsInfo) svcmodel.OsInfo {
 		Supported:             o.Supported,
 		UpgradeRecommendation: o.UpgradeRecommendation,
 	}
+	if o.MtvStatus != nil {
+		status := svcmodel.OsInfoMtvStatus(*o.MtvStatus)
+		result.MtvStatus = &status
+	}
 	if o.SupportTier != nil {
 		tier := svcmodel.OsInfoSupportTier(*o.SupportTier)
 		result.SupportTier = &tier
