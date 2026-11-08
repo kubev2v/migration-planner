@@ -80,7 +80,7 @@ func (v *testCriticalValidator) Validate(ctx context.Context, vm models.VM) ([]m
 }
 
 // setupTestParser creates a new in-memory DuckDB parser with the test validator.
-func setupTestParser(t *testing.T, validator Validator) (*Parser, *sql.DB, func()) {
+func setupTestParser(t testing.TB, validator Validator) (*Parser, *sql.DB, func()) {
 	t.Helper()
 	db, err := sql.Open("duckdb", "")
 	require.NoError(t, err)
@@ -166,7 +166,7 @@ func defaultStandardSheets(vms, hosts []map[string]string) []ExcelSheet {
 
 // createTestExcel generates a test Excel file from variadic sheets (vInfo, vHost, vDisk, etc.).
 // Nothing is mandatory; pass only the sheets you need. Use NewExcelSheet(name, headers, rows).
-func createTestExcel(t *testing.T, sheets ...ExcelSheet) string {
+func createTestExcel(t testing.TB, sheets ...ExcelSheet) string {
 	t.Helper()
 
 	f := excelize.NewFile()
