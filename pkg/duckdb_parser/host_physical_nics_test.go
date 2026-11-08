@@ -168,7 +168,7 @@ var _ = Describe("Host physical NIC ingestion", func() {
 				Expect(hostID).To(Equal("host-1"))
 			})
 
-			It("clears NICs before importing a workbook without a vNIC sheet", func() {
+			It("clears collected NICs before an RVTools import without a vNIC sheet", func() {
 				Expect(parser.Cleanup()).To(Succeed())
 				result, err := parser.IngestRvTools(ctx, hostNICInputs.withoutNICs)
 				Expect(err).NotTo(HaveOccurred())
