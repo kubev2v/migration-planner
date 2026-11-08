@@ -57,6 +57,7 @@ systemd:
         Type=oneshot
         RemainAfterExit=yes
         ExecStart=/usr/local/sbin/podman-custom-selinux.sh
+        ExecStart=/usr/bin/install -m 0755 /run/media/iso/host/appliance-updater /usr/local/sbin/appliance-updater
         ExecStart=/bin/bash -c 'cat /sys/class/dmi/id/product_uuid > /var/lib/data/agent/agent_id'
         ExecStart=/bin/bash -c 'chown -R core:core /var/lib/data'
 
@@ -70,8 +71,8 @@ storage:
       label: "DATA"
 
   links:
-    - path: /home/core/.config/systemd/user/timers.target.wants/podman-auto-update.timer
-      target: /usr/lib/systemd/user/podman-auto-update.timer
+    - path: /home/core/.config/systemd/user/sockets.target.wants/podman.socket
+      target: /usr/lib/systemd/user/podman.socket
       user:
         name: core
       group:
@@ -88,6 +89,12 @@ storage:
         name: core
       group:
         name: core
+    - path: /home/core/.config/systemd/user/default.target.wants/planner-agent-image-recovery.service
+      target: /home/core/.config/systemd/user/planner-agent-image-recovery.service
+      user:
+        name: core
+      group:
+        name: core
   directories:
     - path: /var/lib/data/agent
       user:
@@ -95,6 +102,11 @@ storage:
       group:
         name: core
     - path: /var/lib/data/agent/updates
+      user:
+        name: core
+      group:
+        name: core
+    - path: /var/lib/data/agent/updates/.staging
       user:
         name: core
       group:
@@ -119,6 +131,11 @@ storage:
         name: core
     - path: /home/core/.config/systemd/user
       overwrite: true
+      user:
+        name: core
+      group:
+        name: core
+    - path: /home/core/.config/systemd/user/sockets.target.wants
       user:
         name: core
       group:
@@ -220,26 +237,45 @@ storage:
           exec skopeo copy --tmpdir /var/lib/data/tmp/ \
             "oci-archive:${IMAGE_TAR}" \
             "containers-storage:{{.AgentImage}}"
-    - path: /usr/local/sbin/update-planner-agent-image.sh
-      mode: 0755
+    - path: /home/core/.migration-planner/upgrade.json
+      mode: 0600
+      user:
+        name: core
+      group:
+        name: core
       contents:
         inline: |
-          #!/usr/bin/bash
-          set -euo pipefail
+          {
+            "data_dir": "/var/lib/data/agent",
+            "image_tag": {{ printf "%q" .AgentImage }},
+            "environment_file": "/home/core/.migration-planner/upgrade.env",
+            "command_seconds": 600,
+            "transitions": []
+          }
+    - path: /home/core/.config/systemd/user/planner-agent-image-recovery.service
+      mode: 0644
+      user:
+        name: core
+      group:
+        name: core
+      contents:
+        inline: |
+          [Unit]
+          Requires=podman.socket
+          After=podman.socket
+          Description=Recover unfinished agent image transactions
+          Requires=planner-agent-image-load.service
+          After=planner-agent-image-load.service
+          Before=planner-agent-image-update.path
 
-          readonly UPDATE_DIR=/var/lib/data/agent/updates
+          [Service]
+          Type=oneshot
+          RemainAfterExit=yes
+          TimeoutStartSec=infinity
+          ExecStart=/usr/local/sbin/appliance-updater recover
 
-          for tar in "${UPDATE_DIR}"/*.tar; do
-            [ -f "$tar" ] || continue
-            echo "Loading agent image from ${tar}..." >&2
-            if skopeo copy --tmpdir /var/lib/data/tmp/ "oci-archive:${tar}" "containers-storage:{{.AgentImage}}"; then
-              echo "Successfully loaded ${tar}, removing..." >&2
-              rm -f "$tar"
-            else
-              echo "Failed to load ${tar}, renaming to ${tar}.failed" >&2
-              mv "$tar" "${tar}.failed"
-            fi
-          done
+          [Install]
+          WantedBy=default.target
     - path: /home/core/.config/systemd/user/planner-agent-image-update.path
       mode: 0644
       user:
@@ -250,6 +286,8 @@ storage:
         inline: |
           [Unit]
           Description=Watch for agent image updates
+          Requires=planner-agent-image-recovery.service
+          After=planner-agent-image-recovery.service planner-agent.service
 
           [Path]
           PathExistsGlob=/var/lib/data/agent/updates/*.tar
@@ -265,11 +303,16 @@ storage:
       contents:
         inline: |
           [Unit]
-          Description=Load updated migration planner agent image
+          Requires=podman.socket
+          After=podman.socket
+          Description=Apply a host-coordinated agent image transaction
+          Requires=planner-agent-image-recovery.service
+          After=planner-agent-image-recovery.service
 
           [Service]
           Type=oneshot
-          ExecStart=/usr/local/sbin/update-planner-agent-image.sh
+          TimeoutStartSec=infinity
+          ExecStart=/usr/local/sbin/appliance-updater update
     - path: /home/core/.config/systemd/user/planner-agent-image-load.service
       mode: 0644
       user:
@@ -342,6 +385,8 @@ storage:
       contents:
         inline: |
           [Unit]
+          Requires=podman.socket
+          After=podman.socket
           Description=Planner agent quadlet
           After=planner-agent-image-load.service
           Requires=planner-agent-image-load.service
@@ -349,22 +394,30 @@ storage:
           [Container]
           Image={{.AgentImage}}
           ContainerName=planner-agent
-          Label=io.containers.autoupdate=local
+          Pull=never
+          # HTTP health confirms listener startup after host-managed migrations.
+          HealthCmd=curl -fsk https://localhost:3333/api/v2/version
+          HealthInterval=10s
+          HealthRetries=6
+          HealthStartPeriod=30s
+          Notify=healthy
           {{ if .DebugMode }}
           PublishPort=40001:40001
           {{ end }}
           Volume=/var/lib/data/agent:/var/lib/agent:Z
           Volume=/home/core/.migration-planner/jwt.json:/app/jwt.json:Z
           EnvironmentFile=/home/core/.migration-planner/agent.env
+          EnvironmentFile=/home/core/.migration-planner/upgrade.env
           Network=host
           UserNS=keep-id:uid=1001
 
           [Service]
-          # Extend timeout for pulling the image
-          TimeoutStartSec=600
+          # Every boot, restart, and manual start must pass the durable host gate.
+          TimeoutStartSec=660
           Restart=on-failure
           RestartSec=5
           ExecStartPre=/bin/bash -c 'echo "AGENT_AGENT_ID=$(cat /var/lib/data/agent/agent_id)" >> /home/core/.migration-planner/agent.env'
+          ExecStartPre=/usr/local/sbin/appliance-updater gate
 
           [Install]
           WantedBy=multi-user.target default.target

@@ -63,14 +63,13 @@ help:
 	@echo "    integration-test: run e2e integration tests"
 
 OS := $(shell uname -s | tr '[:upper:]' '[:lower:]')
-# Set build tags conditionally based on OS (libvirt support only on Linux)
+# Podman bindings use the remote client, without native signature or Btrfs dependencies.
+GO_TAGS := remote,containers_image_openpgp,exclude_graphdriver_btrfs
+# libvirt support is available only on Linux.
 ifeq ($(OS),linux)
-GO_TAGS := libvirt
-GO_BUILD_TAGS := -tags $(GO_TAGS)
-else
-GO_TAGS :=
-GO_BUILD_TAGS :=
+GO_TAGS := $(GO_TAGS),libvirt
 endif
+GO_BUILD_TAGS := -tags $(GO_TAGS)
 OC_VERSION ?= 4.17.9
 OC_BIN := $(shell command -v oc)
 oc: # Verify oc installed, in linux install it if not already installed
@@ -131,6 +130,10 @@ build-api: bin
 build-cli: bin
 	go build -buildvcs=false $(GO_BUILD_TAGS) $(GO_BUILD_FLAGS) -o $(GOBIN) ./cmd/planner
 
+.PHONY: build-appliance-updater
+build-appliance-updater: bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags remote,containers_image_openpgp -trimpath -buildvcs=false -o $(GOBIN)/appliance-updater-linux-amd64 ./cmd/appliance-updater
+
 .PHONY: build-local run-local stop-local
 
 build-local:
@@ -169,7 +172,7 @@ bin/.migration-planner-api-container: bin Containerfile.api go.mod go.sum $(GO_F
 
 migration-planner-api-container: bin/.migration-planner-api-container
 
-bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config
+bin/.migration-planner-iso-container: build/migration-planner-iso/Containerfile build/migration-planner-iso/build-ove-image.sh build/migration-planner-iso/config go.mod go.sum $(wildcard cmd/appliance-updater/*.go internal/applianceupdater/*.go)
 	@ISO_URL=$$(grep '^ISO_URL=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	ISO_CHECKSUM=$$(grep '^ISO_CHECKSUM=' build/migration-planner-iso/config | cut -d'=' -f2); \
 	APPLIANCE_IMAGE=$$(grep '^APPLIANCE_IMAGE=' build/migration-planner-iso/config | cut -d'=' -f2); \
