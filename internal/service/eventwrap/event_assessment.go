@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
+
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 
 	"go.uber.org/zap"
@@ -16,7 +18,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
 type EventAssessmentService struct {

@@ -2,9 +2,11 @@ package eventwrap
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/store"
+	"github.com/kubev2v/migration-planner/pkg/metrics"
 	"go.uber.org/zap"
 )
 
@@ -12,6 +14,11 @@ type OutboxDispatcher struct {
 	store    store.Store
 	writers  map[string][]Writer
 	interval time.Duration
+}
+
+type outcome struct {
+	integration string
+	result      string
 }
 
 const (
@@ -63,18 +70,8 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 	}
 
 	var toDelete, toRetain []int
+	var completedResults []outcome
 	for _, outboxEvent := range outboxEvents {
-		if outboxEvent.RetryCount >= outboxMaxRetries {
-			zap.S().Warnw(
-				"outbox dispatcher: max retries exceeded",
-				"id", outboxEvent.ID,
-				"event_type", outboxEvent.EventType,
-				"retries", outboxEvent.RetryCount,
-			)
-			toDelete = append(toDelete, outboxEvent.ID)
-			continue
-		}
-
 		writers, ok := d.writers[outboxEvent.EventType]
 		if !ok || len(writers) == 0 {
 			zap.S().Errorw("outbox dispatcher: no writer registered for event type, dropping",
@@ -84,14 +81,32 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 		}
 
 		// Write to all registered writers, collect errors
+		var results []outcome
 		var errs []error
 		for _, writer := range writers {
+			rl := metrics.IntegrationResultSuccess
 			if err := writer.Write(ctx, outboxEvent.Payload); err != nil {
 				errs = append(errs, err)
+				rl = metrics.IntegrationResultFailure
 			}
+			results = append(results, outcome{strings.Split(outboxEvent.EventType, "-")[0], rl})
 		}
 
-		if len(errs) > 0 {
+		outboxEvent.RetryCount++
+
+		if len(errs) == 0 {
+			zap.S().Debugw(
+				"successfully dispatched",
+				"id", outboxEvent.ID,
+				"event_type", outboxEvent.EventType,
+			)
+			toDelete = append(toDelete, outboxEvent.ID)
+			completedResults = append(completedResults, results...)
+			continue
+		}
+
+		// has errors but not yet exceeds max retries
+		if !outboxEvent.Exceeds(outboxMaxRetries) {
 			zap.S().Errorw(
 				"outbox dispatcher: failed to write event, will retry",
 				"id", outboxEvent.ID,
@@ -104,23 +119,33 @@ func (d *OutboxDispatcher) processBatch(ctx context.Context) {
 			continue
 		}
 
-		zap.S().Debugw(
-			"successfully dispatched",
+		zap.S().Warnw(
+			"outbox dispatcher: max retries exceeded",
 			"id", outboxEvent.ID,
 			"event_type", outboxEvent.EventType,
+			"retries", outboxEvent.RetryCount,
 		)
+
 		toDelete = append(toDelete, outboxEvent.ID)
+		completedResults = append(completedResults, results...)
 	}
 
 	if err := d.store.Outbox().Delete(ctx, toDelete...); err != nil {
 		zap.S().Errorw("outbox dispatcher: failed to delete toDelete events", "error", err)
+		return
 	}
 
 	if err := d.store.Outbox().MarkFailed(ctx, outboxBackoffBase, outboxBackoffCapSeconds, toRetain...); err != nil {
 		zap.S().Errorw("outbox dispatcher: failed to record retry backoff", "error", err)
+		return
 	}
 
 	if _, err := store.Commit(ctx); err != nil {
 		zap.S().Errorw("outbox dispatcher: failed to commit transaction", "error", err)
+		return
+	}
+
+	for _, o := range completedResults {
+		metrics.RecordIntegrationResult(o.integration, o.result)
 	}
 }
