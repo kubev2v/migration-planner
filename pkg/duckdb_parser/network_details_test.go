@@ -10,6 +10,157 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestVMkernelSourceRetention(t *testing.T) {
+	for _, source := range []string{"rvtools", "rvtools-legacy", "sqlite", "sqlite-unknown-mtu"} {
+		t.Run(source, func(t *testing.T) {
+			rvtools := source == "rvtools" || source == "rvtools-legacy"
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			if rvtools {
+				vms := []map[string]string{{"VM ID": "vm-1", "VM": "first", "Host": "host-1", "Cluster": "cluster1", "VI SDK UUID": "vc-1"}}
+				sheets := defaultStandardSheets(vms, nil)
+				var kept []ExcelSheet
+				for _, sheet := range sheets {
+					if sheet.Name != "dvSwitch" && sheet.Name != "dvPort" && sheet.Name != "vPort" && sheet.Name != "vNetwork" {
+						kept = append(kept, sheet)
+					}
+				}
+				switchHeaders := []string{"Name", "Switch", "Max MTU"}
+				portHeaders := []string{"Port", "Switch", "VLAN"}
+				if source == "rvtools" {
+					switchHeaders = append(switchHeaders, "Object ID")
+					portHeaders = append(portHeaders, "Object ID")
+				}
+				sheets = append(kept,
+					NewExcelSheet("vNetwork", []string{"VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch", "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"}, []map[string]string{
+						{"VM ID": "vm-1", "Network": " management ", "Mac Address": "01", "Switch": "vSwitch0", "Type": "assigned"},
+						{"VM ID": "vm-1", "Network": "storage", "Mac Address": "02", "Switch": "distributed", "Type": "generated"},
+						{"VM ID": "vm-1", "Network": " management ", "Mac Address": "03", "Switch": "vSwitch0", "Type": "manual"},
+					}),
+					NewExcelSheet("vSwitch", []string{"Host", "Switch", "MTU"}, []map[string]string{{"Host": "host-1", "Switch": "vSwitch0", "MTU": "1500"}}),
+					NewExcelSheet("vPort", []string{"Host", "Port Group", "Switch", "VLAN"}, []map[string]string{{"Host": "host-1", "Port Group": " management ", "Switch": "vSwitch0"}}),
+					NewExcelSheet("dvSwitch", switchHeaders, []map[string]string{{"Name": "distributed", "Switch": "distributed", "Object ID": "dvs-1", "Max MTU": "9000"}}),
+					NewExcelSheet("dvPort", portHeaders, []map[string]string{{"Port": "storage", "Switch": "distributed", "Object ID": "dpg-id"}, {"Port": " unlinked ", "Switch": " source-switch ", "Object ID": ""}}),
+					NewExcelSheet("vSC_VMK", []string{"Host", "Device", "Port Group", "MTU"}, []map[string]string{
+						{"Host": "host-1", "Device": "vmk0", "Port Group": " management ", "MTU": "1500"},
+						{"Host": "host-1", "Device": "vmk1", "Port Group": "storage", "MTU": "9000"},
+						{"Host": "host-1", "Device": "vmk2", "Port Group": "missing"},
+						{"Host": "host-1", "Device": "vmk3", "Port Group": ""},
+					}))
+				_, err := parser.IngestRvTools(ctx, createTestExcel(t, sheets...))
+				require.NoError(t, err)
+			} else {
+				path := createTestSQLite(t, "vc-1", []sqliteCluster{{id: "c1", name: "cluster1", datacenter: "dc1"}}, []sqliteVM{{id: "vm-1", name: "first", clusterName: "cluster1", nics: `[{"network":{"id":"net-std"},"mac":"01","deviceKey":1},{"network":{"id":"dpg-id"},"mac":"02","deviceKey":2}]`}})
+				_, err := db.Exec(fmt.Sprintf("ATTACH '%s' AS fixture (TYPE sqlite)", escapeSQLString(path)))
+				require.NoError(t, err)
+				_, err = db.Exec(`INSERT INTO fixture.Network (ID,Name,DVSwitch,VlanId,Variant,"Key") VALUES ('net-std','management',NULL,'','Standard',NULL),('dvs-1','distributed',NULL,'','DvSwitch',NULL),('dpg-id','storage','{"id":"dvs-1"}','','DvPortGroup','dpg-key'),('blank-group',' unlinked ','{"id":"source-switch"}','','DvPortGroup','');
+UPDATE fixture.Host SET Network = '{"switches":[{"key":"switch-key","name":"vSwitch0","mtu":1500}],"portGroups":[{"key":"","name":"management","vSwitch":"switch-key","vlanId":0}],"vNICs":[{"key":"k0","device":"vmk0","portGroup":"management","mtu":1500},{"key":"k1","device":"vmk1","dPortGroup":"dpg-key","mtu":9000},{"key":"k2","device":"vmk2","portGroup":"missing","mtu":0},{"key":"","device":"vmk3","dPortGroup":"","portGroup":"","mtu":0}]}'`)
+				require.NoError(t, err)
+				if source == "sqlite" {
+					_, err = db.Exec(`UPDATE fixture.Network SET MaxMTU=9000 WHERE ID='dvs-1'`)
+					require.NoError(t, err)
+				}
+				_, err = db.Exec("DETACH fixture")
+				require.NoError(t, err)
+				_, err = parser.IngestSqlite(ctx, path)
+				require.NoError(t, err)
+			}
+			var count int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM vsc_vmk`).Scan(&count))
+			require.Equal(t, 4, count)
+			var unknown sql.NullInt64
+			require.NoError(t, db.QueryRow(`SELECT "MTU" FROM vsc_vmk WHERE "Device"='vmk2'`).Scan(&unknown))
+			require.False(t, unknown.Valid)
+			require.NoError(t, db.QueryRow(`SELECT "Max MTU" FROM dvswitch WHERE "Switch"='distributed'`).Scan(&unknown))
+			require.Equal(t, source != "sqlite-unknown-mtu", unknown.Valid)
+			if source == "rvtools-legacy" {
+				var id sql.NullString
+				require.NoError(t, db.QueryRow(`SELECT "Object ID" FROM dvswitch WHERE "Switch"='distributed'`).Scan(&id))
+				require.False(t, id.Valid)
+				require.NoError(t, db.QueryRow(`SELECT "Object ID" FROM dvport WHERE "Port"='storage'`).Scan(&id))
+				require.False(t, id.Valid)
+			}
+			var reference, identity, switchRef sql.NullString
+			require.NoError(t, db.QueryRow(`SELECT "Port Group", "Key" FROM vsc_vmk WHERE "Device"='vmk3'`).Scan(&reference, &identity))
+			require.False(t, reference.Valid)
+			require.False(t, identity.Valid)
+			require.NoError(t, db.QueryRow(`SELECT "Switch", "Switch ID", "Key" FROM dvport WHERE "Port"=' unlinked '`).Scan(&reference, &switchRef, &identity))
+			require.False(t, identity.Valid)
+			if rvtools {
+				require.Equal(t, " source-switch ", reference.String)
+				require.False(t, switchRef.Valid)
+			} else {
+				require.False(t, reference.Valid)
+				require.Equal(t, "source-switch", switchRef.String)
+			}
+			require.NoError(t, db.QueryRow(`SELECT "Type", "Switch", "Network" FROM vnetwork WHERE "Mac Address"='01'`).Scan(&reference, &switchRef, &identity))
+			if rvtools {
+				require.Equal(t, "assigned", reference.String)
+				vms, err := parser.VMs(ctx, Filters{}, Options{})
+				require.NoError(t, err)
+				require.Len(t, vms, 1)
+				require.Len(t, vms[0].NICs, 3)
+				for _, nic := range vms[0].NICs {
+					require.Equal(t, map[string]string{"01": "assigned", "02": "generated", "03": "manual"}[nic.MAC], nic.Type)
+				}
+				require.Equal(t, " management ", identity.String)
+				require.Equal(t, "vSwitch0", switchRef.String)
+				require.NoError(t, db.QueryRow(`SELECT "Type" FROM vnetwork WHERE "Mac Address"='02'`).Scan(&reference))
+				require.Equal(t, "generated", reference.String)
+			} else {
+				require.Equal(t, "standard", reference.String)
+				var groupType string
+				require.NoError(t, db.QueryRow(`SELECT "Port Group Type" FROM vnetwork WHERE "Mac Address"='01'`).Scan(&groupType))
+				require.Equal(t, "standard", groupType)
+				require.NoError(t, db.QueryRow(`SELECT "Port Group Type" FROM vnetwork WHERE "Mac Address"='02'`).Scan(&groupType))
+				require.Equal(t, "distributed", groupType)
+				require.Equal(t, "management", identity.String)
+				require.False(t, switchRef.Valid)
+				require.NoError(t, db.QueryRow(`SELECT "Key" FROM vport WHERE "Port Group"='management'`).Scan(&identity))
+				require.False(t, identity.Valid)
+			}
+			query := NetworkTopologyQuery()
+			require.NoError(t, db.QueryRowContext(ctx, "WITH "+query+" SELECT COUNT(*) FROM network_vmkernel_links WHERE (interface->'portGroup') IS NOT NULL").Scan(&count))
+
+			require.Equal(t, 2, count)
+			require.NoError(t, db.QueryRowContext(ctx, "WITH "+query+" SELECT COUNT(*) FROM network_adapter_links WHERE port_group IS NOT NULL").Scan(&count))
+			if rvtools {
+				require.Equal(t, 3, count)
+			} else {
+				require.Equal(t, 2, count)
+			}
+			require.NoError(t, parser.Cleanup())
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM vsc_vmk`).Scan(&count))
+			require.Zero(t, count)
+		})
+	}
+}
+
+func TestNetworkTopologyRelationships(t *testing.T) {
+	ctx := context.Background()
+	_, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vinfo ("VM ID", "VM", "Host") VALUES ('vm-1','first','host-1'),('vm-2','second','host-2');
+INSERT INTO vport ("Host", "Port Group", "Switch") VALUES ('host-1','management','vSwitch0'),('host-2','management','vSwitch0');
+INSERT INTO vswitch VALUES ('host-1','vSwitch0','key-1',1500),('host-2','vSwitch0','key-2',9000);
+INSERT INTO dvswitch VALUES ('distributed','distributed','dvs-1',9000);
+INSERT INTO dvport ("Port","Switch","Object ID","Key","Switch ID") VALUES ('storage','distributed','dpg-id','dpg-key','dvs-1');
+INSERT INTO dvport ("Port","Switch","Object ID") VALUES ('management','vSwitch0','other-group');
+INSERT INTO vsc_vmk VALUES ('host-1','vmk0','key','management','standard',1500),('host-1','vmk1','key2','dpg-key','distributed',9000),('host-1','vmk2','key3','missing',NULL,NULL);
+INSERT INTO vnetwork ("VM ID","Network","Mac Address","Switch","Type","Port Group Type") VALUES ('vm-1','management','01','vSwitch0','assigned','standard'),('vm-1','management','02','vSwitch0','generated','standard'),('vm-2','management','03','vSwitch0','manual','standard');
+INSERT INTO vsc_vmk SELECT * FROM vsc_vmk;`)
+	require.NoError(t, err)
+	query := NetworkTopologyQuery()
+	var interfaces string
+	require.NoError(t, db.QueryRowContext(ctx, "WITH "+query+" SELECT interfaces FROM network_host_interfaces WHERE host='host-1'").Scan(&interfaces))
+	require.JSONEq(t, `[{"device":"vmk0","mtu":1500,"portGroupRef":"management","portGroup":{"name":"management","type":"standard","switch":{"id":"key-1","name":"vSwitch0","type":"standard","mtu":1500}}},{"device":"vmk1","mtu":9000,"portGroupRef":"dpg-key","portGroup":{"id":"dpg-id","name":"storage","type":"distributed","switch":{"id":"dvs-1","name":"distributed","type":"distributed","maxMtu":9000}}},{"device":"vmk2","portGroupRef":"missing"}]`, interfaces)
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, "WITH "+query+" SELECT COUNT(*) FROM network_adapter_links WHERE port_group IS NOT NULL").Scan(&count))
+	require.Equal(t, 3, count)
+
+}
+
 func TestIngestRvTools_NetworkDetails(t *testing.T) {
 	for _, withPorts := range []bool{true, false} {
 		t.Run(fmt.Sprintf("portSheets=%t", withPorts), func(t *testing.T) {
@@ -154,7 +305,7 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 			require.NoError(t, err)
 			_, err = src.Exec(`UPDATE dst.Host SET Network = '{"portGroups":[{"name":"shared","vlanId":0},{"name":"management","vlanId":100},{"name":"ambiguous","vlanId":200},{"name":"ambiguous","vlanId":300}]}'`)
 			require.NoError(t, err)
-			_, err = src.Exec(`INSERT INTO dst.Network VALUES
+			_, err = src.Exec(`INSERT INTO dst.Network (ID, Name, DVSwitch, VlanId) VALUES
 		('standard', 'shared', '{"kind":"","id":""}', ''),
 		('distributed', 'shared', '{"id":"dvs-1"}', '10-20,30-40'),
 		('unknown', 'shared', '{"id":"dvs-2"}', ''),

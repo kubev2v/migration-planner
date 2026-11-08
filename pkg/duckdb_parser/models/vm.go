@@ -106,15 +106,32 @@ type Disk struct {
 // IPv4Addresses and IPv6Addresses treat reported values as adapter IP addresses.
 // An IP address may also contain a CIDR suffix; values are not parsed as network ranges.
 type NIC struct {
-	Network         Ref      `json:"network"` // Changed from string to Ref
-	MAC             string   `json:"mac" db:"Mac Address"`
-	Label           string   `json:"label" db:"NIC label"`
-	Adapter         string   `json:"adapter" db:"Adapter"`
-	Switch          string   `json:"switch" db:"Switch"`
-	Connected       bool     `json:"connected" db:"Connected"`
-	StartsConnected bool     `json:"startsConnected" db:"Starts Connected"`
-	Type            string   `json:"type" db:"Type"`
-	IPv4Addresses   []string `json:"ipv4Addresses" db:"IPv4 Addresses"`
-	IPv6Addresses   []string `json:"ipv6Addresses" db:"IPv6 Addresses"`
-	VlanID          string   `json:"vlanId" db:"VLAN"`
+	PortGroup       *NetworkPortGroup `json:"portGroup,omitempty"`
+	Network         Ref               `json:"network"` // Changed from string to Ref
+	MAC             string            `json:"mac" db:"Mac Address"`
+	Label           string            `json:"label" db:"NIC label"`
+	Adapter         string            `json:"adapter" db:"Adapter"`
+	Switch          string            `json:"switch" db:"Switch"`
+	Connected       bool              `json:"connected" db:"Connected"`
+	StartsConnected bool              `json:"startsConnected" db:"Starts Connected"`
+	Type            string            `json:"type" db:"Type"`
+	IPv4Addresses   []string          `json:"ipv4Addresses" db:"IPv4 Addresses"`
+	IPv6Addresses   []string          `json:"ipv6Addresses" db:"IPv6 Addresses"`
+	VlanID          string            `json:"vlanId" db:"VLAN"`
+}
+
+// VirtualSwitch is the reported switch configuration, not an observed traffic path.
+type VirtualSwitch struct {
+	ID     string `json:"id,omitempty"`
+	Name   string `json:"name,omitempty"`
+	Type   string `json:"type"`
+	MTU    *int32 `json:"mtu,omitempty"`
+	MaxMTU *int32 `json:"maxMtu,omitempty"`
+}
+
+type NetworkPortGroup struct {
+	ID     string         `json:"id,omitempty"`
+	Name   string         `json:"name"`
+	Type   string         `json:"type"`
+	Switch *VirtualSwitch `json:"switch,omitempty"`
 }

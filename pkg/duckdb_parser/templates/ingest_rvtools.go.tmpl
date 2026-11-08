@@ -573,9 +573,10 @@ SELECT
 FROM read_xlsx('{{.FilePath}}', sheet='vNetwork', all_varchar=true) n
 WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
 
-INSERT INTO dvport ("Port", "VLAN", "Switch")
-SELECT "Port", "VLAN", "Switch"
-FROM read_xlsx('{{.FilePath}}', sheet='dvPort', all_varchar=true);
+INSERT INTO dvport ("Port", "VLAN", "Switch", "Object ID")
+SELECT "Port", "VLAN", "Switch",
+    NULLIF(NULLIF(to_json(p)->>'Object ID', ''), 'VM')
+FROM read_xlsx('{{.FilePath}}', sheet='dvPort', all_varchar=true) p;
 
 INSERT INTO vport ("Host", "Port Group", "Switch", "VLAN")
 SELECT "Host", "Port Group", "Switch", "VLAN"
@@ -616,9 +617,20 @@ WHERE p."Port" = n."Network" AND p."Switch" = n."Switch"
         AND s."Port Group" = n."Network" AND s."Switch" = n."Switch"
   );
 
-INSERT INTO dvswitch ("Name")
-SELECT DISTINCT "Name"
-FROM read_xlsx('{{.FilePath}}', sheet='dvSwitch', all_varchar=true);
+INSERT INTO dvswitch ("Name", "Switch", "Object ID", "Max MTU")
+SELECT DISTINCT "Name", s."Switch",
+    NULLIF(NULLIF(to_json(s)->>'Object ID', ''), 'VM'),
+    NULLIF(TRY_CAST(s."Max MTU" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='dvSwitch', all_varchar=true) s;
+
+INSERT INTO vswitch ("Host", "Switch", "MTU")
+SELECT "Host", "Switch", NULLIF(TRY_CAST(s."MTU" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vSwitch', all_varchar=true) s;
+
+INSERT INTO vsc_vmk ("Host", "Device", "Port Group", "MTU")
+SELECT "Host", "Device", NULLIF(NULLIF(i."Port Group", ''), 'VM'),
+    NULLIF(TRY_CAST(i."MTU" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vSC_VMK', all_varchar=true) i;
 
 CREATE TABLE vcluster_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vCluster', all_varchar=true);

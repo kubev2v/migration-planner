@@ -191,7 +191,7 @@ nic_ips AS (
 )
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
-    "Connected", "Starts Connected", "Type", "IPv4 Addresses", "IPv6 Addresses", "VLAN", "Cluster"
+    "Connected", "Starts Connected", "Type", "IPv4 Addresses", "IPv6 Addresses", "VLAN", "Cluster", "Port Group ID", "Port Group Type"
 )
 SELECT
     nf.vm_id,
@@ -199,7 +199,7 @@ SELECT
     nf.mac_addr,
     '',
     nf.adapter,
-    COALESCE(n.DVSwitch->>'id', ''),
+    NULLIF(n.DVSwitch->>'id', ''),
     true,
     true,
     CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN 'distributed' ELSE 'standard' END,
@@ -212,7 +212,9 @@ SELECT
                  '[{"name":"VARCHAR","vlanId":"INTEGER"}]')) AS t(pg)
              WHERE pg.name = n.Name
          ) END,
-    CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END
+    CASE WHEN c.Variant = 'ComputeResource' THEN '' ELSE c.Name END,
+    CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN n.ID END,
+    CASE WHEN COALESCE(n.DVSwitch->>'id', '') != '' THEN 'distributed' ELSE 'standard' END
 FROM nic_flat nf
 LEFT JOIN src.Cluster c ON nf.cluster_id = c.ID
 LEFT JOIN src.Network n ON nf.network_id = n.ID
@@ -378,12 +380,39 @@ GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.f
     COALESCE(ds.IORMEnabled, false), COALESCE(ds.IORMCongestionThreshold, 30),
     COALESCE(ds.IORMCongestionThresholdMode, 'automatic'), COALESCE(ds.IORMPercentOfPeakThroughput, 90);
 
-INSERT INTO dvport ("Port", "VLAN")
-SELECT
-    n.Name,
-    n.VlanId
+INSERT INTO dvport ("Port", "VLAN", "Switch", "Object ID", "Key", "Switch ID")
+SELECT n.Name, n.VlanId, s.Name, n.ID,
+    NULLIF(n.Key, ''), n.DVSwitch->>'id'
 FROM src.Network n
+LEFT JOIN src.Network s ON s.ID = (n.DVSwitch->>'id')
 WHERE COALESCE(n.DVSwitch->>'id', '') != '';
+
+INSERT INTO dvswitch ("Name", "Switch", "Object ID", "Max MTU")
+SELECT n.Name, n.Name, n.ID, NULLIF(n.MaxMTU, 0)
+FROM src.Network n
+WHERE n.Variant = 'DvSwitch';
+
+INSERT INTO vswitch ("Host", "Switch", "Key", "MTU")
+SELECT h.ID, s.value->>'name', NULLIF(s.value->>'key', ''), NULLIF(TRY_CAST(s.value->>'mtu' AS INTEGER), 0)
+FROM src.Host h, json_each(h.Network->'switches') s;
+
+WITH host_groups AS (
+    SELECT h.ID AS host, p.value AS port_group
+    FROM src.Host h, json_each(h.Network->'portGroups') p
+)
+INSERT INTO vport ("Host", "Port Group", "Switch", "VLAN", "Key")
+SELECT p.host, p.port_group->>'name',
+    COALESCE(s."Switch", NULLIF(p.port_group->>'vSwitch', '')),
+    p.port_group->>'vlanId', NULLIF(p.port_group->>'key', '')
+FROM host_groups p
+LEFT JOIN vswitch s ON s."Host" = p.host AND s."Key" = (p.port_group->>'vSwitch');
+
+INSERT INTO vsc_vmk ("Host", "Device", "Key", "Port Group", "Type", "MTU")
+SELECT h.ID, i.value->>'device', NULLIF(i.value->>'key', ''),
+    COALESCE(NULLIF(i.value->>'dPortGroup', ''), NULLIF(i.value->>'portGroup', '')),
+    CASE WHEN NULLIF(i.value->>'dPortGroup', '') IS NOT NULL THEN 'distributed' ELSE 'standard' END,
+    NULLIF(TRY_CAST(i.value->>'mtu' AS INTEGER), 0)
+FROM src.Host h, json_each(h.Network->'vNICs') i;
 
 {{/* Cluster ID hash duplicates generateClusterID (inventory_builder.go); keep in sync. Guarded by TestIngestSqlite_PopulatesVCluster. */}}
 INSERT INTO vcluster ("Name", "Object ID", "DrsEnabled", "DrsDefaultVmBehavior", "DasEnabled")
