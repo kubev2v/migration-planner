@@ -833,11 +833,20 @@ type Histogram struct {
 
 // Host defines model for Host.
 type Host struct {
+	// Cluster Source cluster name; omitted for standalone hosts.
+	Cluster *string `json:"cluster,omitempty"`
+
 	// CpuCores Number of CPU cores
 	CpuCores *int `json:"cpuCores"`
 
+	// CpuModel Source-reported CPU model, when available.
+	CpuModel *string `json:"cpuModel,omitempty"`
+
 	// CpuSockets Number of CPU sockets
 	CpuSockets *int `json:"cpuSockets"`
+
+	// Datacenter Source datacenter name, when available.
+	Datacenter *string `json:"datacenter,omitempty"`
 
 	// Id Unique identifier for this host
 	Id *string `json:"id,omitempty"`
@@ -845,6 +854,9 @@ type Host struct {
 	// MemoryMB Host memory in MB
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`
+
+	// SerialNumber Source-reported host hardware serial or service tag, when available.
+	SerialNumber *string `json:"serialNumber,omitempty"`
 
 	// StorageAdapters Available host storage adapters. Omitted when no records are available; this does not imply a complete empty inventory.
 	StorageAdapters *[]HostStorageAdapter `json:"storageAdapters,omitempty"`

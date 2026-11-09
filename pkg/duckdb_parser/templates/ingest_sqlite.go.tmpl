@@ -230,7 +230,7 @@ SELECT h.ID, h.ID, nic.value->>'key',
     NULLIF(TRY_CAST(nic.value->>'linkSpeed' AS INTEGER), 0)
 FROM src.Host h, json_each(COALESCE(NULLIF(h.Network->'pNICs', 'null'::JSON), '[]'::JSON)) nic;
 
-INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "CPU Model", "Serial Number", "Model", "Vendor", "Host", "Config status",
     "VMotion support", "Storage VMotion support", "VI SDK UUID")
 SELECT
     d.Name,
@@ -239,6 +239,11 @@ SELECT
     h.CpuSockets,
     h.ID,
     h.MemoryBytes / 1048576,
+    CASE WHEN UPPER(TRIM(COALESCE(to_json(h)->>'CpuModel', ''))) IN ('', 'VM') THEN NULL ELSE TRIM(to_json(h)->>'CpuModel') END,
+    COALESCE(
+        CASE WHEN UPPER(TRIM(COALESCE(to_json(h)->>'SerialNumber', ''))) IN ('', 'VM') THEN NULL ELSE TRIM(to_json(h)->>'SerialNumber') END,
+        CASE WHEN UPPER(TRIM(COALESCE(to_json(h)->>'ServiceTag', ''))) IN ('', 'VM') THEN NULL ELSE TRIM(to_json(h)->>'ServiceTag') END
+    ),
     h.Model,
     h.Vendor,
     h.ID,

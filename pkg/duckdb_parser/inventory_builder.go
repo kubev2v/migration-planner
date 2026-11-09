@@ -460,6 +460,10 @@ func (p *Parser) buildInfraData(
 			}
 			hosts = append(hosts, inventory.Host{
 				ID:                      h.Id,
+				Datacenter:              h.Datacenter,
+				Cluster:                 h.Cluster,
+				CpuModel:                h.CpuModel,
+				SerialNumber:            h.SerialNumber,
 				Vendor:                  h.Vendor,
 				Model:                   h.Model,
 				CpuCores:                h.CpuCores,

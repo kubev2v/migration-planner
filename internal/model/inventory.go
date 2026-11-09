@@ -154,6 +154,10 @@ type StorageIoConfiguration struct {
 
 // Host describes a single ESXi host.
 type Host struct {
+	Datacenter              *string               `json:"datacenter,omitempty"`
+	Cluster                 *string               `json:"cluster,omitempty"`
+	CpuModel                *string               `json:"cpuModel,omitempty"`
+	SerialNumber            *string               `json:"serialNumber,omitempty"`
 	CpuCores                *int                  `json:"cpuCores"`
 	CpuSockets              *int                  `json:"cpuSockets"`
 	Id                      *string               `json:"id,omitempty"`

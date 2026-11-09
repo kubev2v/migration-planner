@@ -135,6 +135,10 @@ type DiskTypeSummary struct {
 // Host represents a VMware ESXi host.
 type Host struct {
 	ID                      string
+	Datacenter              string
+	Cluster                 string
+	CpuModel                string
+	SerialNumber            string
 	Vendor                  string
 	Model                   string
 	CpuCores                int
