@@ -19,12 +19,28 @@ type ErrInvalidFile struct {
 	message string
 }
 
+var manualCountFieldLabels = map[string]string{
+	"PerpetualLicensesCount": "Number of perpetual licenses",
+	"CoresLicensingCount":    "Number of cores licensing",
+	"EnvironmentCount":       "Number of environments",
+	"OtherNodesCount":        "Number of other nodes",
+	"PhysicalLocationsCount": "Number of physical locations/datacenters",
+}
+
 func NewErrInvalidFile(format string, args ...any) *ErrInvalidFile {
 	return &ErrInvalidFile{message: fmt.Sprintf(format, args...)}
 }
 
 func (e *ErrInvalidFile) Error() string {
 	return e.message
+}
+
+func ManualCountError(field string) error {
+	label, ok := manualCountFieldLabels[field]
+	if !ok {
+		return nil
+	}
+	return fmt.Errorf("%s must be a whole number within the supported range", label)
 }
 
 // TransformValidationError converts validation errors into user-friendly messages

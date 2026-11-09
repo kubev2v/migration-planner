@@ -4,6 +4,7 @@
 package v1alpha1
 
 import (
+	"encoding/json"
 	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -691,6 +692,12 @@ type CustomerDetailsInput struct {
 	TargetHardware         *string `json:"targetHardware,omitempty" validate:"omitempty,max=1000"`
 }
 
+// CustomerDetailsRequest defines model for CustomerDetailsRequest.
+type CustomerDetailsRequest struct {
+	PhysicalLocationsCount *json.Number `json:"physicalLocationsCount,omitempty"`
+	TargetHardware         *string      `json:"targetHardware,omitempty" validate:"omitempty,max=1000"`
+}
+
 // CustomerList defines model for CustomerList.
 type CustomerList = []Customer
 
@@ -751,6 +758,20 @@ type EnhancementData struct {
 	VmwareSubscription  *VMwareSubscriptionInput  `json:"vmwareSubscription,omitempty"`
 	VmwareVersionCounts *VMwareVersionCountsInput `json:"vmwareVersionCounts,omitempty"`
 	VsphereCore         *VsphereCoreInput         `json:"vsphereCore,omitempty"`
+}
+
+// EnhancementDataRequest Request body for saving VMA enhancement data
+type EnhancementDataRequest struct {
+	ActiveEnvironments  *ActiveEnvironmentsInput    `json:"activeEnvironments,omitempty"`
+	AriaAutomation      *AriaAutomationInput        `json:"ariaAutomation,omitempty"`
+	AriaOps             *AriaOpsInput               `json:"ariaOps,omitempty"`
+	AriaSecure          *AriaSecureInput            `json:"ariaSecure,omitempty"`
+	CustomerDetails     *CustomerDetailsRequest     `json:"customerDetails,omitempty"`
+	DeployedEnvironment *DeployedEnvironmentInput   `json:"deployedEnvironment,omitempty"`
+	Nsx                 *NsxInput                   `json:"nsx,omitempty"`
+	VmwareSubscription  *VMwareSubscriptionInput    `json:"vmwareSubscription,omitempty"`
+	VmwareVersionCounts *VMwareVersionCountsRequest `json:"vmwareVersionCounts,omitempty"`
+	VsphereCore         *VsphereCoreInput           `json:"vsphereCore,omitempty"`
 }
 
 // Error defines model for Error.
@@ -1582,6 +1603,14 @@ type VMwareVersionCountsInput struct {
 	PerpetualLicensesCount *int `json:"perpetualLicensesCount,omitempty" validate:"omitempty,min=0"`
 }
 
+// VMwareVersionCountsRequest defines model for VMwareVersionCountsRequest.
+type VMwareVersionCountsRequest struct {
+	CoresLicensingCount    *json.Number `json:"coresLicensingCount,omitempty"`
+	EnvironmentCount       *json.Number `json:"environmentCount,omitempty"`
+	OtherNodesCount        *json.Number `json:"otherNodesCount,omitempty"`
+	PerpetualLicensesCount *json.Number `json:"perpetualLicensesCount,omitempty"`
+}
+
 // ValidatedCertificateChain defines model for ValidatedCertificateChain.
 type ValidatedCertificateChain = string
 
@@ -1702,7 +1731,7 @@ type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirements
 type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
 
 // SaveAssessmentEnhancementDataJSONRequestBody defines body for SaveAssessmentEnhancementData for application/json ContentType.
-type SaveAssessmentEnhancementDataJSONRequestBody = EnhancementData
+type SaveAssessmentEnhancementDataJSONRequestBody = EnhancementDataRequest
 
 // CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
 type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest

@@ -10,7 +10,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
-// validateEnhancementData validates the enhancement data using the generated struct's validate tags
+// validateEnhancementData validates the generated struct tags on enhancement data.
 func validateEnhancementData(data interface{}) error {
 	v := validator.NewValidator()
 	return validator.TransformValidationError(v.Struct(data))
@@ -44,7 +44,13 @@ func (h *ServiceHandler) SaveAssessmentEnhancementData(ctx context.Context, requ
 		return server.SaveAssessmentEnhancementData400JSONResponse{Message: err.Error()}, nil
 	}
 
-	stored, err := h.enhancementDataSrv.Save(ctx, request.Id, *request.Body)
+	data, err := mapEnhancementDataRequest(*request.Body)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.SaveAssessmentEnhancementData400JSONResponse{Message: err.Error()}, nil
+	}
+
+	stored, err := h.enhancementDataSrv.Save(ctx, request.Id, data)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.SaveAssessmentEnhancementData500JSONResponse{Message: fmt.Sprintf("failed to save enhancement data: %v", err)}, nil
