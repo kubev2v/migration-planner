@@ -134,6 +134,8 @@ CREATE TABLE IF NOT EXISTS vhost (
     "# CPU" INTEGER DEFAULT 0,
     "Object ID" VARCHAR,
     "# Memory" INTEGER DEFAULT 0,
+    "CPU Model" VARCHAR,
+    "Serial Number" VARCHAR,
     "Model" VARCHAR,
     "Vendor" VARCHAR,
     "Host" VARCHAR,
@@ -145,6 +147,8 @@ CREATE TABLE IF NOT EXISTS vhost (
 
 -- Retain source identity for host storage ownership in writable collections.
 ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
+ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "CPU Model" VARCHAR;
+ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "Serial Number" VARCHAR;
 
 CREATE TABLE IF NOT EXISTS vdatastore (
     "Hosts" VARCHAR,

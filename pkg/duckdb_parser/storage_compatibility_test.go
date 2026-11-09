@@ -20,7 +20,7 @@ func newPreStorageDatabase(t *testing.T, path string) *sql.DB {
 	require.NoError(t, err)
 	_, err = db.Exec(string(schema))
 	require.NoError(t, err)
-	_, err = db.Exec(`INSERT INTO vinfo ("VM ID", "VM", "Template", "Cluster") VALUES ('vm-1', 'legacy-vm', false, 'cluster1');
+	_, err = db.Exec(`INSERT INTO vinfo ("VM ID", "VM", "Host", "Host ID", "Template", "Cluster") VALUES ('vm-1', 'legacy-vm', 'esxi.example.com', 'host-1', false, 'cluster1');
 INSERT INTO vhost ("Object ID", "Host", "Cluster") VALUES ('host-1', 'esxi.example.com', 'cluster1');
 INSERT INTO vhba ("Device", "Type") VALUES ('vmhba64', 'ISCSI');
 INSERT INTO vdatastore ("Object ID", "Name", "Hosts", "Type", "Address", "Capacity MiB", "Free MiB", "Backing Devices")

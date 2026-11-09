@@ -477,12 +477,16 @@ func TestInfraFromDuckDB_Hosts(t *testing.T) {
 			input: inventory.InfraData{
 				Hosts: []inventory.Host{
 					{
-						ID:         "host-123",
-						Vendor:     "Dell",
-						Model:      "PowerEdge R740",
-						CpuCores:   32,
-						CpuSockets: 2,
-						MemoryMB:   131072,
+						ID:           "host-123",
+						Datacenter:   "dc-1",
+						Cluster:      "cluster-1",
+						Vendor:       "Dell",
+						Model:        "PowerEdge R740",
+						CpuModel:     "Xeon Gold",
+						SerialNumber: "SN-1",
+						CpuCores:     32,
+						CpuSockets:   2,
+						MemoryMB:     131072,
 					},
 				},
 				HostPowerStates: map[string]int{"poweredOn": 1},
@@ -519,6 +523,24 @@ func TestInfraFromDuckDB_Hosts(t *testing.T) {
 				actual := hosts[i]
 				assert.Equal(t, expected.Vendor, actual.Vendor)
 				assert.Equal(t, expected.Model, actual.Model)
+
+				for _, field := range []struct {
+					name string
+					want string
+					got  *string
+				}{
+					{name: "datacenter", want: expected.Datacenter, got: actual.Datacenter},
+					{name: "cluster", want: expected.Cluster, got: actual.Cluster},
+					{name: "cpuModel", want: expected.CpuModel, got: actual.CpuModel},
+					{name: "serialNumber", want: expected.SerialNumber, got: actual.SerialNumber},
+				} {
+					if field.want == "" {
+						assert.Nil(t, field.got, field.name)
+						continue
+					}
+					require.NotNil(t, field.got, field.name)
+					assert.Equal(t, field.want, *field.got, field.name)
+				}
 
 				// Check optional pointer fields
 				if expected.ID != "" {

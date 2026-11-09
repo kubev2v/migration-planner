@@ -33,7 +33,10 @@ type Os struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
+	Datacenter              string                         `db:"datacenter" json:"datacenter,omitempty"`
 	Cluster                 string                         `db:"cluster" json:"-"`
+	CpuModel                string                         `db:"cpuModel" json:"cpuModel,omitempty"`
+	SerialNumber            string                         `db:"serialNumber" json:"serialNumber,omitempty"`
 	CpuCores                int                            `db:"cpuCores" json:"cpuCores"`
 	CpuSockets              int                            `db:"cpuSockets" json:"cpuSockets"`
 	Id                      string                         `db:"id" json:"id"`

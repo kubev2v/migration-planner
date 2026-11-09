@@ -297,7 +297,7 @@ var _ = Describe("Inventory datastore storage metadata", func() {
 	})
 })
 
-var _ = Describe("Inventory host storage metadata", func() {
+var _ = Describe("Inventory host details and storage metadata", func() {
 	DescribeTable("preserves hosts through service mapping and persisted assessment inventory", func(hostJSON string) {
 		raw := []byte(`{"vcenter_id":"vc1","vcenter":{"infra":{"hosts":[` + hostJSON + `]}},"clusters":{"cluster1":{"infra":{"hosts":[` + hostJSON + `]}}}}`)
 		var input api.Inventory
@@ -314,7 +314,7 @@ var _ = Describe("Inventory host storage metadata", func() {
 			Expect(output.Clusters["cluster1"].Infra.Hosts).To(Equal(input.Clusters["cluster1"].Infra.Hosts))
 		}
 	},
-		Entry("all fields and orphan LUNs", `{"id":"host1","vendor":"host vendor","model":"host model","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
+		Entry("all fields and orphan LUNs", `{"id":"host1","datacenter":"dc-1","cluster":"cluster-1","vendor":"host vendor","model":"host model","cpuModel":"Xeon Gold","serialNumber":"SN-1","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
 		Entry("historical inventory without storage", `{"id":"host1","vendor":"vendor","model":"model"}`),
 	)
 })

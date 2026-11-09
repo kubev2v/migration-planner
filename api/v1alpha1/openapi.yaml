@@ -3258,6 +3258,18 @@ components:
           type: string
         model:
           type: string
+        datacenter:
+          type: string
+          description: Source datacenter name, when available.
+        cluster:
+          type: string
+          description: Source cluster name; omitted for standalone hosts.
+        cpuModel:
+          type: string
+          description: Source-reported CPU model, when available.
+        serialNumber:
+          type: string
+          description: Source-reported host hardware serial or service tag, when available.
         cpuCores:
           type: integer
           description: Number of CPU cores

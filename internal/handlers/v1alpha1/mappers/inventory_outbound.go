@@ -253,6 +253,10 @@ func storageIoConfigurationToAPI(s svcmodel.StorageIoConfiguration) api.StorageI
 
 func hostToAPI(h svcmodel.Host) api.Host {
 	result := api.Host{
+		Datacenter:              h.Datacenter,
+		Cluster:                 h.Cluster,
+		CpuModel:                h.CpuModel,
+		SerialNumber:            h.SerialNumber,
 		CpuCores:                h.CpuCores,
 		CpuSockets:              h.CpuSockets,
 		Id:                      h.Id,
