@@ -1189,4 +1189,79 @@ var _ = Describe("source handler", Ordered, func() {
 			gormdb.Exec("DELETE FROM sources;")
 		})
 	})
+
+	Context("GetSourceDownloadURL with image=appliance", func() {
+		appliance := v1alpha1.Appliance
+		requestFor := func(id uuid.UUID) server.GetSourceDownloadURLRequestObject {
+			return server.GetSourceDownloadURLRequestObject{Id: id, Params: v1alpha1.GetSourceDownloadURLParams{Image: &appliance}}
+		}
+
+		It("returns an agent image URL for an owned source", func() {
+			sourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO image_infras (source_id) VALUES ('%s');", sourceID))
+			Expect(tx.Error).To(BeNil())
+
+			user := auth.User{Username: "admin", Organization: "admin", EmailDomain: "admin.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, requestFor(sourceID))
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL200JSONResponse{}).String()))
+
+			result := resp.(server.GetSourceDownloadURL200JSONResponse)
+			Expect(result.Url).To(ContainSubstring("/appliance"))
+			Expect(result.ExpiresAt).NotTo(BeNil())
+		})
+
+		It("returns 403 when accessing another org's source", func() {
+			victimSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, victimSourceID, "batman", "batman"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO image_infras (source_id) VALUES ('%s');", victimSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			attackerUser := auth.User{Username: "joker", Organization: "joker", EmailDomain: "joker.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, requestFor(victimSourceID))
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL403JSONResponse{}).String()))
+		})
+
+		It("returns 403 when accessing with same username but different org", func() {
+			victimSourceID := uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, victimSourceID, "batman", "batman-org"))
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(fmt.Sprintf("INSERT INTO image_infras (source_id) VALUES ('%s');", victimSourceID))
+			Expect(tx.Error).To(BeNil())
+
+			attackerUser := auth.User{Username: "batman", Organization: "evil-org", EmailDomain: "evil.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), attackerUser)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, requestFor(victimSourceID))
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL403JSONResponse{}).String()))
+		})
+
+		It("returns 404 for a non-existent source", func() {
+			user := auth.User{Username: "admin", Organization: "admin", EmailDomain: "admin.example.com"}
+			ctx := auth.NewTokenContext(context.TODO(), user)
+
+			srv := handlers.NewServiceHandler(service.NewSourceService(s, nil), service.NewAssessmentService(s, nil, nil), nil, service.NewSizerService(nil, s), nil, nil, nil, nil)
+			resp, err := srv.GetSourceDownloadURL(ctx, requestFor(uuid.New()))
+			Expect(err).To(BeNil())
+			Expect(reflect.TypeOf(resp).String()).To(Equal(reflect.TypeOf(server.GetSourceDownloadURL404JSONResponse{}).String()))
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM keys;")
+			gormdb.Exec("DELETE FROM image_infras;")
+			gormdb.Exec("DELETE FROM sources;")
+		})
+	})
 })

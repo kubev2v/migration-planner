@@ -363,9 +363,19 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: image
+          in: query
+          description: Which image to link; the OVA or the appliance image tar for a disconnected update
+          required: false
+          schema:
+            type: string
+            enum:
+              - ova
+              - appliance
+            default: ova
       responses:
         "200":
-          description: URL to download OVA image
+          description: URL to download the image
           content:
             application/json:
               schema:

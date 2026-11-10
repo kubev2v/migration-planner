@@ -153,7 +153,7 @@ type ServerInterface interface {
 	HeadImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id}/image-url)
-	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams)
 
 	// (PUT /api/v1/sources/{id}/inventory)
 	UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -414,7 +414,7 @@ func (_ Unimplemented) HeadImage(w http.ResponseWriter, r *http.Request, id open
 }
 
 // (GET /api/v1/sources/{id}/image-url)
-func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1563,8 +1563,19 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSourceDownloadURLParams
+
+	// ------------- Optional query parameter "image" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "image", r.URL.Query(), &params.Image)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "image", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSourceDownloadURL(w, r, id)
+		siw.Handler.GetSourceDownloadURL(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4560,7 +4571,8 @@ func (response HeadImage500Response) VisitHeadImageResponse(w http.ResponseWrite
 }
 
 type GetSourceDownloadURLRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params GetSourceDownloadURLParams
 }
 
 type GetSourceDownloadURLResponseObject interface {
@@ -6643,10 +6655,11 @@ func (sh *strictHandler) HeadImage(w http.ResponseWriter, r *http.Request, id op
 }
 
 // GetSourceDownloadURL operation middleware
-func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams) {
 	var request GetSourceDownloadURLRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetSourceDownloadURL(ctx, request.(GetSourceDownloadURLRequestObject))
