@@ -43,6 +43,8 @@ var osClassMap = map[string]osClass{
 	"Oracle Linux 10":          {TierVendorSupported, ""},
 
 	// --- Community Supported ---
+	// CentOS 7 is deprecated since 4.18 but still listed as community supported.
+	"CentOS 7":            {TierCommunitySupported, ""},
 	"AlmaLinux 9":         {TierCommunitySupported, ""},
 	"AlmaLinux 10":        {TierCommunitySupported, ""},
 	"CentOS Stream 9":     {TierCommunitySupported, ""},

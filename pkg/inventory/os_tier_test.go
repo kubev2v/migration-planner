@@ -34,6 +34,7 @@ func TestClassifyOSTier(t *testing.T) {
 		{"Oracle Linux 10 (64-bit)", TierVendorSupported},
 
 		// Community Supported
+		{"CentOS 7 (64-bit)", TierCommunitySupported},
 		{"AlmaLinux 9 (64-bit)", TierCommunitySupported},
 		{"AlmaLinux 10 (64-bit)", TierCommunitySupported},
 		{"openSUSE Leap 16 (64-bit)", TierCommunitySupported},
@@ -46,7 +47,7 @@ func TestClassifyOSTier(t *testing.T) {
 
 		// Special Handling (fallback)
 		{"Red Hat Enterprise Linux 6 (64-bit)", TierSpecialHandling},
-		{"CentOS 7 (64-bit)", TierSpecialHandling},
+		{"CentOS Stream 8 (64-bit)", TierSpecialHandling},
 		{"Microsoft Windows 7 (64-bit)", TierSpecialHandling},
 		{"Microsoft Windows Server 2012 R2 (64-bit)", TierSpecialHandling},
 		{"openSUSE Leap 15.5 (64-bit)", TierSpecialHandling},
