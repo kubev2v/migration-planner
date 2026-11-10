@@ -376,7 +376,9 @@ func KnownApplianceVersion(source *model.Source) string {
 
 // CheckAgentVersionWarning compares the version the source runs (agent-reported
 // with the OVA-download stamp as fallback) against the served appliance
-// version, and returns a warning when an update is available.
+// version, and returns a warning when an update is available. Sources below
+// the served image's minimum appliance version are told to deploy a new OVA:
+// the in-place update path is not available to them.
 func CheckAgentVersionWarning(source *model.Source) *string {
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
@@ -397,6 +399,12 @@ func CheckAgentVersionWarning(source *model.Source) *string {
 
 	if !version.UpdateAvailable(served, current) {
 		return nil
+	}
+
+	if version.BelowMin(current, version.MinApplianceVersion()) {
+		message := "Agent version " + current + " does not support in-place updates to " + served +
+			". Deploy a new OVA to update this source."
+		return &message
 	}
 
 	message := "Agent version mismatch detected. The source runs version " + current +

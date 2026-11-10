@@ -74,8 +74,14 @@ func (h *AgentHandler) GetUpdateStatus(ctx context.Context, request agentServer.
 	}
 
 	if updateAvailable {
-		info := v1alpha1.ApplianceImage{}
-		if h.agentImageStaged() {
+		supported := true
+		info := v1alpha1.ApplianceImage{Supported: &supported}
+		switch {
+		case version.BelowMin(current, version.MinApplianceVersion()):
+			supported = false
+			reason := "new-ova-required"
+			info.Reason = &reason
+		case h.agentImageStaged():
 			url, expireAt, err := h.sourceSrv.GetSourceDownloadURL(ctx, request.Id, image.AppliancePathName)
 			if err != nil {
 				zap.S().Named("agent_handler").Errorw("failed to mint agent image URL", "source_id", request.Id, "error", err)

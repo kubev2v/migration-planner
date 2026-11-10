@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -193,6 +194,8 @@ func SourceToApi(s model.Source) (api.Source, error) {
 	if warning := service.CheckAgentVersionWarning(&s); warning != nil {
 		source.AgentVersionWarning = warning
 	}
+	supported := !version.BelowMin(current, version.MinApplianceVersion())
+	source.ApplianceUpdateSupported = &supported
 
 	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
 	// TODO:

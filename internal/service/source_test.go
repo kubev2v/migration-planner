@@ -834,6 +834,7 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 
 		AfterEach(func() {
 			version.SetAgentVersionName(savedVersion)
+			version.SetMinApplianceVersion("")
 		})
 
 		It("returns nil when source is nil", func() {
@@ -879,6 +880,17 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 			Expect(*result).To(ContainSubstring("version mismatch"))
 			Expect(*result).To(ContainSubstring("v0.32.0"))
 			Expect(*result).To(ContainSubstring("v0.33.0"))
+		})
+
+		It("returns the new-OVA warning when the version is below the minimum", func() {
+			version.SetMinApplianceVersion("v0.33.0")
+			source := &model.Source{
+				Agents: []model.Agent{{Version: "v0.32.0"}},
+			}
+			result := service.CheckAgentVersionWarning(source)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("does not support in-place updates"))
+			Expect(*result).To(ContainSubstring("Deploy a new OVA"))
 		})
 
 		It("prefers the agent-reported version over the OVA-download stamp", func() {

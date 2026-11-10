@@ -32,3 +32,33 @@ func TestUpdateAvailable(t *testing.T) {
 		})
 	}
 }
+
+func TestBelowMin(t *testing.T) {
+	cases := []struct {
+		name     string
+		deployed string
+		min      string
+		want     bool
+	}{
+		{"prod below min", "v0.30.5", "v0.31.0", true},
+		{"prod at min", "v0.31.0", "v0.31.0", false},
+		{"prod above min", "v0.32.1", "v0.31.0", false},
+		{"prod major below", "v0.9.9", "v0.31.0", true},
+		{"dev below min", "main-release-0.30-1da41c5", "main-release-0.31-25fcb31", true},
+		{"dev at min numbers", "main-release-0.31-1da41c5", "main-release-0.31-25fcb31", false},
+		{"dev above min", "main-release-0.32-1da41c5", "main-release-0.31-25fcb31", false},
+		{"stage vs dev min", "stable-release-0.30-1da41c5", "main-release-0.31-25fcb31", false},
+		{"prod vs dev min", "v0.30.5", "main-release-0.31-25fcb31", false},
+		{"pr not comparable", "on-pr-383f77d", "main-release-0.31-25fcb31", false},
+		{"empty min no gating", "v0.30.5", "", false},
+		{"deployed invalid", "v0.0.0", "v0.31.0", false},
+		{"min invalid", "v0.30.5", "junk", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := BelowMin(tc.deployed, tc.min); got != tc.want {
+				t.Errorf("BelowMin(%q, %q) = %v, want %v", tc.deployed, tc.min, got, tc.want)
+			}
+		})
+	}
+}

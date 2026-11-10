@@ -1353,10 +1353,13 @@ type Source struct {
 	AgentVersion *string `json:"agentVersion"`
 
 	// AgentVersionWarning Warning message if the version the source runs differs from the current appliance version
-	AgentVersionWarning *string            `json:"agentVersionWarning"`
-	CreatedAt           time.Time          `json:"createdAt"`
-	Id                  openapi_types.UUID `json:"id"`
-	Infra               *struct {
+	AgentVersionWarning *string `json:"agentVersionWarning"`
+
+	// ApplianceUpdateSupported Whether the source's appliance can be updated in place with the served image; false means a new OVA must be deployed
+	ApplianceUpdateSupported *bool              `json:"applianceUpdateSupported"`
+	CreatedAt                time.Time          `json:"createdAt"`
+	Id                       openapi_types.UUID `json:"id"`
+	Infra                    *struct {
 		Proxy        *AgentProxy            `json:"proxy,omitempty"`
 		SshPublicKey *ValidatedSSHPublicKey `json:"sshPublicKey" validate:"omitnil,ssh_key"`
 		VmNetwork    *VmNetwork             `json:"vmNetwork,omitempty"`

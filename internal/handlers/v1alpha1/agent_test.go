@@ -468,12 +468,15 @@ var _ = Describe("agent update status", Ordered, func() {
 
 	var (
 		savedVersion string
+		savedMin     string
 		sourceID     uuid.UUID
 	)
 
 	BeforeEach(func() {
 		savedVersion = version.Get().AgentVersionName
+		savedMin = version.MinApplianceVersion()
 		version.SetAgentVersionName("v0.33.0")
+		version.SetMinApplianceVersion("")
 
 		sourceID = uuid.New()
 		tx := gormdb.Exec(fmt.Sprintf(insertSourceWithUsernameStm, sourceID, "admin", "admin"))
@@ -484,6 +487,7 @@ var _ = Describe("agent update status", Ordered, func() {
 
 	AfterEach(func() {
 		version.SetAgentVersionName(savedVersion)
+		version.SetMinApplianceVersion(savedMin)
 		gormdb.Exec("DELETE FROM agents;")
 		gormdb.Exec("DELETE FROM image_infras;")
 		gormdb.Exec("DELETE FROM sources;")
@@ -542,8 +546,26 @@ var _ = Describe("agent update status", Ordered, func() {
 		result := resp.(server.GetUpdateStatus200JSONResponse)
 		Expect(*result.UpdateAvailable).To(BeTrue())
 		Expect(result.ApplianceImage).NotTo(BeNil())
+		Expect(*result.ApplianceImage.Supported).To(BeTrue())
 		Expect(*result.ApplianceImage.ImageUrl).To(ContainSubstring("/appliance"))
 		Expect(result.ApplianceImage.ExpiresAt).NotTo(BeNil())
+	})
+
+	It("requires a new OVA when the version is below the minimum", func() {
+		version.SetMinApplianceVersion("v0.33.0")
+		reportVersion("v0.32.0")
+		dir := GinkgoT().TempDir()
+		Expect(os.WriteFile(filepath.Join(dir, "migration-planner-agent.tar"), []byte("oci"), 0o644)).To(Succeed())
+		h := handlerFor(dir)
+
+		resp, err := h.GetUpdateStatus(agentCtx(sourceID), server.GetUpdateStatusRequestObject{Id: sourceID})
+		Expect(err).NotTo(HaveOccurred())
+		result := resp.(server.GetUpdateStatus200JSONResponse)
+		Expect(*result.UpdateAvailable).To(BeTrue())
+		Expect(result.ApplianceImage).NotTo(BeNil())
+		Expect(*result.ApplianceImage.Supported).To(BeFalse())
+		Expect(*result.ApplianceImage.Reason).To(Equal("new-ova-required"))
+		Expect(result.ApplianceImage.ImageUrl).To(BeNil())
 	})
 
 	It("offers the update without a URL while the tar is not staged", func() {

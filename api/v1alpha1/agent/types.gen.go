@@ -32,6 +32,12 @@ type ApplianceImage struct {
 
 	// ImageUrl Presigned URL to download the appliance image tar; expires in 4 hours
 	ImageUrl *string `json:"imageUrl"`
+
+	// Reason Why the update is not supported, e.g. new-ova-required
+	Reason *string `json:"reason"`
+
+	// Supported Whether the deployed appliance can be updated in place; false means a new OVA must be deployed
+	Supported *bool `json:"supported,omitempty"`
 }
 
 // SourceStatusUpdate defines model for SourceStatusUpdate.

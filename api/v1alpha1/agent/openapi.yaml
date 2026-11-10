@@ -369,6 +369,13 @@ components:
       type: object
       description: Present only when an update is available
       properties:
+        supported:
+          type: boolean
+          description: Whether the deployed appliance can be updated in place; false means a new OVA must be deployed
+        reason:
+          type: string
+          nullable: true
+          description: Why the update is not supported, e.g. new-ova-required
         imageUrl:
           type: string
           nullable: true

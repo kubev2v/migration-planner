@@ -38,6 +38,17 @@ jobs:
         CONFIG_FILE=build/migration-planner-iso/config
         sed -i "s/^${CONFIG_KEY}=.*/${CONFIG_KEY}=${IMAGE_TAG}/" "$CONFIG_FILE"
         grep -Fxq "${CONFIG_KEY}=${IMAGE_TAG}" "$CONFIG_FILE" || { echo "ERROR: tag update failed"; exit 1; }
+        # The in-place update minimum travels with the appliance image itself
+        # (io.kubev2v.oma.min-upgrade-version label, OMA-3059). Read it from the
+        # exact tag being pinned so the config always describes this image.
+        source "$CONFIG_FILE"
+        MIN_LABEL=$(skopeo inspect --format '{{index .Labels "io.kubev2v.oma.min-upgrade-version"}}' \
+          "docker://${APPLIANCE_IMAGE}:${IMAGE_TAG}" || echo "")
+        if [[ -n "$MIN_LABEL" && ! "$MIN_LABEL" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|main-release-[0-9]+\.[0-9]+-[0-9a-f]{7}|stable-release-[0-9]+\.[0-9]+-[0-9a-f]{7}|on-pr-[0-9a-f]{7})$ ]]; then
+          echo "ERROR: appliance min-upgrade-version label is not a valid version: ${MIN_LABEL}"; exit 1
+        fi
+        sed -i "s/^MIN_APPLIANCE_VERSION=.*/MIN_APPLIANCE_VERSION=${MIN_LABEL}/" "$CONFIG_FILE"
+        grep -Fxq "MIN_APPLIANCE_VERSION=${MIN_LABEL}" "$CONFIG_FILE" || { echo "ERROR: min version update failed"; exit 1; }
     secrets:
       APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}
