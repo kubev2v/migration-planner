@@ -32,7 +32,8 @@ func NewSourceService(store store.Store, opaValidator *opa.Validator) *SourceSer
 }
 
 // TODO should be moved to ImageService (to be created)
-func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) (string, time.Time, error) {
+// imageKind selects the artifact: "ova" (default) or the appliance image tar.
+func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID, imageKind string) (string, time.Time, error) {
 	source, err := s.store.Source().Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
@@ -41,16 +42,21 @@ func (s *SourceService) GetSourceDownloadURL(ctx context.Context, id uuid.UUID) 
 		return "", time.Time{}, err
 	}
 
-	// Pre-generate and store agent JWT so all pods produce byte-identical OVAs.
-	// This is required for Akamai LFO byte-range requests across load-balanced pods.
-	if err := s.ensureAgentToken(ctx, source); err != nil {
-		return "", time.Time{}, fmt.Errorf("failed to ensure agent token: %w", err)
+	name := source.Name + ".ova"
+	if imageKind == image.AppliancePathName {
+		name = image.AppliancePathName
+	} else {
+		// Pre-generate and store agent JWT so all pods produce byte-identical OVAs.
+		// This is required for Akamai LFO byte-range requests across load-balanced pods.
+		if err := s.ensureAgentToken(ctx, source); err != nil {
+			return "", time.Time{}, fmt.Errorf("failed to ensure agent token: %w", err)
+		}
 	}
 
 	// FIXME: refactor the environment vars + config.yaml
 	baseUrl := util.GetEnv("MIGRATION_PLANNER_IMAGE_URL", "http://localhost:11443")
 
-	url, expireAt, err := image.GenerateDownloadURLByToken(baseUrl, source)
+	url, expireAt, err := image.GenerateDownloadURLByToken(baseUrl, source, name)
 	if err != nil {
 		return "", time.Time{}, err
 	}

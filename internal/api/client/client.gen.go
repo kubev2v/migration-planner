@@ -256,7 +256,7 @@ type ClientInterface interface {
 	HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSourceDownloadURL request
-	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateInventoryWithBody request with any body
 	UpdateInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1016,8 +1016,8 @@ func (c *Client) HeadImage(ctx context.Context, id openapi_types.UUID, reqEditor
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSourceDownloadURLRequest(c.Server, id)
+func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSourceDownloadURLRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2886,7 +2886,7 @@ func NewHeadImageRequest(server string, id openapi_types.UUID) (*http.Request, e
 }
 
 // NewGetSourceDownloadURLRequest generates requests for GetSourceDownloadURL
-func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID, params *GetSourceDownloadURLParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2909,6 +2909,28 @@ func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Image != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "image", runtime.ParamLocationQuery, *params.Image); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -3540,7 +3562,7 @@ type ClientWithResponsesInterface interface {
 	HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error)
 
 	// GetSourceDownloadURLWithResponse request
-	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
+	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
 
 	// UpdateInventoryWithBodyWithResponse request with any body
 	UpdateInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInventoryResponse, error)
@@ -5558,8 +5580,8 @@ func (c *ClientWithResponses) HeadImageWithResponse(ctx context.Context, id open
 }
 
 // GetSourceDownloadURLWithResponse request returning *GetSourceDownloadURLResponse
-func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error) {
-	rsp, err := c.GetSourceDownloadURL(ctx, id, reqEditors...)
+func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error) {
+	rsp, err := c.GetSourceDownloadURL(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}

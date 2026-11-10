@@ -296,6 +296,12 @@ const (
 	ListGroupsParamsKindPartner ListGroupsParamsKind = "partner"
 )
 
+// Defines values for GetSourceDownloadURLParamsImage.
+const (
+	Appliance GetSourceDownloadURLParamsImage = "appliance"
+	Ova       GetSourceDownloadURLParamsImage = "ova"
+)
+
 // ActiveEnvironmentsInput defines model for ActiveEnvironmentsInput.
 type ActiveEnvironmentsInput struct {
 	Environments *[]ActiveEnvironmentsInputEnvironments `json:"environments,omitempty" validate:"omitempty,unique,dive,oneof=production qa dev other not_assessed"`
@@ -1679,6 +1685,15 @@ type ListGroupsParams struct {
 
 // ListGroupsParamsKind defines parameters for ListGroups.
 type ListGroupsParamsKind string
+
+// GetSourceDownloadURLParams defines parameters for GetSourceDownloadURL.
+type GetSourceDownloadURLParams struct {
+	// Image Which image to link; the OVA or the appliance image tar for a disconnected update
+	Image *GetSourceDownloadURLParamsImage `form:"image,omitempty" json:"image,omitempty"`
+}
+
+// GetSourceDownloadURLParamsImage defines parameters for GetSourceDownloadURL.
+type GetSourceDownloadURLParamsImage string
 
 // UploadRvtoolsToAssessmentMultipartBody defines parameters for UploadRvtoolsToAssessment.
 type UploadRvtoolsToAssessmentMultipartBody struct {

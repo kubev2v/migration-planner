@@ -418,7 +418,11 @@ func (h *ServiceHandler) GetSourceDownloadURL(ctx context.Context, request serve
 		return server.GetSourceDownloadURL403JSONResponse{Message: message}, nil
 	}
 
-	url, expireAt, err := h.sourceSrv.GetSourceDownloadURL(ctx, request.Id)
+	imageKind := "ova"
+	if request.Params.Image != nil {
+		imageKind = string(*request.Params.Image)
+	}
+	url, expireAt, err := h.sourceSrv.GetSourceDownloadURL(ctx, request.Id, imageKind)
 	if err != nil {
 		return server.GetSourceDownloadURL500JSONResponse{Message: fmt.Sprintf("failed to get download URL for source %s: %v", request.Id, err)}, nil
 	}
