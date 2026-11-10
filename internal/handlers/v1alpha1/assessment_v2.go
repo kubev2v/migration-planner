@@ -148,13 +148,11 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	_, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
-			return server.UploadRvtoolsToAssessment404JSONResponse{Message: errResourceNotFound.Error()}, nil
-		case errors.As(err, &errForbidden):
-			return server.UploadRvtoolsToAssessment403JSONResponse{Message: errForbidden.Error()}, nil
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UploadRvtoolsToAssessment404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.UploadRvtoolsToAssessment403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to get assessment"}, nil
 		}
@@ -280,12 +278,10 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetAssessmentV2404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetAssessmentV2403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
@@ -324,12 +320,10 @@ func (h *ServiceHandler) GetVcenter(ctx context.Context, request server.GetVcent
 	inv, err := h.assessmentSrv.GetVcenterInventory(ctx, request.Id, request.Vid)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetVcenter404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetVcenter403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetVcenter500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
@@ -355,12 +349,10 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 	clusterInv, err := h.assessmentSrv.GetClusterInventory(ctx, request.Id, request.Vid, request.Cid)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetVcenterCluster404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetVcenterCluster403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
