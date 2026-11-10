@@ -4,28 +4,97 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"time"
 
 	v1alpha1 "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	agentServer "github.com/kubev2v/migration-planner/internal/api/server/agent"
 	"github.com/kubev2v/migration-planner/internal/auth"
+	"github.com/kubev2v/migration-planner/internal/config"
 	apiMappers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"github.com/kubev2v/migration-planner/internal/image"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	"github.com/kubev2v/migration-planner/pkg/version"
+	"go.uber.org/zap"
 )
 
 type AgentHandler struct {
-	srv *service.AgentService
+	srv       *service.AgentService
+	sourceSrv *service.SourceService
+	cfg       *config.Config
 }
 
 // Make sure we conform to servers Service interface
 var _ agentServer.Service = (*AgentHandler)(nil)
 
-func NewAgentHandler(srv *service.AgentService) *AgentHandler {
+func NewAgentHandler(srv *service.AgentService, sourceSrv *service.SourceService, cfg *config.Config) *AgentHandler {
 	return &AgentHandler{
-		srv: srv,
+		srv:       srv,
+		sourceSrv: sourceSrv,
+		cfg:       cfg,
 	}
+}
+
+// (GET /api/v1/sources/{id}/update-status)
+func (h *AgentHandler) GetUpdateStatus(ctx context.Context, request agentServer.GetUpdateStatusRequestObject) (agentServer.GetUpdateStatusResponseObject, error) {
+	agentJWT := auth.MustHaveAgent(ctx)
+	if agentJWT.SourceID != request.Id.String() {
+		return agentServer.GetUpdateStatus403JSONResponse{
+			Message: fmt.Sprintf("agent is not authorized to access source %s", request.Id),
+		}, nil
+	}
+
+	source, err := h.sourceSrv.GetSource(ctx, request.Id)
+	if err != nil {
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return agentServer.GetUpdateStatus404JSONResponse{Message: err.Error()}, nil
+		default:
+			zap.S().Named("agent_handler").Errorw("failed to load source", "source_id", request.Id, "error", err)
+			return agentServer.GetUpdateStatus500JSONResponse{Message: fmt.Sprintf("failed to load source %s", request.Id)}, nil
+		}
+	}
+
+	served := version.Get().AgentVersionName
+	current := service.KnownApplianceVersion(source)
+	updateAvailable := version.UpdateAvailable(served, current)
+
+	resp := agentServer.GetUpdateStatus200JSONResponse{
+		UpdateAvailable: &updateAvailable,
+	}
+	// An unreadable served version is not an error: no update signal, but the
+	// fields stay present and empty.
+	if version.IsValidAgentVersion(served) {
+		resp.LatestVersion = &served
+	}
+	if current != "" {
+		resp.CurrentVersion = &current
+	}
+
+	if updateAvailable {
+		info := v1alpha1.ApplianceImage{}
+		if h.agentImageStaged() {
+			url, expireAt, err := h.sourceSrv.GetSourceDownloadURL(ctx, request.Id, image.AppliancePathName)
+			if err != nil {
+				zap.S().Named("agent_handler").Errorw("failed to mint agent image URL", "source_id", request.Id, "error", err)
+			} else {
+				info.ImageUrl = &url
+				info.ExpiresAt = &expireAt
+			}
+		}
+		resp.ApplianceImage = &info
+	}
+
+	return resp, nil
+}
+
+// agentImageStaged reports whether the appliance image tar is served with the
+// current ISO; until it is staged there is nothing to point the agent at.
+func (h *AgentHandler) agentImageStaged() bool {
+	_, err := os.Stat(image.AgentImageTarPath(h.cfg.Service.IsoPath))
+	return err == nil
 }
 
 func (h *AgentHandler) UpdateSourceInventory(ctx context.Context, request agentServer.UpdateSourceInventoryRequestObject) (agentServer.UpdateSourceInventoryResponseObject, error) {

@@ -825,114 +825,82 @@ TZUUZpsP4or19B48WSqiV/eMdCB/PxnFZYT1SyFLlDBiXolb+30HbGeeaF0bEg+u
 	})
 
 	Context("CheckAgentVersionWarning", func() {
-		It("returns nil when imageInfra is nil", func() {
+		var savedVersion string
+
+		BeforeEach(func() {
+			savedVersion = version.Get().AgentVersionName
+			version.SetAgentVersionName("v0.33.0")
+		})
+
+		AfterEach(func() {
+			version.SetAgentVersionName(savedVersion)
+		})
+
+		It("returns nil when source is nil", func() {
 			result := service.CheckAgentVersionWarning(nil)
 			Expect(result).To(BeNil())
 		})
 
-		It("returns nil when AgentVersion is nil", func() {
-			imageInfra := &model.ImageInfra{
-				AgentVersion: nil,
-			}
-			result := service.CheckAgentVersionWarning(imageInfra)
+		It("returns nil when served version is not set", func() {
+			version.SetAgentVersionName("")
+			result := service.CheckAgentVersionWarning(&model.Source{})
 			Expect(result).To(BeNil())
 		})
 
-		It("returns warning when AgentVersion is empty and current version is available", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr(""),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("No version information"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
-			}
+		It("returns the no-information warning when the source has no known version", func() {
+			result := service.CheckAgentVersionWarning(&model.Source{})
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("No version information"))
+			Expect(*result).To(ContainSubstring("v0.33.0"))
 		})
 
-		It("returns nil when current version is not available", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName == "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.5.1"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).To(BeNil())
-			} else {
-				Skip("Skipping test: build version is available (cannot test unavailable version scenario)")
+		It("returns nil when the source runs the served version", func() {
+			source := &model.Source{
+				Agents: []model.Agent{{Version: "v0.33.0"}},
 			}
-		})
-
-		It("returns nil when versions match", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr(versionInfo.AgentVersionName),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).To(BeNil())
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
-			}
-		})
-
-		It("returns warning when versions differ", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.1.0-test"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-				Expect(*result).To(ContainSubstring("v0.1.0-test"))
-			} else {
-				Skip("Skipping test: build version not available (run 'make build' to set version)")
-			}
-		})
-
-		It("returns nil when stored version is 'unknown'", func() {
-			imageInfra := &model.ImageInfra{
-				AgentVersion: util.ToStrPtr("unknown"),
-			}
-			result := service.CheckAgentVersionWarning(imageInfra)
+			result := service.CheckAgentVersionWarning(source)
 			Expect(result).To(BeNil())
 		})
 
-		It("returns warning when stored version differs from current (opaque tag)", func() {
-			versionInfo := version.Get()
-			if version.IsValidAgentVersion(versionInfo.AgentVersionName) && versionInfo.AgentVersionName != "dev-build" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("dev-build"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring("dev-build"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: build version empty, unknown, or dev-build")
+		It("returns nil for a version that gives no comparison signal", func() {
+			source := &model.Source{
+				Agents: []model.Agent{{Version: "v0.0.0"}},
 			}
+			result := service.CheckAgentVersionWarning(source)
+			Expect(result).To(BeNil())
 		})
 
-		It("returns warning when stored version is baseline v0.5.0 and current is newer", func() {
-			versionInfo := version.Get()
-			if versionInfo.AgentVersionName != "" && versionInfo.AgentVersionName != "v0.5.0" {
-				imageInfra := &model.ImageInfra{
-					AgentVersion: util.ToStrPtr("v0.5.0"),
-				}
-				result := service.CheckAgentVersionWarning(imageInfra)
-				Expect(result).NotTo(BeNil())
-				Expect(*result).To(ContainSubstring("version mismatch"))
-				Expect(*result).To(ContainSubstring("v0.5.0"))
-				Expect(*result).To(ContainSubstring(versionInfo.AgentVersionName))
-			} else {
-				Skip("Skipping test: current version is v0.5.0 or not available")
+		It("returns the mismatch warning when an update is available", func() {
+			source := &model.Source{
+				Agents: []model.Agent{{Version: "v0.32.0"}},
 			}
+			result := service.CheckAgentVersionWarning(source)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("version mismatch"))
+			Expect(*result).To(ContainSubstring("v0.32.0"))
+			Expect(*result).To(ContainSubstring("v0.33.0"))
+		})
+
+		It("prefers the agent-reported version over the OVA-download stamp", func() {
+			source := &model.Source{
+				Agents:     []model.Agent{{Version: "v0.33.0"}},
+				ImageInfra: model.ImageInfra{AgentVersion: util.ToStrPtr("v0.31.0")},
+			}
+			result := service.CheckAgentVersionWarning(source)
+			Expect(result).To(BeNil())
+
+			Expect(service.KnownApplianceVersion(source)).To(Equal("v0.33.0"))
+		})
+
+		It("falls back to the OVA-download stamp when no agent reported", func() {
+			source := &model.Source{
+				ImageInfra: model.ImageInfra{AgentVersion: util.ToStrPtr("v0.32.0")},
+			}
+			Expect(service.KnownApplianceVersion(source)).To(Equal("v0.32.0"))
+
+			result := service.CheckAgentVersionWarning(source)
+			Expect(result).NotTo(BeNil())
+			Expect(*result).To(ContainSubstring("version mismatch"))
 		})
 	})
 })

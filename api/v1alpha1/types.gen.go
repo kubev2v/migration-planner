@@ -1349,10 +1349,10 @@ type Snapshot struct {
 type Source struct {
 	Agent *Agent `json:"agent,omitempty"`
 
-	// AgentVersion Agent version (version tag) stored when OVA was downloaded
+	// AgentVersion The appliance version the source runs — agent-reported when connected, else the OVA-download stamp
 	AgentVersion *string `json:"agentVersion"`
 
-	// AgentVersionWarning Warning message if stored agent version differs from current agent version
+	// AgentVersionWarning Warning message if the version the source runs differs from the current appliance version
 	AgentVersionWarning *string            `json:"agentVersionWarning"`
 	CreatedAt           time.Time          `json:"createdAt"`
 	Id                  openapi_types.UUID `json:"id"`

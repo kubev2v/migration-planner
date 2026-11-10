@@ -66,6 +66,12 @@ func Get() Info {
 	}
 }
 
+// SetAgentVersionName overrides the served appliance version. The ldflag is
+// unset under go test, so tests set it explicitly instead of skipping.
+func SetAgentVersionName(v string) {
+	applianceVersion = v
+}
+
 // IsValidAgentVersion reports whether ver is usable for agent version comparison and persistence.
 // Empty string and "unknown" are treated as missing.
 func IsValidAgentVersion(ver string) bool {

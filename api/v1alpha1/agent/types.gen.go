@@ -25,6 +25,15 @@ type AgentStatusUpdate struct {
 	Version       string             `json:"version" validate:"required,max=50"`
 }
 
+// ApplianceImage Present only when an update is available
+type ApplianceImage struct {
+	// ExpiresAt Expiration time of the presigned URL
+	ExpiresAt *time.Time `json:"expiresAt"`
+
+	// ImageUrl Presigned URL to download the appliance image tar; expires in 4 hours
+	ImageUrl *string `json:"imageUrl"`
+}
+
 // SourceStatusUpdate defines model for SourceStatusUpdate.
 type SourceStatusUpdate struct {
 	AgentId   openapi_types.UUID     `json:"agentId"`
@@ -59,6 +68,21 @@ type SourceSubsetUpdate struct {
 type SourceUpdate struct {
 	Inventory externalRef0.Inventory `json:"inventory"`
 	VcenterId *string                `json:"vcenterId,omitempty"`
+}
+
+// UpdateStatus On-demand update check for a source
+type UpdateStatus struct {
+	// ApplianceImage Present only when an update is available
+	ApplianceImage *ApplianceImage `json:"applianceImage,omitempty"`
+
+	// CurrentVersion The version the source runs — agent-reported when available, else the OVA-download stamp
+	CurrentVersion *string `json:"currentVersion"`
+
+	// LatestVersion The appliance version the SaaS serves; empty when unknown
+	LatestVersion *string `json:"latestVersion"`
+
+	// UpdateAvailable Whether the served appliance image differs from the deployed one (channel-aware comparison; invalid or cross-channel versions give no signal)
+	UpdateAvailable *bool `json:"updateAvailable,omitempty"`
 }
 
 // UpdateAgentStatusJSONRequestBody defines body for UpdateAgentStatus for application/json ContentType.

@@ -300,8 +300,85 @@ paths:
             application/json:
               schema:
                 $ref: '../openapi.yaml#/components/schemas/Error'
+  /api/v1/sources/{id}/update-status:
+    get:
+      tags:
+        - source
+      description: Report whether a newer appliance image is available for this source, and how to obtain it
+      operationId: getUpdateStatus
+      parameters:
+        - name: id
+          in: path
+          description: ID of the source
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Update availability for the source
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpdateStatus'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '../openapi.yaml#/components/schemas/Error'
 components:
   schemas:
+    UpdateStatus:
+      type: object
+      description: On-demand update check for a source
+      properties:
+        updateAvailable:
+          type: boolean
+          description: Whether the served appliance image differs from the deployed one (channel-aware comparison; invalid or cross-channel versions give no signal)
+        latestVersion:
+          type: string
+          nullable: true
+          description: The appliance version the SaaS serves; empty when unknown
+        currentVersion:
+          type: string
+          nullable: true
+          description: The version the source runs — agent-reported when available, else the OVA-download stamp
+        applianceImage:
+          nullable: true
+          $ref: '#/components/schemas/ApplianceImage'
+    ApplianceImage:
+      type: object
+      description: Present only when an update is available
+      properties:
+        imageUrl:
+          type: string
+          nullable: true
+          description: Presigned URL to download the appliance image tar; expires in 4 hours
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Expiration time of the presigned URL
+
     SourceStatusUpdate:
       type: object
       properties:

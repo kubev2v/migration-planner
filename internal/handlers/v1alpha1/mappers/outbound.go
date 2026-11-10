@@ -184,11 +184,13 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		}
 	}
 
-	// Map agent version and warning (from ImageInfra, independent of agents)
-	if s.ImageInfra.AgentVersion != nil {
-		source.AgentVersion = s.ImageInfra.AgentVersion
+	// Map agent version and warning (agent-reported with OVA-download stamp
+	// as fallback), and whether an in-place update is supported at all.
+	current := service.KnownApplianceVersion(&s)
+	if current != "" {
+		source.AgentVersion = &current
 	}
-	if warning := service.CheckAgentVersionWarning(&s.ImageInfra); warning != nil {
+	if warning := service.CheckAgentVersionWarning(&s); warning != nil {
 		source.AgentVersionWarning = warning
 	}
 
