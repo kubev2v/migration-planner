@@ -30,7 +30,7 @@ require (
 	github.com/onsi/gomega v1.44.0
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20261109202217-f6e8a0876ff9
-	github.com/openshift/assisted-image-service v0.0.0-20261031020327-e0b16b6ec041
+	github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5
 	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.24.3
