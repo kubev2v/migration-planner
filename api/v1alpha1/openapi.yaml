@@ -4022,6 +4022,15 @@ components:
           description: How NIOC is configured and which traffic is prioritized
           x-oapi-codegen-extra-tags:
             validate: "omitempty,max=1000"
+        portMirroringEnabled:
+          type: boolean
+          description: Whether Port Mirroring is enabled
+        portMirroringDetails:
+          type: string
+          maxLength: 1000
+          description: What traffic is mirrored and why
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,max=1000"
 
     NsxInput:
       type: object
