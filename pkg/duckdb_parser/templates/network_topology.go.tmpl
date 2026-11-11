@@ -1,70 +1,143 @@
 network_switches AS (
-    SELECT DISTINCT s."Host" AS host, s."Switch" AS name,
-        s."Key" AS id, 'standard' AS type,
-        s."MTU" AS mtu, NULL::INTEGER AS max_mtu
+    SELECT DISTINCT
+        s."Host" AS host,
+        s."Switch" AS name,
+        s."Key" AS id,
+        'standard' AS type,
+        s."MTU" AS mtu,
+        NULL::INTEGER AS max_mtu
     FROM vswitch s
+
     UNION ALL
-    SELECT DISTINCT NULL, s."Switch",
-        s."Object ID", 'distributed', NULL::INTEGER,
+
+    SELECT DISTINCT
+        NULL,
+        s."Switch",
+        s."Object ID",
+        'distributed',
+        NULL::INTEGER,
         s."Max MTU"
     FROM dvswitch s
 ),
 network_group_records AS (
-    SELECT DISTINCT p."Host" AS host, p."Port Group" AS name,
-        NULL::VARCHAR AS id, p."Key" AS key, 'standard' AS type,
-        p."Switch" AS switch_name, NULL::VARCHAR AS switch_id
+    SELECT DISTINCT
+        p."Host" AS host,
+        p."Port Group" AS name,
+        NULL::VARCHAR AS id,
+        p."Key" AS key,
+        'standard' AS type,
+        p."Switch" AS switch_name,
+        NULL::VARCHAR AS switch_id
     FROM vport p
+
     UNION ALL
-    SELECT DISTINCT NULL, p."Port", p."Object ID",
-        p."Key", 'distributed', p."Switch", p."Switch ID"
+
+    SELECT DISTINCT
+        NULL,
+        p."Port",
+        p."Object ID",
+        p."Key",
+        'distributed',
+        p."Switch",
+        p."Switch ID"
     FROM dvport p
 ),
 network_groups AS (
-    SELECT g.*, json_merge_patch('{}', json_object(
-        'id', g.id, 'name', g.name, 'type', g.type,
-        'switch', CASE WHEN COUNT(s.name) = 1 THEN json_object(
-            'id', MAX(s.id), 'name', MAX(s.name), 'type', g.type,
-            'mtu', MAX(s.mtu), 'maxMtu', MAX(s.max_mtu)) END
-    )) AS port_group
+    SELECT
+        g.*,
+        json_merge_patch('{}', json_object(
+            'id', g.id,
+            'name', g.name,
+            'type', g.type,
+            -- Ambiguous switch matches stay unresolved.
+            'switch', CASE
+                WHEN COUNT(s.name) = 1 THEN json_object(
+                    'id', MAX(s.id),
+                    'name', MAX(s.name),
+                    'type', g.type,
+                    'mtu', MAX(s.mtu),
+                    'maxMtu', MAX(s.max_mtu)
+                )
+            END
+        )) AS port_group
     FROM network_group_records g
-    LEFT JOIN network_switches s ON s.type = g.type
+    LEFT JOIN network_switches s
+        ON s.type = g.type
         AND (g.type = 'distributed' OR s.host = g.host)
-        AND CASE WHEN g.switch_id IS NOT NULL THEN s.id = g.switch_id
-            ELSE s.name = g.switch_name END
-    GROUP BY g.host, g.name, g.id, g.key, g.type, g.switch_name, g.switch_id
+        AND CASE
+            WHEN g.switch_id IS NOT NULL THEN s.id = g.switch_id
+            ELSE s.name = g.switch_name
+        END
+    GROUP BY
+        g.host,
+        g.name,
+        g.id,
+        g.key,
+        g.type,
+        g.switch_name,
+        g.switch_id
 ),
 network_adapter_links AS (
-    SELECT n.rowid AS nic_row_id,
-        CASE WHEN COUNT(g.name) = 1 THEN MIN(CAST(g.port_group AS VARCHAR)) END AS port_group
+    SELECT
+        n.rowid AS nic_row_id,
+        -- Keep each adapter even when its port group cannot be uniquely identified.
+        CASE
+            WHEN COUNT(g.name) = 1 THEN MIN(CAST(g.port_group AS VARCHAR))
+        END AS port_group
     FROM vnetwork n
     JOIN vinfo v ON n."VM ID" = v."VM ID"
-    LEFT JOIN network_groups g ON (g.type = 'distributed' OR g.host = v."Host")
+    LEFT JOIN network_groups g
+        ON (g.type = 'distributed' OR g.host = v."Host")
         AND (n."Port Group Type" IS NULL OR g.type = n."Port Group Type")
-        AND CASE WHEN n."Port Group ID" IS NOT NULL
-            THEN g.type = 'distributed' AND g.id = n."Port Group ID"
+        AND CASE
+            WHEN n."Port Group ID" IS NOT NULL
+                THEN g.type = 'distributed' AND g.id = n."Port Group ID"
             ELSE g.name = n."Network" AND (
-                n."Switch" IS NULL OR g.switch_name = n."Switch" OR g.switch_id = n."Switch") END
+                n."Switch" IS NULL
+                OR g.switch_name = n."Switch"
+                OR g.switch_id = n."Switch"
+            )
+        END
     GROUP BY n.rowid
 ),
 network_vmkernel_links AS (
-    SELECT i.rowid AS interface_row_id, i."Host" AS host,
+    SELECT
+        i.rowid AS interface_row_id,
+        i."Host" AS host,
         i."Device" AS device,
-        json_merge_patch('{}', json_object('device', i."Device",
+        json_merge_patch('{}', json_object(
+            'device', i."Device",
             'mtu', i."MTU",
             'portGroupRef', i."Port Group",
-            'portGroup', CASE WHEN COUNT(g.name) = 1 THEN CAST(MIN(CAST(g.port_group AS VARCHAR)) AS JSON) END
+            -- Preserve the reported reference when the group is missing or ambiguous.
+            'portGroup', CASE
+                WHEN COUNT(g.name) = 1
+                    THEN CAST(MIN(CAST(g.port_group AS VARCHAR)) AS JSON)
+            END
         )) AS interface
     FROM vsc_vmk i
-    LEFT JOIN network_groups g ON (g.type = 'distributed' OR g.host = i."Host")
+    LEFT JOIN network_groups g
+        ON (g.type = 'distributed' OR g.host = i."Host")
         AND (i."Type" IS NULL OR g.type = i."Type")
-        AND CASE WHEN i."Type" = 'distributed'
-            THEN g.key = i."Port Group"
-            ELSE g.name = i."Port Group" END
-    GROUP BY i.rowid, i."Host", i."Device", i."MTU", i."Port Group"
+        AND CASE
+            WHEN i."Type" = 'distributed' THEN g.key = i."Port Group"
+            ELSE g.name = i."Port Group"
+        END
+    GROUP BY
+        i.rowid,
+        i."Host",
+        i."Device",
+        i."MTU",
+        i."Port Group"
 ),
 network_host_interfaces AS (
-    SELECT host, CAST(to_json(LIST(interface ORDER BY device)) AS VARCHAR) AS interfaces
-    FROM (SELECT DISTINCT host, device, interface FROM network_vmkernel_links)
+    SELECT
+        host,
+        CAST(to_json(LIST(interface ORDER BY device)) AS VARCHAR) AS interfaces
+    FROM (
+        SELECT DISTINCT host, device, interface
+        FROM network_vmkernel_links
+    )
     WHERE host IS NOT NULL
     GROUP BY host
 )
