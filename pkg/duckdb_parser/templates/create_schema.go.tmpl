@@ -93,7 +93,13 @@ CREATE TABLE IF NOT EXISTS vdisk (
     "Disk Mode" VARCHAR,
     "Disk UUID" VARCHAR,
     "RDM LUN UUID" VARCHAR,
+    "RDM Device Name" VARCHAR,
+    "RDM Backing UUID" VARCHAR,
+    "RDM Compatibility Mode" VARCHAR,
+    "RDM LUN UUID Source" VARCHAR,
     "Thin" BOOLEAN DEFAULT false,
+    "Thin Provisioned" BOOLEAN,
+    "Eagerly Scrubbed" BOOLEAN,
     "Controller" VARCHAR,
     "Label" VARCHAR,
     "SCSI Unit #" VARCHAR,
@@ -102,6 +108,15 @@ CREATE TABLE IF NOT EXISTS vdisk (
 
 -- Upgrade writable collections initialized before RDM LUN identity was retained.
 ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM LUN UUID" VARCHAR;
+
+-- Upgrade writable collections initialized before RDM backing details were retained.
+-- Nullable flags stay NULL for unknown; they are never defaulted to false.
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM Device Name" VARCHAR;
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM Backing UUID" VARCHAR;
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM Compatibility Mode" VARCHAR;
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "RDM LUN UUID Source" VARCHAR;
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "Thin Provisioned" BOOLEAN;
+ALTER TABLE vdisk ADD COLUMN IF NOT EXISTS "Eagerly Scrubbed" BOOLEAN;
 
 CREATE TABLE IF NOT EXISTS vnetwork (
     "VM ID" VARCHAR,
@@ -149,6 +164,10 @@ CREATE TABLE IF NOT EXISTS vhost (
 ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "VI SDK UUID" VARCHAR;
 ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "CPU Model" VARCHAR;
 ALTER TABLE vhost ADD COLUMN IF NOT EXISTS "Serial Number" VARCHAR;
+
+-- The RDM host-LUN resolution reads the running host's explicit identity;
+-- writable collections from before this column existed must become queryable.
+ALTER TABLE vinfo ADD COLUMN IF NOT EXISTS "Host ID" VARCHAR;
 
 CREATE TABLE IF NOT EXISTS vdatastore (
     "Hosts" VARCHAR,
@@ -207,6 +226,11 @@ CREATE TABLE IF NOT EXISTS vhostscsi (
     "LUN Model" VARCHAR,
     "LUN UUID" VARCHAR
 );
+
+-- Writable collections from before LUN identity was retained must accept
+-- ingestion writes and stay queryable by the RDM host-LUN resolution.
+ALTER TABLE vhostscsi ADD COLUMN IF NOT EXISTS "SCSI Disk Key" VARCHAR;
+ALTER TABLE vhostscsi ADD COLUMN IF NOT EXISTS "LUN UUID" VARCHAR;
 
 CREATE TABLE IF NOT EXISTS dvport (
     "Port" VARCHAR,

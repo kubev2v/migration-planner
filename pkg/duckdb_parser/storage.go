@@ -31,19 +31,23 @@ func storageTopology(ctx context.Context, db store.QueryInterceptor, vmOnly bool
 	if err != nil {
 		return "", err
 	}
-	return storageTopologyQuery(tables.hba, tables.scsi, vmOnly), nil
+	return storageTopologyQuery(tables, vmOnly), nil
 }
 
 type storageTableSources struct {
 	hostSource string
 	hba        string
 	scsi       string
+	// vdiskRDMColumns reports whether vdisk carries the OMA-2505 RDM backing
+	// columns, selecting the current or legacy disk projection and RDM match
+	// relation. Older read-only collections keep the legacy behavior.
+	vdiskRDMColumns bool
 }
 
 func storageTables(ctx context.Context, db store.QueryInterceptor) (storageTableSources, error) {
 	rows, err := db.QueryContext(ctx, `SELECT table_name, column_name FROM information_schema.columns
 WHERE table_catalog = current_database() AND table_schema = 'main'
-    AND table_name IN ('vhost', 'vhba', 'vhostscsi')`)
+    AND table_name IN ('vhost', 'vhba', 'vhostscsi', 'vdisk')`)
 	if err != nil {
 		return storageTableSources{}, fmt.Errorf("reading storage topology columns: %w", err)
 	}
@@ -64,7 +68,10 @@ WHERE table_catalog = current_database() AND table_schema = 'main'
 		return storageTableSources{}, fmt.Errorf("reading storage topology columns: %w", err)
 	}
 
-	tables := storageTableSources{hostSource: "NULL::VARCHAR"}
+	tables := storageTableSources{
+		hostSource:      "NULL::VARCHAR",
+		vdiskRDMColumns: columns["vdisk"]["RDM Device Name"],
+	}
 	if columns["vhost"]["VI SDK UUID"] {
 		tables.hostSource = `h."VI SDK UUID"`
 	}
@@ -95,7 +102,7 @@ WHERE table_catalog = current_database() AND table_schema = 'main'
 	return tables, nil
 }
 
-func storageTopologyQuery(hba, scsi string, vmOnly bool) string {
+func storageTopologyQuery(tables storageTableSources, vmOnly bool) string {
 	return datastoreResolutionQuery(vmOnly) + ",\n" + fmt.Sprintf(`storage_topology_hosts AS (
     SELECT host_id
     FROM storage_hosts
@@ -121,7 +128,82 @@ storage_scsi AS (
         s."LUN Model" AS "LUN Model"
     FROM %s s
     JOIN storage_topology_hosts host ON host.host_id = (s."Host ID")
-)`, hba, scsi)
+)`, tables.hba, tables.scsi) + rdmLunMatchesQuery(tables)
+}
+
+// rdmLunMatchesQuery resolves at most one host LUN per RDM disk through a
+// verified identifier relationship. Every match stays within one collection
+// and the VM's uniquely resolved running host, and only an owner from the
+// VM's own vCenter source (or a legacy owner without source identity) is
+// eligible; shared datastore membership, cluster membership, or an
+// inventory-wide UUID lookup cannot establish the association. The relation
+// is omitted entirely for legacy collections without the OMA-2505 vdisk
+// columns so their queries stay preparable.
+func rdmLunMatchesQuery(tables storageTableSources) string {
+	if !tables.vdiskRDMColumns {
+		return ""
+	}
+	return ",\n" + fmt.Sprintf(`rdm_host_owners AS (
+    SELECT DISTINCT
+        TRIM(h."Object ID") AS host_id,
+        LOWER(TRIM(h."Host")) AS host_name,
+        COALESCE(h."Cluster", '') AS cluster,
+        COALESCE(h."Datacenter", '') AS datacenter,
+        COALESCE(NULLIF(LOWER(TRIM(%s)), 'vm'), '') AS source,
+        COUNT(*) OVER (PARTITION BY TRIM(h."Object ID")) AS host_rows
+    FROM vhost h
+),
+rdm_unique_host_owners AS (
+    SELECT host_id, MIN(host_name) AS host_name, MIN(source) AS source
+    FROM rdm_host_owners
+    WHERE host_id != ''
+    GROUP BY host_id
+    HAVING COUNT(*) = 1 AND (MIN(source) != '' OR MAX(host_rows) = 1)
+),
+rdm_vm_host_candidates AS (
+    SELECT DISTINCT
+        i."VM ID" AS vm_id,
+        owner.host_id
+    FROM vinfo i
+    JOIN rdm_unique_host_owners owner
+        ON (NULLIF(TRIM(i."Host ID"), '') IS NOT NULL AND owner.host_id = TRIM(i."Host ID"))
+        OR (NULLIF(TRIM(i."Host ID"), '') IS NULL AND LOWER(TRIM(i."Host")) = owner.host_name)
+    WHERE owner.source = ''
+        OR owner.source = COALESCE(NULLIF(LOWER(TRIM(i."VI SDK UUID")), 'vm'), '')
+),
+rdm_resolved_vm_hosts AS (
+    SELECT vm_id, host_id
+    FROM rdm_vm_host_candidates
+    QUALIFY COUNT(*) OVER (PARTITION BY vm_id) = 1
+),
+rdm_disks AS (
+    SELECT
+        dk.rowid AS disk_row_id,
+        dk."VM ID" AS vm_id,
+        NULLIF(TRIM(dk."RDM LUN UUID"), '') AS lun_uuid
+    FROM vdisk dk
+    WHERE dk."Raw" IS TRUE
+      AND NULLIF(TRIM(dk."RDM LUN UUID"), '') IS NOT NULL
+      AND TRIM(dk."RDM LUN UUID Source") = 'forklift-rdm'
+),
+rdm_lun_candidates AS (
+    SELECT DISTINCT
+        d.disk_row_id,
+        h.host_id,
+        l."SCSI Disk Key" AS lun_key,
+        l."Canonical Name" AS canonical_name,
+        l."LUN UUID" AS lun_uuid
+    FROM rdm_disks d
+    JOIN rdm_resolved_vm_hosts h ON h.vm_id = d.vm_id
+    JOIN %s l ON TRIM(l."Host ID") = h.host_id
+    WHERE NULLIF(TRIM(l."LUN UUID"), '') IS NOT NULL
+      AND TRIM(l."LUN UUID") = d.lun_uuid
+),
+storage_rdm_lun_matches AS (
+    SELECT disk_row_id, host_id, lun_key, canonical_name, lun_uuid
+    FROM rdm_lun_candidates
+    QUALIFY COUNT(*) OVER (PARTITION BY disk_row_id) = 1
+)`, tables.hostSource, tables.scsi)
 }
 
 func datastoreResolutionQuery(vmOnly bool) string {
