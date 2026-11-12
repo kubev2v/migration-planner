@@ -64,10 +64,61 @@ func (d *Disks) Scan(value interface{}) error {
 		if lunUUID := strings.TrimSpace(toString(m["RDMLunUUID"])); disk.RDM && lunUUID != "" {
 			disk.RDMBacking = &RDMBacking{LunUUID: lunUUID}
 		}
+		if thin, ok := m["ThinProvisioned"].(bool); ok {
+			disk.ThinProvisioned = &thin
+		}
+		if eager, ok := m["EagerlyScrubbed"].(bool); ok {
+			disk.EagerlyScrubbed = &eager
+		}
+		if disk.RDM {
+			disk.RDMBacking = scanRDMBacking(m, disk.RDMBacking)
+		}
 		result = append(result, disk)
 	}
 	*d = result
 	return nil
+}
+
+// scanRDMBacking rebuilds the backing object with every collected detail.
+// An existing object carries a LUN UUID collected before the OMA-2505
+// columns; preserve it. The backing is exposed when at least one meaningful
+// value exists: an identifier, a physical/virtual mode, or a matched host
+// LUN. Unknown mode alone never creates an otherwise empty object.
+func scanRDMBacking(m map[string]interface{}, existing *RDMBacking) *RDMBacking {
+	backing := RDMBacking{}
+	if existing != nil {
+		backing.LunUUID = existing.LunUUID
+	}
+	backing.DeviceName = strings.TrimSpace(toString(m["RDMDeviceName"]))
+	backing.BackingUUID = strings.TrimSpace(toString(m["RDMBackingUUID"]))
+
+	mode := strings.ToLower(strings.TrimSpace(toString(m["RDMCompatibilityMode"])))
+	switch mode {
+	case "physical", "virtual", "unknown":
+		backing.CompatibilityMode = mode
+	default:
+		backing.CompatibilityMode = "unknown"
+	}
+
+	if hostID := strings.TrimSpace(toString(m["RDMHostID"])); hostID != "" {
+		backing.HostLun = &RDMHostLun{
+			HostID:        hostID,
+			Key:           strings.TrimSpace(toString(m["RDMHostLunKey"])),
+			CanonicalName: strings.TrimSpace(toString(m["RDMHostLunCanonicalName"])),
+			LunUUID:       strings.TrimSpace(toString(m["RDMHostLunUUID"])),
+		}
+	}
+
+	meaningful := backing.LunUUID != "" ||
+		backing.DeviceName != "" ||
+		backing.BackingUUID != "" ||
+		backing.CompatibilityMode == "physical" ||
+		backing.CompatibilityMode == "virtual" ||
+		backing.HostLun != nil
+	if !meaningful {
+		return nil
+	}
+	return &backing
 }
 
 func (d Disks) Value() (driver.Value, error) {

@@ -22,11 +22,13 @@ func (p *Parser) VMs(ctx context.Context, filters Filters, options Options) ([]m
 	if err != nil {
 		return nil, err
 	}
-	topology, err := StorageTopologyQuery(ctx, p.db)
+	// One information_schema read resolves both the table sources and the
+	// current/legacy vdisk column profile for this collection.
+	tables, err := storageTables(ctx, p.db)
 	if err != nil {
 		return nil, err
 	}
-	q, err := p.builder.vmQuery(filters, options, metadataTable, topology)
+	q, err := p.builder.vmQuery(filters, options, metadataTable, storageTopologyQuery(tables, false), tables.vdiskRDMColumns)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build vm query: %v", err)
 	}

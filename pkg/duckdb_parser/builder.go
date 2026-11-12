@@ -75,6 +75,7 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 type queryParams struct {
 	MetadataTable           string
 	StorageTopology         string
+	RDMColumns              bool
 	NetworkColumns          string
 	ClusterFilter           string
 	OSFilter                string
@@ -96,12 +97,16 @@ func faultToleranceEnabledPredicate(tableAlias string) string {
 	return fmt.Sprintf(`COALESCE(%s."FT State" IN (%s), false)`, tableAlias, faultToleranceEnabledStates)
 }
 
+// staticStorageTables is the fallback source set for callers that build
+// queries without an open collection, matching the parser-created table names.
+var staticStorageTables = storageTableSources{hba: "vhba", scsi: "vhostscsi"}
+
 // VMQuery builds the VM query with filters and pagination.
 func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error) {
-	return b.vmQuery(filters, options, "vm_metadata", storageTopologyQuery("vhba", "vhostscsi", false))
+	return b.vmQuery(filters, options, "vm_metadata", storageTopologyQuery(staticStorageTables, false), false)
 }
 
-func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, storageTopology string) (string, error) {
+func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, storageTopology string, rdmColumns bool) (string, error) {
 	const maxNetworkNumbers = 8 // RVTools vInfo has Network #1 through Network #8
 	quoted := make([]string, 0, maxNetworkNumbers)
 	for i := 1; i <= maxNetworkNumbers; i++ {
@@ -112,6 +117,7 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, 
 	params := queryParams{
 		MetadataTable:           metadataTable,
 		StorageTopology:         storageTopology,
+		RDMColumns:              rdmColumns,
 		NetworkColumns:          networkColumns,
 		ClusterFilter:           escapeSQLString(filters.Cluster),
 		OSFilter:                escapeSQLString(filters.OS),
@@ -127,7 +133,7 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, 
 
 // DatastoreQuery builds the datastore query with filters and pagination.
 func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string, error) {
-	return b.datastoreQuery(filters, options, storageTopologyQuery("vhba", "vhostscsi", false))
+	return b.datastoreQuery(filters, options, storageTopologyQuery(staticStorageTables, false))
 }
 
 func (b *QueryBuilder) datastoreQuery(filters Filters, options Options, storageTopology string) (string, error) {

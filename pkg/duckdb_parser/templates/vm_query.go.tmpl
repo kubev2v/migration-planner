@@ -26,8 +26,21 @@ disks AS (
             'Capacity': COALESCE(dk."Capacity MiB", 0),
             'Shared': dk."Sharing mode",
             'RDM': dk."Raw",
+{{- if .RDMColumns }}
+            'RDMLunUUID': dk."RDM LUN UUID",
+            'RDMDeviceName': dk."RDM Device Name",
+            'RDMCompatibilityMode': dk."RDM Compatibility Mode",
+            'RDMBackingUUID': dk."RDM Backing UUID",
+            'RDMHostID': rdm_match.host_id,
+            'RDMHostLunKey': rdm_match.lun_key,
+            'RDMHostLunCanonicalName': rdm_match.canonical_name,
+            'RDMHostLunUUID': rdm_match.lun_uuid,
+            'ThinProvisioned': dk."Thin Provisioned",
+            'EagerlyScrubbed': dk."Eagerly Scrubbed",
+{{- else }}
             -- Row JSON keeps older read-only collections without this column queryable.
             'RDMLunUUID': to_json(dk)->>'RDM LUN UUID',
+{{- end }}
             'Bus': dk."Shared Bus",
             'Mode': dk."Disk Mode",
             'Serial': dk."Disk UUID",
@@ -51,6 +64,9 @@ disks AS (
     FROM vdisk dk
     LEFT JOIN storage_disk_datastores resolved
         ON resolved."VM ID" = dk."VM ID" AND resolved.disk_row_id = dk.rowid
+{{- if .RDMColumns }}
+    LEFT JOIN storage_rdm_lun_matches rdm_match ON rdm_match.disk_row_id = dk.rowid
+{{- end }}
     LEFT JOIN storage_datastores ds ON ds.datastore_row_id = resolved.datastore_row_id
     LEFT JOIN datastore_backing_info backing ON backing.datastore_row_id = ds.datastore_row_id
     GROUP BY dk."VM ID"
