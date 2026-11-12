@@ -101,17 +101,20 @@ func UpdateAvailable(served, deployed string) bool {
 }
 
 // IsUpdateSupported reports whether the running appliance version can be
-// updated in place to the served image: same channel as the minimum and not
-// numerically older than it. Not comparable (different channel, missing
-// numbers, invalid) gives no signal — the gate only blocks on a proven
-// comparison, so it fails open.
+// updated in place to the served image: not numerically older than the
+// minimum. The minimum is compared across channels — it comes from the served
+// image's label and can legitimately lag a channel transition at a release
+// boundary (branch-format config value, prod-format build), and the channel
+// prefix does not change numeric ordering. Not comparable (missing numbers,
+// invalid) gives no signal — the gate only blocks on a proven comparison, so
+// it fails open.
 func IsUpdateSupported(runningVersion, minVersionUpdateSupported string) bool {
 	d, ok := parseApplianceVersion(runningVersion)
 	if !ok {
 		return true
 	}
 	m, ok := parseApplianceVersion(minVersionUpdateSupported)
-	if !ok || m.channel != d.channel || !d.hasNumerics || !m.hasNumerics {
+	if !ok || !d.hasNumerics || !m.hasNumerics {
 		return true
 	}
 	switch {
@@ -119,6 +122,10 @@ func IsUpdateSupported(runningVersion, minVersionUpdateSupported string) bool {
 		return d.major > m.major
 	case d.minor != m.minor:
 		return d.minor > m.minor
+	case d.channel != "prod" || m.channel != "prod":
+		// Only prod versions carry a patch component; a branch format at the
+		// same major.minor has an unknown patch order, so fail open.
+		return true
 	default:
 		return d.patch >= m.patch
 	}
