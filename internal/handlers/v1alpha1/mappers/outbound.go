@@ -17,6 +17,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -184,13 +185,17 @@ func SourceToApi(s model.Source) (api.Source, error) {
 		}
 	}
 
-	// Map agent version and warning (from ImageInfra, independent of agents)
-	if s.ImageInfra.AgentVersion != nil {
-		source.AgentVersion = s.ImageInfra.AgentVersion
+	// Map agent version and warning (agent-reported with OVA-download stamp
+	// as fallback), and whether an in-place update is supported at all.
+	current := service.KnownApplianceVersion(&s)
+	if current != "" {
+		source.AgentVersion = &current
 	}
-	if warning := service.CheckAgentVersionWarning(&s.ImageInfra); warning != nil {
+	if warning := service.CheckAgentVersionWarning(&s); warning != nil {
 		source.AgentVersionWarning = warning
 	}
+	supported := !version.BelowMin(current, version.MinApplianceVersion())
+	source.ApplianceUpdateSupported = &supported
 
 	// We are mapping only the first agent based on created_at timestamp and ignore the rest for now.
 	// TODO:
