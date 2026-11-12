@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner-common/estimations/engines"
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
-	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -629,7 +629,7 @@ var _ = Describe("EstimationService", func() {
 					ctx, assessmentID, []string{clusterID}, schemas, nil,
 				)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(results).NotTo(BeEmpty())
+				Expect(results.Estimation).NotTo(BeEmpty())
 			})
 
 			It("aggregates selected clusters while ignoring empty and duplicate IDs", func() {
@@ -657,7 +657,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)).To(Equal(1))
 				expected, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{combined}, schemas, nil)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(listResults).To(Equal(expected))
+				Expect(listResults.Estimation).To(Equal(expected.Estimation))
 			})
 
 			It("uses vCenter data for an empty cluster list", func() {
@@ -673,7 +673,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(err).NotTo(HaveOccurred())
 				emptyResults, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{}, schemas, nil)
 				Expect(err).NotTo(HaveOccurred())
-				Expect(emptyResults).To(Equal(nilResults))
+				Expect(emptyResults.Estimation).To(Equal(nilResults.Estimation))
 			})
 
 			It("rejects lists without valid clusters before publishing an event", func() {
@@ -708,11 +708,11 @@ var _ = Describe("EstimationService", func() {
 
 				Expect(err).To(BeNil())
 				Expect(results).NotTo(BeNil())
-				Expect(results).To(HaveKey(engines.SchemaNetworkBased))
-				Expect(results).To(HaveKey(engines.SchemaStorageOffload))
-				Expect(results[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
-				Expect(results[engines.SchemaNetworkBased].MaxTotalDuration).To(BeNumerically(">=", results[engines.SchemaNetworkBased].MinTotalDuration))
-				Expect(results[engines.SchemaNetworkBased].Breakdown).NotTo(BeEmpty())
+				Expect(results.Estimation).To(HaveKey(engines.SchemaNetworkBased))
+				Expect(results.Estimation).To(HaveKey(engines.SchemaStorageOffload))
+				Expect(results.Estimation[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
+				Expect(results.Estimation[engines.SchemaNetworkBased].MaxTotalDuration).To(BeNumerically(">=", results.Estimation[engines.SchemaNetworkBased].MinTotalDuration))
+				Expect(results.Estimation[engines.SchemaNetworkBased].Breakdown).NotTo(BeEmpty())
 
 				outboxCount := countOutboxEventsByType(mockStore.outboxEvents, eventwrap.EventTypeKafka)
 				Expect(outboxCount).To(Equal(1))
@@ -726,8 +726,8 @@ var _ = Describe("EstimationService", func() {
 				results, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, nil)
 
 				Expect(err).To(BeNil())
-				Expect(results[engines.SchemaNetworkBased].Breakdown).To(HaveKey("Storage Migration"))
-				Expect(results[engines.SchemaNetworkBased].Breakdown).To(HaveKey("Post-Migration Checks"))
+				Expect(results.Estimation[engines.SchemaNetworkBased].Breakdown).To(HaveKey("Storage Migration"))
+				Expect(results.Estimation[engines.SchemaNetworkBased].Breakdown).To(HaveKey("Post-Migration Checks"))
 			})
 
 			It("calculates correct total duration as sum of all calculators", func() {
@@ -740,7 +740,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(err).To(BeNil())
 
 				// For each schema, verify MinTotalDuration and MaxTotalDuration are consistent with breakdown
-				for _, result := range results {
+				for _, result := range results.Estimation {
 					var expectedMin, expectedMax time.Duration
 					for _, est := range result.Breakdown {
 						if est.IsRanged() {
@@ -764,7 +764,7 @@ var _ = Describe("EstimationService", func() {
 				results, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, nil)
 
 				Expect(err).To(BeNil())
-				for _, result := range results {
+				for _, result := range results.Estimation {
 					for calcName, est := range result.Breakdown {
 						Expect(est.Reason).NotTo(BeEmpty(), "calculator %s should have a reason", calcName)
 					}
@@ -909,7 +909,7 @@ var _ = Describe("EstimationService", func() {
 				Expect(err).To(BeNil())
 				Expect(results).NotTo(BeNil())
 				// Should still have calculators run, just with 0 values
-				for _, result := range results {
+				for _, result := range results.Estimation {
 					Expect(result.Breakdown).NotTo(BeEmpty())
 				}
 			})
@@ -923,7 +923,7 @@ var _ = Describe("EstimationService", func() {
 
 				Expect(err).To(BeNil())
 				Expect(results).NotTo(BeNil())
-				Expect(results[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
+				Expect(results.Estimation[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
 			})
 		})
 
@@ -938,7 +938,7 @@ var _ = Describe("EstimationService", func() {
 					ctx, assessmentID, []string{clusterID}, []engines.Schema{engines.SchemaNetworkBased}, nil,
 				)
 				Expect(err).NotTo(HaveOccurred())
-				defaultDuration := *defaultResults[engines.SchemaNetworkBased].Breakdown["Storage Migration"].Duration
+				defaultDuration := *defaultResults.Estimation[engines.SchemaNetworkBased].Breakdown["Storage Migration"].Duration
 
 				// Run with a much faster transfer rate — duration must be shorter
 				fastResults, err := estimationSrv.CalculateMigrationEstimation(
@@ -946,14 +946,14 @@ var _ = Describe("EstimationService", func() {
 					[]estimation.Param{{Key: "transfer_rate_mbps", Value: 10000.0}},
 				)
 				Expect(err).NotTo(HaveOccurred())
-				fastDuration := *fastResults[engines.SchemaNetworkBased].Breakdown["Storage Migration"].Duration
+				fastDuration := *fastResults.Estimation[engines.SchemaNetworkBased].Breakdown["Storage Migration"].Duration
 
 				Expect(fastDuration).To(BeNumerically("<", defaultDuration))
 			})
 		})
 	})
 
-	Describe("CalculateOsDiskComplexity", func() {
+	Describe("CalculateMigrationEstimationByComplexity", func() {
 		var defaultOsInfo *map[string]svcmodel.OsInfo
 		var defaultDiskTier *map[string]svcmodel.DiskSizeTierSummary
 
@@ -966,7 +966,7 @@ var _ = Describe("EstimationService", func() {
 			})
 		})
 
-		It("returns 5 buckets with VMCount and TotalSizeTB", func() {
+		It("estimates populated buckets using bucket inventory and user params", func() {
 			dist := buildComplexityDistribution(map[string]svcmodel.DiskSizeTierSummary{
 				"1": {VmCount: 30, TotalSizeTB: 5.0},
 				"2": {VmCount: 15, TotalSizeTB: 12.0},
@@ -975,7 +975,9 @@ var _ = Describe("EstimationService", func() {
 				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier, dist,
 			)
 
-			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{clusterID})
+			schemas := []engines.Schema{engines.SchemaNetworkBased}
+			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 8192.0}}
+			result, err := estimationSrv.CalculateMigrationEstimationByComplexity(ctx, assessmentID, []string{clusterID}, schemas, params)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Buckets).To(HaveLen(5))
@@ -983,10 +985,37 @@ var _ = Describe("EstimationService", func() {
 			Expect(result.Buckets[1].TotalSizeTB).To(Equal(5.0))
 			Expect(result.Buckets[2].VMCount).To(Equal(15))
 			Expect(result.Buckets[2].TotalSizeTB).To(Equal(12.0))
+
+			// At 8192 Mbps, the converted 5 TiB and 12 TiB take 5120 and 12288 seconds.
+			expected := []struct {
+				score             int
+				storageDuration   time.Duration
+				postMigrationTime time.Duration
+			}{
+				{score: 1, storageDuration: 5120 * time.Second, postMigrationTime: 3 * time.Hour},
+				{score: 2, storageDuration: 12288 * time.Second, postMigrationTime: 90 * time.Minute},
+			}
+
+			Expect(result.BucketEstimations).To(HaveLen(2))
+			for _, want := range expected {
+				Expect(result.BucketEstimations).To(HaveKey(want.score))
+				schemaResults := result.BucketEstimations[want.score]
+				Expect(schemaResults).To(HaveKey(string(engines.SchemaNetworkBased)))
+				estimate := schemaResults[string(engines.SchemaNetworkBased)]
+				Expect(estimate).NotTo(BeNil())
+				Expect(estimate.Breakdown["Storage Migration"].Duration).To(HaveValue(Equal(want.storageDuration)))
+				Expect(estimate.Breakdown["Post-Migration Checks"].Duration).To(HaveValue(Equal(want.postMigrationTime)))
+				Expect(estimate.MinTotalDuration).To(Equal(want.storageDuration + want.postMigrationTime))
+				Expect(estimate.MaxTotalDuration).To(Equal(want.storageDuration + want.postMigrationTime))
+			}
+
+			for _, score := range []int{0, 3, 4} {
+				Expect(result.BucketEstimations).NotTo(HaveKey(score))
+			}
 		})
 
 		It("returns error for unknown assessment", func() {
-			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, uuid.New(), []string{clusterID})
+			_, err := estimationSrv.CalculateMigrationEstimationByComplexity(ctx, uuid.New(), []string{clusterID}, nil, nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -994,7 +1023,7 @@ var _ = Describe("EstimationService", func() {
 			mockStore.assessments[assessmentID] = createTestAssessmentForComplexity(
 				assessmentID, testUsername, testOrgID, clusterID, defaultOsInfo, defaultDiskTier,
 			)
-			_, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{"wrong-cluster"})
+			_, err := estimationSrv.CalculateMigrationEstimationByComplexity(ctx, assessmentID, []string{"wrong-cluster"}, nil, nil)
 			Expect(err).To(HaveOccurred())
 		})
 
@@ -1010,7 +1039,7 @@ var _ = Describe("EstimationService", func() {
 				createTestInventoryWithVcenter(defaultOsInfo, &diskTier, dist),
 			)
 
-			result, err := estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{""})
+			result, err := estimationSrv.CalculateMigrationEstimationByComplexity(ctx, assessmentID, []string{""}, nil, nil)
 
 			Expect(err).ToNot(HaveOccurred())
 			Expect(result.Buckets).To(HaveLen(5))
@@ -1019,27 +1048,29 @@ var _ = Describe("EstimationService", func() {
 	})
 
 	Describe("RunEstimation", func() {
+		BeforeEach(func() {
+			mockStore.assessments[assessmentID] = createTestAssessmentForEstimation(
+				assessmentID, testUsername, testOrgID, clusterID, 10, 1000,
+			)
+		})
+
 		It("returns results for each requested schema", func() {
 			params := []estimation.Param{
-				{Key: "vm_count", Value: 10},
-				{Key: "total_disk_gb", Value: 1000.0},
 				{Key: "work_hours_per_day", Value: 8.0},
 				{Key: "troubleshoot_mins_per_vm", Value: 30.0},
 				{Key: "post_migration_engineers", Value: 2},
 			}
-			results, err := estimationSrv.RunEstimation(
-				[]engines.Schema{engines.SchemaNetworkBased},
-				params,
+			results, err := estimationSrv.CalculateMigrationEstimation(
+				ctx, assessmentID, []string{clusterID}, []engines.Schema{engines.SchemaNetworkBased}, params,
 			)
 			Expect(err).ToNot(HaveOccurred())
-			Expect(results).To(HaveKey(engines.SchemaNetworkBased))
-			Expect(results[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
+			Expect(results.Estimation).To(HaveKey(engines.SchemaNetworkBased))
+			Expect(results.Estimation[engines.SchemaNetworkBased].MinTotalDuration).To(BeNumerically(">", 0))
 		})
 
 		It("returns an error for an unknown schema", func() {
-			_, err := estimationSrv.RunEstimation(
-				[]engines.Schema{"invalid-schema"},
-				[]estimation.Param{},
+			_, err := estimationSrv.CalculateMigrationEstimation(
+				ctx, assessmentID, []string{clusterID}, []engines.Schema{"invalid-schema"}, nil,
 			)
 			Expect(err).To(HaveOccurred())
 		})
@@ -1047,13 +1078,13 @@ var _ = Describe("EstimationService", func() {
 
 	Describe("BuildBaseParams", func() {
 		It("returns defaults when no user params supplied", func() {
-			params := estimationSrv.BuildBaseParams(nil)
+			params := engines.BuildBaseParams()
 			Expect(params).NotTo(BeEmpty())
 		})
 
 		It("user params override defaults", func() {
 			userParams := []estimation.Param{{Key: "work_hours_per_day", Value: 12.0}}
-			params := estimationSrv.BuildBaseParams(userParams)
+			params := engines.BuildBaseParams(userParams...)
 			var found float64
 			for _, p := range params {
 				if p.Key == "work_hours_per_day" {
@@ -1064,10 +1095,13 @@ var _ = Describe("EstimationService", func() {
 		})
 	})
 
-	Describe("BuildBucketParams", func() {
+	Describe("BuildBaseParams with inventory inputs", func() {
 		It("adds vmCount and totalDiskGB on top of base params", func() {
-			base := estimationSrv.BuildBaseParams(nil)
-			params := estimationSrv.BuildBucketParams(base, 50, 5000.0)
+			base := engines.BuildBaseParams()
+			params := engines.BuildBaseParams(append(base,
+				estimation.Param{Key: "vm_count", Value: 50},
+				estimation.Param{Key: "total_disk_gb", Value: 5000.0},
+			)...)
 			keys := make(map[string]any)
 			for _, p := range params {
 				keys[p.Key] = p.Value
@@ -1100,20 +1134,26 @@ var _ = Describe("EstimationService", func() {
 	})
 
 	Describe("ValidateParams", func() {
+		BeforeEach(func() {
+			mockStore.assessments[assessmentID] = createTestAssessmentForEstimation(
+				assessmentID, testUsername, testOrgID, clusterID, 10, 1000,
+			)
+		})
+
 		It("returns nil for an empty param list", func() {
-			err := estimationSrv.ValidateParams(nil)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, nil)
 			Expect(err).To(BeNil())
 		})
 
 		It("returns nil for a known key with a valid value", func() {
 			params := []estimation.Param{{Key: "work_hours_per_day", Value: 8.0}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).To(BeNil())
 		})
 
 		It("returns ErrInvalidEstimationParam for an unknown key", func() {
 			params := []estimation.Param{{Key: "unknown_param", Value: 42.0}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).NotTo(BeNil())
 			_, ok := err.(*service.ErrInvalidEstimationParam)
 			Expect(ok).To(BeTrue(), "expected *ErrInvalidEstimationParam, got %T: %v", err, err)
@@ -1123,7 +1163,7 @@ var _ = Describe("EstimationService", func() {
 		It("returns ErrInvalidEstimationParam when a value is below its minimum", func() {
 			// transfer_rate_mbps has Min=0.1
 			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 0.0}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).NotTo(BeNil())
 			_, ok := err.(*service.ErrInvalidEstimationParam)
 			Expect(ok).To(BeTrue())
@@ -1132,7 +1172,7 @@ var _ = Describe("EstimationService", func() {
 
 		It("returns ErrInvalidEstimationParam for a non-numeric value", func() {
 			params := []estimation.Param{{Key: "work_hours_per_day", Value: "eight"}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).NotTo(BeNil())
 			_, ok := err.(*service.ErrInvalidEstimationParam)
 			Expect(ok).To(BeTrue())
@@ -1142,7 +1182,7 @@ var _ = Describe("EstimationService", func() {
 		It("returns ErrInvalidEstimationParam for a fractional value on an integer param", func() {
 			// post_migration_engineers has Type="integer"
 			params := []estimation.Param{{Key: "post_migration_engineers", Value: 1.5}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).NotTo(BeNil())
 			_, ok := err.(*service.ErrInvalidEstimationParam)
 			Expect(ok).To(BeTrue())
@@ -1152,14 +1192,14 @@ var _ = Describe("EstimationService", func() {
 		It("returns nil for a whole float on an integer param", func() {
 			// 2.0 is a valid integer value
 			params := []estimation.Param{{Key: "post_migration_engineers", Value: 2.0}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).To(BeNil())
 		})
 
 		It("returns nil for a value exactly at the minimum", func() {
 			// transfer_rate_mbps Min=0.1; 0.1 is valid
 			params := []estimation.Param{{Key: "transfer_rate_mbps", Value: 0.1}}
-			err := estimationSrv.ValidateParams(params)
+			_, err := estimationSrv.CalculateMigrationEstimation(ctx, assessmentID, []string{clusterID}, nil, params)
 			Expect(err).To(BeNil())
 		})
 	})

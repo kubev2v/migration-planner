@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner-common/estimations/engines"
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
-	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
-	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
@@ -106,16 +105,6 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		}
 	}
 
-	if err := h.estimationSrv.ValidateParams(userParams); err != nil {
-		logger.Error(err).Log()
-		switch err.(type) {
-		case *service.ErrInvalidEstimationParam:
-			return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: err.Error()}, nil
-		default:
-			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to validate params"}, nil
-		}
-	}
-
 	_, err := h.assessmentSrv.GetAssessment(ctx, assessmentID)
 	if err != nil {
 		switch err.(type) {
@@ -131,41 +120,18 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		}
 	}
 
-	osDiskResult, err := h.estimationSrv.CalculateOsDiskComplexity(ctx, assessmentID, []string{clusterID})
+	result, err := h.estimationSrv.CalculateMigrationEstimationByComplexity(ctx, assessmentID, []string{clusterID}, schemas, userParams)
 	if err != nil {
 		switch err.(type) {
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimationByComplexity404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrInvalidEstimationParam, *service.ErrInvalidSchema:
+			logger.Error(err).Log()
+			return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: err.Error()}, nil
 		default:
 			logger.Error(err).Log()
 			return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to calculate complexity"}, nil
-		}
-	}
-
-	baseParams := h.estimationSrv.BuildBaseParams(userParams)
-	estimationCtx := &service.EstimationContext{Schemas: schemas, BaseParams: baseParams}
-
-	bucketEstimations := make(map[int]map[string]*service.MigrationAssessmentResult)
-	for _, bucket := range osDiskResult.Buckets {
-		if bucket.VMCount == 0 {
-			continue
-		}
-		diskGB := bucket.TotalSizeTB * 1024
-		bucketParams := h.estimationSrv.BuildBucketParams(baseParams, bucket.VMCount, diskGB)
-		schemaResults, err := h.estimationSrv.RunEstimation(schemas, bucketParams)
-		if err != nil {
-			logger.Error(err).Log()
-			switch err.(type) {
-			case *service.ErrInvalidSchema:
-				return server.CalculateMigrationEstimationByComplexity400JSONResponse{Message: err.Error()}, nil
-			default:
-				return server.CalculateMigrationEstimationByComplexity500JSONResponse{Message: "failed to run estimation"}, nil
-			}
-		}
-		bucketEstimations[bucket.Score] = make(map[string]*service.MigrationAssessmentResult, len(schemaResults))
-		for schema, r := range schemaResults {
-			bucketEstimations[bucket.Score][string(schema)] = r
 		}
 	}
 
@@ -175,10 +141,10 @@ func (h *ServiceHandler) CalculateMigrationEstimationByComplexity(ctx context.Co
 		Log()
 
 	apiResp := mappers.OsDiskEstimationResultToAPI(
-		osDiskResult.Buckets,
-		bucketEstimations,
-		estimationCtx,
-		complexity.ComplexityMatrix,
+		result.Buckets,
+		result.BucketEstimations,
+		&result.EstimationContext,
+		result.ComplexityMatrix,
 	)
 	return server.CalculateMigrationEstimationByComplexity200JSONResponse(apiResp), nil
 }
@@ -218,18 +184,6 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		}
 	}
 
-	if err := h.estimationSrv.ValidateParams(userParams); err != nil {
-		logger.Error(err).Log()
-		switch err.(type) {
-		case *service.ErrInvalidEstimationParam:
-			return server.CalculateMigrationEstimation400JSONResponse{Message: err.Error()}, nil
-		default:
-			return server.CalculateMigrationEstimation500JSONResponse{Message: "failed to validate params"}, nil
-		}
-	}
-
-	baseParams := h.estimationSrv.BuildBaseParams(userParams)
-
 	if _, err := h.assessmentSrv.GetAssessment(ctx, assessmentID); err != nil {
 		logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 		switch err.(type) {
@@ -259,7 +213,7 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 		case *service.ErrResourceNotFound:
 			logger.Error(err).WithUUID("assessment_id", assessmentID).Log()
 			return server.CalculateMigrationEstimation404JSONResponse{Message: err.Error()}, nil
-		case *service.ErrInvalidSchema:
+		case *service.ErrInvalidEstimationParam, *service.ErrInvalidSchema:
 			logger.Error(err).Log()
 			return server.CalculateMigrationEstimation400JSONResponse{Message: err.Error()}, nil
 		default:
@@ -271,15 +225,9 @@ func (h *ServiceHandler) CalculateMigrationEstimation(ctx context.Context, reque
 	logger.Success().
 		WithString("org_id", user.Organization).
 		WithString("username", user.Username).
-		WithInt("schema_count", len(result)).
+		WithInt("schema_count", len(result.Estimation)).
 		Log()
 
-	resolvedSchemas := make([]engines.Schema, 0, len(result))
-	for s := range result {
-		resolvedSchemas = append(resolvedSchemas, s)
-	}
-	estimationCtx := &service.EstimationContext{Schemas: resolvedSchemas, BaseParams: baseParams}
-
-	apiResponse := mappers.MigrationEstimationResultToAPI(result, estimationCtx)
+	apiResponse := mappers.MigrationEstimationResultToAPI(result.Estimation, &result.EstimationContext)
 	return server.CalculateMigrationEstimation200JSONResponse(apiResponse), nil
 }

@@ -1,6 +1,6 @@
 module github.com/kubev2v/migration-planner
 
-go 1.27.0
+go 1.27.2
 
 require (
 	github.com/MicahParks/jwkset v0.11.4
@@ -20,6 +20,7 @@ require (
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
 	github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048
+	github.com/kubev2v/migration-planner-common/estimations v0.0.0-20261112132701-67c604c0066b
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
