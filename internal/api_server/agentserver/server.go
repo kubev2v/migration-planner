@@ -80,7 +80,7 @@ func (s *AgentServer) Run(ctx context.Context) error {
 		oapimiddleware.OapiRequestValidatorWithOptions(swagger, &oapiOpts),
 	)
 
-	h := handlers.NewAgentHandler(service.NewAgentService(s.store))
+	h := handlers.NewAgentHandler(service.NewAgentService(s.store), service.NewSourceService(s.store, nil), s.cfg)
 	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
