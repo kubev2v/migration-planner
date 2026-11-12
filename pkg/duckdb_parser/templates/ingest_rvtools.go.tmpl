@@ -222,6 +222,8 @@ SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vDisk', all_varchar=true);
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Sharing mode" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Disk UUID" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Raw LUN ID" VARCHAR;
+ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Raw Comp. Mode" VARCHAR;
+ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Eagerly Scrub" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Capacity MiB" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Capacity MB" VARCHAR;
 
@@ -233,7 +235,8 @@ UPDATE vdisk_raw SET "Capacity MiB" = COALESCE(
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
     "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID", "RDM LUN UUID",
-    "Thin", "Controller", "Label", "SCSI Unit #"
+    "RDM Device Name", "RDM Backing UUID", "RDM Compatibility Mode", "RDM LUN UUID Source",
+    "Thin", "Thin Provisioned", "Eagerly Scrubbed", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
     d."VM ID",
@@ -248,7 +251,27 @@ SELECT
     d."Disk Mode",
     d."Disk UUID",
     CASE WHEN LOWER(d."Raw") IN ('true', '1', 'yes') THEN NULLIF(TRIM(d."Raw LUN ID"), '') END,
+    NULL,
+    NULL,
+    CASE
+        WHEN COALESCE(LOWER(d."Raw"), '') NOT IN ('true', '1', 'yes') THEN NULL
+        WHEN NULLIF(TRIM(d."Raw Comp. Mode"), '') IS NULL THEN 'unknown'
+        WHEN LOWER(TRIM(d."Raw Comp. Mode")) IN ('physicalmode', 'physical') THEN 'physical'
+        WHEN LOWER(TRIM(d."Raw Comp. Mode")) IN ('virtualmode', 'virtual') THEN 'virtual'
+        ELSE 'unknown'
+    END,
+    CASE WHEN LOWER(d."Raw") IN ('true', '1', 'yes') AND NULLIF(TRIM(d."Raw LUN ID"), '') IS NOT NULL THEN 'rvtools-raw-lun-id' END,
     CASE WHEN LOWER(d."Thin") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Thin") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    CASE LOWER(TRIM(d."Thin"))
+        WHEN 'true' THEN TRUE WHEN '1' THEN TRUE WHEN 'yes' THEN TRUE
+        WHEN 'false' THEN FALSE WHEN '0' THEN FALSE WHEN 'no' THEN FALSE
+        ELSE NULL
+    END,
+    CASE LOWER(TRIM(d."Eagerly Scrub"))
+        WHEN 'true' THEN TRUE
+        WHEN 'false' THEN FALSE
+        ELSE NULL
+    END,
     d."Controller",
     d."Label",
     d."SCSI Unit #"

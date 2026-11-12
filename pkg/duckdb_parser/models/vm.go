@@ -68,9 +68,24 @@ func (vm VM) EffectiveGuestName() string {
 	return vm.GuestName
 }
 
-// RDMBacking identifies the LUN directly reported by an RDM disk backing.
+// RDMBacking describes the source-reported backing of an RDM disk.
+// CompatibilityMode is physical, virtual, or unknown; identifiers are
+// preserved independently and none is a fallback for another.
 type RDMBacking struct {
-	LunUUID string `json:"lunUuid,omitempty"`
+	LunUUID           string      `json:"lunUuid,omitempty"`
+	DeviceName        string      `json:"deviceName,omitempty"`
+	CompatibilityMode string      `json:"compatibilityMode"`
+	BackingUUID       string      `json:"backingUuid,omitempty"`
+	HostLun           *RDMHostLun `json:"hostLun,omitempty"`
+}
+
+// RDMHostLun references the host LUN matched to an RDM disk backing through
+// a verified identifier relationship and the VM's uniquely resolved host.
+type RDMHostLun struct {
+	HostID        string `json:"hostId"`
+	Key           string `json:"key,omitempty"`
+	CanonicalName string `json:"canonicalName,omitempty"`
+	LunUUID       string `json:"lunUuid,omitempty"`
 }
 
 // Disk represents a virtual disk from the vdisk table.
@@ -87,6 +102,8 @@ type Disk struct {
 	Mode                            string      `json:"mode,omitempty" db:"Disk Mode"`
 	Serial                          string      `json:"serial" db:"Disk UUID"`
 	Thin                            string      `json:"thin" db:"Thin"`
+	ThinProvisioned                 *bool       `json:"thinProvisioned,omitempty"`
+	EagerlyScrubbed                 *bool       `json:"eagerlyScrubbed,omitempty"`
 	Controller                      string      `json:"controller" db:"Controller"`
 	Label                           string      `json:"label" db:"Label"`
 	SCSIUnit                        string      `json:"scsiUnit" db:"SCSI Unit #"`

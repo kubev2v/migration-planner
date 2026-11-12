@@ -114,9 +114,9 @@ func TestRDMLunUUIDQuery(t *testing.T) {
 		require.NoError(t, json.Unmarshal(data, &got))
 		switch disk.Key {
 		case "2000":
-			require.Equal(t, map[string]any{"lunUuid": "lun-uuid-A"}, got["rdmBacking"])
+			require.Equal(t, map[string]any{"lunUuid": "lun-uuid-A", "compatibilityMode": "unknown"}, got["rdmBacking"])
 		case "2001":
-			require.Equal(t, map[string]any{"lunUuid": "lun-uuid-B"}, got["rdmBacking"])
+			require.Equal(t, map[string]any{"lunUuid": "lun-uuid-B", "compatibilityMode": "unknown"}, got["rdmBacking"])
 		default:
 			require.NotContains(t, got, "rdmBacking")
 		}
@@ -125,48 +125,87 @@ func TestRDMLunUUIDQuery(t *testing.T) {
 	}
 }
 
+// The RDM backing columns added by OMA-2505 and the pre-existing RDM LUN UUID
+// column define collection eras. A legacy read-only file must stay queryable
+// through the legacy disk projection, with the new fields absent.
 func TestRDMLunUUIDLegacyReadOnlyCollection(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "legacy.duckdb")
-	db, err := sql.Open("duckdb", path)
-	require.NoError(t, err)
-	p := New(db, nil)
-	require.NoError(t, p.Init())
-	_, err = db.Exec(`ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
- INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);
- INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid');`)
-	require.NoError(t, err)
-	require.NoError(t, db.Close())
-	readonly, err := sql.Open("duckdb", path+"?access_mode=READ_ONLY")
-	require.NoError(t, err)
-	defer func() { _ = readonly.Close() }()
-	vms, err := New(readonly, nil).VMs(context.Background(), Filters{}, Options{})
-	require.NoError(t, err)
-	require.Len(t, vms, 1)
-	require.Len(t, vms[0].Disks, 1)
-	require.True(t, vms[0].Disks[0].RDM)
-	require.Equal(t, int64(100), vms[0].Disks[0].Capacity)
-	data, err := json.Marshal(vms[0].Disks[0])
-	require.NoError(t, err)
-	var got map[string]any
-	require.NoError(t, json.Unmarshal(data, &got))
-	require.NotContains(t, got, "rdmBacking")
-	var columns int
-	require.NoError(t, readonly.QueryRow(`SELECT count(*) FROM information_schema.columns WHERE table_name='vdisk' AND column_name='RDM LUN UUID'`).Scan(&columns))
-	require.Zero(t, columns, "querying a legacy collection must not alter it")
+	dropOMA2505Columns := `
+ALTER TABLE vdisk DROP COLUMN "RDM Device Name";
+ALTER TABLE vdisk DROP COLUMN "RDM Backing UUID";
+ALTER TABLE vdisk DROP COLUMN "RDM Compatibility Mode";
+ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID Source";
+ALTER TABLE vdisk DROP COLUMN "Thin Provisioned";
+ALTER TABLE vdisk DROP COLUMN "Eagerly Scrubbed";`
+	for _, tc := range []struct {
+		name        string
+		dropColumns string
+		insert      string
+		wantBacking map[string]any
+	}{
+		{
+			name:        "old RDM LUN column without new columns",
+			dropColumns: dropOMA2505Columns,
+			insert:      `INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID","RDM LUN UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid','lun-uuid-A');`,
+			wantBacking: map[string]any{"lunUuid": "lun-uuid-A", "compatibilityMode": "unknown"},
+		},
+		{
+			name:        "pre-LUN-column file",
+			dropColumns: `ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";` + dropOMA2505Columns,
+			insert:      `INSERT INTO vdisk ("VM ID","Disk Key","Raw","Capacity MiB","Disk UUID") VALUES ('vm-1','2000',true,100,'not-a-lun-uuid');`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "legacy.duckdb")
+			db, err := sql.Open("duckdb", path)
+			require.NoError(t, err)
+			p := New(db, nil)
+			require.NoError(t, p.Init())
+			_, err = db.Exec(tc.dropColumns + `
+INSERT INTO vinfo ("VM ID","VM","Template") VALUES ('vm-1','legacy-vm',false);` + tc.insert)
+			require.NoError(t, err)
+			require.NoError(t, db.Close())
+			readonly, err := sql.Open("duckdb", path+"?access_mode=READ_ONLY")
+			require.NoError(t, err)
+			defer func() { _ = readonly.Close() }()
+			vms, err := New(readonly, nil).VMs(context.Background(), Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, vms, 1)
+			require.Len(t, vms[0].Disks, 1)
+			require.True(t, vms[0].Disks[0].RDM)
+			require.Equal(t, int64(100), vms[0].Disks[0].Capacity)
+			data, err := json.Marshal(vms[0].Disks[0])
+			require.NoError(t, err)
+			var got map[string]any
+			require.NoError(t, json.Unmarshal(data, &got))
+			if tc.wantBacking == nil {
+				require.NotContains(t, got, "rdmBacking")
+			} else {
+				require.Equal(t, tc.wantBacking, got["rdmBacking"])
+			}
+			var columns int
+			require.NoError(t, readonly.QueryRow(`SELECT count(*) FROM information_schema.columns WHERE table_name='vdisk' AND column_name IN ('RDM Device Name','RDM Backing UUID','RDM Compatibility Mode','RDM LUN UUID Source','Thin Provisioned','Eagerly Scrubbed')`).Scan(&columns))
+			require.Zero(t, columns, "querying a legacy collection must not alter it")
+		})
+	}
 }
 
 func TestRDMLunUUIDInitUpgradesWritableCollection(t *testing.T) {
 	p, db, cleanup := setupTestParser(t, nil)
 	defer cleanup()
 	_, err := db.Exec(`ALTER TABLE vdisk DROP COLUMN "RDM LUN UUID";
- INSERT INTO vinfo ("VM ID","VM") VALUES ('vm-1','legacy-vm');
- INSERT INTO vdisk ("VM ID","Raw","Capacity MiB") VALUES ('vm-1',true,100);`)
+ALTER TABLE vdisk DROP COLUMN "RDM Device Name";
+ALTER TABLE vdisk DROP COLUMN "Thin Provisioned";
+INSERT INTO vinfo ("VM ID","VM") VALUES ('vm-1','legacy-vm');
+INSERT INTO vdisk ("VM ID","Raw","Capacity MiB") VALUES ('vm-1',true,100);`)
 	require.NoError(t, err)
 	require.NoError(t, p.Init())
 	require.NoError(t, p.Init())
 	var capacity int64
-	var uuid sql.NullString
-	require.NoError(t, db.QueryRow(`SELECT "Capacity MiB", "RDM LUN UUID" FROM vdisk`).Scan(&capacity, &uuid))
+	var uuid, deviceName sql.NullString
+	var thin sql.NullBool
+	require.NoError(t, db.QueryRow(`SELECT "Capacity MiB", "RDM LUN UUID", "RDM Device Name", "Thin Provisioned" FROM vdisk`).Scan(&capacity, &uuid, &deviceName, &thin))
 	require.Equal(t, int64(100), capacity)
 	require.False(t, uuid.Valid)
+	require.False(t, deviceName.Valid)
+	require.False(t, thin.Valid)
 }
