@@ -113,6 +113,26 @@ jobs:
           # Here, we also check for untracked files, as none are expected at this stage.
           if [[ $(git ls-files --others --exclude-standard) ]]; then git ls-files --others --exclude-standard; echo "These files are not tracked by git"; exit 1; fi
 
+  check-appliance-version:
+    runs-on: ubuntu-latest
+    needs: [config, validate-commits, validate-pr-title]
+    if: needs.config.outputs.run-code-validations == 'true'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # APPLIANCE_VERSION is used both to pull the appliance image and to report
+      # the version the service serves, so the tag and its label must agree.
+      - name: Check the appliance tag matches the image version label
+        run: |
+          source build/migration-planner-iso/config
+          LABEL=$(skopeo inspect --format '{{index .Labels "org.opencontainers.image.version"}}' \
+            "docker://${APPLIANCE_IMAGE}:${APPLIANCE_VERSION}")
+          [[ "$LABEL" == "$APPLIANCE_VERSION" ]] || {
+            echo "::error::appliance tag ${APPLIANCE_VERSION} does not match its version label ${LABEL}"
+            exit 1
+          }
+
   check-format:
     runs-on: ubuntu-latest
     needs: [config, validate-commits, validate-pr-title]
@@ -167,7 +187,7 @@ jobs:
 
   # Always runs so branch protection can require this single check.
   # Do not require lint/unit-test directly if you want docs-only PRs to merge:
-  # those jobs are skipped when only documentation/image files change.
+  # those jobs are skipped when only documentation/static assets change.
   # Skipped jobs count as success, but a failed commit check would also skip
   # them — this job fails unless commit/title checks passed and, when code
   # changed, the code validations passed.
@@ -180,6 +200,7 @@ jobs:
       - lint
       - check-generate
       - check-format
+      - check-appliance-version
       - unit-test
     if: always()
     runs-on: ubuntu-latest
@@ -193,6 +214,7 @@ jobs:
           LINT: ${{ needs.lint.result }}
           GENERATE: ${{ needs.check-generate.result }}
           FORMAT: ${{ needs.check-format.result }}
+          APPLIANCE: ${{ needs.check-appliance-version.result }}
           TEST: ${{ needs.unit-test.result }}
         run: |
           echo "config=$CONFIG commits=$COMMITS title=$TITLE run_code=$RUN_CODE"
@@ -208,6 +230,7 @@ jobs:
             [[ "$LINT" == success ]] || fail "lint did not succeed ($LINT)"
             [[ "$GENERATE" == success ]] || fail "check-generate did not succeed ($GENERATE)"
             [[ "$FORMAT" == success ]] || fail "check-format did not succeed ($FORMAT)"
+            [[ "$APPLIANCE" == success ]] || fail "check-appliance-version did not succeed ($APPLIANCE)"
             [[ "$TEST" == success ]] || fail "unit-test did not succeed ($TEST)"
           else
             echo "Only skippable files changed; code validations were skipped"

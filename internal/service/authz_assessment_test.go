@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -17,7 +19,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
@@ -56,6 +57,42 @@ var _ = Describe("authz assessment service", Ordered, func() {
 
 	AfterAll(func() {
 		_ = s.Close()
+	})
+
+	Context("inventory access", func() {
+		var assessmentID, vcenterID uuid.UUID
+		BeforeEach(func() {
+			assessmentID, vcenterID = uuid.New(), uuid.New()
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Inventory access", "org1", "owner", "John", "Doe", service.SourceTypeAgent, "NULL")).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "main", vcenterID, false, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "reader")).Error).NotTo(HaveOccurred())
+		})
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations WHERE resource_id = ?", assessmentID.String())
+			Expect(s.Assessment().Delete(context.Background(), assessmentID)).To(Succeed())
+		})
+
+		It("permits a reader to retrieve inventories", func() {
+			ctx := ctxWithUser("reader", "org1")
+			inventory, inventoryErr := svc.GetVcenterInventory(ctx, assessmentID, vcenterID)
+			cluster, clusterErr := svc.GetClusterInventory(ctx, assessmentID, vcenterID, "cluster-1")
+			Expect(inventoryErr).NotTo(HaveOccurred())
+			Expect(inventory.VCenterID).To(Equal(vcenterID.String()))
+			Expect(clusterErr).NotTo(HaveOccurred())
+			Expect(cluster.Vms.Total).To(Equal(10))
+		})
+
+		It("denies an unprivileged user from retrieving inventories", func() {
+			ctx := ctxWithUser("unauthorized-user", "org1")
+			inventory, inventoryErr := svc.GetVcenterInventory(ctx, assessmentID, vcenterID)
+			Expect(inventory).To(BeNil())
+			var inventoryForbidden *service.ErrForbidden
+			Expect(errors.As(inventoryErr, &inventoryForbidden)).To(BeTrue())
+			cluster, clusterErr := svc.GetClusterInventory(ctx, assessmentID, vcenterID, "cluster-1")
+			Expect(cluster).To(BeNil())
+			var clusterForbidden *service.ErrForbidden
+			Expect(errors.As(clusterErr, &clusterForbidden)).To(BeTrue())
+		})
 	})
 
 	Context("ListAssessments", func() {
@@ -136,7 +173,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 			}
 
 			// Viewer sees only read
@@ -145,7 +182,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err = svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			Expect(assessments).To(HaveLen(1))
-			Expect(assessments[0].Permissions).To(ConsistOf(model.ReadPermission))
+			Expect(assessments[0].Permissions).To(ConsistOf(svcmodel.ReadPermission))
 		})
 
 		It("customer owner keeps share permission", func() {
@@ -160,7 +197,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.SharePermission, svcmodel.DeletePermission))
 			}
 
 			gormdb.Exec("DELETE FROM partners_customers")
@@ -179,7 +216,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 			for _, a := range assessments {
-				Expect(a.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+				Expect(a.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 			}
 
 			gormdb.Exec("DELETE FROM members")
@@ -204,7 +241,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessments, err := svc.ListAssessments(ctx, filter)
 			Expect(err).To(BeNil())
 
-			var shared *model.Assessment
+			var shared *svcmodel.AssessmentSummary
 			for i, a := range assessments {
 				if a.ID.String() == resourceID {
 					shared = &assessments[i]
@@ -300,13 +337,13 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			// Viewer sees only read
 			ctx = ctxWithUser("viewer-user", "org1")
 			assessment, err = svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission))
 		})
 
 		It("customer owner keeps share permission", func() {
@@ -321,7 +358,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.SharePermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.SharePermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM partners_customers")
 			gormdb.Exec("DELETE FROM groups")
@@ -339,7 +376,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			ctx := ctxWithUser("user1", "org1")
 			assessment, err := svc.GetAssessment(ctx, assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Permissions).To(ConsistOf(model.ReadPermission, model.DeletePermission))
+			Expect(assessment.Permissions).To(ConsistOf(svcmodel.ReadPermission, svcmodel.DeletePermission))
 
 			gormdb.Exec("DELETE FROM members")
 			gormdb.Exec("DELETE FROM groups")
@@ -406,15 +443,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			})
 
 			testID := uuid.New()
-			inv, err := model.NewAssessmentInventory(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testID, "Authz Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          testID,
-				Name:        "Authz Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:            testID,
+				Name:          "Authz Assessment",
+				OrgID:         "org1",
+				Username:      "user1",
+				SourceType:    service.SourceTypeInventory,
+				MainInventory: inv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -439,15 +476,15 @@ var _ = Describe("authz assessment service", Ordered, func() {
 				},
 			})
 
-			inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
+			inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "Visible Assessment", false, inventoryJSON)
 			Expect(err).To(BeNil())
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "Visible Assessment",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeInventory,
-				Inventories: []model.AssessmentInventory{inv},
+				ID:            uuid.New(),
+				Name:          "Visible Assessment",
+				OrgID:         "org1",
+				Username:      "user1",
+				SourceType:    service.SourceTypeInventory,
+				MainInventory: inv,
 			}
 
 			ctx := ctxWithUser("user1", "org1")
@@ -502,7 +539,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessmentID = uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "test", "", false, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 			Expect(tx.Error).To(BeNil())
 		})
 
@@ -604,6 +641,84 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			Expect(err).ToNot(BeNil())
 			var forbidden *service.ErrForbidden
 			Expect(errors.As(err, &forbidden)).To(BeTrue())
+		})
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations;")
+			gormdb.Exec("DELETE FROM assessment_inventories;")
+			gormdb.Exec("DELETE FROM assessments;")
+		})
+	})
+
+	Context("DeleteVCenterInventory", func() {
+		var assessmentID, vcenterID uuid.UUID
+
+		BeforeEach(func() {
+			assessmentID = uuid.New()
+			vcenterID = uuid.New()
+			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "VCenter Delete", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL"))
+			Expect(tx.Error).To(BeNil())
+
+			tx = gormdb.Exec(
+				"INSERT INTO assessment_inventories (id, assessment_id, name, is_subset, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (?, ?, ?, false, '', 3, 0, 0, 0, 2, ?)",
+				uuid.New(), assessmentID, "main", `{"vcenter_id":"","vcenter":{"vms":{"total":3},"infra":{}}}`,
+			)
+			Expect(tx.Error).To(BeNil())
+			tx = gormdb.Exec(
+				"INSERT INTO assessment_inventories (id, assessment_id, name, is_subset, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (?, ?, ?, true, ?, 3, 0, 0, 0, 2, ?)",
+				uuid.New(), assessmentID, "subset", vcenterID.String(), fmt.Sprintf(`{"vcenter_id":%q,"vcenter":{"vms":{"total":3},"infra":{}}}`, vcenterID.String()),
+			)
+			Expect(tx.Error).To(BeNil())
+		})
+
+		It("allows the owner to delete the vCenter inventory", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+
+			err := svc.DeleteVCenterInventory(ctxWithUser("user1", "org1"), assessmentID, vcenterID)
+			Expect(err).NotTo(HaveOccurred())
+
+			var count int64
+			Expect(gormdb.Table("assessment_inventories").Where("assessment_id = ? AND is_subset", assessmentID).Count(&count).Error).To(BeNil())
+			Expect(count).To(Equal(int64(0)))
+		})
+
+		It("rejects a viewer without deleting the inventory", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "viewer-user"))
+			Expect(tx.Error).To(BeNil())
+
+			err := svc.DeleteVCenterInventory(ctxWithUser("viewer-user", "org1"), assessmentID, vcenterID)
+			var forbidden *service.ErrForbidden
+			Expect(errors.As(err, &forbidden)).To(BeTrue())
+
+			var count int64
+			Expect(gormdb.Table("assessment_inventories").Where("assessment_id = ? AND is_subset", assessmentID).Count(&count).Error).To(BeNil())
+			Expect(count).To(Equal(int64(1)))
+		})
+
+		It("rejects a user with no assessment relation", func() {
+			err := svc.DeleteVCenterInventory(ctxWithUser("unrelated-user", "org1"), assessmentID, vcenterID)
+			var forbidden *service.ErrForbidden
+			Expect(errors.As(err, &forbidden)).To(BeTrue())
+
+			var count int64
+			Expect(gormdb.Table("assessment_inventories").Where("assessment_id = ? AND is_subset", assessmentID).Count(&count).Error).To(BeNil())
+			Expect(count).To(Equal(int64(1)))
+		})
+
+		It("returns not found for a missing assessment", func() {
+			err := svc.DeleteVCenterInventory(ctxWithUser("user1", "org1"), uuid.New(), vcenterID)
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+		})
+
+		It("returns not found for a missing vCenter after checking permission", func() {
+			tx := gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "owner", "user", "user1"))
+			Expect(tx.Error).To(BeNil())
+
+			err := svc.DeleteVCenterInventory(ctxWithUser("user1", "org1"), assessmentID, uuid.New())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
 		})
 
 		AfterEach(func() {

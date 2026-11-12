@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -28,6 +29,61 @@ func TestParse_JSON(t *testing.T) {
 	}
 	if len(parsed.Subsets) != 0 {
 		t.Errorf("Subsets len = %d, want 0", len(parsed.Subsets))
+	}
+}
+
+func TestParse_InventoryVersion(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		data    string
+		wantErr bool
+	}{
+		{
+			name:    "v1",
+			data:    `{"vms":{"total":10},"infra":{"totalHosts":5},"vcenter":{"id":"vc-1","name":"legacy"}}`,
+			wantErr: true,
+		},
+		{name: "v2_vcenter_id", data: `{"vcenter_id":"vc-1"}`},
+		{name: "v2_clusters", data: `{"clusters":{}}`},
+	} {
+		for _, envelope := range []struct {
+			name string
+			data string
+		}{
+			{name: "bare", data: tt.data},
+			{name: "wrapped", data: `{"inventory":` + tt.data + `}`},
+			{name: "nested", data: `{"inventory":{"inventory":` + tt.data + `}}`},
+		} {
+			for _, format := range []string{"json", "zip"} {
+				t.Run(tt.name+"/"+envelope.name+"/"+format, func(t *testing.T) {
+					data := []byte(envelope.data)
+					if format == "zip" {
+						var buf bytes.Buffer
+						zw := zip.NewWriter(&buf)
+						w, err := zw.Create("inventory.json")
+						if err != nil {
+							t.Fatal(err)
+						}
+						if _, err := w.Write(data); err != nil {
+							t.Fatal(err)
+						}
+						if err := zw.Close(); err != nil {
+							t.Fatal(err)
+						}
+						data = buf.Bytes()
+					}
+
+					_, err := Parse(data)
+					if tt.wantErr {
+						if err == nil || !strings.Contains(err.Error(), "only v2 inventories are supported") {
+							t.Fatalf("Parse error = %v, want unsupported inventory version", err)
+						}
+					} else if err != nil {
+						t.Fatalf("Parse: %v", err)
+					}
+				})
+			}
+		}
 	}
 }
 
@@ -241,4 +297,38 @@ func buildZip(t *testing.T, main v1alpha1.Inventory, subsets map[string]agentAPI
 		t.Fatal(err)
 	}
 	return buf.Bytes()
+}
+
+func TestParse_CollectionTime(t *testing.T) {
+	collected := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	inv := v1alpha1.Inventory{VcenterId: "vc-1", CollectionTime: &collected}
+	raw, err := json.Marshal(inv)
+	if err != nil {
+		t.Fatal(err)
+	}
+	groupID := uuid.New()
+	for _, input := range [][]byte{
+		raw,
+		buildZip(t, inv, map[string]agentAPI.SourceSubsetUpdate{
+			groupID.String(): {Name: "group", Inventory: inv},
+		}),
+	} {
+		parsed, err := Parse(input)
+		if err != nil {
+			t.Fatal(err)
+		}
+		documents := [][]byte{parsed.MainInventory}
+		for _, subset := range parsed.Subsets {
+			documents = append(documents, subset.Inventory)
+		}
+		for _, document := range documents {
+			var got v1alpha1.Inventory
+			if err := json.Unmarshal(document, &got); err != nil {
+				t.Fatal(err)
+			}
+			if got.CollectionTime == nil || !got.CollectionTime.Equal(collected) {
+				t.Fatalf("collection time = %v, want %v", got.CollectionTime, collected)
+			}
+		}
+	}
 }

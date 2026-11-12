@@ -2,6 +2,8 @@
 # The `code` filter is true when at least one changed file is not excluded.
 # Keep this in the job (dorny/paths-filter), not on on.pull_request.paths —
 # skipping the whole workflow leaves required checks pending.
+# Appliance image pins in build/migration-planner-iso/config must run tests.
+# Updating the bundled agent can change its compatibility with the planner.
 code:
   - '**'
   - '!**/*.md'
@@ -29,4 +31,3 @@ code:
   - '!skills/**'
   - '!examples/**'
   - '!hack/staging-debug-tool/**'
-  - '!build/migration-planner-iso/config'

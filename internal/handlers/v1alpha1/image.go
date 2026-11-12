@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/config"
@@ -16,8 +18,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 	"github.com/kubev2v/migration-planner/pkg/version"
 	"go.uber.org/zap"
 )
@@ -60,6 +60,42 @@ func (h *ImageHandler) HeadImageByToken(ctx context.Context, req imageServer.Hea
 	return imageServer.HeadImageByToken200Response{}, nil
 }
 
+// serveAgentImage streams the appliance image tar and records the served
+// version — the only signal a disconnected source ever received a newer
+// image, since a disconnected appliance never reports back.
+func (h *ImageHandler) serveAgentImage(ctx context.Context, writer http.ResponseWriter, httpReq *http.Request, source *model.Source) (imageServer.GetImageByTokenResponseObject, error) {
+	if err := image.ServeAgentImageTar(writer, httpReq, h.cfg.Service.IsoPath); err != nil {
+		if os.IsNotExist(err) {
+			return imageServer.GetImageByToken404JSONResponse{Message: "agent image not available yet"}, nil
+		}
+		zap.S().Named("image_service").Errorw("failed to serve agent image", "source_id", source.ID, "error", err)
+		return imageServer.GetImageByToken500JSONResponse{Message: "failed to serve agent image"}, nil
+	}
+
+	h.stampAgentVersion(ctx, source)
+
+	// ServeAgentImageTar already wrote the response.
+	return nil, nil
+}
+
+// stampAgentVersion records the version of the agent embedded in the served
+// ISO on the source; the value comes from the ISO's agent-version file.
+func (h *ImageHandler) stampAgentVersion(ctx context.Context, source *model.Source) {
+	versionInfo := version.Get()
+	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
+		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName, "agent_git_commit", versionInfo.AgentGitCommit)
+		return
+	}
+	persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
+		zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
+	} else {
+		zap.S().Named("image_service").Infow("stored agent version", "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
+	}
+}
+
 func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetImageByTokenRequestObject) (imageServer.GetImageByTokenResponseObject, error) {
 	writer, ok := ctx.Value(image.ResponseWriterKey).(http.ResponseWriter)
 	if !ok {
@@ -81,6 +117,12 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 	source, err := h.getSource(ctx, sourceId)
 	if err != nil {
 		return imageServer.GetImageByToken401JSONResponse{Message: "failed to create the HTTP stream"}, nil
+	}
+
+	// The presigned appliance URL uses "appliance" as its {name} segment; OVA
+	// names always end in ".ova", so the values cannot collide.
+	if req.Name == image.AppliancePathName {
+		return h.serveAgentImage(ctx, writer, httpReq, source)
 	}
 
 	imageBuilder := image.NewImageBuilder(source.ID)
@@ -120,28 +162,16 @@ func (h *ImageHandler) GetImageByToken(ctx context.Context, req imageServer.GetI
 
 	downloadURLID, err := image.DownloadURLID(req.Token)
 	if err == nil {
-		payload := kafka.NewOVADownloadPayload(source.Username, source.ID.String(), downloadURLID)
-		ceBytes, err := kafka.BuildCloudEvent(kafka.DownloadOVAEventType, payload)
+		payload := events.NewOVADownloadPayload(source.Username, source.ID.String(), downloadURLID)
+		ceBytes, err := events.BuildCloudEvent(events.DownloadOVAEventType, payload)
 		if err != nil {
 			zap.S().Warnw("failed to build download event", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
-		} else if err := h.outbox.Insert(ctx, events.EventTypeKafka, ceBytes); err != nil {
+		} else if err := h.outbox.Insert(ctx, eventwrap.EventTypeKafka, ceBytes); err != nil {
 			zap.S().Warnw("failed to write download event to outbox", "source_id", source.ID, "download_url_id", downloadURLID, "error", err)
 		}
 	}
 
-	versionInfo := version.Get()
-	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
-		zap.S().Named("image_service").Warnw("agent version not valid, skipping storage", "source_id", source.ID, "agent_version_name", versionInfo.AgentVersionName, "agent_git_commit", versionInfo.AgentGitCommit)
-	} else {
-		persistCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-
-		if err := h.store.ImageInfra().UpdateAgentVersion(persistCtx, source.ID.String(), versionInfo.AgentVersionName); err != nil {
-			zap.S().Named("image_service").Warnw("failed to update agent version", "error", err, "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
-		} else {
-			zap.S().Named("image_service").Infow("stored agent version", "source_id", source.ID, "agent_version", versionInfo.AgentVersionName)
-		}
-	}
+	h.stampAgentVersion(ctx, source)
 
 	// Return nil — http.ServeContent already wrote the response.
 	// Returning a response object would cause a duplicate WriteHeader.

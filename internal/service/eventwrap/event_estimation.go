@@ -5,12 +5,11 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
-	"github.com/kubev2v/migration-planner/pkg/events"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
 )
 
 type EventEstimationService struct {
@@ -35,7 +34,7 @@ func (e *EventEstimationService) CalculateMigrationEstimation(
 		return nil, err
 	}
 
-	if err := e.publishUserAction(ctx, assessmentID, kafka.MigrationTimeEstimationEventType); err != nil {
+	if err := e.publishUserAction(ctx, assessmentID, events.MigrationTimeEstimationEventType); err != nil {
 		return nil, err
 	}
 	return results, nil
@@ -51,7 +50,7 @@ func (e *EventEstimationService) CalculateMigrationComplexity(
 		return nil, err
 	}
 
-	if err := e.publishUserAction(ctx, assessmentID, kafka.MigrationComplexityEventType); err != nil {
+	if err := e.publishUserAction(ctx, assessmentID, events.MigrationComplexityEventType); err != nil {
 		return nil, err
 	}
 	return result, nil
@@ -86,20 +85,20 @@ func (e *EventEstimationService) publishUserAction(ctx context.Context, assessme
 	if err != nil {
 		return err
 	}
-	ceBytes, err := kafka.BuildCloudEvent(eventType, payload)
+	ceBytes, err := events.BuildCloudEvent(eventType, payload)
 	if err != nil {
 		return err
 	}
-	return e.outbox.Insert(ctx, events.EventTypeKafka, ceBytes)
+	return e.outbox.Insert(ctx, EventTypeKafka, ceBytes)
 }
 
-func buildEstimationPayload(eventType, username, assessmentID string) (kafka.UserActionEventPayload, error) {
+func buildEstimationPayload(eventType, username, assessmentID string) (events.UserActionEventPayload, error) {
 	switch eventType {
-	case kafka.MigrationComplexityEventType:
-		return kafka.NewComplexityPayload(username, assessmentID), nil
-	case kafka.MigrationTimeEstimationEventType:
-		return kafka.NewTimeEstimationPayload(username, assessmentID), nil
+	case events.MigrationComplexityEventType:
+		return events.NewComplexityPayload(username, assessmentID), nil
+	case events.MigrationTimeEstimationEventType:
+		return events.NewTimeEstimationPayload(username, assessmentID), nil
 	default:
-		return kafka.UserActionEventPayload{}, fmt.Errorf("unknown estimation event type: %s", eventType)
+		return events.UserActionEventPayload{}, fmt.Errorf("unknown estimation event type: %s", eventType)
 	}
 }

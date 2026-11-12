@@ -4,6 +4,9 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"strings"
+
+	"go.uber.org/zap"
 )
 
 // Disks is a slice of Disk that implements sql.Scanner for DuckDB LIST type.
@@ -28,23 +31,38 @@ func (d *Disks) Scan(value interface{}) error {
 		}
 		controller := toString(m["Controller"])
 		controllerKey, bus := tracker.GetKeyAndBus(controller)
+		var backingDeviceIDs BackingDeviceIDs
+		if err := backingDeviceIDs.Scan(m["DatastoreBackingDeviceIDs"]); err != nil {
+			return err
+		}
 
 		disk := Disk{
-			Key:           toString(m["Key"]),
-			UnitNumber:    toInt32(m["UnitNumber"]),
-			ControllerKey: controllerKey,
-			File:          toString(m["File"]),
-			Capacity:      toInt64(m["Capacity"]),
-			Shared:        toBool(m["Shared"]),
-			RDM:           toBool(m["RDM"]),
-			Bus:           bus,
-			Mode:          toString(m["Mode"]),
-			Serial:        toString(m["Serial"]),
-			Thin:          toString(m["Thin"]),
-			Controller:    controller,
-			Label:         toString(m["Label"]),
-			SCSIUnit:      toString(m["SCSIUnit"]),
-			Datastore:     Ref{ID: toString(m["Datastore"])},
+			Key:                             toString(m["Key"]),
+			UnitNumber:                      toInt32(m["UnitNumber"]),
+			ControllerKey:                   controllerKey,
+			File:                            toString(m["File"]),
+			Capacity:                        toInt64(m["Capacity"]),
+			Shared:                          toBool(m["Shared"]),
+			RDM:                             toBool(m["RDM"]),
+			Bus:                             bus,
+			Mode:                            toString(m["Mode"]),
+			Serial:                          toString(m["Serial"]),
+			Thin:                            toString(m["Thin"]),
+			Controller:                      controller,
+			Label:                           toString(m["Label"]),
+			SCSIUnit:                        toString(m["SCSIUnit"]),
+			Datastore:                       Ref{ID: toString(m["Datastore"])},
+			DatastoreName:                   toString(m["DatastoreName"]),
+			DatastoreType:                   toString(m["DatastoreType"]),
+			DatastoreFilesystemType:         toString(m["DatastoreFilesystemType"]),
+			DatastoreFilesystemMajorVersion: toInt32(m["DatastoreFilesystemMajorVersion"]),
+			DatastoreStorageProtocol:        toString(m["DatastoreStorageProtocol"]),
+			DatastoreBackingDeviceIDs:       backingDeviceIDs,
+			DatastoreVendor:                 toString(m["DatastoreVendor"]),
+			DatastoreModel:                  toString(m["DatastoreModel"]),
+		}
+		if lunUUID := strings.TrimSpace(toString(m["RDMLunUUID"])); disk.RDM && lunUUID != "" {
+			disk.RDMBacking = &RDMBacking{LunUUID: lunUUID}
 		}
 		result = append(result, disk)
 	}
@@ -54,6 +72,33 @@ func (d *Disks) Scan(value interface{}) error {
 
 func (d Disks) Value() (driver.Value, error) {
 	return d, nil
+}
+
+// BackingDeviceIDs scans backing device identifiers from DuckDB values.
+type BackingDeviceIDs []string
+
+func (ids *BackingDeviceIDs) Scan(value interface{}) error {
+	*ids = nil
+	switch value := value.(type) {
+	case []string:
+		*ids = append(BackingDeviceIDs(nil), value...)
+	case []interface{}:
+		result := make(BackingDeviceIDs, 0, len(value))
+		for _, item := range value {
+			if item != nil {
+				result = append(result, toString(item))
+			}
+		}
+		*ids = result
+	case string:
+		var result []string
+		if err := json.Unmarshal([]byte(value), &result); err != nil {
+			zap.S().Named("duckdb_parser").Warnw("failed to parse datastore backing devices", "error", err)
+			return nil
+		}
+		*ids = result
+	}
+	return nil
 }
 
 // NICs is a slice of NIC that implements sql.Scanner for DuckDB LIST type.
@@ -74,6 +119,13 @@ func (n *NICs) Scan(value interface{}) error {
 		if !ok {
 			continue
 		}
+		var ipv4, ipv6 Networks
+		if err := ipv4.Scan(m["IPv4Addresses"]); err != nil {
+			return fmt.Errorf("NICs.Scan: IPv4Addresses: %w", err)
+		}
+		if err := ipv6.Scan(m["IPv6Addresses"]); err != nil {
+			return fmt.Errorf("NICs.Scan: IPv6Addresses: %w", err)
+		}
 		nic := NIC{
 			Network:         Ref{ID: toString(m["Network"])},
 			MAC:             toString(m["MAC"]),
@@ -83,8 +135,9 @@ func (n *NICs) Scan(value interface{}) error {
 			Connected:       toBool(m["Connected"]),
 			StartsConnected: toBool(m["StartsConnected"]),
 			Type:            toString(m["Type"]),
-			IPv4Address:     toString(m["IPv4Address"]),
-			IPv6Address:     toString(m["IPv6Address"]),
+			VlanID:          toString(m["VlanID"]),
+			IPv4Addresses:   append([]string{}, ipv4...),
+			IPv6Addresses:   append([]string{}, ipv6...),
 		}
 		result = append(result, nic)
 	}

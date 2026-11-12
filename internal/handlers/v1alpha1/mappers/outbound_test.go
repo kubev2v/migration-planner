@@ -5,10 +5,13 @@ import (
 	"testing"
 	"time"
 
+	model2 "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
@@ -152,50 +155,63 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 	})
 })
 
-var _ = Describe("AssessmentInventoryToAPI", func() {
+var _ = Describe("InventoryToV2API", func() {
 	storedAt := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	collectedAt := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
+	vcenterVersion := "8.0.3.0"
 	for _, tc := range []struct {
 		id         int
 		name       string
 		version    uint
-		raw        string
+		raw        model2.Inventory
 		created    time.Time
 		apiVersion string
+		collection *time.Time
 	}{
 		{
-			id:         1,
-			name:       "v2 preserves collection metadata",
-			version:    model.InventoryVersionV2,
-			raw:        `{"vcenter_id":"vc-id","vcenter_version":"8.0.3.0","created_at":"2026-10-13T09:00:00Z","vcenter":{"vms":{"total":5}},"clusters":{"domain-c34":{"vms":{"total":2}}}}`,
-			created:    collectedAt,
-			apiVersion: "8.0.3.0",
+			id:      1,
+			name:    "v2 falls back to stored timestamp",
+			version: model.InventoryVersionV2,
+			raw: model2.Inventory{
+				VcenterId: "vc-id",
+				Vcenter: &model2.InventoryData{
+					Vms: model2.VMs{
+						Total: 5,
+					},
+				},
+			},
+			created: storedAt,
 		},
 		{
 			id:      2,
-			name:    "v2 falls back to stored timestamp",
-			version: model.InventoryVersionV2,
-			raw:     `{"vcenter_id":"vc-id","vcenter":{"vms":{"total":5}},"clusters":{}}`,
-			created: storedAt,
-		},
-		{
-			id:      3,
 			name:    "legacy inventory uses stored timestamp",
 			version: model.InventoryVersionV1,
-			raw:     `{"vcenter":{"id":"vc-id"},"vms":{"total":5}}`,
-			created: storedAt,
+			raw: model2.Inventory{
+				VcenterId:      "vc-id",
+				CollectionTime: &collectedAt,
+				VcenterVersion: &vcenterVersion,
+				Vcenter: &model2.InventoryData{
+					Vms: model2.VMs{
+						Total: 5,
+					},
+				},
+			},
+			created:    storedAt,
+			apiVersion: "8.0.3.0",
+			collection: &collectedAt,
 		},
 	} {
 		It(tc.name, func() {
-			data, clusters, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{
-				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: []byte(tc.raw),
+
+			data := mappers.InventoryToV2API(model2.AssessmentInventory{
+				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: tc.raw,
 			})
-			Expect(err).NotTo(HaveOccurred())
 			raw, err := json.Marshal(data)
 			Expect(err).NotTo(HaveOccurred())
 			var result api.InventoryV2
 			Expect(json.Unmarshal(raw, &result)).To(Succeed())
 			Expect(result.CreatedAt).To(HaveValue(BeTemporally("==", tc.created)))
+			Expect(result.CollectionTime).To(Equal(tc.collection))
 			Expect(result.Data.Vms.Total).To(Equal(5))
 			if tc.apiVersion != "" {
 				Expect(result.VcenterVersion).To(HaveValue(Equal(tc.apiVersion)))
@@ -204,19 +220,117 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			}
 			Expect(result.Data.Infra.Datastores).NotTo(BeNil(), "inventory collections must be normalized")
 			Expect(result.Data.Vms.PowerStates).NotTo(BeNil(), "inventory collections must be normalized")
-
-			if tc.id == 1 {
-				Expect(clusters).To(HaveKey("domain-c34"))
-				Expect(clusters["domain-c34"].Vms.Total).To(Equal(2))
-			}
 		})
 	}
+})
 
-	DescribeTable("rejects malformed JSON", func(version uint) {
-		_, _, err := mappers.AssessmentInventoryToAPI(model.AssessmentInventory{Version: version, Inventory: []byte(`{`)})
-		Expect(err).To(HaveOccurred())
+var _ = Describe("Inventory collection time", func() {
+	It("preserves source, subset, and assessment collection times in API responses", func() {
+		raw := []byte(`{"vcenter_id":"vc-1","clusters":{},"collection_time":"2026-09-20T10:30:00Z"}`)
+		want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+		var input api.Inventory
+		Expect(json.Unmarshal(raw, &input)).To(Succeed())
+		domain := mappers.InventoryFromAPI(input)
+		Expect(domain.CollectionTime).To(Equal(&want))
+		Expect(mappers.InventoryToAPI(domain).CollectionTime).To(Equal(&want))
+		source, err := mappers.SourceToApi(model.Source{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(source.Inventory.CollectionTime).To(Equal(&want))
+		subset, err := mappers.SourceInventoryToApi(model.SourceSubsetInventory{Inventory: raw})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
+		assessmentID := uuid.New()
+		main, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "main", false, raw)
+		Expect(err).NotTo(HaveOccurred())
+		group, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "group", true, raw)
+		Expect(err).NotTo(HaveOccurred())
+		createdAt := want.Add(24 * time.Hour)
+		domainAssessment, err := storemappers.AssessmentFromStore(&model.Assessment{
+			CreatedAt:   createdAt,
+			Inventories: []model.AssessmentInventory{main, group},
+		})
+		Expect(err).NotTo(HaveOccurred())
+		assessment := mappers.AssessmentToApi(domainAssessment)
+		Expect(assessment.CreatedAt).To(Equal(createdAt))
+		Expect(assessment.Snapshots).To(HaveLen(1))
+		snapshot := assessment.Snapshots[0]
+		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
+		Expect(snapshot.SubsetInventories).NotTo(BeNil())
+		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+		assessment = mappers.AssessmentToApi(model2.Assessment{
+			MainInventory:     model2.AssessmentInventory{Inventory: domain},
+			SubsetInventories: []model2.AssessmentInventory{{Inventory: domain}},
+		})
+		Expect(assessment.Snapshots).To(HaveLen(1))
+		snapshot = assessment.Snapshots[0]
+		Expect(snapshot.Inventory.CollectionTime).To(Equal(&want))
+		Expect(snapshot.SubsetInventories).NotTo(BeNil())
+		Expect((*snapshot.SubsetInventories)[0].Inventory.CollectionTime).To(Equal(&want))
+	})
+})
+
+var _ = Describe("Inventory datastore storage metadata", func() {
+	It("preserves metadata through the service model and persisted inventory", func() {
+		backingIDs := []string{"naa.123", "naa.456"}
+		filesystem := "VMFS"
+		version := int32(6)
+		datastore := api.Datastore{
+			DiskId:                 "datastore-1",
+			BackingDeviceIds:       &backingIDs,
+			FilesystemType:         &filesystem,
+			FilesystemMajorVersion: &version,
+		}
+		input := api.Inventory{
+			Vcenter: &api.InventoryData{Infra: api.Infra{Datastores: []api.Datastore{datastore}}},
+			Clusters: map[string]api.InventoryData{
+				"cluster-1": {Infra: api.Infra{Datastores: []api.Datastore{datastore}}},
+			},
+		}
+		domain := mappers.InventoryFromAPI(input)
+		data, err := json.Marshal(domain)
+		Expect(err).NotTo(HaveOccurred())
+		var restored model2.Inventory
+		Expect(json.Unmarshal(data, &restored)).To(Succeed())
+		output := mappers.InventoryToAPI(restored)
+		Expect(output.Vcenter.Infra.Datastores).To(Equal(input.Vcenter.Infra.Datastores))
+		Expect(output.Clusters["cluster-1"].Infra.Datastores).To(Equal(input.Clusters["cluster-1"].Infra.Datastores))
+	})
+})
+
+var _ = Describe("Inventory host details and storage metadata", func() {
+	DescribeTable("preserves hosts through service mapping and persisted assessment inventory", func(hostJSON string) {
+		raw := []byte(`{"vcenter_id":"vc1","vcenter":{"infra":{"hosts":[` + hostJSON + `]}},"clusters":{"cluster1":{"infra":{"hosts":[` + hostJSON + `]}}}}`)
+		var input api.Inventory
+		Expect(json.Unmarshal(raw, &input)).To(Succeed())
+		domain := mappers.InventoryFromAPI(input)
+		mapped, err := json.Marshal(domain)
+		Expect(err).NotTo(HaveOccurred())
+		// Assessments are also loaded directly from raw collection JSON.
+		for _, data := range [][]byte{mapped, raw} {
+			var restored model2.Inventory
+			Expect(json.Unmarshal(data, &restored)).To(Succeed())
+			output := mappers.InventoryToAPI(restored)
+			Expect(output.Vcenter.Infra.Hosts).To(Equal(input.Vcenter.Infra.Hosts))
+			Expect(output.Clusters["cluster1"].Infra.Hosts).To(Equal(input.Clusters["cluster1"].Infra.Hosts))
+		}
 	},
-		Entry("for legacy inventory", uint(model.InventoryVersionV1)),
-		Entry("for v2 inventory", uint(model.InventoryVersionV2)),
+		Entry("all fields and orphan LUNs", `{"id":"host1","datacenter":"dc-1","cluster":"cluster-1","vendor":"host vendor","model":"host model","cpuModel":"Xeon Gold","serialNumber":"SN-1","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
+		Entry("historical inventory without storage", `{"id":"host1","vendor":"vendor","model":"model"}`),
 	)
 })
+
+var _ = DescribeTable("Inventory OS MTV status preserves through the service model and persisted inventory",
+	func(status *api.OsInfoMtvStatus) {
+		osInfo := map[string]api.OsInfo{"guest": {Count: 1, Supported: true, MtvStatus: status}}
+		input := api.Inventory{Vcenter: &api.InventoryData{Vms: api.VMs{OsInfo: &osInfo}}}
+		data, err := json.Marshal(mappers.InventoryFromAPI(input))
+		Expect(err).NotTo(HaveOccurred())
+		var restored model2.Inventory
+		Expect(json.Unmarshal(data, &restored)).To(Succeed())
+		output := mappers.InventoryToAPI(restored)
+		Expect((*output.Vcenter.Vms.OsInfo)["guest"].MtvStatus).To(Equal(status))
+	},
+	Entry("unreported", nil),
+	Entry("green", new(api.Green)),
+	Entry("blue", new(api.Blue)),
+)

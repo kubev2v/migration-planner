@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"slices"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 )
 
@@ -22,12 +25,12 @@ func NewAuthzAssessmentService(inner AssessmentServicer, s store.Store, accounts
 	return &AuthzAssessmentService{inner: inner, store: s, accountsSrv: accountsSrv}
 }
 
-func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *AssessmentFilter) ([]model.Assessment, error) {
+func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	user := auth.MustHaveUser(ctx)
 
 	identity, err := a.accountsSrv.GetIdentity(ctx, user)
 	if err != nil {
-		return []model.Assessment{}, err
+		return []svcmodel.AssessmentSummary{}, err
 	}
 
 	resources, err := a.store.Authz().ListResources(ctx, user.Username, model.AssessmentResource)
@@ -36,10 +39,10 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 	}
 
 	if len(resources) == 0 {
-		return []model.Assessment{}, nil
+		return []svcmodel.AssessmentSummary{}, nil
 	}
 
-	permsByID := make(map[string][]model.Permission, len(resources))
+	permsByID := make(map[string][]svcmodel.Permission, len(resources))
 	ids := make([]uuid.UUID, 0, len(resources))
 	for _, r := range resources {
 		id, err := uuid.Parse(r.ID)
@@ -47,7 +50,7 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 			continue
 		}
 		ids = append(ids, id)
-		permsByID[r.ID] = r.Permissions
+		permsByID[r.ID] = storemappers.PermissionsFromStore(r.Permissions)
 	}
 
 	assessments, err := a.inner.ListAssessments(ctx, NewAssessmentFilter().WithIDs(ids))
@@ -78,11 +81,11 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 				return nil, err
 			}
 			assessments[i].Sharing = sharingM
-			assessments[i].Permissions = slices.DeleteFunc(assessments[i].Permissions, func(s model.Permission) bool {
+			assessments[i].Permissions = slices.DeleteFunc(assessments[i].Permissions, func(s svcmodel.Permission) bool {
 				if identity.Kind == KindRegular || identity.Kind == KindPartner {
-					return s.String() == "share" || s.String() == "edit"
+					return s == svcmodel.SharePermission || s == svcmodel.EditPermission
 				}
-				return s.String() == "edit"
+				return s == svcmodel.EditPermission
 			})
 		} else {
 			ownerName := ""
@@ -97,7 +100,7 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 	return assessments, nil
 }
 
-func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
 	assessment, err := a.inner.GetAssessment(ctx, id)
@@ -110,11 +113,12 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
 	}
 
-	if !model.ReadPermission.In(resource.Permissions) {
+	permissions := storemappers.PermissionsFromStore(resource.Permissions)
+	if !svcmodel.ReadPermission.In(permissions) {
 		return nil, NewErrForbidden("assessment", id.String())
 	}
 
-	assessment.Permissions = resource.Permissions
+	assessment.Permissions = permissions
 
 	if assessment.Username == user.Username {
 		rels, err := a.store.Authz().ListRelationships(ctx, model.NewAssessmentResource(id.String()))
@@ -131,11 +135,11 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 		if err != nil {
 			return nil, err
 		}
-		assessment.Permissions = slices.DeleteFunc(assessment.Permissions, func(s model.Permission) bool {
+		assessment.Permissions = slices.DeleteFunc(assessment.Permissions, func(s svcmodel.Permission) bool {
 			if identity.Kind == KindRegular || identity.Kind == KindPartner {
-				return s.String() == "share" || s.String() == "edit"
+				return s == svcmodel.SharePermission || s == svcmodel.EditPermission
 			}
-			return s.String() == "edit"
+			return s == svcmodel.EditPermission
 		})
 	} else {
 		ownerName := ""
@@ -148,7 +152,45 @@ func (a *AuthzAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 	return assessment, nil
 }
 
-func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (a *AuthzAssessmentService) GetClusterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID, clusterId string) (*svcmodel.InventoryData, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if _, err := a.inner.GetAssessment(ctx, assessmentId); err != nil {
+		return nil, err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentId.String()))
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.ReadPermission.In(resource.Permissions) {
+		return nil, NewErrForbidden("assessment", assessmentId.String())
+	}
+
+	return a.inner.GetClusterInventory(ctx, assessmentId, vcenterID, clusterId)
+}
+
+func (a *AuthzAssessmentService) GetVcenterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	user := auth.MustHaveUser(ctx)
+
+	if _, err := a.inner.GetAssessment(ctx, assessmentId); err != nil {
+		return nil, err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentId.String()))
+	if err != nil {
+		return nil, fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.ReadPermission.In(resource.Permissions) {
+		return nil, NewErrForbidden("assessment", assessmentId.String())
+	}
+
+	return a.inner.GetVcenterInventory(ctx, assessmentId, vcenterID)
+}
+
+func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
 	ctx, err := a.store.NewTransactionContext(ctx)
@@ -179,7 +221,7 @@ func (a *AuthzAssessmentService) CreateAssessment(ctx context.Context, createFor
 	return assessment, nil
 }
 
-func (a *AuthzAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*model.Assessment, error) {
+func (a *AuthzAssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID, name *string) (*svcmodel.Assessment, error) {
 	user := auth.MustHaveUser(ctx)
 
 	_, err := a.inner.GetAssessment(ctx, id)
@@ -240,6 +282,27 @@ func (a *AuthzAssessmentService) DeleteAssessment(ctx context.Context, id uuid.U
 	return nil
 }
 
+func (a *AuthzAssessmentService) DeleteVCenterInventory(ctx context.Context, assessmentID uuid.UUID, vcenterID uuid.UUID) error {
+	user := auth.MustHaveUser(ctx)
+
+	// get assessment first to capture the 404 if any
+	_, err := a.inner.GetAssessment(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
+
+	resource, err := a.store.Authz().GetPermissions(ctx, user.Username, model.NewAssessmentResource(assessmentID.String()))
+	if err != nil {
+		return fmt.Errorf("authz: failed to get permissions: %w", err)
+	}
+
+	if !model.DeletePermission.In(resource.Permissions) {
+		return NewErrForbidden("assessment", assessmentID.String())
+	}
+
+	return a.inner.DeleteVCenterInventory(ctx, assessmentID, vcenterID)
+}
+
 func (a *AuthzAssessmentService) ShareAssessment(ctx context.Context, id uuid.UUID) error {
 	user := auth.MustHaveUser(ctx)
 
@@ -282,13 +345,13 @@ func (a *AuthzAssessmentService) UnshareAssessment(ctx context.Context, id uuid.
 	return a.inner.UnshareAssessment(ctx, id)
 }
 
-func (a *AuthzAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (model.AssessmentInventory, error) {
+func (a *AuthzAssessmentService) AggregateInventories(ctx context.Context, assessmentID uuid.UUID, clusterIDs ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
 	// TODO: Add authz when this method will be exposed
 	return a.inner.AggregateInventories(ctx, assessmentID, clusterIDs...)
 }
 
-func (a *AuthzAssessmentService) buildOwnerSharing(ctx context.Context, rels []model.Relationship) (*model.Sharing, error) {
-	shared := make([]model.SharingSubject, 0, len(rels))
+func (a *AuthzAssessmentService) buildOwnerSharing(ctx context.Context, rels []model.Relationship) (*svcmodel.Sharing, error) {
+	shared := make([]svcmodel.SharingSubject, 0, len(rels))
 	for _, r := range rels {
 		if r.Relation == model.OwnerRelation {
 			continue
@@ -309,18 +372,18 @@ func (a *AuthzAssessmentService) buildOwnerSharing(ctx context.Context, rels []m
 
 			name = group.Name
 		}
-		shared = append(shared, model.SharingSubject{Type: st, ID: r.Subject.ID, Name: name})
+		shared = append(shared, svcmodel.SharingSubject{Type: st, ID: r.Subject.ID, Name: name})
 	}
-	return &model.Sharing{
+	return &svcmodel.Sharing{
 		IsShared:   len(shared) > 0,
 		SharedWith: shared,
 	}, nil
 }
 
-func (a *AuthzAssessmentService) buildViewerSharing(ownerName string, ownerUsername string) *model.Sharing {
-	return &model.Sharing{
+func (a *AuthzAssessmentService) buildViewerSharing(ownerName string, ownerUsername string) *svcmodel.Sharing {
+	return &svcmodel.Sharing{
 		IsShared:   true,
-		SharedWith: []model.SharingSubject{},
-		SharedBy:   &model.SharingSubject{Type: "username", ID: ownerUsername, Name: ownerName},
+		SharedWith: []svcmodel.SharingSubject{},
+		SharedBy:   &svcmodel.SharingSubject{Type: "username", ID: ownerUsername, Name: ownerName},
 	}
 }

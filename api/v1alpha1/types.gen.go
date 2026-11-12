@@ -276,6 +276,12 @@ const (
 	Vvs         VMwareSubscriptionInputLevel = "vvs"
 )
 
+// Defines values for OsInfoMtvStatus.
+const (
+	Blue  OsInfoMtvStatus = "blue"
+	Green OsInfoMtvStatus = "green"
+)
+
 // Defines values for OsInfoSupportTier.
 const (
 	Certified          OsInfoSupportTier = "certified"
@@ -288,6 +294,12 @@ const (
 const (
 	ListGroupsParamsKindAdmin   ListGroupsParamsKind = "admin"
 	ListGroupsParamsKindPartner ListGroupsParamsKind = "partner"
+)
+
+// Defines values for GetSourceDownloadURLParamsImage.
+const (
+	Appliance GetSourceDownloadURLParamsImage = "appliance"
+	Ova       GetSourceDownloadURLParamsImage = "ova"
 )
 
 // ActiveEnvironmentsInput defines model for ActiveEnvironmentsInput.
@@ -690,12 +702,22 @@ type CustomerList = []Customer
 
 // Datastore defines model for Datastore.
 type Datastore struct {
-	DiskId                  string `json:"diskId"`
-	FreeCapacityGB          int    `json:"freeCapacityGB"`
-	HardwareAcceleratedMove bool   `json:"hardwareAcceleratedMove"`
+	// BackingDeviceIds Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+	BackingDeviceIds *[]string `json:"backingDeviceIds,omitempty"`
+	DiskId           string    `json:"diskId"`
+
+	// FilesystemMajorVersion VMFS major version when reported; omitted when unknown or not applicable
+	FilesystemMajorVersion *int32 `json:"filesystemMajorVersion,omitempty"`
+
+	// FilesystemType Filesystem type reported by the datastore, such as VMFS, NFS, or NFS41
+	FilesystemType          *string `json:"filesystemType,omitempty"`
+	FreeCapacityGB          int     `json:"freeCapacityGB"`
+	HardwareAcceleratedMove bool    `json:"hardwareAcceleratedMove"`
 
 	// HostId Identifier of the host where this datastore is attached
-	HostId                 *string                 `json:"hostId"`
+	HostId *string `json:"hostId"`
+
+	// Model Model reported by matching backing devices when available
 	Model                  string                  `json:"model"`
 	ProtocolType           string                  `json:"protocolType"`
 	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
@@ -704,7 +726,9 @@ type Datastore struct {
 	StorageProtocol *DatastoreStorageProtocol `json:"storageProtocol,omitempty"`
 	TotalCapacityGB int                       `json:"totalCapacityGB"`
 	Type            string                    `json:"type"`
-	Vendor          string                    `json:"vendor"`
+
+	// Vendor Vendor reported by matching backing devices when available
+	Vendor string `json:"vendor"`
 
 	// VsanSnapshotSupport Whether this datastore supports vSAN point-in-time snapshots
 	VsanSnapshotSupport *bool `json:"vsanSnapshotSupport,omitempty"`
@@ -809,11 +833,20 @@ type Histogram struct {
 
 // Host defines model for Host.
 type Host struct {
+	// Cluster Source cluster name; omitted for standalone hosts.
+	Cluster *string `json:"cluster,omitempty"`
+
 	// CpuCores Number of CPU cores
 	CpuCores *int `json:"cpuCores"`
 
+	// CpuModel Source-reported CPU model, when available.
+	CpuModel *string `json:"cpuModel,omitempty"`
+
 	// CpuSockets Number of CPU sockets
 	CpuSockets *int `json:"cpuSockets"`
+
+	// Datacenter Source datacenter name, when available.
+	Datacenter *string `json:"datacenter,omitempty"`
 
 	// Id Unique identifier for this host
 	Id *string `json:"id,omitempty"`
@@ -822,12 +855,69 @@ type Host struct {
 	MemoryMB *int64 `json:"memoryMB"`
 	Model    string `json:"model"`
 
+	// SerialNumber Source-reported host hardware serial or service tag, when available.
+	SerialNumber *string `json:"serialNumber,omitempty"`
+
+	// StorageAdapters Available host storage adapters. Omitted when no records are available; this does not imply a complete empty inventory.
+	StorageAdapters *[]HostStorageAdapter `json:"storageAdapters,omitempty"`
+
+	// StorageLuns Available host-visible LUNs and adapter associations, without per-path state or VM disk placement.
+	StorageLuns *[]HostStorageLun `json:"storageLuns,omitempty"`
+
 	// StorageVmotionSupported Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)
 	StorageVmotionSupported *bool  `json:"storageVmotionSupported,omitempty"`
 	Vendor                  string `json:"vendor"`
 
 	// VmotionSupported Whether vMotion is supported on this host (HostSystem.capability.vmotionSupported)
 	VmotionSupported *bool `json:"vmotionSupported,omitempty"`
+}
+
+// HostStorageAdapter Source-provided adapter facts. Missing or conflicting values are omitted.
+type HostStorageAdapter struct {
+	// Device Host-local adapter device name.
+	Device *string `json:"device,omitempty"`
+
+	// Driver Adapter driver.
+	Driver *string `json:"driver,omitempty"`
+
+	// Key Source adapter key; distinct from device name.
+	Key *string `json:"key,omitempty"`
+
+	// Model Adapter model.
+	Model *string `json:"model,omitempty"`
+
+	// NodeWwn Node WWN as identifier text, preserving leading zeros.
+	NodeWwn *string `json:"nodeWwn,omitempty"`
+
+	// PortWwn Port WWN as identifier text, preserving leading zeros.
+	PortWwn *string `json:"portWwn,omitempty"`
+
+	// Protocol Adapter protocol as supplied by the source.
+	Protocol *string `json:"protocol,omitempty"`
+
+	// Type Adapter type as supplied by the source.
+	Type *string `json:"type,omitempty"`
+}
+
+// HostStorageLun A host-visible LUN; missing or conflicting identity/metadata fields are omitted.
+type HostStorageLun struct {
+	// AdapterDevices Distinct sorted adapter device names associated with this LUN, including names whose adapter metadata is unavailable.
+	AdapterDevices *[]string `json:"adapterDevices,omitempty"`
+
+	// CanonicalName Canonical device name, distinct from the LUN UUID.
+	CanonicalName *string `json:"canonicalName,omitempty"`
+
+	// Key Source SCSI disk key.
+	Key *string `json:"key,omitempty"`
+
+	// LunUuid Source-provided LUN UUID; never inferred from the device name or key.
+	LunUuid *string `json:"lunUuid,omitempty"`
+
+	// Model LUN model.
+	Model *string `json:"model,omitempty"`
+
+	// Vendor LUN vendor.
+	Vendor *string `json:"vendor,omitempty"`
 }
 
 // Identity defines model for Identity.
@@ -890,7 +980,10 @@ type Inventory struct {
 	// Clusters Map of cluster names to their inventory data
 	Clusters map[string]InventoryData `json:"clusters"`
 
-	// CreatedAt Timestamp when the inventory data was created or collected
+	// CollectionTime Oldest known source collection time. Agent data uses collection database creation time; RVTools uses export metadata, assuming UTC when no timezone is specified. Null when unknown.
+	CollectionTime *time.Time `json:"collection_time"`
+
+	// CreatedAt Timestamp when the inventory document was built
 	CreatedAt *time.Time     `json:"created_at,omitempty"`
 	Vcenter   *InventoryData `json:"vcenter,omitempty"`
 
@@ -924,6 +1017,9 @@ type InventoryTotals struct {
 
 // InventoryV2 defines model for InventoryV2.
 type InventoryV2 struct {
+	// CollectionTime Oldest known source collection time. Null when unknown.
+	CollectionTime *time.Time `json:"collection_time"`
+
 	// CreatedAt Timestamp when the inventory data was created or collected
 	CreatedAt *time.Time    `json:"created_at,omitempty"`
 	Data      InventoryData `json:"data"`
@@ -1561,6 +1657,9 @@ type DiskTypeSummary struct {
 type OsInfo struct {
 	Count int `json:"count"`
 
+	// MtvStatus MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+	MtvStatus *OsInfoMtvStatus `json:"mtvStatus,omitempty"`
+
 	// SupportTier OS support tier per Red Hat KCS article 4234591
 	SupportTier *OsInfoSupportTier `json:"supportTier,omitempty"`
 	Supported   bool               `json:"supported"`
@@ -1568,6 +1667,9 @@ type OsInfo struct {
 	// UpgradeRecommendation Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
 	UpgradeRecommendation *string `json:"upgradeRecommendation,omitempty"`
 }
+
+// OsInfoMtvStatus MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
+type OsInfoMtvStatus string
 
 // OsInfoSupportTier OS support tier per Red Hat KCS article 4234591
 type OsInfoSupportTier string
@@ -1601,6 +1703,15 @@ type ListGroupsParams struct {
 
 // ListGroupsParamsKind defines parameters for ListGroups.
 type ListGroupsParamsKind string
+
+// GetSourceDownloadURLParams defines parameters for GetSourceDownloadURL.
+type GetSourceDownloadURLParams struct {
+	// Image Which image to link; the OVA or the appliance image tar for a disconnected update
+	Image *GetSourceDownloadURLParamsImage `form:"image,omitempty" json:"image,omitempty"`
+}
+
+// GetSourceDownloadURLParamsImage defines parameters for GetSourceDownloadURL.
+type GetSourceDownloadURLParamsImage string
 
 // UploadRvtoolsToAssessmentMultipartBody defines parameters for UploadRvtoolsToAssessment.
 type UploadRvtoolsToAssessmentMultipartBody struct {
@@ -1667,6 +1778,9 @@ type UploadSourceInventoryFileMultipartRequestBody = SourceInventoryFileForm
 
 // CreateRVToolsAssessmentV2MultipartRequestBody defines body for CreateRVToolsAssessmentV2 for multipart/form-data ContentType.
 type CreateRVToolsAssessmentV2MultipartRequestBody = AssessmentRvtoolsForm
+
+// UpdateAssessmentV2JSONRequestBody defines body for UpdateAssessmentV2 for application/json ContentType.
+type UpdateAssessmentV2JSONRequestBody = AssessmentUpdate
 
 // UploadRvtoolsToAssessmentMultipartRequestBody defines body for UploadRvtoolsToAssessment for multipart/form-data ContentType.
 type UploadRvtoolsToAssessmentMultipartRequestBody UploadRvtoolsToAssessmentMultipartBody

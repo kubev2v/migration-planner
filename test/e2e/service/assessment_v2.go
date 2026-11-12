@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -51,6 +52,36 @@ func (s *plannerService) GetAssessmentV2(id uuid.UUID) (*v1alpha1.AssessmentV2, 
 		return nil, fmt.Errorf("failed to decode v2 assessment response: %w", err)
 	}
 	return &assessment, nil
+}
+
+func (s *plannerService) GetVCenterV2(assessmentID, vcenterID uuid.UUID) (int, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, assessmentID.String(), "vcenters", vcenterID.String())
+	res, err := s.api.GetRequest(endpoint)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(res.Body)
+		return res.StatusCode, fmt.Errorf("failed to get vCenter. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return res.StatusCode, nil
+}
+
+func (s *plannerService) DeleteVCenterInventory(assessmentID, vcenterID uuid.UUID) (int, error) {
+	endpoint := path.Join(apiV2AssessmentsPath, assessmentID.String(), "vcenters", vcenterID.String())
+	res, err := s.api.DeleteRequest(endpoint)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = res.Body.Close() }()
+
+	if res.StatusCode != http.StatusNoContent {
+		body, _ := io.ReadAll(res.Body)
+		return res.StatusCode, fmt.Errorf("failed to delete vCenter inventory. status: %d, body: %s", res.StatusCode, strings.TrimSpace(string(body)))
+	}
+	return res.StatusCode, nil
 }
 
 func parseAcceptedRVToolsJob(res *http.Response, operation string) (*v1alpha1.Job, error) {

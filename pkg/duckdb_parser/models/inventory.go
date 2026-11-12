@@ -1,21 +1,26 @@
 package models
 
+import "github.com/kubev2v/migration-planner/pkg/inventory"
+
 // Datastore represents a VMware datastore.
 type Datastore struct {
-	Cluster                 string  `db:"cluster" json:"-"`
-	DiskId                  string  `db:"diskId" json:"diskId"`
-	FreeCapacityGB          float64 `db:"freeCapacityGB" json:"freeCapacityGB"`
-	HardwareAcceleratedMove bool    `db:"hardwareAcceleratedMove" json:"hardwareAcceleratedMove"`
-	HostId                  string  `db:"hostId" json:"hostId"`
-	Model                   string  `db:"model" json:"model"`
-	ProtocolType            string  `db:"protocolType" json:"protocolType"`
-	TotalCapacityGB         float64 `db:"totalCapacityGB" json:"totalCapacityGB"`
-	Type                    string  `db:"type" json:"type"`
-	Vendor                  string  `db:"vendor" json:"vendor"`
-	SiocEnabled             bool    `db:"siocEnabled" json:"siocEnabled"`
-	SiocThreshold           int     `db:"siocCongestionThreshold" json:"siocCongestionThreshold"`
-	SiocMode                string  `db:"siocCongestionThresholdMode" json:"siocCongestionThresholdMode"`
-	SiocPercent             int     `db:"siocPercentOfPeakThroughput" json:"siocPercentOfPeakThroughput"`
+	Cluster                 string           `db:"cluster" json:"-"`
+	BackingDeviceIDs        BackingDeviceIDs `db:"backingDeviceIds" json:"-"`
+	DiskId                  string           `db:"diskId" json:"diskId"`
+	FilesystemType          string           `db:"filesystemType" json:"filesystemType,omitempty"`
+	FilesystemMajorVersion  int32            `db:"filesystemMajorVersion" json:"filesystemMajorVersion,omitempty"`
+	FreeCapacityGB          float64          `db:"freeCapacityGB" json:"freeCapacityGB"`
+	HardwareAcceleratedMove bool             `db:"hardwareAcceleratedMove" json:"hardwareAcceleratedMove"`
+	HostId                  string           `db:"hostId" json:"hostId"`
+	Model                   string           `db:"model" json:"model"`
+	ProtocolType            string           `db:"protocolType" json:"protocolType"`
+	TotalCapacityGB         float64          `db:"totalCapacityGB" json:"totalCapacityGB"`
+	Type                    string           `db:"type" json:"type"`
+	Vendor                  string           `db:"vendor" json:"vendor"`
+	SiocEnabled             bool             `db:"siocEnabled" json:"siocEnabled"`
+	SiocThreshold           int              `db:"siocCongestionThreshold" json:"siocCongestionThreshold"`
+	SiocMode                string           `db:"siocCongestionThresholdMode" json:"siocCongestionThresholdMode"`
+	SiocPercent             int              `db:"siocPercentOfPeakThroughput" json:"siocPercentOfPeakThroughput"`
 }
 
 // Os represents an operating system summary.
@@ -28,15 +33,20 @@ type Os struct {
 
 // Host represents a VMware ESXi host.
 type Host struct {
-	Cluster                 string `db:"cluster" json:"-"`
-	CpuCores                int    `db:"cpuCores" json:"cpuCores"`
-	CpuSockets              int    `db:"cpuSockets" json:"cpuSockets"`
-	Id                      string `db:"id" json:"id"`
-	MemoryMB                int    `db:"memoryMB" json:"memoryMB"`
-	Model                   string `db:"model" json:"model"`
-	Vendor                  string `db:"vendor" json:"vendor"`
-	VMotionSupported        *bool  `db:"vmotionSupported" json:"vmotionSupported"`
-	StorageVMotionSupported *bool  `db:"storageVmotionSupported" json:"storageVmotionSupported"`
+	Datacenter              string                         `db:"datacenter" json:"datacenter,omitempty"`
+	Cluster                 string                         `db:"cluster" json:"-"`
+	CpuModel                string                         `db:"cpuModel" json:"cpuModel,omitempty"`
+	SerialNumber            string                         `db:"serialNumber" json:"serialNumber,omitempty"`
+	CpuCores                int                            `db:"cpuCores" json:"cpuCores"`
+	CpuSockets              int                            `db:"cpuSockets" json:"cpuSockets"`
+	Id                      string                         `db:"id" json:"id"`
+	MemoryMB                int                            `db:"memoryMB" json:"memoryMB"`
+	Model                   string                         `db:"model" json:"model"`
+	Vendor                  string                         `db:"vendor" json:"vendor"`
+	VMotionSupported        *bool                          `db:"vmotionSupported" json:"vmotionSupported"`
+	StorageVMotionSupported *bool                          `db:"storageVmotionSupported" json:"storageVmotionSupported"`
+	StorageAdapters         []inventory.HostStorageAdapter `db:"-" json:"storageAdapters,omitempty"`
+	StorageLuns             []inventory.HostStorageLun     `db:"-" json:"storageLuns,omitempty"`
 }
 
 // Network represents a VMware network.

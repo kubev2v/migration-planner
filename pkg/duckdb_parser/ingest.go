@@ -34,31 +34,14 @@ func isCriticalStatement(stmt string) bool {
 	return false
 }
 
-// xlsxErrorMappings maps DuckDB error substrings to user-friendly messages.
-var xlsxErrorMappings = map[string]string{
-	"No xl/workbook.xml found":         "The file is corrupted or not a valid Excel file",
-	"\"vInfo\" not found in xlsx file": "File is not a valid RVTools export (missing required 'vInfo' sheet)",
-}
-
-// translateXLSXError converts technical DuckDB xlsx errors to user-friendly messages.
-func translateXLSXError(err error) error {
-	errStr := err.Error()
-	for pattern, message := range xlsxErrorMappings {
-		if strings.Contains(errStr, pattern) {
-			return fmt.Errorf("%s", message)
-		}
-	}
-	return err
-}
-
 // IngestRvTools ingests data from an RVTools Excel file, runs VM validation if a validator
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result ValidationResult, err error) {
+func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (ValidationResult, error) {
 	metadata, err := readRVToolsMetadata(ctx, excelFile)
 	if err != nil {
-		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", err)
+		return ValidationResult{}, fmt.Errorf("reading RVTools metadata: %w", &XLSXError{Cause: err})
 	}
 	var args []any
 	if len(metadata) > 0 {
@@ -72,36 +55,32 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building rvtools ingestion query: %w", err)
 	}
-	defer func() {
-		if err == nil {
-			return
-		}
-		cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		defer cancel()
-		if cleanupErr := p.dropVinfoRaw(cleanupCtx); cleanupErr != nil {
-			zap.S().Warnw("dropping vinfo_raw after failed import", "error", cleanupErr)
-		}
-	}()
-	if err := p.executeStatements(ctx, query, args...); err != nil {
-		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", err)
+	validation, err := p.prepareIngestionValidation(ctx, "rvtools", excelFile)
+	if err != nil {
+		return ValidationResult{}, err
 	}
-
+	if err := p.executeStatements(ctx, query, args...); err != nil {
+		return ValidationResult{}, fmt.Errorf("ingesting rvtools data: %w", &XLSXError{Cause: err})
+	}
 	// Validate schema against vinfo_raw (unfiltered RVTools data) for granular error reporting
-	result = p.ValidateSchema(ctx, "vinfo_raw")
+	result, err := validation.Validate(ctx, "vinfo_raw")
 
 	// Drop vinfo_raw now that validation is complete
-	if err := p.dropVinfoRaw(ctx); err != nil {
-		return result, fmt.Errorf("dropping vinfo_raw: %w", err)
+	if dropErr := p.dropVinfoRaw(ctx); dropErr != nil {
+		return result, fmt.Errorf("dropping vinfo_raw: %w", dropErr)
+	}
+	if err != nil {
+		return result, err
+	}
+	if result.HasErrors() {
+		return result, result.Error()
 	}
 
-	// Only run post-ingestion steps if schema is valid (we have VMs to process)
-	if result.IsValid() {
-		if err := p.populateComplexity(ctx); err != nil {
-			return result, fmt.Errorf("populating complexity: %w", err)
-		}
-		if err := p.validateVMs(ctx); err != nil {
-			return result, fmt.Errorf("validating VMs: %w", err)
-		}
+	if err := p.populateComplexity(ctx); err != nil {
+		return result, fmt.Errorf("populating complexity: %w", err)
+	}
+	if err := p.validateVMs(ctx); err != nil {
+		return result, fmt.Errorf("validating VMs: %w", err)
 	}
 
 	return result, nil
@@ -111,24 +90,26 @@ func (p *Parser) IngestRvTools(ctx context.Context, excelFile string) (result Va
 // is configured, and validates the schema for required tables/columns.
 // Returns a ValidationResult with errors (fatal) and warnings (non-fatal).
 // If ValidationResult.HasErrors() is true, the inventory cannot be built.
-// Optional category names come from temp.main.tag_categories on the same connection.
 func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result ValidationResult, err error) {
 	defer func() {
 		p.cleanupSqliteImport(ctx, err)
 	}()
-	if err := p.setupTagCategories(ctx); err != nil {
-		return ValidationResult{}, fmt.Errorf("creating tag categories: %w", err)
-	}
 	query, err := p.builder.IngestSqliteQuery(sqliteFile)
 	if err != nil {
 		return ValidationResult{}, fmt.Errorf("building sqlite ingestion query: %w", err)
 	}
+	validation, err := p.prepareIngestionValidation(ctx, "sqlite", sqliteFile)
+	if err != nil {
+		return ValidationResult{}, err
+	}
 	if err := p.executeStatements(ctx, query); err != nil {
 		return ValidationResult{}, fmt.Errorf("ingesting sqlite data: %w", err)
 	}
-
 	// Validate schema against vinfo (SQLite inserts directly into vinfo, no vinfo_raw)
-	result = p.ValidateSchema(ctx, "vinfo")
+	result, err = validation.Validate(ctx, "vinfo")
+	if err != nil {
+		return result, err
+	}
 
 	// Only run post-ingestion steps if schema is valid (we have VMs to process)
 	if result.IsValid() {
@@ -143,17 +124,9 @@ func (p *Parser) IngestSqlite(ctx context.Context, sqliteFile string) (result Va
 	return result, nil
 }
 
-func (p *Parser) setupTagCategories(ctx context.Context) error {
-	_, err := p.db.ExecContext(ctx, "CREATE TEMP TABLE IF NOT EXISTS tag_categories (id VARCHAR, name VARCHAR)")
-	return err
-}
-
 func (p *Parser) cleanupSqliteImport(ctx context.Context, importErr error) {
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	if _, err := p.db.ExecContext(ctx, "DROP TABLE IF EXISTS temp.main.tag_categories"); err != nil {
-		zap.S().Warnw("dropping tag categories after import", "error", err)
-	}
 	if importErr != nil {
 		if _, err := p.db.ExecContext(ctx, "DETACH DATABASE IF EXISTS src"); err != nil {
 			zap.S().Warnw("detaching SQLite source after failed import", "error", err)
@@ -184,9 +157,9 @@ func (p *Parser) executeStatements(ctx context.Context, query string, args ...an
 		}
 		if _, err := p.db.ExecContext(ctx, stmt, stmtArgs...); err != nil {
 			if isCriticalStatement(stmt) {
-				return translateXLSXError(err)
+				return err
 			}
-			// Non-critical failures are logged but don't stop execution
+			// Non-critical failures are logged but don't stop execution.
 			zap.S().Debugw("non-critical statement failed", "error", err)
 		}
 	}

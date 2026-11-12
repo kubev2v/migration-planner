@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -78,6 +79,73 @@ var _ = Describe("e2e-rvtools", func() {
 	})
 
 	Context("assessment v2 RVTools aggregation", func() {
+		It("deletes one vCenter and reaggregates the remaining inventory", func() {
+			firstVCenterID := uuid.New()
+			secondVCenterID := uuid.New()
+
+			firstContent, err := CreateValidTestExcel(firstVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			firstFile, err := CreateTempExcelFile(firstContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(firstFile) }()
+
+			secondContent, err := CreateMultiClusterTestExcel(secondVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			secondFile, err := CreateTempExcelFile(secondContent)
+			Expect(err).NotTo(HaveOccurred())
+			defer func() { _ = os.Remove(secondFile) }()
+
+			createJob, err := svc.CreateRVToolsV2Job("v2-rvtools-delete-test", firstFile)
+			Expect(err).NotTo(HaveOccurred())
+			createJob, err = waitForRVToolsJob(svc, createJob.Id)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(createJob.AssessmentId).NotTo(BeNil())
+			assessmentID := *createJob.AssessmentId
+			DeferCleanup(svc.RemoveAssessment, assessmentID)
+
+			updateJob, err := svc.UploadRVToolsToAssessment(assessmentID, secondFile)
+			Expect(err).NotTo(HaveOccurred())
+			_, err = waitForRVToolsJob(svc, updateJob.Id)
+			Expect(err).NotTo(HaveOccurred())
+
+			before, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(before.Data.Data.Vms.Total).To(Equal(6))
+			Expect(before.Vcenters).To(ConsistOf(
+				v1alpha1.SubResource{Id: firstVCenterID.String()},
+				v1alpha1.SubResource{Id: secondVCenterID.String()},
+			))
+
+			otherSvc, err := NewPlannerService(UserAuth("rvtools-intruder", "otherorg", config.Cfg.Test.DefaultEmailDomain))
+			Expect(err).NotTo(HaveOccurred())
+			status, err := otherSvc.DeleteVCenterInventory(assessmentID, firstVCenterID)
+			Expect(status).To(Equal(http.StatusForbidden))
+			Expect(err).To(HaveOccurred())
+
+			status, err = svc.DeleteVCenterInventory(assessmentID, firstVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(status).To(Equal(http.StatusNoContent))
+
+			after, err := svc.GetAssessmentV2(assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(after.Vcenters).To(ConsistOf(v1alpha1.SubResource{Id: secondVCenterID.String()}))
+			Expect(after.Data.Data.Vms.Total).To(Equal(4))
+
+			status, err = svc.GetVCenterV2(assessmentID, firstVCenterID)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(err).To(HaveOccurred())
+			status, err = svc.GetVCenterV2(assessmentID, secondVCenterID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(status).To(Equal(http.StatusOK))
+
+			status, err = svc.DeleteVCenterInventory(assessmentID, firstVCenterID)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(err).To(HaveOccurred())
+			status, err = svc.DeleteVCenterInventory(uuid.New(), firstVCenterID)
+			Expect(status).To(Equal(http.StatusNotFound))
+			Expect(err).To(HaveOccurred())
+		})
+
 		It("POSTs the initial inventory and PUT aggregates a second vCenter inventory", func() {
 			firstVCenterID := uuid.New()
 			secondVCenterID := uuid.New()
@@ -294,7 +362,7 @@ var _ = Describe("e2e-rvtools", func() {
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})
 
-		It("should handle missing sheets", func() {
+		It("should handle missing sheets with metadata", func() {
 			zap.S().Infof("============Running test: %s============", CurrentSpecReport().LeafNodeText)
 
 			// Create Excel file missing required sheets
@@ -308,10 +376,9 @@ var _ = Describe("e2e-rvtools", func() {
 			assessment, err = svc.CreateAssessmentFromRvtools("missing-sheets-test", tmpFile)
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
-
-			// Clean up if successful
-			err = svc.RemoveAssessment(assessment.Id)
-			Expect(err).To(BeNil())
+			DeferCleanup(svc.RemoveAssessment, assessment.Id)
+			Expect(assessment.Snapshots).NotTo(BeEmpty())
+			Expect(assessment.Snapshots[0].Inventory.Vcenter.Vms.Total).To(Equal(1))
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)
 		})

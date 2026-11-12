@@ -28,7 +28,8 @@ func CreateExcelOnlyWithVInfo(vcenterID uuid.UUID) ([]byte, error) {
 	_ = f.DeleteSheet("Sheet1")
 
 	// Set headers for vInfo - include Host column for cluster extraction
-	headers := []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "Powerstate"}
+	headers := []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "Powerstate",
+		"Annotation", "Owner", "Environment", "CustomAttribute", "Empty", "Datacenter"}
 	for colIndex, header := range headers {
 		cellRef := ColumnToLetter(colIndex) + "1"
 		if err := f.SetCellValue("vInfo", cellRef, header); err != nil {
@@ -37,7 +38,8 @@ func CreateExcelOnlyWithVInfo(vcenterID uuid.UUID) ([]byte, error) {
 	}
 
 	// Add at least one VM data row to pass validation
-	vmRow := []string{"test-vm-1", "vm-001", vcenterID.String(), "esxi-host-1", "cluster1", "poweredOn"}
+	vmRow := []string{"test-vm-1", "vm-001", vcenterID.String(), "esxi-host-1", "cluster1", "poweredOn",
+		"notes", "Alice", "production", "VM", "", "datacenter1"}
 	for colIndex, value := range vmRow {
 		cellRef := ColumnToLetter(colIndex) + "2"
 		if err := f.SetCellValue("vInfo", cellRef, value); err != nil {

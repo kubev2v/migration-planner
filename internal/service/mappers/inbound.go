@@ -3,6 +3,7 @@ package mappers
 import (
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/riverqueue/river/rivertype"
 )
@@ -209,28 +210,30 @@ func (f *SourceUpdateForm) ToLabels() []model.Label {
 // Assessment-related mappers
 
 type AssessmentCreateForm struct {
-	ID             uuid.UUID
-	SourceType     string
-	Name           string
-	OrgID          string
-	Username       string
-	OwnerFirstName *string
-	OwnerLastName  *string
-	SourceID       *uuid.UUID
-	Inventory      []byte                      // kept for backward compat (handler mapper)
-	Inventories    []model.AssessmentInventory // pre-built inventories (rvtools path)
+	ID                uuid.UUID
+	SourceType        string
+	Name              string
+	OrgID             string
+	Username          string
+	OwnerFirstName    *string
+	OwnerLastName     *string
+	SourceID          *uuid.UUID
+	MainInventory     svcmodel.AssessmentInventory
+	SubsetInventories []svcmodel.AssessmentInventory
 }
 
-func (f *AssessmentCreateForm) ToModel() model.Assessment {
-	return model.Assessment{
-		ID:             f.ID,
-		Name:           f.Name,
-		OrgID:          f.OrgID,
-		Username:       f.Username,
-		OwnerFirstName: f.OwnerFirstName,
-		OwnerLastName:  f.OwnerLastName,
-		SourceType:     f.SourceType,
-		SourceID:       f.SourceID,
+func (f *AssessmentCreateForm) ToModel() svcmodel.Assessment {
+	return svcmodel.Assessment{
+		ID:                f.ID,
+		Name:              f.Name,
+		OrgID:             f.OrgID,
+		Username:          f.Username,
+		OwnerFirstName:    f.OwnerFirstName,
+		OwnerLastName:     f.OwnerLastName,
+		SourceType:        f.SourceType,
+		SourceID:          f.SourceID,
+		MainInventory:     f.MainInventory,
+		SubsetInventories: f.SubsetInventories,
 	}
 }
 

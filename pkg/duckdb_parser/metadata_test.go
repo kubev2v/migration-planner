@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -14,9 +15,11 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+	"github.com/xuri/excelize/v2"
+
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/store"
-	"github.com/stretchr/testify/require"
 )
 
 func TestMetadataSQLite(t *testing.T) {
@@ -40,21 +43,17 @@ func TestMetadataSQLite(t *testing.T) {
 	require.NoError(t, err)
 	p, _, cleanup := setupTestParser(t, nil)
 	defer cleanup()
-	_, err = p.db.ExecContext(ctx, `CREATE TABLE tag_categories (id VARCHAR); INSERT INTO tag_categories VALUES ('permanent')`)
-	require.NoError(t, err)
-	_, err = p.db.ExecContext(ctx, `CREATE TEMP TABLE tag_categories (id VARCHAR, name VARCHAR)`)
-	require.NoError(t, err)
-	_, err = p.db.ExecContext(ctx, `INSERT INTO temp.main.tag_categories VALUES (?, ?)`, "cat1", "Owner's; \"name\"")
+	_, err = p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES (?, ?)`, "cat1", "Owner's; \"name\"")
 	require.NoError(t, err)
 	result, err := p.IngestSqlite(ctx, path)
 	require.NoError(t, err)
 	require.False(t, result.HasErrors())
 	var temporaryTables int
 	require.NoError(t, p.db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_catalog = 'temp' AND table_name = 'tag_categories'`).Scan(&temporaryTables))
-	require.Zero(t, temporaryTables, "category staging must be removed after import")
+	require.Zero(t, temporaryTables, "ingestion must not create a temporary category table")
 	var categoryID string
 	require.NoError(t, p.db.QueryRowContext(ctx, `SELECT id FROM tag_categories`).Scan(&categoryID))
-	require.Equal(t, "permanent", categoryID, "cleanup must preserve a permanent table with the same name")
+	require.Equal(t, "cat1", categoryID, "ingestion must preserve the category lookup table")
 	vms, err := p.VMs(ctx, Filters{}, Options{})
 	require.NoError(t, err)
 	require.Len(t, vms, 1)
@@ -75,8 +74,7 @@ func TestMetadataSQLite(t *testing.T) {
 			unresolved, _, closeUnresolved := setupTestParser(t, nil)
 			defer closeUnresolved()
 			if categoryName != "unavailable" {
-				_, err := unresolved.db.ExecContext(ctx, `CREATE TEMP TABLE tag_categories (id VARCHAR, name VARCHAR);
-					INSERT INTO tag_categories VALUES ('cat1', ?)`, categoryName)
+				_, err := unresolved.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', ?)`, categoryName)
 				require.NoError(t, err)
 			}
 			result, err := unresolved.IngestSqlite(ctx, path)
@@ -119,7 +117,7 @@ func TestSQLiteMetadataWriteFailure(t *testing.T) {
 	require.NoError(t, err)
 	p, _, cleanup := setupTestParser(t, nil)
 	defer cleanup()
-	_, err = p.db.ExecContext(context.Background(), `CREATE TEMP TABLE tag_categories AS SELECT 'cat1' AS id, 'Owner' AS name`)
+	_, err = p.db.ExecContext(context.Background(), `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
 	require.NoError(t, err)
 	_, err = p.IngestSqlite(context.Background(), path)
 	require.ErrorContains(t, err, "Malformed JSON")
@@ -130,8 +128,8 @@ func TestSQLiteMetadataWriteFailure(t *testing.T) {
 	require.Zero(t, count, "metadata failure must stop later inventory writes")
 	require.NoError(t, p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM duckdb_databases() WHERE database_name = 'src'`).Scan(&count))
 	require.Zero(t, count, "failed import must detach its SQLite source")
-	require.NoError(t, p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM information_schema.tables WHERE table_catalog = 'temp' AND table_name = 'tag_categories'`).Scan(&count))
-	require.Zero(t, count, "failed import must drop category staging")
+	require.NoError(t, p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM tag_categories`).Scan(&count))
+	require.Equal(t, 1, count, "failed import must preserve category names for retry")
 	validPath := createTestSQLite(t, "uuid", []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}},
 		[]sqliteVM{{id: "vm2", name: "replacement", clusterName: "cluster"}})
 	_, err = p.IngestSqlite(context.Background(), validPath)
@@ -161,21 +159,21 @@ func TestSQLiteCancelledImportRetry(t *testing.T) {
 		[]sqliteVM{{id: "vm1", name: "vm", clusterName: "cluster"}})
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	_, err := db.ExecContext(ctx, `CREATE TEMP TABLE tag_categories AS SELECT 'cat1' AS id, 'Owner' AS name`)
+	_, err := db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
 	require.NoError(t, err)
 	p.db = &cancelVMWriteDB{DB: db, cancel: cancel}
 	_, err = p.IngestSqlite(ctx, path)
 	require.ErrorIs(t, err, context.Canceled)
 	var count int
-	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT count(*) FROM information_schema.tables WHERE table_catalog = 'temp' AND table_name = 'tag_categories'`).Scan(&count))
-	require.Zero(t, count)
+	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT count(*) FROM tag_categories`).Scan(&count))
+	require.Equal(t, 1, count)
 	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT count(*) FROM duckdb_databases() WHERE database_name = 'src'`).Scan(&count))
 	require.Zero(t, count)
 	_, err = p.IngestSqlite(context.Background(), path)
 	require.NoError(t, err)
 }
 
-func TestRVToolsCancelledImportRetry(t *testing.T) {
+func TestRVToolsCancelledImportRetryAfterCleanup(t *testing.T) {
 	p, db, cleanup := setupTestParser(t, nil)
 	defer cleanup()
 	sheets := defaultStandardSheets([]map[string]string{{"VM": "vm", "VM ID": "vm1", "VI SDK UUID": "uuid",
@@ -189,9 +187,7 @@ func TestRVToolsCancelledImportRetry(t *testing.T) {
 	p.db = &cancelVMWriteDB{DB: db, cancel: cancel}
 	_, err := p.IngestRvTools(ctx, path)
 	require.ErrorIs(t, err, context.Canceled)
-	var count int
-	require.NoError(t, db.QueryRowContext(context.Background(), `SELECT count(*) FROM information_schema.tables WHERE table_name = 'vinfo_raw'`).Scan(&count))
-	require.Zero(t, count, "cancelled import must drop its temporary table")
+	require.NoError(t, p.Cleanup())
 	_, err = p.IngestRvTools(context.Background(), path)
 	require.NoError(t, err)
 	require.Equal(t, map[string][]string{"Owner": {"Finance"}}, storedMetadata(t, db, "vm1"))
@@ -207,6 +203,8 @@ func TestMetadataSQLiteExistingVM(t *testing.T) {
 			ctx := context.Background()
 			p, _, cleanup := setupTestParser(t, nil)
 			defer cleanup()
+			_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('Owner', 'Owner')`)
+			require.NoError(t, err)
 			db, err := sql.Open("duckdb", "")
 			require.NoError(t, err)
 			defer func() { _ = db.Close() }()
@@ -236,8 +234,6 @@ func TestMetadataSQLiteExistingVM(t *testing.T) {
 					require.NoError(t, err)
 				}
 				_, err = db.Exec(`DETACH src`)
-				require.NoError(t, err)
-				_, err = p.db.ExecContext(ctx, `CREATE TEMP TABLE tag_categories AS SELECT 'Owner' AS id, 'Owner' AS name`)
 				require.NoError(t, err)
 				_, err = p.IngestSqlite(ctx, path)
 				require.NoError(t, err)
@@ -560,4 +556,82 @@ func TestMetadataPersistenceFailure(t *testing.T) {
 	var count int
 	require.NoError(t, db.QueryRow(`SELECT count(*) FROM vinfo`).Scan(&count))
 	require.Zero(t, count, "failed metadata persistence must stop later statements")
+}
+
+func TestParserCleanup(t *testing.T) {
+	p, _, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	ctx := context.Background()
+	_, err := p.db.ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'vm');
+        INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm1', 'Owner', 'Alice');
+        INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Vendor", "LUN Model")
+        VALUES ('host-1', 'naa.shared', 'OLD', 'old-model')`)
+	require.NoError(t, err)
+	require.NoError(t, p.Cleanup())
+	require.Empty(t, storedMetadata(t, p.db, "vm1"))
+	vms, err := p.VMs(ctx, Filters{}, Options{})
+	require.NoError(t, err)
+	require.Empty(t, vms)
+	_, err = p.db.ExecContext(ctx, `INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
+        INSERT INTO vdatastore ("Name", "Hosts", "Backing Devices") VALUES ('new-datastore', 'esxi1', '["naa.shared"]')`)
+	require.NoError(t, err)
+	datastores, err := p.Datastores(ctx, Filters{}, Options{})
+	require.NoError(t, err)
+	require.Len(t, datastores, 1)
+	require.Equal(t, "N/A", datastores[0].Vendor, "previous LUN metadata must not survive parser reuse")
+	require.Equal(t, "N/A", datastores[0].Model)
+}
+
+func TestRVToolsValidationErrorDetails(t *testing.T) {
+	require.NoError(t, (ValidationResult{}).Error())
+	require.NoError(t, (ValidationResult{Warnings: []ValidationIssue{{Message: "warning"}}}).Error())
+	result := ValidationResult{Errors: []ValidationIssue{
+		{Code: CodeMissingVMID, Message: "First issue: missing VM ID"},
+		{Code: CodeColumnValidationFailed, Message: "SELECT private_column FROM /private/database"},
+		{Code: CodeMissingVMName, Message: "Second issue: missing name"},
+	}}
+	err := fmt.Errorf("ingesting: %w", result.Error())
+	var validation *SchemaValidationError
+	require.False(t, errors.As(err, &validation), "technical issues must use the caller's fallback")
+	require.Contains(t, err.Error(), "private_column")
+	require.Contains(t, err.Error(), "First issue: missing VM ID")
+	require.Contains(t, err.Error(), "Second issue: missing name")
+	require.Len(t, result.Errors, 3)
+}
+
+func TestRVToolsWorkbookErrorMessages(t *testing.T) {
+	for _, tc := range []struct {
+		name, sheet, content string
+		truncate             bool
+	}{
+		{name: "JSON", content: "{}"},
+		{name: "empty"},
+		{name: "missing vInfo", sheet: "vHost"},
+		{name: "truncated", sheet: "vInfo", truncate: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "private.xlsx")
+			if tc.sheet == "" {
+				require.NoError(t, os.WriteFile(path, []byte(tc.content), 0600))
+			} else {
+				path = createTestExcel(t, NewExcelSheet(tc.sheet, []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}, nil))
+				if tc.truncate {
+					data, err := os.ReadFile(path)
+					require.NoError(t, err)
+					require.NoError(t, os.Truncate(path, int64(len(data)/2)))
+				}
+			}
+			_, err := readRVToolsMetadata(context.Background(), path)
+			require.Error(t, err)
+			if tc.sheet == "" || tc.truncate {
+				require.ErrorIs(t, err, zip.ErrFormat)
+			} else {
+				var missing excelize.ErrSheetNotExist
+				require.ErrorAs(t, err, &missing)
+				require.Equal(t, "vInfo", missing.SheetName)
+			}
+		})
+	}
+	_, err := readRVToolsMetadata(context.Background(), "/does/not/exist/private.xlsx")
+	require.ErrorIs(t, err, os.ErrNotExist)
 }

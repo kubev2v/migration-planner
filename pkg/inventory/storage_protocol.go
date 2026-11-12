@@ -14,7 +14,7 @@ func StorageProtocolFromDatastoreType(datastoreType string) string {
 	switch strings.ToUpper(strings.TrimSpace(datastoreType)) {
 	case "VMFS":
 		return StorageProtocolBlock
-	case "NFS", "NFS41":
+	case "NFS", "NFS41", "NFS4.1", "NFS 4.1":
 		return StorageProtocolFile
 	case "VSAN":
 		return StorageProtocolObject

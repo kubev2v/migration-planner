@@ -363,9 +363,19 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: image
+          in: query
+          description: Which image to link; the OVA or the appliance image tar for a disconnected update
+          required: false
+          schema:
+            type: string
+            enum:
+              - ova
+              - appliance
+            default: ova
       responses:
         "200":
-          description: URL to download OVA image
+          description: URL to download the image
           content:
             application/json:
               schema:
@@ -1426,6 +1436,62 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - assessment
+      description: Update the assessment name
+      operationId: updateAssessmentV2
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentV2"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /api/v2/assessments/{id}/vcenters/{vid}:
     get:
       tags:
@@ -1454,6 +1520,53 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AssessmentVCenterV2"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    delete:
+      tags:
+        - assessment
+      description: Delete the specified vcenter inventory
+      operationId: deleteVCenter
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: vid
+          in: path
+          description: ID of the vcenter
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: OK
         "401":
           description: Unauthorized
           content:
@@ -2771,7 +2884,13 @@ components:
         created_at:
           type: string
           format: date-time
-          description: Timestamp when the inventory data was created or collected
+          description: Timestamp when the inventory document was built
+        collection_time:
+          type: string
+          format: date-time
+          nullable: true
+          x-omitempty: false
+          description: Oldest known source collection time. Agent data uses collection database creation time; RVTools uses export metadata, assuming UTC when no timezone is specified. Null when unknown.
 
     InventoryV2:
       type: object
@@ -2787,6 +2906,12 @@ components:
           type: string
           format: date-time
           description: Timestamp when the inventory data was created or collected
+        collection_time:
+          type: string
+          format: date-time
+          nullable: true
+          x-omitempty: false
+          description: Oldest known source collection time. Null when unknown.
       required:
         - id
         - data
@@ -3049,6 +3174,12 @@ components:
             - community_supported
             - special_handling
           description: OS support tier per Red Hat KCS article 4234591
+        mtvStatus:
+          type: string
+          enum:
+            - green
+            - blue
+          description: MTV verification per Red Hat KCS article 4234591. Green means tested and verified; blue means successfully running on the target cluster. Omitted when the OS/architecture has no listed status.
         upgradeRecommendation:
           type: string
           description: Recommended OS upgrade for MTV unsupported OS that can be upgraded to a supported OS
@@ -3127,6 +3258,18 @@ components:
           type: string
         model:
           type: string
+        datacenter:
+          type: string
+          description: Source datacenter name, when available.
+        cluster:
+          type: string
+          description: Source cluster name; omitted for standalone hosts.
+        cpuModel:
+          type: string
+          description: Source-reported CPU model, when available.
+        serialNumber:
+          type: string
+          description: Source-reported host hardware serial or service tag, when available.
         cpuCores:
           type: integer
           description: Number of CPU cores
@@ -3146,6 +3289,71 @@ components:
         storageVmotionSupported:
           type: boolean
           description: "Whether Storage vMotion is supported on this host (HostSystem.capability.storageVMotionSupported)"
+
+        storageAdapters:
+          type: array
+          description: Available host storage adapters. Omitted when no records are available; this does not imply a complete empty inventory.
+          items:
+            $ref: '#/components/schemas/HostStorageAdapter'
+        storageLuns:
+          type: array
+          description: Available host-visible LUNs and adapter associations, without per-path state or VM disk placement.
+          items:
+            $ref: '#/components/schemas/HostStorageLun'
+
+    HostStorageAdapter:
+      type: object
+      description: Source-provided adapter facts. Missing or conflicting values are omitted.
+      properties:
+        device:
+          type: string
+          description: Host-local adapter device name.
+        key:
+          type: string
+          description: Source adapter key; distinct from device name.
+        type:
+          type: string
+          description: Adapter type as supplied by the source.
+        protocol:
+          type: string
+          description: Adapter protocol as supplied by the source.
+        model:
+          type: string
+          description: Adapter model.
+        driver:
+          type: string
+          description: Adapter driver.
+        nodeWwn:
+          type: string
+          description: Node WWN as identifier text, preserving leading zeros.
+        portWwn:
+          type: string
+          description: Port WWN as identifier text, preserving leading zeros.
+
+    HostStorageLun:
+      type: object
+      description: A host-visible LUN; missing or conflicting identity/metadata fields are omitted.
+      properties:
+        canonicalName:
+          type: string
+          description: Canonical device name, distinct from the LUN UUID.
+        key:
+          type: string
+          description: Source SCSI disk key.
+        lunUuid:
+          type: string
+          description: Source-provided LUN UUID; never inferred from the device name or key.
+        vendor:
+          type: string
+          description: LUN vendor.
+        model:
+          type: string
+          description: LUN model.
+        adapterDevices:
+          type: array
+          description: Distinct sorted adapter device names associated with this LUN, including names whose adapter metadata is unavailable.
+          items:
+            type: string
 
     Network:
       type: object
@@ -3179,6 +3387,18 @@ components:
       properties:
         type:
           type: string
+        backingDeviceIds:
+          type: array
+          description: Canonical identifiers for devices backing the datastore (for example, an NAA identifier for a SCSI LUN); may be unavailable for some datastore types
+          items:
+            type: string
+        filesystemType:
+          type: string
+          description: Filesystem type reported by the datastore, such as VMFS, NFS, or NFS41
+        filesystemMajorVersion:
+          type: integer
+          format: int32
+          description: VMFS major version when reported; omitted when unknown or not applicable
         storageProtocol:
           type: string
           description: Storage access category derived from Datastore.Type
@@ -3192,6 +3412,7 @@ components:
           type: integer
         vendor:
           type: string
+          description: Vendor reported by matching backing devices when available
         diskId:
           type: string
         hardwareAcceleratedMove:
@@ -3200,6 +3421,7 @@ components:
           type: string
         model:
           type: string
+          description: Model reported by matching backing devices when available
         hostId:
           type: string
           description: Identifier of the host where this datastore is attached

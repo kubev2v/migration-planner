@@ -28,7 +28,6 @@ func DefaultGenerateOptions() *GenerateOptions {
 	return &GenerateOptions{
 		GlobalOptions: DefaultGlobalOptions(),
 		ImageType:     "ova",
-		AgentImageURL: "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest",
 	}
 }
 
@@ -39,10 +38,6 @@ func (o *GenerateOptions) Complete(cmd *cobra.Command, args []string) error {
 func (o *GenerateOptions) Validate(args []string) error {
 	if _, err := uuid.Parse(args[0]); err != nil {
 		return fmt.Errorf("invalid source id: %s", err)
-	}
-
-	if o.AgentImageURL == "" {
-		return fmt.Errorf("agent image url is invalid")
 	}
 
 	if o.OutputImageFilePath == "" {
@@ -101,7 +96,7 @@ func (o *GenerateOptions) Bind(fs *pflag.FlagSet) {
 	o.GlobalOptions.Bind(fs)
 
 	fs.StringVarP(&o.ImageType, "image-type", "", "ova", "Type of the image. Only accepts ova and iso")
-	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "", "quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest", "Quay url of the agent's image. Defaults to quay.io/redhat-user-workloads/assisted-migration-tenant/migration-planner-agent:latest")
+	fs.StringVarP(&o.AgentImageURL, "agent-image-url", "", "", "Quay url of the agent's image. If empty, uses the AGENT_IMAGE env var or the built-in default")
 	fs.StringVarP(&o.OutputImageFilePath, "output-file", "", "", "Output image file path")
 	fs.StringVarP(&o.HttpProxyUrl, "http-proxy", "", "", "Url of HTTP_PROXY")
 	fs.StringVarP(&o.HttpsProxyUrl, "https-proxy", "", "", "Url of HTTPS_PROXY")
@@ -133,6 +128,10 @@ func (o *GenerateOptions) Run(ctx context.Context, args []string) error {
 			HttpsUrl:      o.HttpsProxyUrl,
 			NoProxyDomain: o.NoProxyDomain,
 		})
+
+	if o.AgentImageURL != "" {
+		imageBuilder = imageBuilder.WithAgentImage(o.AgentImageURL)
+	}
 
 	switch o.ImageType {
 	case "iso":

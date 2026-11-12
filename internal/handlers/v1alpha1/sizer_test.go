@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"time"
 
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
+
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
@@ -18,6 +20,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
+	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -51,23 +54,35 @@ func (m *MockStore) Authz() store.Authz {
 // from all methods. Used to test handler 403 responses.
 type ForbiddenAssessmentService struct{}
 
-func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
-func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]model.Assessment, error) {
+func (f *ForbiddenAssessmentService) GetClusterInventory(_ context.Context, id, _ uuid.UUID, _ string) (*svcmodel.InventoryData, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) GetVcenterInventory(_ context.Context, id, _ uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	return nil, service.NewErrForbidden("assessment", "list")
 }
 
-func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappers.AssessmentCreateForm) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) CreateAssessment(_ context.Context, _ mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", "create")
 }
 
-func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*model.Assessment, error) {
+func (f *ForbiddenAssessmentService) UpdateAssessment(_ context.Context, id uuid.UUID, _ *string) (*svcmodel.Assessment, error) {
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
 func (f *ForbiddenAssessmentService) DeleteAssessment(_ context.Context, id uuid.UUID) error {
+	return service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) DeleteVCenterInventory(_ context.Context, id, _ uuid.UUID) error {
 	return service.NewErrForbidden("assessment", id.String())
 }
 
@@ -79,8 +94,8 @@ func (f *ForbiddenAssessmentService) UnshareAssessment(_ context.Context, id uui
 	return service.NewErrForbidden("assessment", id.String())
 }
 
-func (f *ForbiddenAssessmentService) AggregateInventories(_ context.Context, id uuid.UUID, _ ...uuid.UUID) (model.AssessmentInventory, error) {
-	return model.AssessmentInventory{}, service.NewErrForbidden("assessment", id.String())
+func (f *ForbiddenAssessmentService) AggregateInventories(_ context.Context, id uuid.UUID, _ ...uuid.UUID) (svcmodel.AssessmentInventory, error) {
+	return svcmodel.AssessmentInventory{}, service.NewErrForbidden("assessment", id.String())
 }
 
 func (m *MockStore) Source() store.Source {
@@ -147,7 +162,7 @@ type MockClusterSizingInputStore struct {
 	store *MockStore
 }
 
-func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*svcmodel.Assessment, error) {
 	if m.store.getError != nil {
 		return nil, m.store.getError
 	}
@@ -155,23 +170,31 @@ func (m *MockAssessmentStore) Get(ctx context.Context, id uuid.UUID) (*model.Ass
 	if !exists {
 		return nil, store.ErrRecordNotFound
 	}
-	return assessment, nil
+	domain, err := storemappers.AssessmentFromStore(assessment)
+	if err != nil {
+		return nil, err
+	}
+	return &domain, nil
 }
 
-func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (model.AssessmentList, error) {
+func (m *MockAssessmentStore) List(ctx context.Context, filter *store.AssessmentQueryFilter) (svcmodel.AssessmentList, error) {
 	panic("List() not implemented in MockAssessmentStore for this test")
 }
 
-func (m *MockAssessmentStore) Create(ctx context.Context, assessment model.Assessment) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Create(ctx context.Context, assessment svcmodel.Assessment) (*svcmodel.Assessment, error) {
 	panic("Create() not implemented in MockAssessmentStore for this test")
 }
 
-func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []model.AssessmentInventory) (*model.Assessment, error) {
+func (m *MockAssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, name *string, inventories []svcmodel.AssessmentInventory) (*svcmodel.Assessment, error) {
 	panic("Update() not implemented in MockAssessmentStore for this test")
 }
 
-func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...model.AssessmentInventory) error {
+func (m *MockAssessmentStore) UpsertInventories(ctx context.Context, inventories ...svcmodel.AssessmentInventory) error {
 	panic("UpsertInventories() not implemented in MockAssessmentStore for this test")
+}
+
+func (m *MockAssessmentStore) DeleteInventory(ctx context.Context, assessmentID, inventoryID uuid.UUID) error {
+	panic("DeleteInventory() not implemented in MockAssessmentStore for this test")
 }
 
 func (m *MockAssessmentStore) Delete(ctx context.Context, id uuid.UUID) error {

@@ -10,12 +10,14 @@ Strategy:
   - TRY_CAST returns NULL if conversion fails (e.g., "VM" placeholder)
 */ -}}
 INSTALL excel;
-LOAD excel; 
+LOAD excel;
+
 CREATE TABLE vinfo_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vInfo', header=true, all_varchar=true);
 
 -- Add potentially missing columns with NULL defaults for minimal schema support
 -- Only VM ID and VM are required; all other columns are optional
+ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "NICs" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Annotation" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder" VARCHAR;
 ALTER TABLE vinfo_raw ADD COLUMN IF NOT EXISTS "Folder ID" VARCHAR;
@@ -76,7 +78,7 @@ UPDATE vinfo_raw SET
 INSERT INTO vinfo (
     "VM ID", "VM", "Annotation", "Folder ID", "Folder", "Host", "SMBIOS UUID", "VM UUID",
     "Firmware", "Powerstate", "Connection state", "FT State",
-    "CPUs", "Memory",
+    "NICs", "CPUs", "Memory",
     "OS according to the configuration file", "OS according to the VMware Tools",
     "DNS Name", "Primary IP Address", "In Use MiB",
     "Template", "CBT", "EnableUUID",
@@ -99,6 +101,7 @@ SELECT
     "Powerstate",
     "Connection state",
     "FT State",
+    COALESCE(TRY_CAST("NICs" AS INTEGER), 0),
     TRY_CAST("CPUs" AS INTEGER),
     TRY_CAST("Memory" AS INTEGER),
     NULLIF("OS according to the configuration file", 'VM'),
@@ -138,11 +141,35 @@ WHERE source."VM" IS NOT NULL AND source."VM" != ''
 ON CONFLICT DO NOTHING;
 {{end}}
 
-INSERT INTO about ("APIVersion", "Product", "InstanceUuid")
-SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID"
-FROM vinfo_raw
+-- Stage source metadata so an absent vMetaData sheet does not lose vCenter details.
+CREATE TABLE about_raw AS
+SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID",
+    NULL::TIMESTAMP AS "CollectionTime"
+FROM vinfo_raw;
+
+-- Excel export dates have no timezone; assume UTC.
+UPDATE about_raw SET "CollectionTime" = (
+    SELECT TRY_STRPTIME(
+        COALESCE(
+            TRY(excel_text(
+                TRY_CAST(TRIM("xlsx creation datetime") AS DOUBLE),
+                'yyyy/mm/dd hh:mm:ss'
+            )),
+            TRIM("xlsx creation datetime")
+        ),
+        '%Y/%m/%d %H:%M:%S'
+    )
+    FROM read_xlsx('{{.FilePath}}', sheet='vMetaData', header=true, all_varchar=true)
+    WHERE LOWER(TRIM("xlsx creation datetime")) NOT IN ('', 'vm')
+);
+
+INSERT INTO about ("APIVersion", "Product", "InstanceUuid", "CollectionTime")
+SELECT DISTINCT "VI SDK API Version", "VI SDK Server type", "VI SDK UUID", "CollectionTime"
+FROM about_raw
 WHERE "VI SDK UUID" IS NOT NULL
 ORDER BY "VI SDK API Version" IS NOT NULL DESC;
+
+DROP TABLE about_raw;
 
 WITH cleaned_networks AS (
     SELECT
@@ -194,6 +221,7 @@ SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vDisk', all_varchar=true);
 -- Add potentially missing columns with NULL defaults
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Sharing mode" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Disk UUID" VARCHAR;
+ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Raw LUN ID" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Capacity MiB" VARCHAR;
 ALTER TABLE vdisk_raw ADD COLUMN IF NOT EXISTS "Capacity MB" VARCHAR;
 
@@ -204,7 +232,7 @@ UPDATE vdisk_raw SET "Capacity MiB" = COALESCE(
 
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
-    "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID",
+    "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID", "RDM LUN UUID",
     "Thin", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
@@ -219,6 +247,7 @@ SELECT
     d."Shared Bus",
     d."Disk Mode",
     d."Disk UUID",
+    CASE WHEN LOWER(d."Raw") IN ('true', '1', 'yes') THEN NULLIF(TRIM(d."Raw LUN ID"), '') END,
     CASE WHEN LOWER(d."Thin") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."Thin") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     d."Controller",
     d."Label",
@@ -249,56 +278,276 @@ UPDATE vdatastore_raw SET
     NULLIF(TRIM("Capacity MB"), '')
   );
 
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
-    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
-SELECT
-    "Hosts",
-    "Address",
-    "Name",
-    "Object ID",
-    TRY_CAST("Free MiB" AS DOUBLE),
-    CASE WHEN LOWER("MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER("MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
-    TRY_CAST("Capacity MiB" AS DOUBLE),
-    "Type",
-    CASE WHEN LOWER(TRIM(COALESCE("SIOC Enabled", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
-    COALESCE(TRY_CAST("SIOC Congestion Threshold" AS INTEGER), 30),
-    CASE WHEN LOWER(TRIM(COALESCE("SIOC Congestion Threshold Mode", ''))) = 'manual' THEN 'manual' ELSE 'automatic' END,
-    COALESCE(TRY_CAST("SIOC Percent Of Peak Throughput" AS INTEGER), 90)
-FROM vdatastore_raw;
-
-DROP TABLE vdatastore_raw;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "# Extents" VARCHAR;
+ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Major Version" VARCHAR;
 
 CREATE TABLE vhost_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "CPU Model" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Serial number" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Service tag" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Config status" VARCHAR;
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "VMotion support" VARCHAR;
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Storage VMotion support" VARCHAR;
 
-INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
-    "VMotion support", "Storage VMotion support")
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "CPU Model", "Serial Number", "Model", "Vendor", "Host", "Config status",
+    "VMotion support", "Storage VMotion support", "VI SDK UUID")
 SELECT
     "Datacenter",
     "Cluster",
     TRY_CAST("# Cores" AS INTEGER),
     TRY_CAST("# CPU" AS INTEGER),
-    "Object ID",
+    CASE WHEN UPPER(TRIM(COALESCE("Object ID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Object ID") END,
     TRY_CAST("# Memory" AS INTEGER),
+    CASE WHEN UPPER(TRIM(COALESCE("CPU Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("CPU Model") END,
+    COALESCE(
+        CASE WHEN UPPER(TRIM(COALESCE("Serial number", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Serial number") END,
+        CASE WHEN UPPER(TRIM(COALESCE("Service tag", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Service tag") END
+    ),
     "Model",
     "Vendor",
     "Host",
     COALESCE(NULLIF("Config status", ''), 'green'),
     CASE WHEN LOWER(TRIM(COALESCE("VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
-    CASE WHEN LOWER(TRIM(COALESCE("Storage VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END
-FROM vhost_raw;
+    CASE WHEN LOWER(TRIM(COALESCE("Storage VMotion support", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    COALESCE(
+        NULLIF(NULLIF(LOWER(TRIM(to_json(h)->>'VI SDK UUID')), ''), 'vm'),
+        NULLIF(NULLIF(LOWER(TRIM(to_json(h)->>'vCenter UUID')), ''), 'vm'),
+        (SELECT CASE WHEN COUNT(DISTINCT source_id) = 1 THEN MIN(source_id) END
+         FROM (SELECT NULLIF(NULLIF(LOWER(TRIM("VI SDK UUID")), ''), 'vm') AS source_id FROM vinfo_raw))
+    )
+FROM vhost_raw h;
 
 DROP TABLE vhost_raw;
 
-INSERT INTO vhba ("Device", "Type")
-SELECT "Device", "Type"
-FROM read_xlsx('{{.FilePath}}', sheet='vHBA', all_varchar=true);
+-- Resolve RVTools host names without linking ambiguous names to an arbitrary host.
+CREATE OR REPLACE TEMP TABLE rvtools_host_map AS
+SELECT LOWER(TRIM("Host")) AS source_key, "Object ID" AS "Host ID"
+FROM vhost
+WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
+  AND NULLIF(TRIM("Object ID"), '') IS NOT NULL
+  AND LOWER(TRIM("Host")) IN (
+      SELECT LOWER(TRIM("Host"))
+      FROM vhost
+      WHERE NULLIF(TRIM("Host"), '') IS NOT NULL
+      GROUP BY LOWER(TRIM("Host"))
+      HAVING COUNT(*) = 1
+  );
 
+-- Resolve VM host IDs; missing or ambiguous host names remain NULL.
+UPDATE vinfo SET "Host ID" = (
+    SELECT h."Host ID" FROM rvtools_host_map h
+    WHERE h.source_key = LOWER(TRIM(vinfo."Host"))
+);
+
+INSERT INTO vnic ("Host", "Host ID", "Network Device", "Speed")
+SELECT n."Host", h."Host ID", n."Network Device",
+    NULLIF(TRY_CAST(n."Speed" AS INTEGER), 0)
+FROM read_xlsx('{{.FilePath}}', sheet='vNIC', all_varchar=true) n
+LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(n."Host"));
+
+-- vHBA is optional in partial RVTools exports.
+CREATE OR REPLACE TEMP TABLE vhba_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHBA', all_varchar=true);
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Device" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Type" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Model" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "Driver" VARCHAR;
+ALTER TABLE vhba_raw ADD COLUMN IF NOT EXISTS "WWN" VARCHAR;
+
+INSERT INTO vhba ("Host ID", "Device", "Type", "HBA Key", "Protocol", "Model", "Driver", "Node WWN", "Port WWN")
+SELECT DISTINCT
+    h."Host ID",
+    CASE WHEN UPPER(TRIM(COALESCE(a."Device", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Device") END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Type", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Type") END,
+    NULL,
+    CASE UPPER(TRIM(COALESCE(a."Type", '')))
+        WHEN 'ISCSI' THEN 'iSCSI'
+        WHEN 'FIBRE CHANNEL' THEN 'FibreChannel'
+        ELSE NULL
+    END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Model") END,
+    CASE WHEN UPPER(TRIM(COALESCE(a."Driver", ''))) IN ('', 'VM') THEN NULL ELSE TRIM(a."Driver") END,
+    CASE
+        WHEN regexp_matches(TRIM(COALESCE(a."WWN", '')), '^[0-9A-Fa-f]{16}[[:space:]]+[0-9A-Fa-f]{16}$')
+        THEN LOWER(regexp_extract(TRIM(a."WWN"), '^([0-9A-Fa-f]{16})[[:space:]]+[0-9A-Fa-f]{16}$', 1))
+        ELSE NULL
+    END,
+    CASE
+        WHEN regexp_matches(TRIM(COALESCE(a."WWN", '')), '^[0-9A-Fa-f]{16}[[:space:]]+[0-9A-Fa-f]{16}$')
+        THEN LOWER(regexp_extract(TRIM(a."WWN"), '^[0-9A-Fa-f]{16}[[:space:]]+([0-9A-Fa-f]{16})$', 1))
+        ELSE NULL
+    END
+FROM vhba_raw a
+LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(a."Host"))
+WHERE UPPER(TRIM(COALESCE(a."Device", ''))) NOT IN ('', 'VM');
+
+DROP TABLE IF EXISTS vhba_raw;
+
+-- Keep a stable empty source table when the optional vMultiPath sheet is absent.
+CREATE OR REPLACE TEMP TABLE vMultiPath_raw (
+    "Host" VARCHAR,
+    "Disk" VARCHAR,
+    "Vendor" VARCHAR,
+    "Model" VARCHAR,
+    "UUID" VARCHAR,
+    "Object ID" VARCHAR,
+    "Path 1" VARCHAR,
+    "Path 2" VARCHAR,
+    "Path 3" VARCHAR,
+    "Path 4" VARCHAR,
+    "Path 5" VARCHAR,
+    "Path 6" VARCHAR,
+    "Path 7" VARCHAR,
+    "Path 8" VARCHAR
+);
+
+CREATE OR REPLACE TEMP TABLE vMultiPath_sheet_raw AS
+SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vMultiPath', all_varchar=true);
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Host" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Disk" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Vendor" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Model" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "UUID" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 1" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 2" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 3" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 4" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 5" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 6" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 7" VARCHAR;
+ALTER TABLE vMultiPath_sheet_raw ADD COLUMN IF NOT EXISTS "Path 8" VARCHAR;
+INSERT INTO vMultiPath_raw
+SELECT "Host", "Disk", "Vendor", "Model", "UUID", "Object ID",
+       "Path 1", "Path 2", "Path 3", "Path 4", "Path 5", "Path 6", "Path 7", "Path 8"
+FROM vMultiPath_sheet_raw;
+DROP TABLE IF EXISTS vMultiPath_sheet_raw;
+
+CREATE OR REPLACE TEMP TABLE vMultiPath_normalized AS
+SELECT
+    CASE WHEN UPPER(TRIM(COALESCE("Host", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Host") END AS "Host",
+    CASE WHEN UPPER(TRIM(COALESCE("Disk", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Disk") END AS "Disk",
+    CASE WHEN UPPER(TRIM(COALESCE("Vendor", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Vendor") END AS "Vendor",
+    CASE WHEN UPPER(TRIM(COALESCE("Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Model") END AS "Model",
+    CASE WHEN UPPER(TRIM(COALESCE("UUID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("UUID") END AS "UUID",
+    CASE WHEN UPPER(TRIM(COALESCE("Object ID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Object ID") END AS "Object ID",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 1", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 1") END AS "Path 1",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 2", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 2") END AS "Path 2",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 3", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 3") END AS "Path 3",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 4", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 4") END AS "Path 4",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 5", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 5") END AS "Path 5",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 6", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 6") END AS "Path 6",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 7", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 7") END AS "Path 7",
+    CASE WHEN UPPER(TRIM(COALESCE("Path 8", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Path 8") END AS "Path 8"
+FROM vMultiPath_raw;
+
+WITH path_records AS (
+    SELECT
+        h."Host ID",
+        NULLIF(TRIM(path.adapter_device), '') AS hba_device,
+        NULLIF(TRIM(m."Disk"), '') AS canonical_name,
+        NULLIF(TRIM(m."Vendor"), '') AS lun_vendor,
+        NULLIF(TRIM(m."Model"), '') AS lun_model,
+        NULLIF(TRIM(m."UUID"), '') AS lun_uuid
+    FROM vMultiPath_normalized m
+    LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(m."Host"))
+    CROSS JOIN UNNEST([
+        m."Path 1", m."Path 2", m."Path 3", m."Path 4",
+        m."Path 5", m."Path 6", m."Path 7", m."Path 8"
+    ]) AS path(adapter_device)
+    WHERE m."Disk" IS NOT NULL
+      AND path.adapter_device IS NOT NULL
+),
+unassociated_records AS (
+    SELECT
+        h."Host ID",
+        NULL::VARCHAR AS hba_device,
+        NULLIF(TRIM(m."Disk"), '') AS canonical_name,
+        NULLIF(TRIM(m."Vendor"), '') AS lun_vendor,
+        NULLIF(TRIM(m."Model"), '') AS lun_model,
+        NULLIF(TRIM(m."UUID"), '') AS lun_uuid
+    FROM vMultiPath_normalized m
+    LEFT JOIN rvtools_host_map h ON h.source_key = LOWER(TRIM(m."Host"))
+    WHERE m."Disk" IS NOT NULL
+      AND COALESCE(
+          m."Path 1", m."Path 2", m."Path 3", m."Path 4",
+          m."Path 5", m."Path 6", m."Path 7", m."Path 8"
+      ) IS NULL
+)
+INSERT INTO vhostscsi ("Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model", "LUN UUID")
+SELECT DISTINCT "Host ID", hba_device, NULL, canonical_name, lun_vendor, lun_model, lun_uuid
+FROM path_records
+UNION
+SELECT DISTINCT "Host ID", hba_device, NULL, canonical_name, lun_vendor, lun_model, lun_uuid
+FROM unassociated_records;
+
+WITH multipath_backing AS (
+    SELECT
+        "Object ID" AS datastore_id,
+        CAST(to_json(
+            list(DISTINCT "Disk" ORDER BY "Disk") FILTER (WHERE "Disk" IS NOT NULL)
+        ) AS VARCHAR) AS backing_devices
+    FROM vMultiPath_normalized
+    WHERE "Object ID" IS NOT NULL
+    GROUP BY "Object ID"
+)
+INSERT INTO vdatastore (
+    "Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type",
+    "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol",
+    "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput"
+)
+SELECT
+    d."Hosts",
+    d."Address",
+    d."Name",
+    d."Object ID",
+    TRY_CAST(d."Free MiB" AS DOUBLE),
+    CASE WHEN LOWER(d."MHA") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(d."MHA") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
+    TRY_CAST(d."Capacity MiB" AS DOUBLE),
+    d."Type",
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) IN ('NFS4.1', 'NFS 4.1') THEN 'NFS41'
+        ELSE NULLIF(UPPER(TRIM(d."Type")), '')
+    END,
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) = 'VMFS'
+         AND TRY_CAST(d."Major Version" AS INTEGER) > 0
+        THEN TRY_CAST(d."Major Version" AS INTEGER)
+        ELSE NULL
+    END,
+    COALESCE(
+        b.backing_devices,
+        CASE
+            WHEN UPPER(TRIM(COALESCE(d."Type", ''))) = 'VMFS'
+             AND TRY_CAST(d."# Extents" AS INTEGER) = 1
+			AND regexp_matches(LOWER(TRIM(COALESCE(d."Address", ''))), '^(naa\.|eui\.|t10\.|mpx\.|vml\.|nvme\.).+')
+            THEN CAST(to_json([TRIM(d."Address")]) AS VARCHAR)
+            ELSE '[]'
+        END
+    ),
+    CASE
+        WHEN UPPER(TRIM(COALESCE(d."Type", ''))) IN ('NFS', 'NFS41', 'NFS4.1', 'NFS 4.1') THEN 'NFS'
+        ELSE NULL
+    END,
+    CASE WHEN LOWER(TRIM(COALESCE(d."SIOC Enabled", ''))) IN ('true', '1', 'yes') THEN true ELSE false END,
+    COALESCE(TRY_CAST(d."SIOC Congestion Threshold" AS INTEGER), 30),
+    CASE WHEN LOWER(TRIM(COALESCE(d."SIOC Congestion Threshold Mode", ''))) = 'manual' THEN 'manual' ELSE 'automatic' END,
+    COALESCE(TRY_CAST(d."SIOC Percent Of Peak Throughput" AS INTEGER), 90)
+FROM vdatastore_raw d
+LEFT JOIN multipath_backing b ON b.datastore_id = d."Object ID";
+
+DROP TABLE IF EXISTS vdatastore_raw;
+DROP TABLE IF EXISTS rvtools_host_map;
+DROP TABLE IF EXISTS vMultiPath_normalized;
+DROP TABLE IF EXISTS vMultiPath_raw;
+
+-- DuckDB may read empty XLSX cells as 'VM'; exclude them from address lists.
 INSERT INTO vnetwork (
     "VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch",
-    "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"
+    "Connected", "Starts Connected", "Type", "IPv4 Addresses", "IPv6 Addresses", "Cluster"
 )
 SELECT
     n."VM ID",
@@ -310,8 +559,16 @@ SELECT
     CASE WHEN LOWER(n."Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     CASE WHEN LOWER(n."Starts Connected") IN ('true', '1', 'yes') THEN TRUE WHEN LOWER(n."Starts Connected") IN ('false', '0', 'no') THEN FALSE ELSE NULL END,
     n."Type",
-    n."IPv4 Address",
-    n."IPv6 Address",
+    COALESCE((
+        SELECT LIST(DISTINCT TRIM(ip) ORDER BY TRIM(ip))
+        FROM unnest(string_split(n."IPv4 Address", ',')) AS t(ip)
+        WHERE TRIM(ip) NOT IN ('', 'VM')
+    ), []),
+    COALESCE((
+        SELECT LIST(DISTINCT TRIM(ip) ORDER BY TRIM(ip))
+        FROM unnest(string_split(n."IPv6 Address", ',')) AS t(ip)
+        WHERE TRIM(ip) NOT IN ('', 'VM')
+    ), []),
     n."Cluster"
 FROM read_xlsx('{{.FilePath}}', sheet='vNetwork', all_varchar=true) n
 WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
@@ -319,6 +576,45 @@ WHERE n."VM ID" IN (SELECT "VM ID" FROM vinfo);
 INSERT INTO dvport ("Port", "VLAN", "Switch")
 SELECT "Port", "VLAN", "Switch"
 FROM read_xlsx('{{.FilePath}}', sheet='dvPort', all_varchar=true);
+
+INSERT INTO vport ("Host", "Port Group", "Switch", "VLAN")
+SELECT "Host", "Port Group", "Switch", "VLAN"
+FROM read_xlsx('{{.FilePath}}', sheet='vPort', all_varchar=true);
+
+-- If both port-group types match an adapter, its VLAN is unknown.
+-- DuckDB may read empty XLSX cells as 'VM'; treat them as unknown VLANs.
+-- Conflicting rows for the same port group leave its VLAN unknown.
+UPDATE vnetwork n SET "VLAN" = p."VLAN"
+FROM vinfo v
+JOIN (
+    SELECT "Host", "Port Group", "Switch", MIN("VLAN") AS "VLAN"
+    FROM vport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Host", "Port Group", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p ON p."Host" = v."Host"
+WHERE n."VM ID" = v."VM ID"
+  AND p."Port Group" = n."Network" AND p."Switch" = n."Switch"
+  AND NOT EXISTS (
+      SELECT 1 FROM dvport d
+      WHERE d."Port" = n."Network" AND d."Switch" = n."Switch"
+  );
+
+UPDATE vnetwork n SET "VLAN" = p."VLAN"
+FROM (
+    SELECT "Port", "Switch", MIN("VLAN") AS "VLAN"
+    FROM dvport
+    WHERE "VLAN" NOT IN ('', 'VM')
+    GROUP BY "Port", "Switch"
+    HAVING COUNT(DISTINCT "VLAN") = 1
+) p
+WHERE p."Port" = n."Network" AND p."Switch" = n."Switch"
+  AND NOT EXISTS (
+      SELECT 1 FROM vinfo v
+      JOIN vport s ON s."Host" = v."Host"
+      WHERE v."VM ID" = n."VM ID"
+        AND s."Port Group" = n."Network" AND s."Switch" = n."Switch"
+  );
 
 INSERT INTO dvswitch ("Name")
 SELECT DISTINCT "Name"

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"testing"
+	"time"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
@@ -66,7 +67,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		`CREATE TABLE dst.Cluster (ID VARCHAR PRIMARY KEY, Name VARCHAR, Parent VARCHAR, DasEnabled BOOLEAN DEFAULT false, DrsEnabled BOOLEAN DEFAULT false, DrsBehavior VARCHAR DEFAULT '', Variant VARCHAR DEFAULT 'ClusterComputeResource')`,
 
 		// Host
-		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false)`,
+		`CREATE TABLE dst.Host (ID VARCHAR PRIMARY KEY, Cluster VARCHAR, CpuCores INTEGER, CpuSockets INTEGER, MemoryBytes BIGINT, Model VARCHAR, Vendor VARCHAR, Datastores VARCHAR, VMotionSupported BOOLEAN DEFAULT false, StorageVMotionSupported BOOLEAN DEFAULT false, HbaDiskInfo VARCHAR DEFAULT '[]', HostScsiTopology VARCHAR DEFAULT '[]', HostScsiDisks VARCHAR DEFAULT '[]', Network VARCHAR DEFAULT '{}')`,
 
 		// VM
 		`CREATE TABLE dst.VM (
@@ -80,14 +81,15 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 			CpuHotAddEnabled INTEGER, CpuHotRemoveEnabled INTEGER, CoresPerSocket INTEGER,
 			MemoryHotAddEnabled INTEGER, BalloonedMemory INTEGER,
 			GuestApps VARCHAR DEFAULT '[]',
-			GuestNetworks VARCHAR DEFAULT '[]'
+			GuestNetworks VARCHAR DEFAULT '[]',
+			Devices VARCHAR DEFAULT '[]'
 		)`,
 
 		// Network (referenced by ingest template; empty is fine for these tests)
 		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR)`,
 
 		// Datastore
-		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
+		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, FilesystemType VARCHAR, FilesystemMajorVersion INTEGER, ProtocolEndpointType VARCHAR DEFAULT '', BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
 	}
 
 	for _, stmt := range stmts {
@@ -130,7 +132,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		// Insert one host per cluster so Host→Cluster join resolves.
 		hostID := fmt.Sprintf("host-%d", i+1)
 		_, err = db.Exec(fmt.Sprintf(
-			`INSERT INTO dst.Host VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`,
+			`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('%s', '%s', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`,
 			escapeSQLString(hostID), escapeSQLString(c.id),
 		))
 		require.NoError(t, err)
@@ -183,6 +185,53 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 	require.NoError(t, err)
 
 	return sqlitePath
+}
+
+func TestIngestSqlite_Annotation(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		hasColumn  bool
+		annotation sql.NullString
+	}{
+		{name: "reported annotation", hasColumn: true, annotation: sql.NullString{String: "  SAP production application's: 東京 / Finance!\nOwner: Финансы.  ", Valid: true}},
+		{name: "literal VM annotation", hasColumn: true, annotation: sql.NullString{String: "VM", Valid: true}},
+		{name: "empty annotation", hasColumn: true, annotation: sql.NullString{Valid: true}},
+		{name: "NULL annotation", hasColumn: true},
+		{name: "legacy snapshot without annotation column"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vcenter-1",
+				[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "test-vm", clusterName: "cluster1"}},
+			)
+			if tc.hasColumn {
+				_, err := db.ExecContext(ctx, fmt.Sprintf("ATTACH '%s' AS annotation_source (TYPE sqlite)", escapeSQLString(sqlitePath)))
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `ALTER TABLE annotation_source.VM ADD COLUMN Annotation VARCHAR`)
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `UPDATE annotation_source.VM SET Annotation = ? WHERE ID = ?`, tc.annotation, "vm-1")
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, "DETACH annotation_source")
+				require.NoError(t, err)
+			}
+
+			result, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "SQLite validation failed: %v", result.Errors)
+
+			var annotation sql.NullString
+			var name, folder, host string
+			err = db.QueryRowContext(ctx, `SELECT "Annotation", "VM", "Folder ID", "Host" FROM vinfo WHERE "VM ID" = ?`, "vm-1").Scan(&annotation, &name, &folder, &host)
+			require.NoError(t, err)
+			require.Equal(t, tc.annotation, annotation)
+			require.Equal(t, "test-vm", name)
+			require.Equal(t, "folder-1", folder)
+			require.Equal(t, "host-1", host)
+		})
+	}
 }
 
 func TestIngestSqlite_PopulatesVCluster(t *testing.T) {
@@ -394,11 +443,14 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.True(t, result.IsValid())
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-001' ORDER BY "Mac Address"`)
+		`SELECT "Mac Address", "IPv4 Addresses" FROM vnetwork WHERE "VM ID" = 'vm-001' ORDER BY "Mac Address"`)
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -408,11 +460,11 @@ func TestIngestSqlite_NICsGetPerNICIPsFromGuestNetworks(t *testing.T) {
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "10.0.0.1", nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
-	assert.Equal(t, "10.0.0.2", nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
+	assert.Equal(t, []interface{}{"10.0.0.1/24"}, nics[0].ipv4, "first NIC should have its own IP from GuestNetworks")
+	assert.Equal(t, []interface{}{"10.0.0.2/24"}, nics[1].ipv4, "second NIC should have its own IP, not the VM primary IP")
 }
 
-func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
+func TestIngestSqlite_NICsDoNotUsePrimaryIPWhenGuestNetworksEmpty(t *testing.T) {
 	ctx := context.Background()
 	parser, db, cleanup := setupTestParser(t, &testValidator{})
 	defer cleanup()
@@ -430,7 +482,7 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:01","order":0,"deviceKey":200},` +
 				`{"network":{"kind":"Network","id":"net-1"},"mac":"bb:cc:dd:ee:ff:02","order":1,"deviceKey":201}` +
 				`]`,
-			// guestNetworks intentionally empty — should fall back to v.IpAddress
+			// Guest data is absent; the VM primary IP does not identify an adapter.
 		},
 	}
 	sqlitePath := createTestSQLite(t, "vcenter-uuid-002", clusters, vms)
@@ -440,11 +492,14 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 	require.True(t, result.IsValid())
 
 	rows, err := db.QueryContext(ctx,
-		`SELECT "Mac Address", "IPv4 Address" FROM vnetwork WHERE "VM ID" = 'vm-002' ORDER BY "Mac Address"`)
+		`SELECT "Mac Address", "IPv4 Addresses" FROM vnetwork WHERE "VM ID" = 'vm-002' ORDER BY "Mac Address"`)
 	require.NoError(t, err)
 	defer func() { _ = rows.Close() }()
 
-	type nicRow struct{ mac, ipv4 string }
+	type nicRow struct {
+		mac  string
+		ipv4 []interface{}
+	}
 	var nics []nicRow
 	for rows.Next() {
 		var r nicRow
@@ -454,8 +509,8 @@ func TestIngestSqlite_NICsFallBackToPrimaryIPWhenGuestNetworksEmpty(t *testing.T
 	require.NoError(t, rows.Err())
 
 	require.Len(t, nics, 2)
-	assert.Equal(t, "192.168.1.50", nics[0].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
-	assert.Equal(t, "192.168.1.50", nics[1].ipv4, "should fall back to VM primary IP when GuestNetworks is empty")
+	assert.Empty(t, nics[0].ipv4, "missing guest data must not borrow the VM primary IP")
+	assert.Empty(t, nics[1].ipv4, "missing guest data must not borrow the VM primary IP")
 }
 
 func TestIngestSqlite_VHostReadsVMotionFromForklift(t *testing.T) {
@@ -512,7 +567,7 @@ func TestIngestSqlite_StandaloneHostDetection(t *testing.T) {
 				require.NoError(t, err)
 				_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 				require.NoError(t, err)
-				_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+				_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`)
 				require.NoError(t, err)
 				require.NoError(t, func() error { _, err := sdb.Exec("DETACH dst"); return err }())
 			}
@@ -542,7 +597,7 @@ func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.Cluster (ID, Name, Variant, Parent) VALUES ('domain-s10', 'esxi-standalone.example.com', 'ComputeResource', '{"id":"folder-1"}')`)
 	require.NoError(t, err)
-	_, err = sdb.Exec(`INSERT INTO dst.Host VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true)`)
+	_, err = sdb.Exec(`INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, MemoryBytes, Model, Vendor, Datastores, VMotionSupported, StorageVMotionSupported, Network) VALUES ('host-standalone', 'domain-s10', 8, 2, 34359738368, 'ESXi', 'VMware', '[]', true, true, '{}')`)
 	require.NoError(t, err)
 	_, err = sdb.Exec(`INSERT INTO dst.VM (
 		ID, Name, Folder, Host, UUID, Firmware, PowerState, ConnectionState,
@@ -635,6 +690,41 @@ func TestIngestSqlite_FaultToleranceEnabledMapping(t *testing.T) {
 	assert.False(t, vmMap["vm-ft-off"].FaultToleranceEnabled)
 }
 
+func TestIngestSqlite_HostDatacenter(t *testing.T) {
+	for _, variant := range []string{"ClusterComputeResource", "ComputeResource"} {
+		t.Run(variant, func(t *testing.T) {
+			parser, db, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vc-1",
+				[]sqliteCluster{{id: "domain-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}},
+			)
+			src, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = src.Close() }()
+			_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+			require.NoError(t, err)
+			_, err = src.Exec(`UPDATE dst.Cluster SET Variant = ?`, variant)
+			require.NoError(t, err)
+			_, err = src.Exec("DETACH dst")
+			require.NoError(t, err)
+
+			_, err = parser.IngestSqlite(context.Background(), sqlitePath)
+			require.NoError(t, err)
+			var datacenter sql.NullString
+			var cluster sql.NullString
+			require.NoError(t, db.QueryRow(`SELECT "Datacenter", "Cluster" FROM vhost WHERE "Object ID" = 'host-1'`).Scan(&datacenter, &cluster))
+			require.True(t, datacenter.Valid, "the host's parent chain must resolve its datacenter")
+			require.Equal(t, "dc1", datacenter.String)
+			if variant == "ComputeResource" {
+				require.Empty(t, cluster.String, "a standalone host must not expose its synthetic cluster")
+			} else {
+				require.Equal(t, "cluster1", cluster.String)
+			}
+		})
+	}
+}
+
 func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {
 	ctx := context.Background()
 	parser, db, cleanup := setupTestParser(t, &testValidator{})
@@ -672,4 +762,269 @@ func TestIngestSqlite_DatastoreIORMValues(t *testing.T) {
 
 	assert.True(t, siocEnabled, "SIOC Enabled should be true")
 	assert.Equal(t, 50, congestionThreshold, "SIOC Congestion Threshold should be 50, not the default 30")
+}
+
+func TestIngestSqlite_CollectionTime(t *testing.T) {
+	ctx := context.Background()
+	first := time.Date(2026, 10, 1, 10, 0, 0, 0, time.UTC)
+	for _, createdAt := range []time.Time{first, first.Add(24 * time.Hour)} {
+		parser, db, cleanup := setupTestParser(t, nil)
+		t.Cleanup(cleanup)
+		sqlitePath := createTestSQLite(t, "vc-1",
+			[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+			[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}})
+		result, err := parser.IngestSqlite(ctx, sqlitePath)
+		require.NoError(t, err)
+		require.True(t, result.IsValid())
+		_, err = db.ExecContext(ctx, `UPDATE about SET "CollectionTime" = ?`, createdAt)
+		require.NoError(t, err)
+		for _, vmIDs := range [][]string{nil, {"vm-1"}} {
+			inv, err := New(db, nil).BuildInventory(ctx, vmIDs)
+			require.NoError(t, err)
+			require.Equal(t, &createdAt, inv.CollectionTime)
+			require.True(t, inv.CreatedAt.After(createdAt))
+		}
+	}
+}
+
+func TestIngestSqlite_DatastoreOptionalStorageColumns(t *testing.T) {
+	tests := []struct {
+		name               string
+		missing            []string
+		wantVMFSFilesystem string
+		wantVMFSVersion    int32
+		wantNFSFilesystem  string
+		wantVVolProtocol   string
+	}{
+		{name: "current snapshot", wantVMFSFilesystem: "VMFS", wantVMFSVersion: 6, wantNFSFilesystem: "NFS41", wantVVolProtocol: "SCSI"},
+		{name: "missing filesystem type", missing: []string{"FilesystemType"}, wantVMFSVersion: 6, wantVVolProtocol: "SCSI"},
+		{name: "missing filesystem version", missing: []string{"FilesystemMajorVersion"}, wantVMFSFilesystem: "VMFS", wantNFSFilesystem: "NFS41", wantVVolProtocol: "SCSI"},
+		{name: "missing endpoint protocol", missing: []string{"ProtocolEndpointType"}, wantVMFSFilesystem: "VMFS", wantVMFSVersion: 6, wantNFSFilesystem: "NFS41", wantVVolProtocol: "N/A"},
+		{name: "legacy snapshot", missing: []string{"FilesystemType", "FilesystemMajorVersion", "ProtocolEndpointType"}, wantVVolProtocol: "N/A"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			sqlitePath := createTestSQLite(t, "vcenter-1",
+				[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+				[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}},
+			)
+			src, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = src.Close() }()
+			exec := func(query string, args ...any) {
+				t.Helper()
+				_, err := src.Exec(query, args...)
+				require.NoError(t, err)
+			}
+			exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+			exec(`INSERT INTO dst.Datastore (ID, Name, Type, FilesystemType, FilesystemMajorVersion,
+				ProtocolEndpointType, Free, Capacity, BackingDevicesNames)
+				VALUES ('ds-vmfs', 'vmfs-ds', 'VMFS', 'VMFS', 6, '', 1073741824, 2147483648, '["naa.shared"]'),
+				       ('ds-vvol', 'vvol-ds', 'VVOL', 'VVOL', 0, 'SCSI', 1073741824, 2147483648, '[]'),
+				       ('ds-nfs', 'nfs-ds', 'NFS', 'NFS41', 0, '', 1073741824, 2147483648, '[]')`)
+			exec(`UPDATE dst.Host SET Datastores = ?, HbaDiskInfo = ?, HostScsiTopology = ?, HostScsiDisks = ? WHERE ID = 'host-1'`,
+				`[{"id":"ds-vmfs"},{"id":"ds-vvol"},{"id":"ds-nfs"}]`,
+				`[{"key":"hba-1","hbaDevice":"vmhba64","protocol":"iSCSI","model":"Software Adapter"}]`,
+				`[{"key":"hba-1","scsiDiskKeys":["lun-1"]}]`,
+				`[{"key":"lun-1","canonicalName":"naa.shared","vendor":"NETAPP","model":"LUN C-Mode"}]`)
+			exec(`UPDATE dst.VM SET Disks = ? WHERE ID = 'vm-1'`,
+				`[{"key":2000,"file":"[vmfs-ds] vm1/disk.vmdk","capacity":1073741824,"bus":"scsi","mode":"persistent"}]`)
+			for _, column := range tt.missing {
+				exec(fmt.Sprintf(`ALTER TABLE dst.Datastore DROP COLUMN "%s"`, column))
+			}
+			exec("DETACH dst")
+
+			result, err := parser.IngestSqlite(ctx, sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "%v", result.Errors)
+			var count int
+			require.NoError(t, db.QueryRow(`SELECT count(*) FROM vdatastore`).Scan(&count))
+			require.Equal(t, 3, count, "missing optional columns must not drop datastore rows")
+
+			for _, filters := range []Filters{{}, {Cluster: "cluster1"}} {
+				datastores, err := parser.Datastores(ctx, filters, Options{})
+				require.NoError(t, err)
+				require.Len(t, datastores, 3)
+				byName := make(map[string]models.Datastore, len(datastores))
+				for _, ds := range datastores {
+					byName[ds.DiskId] = ds
+				}
+				vmfs := byName["vmfs-ds"]
+				require.Equal(t, "VMFS", vmfs.Type)
+				require.Equal(t, tt.wantVMFSFilesystem, vmfs.FilesystemType)
+				require.Equal(t, tt.wantVMFSVersion, vmfs.FilesystemMajorVersion)
+				require.Equal(t, "iSCSI", vmfs.ProtocolType)
+				require.Equal(t, "NETAPP", vmfs.Vendor)
+				require.Equal(t, "LUN C-Mode", vmfs.Model)
+				require.Equal(t, models.BackingDeviceIDs{"naa.shared"}, vmfs.BackingDeviceIDs)
+				require.Equal(t, "NFS", byName["nfs-ds"].ProtocolType)
+				require.Equal(t, tt.wantNFSFilesystem, byName["nfs-ds"].FilesystemType)
+				require.Equal(t, tt.wantVVolProtocol, byName["vvol-ds"].ProtocolType)
+			}
+
+			var capacity, free int64
+			require.NoError(t, db.QueryRow(`SELECT "Capacity MiB", "Free MiB" FROM vdatastore WHERE "Object ID" = 'ds-vmfs'`).Scan(&capacity, &free))
+			require.Equal(t, int64(2048), capacity)
+			require.Equal(t, int64(1024), free)
+			vms, err := parser.VMs(ctx, Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, vms, 1)
+			require.Len(t, vms[0].Disks, 1)
+			disk := vms[0].Disks[0]
+			require.Equal(t, "ds-vmfs", disk.Datastore.ID)
+			require.Equal(t, tt.wantVMFSFilesystem, disk.DatastoreFilesystemType)
+			require.Equal(t, tt.wantVMFSVersion, disk.DatastoreFilesystemMajorVersion)
+			require.Equal(t, "iSCSI", disk.DatastoreStorageProtocol)
+			require.Equal(t, "NETAPP", disk.DatastoreVendor)
+			require.Equal(t, "LUN C-Mode", disk.DatastoreModel)
+			require.Equal(t, []string{"naa.shared"}, disk.DatastoreBackingDeviceIDs)
+		})
+	}
+}
+
+func TestIngestSqlite_NICCountAndAdapterModels(t *testing.T) {
+	ctx := context.Background()
+	parser, db, cleanup := setupTestParser(t, &testValidator{})
+	defer cleanup()
+
+	clusters := []sqliteCluster{{id: "domain-c1", name: "cluster1", datacenter: "dc1"}}
+	vms := []sqliteVM{
+		{id: "vm-nics", name: "with-nics", clusterName: "cluster1", nics: `[
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:01","deviceKey":100},
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:02","deviceKey":101},
+            {"network":{"id":"net-1"},"mac":"aa:00:00:00:00:03","deviceKey":102}]`},
+		{id: "vm-empty", name: "without-nics", clusterName: "cluster1"},
+		{id: "vm-null", name: "null-nics", clusterName: "cluster1"},
+	}
+	sqlitePath := createTestSQLite(t, "vcenter-nic-models", clusters, vms)
+	src, err := sql.Open("duckdb", "")
+	require.NoError(t, err)
+	defer func() { _ = src.Close() }()
+	_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
+	require.NoError(t, err)
+	_, err = src.Exec(`UPDATE dst.VM SET Devices = '[
+        {"key":101,"kind":"VirtualE1000"},
+        {"key":900,"kind":"VirtualSriovEthernetCard"},
+        {"key":100,"kind":"VirtualVmxnet3"},
+        {"key":100,"kind":"VirtualVmxnet3"}]' WHERE ID = 'vm-nics'`)
+	require.NoError(t, err)
+	_, err = src.Exec(`UPDATE dst.VM SET NICs = NULL WHERE ID = 'vm-null'`)
+	require.NoError(t, err)
+	_, err = src.Exec(`INSERT INTO dst.Network VALUES ('net-1', 'Production', NULL, '0')`)
+	require.NoError(t, err)
+	_, err = src.Exec("DETACH dst")
+	require.NoError(t, err)
+
+	result, err := parser.IngestSqlite(ctx, sqlitePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-nics'`).Scan(&count))
+	assert.Equal(t, 3, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-empty'`).Scan(&count))
+	assert.Zero(t, count)
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "NICs" FROM vinfo WHERE "VM ID" = 'vm-null'`).Scan(&count))
+	assert.Zero(t, count)
+	var cpus, memory int
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT "CPUs", "Memory" FROM vinfo WHERE "VM ID" = 'vm-nics'`).Scan(&cpus, &memory))
+	assert.Equal(t, 4, cpus)
+	assert.Equal(t, 8192, memory)
+
+	rows, err := db.QueryContext(ctx, `SELECT "Mac Address", "Network", "Adapter" FROM vnetwork ORDER BY "Mac Address"`)
+	require.NoError(t, err)
+	defer func() { _ = rows.Close() }()
+	var adapters []sql.NullString
+	for rows.Next() {
+		var mac, network string
+		var adapter sql.NullString
+		require.NoError(t, rows.Scan(&mac, &network, &adapter))
+		assert.Equal(t, "Production", network)
+		adapters = append(adapters, adapter)
+	}
+	require.NoError(t, rows.Err())
+	require.Len(t, adapters, 3)
+	assert.Equal(t, sql.NullString{String: "Vmxnet3", Valid: true}, adapters[0])
+	assert.Equal(t, sql.NullString{String: "E1000", Valid: true}, adapters[1])
+	assert.False(t, adapters[2].Valid, "missing device model must stay unknown")
+}
+
+func TestIngestSqlite_HostFacts(t *testing.T) {
+	tests := []struct {
+		name             string
+		hostFactsColumns bool
+		cpuModel         string
+		serial           string
+		serviceTag       string
+		wantCPU          string
+		wantSerial       string
+		wantCores        int
+		wantSockets      int
+		wantMemoryMB     int
+	}{
+		{name: "hardware serial takes precedence", hostFactsColumns: true, cpuModel: " Xeon Gold 6338 ", serial: " SN-1 ", serviceTag: "TAG-1", wantCPU: "Xeon Gold 6338", wantSerial: "SN-1", wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "service tag fills absent serial", hostFactsColumns: true, cpuModel: "Xeon Silver", serviceTag: " TAG-2 ", wantCPU: "Xeon Silver", wantSerial: "TAG-2", wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "empty facts remain unknown", hostFactsColumns: true, wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "older source without host fact columns", wantCores: 8, wantSockets: 2, wantMemoryMB: 32768},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			sqlitePath := createTestSQLite(t, "vc-1", []sqliteCluster{{id: "cluster-1", name: "cluster-a", datacenter: "dc-a"}}, []sqliteVM{{id: "vm-1", name: "vm-1", clusterName: "cluster-a"}})
+			sourceDB, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = sourceDB.Close() }()
+			_, err = sourceDB.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", escapeSQLString(sqlitePath)))
+			require.NoError(t, err)
+			if tt.hostFactsColumns {
+				_, err = sourceDB.Exec(`ALTER TABLE dst.Host ADD COLUMN CpuModel VARCHAR;
+ALTER TABLE dst.Host ADD COLUMN SerialNumber VARCHAR;
+ALTER TABLE dst.Host ADD COLUMN ServiceTag VARCHAR;
+DELETE FROM dst.Host WHERE ID = 'host-1';
+INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, CpuModel, SerialNumber, ServiceTag, MemoryBytes, Model, Vendor)
+VALUES ('host-1', 'cluster-1', 32, 2, ?, ?, ?, 137438953472, 'PowerEdge R740', 'Dell')`, tt.cpuModel, tt.serial, tt.serviceTag)
+				require.NoError(t, err)
+			}
+			require.NoError(t, sourceDB.Close())
+
+			result, err := parser.IngestSqlite(context.Background(), sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "Forklift validation failed: %v", result.Errors)
+
+			hosts, err := parser.Hosts(context.Background(), Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, hosts, 1)
+			var persistedHosts int
+			require.NoError(t, parser.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM vhost`).Scan(&persistedHosts))
+			require.Equal(t, 1, persistedHosts, "source compatibility must not drop the vhost row")
+			assert.Equal(t, "host-1", hosts[0].Id)
+			assert.Equal(t, "dc-a", hosts[0].Datacenter)
+			assert.Equal(t, "cluster-a", hosts[0].Cluster)
+			assert.Equal(t, tt.wantCPU, hosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, hosts[0].SerialNumber)
+			assert.Equal(t, tt.wantCores, hosts[0].CpuCores)
+			assert.Equal(t, tt.wantSockets, hosts[0].CpuSockets)
+			assert.Equal(t, tt.wantMemoryMB, hosts[0].MemoryMB)
+
+			built, err := parser.BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, built.VCenter)
+			require.Len(t, built.VCenter.Infra.Hosts, 1)
+			assert.Equal(t, tt.wantCPU, built.VCenter.Infra.Hosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, built.VCenter.Infra.Hosts[0].SerialNumber)
+			var clusterHosts []inventory.Host
+			for _, cluster := range built.Clusters {
+				clusterHosts = append(clusterHosts, cluster.Infra.Hosts...)
+			}
+			require.Len(t, clusterHosts, 1)
+			assert.Equal(t, tt.wantCPU, clusterHosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, clusterHosts[0].SerialNumber)
+		})
+	}
 }

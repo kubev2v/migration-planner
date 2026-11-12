@@ -68,36 +68,53 @@ func (vm VM) EffectiveGuestName() string {
 	return vm.GuestName
 }
 
+// RDMBacking identifies the LUN directly reported by an RDM disk backing.
+type RDMBacking struct {
+	LunUUID string `json:"lunUuid,omitempty"`
+}
+
 // Disk represents a virtual disk from the vdisk table.
 type Disk struct {
-	Key                   string `json:"key" db:"Disk Key"`
-	UnitNumber            int32  `json:"unitNumber" db:"Unit #"` // Changed to int32 for OPA
-	ControllerKey         int32  `json:"controllerKey"`          // Populated by scanner using ControllerTracker
-	File                  string `json:"file" db:"Path"`
-	Capacity              int64  `json:"capacity" db:"Capacity MiB"` // SQL returns bytes
-	Shared                bool   `json:"shared" db:"Sharing mode"`
-	RDM                   bool   `json:"rdm" db:"Raw"`
-	Bus                   string `json:"bus" db:"Shared Bus"` // Populated by scanner using ControllerTracker
-	Mode                  string `json:"mode,omitempty" db:"Disk Mode"`
-	Serial                string `json:"serial" db:"Disk UUID"`
-	Thin                  string `json:"thin" db:"Thin"`
-	Controller            string `json:"controller" db:"Controller"`
-	Label                 string `json:"label" db:"Label"`
-	SCSIUnit              string `json:"scsiUnit" db:"SCSI Unit #"`
-	Datastore             Ref    `json:"datastore"`             // Changed from string to Ref
-	ChangeTrackingEnabled bool   `json:"changeTrackingEnabled"` // Inherited from VM for OPA per-disk CBT check
+	Key                             string      `json:"key" db:"Disk Key"`
+	UnitNumber                      int32       `json:"unitNumber" db:"Unit #"` // Changed to int32 for OPA
+	ControllerKey                   int32       `json:"controllerKey"`          // Populated by scanner using ControllerTracker
+	File                            string      `json:"file" db:"Path"`
+	Capacity                        int64       `json:"capacity" db:"Capacity MiB"` // SQL returns bytes
+	Shared                          bool        `json:"shared" db:"Sharing mode"`
+	RDM                             bool        `json:"rdm" db:"Raw"`
+	RDMBacking                      *RDMBacking `json:"rdmBacking,omitempty"`
+	Bus                             string      `json:"bus" db:"Shared Bus"` // Populated by scanner using ControllerTracker
+	Mode                            string      `json:"mode,omitempty" db:"Disk Mode"`
+	Serial                          string      `json:"serial" db:"Disk UUID"`
+	Thin                            string      `json:"thin" db:"Thin"`
+	Controller                      string      `json:"controller" db:"Controller"`
+	Label                           string      `json:"label" db:"Label"`
+	SCSIUnit                        string      `json:"scsiUnit" db:"SCSI Unit #"`
+	Datastore                       Ref         `json:"datastore"` // Changed from string to Ref
+	DatastoreName                   string      `json:"datastoreName,omitempty"`
+	DatastoreType                   string      `json:"datastoreType,omitempty"`
+	DatastoreFilesystemType         string      `json:"datastoreFilesystemType,omitempty"`
+	DatastoreFilesystemMajorVersion int32       `json:"datastoreFilesystemMajorVersion,omitempty"`
+	DatastoreStorageProtocol        string      `json:"datastoreStorageProtocol,omitempty"`
+	DatastoreBackingDeviceIDs       []string    `json:"datastoreBackingDeviceIds,omitempty"`
+	DatastoreVendor                 string      `json:"datastoreVendor,omitempty"`
+	DatastoreModel                  string      `json:"datastoreModel,omitempty"`
+	ChangeTrackingEnabled           bool        `json:"changeTrackingEnabled"` // Inherited from VM for OPA per-disk CBT check
 }
 
 // NIC represents a network interface from the vnetwork table.
+// IPv4Addresses and IPv6Addresses treat reported values as adapter IP addresses.
+// An IP address may also contain a CIDR suffix; values are not parsed as network ranges.
 type NIC struct {
-	Network         Ref    `json:"network"` // Changed from string to Ref
-	MAC             string `json:"mac" db:"Mac Address"`
-	Label           string `json:"label" db:"NIC label"`
-	Adapter         string `json:"adapter" db:"Adapter"`
-	Switch          string `json:"switch" db:"Switch"`
-	Connected       bool   `json:"connected" db:"Connected"`
-	StartsConnected bool   `json:"startsConnected" db:"Starts Connected"`
-	Type            string `json:"type" db:"Type"`
-	IPv4Address     string `json:"ipv4Address" db:"IPv4 Address"`
-	IPv6Address     string `json:"ipv6Address" db:"IPv6 Address"`
+	Network         Ref      `json:"network"` // Changed from string to Ref
+	MAC             string   `json:"mac" db:"Mac Address"`
+	Label           string   `json:"label" db:"NIC label"`
+	Adapter         string   `json:"adapter" db:"Adapter"`
+	Switch          string   `json:"switch" db:"Switch"`
+	Connected       bool     `json:"connected" db:"Connected"`
+	StartsConnected bool     `json:"startsConnected" db:"Starts Connected"`
+	Type            string   `json:"type" db:"Type"`
+	IPv4Addresses   []string `json:"ipv4Addresses" db:"IPv4 Addresses"`
+	IPv6Addresses   []string `json:"ipv6Addresses" db:"IPv6 Addresses"`
+	VlanID          string   `json:"vlanId" db:"VLAN"`
 }

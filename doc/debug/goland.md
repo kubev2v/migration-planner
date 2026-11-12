@@ -27,8 +27,7 @@ Click **Run → Edit Configurations → ➕ icon**. Then, Follow the instruction
 
 1. Add a new **Go Build** configuration.
 2. Give it a name
-3. For the API, Change the package path to: "`github.com/kubev2v/migration-planner/cmd/planner-api`"  
-For the Agent, the code is now in the `agent-v2` submodule. You can debug it by opening the submodule directory in GoLand or by setting the working directory to `agent-v2` and using the main package path from the submodule.
+3. For the API, change the package path to: "`github.com/kubev2v/migration-planner/cmd/planner-api`".
 4. Only for the API add "`run`" as Program Argument 
 5. Click apply
 
@@ -37,9 +36,10 @@ For the Agent, the code is now in the `agent-v2` submodule. You can debug it by 
 1. Add a new **Go Remote** configuration.
 2. Give it a name
 3. For the API, change the host to "localhost" and port to **40000**   
-For the Agent, change the host to VM IP and port to **40001**
 4. Click apply
 
 ## Step 4: Start Debugging Session
 
 Click **Debug** on the remote configuration. GoLand will connect to the remote `dlv` server.
+
+For agent development and debugging, open a separate checkout of [assisted-migration-agent](https://github.com/kubev2v/assisted-migration-agent) and follow its instructions.

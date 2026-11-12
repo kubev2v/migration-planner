@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
@@ -13,12 +14,12 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/kubev2v/migration-planner/internal/auth"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser"
-	"github.com/kubev2v/migration-planner/pkg/inventory/converters"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	pkgstore "github.com/kubev2v/migration-planner/pkg/store"
 )
@@ -52,7 +53,10 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 	// Create per-job DuckDB instance for isolation
 	parser, duckDB, err := w.createParser()
 	if err != nil {
-		return w.failJob(ctx, logger, job.ID, "create_parser", err, fmt.Sprintf("failed to create DuckDB parser: %v", err))
+		return w.failJob(ctx, logger, job.ID, "create_parser", &duckdb_parser.RVToolsProcessingError{
+			Stage: duckdb_parser.RVToolsStageInitialization,
+			Cause: err,
+		}, "Could not start processing the RVTools file")
 	}
 	defer func() {
 		_ = duckDB.Close()
@@ -64,23 +68,24 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		logger.Error(err).WithString("step", "update_parsing_status").Log()
 	}
 
-	parsingErr := NewRVToolParsingError()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	result, err := w.parseFile(ctx, parser, job.Args.File, logger)
 	if err != nil {
-		parsingErr.Add(job.Args.Name, err)
+		return w.failJob(ctx, logger, job.ID, "parse_files", &duckdb_parser.RVToolsProcessingError{
+			Stage:    duckdb_parser.RVToolsStageParsing,
+			Filename: job.Args.File,
+			Cause:    err,
+		}, duckdb_parser.RVToolsFailureMessage)
 	}
-
-	if cleanupErr := parser.Cleanup(); cleanupErr != nil {
-		logger.Error(cleanupErr).WithString("step", "cleanup").WithString("file", job.Args.File).Log()
-		parsingErr.Add(job.Args.Name, err)
-	}
-
-	if parsingErr.HasErrors() {
-		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, parsingErr.Error())
+	if err := parser.Cleanup(); err != nil {
+		return w.failJob(ctx, logger, job.ID, "cleanup", &duckdb_parser.RVToolsProcessingError{
+			Stage:    duckdb_parser.RVToolsStageCleanup,
+			Filename: job.Args.File,
+			Cause:    err,
+		}, duckdb_parser.RVToolsFailureMessage)
 	}
 
 	// Check for cancellation before creating assessment
@@ -94,22 +99,21 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		logger.Step("creating_assessment").Log()
 		assessmentID := uuid.New()
 
-		assessmentInv, err := model.NewAssessmentInventory(uuid.New(), assessmentID, job.Args.Name, false, result)
-		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
-		}
+		assessmentInv := svcmodel.NewAssessmentInventory(uuid.New(), assessmentID, job.Args.Name, svcmodel.InventoryVersionV2, false, *result)
+
 		// The initial aggregate is the same inventory as its first vCenter subset.
 		subsetInv := assessmentInv
 		subsetInv.ID = uuid.New()
 		subsetInv.IsSubset = true
 
 		createForm := mappers.AssessmentCreateForm{
-			ID:          assessmentID,
-			Name:        job.Args.Name,
-			OrgID:       job.Args.OrgID,
-			Username:    job.Args.Username,
-			SourceType:  "rvtools",
-			Inventories: []model.AssessmentInventory{assessmentInv, subsetInv},
+			ID:                assessmentID,
+			Name:              job.Args.Name,
+			OrgID:             job.Args.OrgID,
+			Username:          job.Args.Username,
+			SourceType:        "rvtools",
+			MainInventory:     assessmentInv,
+			SubsetInventories: []svcmodel.AssessmentInventory{subsetInv},
 		}
 		if job.Args.FirstName != "" {
 			createForm.OwnerFirstName = &job.Args.FirstName
@@ -124,7 +128,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		})
 		createdAssessment, err := w.assessmentSvc.CreateAssessment(svcCtx, createForm)
 		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "create_assessment", err, fmt.Sprintf("failed to create assessment: %v", err))
+			return w.failJob(ctx, logger, job.ID, "create_assessment", err, "failed to create assessment")
 		}
 
 		if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &createdAssessment.ID); err != nil {
@@ -143,17 +147,14 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 		// Assessment itself is updated to update the "update_at" field.
 		logger.Step("updating_assessment").Log()
 
-		subsetInv, err := model.NewAssessmentInventory(uuid.New(), job.Args.AssessmentID, job.Args.Name, true, result)
-		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "build_inventory_model", err, fmt.Sprintf("failed to build inventory model: %v", err))
-		}
+		subsetInv := svcmodel.NewAssessmentInventory(uuid.New(), job.Args.AssessmentID, job.Args.Name, svcmodel.InventoryVersionV2, true, *result)
 
 		assessment, err := w.store.Assessment().Get(ctx, job.Args.AssessmentID)
 		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "get_assessment", err, fmt.Sprintf("failed to get assessment: %v", err))
+			return w.failJob(ctx, logger, job.ID, "get_assessment", err, "failed to get assessment")
 		}
 
-		for _, existing := range assessment.Inventories {
+		for _, existing := range assessment.SubsetInventories {
 			if existing.IsSubset && existing.VCenterID == subsetInv.VCenterID {
 				subsetInv.ID = existing.ID
 				break
@@ -162,14 +163,14 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 
 		txCtx, err := w.store.NewTransactionContext(ctx)
 		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "begin_transaction", err, fmt.Sprintf("failed to begin transaction: %v", err))
+			return w.failJob(ctx, logger, job.ID, "begin_transaction", err, "failed to begin transaction")
 		}
 		defer func() {
 			_, _ = store.Rollback(txCtx)
 		}()
 
 		if err := w.store.Assessment().UpsertInventories(txCtx, subsetInv); err != nil {
-			return w.failJob(ctx, logger, job.ID, "upsert_subset_inventory", err, fmt.Sprintf("failed to upsert subset inventory: %v", err))
+			return w.failJob(ctx, logger, job.ID, "upsert_subset_inventory", err, "failed to upsert subset inventory")
 		}
 
 		svcCtx := auth.NewTokenContext(txCtx, auth.User{
@@ -179,19 +180,19 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 
 		mainInv, err := w.assessmentSvc.AggregateInventories(svcCtx, job.Args.AssessmentID)
 		if err != nil {
-			return w.failJob(ctx, logger, job.ID, "aggregate_inventories", err, fmt.Sprintf("failed to aggregate inventories: %v", err))
+			return w.failJob(ctx, logger, job.ID, "aggregate_inventories", err, "failed to aggregate inventories")
 		}
 
 		if err := w.store.Assessment().UpsertInventories(txCtx, mainInv); err != nil {
-			return w.failJob(ctx, logger, job.ID, "upsert_main_inventory", err, fmt.Sprintf("failed to upsert main inventory: %v", err))
+			return w.failJob(ctx, logger, job.ID, "upsert_main_inventory", err, "failed to upsert main inventory")
 		}
 
 		if _, err := w.store.Assessment().Update(txCtx, job.Args.AssessmentID, &assessment.Name, nil); err != nil {
-			return w.failJob(ctx, logger, job.ID, "update_assessment_timestamp", err, fmt.Sprintf("failed to update assessment: %v", err))
+			return w.failJob(ctx, logger, job.ID, "update_assessment_timestamp", err, "failed to update assessment")
 		}
 
 		if _, err := store.Commit(txCtx); err != nil {
-			return w.failJob(ctx, logger, job.ID, "commit_transaction", err, fmt.Sprintf("failed to commit transaction: %v", err))
+			return w.failJob(ctx, logger, job.ID, "commit_transaction", err, "failed to commit transaction")
 		}
 
 		if err := w.updateJobStatus(ctx, job.ID, model.JobStatusCompleted, "", &job.Args.AssessmentID); err != nil {
@@ -202,7 +203,7 @@ func (w *RVToolsWorker) Work(ctx context.Context, job *river.Job[model.RVToolsJo
 			WithUUID("assessment_id", job.Args.AssessmentID).
 			Log()
 	default:
-		return w.failJob(ctx, logger, job.ID, "parse_files", parsingErr, "invalid operation type")
+		return w.failJob(ctx, logger, job.ID, "parse_files", fmt.Errorf("invalid operation type"), "invalid operation type")
 	}
 
 	return nil
@@ -239,24 +240,42 @@ func (w *RVToolsWorker) createParser() (*duckdb_parser.Parser, *sql.DB, error) {
 
 // failJob logs an error, updates job status to failed, and returns the error.
 func (w *RVToolsWorker) failJob(ctx context.Context, logger *log.OperationTracer, jobID int64, step string, err error, errMsg string) error {
-	logger.Error(err).WithString("step", step).Log()
-	if updateErr := w.updateJobStatus(ctx, jobID, model.JobStatusFailed, errMsg, nil); updateErr != nil {
+	message := errMsg
+	entry := logger.Error(err).WithString("step", step)
+	var processing *duckdb_parser.RVToolsProcessingError
+	var validation *duckdb_parser.SchemaValidationError
+	var workbook *duckdb_parser.XLSXError
+
+	switch {
+	case errors.As(err, &processing) && processing.Stage != duckdb_parser.RVToolsStageParsing:
+		// Initialization and cleanup keep the caller's safe message.
+	case errors.As(err, &validation):
+		if text := validation.Error(); text != "" {
+			message = text
+		}
+		entry.WithParam("validation_errors", validation.Result.Errors)
+	case errors.As(err, &workbook):
+		message = workbook.Error()
+		entry.WithString("cause", fmt.Sprint(workbook.Cause))
+	}
+
+	var duplicate *service.ErrDuplicateKey
+	if step == "create_assessment" && errors.As(err, &duplicate) {
+		message = duplicate.Error()
+	}
+
+	entry.Log()
+	if updateErr := w.updateJobStatus(ctx, jobID, model.JobStatusFailed, message, nil); updateErr != nil {
 		logger.Error(updateErr).WithString("step", "update_failed_status").Log()
 	}
 	return err
 }
 
-func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) ([]byte, error) {
+func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Parser, filepath string, logger *log.OperationTracer) (*svcmodel.Inventory, error) {
 	// Ingest RVTools file using duckdb_parser
 	validationResult, err := parser.IngestRvTools(ctx, filepath)
 	if err != nil {
-		return []byte{}, err
-	}
-
-	// Check for validation errors
-	if validationResult.HasErrors() {
-		validationErr := fmt.Errorf("validation failed: %v", validationResult.Errors)
-		return []byte{}, validationErr
+		return nil, err
 	}
 
 	// Log any warnings
@@ -268,17 +287,10 @@ func (w *RVToolsWorker) parseFile(ctx context.Context, parser *duckdb_parser.Par
 	logger.Step("building_inventory").Log()
 	inv, err := parser.BuildInventory(ctx, nil)
 	if err != nil {
-		return []byte{}, err
-	}
-	inventory := converters.ToAPI(inv)
-
-	// Marshal inventory to JSON
-	inventoryJSON, err := json.Marshal(inventory)
-	if err != nil {
-		return []byte{}, err
+		return nil, err
 	}
 
-	return inventoryJSON, nil
+	return mappers.InventoryFromDuckDB(inv), nil
 }
 
 // updateJobStatus updates the job's metadata with the current status using job store.

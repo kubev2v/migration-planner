@@ -1,13 +1,18 @@
 package duckdb_parser
 
 import (
+	"archive/zip"
+	"bytes"
 	"context"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 	"github.com/stretchr/testify/assert"
@@ -16,6 +21,7 @@ import (
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/inventory"
+	"github.com/kubev2v/migration-planner/pkg/store"
 )
 
 // testValidator returns no concerns for all VMs.
@@ -81,6 +87,9 @@ func setupTestParser(t *testing.T, validator Validator) (*Parser, *sql.DB, func(
 
 	parser := New(db, validator)
 	require.NoError(t, parser.Init())
+	// SQLite callers provide the category lookup table, even when no names are available.
+	_, err = db.Exec(`CREATE TABLE tag_categories (id VARCHAR, name VARCHAR)`)
+	require.NoError(t, err)
 
 	cleanup := func() {
 		_ = db.Close()
@@ -449,19 +458,12 @@ func TestBuildInventory_EmptyData(t *testing.T) {
 
 	ctx := context.Background()
 	result, err := parser.IngestRvTools(ctx, tmpFile)
-	require.NoError(t, err)
-
-	// Schema should have errors due to empty vInfo
-	if result.HasErrors() {
-		// Expected - empty data fails validation
-		return
-	}
-
-	// If no errors, inventory should still be valid but empty
-	inv, err := parser.BuildInventory(ctx, nil)
-	require.NoError(t, err)
-	require.NotNil(t, inv)
-	assert.Equal(t, 0, inv.VCenter.VMs.Total)
+	require.Error(t, err)
+	var validation *SchemaValidationError
+	require.ErrorAs(t, err, &validation)
+	require.Equal(t, CodeNoVMs, validation.Result.Errors[0].Code)
+	require.Equal(t, "No VMs found in vInfo sheet - cannot build inventory without VM data", validation.Result.Errors[0].Message)
+	require.True(t, result.HasErrors())
 }
 
 func TestValidation_ErrorCodes(t *testing.T) {
@@ -562,8 +564,8 @@ func TestValidation_ErrorCodes(t *testing.T) {
 			}
 
 			result, err := parser.IngestRvTools(context.Background(), tmpFile)
-			require.NoError(t, err)
 			require.True(t, result.HasErrors())
+			require.EqualError(t, err, result.Error().Error())
 
 			errorCodes := make(map[string]bool)
 			for _, e := range result.Errors {
@@ -1353,6 +1355,10 @@ func TestBuildInventory_ComplexityDistributionWithDiskSize(t *testing.T) {
 			"Powerstate": "poweredOn", "Cluster": "cluster-b", "Datacenter": "dc-1",
 		},
 	}
+	for _, vm := range vms {
+		vm["VI SDK UUID"] = "test-vcenter-uuid"
+	}
+
 	hosts := []map[string]string{
 		{"Host": "host-1", "Cluster": "cluster-a", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
 		{"Host": "host-2", "Cluster": "cluster-b", "Datacenter": "dc-1", "# Cores": "8", "# CPU": "2", "# Memory": "65536"},
@@ -1595,6 +1601,8 @@ func TestInventory_ExcludesMigrationExcludedVMs(t *testing.T) {
 
 	// Verify OS distribution excludes excluded VMs
 	assert.Equal(t, 2, inv.VCenter.VMs.OSInfo["Red Hat Enterprise Linux 8 (64-bit)"].Count, "RHEL 8 count should exclude excluded VMs")
+	assert.Equal(t, inventory.MTVStatusGreen, inv.VCenter.VMs.OSInfo["Red Hat Enterprise Linux 8 (64-bit)"].MTVStatus)
+	assert.Empty(t, inv.VCenter.VMs.OSInfo["CentOS 7 (64-bit)"].MTVStatus)
 	assert.Equal(t, 1, inv.VCenter.VMs.OSInfo["CentOS 7 (64-bit)"].Count, "CentOS 7 count should exclude excluded VMs")
 	assert.NotContains(t, inv.VCenter.VMs.OSInfo, "Windows Server 2019 (64-bit)", "Windows should not appear as all Windows VMs are excluded")
 
@@ -1627,6 +1635,10 @@ func TestBuildInventory_VMListFilter(t *testing.T) {
 		{"VM": "vm-004", "VM ID": "vm-004", "Powerstate": "poweredOff", "CPUs": "4", "Memory": "8192", "Cluster": "Cluster-B", "Datacenter": "DC1", "OS according to the configuration file": "CentOS 8 (64-bit)", "Total disk capacity MiB": "100000", "In Use MiB": "50000"},
 		{"VM": "vm-005", "VM ID": "vm-005", "Powerstate": "poweredOn", "CPUs": "2", "Memory": "4096", "Cluster": "Cluster-A", "Datacenter": "DC1", "OS according to the configuration file": "Ubuntu 22.04 (64-bit)", "Total disk capacity MiB": "50000", "In Use MiB": "25000"},
 	}
+	for _, vm := range vms {
+		vm["VI SDK UUID"] = "test-vcenter-uuid"
+	}
+
 	hosts := []map[string]string{
 		{"Datacenter": "DC1", "Cluster": "Cluster-A", "# Cores": "16", "# CPU": "2", "Object ID": "host-001", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-1", "Config status": "green"},
 		{"Datacenter": "DC1", "Cluster": "Cluster-B", "# Cores": "16", "# CPU": "2", "Object ID": "host-002", "# Memory": "65536", "Model": "ESXi", "Vendor": "VMware", "Host": "esxi-host-2", "Config status": "green"},
@@ -2328,7 +2340,11 @@ func TestVCenterVersion(t *testing.T) {
 
 		ctx := context.Background()
 		_, err := parser.IngestRvTools(ctx, tmpFile)
-		require.NoError(t, err)
+		require.Error(t, err)
+		var validation *SchemaValidationError
+		require.ErrorAs(t, err, &validation)
+		require.Equal(t, CodeNoVMs, validation.Result.Errors[0].Code)
+		require.Equal(t, "No VMs found in vInfo sheet - cannot build inventory without VM data", validation.Result.Errors[0].Message)
 
 		version, err := parser.VCenterApiVersion(ctx)
 		require.NoError(t, err)
@@ -2449,4 +2465,421 @@ func TestBuildInventory_VMotionSupport_DefaultWhenMissing(t *testing.T) {
 	assert.False(t, *host.VMotionSupported, "should default to false when column missing")
 	require.NotNil(t, host.StorageVMotionSupported, "should not be nil when column missing")
 	assert.False(t, *host.StorageVMotionSupported, "should default to false when column missing")
+}
+
+func TestIngestRvTools_CollectionTime(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	tests := []struct {
+		name       string
+		sheet      string
+		header     string
+		values     []any
+		styled     bool
+		emptyIndex bool
+		want       *time.Time
+	}{
+		{name: "Excel date", sheet: "vMetaData", values: []any{46285.4375}, want: &want},
+		{name: "fractional Excel date", sheet: "vMetaData", values: []any{46285.437500001}, want: &want},
+		{name: "styled Excel date", sheet: "vMetaData", values: []any{46285.4375}, styled: true, want: &want},
+		{name: "RVTools text date", sheet: "vMetaData", values: []any{"2026/09/20 10:30:00"}, want: &want},
+		{name: "unsupported dashed text", sheet: "vMetaData", values: []any{"2026-09-20 10:30:00"}},
+		{name: "unsupported timezone offset", sheet: "vMetaData", values: []any{"2026-09-20T13:30:00+03:00"}},
+		{name: "case insensitive header", sheet: "vMetaData", header: "XLSX creation datetime", values: []any{46285.4375}, want: &want},
+		{name: "missing sheet"},
+		{name: "missing header", sheet: "vMetaData", header: "Other metadata", values: []any{"4.7"}},
+		{name: "empty cell", sheet: "vMetaData", values: []any{nil}},
+		{name: "empty string", sheet: "vMetaData", values: []any{""}},
+		{name: "VM placeholder", sheet: "vMetaData", values: []any{"VM"}},
+		{name: "padded lowercase placeholder", sheet: "vMetaData", values: []any{" vm "}},
+		{name: "empty shared-string index", sheet: "vMetaData", values: []any{"placeholder"}, emptyIndex: true},
+		{name: "empty shared-string index before date", sheet: "vMetaData", values: []any{"placeholder", 46285.4375}, emptyIndex: true, want: &want},
+		{name: "empty row before date", sheet: "vMetaData", values: []any{nil, 46285.4375}, want: &want},
+		{name: "VM placeholder before date", sheet: "vMetaData", values: []any{"VM", 46285.4375}, want: &want},
+		{name: "bad date", sheet: "vMetaData", values: []any{"not a date"}},
+		{name: "ambiguous locale", sheet: "vMetaData", values: []any{"09/10/2026 10:30:00"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Make "VM" the first shared string, reproducing the XLSX reader's
+			// empty-cell placeholder when a shared-string index is missing.
+			filePath := createTestExcel(t, NewExcelSheet("vInfo",
+				[]string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+				[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}}))
+			f, err := excelize.OpenFile(filePath)
+			require.NoError(t, err)
+			defer func() { _ = f.Close() }()
+			if tt.sheet != "" {
+				_, err := f.NewSheet(tt.sheet)
+				require.NoError(t, err)
+				header := tt.header
+				if header == "" {
+					header = "xlsx creation datetime"
+				}
+				require.NoError(t, f.SetCellValue(tt.sheet, "A1", header))
+				require.NoError(t, f.SetCellValue(tt.sheet, "B1", "RVTools version"))
+				for i, value := range tt.values {
+					cell := fmt.Sprintf("A%d", i+2)
+					if value != nil {
+						require.NoError(t, f.SetCellValue(tt.sheet, cell, value))
+					}
+					require.NoError(t, f.SetCellValue(tt.sheet, fmt.Sprintf("B%d", i+2), "4.8"))
+					if tt.styled {
+						style, err := f.NewStyle(&excelize.Style{NumFmt: 22})
+						require.NoError(t, err)
+						require.NoError(t, f.SetCellStyle(tt.sheet, cell, cell, style))
+					}
+				}
+			}
+			require.NoError(t, f.Save())
+			if tt.emptyIndex {
+				for id, name := range f.GetSheetMap() {
+					if name == tt.sheet {
+						clearSharedStringIndex(t, filePath, fmt.Sprintf("xl/worksheets/sheet%d.xml", id))
+					}
+				}
+			}
+
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			// Collection time must not depend on the database session timezone.
+			_, err = db.Exec("SET TimeZone = 'America/New_York'")
+			require.NoError(t, err)
+			result, err := parser.IngestRvTools(context.Background(), filePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "Metadata must not reject valid inventory: %v", result.Errors)
+			collectionTime, err := parser.CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, collectionTime)
+			if tt.emptyIndex {
+				var rawValue string
+				require.NoError(t, db.QueryRow(`SELECT "xlsx creation datetime" FROM read_xlsx(?, sheet='vMetaData', header=true, all_varchar=true)`, filePath).Scan(&rawValue))
+				require.Equal(t, "VM", rawValue, "The fixture must reproduce DuckDB's empty-cell placeholder")
+			}
+			// The same parser builds the inventory after the uploaded file is removed.
+			require.NoError(t, os.Remove(filePath))
+			inv, err := parser.BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.Equal(t, 1, inv.VCenter.VMs.Total)
+			require.Equal(t, tt.want, inv.CollectionTime)
+			require.Equal(t, "uuid-1", inv.VCenterID)
+			collectionTime, err = parser.CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, collectionTime)
+		})
+	}
+}
+
+func TestCollectionTime(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	later := want.Add(time.Hour)
+	for _, tt := range []struct {
+		name  string
+		dates []*time.Time
+		want  *time.Time
+	}{
+		{name: "no sources"},
+		{name: "one known date", dates: []*time.Time{&want}, want: &want},
+		{name: "same dates across sources", dates: []*time.Time{&want, &want}, want: &want},
+		{name: "different dates across sources", dates: []*time.Time{&want, &later}, want: &want},
+		{name: "oldest date last", dates: []*time.Time{&later, &want}, want: &want},
+		{name: "unknown date", dates: []*time.Time{nil}},
+		{name: "all dates unknown", dates: []*time.Time{nil, nil}},
+		{name: "known and unknown dates", dates: []*time.Time{&want, nil}, want: &want},
+		{name: "unknown date first", dates: []*time.Time{nil, &want}, want: &want},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			_, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			for _, date := range tt.dates {
+				_, err := db.Exec(`INSERT INTO about ("CollectionTime") VALUES (?)`, date)
+				require.NoError(t, err)
+			}
+			got, err := New(db, nil).CollectionTime(context.Background())
+			require.NoError(t, err)
+			require.Equal(t, tt.want, got)
+		})
+	}
+	t.Run("older collection database", func(t *testing.T) {
+		_, db, cleanup := setupTestParser(t, nil)
+		defer cleanup()
+		_, err := db.Exec(`ALTER TABLE about DROP COLUMN "CollectionTime"`)
+		require.NoError(t, err)
+		inv, err := New(db, nil).BuildInventory(context.Background(), nil)
+		require.NoError(t, err)
+		require.Nil(t, inv.CollectionTime)
+	})
+	t.Run("context cancellation is returned", func(t *testing.T) {
+		parser, _, cleanup := setupTestParser(t, nil)
+		defer cleanup()
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		_, err := parser.CollectionTime(ctx)
+		require.ErrorIs(t, err, context.Canceled)
+	})
+}
+
+func TestCollectionTime_PersistsAfterReopening(t *testing.T) {
+	filePath := createTestExcel(t,
+		NewExcelSheet("vInfo", []string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+			[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}}),
+		NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+			[]map[string]string{{"xlsx creation datetime": "46285.4375"}}))
+	databasePath := filepath.Join(t.TempDir(), "collection.duckdb")
+	db, err := sql.Open("duckdb", databasePath)
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	parser := New(db, nil)
+	require.NoError(t, parser.Init())
+	result, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+	require.NoError(t, os.Remove(filePath))
+	require.NoError(t, db.Close())
+
+	reopened, err := sql.Open("duckdb", databasePath)
+	require.NoError(t, err)
+	defer func() { _ = reopened.Close() }()
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	for _, vmIDs := range [][]string{nil, {"vm-001"}} {
+		inv, err := New(reopened, nil).BuildInventory(context.Background(), vmIDs)
+		require.NoError(t, err)
+		require.Equal(t, &want, inv.CollectionTime)
+	}
+}
+
+func TestIngestRvTools_CollectionTimeAcrossConnections(t *testing.T) {
+	filePath := createTestExcel(t,
+		NewExcelSheet("vInfo", []string{"VM", "VM ID", "Cluster", "VI SDK UUID", "Annotation", "Owner", "Datacenter"},
+			[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1", "Owner": "Finance", "Datacenter": "dc1"}}),
+		NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+			[]map[string]string{{"xlsx creation datetime": "46285.4375"}}))
+	db, err := sql.Open("duckdb", filepath.Join(t.TempDir(), "collection.duckdb"))
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+	// Close each connection after use so ingestion cannot rely on session state.
+	db.SetMaxIdleConns(0)
+	parser := New(store.NewQueryInterceptor(db), nil)
+	require.NoError(t, parser.Init())
+	result, err := parser.IngestRvTools(context.Background(), filePath)
+	require.NoError(t, err)
+	require.True(t, result.IsValid())
+	inv, err := parser.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	require.Equal(t, &want, inv.CollectionTime)
+	require.Equal(t, "uuid-1", inv.VCenterID)
+	require.Equal(t, map[string][]string{"Owner": {"Finance"}}, storedMetadata(t, parser.db, "vm-001"))
+}
+
+func TestIngestRvTools_CollectionTimeAcrossFiles(t *testing.T) {
+	want := time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC)
+	earlier := want.Add(-24 * time.Hour)
+	for _, tt := range []struct {
+		name       string
+		secondDate string
+		want       *time.Time
+	}{
+		{name: "same date", secondDate: "46285.4375", want: &want},
+		{name: "later date", secondDate: "46286.4375", want: &want},
+		{name: "earlier date", secondDate: "46284.4375", want: &earlier},
+		{name: "missing date", want: &want},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			for _, date := range []string{"46285.4375", tt.secondDate} {
+				sheets := []ExcelSheet{NewExcelSheet("vInfo",
+					[]string{"VM", "VM ID", "Cluster", "VI SDK UUID"},
+					[]map[string]string{{"VM": "vm-1", "VM ID": "vm-001", "Cluster": "cluster1", "VI SDK UUID": "uuid-1"}})}
+				if date != "" {
+					sheets = append(sheets, NewExcelSheet("vMetaData", []string{"xlsx creation datetime"},
+						[]map[string]string{{"xlsx creation datetime": date}}))
+				}
+				result, err := parser.IngestRvTools(context.Background(), createTestExcel(t, sheets...))
+				require.NoError(t, err)
+				require.True(t, result.IsValid())
+			}
+			var aboutRows, datedRows int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*), COUNT("CollectionTime") FROM about`).Scan(&aboutRows, &datedRows))
+			require.Equal(t, 2, aboutRows, "Each file adds its source metadata, even with the same vCenter UUID")
+			if tt.secondDate == "" {
+				require.Equal(t, 1, datedRows, "Missing metadata must not inherit the preceding file's date")
+			} else {
+				require.Equal(t, 2, datedRows)
+			}
+			var stagingTables int
+			require.NoError(t, db.QueryRow(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'about_raw'`).Scan(&stagingTables))
+			require.Zero(t, stagingTables)
+			inv, err := New(db, nil).BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.want, inv.CollectionTime)
+		})
+	}
+}
+
+// clearSharedStringIndex creates the empty shared-string cell that DuckDB
+// misreads as shared string zero ("VM"), instead of only testing a literal "VM".
+func clearSharedStringIndex(t *testing.T, filePath, sheetPath string) {
+	t.Helper()
+	f, err := zip.OpenReader(filePath)
+	require.NoError(t, err)
+	var buf bytes.Buffer
+	w := zip.NewWriter(&buf)
+	changed := false
+	for _, entry := range f.File {
+		r, err := entry.Open()
+		require.NoError(t, err)
+		content, err := io.ReadAll(r)
+		require.NoError(t, err)
+		require.NoError(t, r.Close())
+		if entry.Name == sheetPath {
+			pattern := regexp.MustCompile(`<c r="A2"[^>]*>.*?</c>`)
+			require.True(t, pattern.Match(content))
+			content = pattern.ReplaceAll(content, []byte(`<c r="A2" t="s"><v></v></c>`))
+			changed = true
+		}
+		dest, err := w.Create(entry.Name)
+		require.NoError(t, err)
+		_, err = dest.Write(content)
+		require.NoError(t, err)
+	}
+	require.True(t, changed)
+	require.NoError(t, w.Close())
+	require.NoError(t, f.Close())
+	require.NoError(t, os.WriteFile(filePath, buf.Bytes(), 0600))
+}
+
+type hostStorageTestInterceptor struct {
+	store.QueryInterceptor
+	queries int
+	err     error
+}
+
+func (q *hostStorageTestInterceptor) QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
+	if strings.HasPrefix(query, "WITH owners AS (") {
+		q.queries++
+		if q.err != nil {
+			return nil, q.err
+		}
+	}
+	return q.QueryInterceptor.QueryContext(ctx, query, args...)
+}
+
+func TestBuildInventory_HostStoragePerBuild(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		vmIDs       []string
+		noHosts     bool
+		noStorage   bool
+		ambiguous   bool
+		wantQueries int
+	}{
+		{name: "all VMs", wantQueries: 1},
+		{name: "selected VMs", vmIDs: []string{"vm-1"}, wantQueries: 1},
+		{name: "no storage records", noStorage: true, wantQueries: 1},
+		{name: "ambiguous owners across clusters", ambiguous: true, wantQueries: 1},
+		{name: "no hosts", noHosts: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p, db, cleanup := setupTestParser(t, nil)
+			defer cleanup()
+			_, err := db.Exec(`INSERT INTO about ("InstanceUuid", "APIVersion", "Product") VALUES ('vc-1', '8.0', 'vCenter');
+INSERT INTO vcluster ("Name", "Object ID") VALUES ('cluster1', 'domain-c1'), ('cluster2', 'domain-c2');
+INSERT INTO vinfo ("VM ID", "VM", "Cluster", "Datacenter", "VI SDK UUID", "CPUs", "Memory") VALUES
+('vm-1', 'vm-1', 'cluster1', 'dc1', 'vc-1', 2, 4096), ('vm-2', 'vm-2', 'cluster2', 'dc1', 'vc-1', 2, 4096);`)
+			require.NoError(t, err)
+			if !tc.noHosts {
+				_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES
+('host-1', 'esxi1', 'cluster1', 'vc-1'), ('host-2', 'esxi2', 'cluster2', 'vc-1');`)
+				require.NoError(t, err)
+			}
+			if !tc.noStorage {
+				_, err = db.Exec(`INSERT INTO vhba ("Host ID", "Device", "Model") VALUES
+('host-1', 'vmhba1', 'initial'), ('host-2', 'vmhba1', 'initial');
+INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Model", "HBA Device") VALUES
+('host-1', 'naa.host-1', 'initial', 'vmhba1'), ('host-2', 'naa.host-2', 'initial', 'vmhba1');`)
+				require.NoError(t, err)
+			}
+			if tc.ambiguous {
+				_, err = db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster", "VI SDK UUID") VALUES
+('host-1', 'other1', 'cluster2', 'vc-2'), ('host-2', 'other2', 'cluster1', 'vc-2');`)
+				require.NoError(t, err)
+			}
+			recorder := &hostStorageTestInterceptor{QueryInterceptor: p.db}
+			p.db = recorder
+			checkStorage := func(id string, adapters []inventory.HostStorageAdapter, luns []inventory.HostStorageLun, model string) {
+				t.Helper()
+				if tc.noStorage || tc.ambiguous {
+					require.Empty(t, adapters)
+					require.Empty(t, luns)
+					return
+				}
+				require.Equal(t, []inventory.HostStorageAdapter{{Device: "vmhba1", Model: model}}, adapters)
+				require.Equal(t, []inventory.HostStorageLun{{CanonicalName: "naa." + id, Model: model, AdapterDevices: []string{"vmhba1"}}}, luns)
+			}
+			checkInventory := func(inv *inventory.Inventory, model string) {
+				t.Helper()
+				wantHosts := 2
+				if tc.noHosts {
+					wantHosts = 0
+				} else if tc.ambiguous {
+					wantHosts = 4
+				}
+				require.Len(t, inv.VCenter.Infra.Hosts, wantHosts)
+				for _, host := range inv.VCenter.Infra.Hosts {
+					checkStorage(host.ID, host.StorageAdapters, host.StorageLuns, model)
+				}
+				require.Len(t, inv.Clusters, 2)
+				for _, id := range []string{"domain-c1", "domain-c2"} {
+					require.Contains(t, inv.Clusters, id)
+					require.Len(t, inv.Clusters[id].Infra.Hosts, wantHosts/2)
+					for _, host := range inv.Clusters[id].Infra.Hosts {
+						checkStorage(host.ID, host.StorageAdapters, host.StorageLuns, model)
+					}
+				}
+			}
+
+			ctx := context.Background()
+			first, err := p.BuildInventory(ctx, tc.vmIDs)
+			require.NoError(t, err)
+			checkInventory(first, "initial")
+			require.Equal(t, tc.wantQueries, recorder.queries, "aggregate globally once for the vCenter and all clusters")
+
+			_, err = db.Exec(`UPDATE vhba SET "Model" = 'updated'; UPDATE vhostscsi SET "LUN Model" = 'updated';`)
+			require.NoError(t, err)
+			hosts, err := p.Hosts(ctx, Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, hosts, len(first.VCenter.Infra.Hosts))
+			for _, host := range hosts {
+				checkStorage(host.Id, host.StorageAdapters, host.StorageLuns, "updated")
+			}
+			require.Equal(t, 2*tc.wantQueries, recorder.queries, "standalone Hosts calls must read fresh storage")
+
+			second, err := p.BuildInventory(ctx, tc.vmIDs)
+			require.NoError(t, err)
+			checkInventory(second, "updated")
+			checkInventory(first, "initial")
+			require.Equal(t, 3*tc.wantQueries, recorder.queries, "each inventory build must read fresh storage")
+		})
+	}
+}
+
+func TestBuildInventory_HostStorageErrorRecovery(t *testing.T) {
+	p, db, cleanup := setupTestParser(t, nil)
+	defer cleanup()
+	_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
+INSERT INTO vhba ("Host ID", "Device") VALUES ('host-1', 'vmhba1');`)
+	require.NoError(t, err)
+	recorder := &hostStorageTestInterceptor{QueryInterceptor: p.db, err: fmt.Errorf("storage query failed")}
+	p.db = recorder
+	_, err = p.BuildInventory(context.Background(), nil)
+	require.ErrorIs(t, err, recorder.err)
+	require.Equal(t, 1, recorder.queries)
+
+	recorder.err = nil
+	inv, err := p.BuildInventory(context.Background(), nil)
+	require.NoError(t, err)
+	require.Len(t, inv.VCenter.Infra.Hosts, 1)
+	require.Equal(t, []inventory.HostStorageAdapter{{Device: "vmhba1"}}, inv.VCenter.Infra.Hosts[0].StorageAdapters)
+	require.Equal(t, 2, recorder.queries, "a failed build must not poison subsequent builds")
 }

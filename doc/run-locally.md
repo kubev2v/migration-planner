@@ -316,12 +316,7 @@ echo "Agent ID: $AGENT_ID"
 
 ### 3. Build and run the Agent Application
 
-Start the OpenShift Migration Advisor Agent BE:
-
-```bash
-# Build and run the agent from the agent-v2 submodule
-make run-agent-image
-```
+Build and run the agent from a separate checkout of [assisted-migration-agent](https://github.com/kubev2v/assisted-migration-agent), following that repository's local development instructions. Pass the `SOURCE_ID` and `AGENT_ID` created above when configuring the agent to connect to your local planner API.
 
 ### 4. Verify Agent Status
 

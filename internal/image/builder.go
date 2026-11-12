@@ -44,6 +44,7 @@ const (
 	defaultOvfName               = "MigrationAssessment.ovf"
 	defaultIsoImageName          = "MigrationAssessment.iso"
 	defaultRHCOSImage            = "rhcos-live-iso.x86_64.iso"
+	defaultAgentImage            = "localhost/oma-appliance:latest"
 )
 
 // IgnitionData defines modifiable fields in ignition config
@@ -60,6 +61,7 @@ type IgnitionData struct {
 	HttpsProxyUrl        string
 	NoProxyDomain        string
 	RhcosPassword        string
+	AgentImage           string
 	IpAddress            string
 	SubnetMask           string
 	DefaultGateway       string
@@ -98,6 +100,7 @@ type ImageBuilder struct {
 	RHCOSImage           string
 	imageType            ImageType
 	RhcosPassword        string
+	AgentImage           string
 	VmNetwork            VmNetwork
 }
 
@@ -114,6 +117,7 @@ func NewImageBuilder(sourceID uuid.UUID) *ImageBuilder {
 		OvfName:              defaultOvfName,
 		Template:             defaultTemplate,
 		RHCOSImage:           util.GetEnv("MIGRATION_PLANNER_ISO_PATH", defaultRHCOSImage),
+		AgentImage:           util.GetEnv("AGENT_IMAGE", defaultAgentImage),
 		imageType:            OVAImageType,
 	}
 
@@ -284,6 +288,7 @@ func (b *ImageBuilder) generateIgnition() (string, error) {
 		HttpsProxyUrl:        b.Proxy.HttpsUrl,
 		NoProxyDomain:        b.Proxy.NoProxyDomain,
 		RhcosPassword:        b.RhcosPassword,
+		AgentImage:           b.AgentImage,
 		IpAddress:            b.VmNetwork.IpAddress,
 		SubnetMask:           b.VmNetwork.SubnetMask,
 		DefaultGateway:       b.VmNetwork.DefaultGateway,
@@ -527,6 +532,11 @@ func (b *ImageBuilder) WithCertificateChain(certs string) *ImageBuilder {
 
 func (b *ImageBuilder) WithVmNetwork(network VmNetwork) *ImageBuilder {
 	b.VmNetwork = network
+	return b
+}
+
+func (b *ImageBuilder) WithAgentImage(agentImage string) *ImageBuilder {
+	b.AgentImage = agentImage
 	return b
 }
 

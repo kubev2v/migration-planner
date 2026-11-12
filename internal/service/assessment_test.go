@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"gorm.io/gorm"
@@ -19,7 +20,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events"
 	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
@@ -27,10 +27,25 @@ import (
 const (
 	insertSourceStm              = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
 	insertAssessmentStm          = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, assessment_id, name, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (gen_random_uuid()::text, '%s', 'test', '', 0, 0, 0, 0, 2, '%s');"
+	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, assessment_id, name, vcenter_id, is_subset, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (gen_random_uuid()::text, '%s', '%s', '%s', %t, 0, 0, 0, 0, 2, '%s');"
 	countOutboxByTypeStm         = "SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;"
 	countOutboxEventsStm         = "SELECT COUNT(*) FROM outbox_events;"
 )
+
+type failingInventoryUpsert struct{ store.Assessment }
+
+func (f failingInventoryUpsert) UpsertInventories(context.Context, ...svcmodel.AssessmentInventory) error {
+	return errors.New("forced inventory upsert failure")
+}
+
+type storeWithAssessmentOverride struct {
+	store.Store
+	assessment store.Assessment
+}
+
+func (s storeWithAssessmentOverride) Assessment() store.Assessment {
+	return s.assessment
+}
 
 var _ = Describe("assessment service", Ordered, func() {
 	var (
@@ -57,6 +72,32 @@ var _ = Describe("assessment service", Ordered, func() {
 
 	AfterAll(func() {
 		_ = s.Close()
+	})
+
+	Context("inventory lookup", func() {
+		var assessmentID, vcenterID uuid.UUID
+		BeforeEach(func() {
+			assessmentID, vcenterID = uuid.New(), uuid.New()
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Inventory lookup", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL")).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "main", vcenterID, false, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "subset", vcenterID, true, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+		})
+		AfterEach(func() {
+			Expect(s.Assessment().Delete(context.Background(), assessmentID)).To(Succeed())
+		})
+
+		It("returns the matching RVTools subset inventory", func() {
+			inventory, err := svc.GetVcenterInventory(context.Background(), assessmentID, vcenterID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(inventory.Name).To(Equal("subset"))
+			Expect(inventory.VCenterID).To(Equal(vcenterID.String()))
+		})
+
+		It("returns the requested cluster inventory", func() {
+			cluster, err := svc.GetClusterInventory(context.Background(), assessmentID, vcenterID, "cluster-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cluster.Vms.Total).To(Equal(10))
+		})
 	})
 
 	Context("ListAssessments", func() {
@@ -86,13 +127,13 @@ var _ = Describe("assessment service", Ordered, func() {
 			}
 
 			var count int64
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&count)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&count)
 			Expect(count).To(Equal(int64(1)))
 
 			var outboxEvent model.OutboxEvent
 			tx := gormdb.Raw(
 				"SELECT * FROM outbox_events WHERE event_type = ? ORDER BY id DESC LIMIT 1",
-				events.EventTypeKafka,
+				eventwrap.EventTypeKafka,
 			).Scan(&outboxEvent)
 			Expect(tx.Error).To(BeNil())
 
@@ -241,7 +282,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				testAssessmentID := uuid.New()
 				ownerFirstName := "Alice"
 				ownerLastName := "Johnson"
-				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -251,7 +292,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: &ownerFirstName,
 					OwnerLastName:  &ownerLastName,
 					SourceType:     service.SourceTypeInventory,
-					Inventories:    []model.AssessmentInventory{inv},
+					MainInventory:  inv,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -263,7 +304,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.Username).To(Equal("user1"))
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeInventory))
 				Expect(assessment.SourceID).To(BeNil())
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(10))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 				// Verify owner fields are properly mapped from user context
 				Expect(assessment.OwnerFirstName).ToNot(BeNil())
 				Expect(*assessment.OwnerFirstName).To(Equal("Alice"))
@@ -271,7 +314,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(*assessment.OwnerLastName).To(Equal("Johnson"))
 
 				var count int64
-				gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&count)
+				gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&count)
 				Expect(count).To(Equal(int64(1)))
 			})
 
@@ -285,7 +328,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				})
 
 				testAssessmentID := uuid.New()
-				inv, err := model.NewAssessmentInventory(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), testAssessmentID, "Test Assessment No Owner", false, inventoryJSON)
 				Expect(err).To(BeNil())
 				createForm := mappers.AssessmentCreateForm{
 					ID:             testAssessmentID,
@@ -295,7 +338,7 @@ var _ = Describe("assessment service", Ordered, func() {
 					OwnerFirstName: nil, // Test nil values
 					OwnerLastName:  nil,
 					SourceType:     service.SourceTypeInventory,
-					Inventories:    []model.AssessmentInventory{inv},
+					MainInventory:  inv,
 				}
 
 				assessment, err := svc.CreateAssessment(context.TODO(), createForm)
@@ -325,15 +368,15 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Second creation with same name should fail via service (unique constraint)
-				inv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), name, false, inventoryJSON)
+				inv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), name, false, inventoryJSON)
 				Expect(err).To(BeNil())
 				secondForm := mappers.AssessmentCreateForm{
-					ID:          uuid.New(),
-					Name:        name, // duplicate name
-					OrgID:       "org1",
-					Username:    "user1",
-					SourceType:  service.SourceTypeInventory,
-					Inventories: []model.AssessmentInventory{inv},
+					ID:            uuid.New(),
+					Name:          name, // duplicate name
+					OrgID:         "org1",
+					Username:      "user1",
+					SourceType:    service.SourceTypeInventory,
+					MainInventory: inv,
 				}
 
 				secondAssessment, secondErr := svc.CreateAssessment(context.TODO(), secondForm)
@@ -376,7 +419,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(assessment.SourceType).To(Equal(service.SourceTypeAgent))
 				Expect(assessment.SourceID).ToNot(BeNil())
 				Expect(assessment.SourceID.String()).To(Equal(sourceID.String()))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(10))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 			})
 
 			It("fails when user orgID is different than source orgID", func() {
@@ -467,7 +512,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(100))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 
 				var inventoryVersion int
 				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
@@ -497,7 +544,9 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(err).To(BeNil())
 				Expect(assessment).ToNot(BeNil())
 				Expect(assessment.ID).To(Equal(testAssessmentID))
-				Expect(assessment.Inventories).To(HaveLen(1))
+				Expect(assessment.MainInventory.ID).NotTo(Equal(uuid.Nil))
+				Expect(assessment.MainInventory.Inventory.Vcenter.Vms.Total).To(Equal(200))
+				Expect(assessment.SubsetInventories).To(BeEmpty())
 
 				var inventoryVersion int
 				tx = gormdb.Raw("SELECT version FROM assessment_inventories WHERE assessment_id = ?", testAssessmentID).Scan(&inventoryVersion)
@@ -531,7 +580,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -563,7 +612,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -593,7 +642,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 0 inventories
@@ -647,7 +696,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Delete the source (this will set source_id to NULL due to ON DELETE SET NULL)
@@ -678,7 +727,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -717,7 +766,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 1 inventory
@@ -795,7 +844,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(0))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
@@ -1036,14 +1085,14 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(1)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeNotification).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
 			var payload string
-			tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", events.EventTypeNotification).Scan(&payload)
+			tx = gormdb.Raw("SELECT payload FROM outbox_events WHERE event_type = ?", eventwrap.EventTypeNotification).Scan(&payload)
 			Expect(tx.Error).To(BeNil())
 
 			var n notification.Notification
@@ -1070,11 +1119,11 @@ var _ = Describe("assessment service", Ordered, func() {
 
 			// The share CloudEvent is committed
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 
 			// But no console notification is emitted (would otherwise email the whole org)
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeNotification).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeNotification).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(0)))
 		})
 
@@ -1165,7 +1214,7 @@ var _ = Describe("assessment service", Ordered, func() {
 			Expect(count).To(Equal(int64(0)))
 
 			var outboxCount int64
-			gormdb.Raw(countOutboxByTypeStm, events.EventTypeKafka).Scan(&outboxCount)
+			gormdb.Raw(countOutboxByTypeStm, eventwrap.EventTypeKafka).Scan(&outboxCount)
 			Expect(outboxCount).To(Equal(int64(1)))
 		})
 
@@ -1206,6 +1255,146 @@ var _ = Describe("assessment service", Ordered, func() {
 		})
 	})
 
+	Context("DeleteVCenterInventory", func() {
+		createFixture := func(sourceType string, counts ...int) (uuid.UUID, []uuid.UUID, uuid.UUID) {
+			GinkgoHelper()
+			assessmentID := uuid.New()
+			mainID := uuid.New()
+			vcenterIDs := make([]uuid.UUID, len(counts))
+			subsets := make([]svcmodel.AssessmentInventory, len(counts))
+			total := 0
+
+			newInventory := func(id uuid.UUID, vcenterID string, isSubset bool, vmCount int) svcmodel.AssessmentInventory {
+				data, err := json.Marshal(v1alpha1.Inventory{
+					VcenterId: vcenterID,
+					Clusters:  map[string]v1alpha1.InventoryData{},
+					Vcenter: &v1alpha1.InventoryData{
+						Vms: v1alpha1.VMs{Total: vmCount},
+						Infra: v1alpha1.Infra{
+							TotalHosts: vmCount,
+							Networks:   make([]v1alpha1.Network, vmCount),
+							Datastores: make([]v1alpha1.Datastore, vmCount),
+						},
+					},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				inventory, err := mappers.AssessmentInventoryFromJSON(id, assessmentID, "inventory", isSubset, data)
+				Expect(err).NotTo(HaveOccurred())
+				return inventory
+			}
+
+			for i, count := range counts {
+				vcenterIDs[i] = uuid.New()
+				subsets[i] = newInventory(uuid.New(), vcenterIDs[i].String(), true, count)
+				total += count
+			}
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			_, err := assessmentSvc.CreateAssessment(context.TODO(), mappers.AssessmentCreateForm{
+				ID:                assessmentID,
+				Name:              "delete-vcenter-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        sourceType,
+				MainInventory:     newInventory(mainID, "", false, total),
+				SubsetInventories: subsets,
+			})
+			Expect(err).NotTo(HaveOccurred())
+			return assessmentID, vcenterIDs, mainID
+		}
+
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM assessment_inventories;")
+			gormdb.Exec("DELETE FROM assessments;")
+		})
+
+		It("removes the vcenter subset and reaggregates the main inventory", func() {
+			assessmentID, vcenterIDs, mainID := createFixture(service.SourceTypeRvtools, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])
+			Expect(err).To(BeNil())
+
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessment.SubsetInventories).To(HaveLen(1))
+			Expect(assessment.SubsetInventories[0].VCenterID).To(Equal(vcenterIDs[1].String()))
+			Expect(assessment.MainInventory.ID).To(Equal(mainID))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(5))
+			Expect(assessment.MainInventory.HostsCount).To(Equal(5))
+			Expect(assessment.MainInventory.NetworksCount).To(Equal(5))
+			Expect(assessment.MainInventory.DatastoresCount).To(Equal(5))
+			Expect(assessment.UpdatedAt).NotTo(BeNil())
+
+			ctx := auth.NewTokenContext(context.TODO(), auth.User{Username: "user1", Organization: "org1"})
+			summaries, err := assessmentSvc.ListAssessments(ctx, service.NewAssessmentFilter().WithIDs([]uuid.UUID{assessmentID}))
+			Expect(err).To(BeNil())
+			Expect(summaries).To(HaveLen(1))
+			Expect(summaries[0].VMsCount).To(Equal(5))
+			Expect(summaries[0].HostsCount).To(Equal(5))
+			Expect(summaries[0].NetworksCount).To(Equal(5))
+			Expect(summaries[0].DatastoresCount).To(Equal(5))
+		})
+
+		It("leaves an empty aggregate after deleting the last subset", func() {
+			assessmentID, vcenterIDs, mainID := createFixture(service.SourceTypeRvtools, 3)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			Expect(assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])).To(Succeed())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(BeEmpty())
+			Expect(assessment.MainInventory.ID).To(Equal(mainID))
+			Expect(assessment.MainInventory.VMsCount).To(BeZero())
+		})
+
+		It("returns not found without changing the assessment for an unknown vCenter", func() {
+			assessmentID, _, _ := createFixture(service.SourceTypeRvtools, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, uuid.New())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(2))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(8))
+		})
+
+		It("deletes a subset on a non-RVTools assessment", func() {
+			assessmentID, vcenterIDs, _ := createFixture(service.SourceTypeInventory, 3, 5)
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+
+			Expect(assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])).To(Succeed())
+			assessment, err := assessmentSvc.GetAssessment(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(1))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(5))
+		})
+
+		It("rolls back the deletion when saving the aggregate fails", func() {
+			assessmentID, vcenterIDs, _ := createFixture(service.SourceTypeRvtools, 3, 5)
+			brokenStore := storeWithAssessmentOverride{
+				Store:      s,
+				assessment: failingInventoryUpsert{Assessment: s.Assessment()},
+			}
+			assessmentSvc := service.NewAssessmentService(&brokenStore, nil, nil)
+
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), assessmentID, vcenterIDs[0])
+			Expect(err).To(MatchError(ContainSubstring("forced inventory upsert failure")))
+
+			assessment, err := s.Assessment().Get(context.TODO(), assessmentID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(assessment.SubsetInventories).To(HaveLen(2))
+			Expect(assessment.MainInventory.VMsCount).To(Equal(8))
+		})
+
+		It("returns not found for an unknown assessment", func() {
+			assessmentSvc := service.NewAssessmentService(s, nil, nil)
+			err := assessmentSvc.DeleteVCenterInventory(context.TODO(), uuid.New(), uuid.New())
+			var notFound *service.ErrResourceNotFound
+			Expect(errors.As(err, &notFound)).To(BeTrue())
+		})
+	})
+
 	Context("AggregateInventories", func() {
 		AfterEach(func() {
 			gormdb.Exec("DELETE FROM outbox_events;")
@@ -1243,22 +1432,23 @@ var _ = Describe("assessment service", Ordered, func() {
 				},
 			})
 
-			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
 			Expect(err).To(BeNil())
 
-			subset1, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
+			subset1, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-1", true, inv1JSON)
 			Expect(err).To(BeNil())
 
-			subset2, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
+			subset2, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "file-2", true, inv2JSON)
 			Expect(err).To(BeNil())
 
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "aggregate-test",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeRvtools,
-				Inventories: []model.AssessmentInventory{mainInv, subset1, subset2},
+				ID:                uuid.New(),
+				Name:              "aggregate-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        service.SourceTypeRvtools,
+				MainInventory:     mainInv,
+				SubsetInventories: []svcmodel.AssessmentInventory{subset1, subset2},
 			}
 			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
 			Expect(err).To(BeNil())
@@ -1295,19 +1485,20 @@ var _ = Describe("assessment service", Ordered, func() {
 				},
 			})
 
-			mainInv, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "main", false, mainJSON)
+			mainInv, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "main", false, mainJSON)
 			Expect(err).To(BeNil())
 
-			subset, err := model.NewAssessmentInventory(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
+			subset, err := mappers.AssessmentInventoryFromJSON(uuid.New(), uuid.New(), "subset-1", true, subsetJSON)
 			Expect(err).To(BeNil())
 
 			createForm := mappers.AssessmentCreateForm{
-				ID:          uuid.New(),
-				Name:        "skip-main-test",
-				OrgID:       "org1",
-				Username:    "user1",
-				SourceType:  service.SourceTypeRvtools,
-				Inventories: []model.AssessmentInventory{mainInv, subset},
+				ID:                uuid.New(),
+				Name:              "skip-main-test",
+				OrgID:             "org1",
+				Username:          "user1",
+				SourceType:        service.SourceTypeRvtools,
+				MainInventory:     mainInv,
+				SubsetInventories: []svcmodel.AssessmentInventory{subset},
 			}
 			assessment, err := svc.CreateAssessment(context.TODO(), createForm)
 			Expect(err).To(BeNil())

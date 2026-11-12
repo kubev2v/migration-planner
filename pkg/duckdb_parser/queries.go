@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/georgysavva/scany/v2/sqlscan"
 	"github.com/go-viper/mapstructure/v2"
@@ -20,7 +22,11 @@ func (p *Parser) VMs(ctx context.Context, filters Filters, options Options) ([]m
 	if err != nil {
 		return nil, err
 	}
-	q, err := p.builder.vmQuery(filters, options, metadataTable)
+	topology, err := StorageTopologyQuery(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	q, err := p.builder.vmQuery(filters, options, metadataTable, topology)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build vm query: %v", err)
 	}
@@ -42,7 +48,11 @@ func (p *Parser) VMCount(ctx context.Context, filters Filters) (int, error) {
 
 // Datastores returns datastores with optional filters and pagination.
 func (p *Parser) Datastores(ctx context.Context, filters Filters, options Options) ([]models.Datastore, error) {
-	q, err := p.builder.DatastoreQuery(filters, options)
+	topology, err := StorageTopologyQuery(ctx, p.db)
+	if err != nil {
+		return nil, err
+	}
+	q, err := p.builder.datastoreQuery(filters, options, topology)
 	if err != nil {
 		return nil, fmt.Errorf("building datastore query: %w", err)
 	}
@@ -68,6 +78,15 @@ func (p *Parser) Networks(ctx context.Context, filters Filters, options Options)
 
 // Hosts returns hosts with optional filters and pagination.
 func (p *Parser) Hosts(ctx context.Context, filters Filters, options Options) ([]models.Host, error) {
+	return p.hosts(ctx, filters, options, func() (map[string]hostStorageFacts, error) {
+		return p.hostStorage(ctx)
+	})
+}
+
+func (p *Parser) hosts(
+	ctx context.Context, filters Filters, options Options,
+	loadStorage func() (map[string]hostStorageFacts, error),
+) ([]models.Host, error) {
 	q, err := p.builder.HostQuery(filters, options)
 	if err != nil {
 		return nil, fmt.Errorf("building host query: %w", err)
@@ -75,6 +94,18 @@ func (p *Parser) Hosts(ctx context.Context, filters Filters, options Options) ([
 	var results []models.Host
 	if err := sqlscan.Select(ctx, p.db, &results, q); err != nil {
 		return nil, fmt.Errorf("scanning hosts: %w", err)
+	}
+	if len(results) == 0 {
+		return results, nil
+	}
+	storage, err := loadStorage()
+	if err != nil {
+		return nil, fmt.Errorf("reading host storage: %w", err)
+	}
+	for i := range results {
+		facts := storage[strings.TrimSpace(results[i].Id)]
+		results[i].StorageAdapters = facts.adapters
+		results[i].StorageLuns = facts.luns
 	}
 	return results, nil
 }
@@ -718,4 +749,21 @@ func metadataTable(ctx context.Context, db store.QueryInterceptor) (string, erro
 		return "(SELECT NULL::VARCHAR AS vm_id, NULL::VARCHAR AS key, NULL::VARCHAR AS value WHERE false)", nil
 	}
 	return "vm_metadata", nil
+}
+
+// CollectionTime reads the oldest known source date from the collected data.
+func (p *Parser) CollectionTime(ctx context.Context) (*time.Time, error) {
+	query, err := p.builder.CollectionTimeQuery()
+	if err != nil {
+		return nil, fmt.Errorf("building collection time query: %w", err)
+	}
+	var collectedAt sql.NullTime
+	if err := p.db.QueryRowContext(ctx, query).Scan(&collectedAt); err != nil {
+		return nil, fmt.Errorf("reading collection time: %w", err)
+	}
+	if !collectedAt.Valid {
+		return nil, nil
+	}
+	utc := collectedAt.Time.UTC()
+	return &utc, nil
 }
