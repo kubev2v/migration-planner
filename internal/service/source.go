@@ -351,32 +351,65 @@ func WithOrgID(orgID string) SourceFilterFunc {
 	}
 }
 
-// CheckAgentVersionWarning compares stored agent version with current and returns warning if they differ.
-func CheckAgentVersionWarning(imageInfra *model.ImageInfra) *string {
+// KnownApplianceVersion returns the appliance version a source runs: the most
+// recently reported agent version when a connected agent reported one, else
+// the OVA-download stamp — the only signal for a disconnected source.
+func KnownApplianceVersion(source *model.Source) string {
+	var latest *model.Agent
+	for i := range source.Agents {
+		agent := &source.Agents[i]
+		// Only a parseable agent report overrides the OVA-download stamp: junk
+		// versions (pre-#571 "v0.0.0", test fixtures, unparseable strings)
+		// carry no signal, same rule as the comparison.
+		if !version.IsKnownFormat(agent.Version) {
+			continue
+		}
+		if latest == nil || agent.UpdatedAt.After(latest.UpdatedAt) {
+			latest = agent
+		}
+	}
+	if latest != nil {
+		return latest.Version
+	}
+	if source.ImageInfra.AgentVersion != nil {
+		return *source.ImageInfra.AgentVersion
+	}
+	return ""
+}
+
+// CheckAgentVersionWarning compares the version the source runs (agent-reported
+// with the OVA-download stamp as fallback) against the served appliance
+// version, and returns a warning when an update is available.
+func CheckAgentVersionWarning(source *model.Source) *string {
 	versionInfo := version.Get()
 	if !version.IsValidAgentVersion(versionInfo.AgentVersionName) {
 		return nil
 	}
-	currentVersion := versionInfo.AgentVersionName
+	served := versionInfo.AgentVersionName
 
-	// Handle missing version (edge case if migration hasn't run)
-	if imageInfra == nil || imageInfra.AgentVersion == nil || *imageInfra.AgentVersion == "" {
-		message := "No version information available for this OVA. Current system version: " + currentVersion +
+	if source == nil {
+		return nil
+	}
+
+	current := KnownApplianceVersion(source)
+	if current == "" {
+		message := "No version information available for this OVA. Current system version: " + served +
 			". Consider downloading a new OVA to ensure compatibility."
 		return &message
 	}
 
-	storedVersion := *imageInfra.AgentVersion
-	if !version.IsValidAgentVersion(storedVersion) {
+	if !version.UpdateAvailable(served, current) {
 		return nil
 	}
 
-	if storedVersion == currentVersion {
-		return nil
+	if version.BelowMin(current, version.MinApplianceVersion()) {
+		message := "Agent version " + current + " does not support in-place updates to " + served +
+			". Deploy a new OVA to update this source."
+		return &message
 	}
 
-	message := "Agent version mismatch detected. The OVA was downloaded with version " + storedVersion +
-		", but the current system version is " + currentVersion +
+	message := "Agent version mismatch detected. The appliance runs version " + current +
+		", but the current system version is " + served +
 		". Consider downloading a new OVA to ensure compatibility."
 	return &message
 }
