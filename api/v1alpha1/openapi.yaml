@@ -363,9 +363,19 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: image
+          in: query
+          description: Which image to link; the OVA or the appliance image tar for a disconnected update
+          required: false
+          schema:
+            type: string
+            enum:
+              - ova
+              - appliance
+            default: ova
       responses:
         "200":
-          description: URL to download OVA image
+          description: URL to download the image
           content:
             application/json:
               schema:
@@ -1422,6 +1432,62 @@ paths:
                 $ref: "#/components/schemas/Error"
         "500":
           description: Internal error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      tags:
+        - assessment
+      description: Update the assessment name
+      operationId: updateAssessmentV2
+      parameters:
+        - name: id
+          in: path
+          description: ID of the assessment
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssessmentUpdate"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssessmentV2"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: NotFound
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -3192,6 +3258,18 @@ components:
           type: string
         model:
           type: string
+        datacenter:
+          type: string
+          description: Source datacenter name, when available.
+        cluster:
+          type: string
+          description: Source cluster name; omitted for standalone hosts.
+        cpuModel:
+          type: string
+          description: Source-reported CPU model, when available.
+        serialNumber:
+          type: string
+          description: Source-reported host hardware serial or service tag, when available.
         cpuCores:
           type: integer
           description: Number of CPU cores

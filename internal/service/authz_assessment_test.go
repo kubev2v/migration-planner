@@ -59,6 +59,42 @@ var _ = Describe("authz assessment service", Ordered, func() {
 		_ = s.Close()
 	})
 
+	Context("inventory access", func() {
+		var assessmentID, vcenterID uuid.UUID
+		BeforeEach(func() {
+			assessmentID, vcenterID = uuid.New(), uuid.New()
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Inventory access", "org1", "owner", "John", "Doe", service.SourceTypeAgent, "NULL")).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "main", vcenterID, false, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertRelationStm, "assessment", assessmentID, "viewer", "user", "reader")).Error).NotTo(HaveOccurred())
+		})
+		AfterEach(func() {
+			gormdb.Exec("DELETE FROM relations WHERE resource_id = ?", assessmentID.String())
+			Expect(s.Assessment().Delete(context.Background(), assessmentID)).To(Succeed())
+		})
+
+		It("permits a reader to retrieve inventories", func() {
+			ctx := ctxWithUser("reader", "org1")
+			inventory, inventoryErr := svc.GetVcenterInventory(ctx, assessmentID, vcenterID)
+			cluster, clusterErr := svc.GetClusterInventory(ctx, assessmentID, vcenterID, "cluster-1")
+			Expect(inventoryErr).NotTo(HaveOccurred())
+			Expect(inventory.VCenterID).To(Equal(vcenterID.String()))
+			Expect(clusterErr).NotTo(HaveOccurred())
+			Expect(cluster.Vms.Total).To(Equal(10))
+		})
+
+		It("denies an unprivileged user from retrieving inventories", func() {
+			ctx := ctxWithUser("unauthorized-user", "org1")
+			inventory, inventoryErr := svc.GetVcenterInventory(ctx, assessmentID, vcenterID)
+			Expect(inventory).To(BeNil())
+			var inventoryForbidden *service.ErrForbidden
+			Expect(errors.As(inventoryErr, &inventoryForbidden)).To(BeTrue())
+			cluster, clusterErr := svc.GetClusterInventory(ctx, assessmentID, vcenterID, "cluster-1")
+			Expect(cluster).To(BeNil())
+			var clusterForbidden *service.ErrForbidden
+			Expect(errors.As(clusterErr, &clusterForbidden)).To(BeTrue())
+		})
+	})
+
 	Context("ListAssessments", func() {
 		BeforeEach(func() {
 			// Create assessments for different users
@@ -503,7 +539,7 @@ var _ = Describe("authz assessment service", Ordered, func() {
 			assessmentID = uuid.New()
 			tx := gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Original Name", "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL"))
 			Expect(tx.Error).To(BeNil())
-			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+			tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "test", "", false, `{"vcenter_id":"test","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 			Expect(tx.Error).To(BeNil())
 		})
 

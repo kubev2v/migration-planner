@@ -155,7 +155,7 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 	})
 })
 
-var _ = Describe("AssessmentInventoryToAPI", func() {
+var _ = Describe("InventoryToV2API", func() {
 	storedAt := time.Date(2026, 10, 14, 10, 0, 0, 0, time.UTC)
 	collectedAt := time.Date(2026, 10, 13, 9, 0, 0, 0, time.UTC)
 	vcenterVersion := "8.0.3.0"
@@ -170,32 +170,6 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 	}{
 		{
 			id:      1,
-			name:    "v2 preserves collection metadata",
-			version: model.InventoryVersionV2,
-			raw: model2.Inventory{
-				VcenterId:      "vcenter-id",
-				VcenterVersion: &vcenterVersion,
-				CreatedAt:      &collectedAt,
-				CollectionTime: &collectedAt,
-				Vcenter: &model2.InventoryData{
-					Vms: model2.VMs{
-						Total: 5,
-					},
-				},
-				Clusters: map[string]model2.InventoryData{
-					"domain-c34": {
-						Vms: model2.VMs{
-							Total: 2,
-						},
-					},
-				},
-			},
-			created:    collectedAt,
-			apiVersion: "8.0.3.0",
-			collection: &collectedAt,
-		},
-		{
-			id:      2,
 			name:    "v2 falls back to stored timestamp",
 			version: model.InventoryVersionV2,
 			raw: model2.Inventory{
@@ -209,26 +183,29 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			created: storedAt,
 		},
 		{
-			id:      3,
+			id:      2,
 			name:    "legacy inventory uses stored timestamp",
 			version: model.InventoryVersionV1,
 			raw: model2.Inventory{
-				VcenterId: "vc-id",
+				VcenterId:      "vc-id",
+				CollectionTime: &collectedAt,
+				VcenterVersion: &vcenterVersion,
 				Vcenter: &model2.InventoryData{
 					Vms: model2.VMs{
 						Total: 5,
 					},
 				},
 			},
-			created: storedAt,
+			created:    storedAt,
+			apiVersion: "8.0.3.0",
+			collection: &collectedAt,
 		},
 	} {
 		It(tc.name, func() {
 
-			data, clusters, err := mappers.AssessmentInventoryToAPI(model2.AssessmentInventory{
+			data := mappers.InventoryToV2API(model2.AssessmentInventory{
 				VCenterID: "vc-id", Version: tc.version, CreatedAt: storedAt, Inventory: tc.raw,
 			})
-			Expect(err).NotTo(HaveOccurred())
 			raw, err := json.Marshal(data)
 			Expect(err).NotTo(HaveOccurred())
 			var result api.InventoryV2
@@ -243,11 +220,6 @@ var _ = Describe("AssessmentInventoryToAPI", func() {
 			}
 			Expect(result.Data.Infra.Datastores).NotTo(BeNil(), "inventory collections must be normalized")
 			Expect(result.Data.Vms.PowerStates).NotTo(BeNil(), "inventory collections must be normalized")
-
-			if tc.id == 1 {
-				Expect(clusters).To(HaveKey("domain-c34"))
-				Expect(clusters["domain-c34"].Vms.Total).To(Equal(2))
-			}
 		})
 	}
 })
@@ -325,7 +297,7 @@ var _ = Describe("Inventory datastore storage metadata", func() {
 	})
 })
 
-var _ = Describe("Inventory host storage metadata", func() {
+var _ = Describe("Inventory host details and storage metadata", func() {
 	DescribeTable("preserves hosts through service mapping and persisted assessment inventory", func(hostJSON string) {
 		raw := []byte(`{"vcenter_id":"vc1","vcenter":{"infra":{"hosts":[` + hostJSON + `]}},"clusters":{"cluster1":{"infra":{"hosts":[` + hostJSON + `]}}}}`)
 		var input api.Inventory
@@ -342,7 +314,7 @@ var _ = Describe("Inventory host storage metadata", func() {
 			Expect(output.Clusters["cluster1"].Infra.Hosts).To(Equal(input.Clusters["cluster1"].Infra.Hosts))
 		}
 	},
-		Entry("all fields and orphan LUNs", `{"id":"host1","vendor":"host vendor","model":"host model","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
+		Entry("all fields and orphan LUNs", `{"id":"host1","datacenter":"dc-1","cluster":"cluster-1","vendor":"host vendor","model":"host model","cpuModel":"Xeon Gold","serialNumber":"SN-1","storageAdapters":[{"device":"vmhba1","key":"hba1","type":"FC","protocol":"FibreChannel","model":"adapter model","driver":"driver","nodeWwn":"000123","portWwn":"000456"}],"storageLuns":[{"canonicalName":"naa.001","key":"lun1","lunUuid":"000uuid","vendor":"LUN vendor","model":"LUN model","adapterDevices":["vmhba1","vmhba2"]},{"canonicalName":"naa.orphan"}]}`),
 		Entry("historical inventory without storage", `{"id":"host1","vendor":"vendor","model":"model"}`),
 	)
 })

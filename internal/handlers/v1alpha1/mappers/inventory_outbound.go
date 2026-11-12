@@ -31,6 +31,12 @@ func InventoryToAPI(inv svcmodel.Inventory) api.Inventory {
 	return result
 }
 
+func ClusterInventoryToAPI(d svcmodel.InventoryData) api.InventoryData {
+	result := inventoryDataToAPI(d)
+	normalizeInventoryData(&result)
+	return result
+}
+
 func inventoryDataToAPI(d svcmodel.InventoryData) api.InventoryData {
 	result := api.InventoryData{
 		Infra: infraToAPI(d.Infra),
@@ -247,6 +253,10 @@ func storageIoConfigurationToAPI(s svcmodel.StorageIoConfiguration) api.StorageI
 
 func hostToAPI(h svcmodel.Host) api.Host {
 	result := api.Host{
+		Datacenter:              h.Datacenter,
+		Cluster:                 h.Cluster,
+		CpuModel:                h.CpuModel,
+		SerialNumber:            h.SerialNumber,
 		CpuCores:                h.CpuCores,
 		CpuSockets:              h.CpuSockets,
 		Id:                      h.Id,

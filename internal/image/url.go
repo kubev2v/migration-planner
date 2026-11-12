@@ -28,9 +28,13 @@ type payload struct {
 const (
 	// ImageExpirationTime define the expiration of the image download URL
 	ImageExpirationTime = 4 * time.Hour
+
+	// AppliancePathName is the {name} path segment that selects the appliance
+	// image tar on the bytoken route; OVA names always end in ".ova".
+	AppliancePathName = "appliance"
 )
 
-func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *strfmt.DateTime, error) {
+func GenerateDownloadURLByToken(baseUrl string, source *model.Source, name string) (string, *strfmt.DateTime, error) {
 	token, err := JWTForSymmetricKey([]byte(source.ImageInfra.ImageTokenKey), ImageExpirationTime, source.ID.String(), uuid.NewString())
 	if err != nil {
 		return "", nil, errors.Wrap(err, "failed to sign image URL")
@@ -41,7 +45,7 @@ func GenerateDownloadURLByToken(baseUrl string, source *model.Source) (string, *
 		return "", nil, err
 	}
 
-	path := fmt.Sprintf("%s/%s/%s.ova", "/api/v1/image/bytoken/", token, source.Name)
+	path := fmt.Sprintf("%s/%s/%s", "/api/v1/image/bytoken/", token, name)
 	shortURL, err := buildURL(baseUrl, path, false, map[string]string{})
 	if err != nil {
 		return "", nil, err

@@ -27,7 +27,7 @@ import (
 const (
 	insertSourceStm              = "INSERT INTO sources (id, name, username, org_id, inventory) VALUES ('%s', '%s', '%s', '%s', '%s');"
 	insertAssessmentStm          = "INSERT INTO assessments (id, created_at, name, org_id, username, owner_first_name, owner_last_name, source_type, source_id) VALUES ('%s', now(), '%s', '%s', '%s', '%s', '%s', '%s', %s);"
-	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, assessment_id, name, vcenter_id, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (gen_random_uuid()::text, '%s', 'test', '', 0, 0, 0, 0, 2, '%s');"
+	insertAssessmentInventoryStm = "INSERT INTO assessment_inventories (id, assessment_id, name, vcenter_id, is_subset, vms_count, hosts_count, networks_count, datastores_count, version, inventory) VALUES (gen_random_uuid()::text, '%s', '%s', '%s', %t, 0, 0, 0, 0, 2, '%s');"
 	countOutboxByTypeStm         = "SELECT COUNT(*) FROM outbox_events WHERE event_type = ?;"
 	countOutboxEventsStm         = "SELECT COUNT(*) FROM outbox_events;"
 )
@@ -72,6 +72,32 @@ var _ = Describe("assessment service", Ordered, func() {
 
 	AfterAll(func() {
 		_ = s.Close()
+	})
+
+	Context("inventory lookup", func() {
+		var assessmentID, vcenterID uuid.UUID
+		BeforeEach(func() {
+			assessmentID, vcenterID = uuid.New(), uuid.New()
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Inventory lookup", "org1", "user1", "John", "Doe", service.SourceTypeRvtools, "NULL")).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "main", vcenterID, false, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID, "subset", vcenterID, true, `{"clusters":{"cluster-1":{"vms":{"total":10}}}}`)).Error).To(Succeed())
+		})
+		AfterEach(func() {
+			Expect(s.Assessment().Delete(context.Background(), assessmentID)).To(Succeed())
+		})
+
+		It("returns the matching RVTools subset inventory", func() {
+			inventory, err := svc.GetVcenterInventory(context.Background(), assessmentID, vcenterID)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(inventory.Name).To(Equal("subset"))
+			Expect(inventory.VCenterID).To(Equal(vcenterID.String()))
+		})
+
+		It("returns the requested cluster inventory", func() {
+			cluster, err := svc.GetClusterInventory(context.Background(), assessmentID, vcenterID, "cluster-1")
+			Expect(err).NotTo(HaveOccurred())
+			Expect(cluster.Vms.Total).To(Equal(10))
+		})
 	})
 
 	Context("ListAssessments", func() {
@@ -554,7 +580,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -586,7 +612,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -616,7 +642,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 0 inventories
@@ -670,7 +696,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"old-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Delete the source (this will set source_id to NULL due to ON DELETE SET NULL)
@@ -701,7 +727,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				newName := "Updated Name"
@@ -740,7 +766,7 @@ var _ = Describe("assessment service", Ordered, func() {
 				Expect(tx.Error).To(BeNil())
 
 				// Add initial inventory
-				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
+				tx = gormdb.Exec(fmt.Sprintf(insertAssessmentInventoryStm, assessmentID.String(), "test", "", false, `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10},"infra":{"totalHosts":5}}}`))
 				Expect(tx.Error).To(BeNil())
 
 				// Verify initial state: 1 inventory

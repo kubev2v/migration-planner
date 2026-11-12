@@ -58,6 +58,14 @@ func (f *ForbiddenAssessmentService) GetAssessment(_ context.Context, id uuid.UU
 	return nil, service.NewErrForbidden("assessment", id.String())
 }
 
+func (f *ForbiddenAssessmentService) GetClusterInventory(_ context.Context, id, _ uuid.UUID, _ string) (*svcmodel.InventoryData, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
+func (f *ForbiddenAssessmentService) GetVcenterInventory(_ context.Context, id, _ uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	return nil, service.NewErrForbidden("assessment", id.String())
+}
+
 func (f *ForbiddenAssessmentService) ListAssessments(_ context.Context, _ *service.AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	return nil, service.NewErrForbidden("assessment", "list")
 }

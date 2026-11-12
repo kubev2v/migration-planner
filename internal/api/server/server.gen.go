@@ -153,7 +153,7 @@ type ServerInterface interface {
 	HeadImage(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v1/sources/{id}/image-url)
-	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+	GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams)
 
 	// (PUT /api/v1/sources/{id}/inventory)
 	UpdateInventory(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -169,6 +169,9 @@ type ServerInterface interface {
 
 	// (GET /api/v2/assessments/{id})
 	GetAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
+
+	// (PATCH /api/v2/assessments/{id})
+	UpdateAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (PUT /api/v2/assessments/{id}/rvtools)
 	UploadRvtoolsToAssessment(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
@@ -411,7 +414,7 @@ func (_ Unimplemented) HeadImage(w http.ResponseWriter, r *http.Request, id open
 }
 
 // (GET /api/v1/sources/{id}/image-url)
-func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (_ Unimplemented) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -437,6 +440,11 @@ func (_ Unimplemented) CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.
 
 // (GET /api/v2/assessments/{id})
 func (_ Unimplemented) GetAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// (PATCH /api/v2/assessments/{id})
+func (_ Unimplemented) UpdateAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1555,8 +1563,19 @@ func (siw *ServerInterfaceWrapper) GetSourceDownloadURL(w http.ResponseWriter, r
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetSourceDownloadURLParams
+
+	// ------------- Optional query parameter "image" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "image", r.URL.Query(), &params.Image)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "image", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.GetSourceDownloadURL(w, r, id)
+		siw.Handler.GetSourceDownloadURL(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1665,6 +1684,32 @@ func (siw *ServerInterfaceWrapper) GetAssessmentV2(w http.ResponseWriter, r *htt
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetAssessmentV2(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r.WithContext(ctx))
+}
+
+// UpdateAssessmentV2 operation middleware
+func (siw *ServerInterfaceWrapper) UpdateAssessmentV2(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var err error
+
+	// ------------- Path parameter "id" -------------
+	var id openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateAssessmentV2(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2091,6 +2136,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/v2/assessments/{id}", wrapper.GetAssessmentV2)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/api/v2/assessments/{id}", wrapper.UpdateAssessmentV2)
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/v2/assessments/{id}/rvtools", wrapper.UploadRvtoolsToAssessment)
@@ -4523,7 +4571,8 @@ func (response HeadImage500Response) VisitHeadImageResponse(w http.ResponseWrite
 }
 
 type GetSourceDownloadURLRequestObject struct {
-	Id openapi_types.UUID `json:"id"`
+	Id     openapi_types.UUID `json:"id"`
+	Params GetSourceDownloadURLParams
 }
 
 type GetSourceDownloadURLResponseObject interface {
@@ -4853,6 +4902,69 @@ func (response GetAssessmentV2404JSONResponse) VisitGetAssessmentV2Response(w ht
 type GetAssessmentV2500JSONResponse Error
 
 func (response GetAssessmentV2500JSONResponse) VisitGetAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2RequestObject struct {
+	Id   openapi_types.UUID `json:"id"`
+	Body *UpdateAssessmentV2JSONRequestBody
+}
+
+type UpdateAssessmentV2ResponseObject interface {
+	VisitUpdateAssessmentV2Response(w http.ResponseWriter) error
+}
+
+type UpdateAssessmentV2200JSONResponse AssessmentV2
+
+func (response UpdateAssessmentV2200JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2400JSONResponse Error
+
+func (response UpdateAssessmentV2400JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2401JSONResponse Error
+
+func (response UpdateAssessmentV2401JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2403JSONResponse Error
+
+func (response UpdateAssessmentV2403JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2404JSONResponse Error
+
+func (response UpdateAssessmentV2404JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type UpdateAssessmentV2500JSONResponse Error
+
+func (response UpdateAssessmentV2500JSONResponse) VisitUpdateAssessmentV2Response(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -5251,6 +5363,9 @@ type StrictServerInterface interface {
 
 	// (GET /api/v2/assessments/{id})
 	GetAssessmentV2(ctx context.Context, request GetAssessmentV2RequestObject) (GetAssessmentV2ResponseObject, error)
+
+	// (PATCH /api/v2/assessments/{id})
+	UpdateAssessmentV2(ctx context.Context, request UpdateAssessmentV2RequestObject) (UpdateAssessmentV2ResponseObject, error)
 
 	// (PUT /api/v2/assessments/{id}/rvtools)
 	UploadRvtoolsToAssessment(ctx context.Context, request UploadRvtoolsToAssessmentRequestObject) (UploadRvtoolsToAssessmentResponseObject, error)
@@ -6540,10 +6655,11 @@ func (sh *strictHandler) HeadImage(w http.ResponseWriter, r *http.Request, id op
 }
 
 // GetSourceDownloadURL operation middleware
-func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+func (sh *strictHandler) GetSourceDownloadURL(w http.ResponseWriter, r *http.Request, id openapi_types.UUID, params GetSourceDownloadURLParams) {
 	var request GetSourceDownloadURLRequestObject
 
 	request.Id = id
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.GetSourceDownloadURL(ctx, request.(GetSourceDownloadURLRequestObject))
@@ -6705,6 +6821,39 @@ func (sh *strictHandler) GetAssessmentV2(w http.ResponseWriter, r *http.Request,
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetAssessmentV2ResponseObject); ok {
 		if err := validResponse.VisitGetAssessmentV2Response(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateAssessmentV2 operation middleware
+func (sh *strictHandler) UpdateAssessmentV2(w http.ResponseWriter, r *http.Request, id openapi_types.UUID) {
+	var request UpdateAssessmentV2RequestObject
+
+	request.Id = id
+
+	var body UpdateAssessmentV2JSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateAssessmentV2(ctx, request.(UpdateAssessmentV2RequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateAssessmentV2")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateAssessmentV2ResponseObject); ok {
+		if err := validResponse.VisitUpdateAssessmentV2Response(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -256,7 +256,7 @@ type ClientInterface interface {
 	HeadImage(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSourceDownloadURL request
-	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+	GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UpdateInventoryWithBody request with any body
 	UpdateInventoryWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -274,6 +274,11 @@ type ClientInterface interface {
 
 	// GetAssessmentV2 request
 	GetAssessmentV2(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateAssessmentV2WithBody request with any body
+	UpdateAssessmentV2WithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	UpdateAssessmentV2(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentV2JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// UploadRvtoolsToAssessmentWithBody request with any body
 	UploadRvtoolsToAssessmentWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1011,8 +1016,8 @@ func (c *Client) HeadImage(ctx context.Context, id openapi_types.UUID, reqEditor
 	return c.Client.Do(req)
 }
 
-func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewGetSourceDownloadURLRequest(c.Server, id)
+func (c *Client) GetSourceDownloadURL(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSourceDownloadURLRequest(c.Server, id, params)
 	if err != nil {
 		return nil, err
 	}
@@ -1085,6 +1090,30 @@ func (c *Client) CreateRVToolsAssessmentV2WithBody(ctx context.Context, contentT
 
 func (c *Client) GetAssessmentV2(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewGetAssessmentV2Request(c.Server, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAssessmentV2WithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAssessmentV2RequestWithBody(c.Server, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+func (c *Client) UpdateAssessmentV2(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentV2JSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateAssessmentV2Request(c.Server, id, body)
 	if err != nil {
 		return nil, err
 	}
@@ -2857,7 +2886,7 @@ func NewHeadImageRequest(server string, id openapi_types.UUID) (*http.Request, e
 }
 
 // NewGetSourceDownloadURLRequest generates requests for GetSourceDownloadURL
-func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http.Request, error) {
+func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID, params *GetSourceDownloadURLParams) (*http.Request, error) {
 	var err error
 
 	var pathParam0 string
@@ -2880,6 +2909,28 @@ func NewGetSourceDownloadURLRequest(server string, id openapi_types.UUID) (*http
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.Image != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "image", runtime.ParamLocationQuery, *params.Image); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -3059,6 +3110,53 @@ func NewGetAssessmentV2Request(server string, id openapi_types.UUID) (*http.Requ
 	if err != nil {
 		return nil, err
 	}
+
+	return req, nil
+}
+
+// NewUpdateAssessmentV2Request calls the generic UpdateAssessmentV2 builder with application/json body
+func NewUpdateAssessmentV2Request(server string, id openapi_types.UUID, body UpdateAssessmentV2JSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateAssessmentV2RequestWithBody(server, id, "application/json", bodyReader)
+}
+
+// NewUpdateAssessmentV2RequestWithBody generates requests for UpdateAssessmentV2 with any type of body
+func NewUpdateAssessmentV2RequestWithBody(server string, id openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithLocation("simple", false, "id", runtime.ParamLocationPath, id)
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/api/v2/assessments/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest("PATCH", queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
 
 	return req, nil
 }
@@ -3464,7 +3562,7 @@ type ClientWithResponsesInterface interface {
 	HeadImageWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*HeadImageResponse, error)
 
 	// GetSourceDownloadURLWithResponse request
-	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
+	GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error)
 
 	// UpdateInventoryWithBodyWithResponse request with any body
 	UpdateInventoryWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInventoryResponse, error)
@@ -3482,6 +3580,11 @@ type ClientWithResponsesInterface interface {
 
 	// GetAssessmentV2WithResponse request
 	GetAssessmentV2WithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetAssessmentV2Response, error)
+
+	// UpdateAssessmentV2WithBodyWithResponse request with any body
+	UpdateAssessmentV2WithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAssessmentV2Response, error)
+
+	UpdateAssessmentV2WithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentV2JSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAssessmentV2Response, error)
 
 	// UploadRvtoolsToAssessmentWithBodyWithResponse request with any body
 	UploadRvtoolsToAssessmentWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadRvtoolsToAssessmentResponse, error)
@@ -4800,6 +4903,33 @@ func (r GetAssessmentV2Response) StatusCode() int {
 	return 0
 }
 
+type UpdateAssessmentV2Response struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	JSON200      *AssessmentV2
+	JSON400      *Error
+	JSON401      *Error
+	JSON403      *Error
+	JSON404      *Error
+	JSON500      *Error
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateAssessmentV2Response) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateAssessmentV2Response) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
 type UploadRvtoolsToAssessmentResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5450,8 +5580,8 @@ func (c *ClientWithResponses) HeadImageWithResponse(ctx context.Context, id open
 }
 
 // GetSourceDownloadURLWithResponse request returning *GetSourceDownloadURLResponse
-func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error) {
-	rsp, err := c.GetSourceDownloadURL(ctx, id, reqEditors...)
+func (c *ClientWithResponses) GetSourceDownloadURLWithResponse(ctx context.Context, id openapi_types.UUID, params *GetSourceDownloadURLParams, reqEditors ...RequestEditorFn) (*GetSourceDownloadURLResponse, error) {
+	rsp, err := c.GetSourceDownloadURL(ctx, id, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -5509,6 +5639,23 @@ func (c *ClientWithResponses) GetAssessmentV2WithResponse(ctx context.Context, i
 		return nil, err
 	}
 	return ParseGetAssessmentV2Response(rsp)
+}
+
+// UpdateAssessmentV2WithBodyWithResponse request with arbitrary body returning *UpdateAssessmentV2Response
+func (c *ClientWithResponses) UpdateAssessmentV2WithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateAssessmentV2Response, error) {
+	rsp, err := c.UpdateAssessmentV2WithBody(ctx, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAssessmentV2Response(rsp)
+}
+
+func (c *ClientWithResponses) UpdateAssessmentV2WithResponse(ctx context.Context, id openapi_types.UUID, body UpdateAssessmentV2JSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateAssessmentV2Response, error) {
+	rsp, err := c.UpdateAssessmentV2(ctx, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateAssessmentV2Response(rsp)
 }
 
 // UploadRvtoolsToAssessmentWithBodyWithResponse request with arbitrary body returning *UploadRvtoolsToAssessmentResponse
@@ -8226,6 +8373,67 @@ func ParseGetAssessmentV2Response(rsp *http.Response) (*GetAssessmentV2Response,
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON401 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 403:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON403 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 404:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON404 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 500:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON500 = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateAssessmentV2Response parses an HTTP response from a UpdateAssessmentV2WithResponse call
+func ParseUpdateAssessmentV2Response(rsp *http.Response) (*UpdateAssessmentV2Response, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateAssessmentV2Response{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest AssessmentV2
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error

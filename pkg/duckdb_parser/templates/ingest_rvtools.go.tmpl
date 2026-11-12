@@ -283,18 +283,28 @@ ALTER TABLE vdatastore_raw ADD COLUMN IF NOT EXISTS "Major Version" VARCHAR;
 
 CREATE TABLE vhost_raw AS
 SELECT * FROM read_xlsx('{{.FilePath}}', sheet='vHost', all_varchar=true);
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Object ID" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "CPU Model" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Serial number" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Service tag" VARCHAR;
+ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Config status" VARCHAR;
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "VMotion support" VARCHAR;
 ALTER TABLE vhost_raw ADD COLUMN IF NOT EXISTS "Storage VMotion support" VARCHAR;
 
-INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "Model", "Vendor", "Host", "Config status",
+INSERT INTO vhost ("Datacenter", "Cluster", "# Cores", "# CPU", "Object ID", "# Memory", "CPU Model", "Serial Number", "Model", "Vendor", "Host", "Config status",
     "VMotion support", "Storage VMotion support", "VI SDK UUID")
 SELECT
     "Datacenter",
     "Cluster",
     TRY_CAST("# Cores" AS INTEGER),
     TRY_CAST("# CPU" AS INTEGER),
-    "Object ID",
+    CASE WHEN UPPER(TRIM(COALESCE("Object ID", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Object ID") END,
     TRY_CAST("# Memory" AS INTEGER),
+    CASE WHEN UPPER(TRIM(COALESCE("CPU Model", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("CPU Model") END,
+    COALESCE(
+        CASE WHEN UPPER(TRIM(COALESCE("Serial number", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Serial number") END,
+        CASE WHEN UPPER(TRIM(COALESCE("Service tag", ''))) IN ('', 'VM') THEN NULL ELSE TRIM("Service tag") END
+    ),
     "Model",
     "Vendor",
     "Host",

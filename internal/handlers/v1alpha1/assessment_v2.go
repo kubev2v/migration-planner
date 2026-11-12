@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 
-	svcmodel "github.com/kubev2v/migration-planner/internal/model"
-
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
@@ -57,7 +55,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 				break
 			}
 			logger.Error(err).WithString("step", "parse_multipart").Log()
-			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err)}, nil
+			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to parse form"}, nil
 		}
 
 		switch part.FormName() {
@@ -66,7 +64,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 			_ = part.Close()
 			if err != nil {
 				logger.Error(err).WithString("step", "read_name").Log()
-				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to read name: %v", err)}, nil
+				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to read name"}, nil
 			}
 			name = string(nameBytes)
 		case "file":
@@ -76,7 +74,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 
 			if copyErr != nil {
 				logger.Error(copyErr).WithString("step", "write_temp_file").Log()
-				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: fmt.Sprintf("failed to read file: %v", copyErr)}, nil
+				return server.CreateRVToolsAssessmentV2400JSONResponse{Message: "failed to read file"}, nil
 			}
 
 			if closeErr != nil {
@@ -106,7 +104,11 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 
 	if err := validateXLSXFile(tmpFile.Name()); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.CreateRVToolsAssessmentV2400JSONResponse{Message: err.Error()}, nil
+		var invalid *validator.ErrInvalidFile
+		if errors.As(err, &invalid) {
+			return server.CreateRVToolsAssessmentV2400JSONResponse{Message: invalid.Error()}, nil
+		}
+		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	logger.Step("file_received").WithInt("file_size", int(fileSize)).Log()
@@ -124,7 +126,7 @@ func (h *ServiceHandler) CreateRVToolsAssessmentV2(ctx context.Context, request 
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
+		return server.CreateRVToolsAssessmentV2500JSONResponse{Message: "failed to create job"}, nil
 	}
 	canCleanup = false
 
@@ -146,15 +148,13 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	_, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.UploadRvtoolsToAssessment404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.UploadRvtoolsToAssessment403JSONResponse{Message: err.Error()}, nil
 		default:
-			return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
+			return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to get assessment"}, nil
 		}
 	}
 
@@ -166,18 +166,18 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	part, err := request.Body.NextPart()
 	if err != nil {
 		logger.Error(err).WithString("step", "parse_multipart").Log()
-		return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to parse form: %v", err)}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to parse form"}, nil
 	}
 
 	if part.FormName() != "file" {
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: fmt.Sprintf("failed to process uploaded file. Unknown part: %s", part.FormName())}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "file is required"}, nil
 	}
 
 	tmpFile, err := os.CreateTemp("", "rvtools-upload-*.xlsx")
 	if err != nil {
 		_ = part.Close()
 		logger.Error(err).WithString("step", "create_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to create temp file"}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to create temp file"}, nil
 	}
 	cleanup := true
 	defer func() {
@@ -191,12 +191,12 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	partCloseErr := part.Close()
 	if copyErr != nil {
 		logger.Error(copyErr).WithString("step", "write_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: fmt.Sprintf("failed to read file: %v", copyErr)}, nil
+		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	if closeErr != nil {
 		logger.Error(closeErr).WithString("step", "close_temp_file").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: "failed to write temp file"}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to write temp file"}, nil
 	}
 
 	if partCloseErr != nil {
@@ -216,7 +216,11 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 
 	if err := validateXLSXFile(tmpFile.Name()); err != nil {
 		logger.Error(err).WithString("step", "validation").Log()
-		return server.UploadRvtoolsToAssessment400JSONResponse{Message: err.Error()}, nil
+		var invalid *validator.ErrInvalidFile
+		if errors.As(err, &invalid) {
+			return server.UploadRvtoolsToAssessment400JSONResponse{Message: invalid.Error()}, nil
+		}
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to read file"}, nil
 	}
 
 	logger.Step("file_received").WithInt("file_size", int(n)).Log()
@@ -234,7 +238,7 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 	job, err := h.jobSrv.CreateRVToolsJob(ctx, jobArgs)
 	if err != nil {
 		logger.Error(err).Log()
-		return server.UploadRvtoolsToAssessment500JSONResponse{Message: fmt.Sprintf("failed to create job: %v", err)}, nil
+		return server.UploadRvtoolsToAssessment500JSONResponse{Message: "failed to create job"}, nil
 	}
 	cleanup = false
 
@@ -258,9 +262,57 @@ func (h *ServiceHandler) ListAssessmentsV2(ctx context.Context, _ server.ListAss
 
 	response := make([]api.AssessmentV2Summary, len(assessments))
 	for i, assessment := range assessments {
-		response[i] = mappers.AssessmentV2ToApi(assessment)
+		response[i] = mappers.AssessmentSummaryToApi(assessment)
 	}
 	return server.ListAssessmentsV2200JSONResponse(response), nil
+}
+
+// UpdateAssessmentV2 (PATCH /api/v2/assessments/{id})
+func (h *ServiceHandler) UpdateAssessmentV2(ctx context.Context, request server.UpdateAssessmentV2RequestObject) (server.UpdateAssessmentV2ResponseObject, error) {
+	logger := log.NewDebugLogger("assessment_v2_handler").
+		WithContext(ctx).
+		Operation("update_assessment").
+		WithUUID("assessment_id", request.Id).
+		WithRequestBody("request_body", request.Body).
+		Build()
+
+	if request.Body == nil || request.Body.Name == nil {
+		logger.Error(fmt.Errorf("empty request body")).Log()
+		return server.UpdateAssessmentV2400JSONResponse{Message: "empty body"}, nil
+	}
+
+	if err := validator.ValidateName(*request.Body.Name); err != nil {
+		logger.Error(err).Log()
+		return server.UpdateAssessmentV2400JSONResponse{Message: err.Error()}, nil
+	}
+
+	updatedAssessment, err := h.assessmentSrv.UpdateAssessment(ctx, request.Id, request.Body.Name)
+	if err != nil {
+		logger.Error(err).Log()
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
+			return server.UpdateAssessmentV2404JSONResponse{Message: err.Error()}, nil
+		case *service.ErrForbidden:
+			return server.UpdateAssessmentV2403JSONResponse{Message: err.Error()}, nil
+		case *service.ErrAgentUpdateForbidden, *service.ErrDuplicateKey:
+			return server.UpdateAssessmentV2400JSONResponse{Message: err.Error()}, nil
+		default:
+			return server.UpdateAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to update assessment: %v", err)}, nil
+		}
+	}
+
+	response, err := mappers.AssessmentToV2API(updatedAssessment)
+	if err != nil {
+		logger.Error(err).Log()
+		return server.UpdateAssessmentV2500JSONResponse{Message: err.Error()}, nil
+	}
+
+	logger.Success().
+		WithString("updated_name", updatedAssessment.Name).
+		WithString("source_type", updatedAssessment.SourceType).
+		Log()
+
+	return server.UpdateAssessmentV2200JSONResponse(response), nil
 }
 
 // GetAssessmentV2 (GET /api/v2/assessments/{id})
@@ -274,42 +326,23 @@ func (h *ServiceHandler) GetAssessmentV2(ctx context.Context, request server.Get
 	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetAssessmentV2404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetAssessmentV2403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetAssessmentV2500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
-	vcenters := make([]api.SubResource, 0, len(assessment.SubsetInventories))
-	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
-		for _, inv := range assessment.SubsetInventories {
-			vcenters = append(vcenters, api.SubResource{
-				Id: inv.VCenterID,
-			})
-		}
-	default:
-		vcenters = append(vcenters, api.SubResource{
-			Id: assessment.MainInventory.VCenterID,
-		})
-	}
-
-	data, _, err := mappers.AssessmentInventoryToAPI(assessment.MainInventory)
+	response, err := mappers.AssessmentToV2API(assessment)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.GetAssessmentV2500JSONResponse{Message: err.Error()}, nil
 	}
 
-	return server.GetAssessmentV2200JSONResponse{
-		Data:     data,
-		Vcenters: vcenters,
-	}, nil
+	return server.GetAssessmentV2200JSONResponse(response), nil
 }
 
 // GetVcenter (GET /api/v2/assessments/{id}/vcenters/{vid})
@@ -321,42 +354,23 @@ func (h *ServiceHandler) GetVcenter(ctx context.Context, request server.GetVcent
 		WithUUID("vcenter_id", request.Vid).
 		Build()
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
+	inv, err := h.assessmentSrv.GetVcenterInventory(ctx, request.Id, request.Vid)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetVcenter404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetVcenter403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetVcenter500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
-	var vcenterInv svcmodel.AssessmentInventory
-
-	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
-		inv, found := firstInventoryByID(assessment.SubsetInventories, request.Vid.String())
-		if !found {
-			return server.GetVcenter404JSONResponse{Message: fmt.Sprintf("vcenter id: %s has not found", request.Vid)}, nil
-		}
-		vcenterInv = inv
-	default:
-		vcenterInv = assessment.MainInventory
-	}
-
-	vcenter, clusters, err := mappers.AssessmentInventoryToAPI(vcenterInv)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetVcenter500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
-	}
-
-	clusterList := mappers.AssessmentClustersToAPI(clusters)
-	return server.GetVcenter200JSONResponse{Data: vcenter, Clusters: clusterList}, nil
+	return server.GetVcenter200JSONResponse{
+		Data:     mappers.InventoryToV2API(*inv),
+		Clusters: mappers.AssessmentClustersToAPI(inv.Inventory.Clusters),
+	}, nil
 }
 
 // GetVcenterCluster (GET /api/v2/assessments/{id}/vcenters/{vid}/clusters/{cid})
@@ -369,44 +383,20 @@ func (h *ServiceHandler) GetVcenterCluster(ctx context.Context, request server.G
 		WithString("cluster_id", request.Cid).
 		Build()
 
-	assessment, err := h.assessmentSrv.GetAssessment(ctx, request.Id)
+	clusterInv, err := h.assessmentSrv.GetClusterInventory(ctx, request.Id, request.Vid, request.Cid)
 	if err != nil {
 		logger.Error(err).Log()
-		var errResourceNotFound *service.ErrResourceNotFound
-		var errForbidden *service.ErrForbidden
-		switch {
-		case errors.As(err, &errResourceNotFound):
+		switch err.(type) {
+		case *service.ErrResourceNotFound:
 			return server.GetVcenterCluster404JSONResponse{Message: err.Error()}, nil
-		case errors.As(err, &errForbidden):
+		case *service.ErrForbidden:
 			return server.GetVcenterCluster403JSONResponse{Message: err.Error()}, nil
 		default:
 			return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to get assessment: %v", err)}, nil
 		}
 	}
 
-	var vcenterInv svcmodel.AssessmentInventory
-
-	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
-		inv, found := firstInventoryByID(assessment.SubsetInventories, request.Vid.String())
-		if !found {
-			return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("vcenter id: %s has not found", request.Vid)}, nil
-		}
-		vcenterInv = inv
-	default:
-		vcenterInv = assessment.MainInventory
-	}
-
-	_, clusters, err := mappers.AssessmentInventoryToAPI(vcenterInv)
-	if err != nil {
-		logger.Error(err).Log()
-		return server.GetVcenterCluster500JSONResponse{Message: fmt.Sprintf("failed to read vcenter inventory: %v", err)}, nil
-	}
-	cluster, ok := clusters[request.Cid]
-	if !ok {
-		return server.GetVcenterCluster404JSONResponse{Message: fmt.Sprintf("cluster %s not found in vcenter %s", request.Cid, request.Vid)}, nil
-	}
-	return server.GetVcenterCluster200JSONResponse(cluster), nil
+	return server.GetVcenterCluster200JSONResponse(mappers.ClusterInventoryToAPI(*clusterInv)), nil
 }
 
 func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.DeleteVCenterRequestObject) (server.DeleteVCenterResponseObject, error) {
@@ -431,13 +421,4 @@ func (h *ServiceHandler) DeleteVCenter(ctx context.Context, request server.Delet
 
 	logger.Success().Log()
 	return server.DeleteVCenter204Response{}, nil
-}
-
-func firstInventoryByID(inventories []svcmodel.AssessmentInventory, id string) (svcmodel.AssessmentInventory, bool) {
-	for _, inv := range inventories {
-		if inv.VCenterID == id {
-			return inv, true
-		}
-	}
-	return svcmodel.AssessmentInventory{}, false
 }

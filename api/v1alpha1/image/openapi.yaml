@@ -12,7 +12,7 @@ paths:
     get:
       tags:
         - image
-      description: Get the OVA image via URL
+      description: Get the OVA image via URL; the name "appliance" serves the appliance image tar instead
       operationId: getImageByToken
       parameters:
         - name: token
@@ -23,13 +23,13 @@ paths:
             type: string
         - name: name
           in: path
-          description: Image name
+          description: Image name; "appliance" selects the appliance image tar
           required: true
           schema:
             type: string
       responses:
         "200":
-          description: An OVA image
+          description: An OVA image, or the appliance image tar (application/x-tar) when the name is "appliance"
           content:
             application/ovf:
               schema:

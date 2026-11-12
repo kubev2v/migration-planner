@@ -230,8 +230,12 @@ func infraFromDuckDB(i *inventory.InfraData) svcmodel.Infra {
 	hosts := make([]svcmodel.Host, 0, len(i.Hosts))
 	for _, h := range i.Hosts {
 		host := svcmodel.Host{
-			Vendor: h.Vendor,
-			Model:  h.Model,
+			Vendor:       h.Vendor,
+			Model:        h.Model,
+			Datacenter:   optionalStorageString(h.Datacenter),
+			Cluster:      optionalStorageString(h.Cluster),
+			CpuModel:     optionalStorageString(h.CpuModel),
+			SerialNumber: optionalStorageString(h.SerialNumber),
 		}
 		if h.ID != "" {
 			id := h.ID

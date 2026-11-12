@@ -951,3 +951,80 @@ func TestIngestSqlite_NICCountAndAdapterModels(t *testing.T) {
 	assert.Equal(t, sql.NullString{String: "E1000", Valid: true}, adapters[1])
 	assert.False(t, adapters[2].Valid, "missing device model must stay unknown")
 }
+
+func TestIngestSqlite_HostFacts(t *testing.T) {
+	tests := []struct {
+		name             string
+		hostFactsColumns bool
+		cpuModel         string
+		serial           string
+		serviceTag       string
+		wantCPU          string
+		wantSerial       string
+		wantCores        int
+		wantSockets      int
+		wantMemoryMB     int
+	}{
+		{name: "hardware serial takes precedence", hostFactsColumns: true, cpuModel: " Xeon Gold 6338 ", serial: " SN-1 ", serviceTag: "TAG-1", wantCPU: "Xeon Gold 6338", wantSerial: "SN-1", wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "service tag fills absent serial", hostFactsColumns: true, cpuModel: "Xeon Silver", serviceTag: " TAG-2 ", wantCPU: "Xeon Silver", wantSerial: "TAG-2", wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "empty facts remain unknown", hostFactsColumns: true, wantCores: 32, wantSockets: 2, wantMemoryMB: 131072},
+		{name: "older source without host fact columns", wantCores: 8, wantSockets: 2, wantMemoryMB: 32768},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			parser, _, cleanup := setupTestParser(t, &testValidator{})
+			defer cleanup()
+
+			sqlitePath := createTestSQLite(t, "vc-1", []sqliteCluster{{id: "cluster-1", name: "cluster-a", datacenter: "dc-a"}}, []sqliteVM{{id: "vm-1", name: "vm-1", clusterName: "cluster-a"}})
+			sourceDB, err := sql.Open("duckdb", "")
+			require.NoError(t, err)
+			defer func() { _ = sourceDB.Close() }()
+			_, err = sourceDB.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", escapeSQLString(sqlitePath)))
+			require.NoError(t, err)
+			if tt.hostFactsColumns {
+				_, err = sourceDB.Exec(`ALTER TABLE dst.Host ADD COLUMN CpuModel VARCHAR;
+ALTER TABLE dst.Host ADD COLUMN SerialNumber VARCHAR;
+ALTER TABLE dst.Host ADD COLUMN ServiceTag VARCHAR;
+DELETE FROM dst.Host WHERE ID = 'host-1';
+INSERT INTO dst.Host (ID, Cluster, CpuCores, CpuSockets, CpuModel, SerialNumber, ServiceTag, MemoryBytes, Model, Vendor)
+VALUES ('host-1', 'cluster-1', 32, 2, ?, ?, ?, 137438953472, 'PowerEdge R740', 'Dell')`, tt.cpuModel, tt.serial, tt.serviceTag)
+				require.NoError(t, err)
+			}
+			require.NoError(t, sourceDB.Close())
+
+			result, err := parser.IngestSqlite(context.Background(), sqlitePath)
+			require.NoError(t, err)
+			require.True(t, result.IsValid(), "Forklift validation failed: %v", result.Errors)
+
+			hosts, err := parser.Hosts(context.Background(), Filters{}, Options{})
+			require.NoError(t, err)
+			require.Len(t, hosts, 1)
+			var persistedHosts int
+			require.NoError(t, parser.db.QueryRowContext(context.Background(), `SELECT COUNT(*) FROM vhost`).Scan(&persistedHosts))
+			require.Equal(t, 1, persistedHosts, "source compatibility must not drop the vhost row")
+			assert.Equal(t, "host-1", hosts[0].Id)
+			assert.Equal(t, "dc-a", hosts[0].Datacenter)
+			assert.Equal(t, "cluster-a", hosts[0].Cluster)
+			assert.Equal(t, tt.wantCPU, hosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, hosts[0].SerialNumber)
+			assert.Equal(t, tt.wantCores, hosts[0].CpuCores)
+			assert.Equal(t, tt.wantSockets, hosts[0].CpuSockets)
+			assert.Equal(t, tt.wantMemoryMB, hosts[0].MemoryMB)
+
+			built, err := parser.BuildInventory(context.Background(), nil)
+			require.NoError(t, err)
+			require.NotNil(t, built.VCenter)
+			require.Len(t, built.VCenter.Infra.Hosts, 1)
+			assert.Equal(t, tt.wantCPU, built.VCenter.Infra.Hosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, built.VCenter.Infra.Hosts[0].SerialNumber)
+			var clusterHosts []inventory.Host
+			for _, cluster := range built.Clusters {
+				clusterHosts = append(clusterHosts, cluster.Infra.Hosts...)
+			}
+			require.Len(t, clusterHosts, 1)
+			assert.Equal(t, tt.wantCPU, clusterHosts[0].CpuModel)
+			assert.Equal(t, tt.wantSerial, clusterHosts[0].SerialNumber)
+		})
+	}
+}

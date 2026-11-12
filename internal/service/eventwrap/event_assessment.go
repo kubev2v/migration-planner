@@ -52,6 +52,14 @@ func (e *EventAssessmentService) GetAssessment(ctx context.Context, id uuid.UUID
 	return e.inner.GetAssessment(ctx, id)
 }
 
+func (e *EventAssessmentService) GetClusterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID, clusterId string) (*svcmodel.InventoryData, error) {
+	return e.inner.GetClusterInventory(ctx, assessmentId, vcenterID, clusterId)
+}
+
+func (e *EventAssessmentService) GetVcenterInventory(ctx context.Context, assessmentId, vcenterID uuid.UUID) (*svcmodel.AssessmentInventory, error) {
+	return e.inner.GetVcenterInventory(ctx, assessmentId, vcenterID)
+}
+
 func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createForm mappers.AssessmentCreateForm) (*svcmodel.Assessment, error) {
 	accountIdentity, err := e.accountsSvc.GetAccountIdentity(ctx, createForm.OrgID)
 	if err != nil {

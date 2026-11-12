@@ -3,23 +3,27 @@ package v1alpha1_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
+
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 
 	"github.com/kubev2v/migration-planner/internal/api/server"
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/client"
 	"github.com/kubev2v/migration-planner/internal/config"
 	handlers "github.com/kubev2v/migration-planner/internal/handlers/v1alpha1"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
 )
 
 var _ = Describe("job handler", Ordered, func() {
@@ -206,5 +210,95 @@ var _ = Describe("job handler", Ordered, func() {
 			Expect(errorResp.Message).To(ContainSubstring("The provided name"))
 			Expect(errorResp.Message).To(ContainSubstring("invalid"))
 		})
+	})
+})
+
+type rvtoolsFailingReader struct{ err error }
+
+func (r rvtoolsFailingReader) Read([]byte) (int, error) { return 0, r.err }
+
+type rvtoolsFailingJobStore struct {
+	store.Job
+	err error
+}
+
+func (s *rvtoolsFailingJobStore) Get(context.Context, int64) (*store.JobRow, error) {
+	return nil, s.err
+}
+
+type rvtoolsHandlerStore struct {
+	store.Store
+	job store.Job
+}
+
+func (s *rvtoolsHandlerStore) Job() store.Job { return s.job }
+
+var _ = Describe("RVTools safe API errors", func() {
+
+	DescribeTable("does not expose upload implementation errors", func(version int, problem string) {
+		cause := errors.New("reading /var/lib/agent/private.xlsx: SELECT secret FROM internal")
+		ctx := auth.NewTokenContext(context.Background(), auth.User{Username: "user", Organization: "org"})
+		srv := handlers.NewServiceHandler(nil, &assessmentV2ServiceStub{assessment: &svcmodel.Assessment{}}, nil, nil, nil, nil, nil, nil)
+		body := multipart.NewReader(rvtoolsFailingReader{cause}, "boundary")
+		expectedStatus := http.StatusBadRequest
+		expectedMessage := "failed to parse form"
+		if problem != "read" {
+			var data bytes.Buffer
+			writer := multipart.NewWriter(&data)
+			if version != 3 {
+				Expect(writer.WriteField("name", "assessment")).To(Succeed())
+			}
+			part, err := writer.CreateFormFile("file", "private.xlsx")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = part.Write([]byte("not an Excel workbook"))
+			Expect(err).NotTo(HaveOccurred())
+			Expect(writer.Close()).To(Succeed())
+			body = multipart.NewReader(&data, writer.Boundary())
+			if problem == "save" {
+				GinkgoT().Setenv("TMPDIR", filepath.Join(GinkgoT().TempDir(), "missing"))
+				expectedStatus = http.StatusInternalServerError
+				expectedMessage = "failed to create temp file"
+			} else {
+				expectedMessage = "file is not a valid Excel file"
+			}
+		}
+		recorder := httptest.NewRecorder()
+		switch version {
+		case 3:
+			response, err := srv.UploadRvtoolsToAssessment(ctx, server.UploadRvtoolsToAssessmentRequestObject{Body: body})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.VisitUploadRvtoolsToAssessmentResponse(recorder)).To(Succeed())
+		default:
+			response, err := srv.CreateRVToolsAssessmentV2(ctx, server.CreateRVToolsAssessmentV2RequestObject{Body: body})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(response.VisitCreateRVToolsAssessmentV2Response(recorder)).To(Succeed())
+		}
+		Expect(recorder.Code).To(Equal(expectedStatus))
+		Expect(recorder.Body.String()).To(MatchJSON(`{"message":"` + expectedMessage + `"}`))
+	},
+		Entry("v2 read failure", 2, "read"),
+		Entry("v2 save failure", 2, "save"),
+		Entry("v2 invalid signature", 2, "signature"),
+		Entry("update read failure", 3, "read"), Entry("update save failure", 3, "save"), Entry("update invalid signature", 3, "signature"),
+	)
+
+	It("hides job-store errors from polling and cancellation responses", func() {
+		cause := errors.New("SELECT private_column FROM /private/database")
+		st := &rvtoolsHandlerStore{job: &rvtoolsFailingJobStore{err: cause}}
+		jobs := service.NewJobService(st, nil, "")
+		srv := handlers.NewServiceHandler(nil, nil, jobs, nil, nil, nil, nil, nil)
+		ctx := auth.NewTokenContext(context.Background(), auth.User{Username: "user", Organization: "org"})
+		recorder := httptest.NewRecorder()
+		response, err := srv.GetJob(ctx, server.GetJobRequestObject{Id: 1})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(response.VisitGetJobResponse(recorder)).To(Succeed())
+		Expect(recorder.Code).To(Equal(http.StatusInternalServerError))
+		Expect(recorder.Body.String()).To(MatchJSON(`{"message":"failed to get job"}`))
+		recorder = httptest.NewRecorder()
+		cancelled, err := srv.CancelJob(ctx, server.CancelJobRequestObject{Id: 1})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(cancelled.VisitCancelJobResponse(recorder)).To(Succeed())
+		Expect(recorder.Code).To(Equal(http.StatusInternalServerError))
+		Expect(recorder.Body.String()).To(MatchJSON(`{"message":"failed to cancel job"}`))
 	})
 })
