@@ -114,10 +114,6 @@ func oapiErrorHandler(w http.ResponseWriter, message string, statusCode int) {
 	http.Error(w, fmt.Sprintf("API Error: %s", message), statusCode)
 }
 
-func requestErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
-	http.Error(w, err.Error(), http.StatusBadRequest)
-}
-
 // detectOldSchemaMiddleware checks for old inventory schema format before OpenAPI validation.
 // Old schema: inventory.{infra, vcenter, vms} - VMs at top level
 // New schema: inventory.{clusters, vcenter, vcenter_id} - VMs inside clusters/vcenter
@@ -299,12 +295,7 @@ func (s *Server) Run(ctx context.Context) error {
 		enhancementDataSvc,
 	)
 
-	server.HandlerFromMux(server.NewStrictHandlerWithOptions(h, nil, server.StrictHTTPServerOptions{
-		RequestErrorHandlerFunc: requestErrorHandler,
-		ResponseErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-		},
-	}), router)
+	server.HandlerFromMux(server.NewStrictHandler(h, nil), router)
 	srv := http.Server{Addr: s.cfg.Service.Address, Handler: router}
 
 	go func() {

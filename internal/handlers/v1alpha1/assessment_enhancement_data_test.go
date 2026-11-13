@@ -139,6 +139,26 @@ var _ = Describe("enhancement data handler", func() {
 			Expect(ok).To(BeTrue())
 		})
 
+		It("returns a field-specific 400 when a counter exceeds the supported range", func() {
+			tooLarge := json.Number("2147483648")
+			request := &api.EnhancementDataRequest{
+				VmwareVersionCounts: &api.VMwareVersionCountsRequest{
+					PerpetualLicensesCount: &tooLarge,
+				},
+			}
+
+			resp, err := handler.SaveAssessmentEnhancementData(ctx, server.SaveAssessmentEnhancementDataRequestObject{
+				Id:   assessmentID,
+				Body: request,
+			})
+
+			Expect(err).To(BeNil())
+			response, ok := resp.(server.SaveAssessmentEnhancementData400JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(response.Message).To(Equal("Number of perpetual licenses must be a whole number within the supported range"))
+			Expect(mockStore.enhancementData[assessmentID.String()]).To(BeNil())
+		})
+
 		It("returns 403 when authz denies access", func() {
 			forbiddenHandler := handlers.NewServiceHandler(
 				nil,
