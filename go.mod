@@ -33,7 +33,7 @@ require (
 	github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5
 	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.25.0
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
@@ -222,6 +222,6 @@ require (
 replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.29.0
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
