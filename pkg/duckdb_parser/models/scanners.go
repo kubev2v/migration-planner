@@ -139,6 +139,11 @@ func (n *NICs) Scan(value interface{}) error {
 			IPv4Addresses:   append([]string{}, ipv4...),
 			IPv6Addresses:   append([]string{}, ipv6...),
 		}
+		if group := toString(m["PortGroup"]); group != "" {
+			if err := json.Unmarshal([]byte(group), &nic.PortGroup); err != nil {
+				return fmt.Errorf("NICs.Scan: PortGroup: %w", err)
+			}
+		}
 		result = append(result, nic)
 	}
 	*n = result

@@ -150,6 +150,11 @@ func (b *QueryBuilder) NetworkQuery(filters Filters, options Options) (string, e
 	return b.buildQuery("network_query", mustGetTemplate("network_query"), params)
 }
 
+// NetworkTopologyQuery returns shared interface, port-group and switch relationships.
+func NetworkTopologyQuery() string {
+	return mustGetTemplate("network_topology")
+}
+
 // HostQuery builds a host query with filters and pagination.
 func (b *QueryBuilder) HostQuery(filters Filters, options Options) (string, error) {
 	params := queryParams{

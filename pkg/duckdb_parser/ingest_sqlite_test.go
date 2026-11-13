@@ -39,7 +39,7 @@ type sqliteVM struct {
 
 // createTestSQLite builds a minimal forklift SQLite database at a temp path and returns
 // that path. Tables match what ingest_sqlite.go.tmpl expects.
-func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluster, vms []sqliteVM) string {
+func createTestSQLite(t testing.TB, instanceUUID string, clusters []sqliteCluster, vms []sqliteVM) string {
 	t.Helper()
 
 	sqlitePath := filepath.Join(t.TempDir(), "test-forklift.db")
@@ -86,7 +86,7 @@ func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluste
 		)`,
 
 		// Network (referenced by ingest template; empty is fine for these tests)
-		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR)`,
+		`CREATE TABLE dst.Network (ID VARCHAR PRIMARY KEY, Name VARCHAR, DVSwitch VARCHAR, VlanId VARCHAR, Variant VARCHAR, "Key" VARCHAR, MaxMTU INTEGER DEFAULT 0)`,
 
 		// Datastore
 		`CREATE TABLE dst.Datastore (ID VARCHAR PRIMARY KEY, Name VARCHAR, Free BIGINT, Capacity BIGINT, MaintenanceMode VARCHAR, Type VARCHAR, FilesystemType VARCHAR, FilesystemMajorVersion INTEGER, ProtocolEndpointType VARCHAR DEFAULT '', BackingDevicesNames VARCHAR, IORMEnabled BOOLEAN, IORMCongestionThreshold INTEGER, IORMCongestionThresholdMode VARCHAR, IORMPercentOfPeakThroughput INTEGER)`,
@@ -612,7 +612,7 @@ func TestIngestSqlite_StandalonePlaceholderExcludedFromClusters(t *testing.T) {
 		10737418240, 0, 0, 0, '[]', '[]', 0, 0, 2, 0, 0, '[]', '[]'
 	)`)
 	require.NoError(t, err)
-	_, err = sdb.Exec(`INSERT INTO dst.Network VALUES ('net-standalone', 'standalone-network', NULL, '0')`)
+	_, err = sdb.Exec(`INSERT INTO dst.Network (ID, Name, DVSwitch, VlanId) VALUES ('net-standalone', 'standalone-network', NULL, '0')`)
 	require.NoError(t, err)
 	_, err = sdb.Exec(`UPDATE dst.VM
 		SET NICs = '[{"network":{"kind":"Network","id":"net-standalone"},"mac":"aa:bb:cc:dd:ee:ff","order":0,"deviceKey":100}]'
@@ -913,7 +913,7 @@ func TestIngestSqlite_NICCountAndAdapterModels(t *testing.T) {
 	require.NoError(t, err)
 	_, err = src.Exec(`UPDATE dst.VM SET NICs = NULL WHERE ID = 'vm-null'`)
 	require.NoError(t, err)
-	_, err = src.Exec(`INSERT INTO dst.Network VALUES ('net-1', 'Production', NULL, '0')`)
+	_, err = src.Exec(`INSERT INTO dst.Network (ID, Name, DVSwitch, VlanId) VALUES ('net-1', 'Production', NULL, '0')`)
 	require.NoError(t, err)
 	_, err = src.Exec("DETACH dst")
 	require.NoError(t, err)

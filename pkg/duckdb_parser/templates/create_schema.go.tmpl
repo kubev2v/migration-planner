@@ -117,6 +117,8 @@ CREATE TABLE IF NOT EXISTS vnetwork (
     "IPv6 Addresses" VARCHAR[] DEFAULT [],
     "VLAN" VARCHAR,
     "Cluster" VARCHAR,
+    "Port Group ID" VARCHAR,
+    "Port Group Type" VARCHAR,
     FOREIGN KEY ("VM ID") REFERENCES vinfo("VM ID")
 );
 
@@ -211,18 +213,41 @@ CREATE TABLE IF NOT EXISTS vhostscsi (
 CREATE TABLE IF NOT EXISTS dvport (
     "Port" VARCHAR,
     "VLAN" VARCHAR,
-    "Switch" VARCHAR
+    "Switch" VARCHAR,
+    "Object ID" VARCHAR,
+    "Key" VARCHAR,
+    "Switch ID" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS vport (
     "Host" VARCHAR,
     "Port Group" VARCHAR,
     "Switch" VARCHAR,
-    "VLAN" VARCHAR
+    "VLAN" VARCHAR,
+    "Key" VARCHAR
 );
 
 CREATE TABLE IF NOT EXISTS dvswitch (
-    "Name" VARCHAR
+    "Name" VARCHAR,
+    "Switch" VARCHAR,
+    "Object ID" VARCHAR,
+    "Max MTU" INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS vswitch (
+    "Host" VARCHAR,
+    "Switch" VARCHAR,
+    "Key" VARCHAR,
+    "MTU" INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS vsc_vmk (
+    "Host" VARCHAR,
+    "Device" VARCHAR,
+    "Key" VARCHAR,
+    "Port Group" VARCHAR,
+    "Type" VARCHAR,
+    "MTU" INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS concerns (
