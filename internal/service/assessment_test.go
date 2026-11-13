@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
+
 	"github.com/google/uuid"
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +22,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 

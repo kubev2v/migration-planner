@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
+
 	"go.uber.org/zap"
 
 	"github.com/google/uuid"
@@ -12,7 +14,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
 )
 
 type EventPartnerService struct {

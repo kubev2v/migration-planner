@@ -13,6 +13,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/kafka"
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
+
 	"github.com/kubev2v/migration-planner/pkg/opa"
 	"github.com/twmb/franz-go/pkg/kgo"
 	"github.com/twmb/franz-go/pkg/sasl/scram"
@@ -26,8 +29,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/config"
 	"github.com/kubev2v/migration-planner/internal/service/eventwrap"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/events/kafka"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/log"
 	"github.com/kubev2v/migration-planner/pkg/migrations"
 	"github.com/kubev2v/migration-planner/pkg/version"
