@@ -91,6 +91,8 @@ func enhancementDataAPIToModel(assessmentID uuid.UUID, data api.EnhancementData)
 		m.VsphereSrmEnabled = data.VsphereCore.SrmEnabled
 		m.VsphereNiocEnabled = data.VsphereCore.NiocEnabled
 		m.VsphereNiocDetails = data.VsphereCore.NiocDetails
+		m.VspherePortMirroringEnabled = data.VsphereCore.PortMirroringEnabled
+		m.VspherePortMirroringDetails = data.VsphereCore.PortMirroringDetails
 	}
 
 	if data.Nsx != nil {
@@ -146,13 +148,16 @@ func enhancementDataModelToAPI(m *model.AssessmentEnhancementData) api.Enhanceme
 	}
 
 	if m.VsphereVmEncryptionEnabled != nil || m.VsphereVmEncryptionPolicy != nil ||
-		m.VsphereSrmEnabled != nil || m.VsphereNiocEnabled != nil || m.VsphereNiocDetails != nil {
+		m.VsphereSrmEnabled != nil || m.VsphereNiocEnabled != nil || m.VsphereNiocDetails != nil ||
+		m.VspherePortMirroringEnabled != nil || m.VspherePortMirroringDetails != nil {
 		data.VsphereCore = &api.VsphereCoreInput{
-			VmEncryptionEnabled: m.VsphereVmEncryptionEnabled,
-			VmEncryptionPolicy:  m.VsphereVmEncryptionPolicy,
-			SrmEnabled:          m.VsphereSrmEnabled,
-			NiocEnabled:         m.VsphereNiocEnabled,
-			NiocDetails:         m.VsphereNiocDetails,
+			VmEncryptionEnabled:  m.VsphereVmEncryptionEnabled,
+			VmEncryptionPolicy:   m.VsphereVmEncryptionPolicy,
+			SrmEnabled:           m.VsphereSrmEnabled,
+			NiocEnabled:          m.VsphereNiocEnabled,
+			NiocDetails:          m.VsphereNiocDetails,
+			PortMirroringEnabled: m.VspherePortMirroringEnabled,
+			PortMirroringDetails: m.VspherePortMirroringDetails,
 		}
 	}
 

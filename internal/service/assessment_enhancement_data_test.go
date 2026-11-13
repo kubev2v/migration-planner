@@ -82,11 +82,13 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 		}),
 		Entry("vsphere core", api.EnhancementData{
 			VsphereCore: &api.VsphereCoreInput{
-				VmEncryptionEnabled: util.BoolPtr(true),
-				VmEncryptionPolicy:  util.ToStrPtr("strict"),
-				SrmEnabled:          util.BoolPtr(false),
-				NiocEnabled:         util.BoolPtr(true),
-				NiocDetails:         util.ToStrPtr("Storage traffic is prioritized."),
+				VmEncryptionEnabled:  util.BoolPtr(true),
+				VmEncryptionPolicy:   util.ToStrPtr("strict"),
+				SrmEnabled:           util.BoolPtr(false),
+				NiocEnabled:          util.BoolPtr(true),
+				NiocDetails:          util.ToStrPtr("Storage traffic is prioritized."),
+				PortMirroringEnabled: util.BoolPtr(true),
+				PortMirroringDetails: util.ToStrPtr("Mirror application traffic for security analysis."),
 			},
 		}, func(out api.EnhancementData) {
 			Expect(out.VsphereCore).NotTo(BeNil())
@@ -97,6 +99,9 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 			Expect(*out.VsphereCore.NiocEnabled).To(BeTrue())
 			Expect(out.VsphereCore.NiocDetails).NotTo(BeNil())
 			Expect(*out.VsphereCore.NiocDetails).To(Equal("Storage traffic is prioritized."))
+			Expect(out.VsphereCore.PortMirroringEnabled).NotTo(BeNil())
+			Expect(*out.VsphereCore.PortMirroringEnabled).To(BeTrue())
+			Expect(*out.VsphereCore.PortMirroringDetails).To(Equal("Mirror application traffic for security analysis."))
 		}),
 		Entry("NIOC-only disabled", api.EnhancementData{
 			VsphereCore: &api.VsphereCoreInput{
@@ -107,6 +112,16 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 			Expect(out.VsphereCore.NiocEnabled).NotTo(BeNil())
 			Expect(*out.VsphereCore.NiocEnabled).To(BeFalse())
 			Expect(out.VsphereCore.NiocDetails).To(BeNil())
+		}),
+		Entry("Port Mirroring-only disabled", api.EnhancementData{
+			VsphereCore: &api.VsphereCoreInput{
+				PortMirroringEnabled: util.BoolPtr(false),
+			},
+		}, func(out api.EnhancementData) {
+			Expect(out.VsphereCore).NotTo(BeNil())
+			Expect(out.VsphereCore.PortMirroringEnabled).NotTo(BeNil())
+			Expect(*out.VsphereCore.PortMirroringEnabled).To(BeFalse())
+			Expect(out.VsphereCore.PortMirroringDetails).To(BeNil())
 		}),
 		Entry("nsx features", api.EnhancementData{
 			Nsx: &api.NsxInput{

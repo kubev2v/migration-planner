@@ -1623,10 +1623,16 @@ type VsphereCoreInput struct {
 	NiocDetails *string `json:"niocDetails,omitempty" validate:"omitempty,max=1000"`
 
 	// NiocEnabled Whether Network I/O Control is enabled
-	NiocEnabled         *bool   `json:"niocEnabled,omitempty"`
-	SrmEnabled          *bool   `json:"srmEnabled,omitempty"`
-	VmEncryptionEnabled *bool   `json:"vmEncryptionEnabled,omitempty"`
-	VmEncryptionPolicy  *string `json:"vmEncryptionPolicy,omitempty" validate:"omitempty,max=1000"`
+	NiocEnabled *bool `json:"niocEnabled,omitempty"`
+
+	// PortMirroringDetails What traffic is mirrored and why
+	PortMirroringDetails *string `json:"portMirroringDetails,omitempty" validate:"omitempty,max=1000"`
+
+	// PortMirroringEnabled Whether Port Mirroring is enabled
+	PortMirroringEnabled *bool   `json:"portMirroringEnabled,omitempty"`
+	SrmEnabled           *bool   `json:"srmEnabled,omitempty"`
+	VmEncryptionEnabled  *bool   `json:"vmEncryptionEnabled,omitempty"`
+	VmEncryptionPolicy   *string `json:"vmEncryptionPolicy,omitempty" validate:"omitempty,max=1000"`
 }
 
 // DiskSizeTierSummary defines model for diskSizeTierSummary.
