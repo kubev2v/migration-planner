@@ -1,4 +1,13 @@
+FROM --platform=linux/amd64 registry.access.redhat.com/ubi9/go-toolset AS host-builder
+WORKDIR /src
+ENV GOTOOLCHAIN=auto
+COPY go.mod go.sum ./
+COPY cmd/appliance-updater ./cmd/appliance-updater
+COPY internal/applianceupdater ./internal/applianceupdater
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags remote,containers_image_openpgp -trimpath -buildvcs=false -o /tmp/appliance-updater ./cmd/appliance-updater
+
 FROM --platform=linux/amd64 quay.io/centos/centos:stream9 AS builder
+COPY --from=host-builder /tmp/appliance-updater /appliance-updater
 
 ARG ISO_URL ISO_CHECKSUM TLS_VERIFY=true
 ARG APPLIANCE_IMAGE=quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance
