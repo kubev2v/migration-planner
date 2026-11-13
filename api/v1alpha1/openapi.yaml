@@ -766,7 +766,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/EnhancementData"
+              $ref: "#/components/schemas/EnhancementDataRequest"
         required: true
       responses:
         "200":
@@ -4141,6 +4141,31 @@ components:
       required:
         - clusterId
 
+    EnhancementDataRequest:
+      type: object
+      description: Request body for saving VMA enhancement data
+      properties:
+        deployedEnvironment:
+          $ref: "#/components/schemas/DeployedEnvironmentInput"
+        vmwareVersionCounts:
+          $ref: "#/components/schemas/VMwareVersionCountsRequest"
+        activeEnvironments:
+          $ref: "#/components/schemas/ActiveEnvironmentsInput"
+        vmwareSubscription:
+          $ref: "#/components/schemas/VMwareSubscriptionInput"
+        vsphereCore:
+          $ref: "#/components/schemas/VsphereCoreInput"
+        nsx:
+          $ref: "#/components/schemas/NsxInput"
+        ariaOps:
+          $ref: "#/components/schemas/AriaOpsInput"
+        ariaAutomation:
+          $ref: "#/components/schemas/AriaAutomationInput"
+        ariaSecure:
+          $ref: "#/components/schemas/AriaSecureInput"
+        customerDetails:
+          $ref: "#/components/schemas/CustomerDetailsRequest"
+
     EnhancementData:
       type: object
       description: VMA enhancement data — fields that cannot be auto-collected by Agent or RVTools
@@ -4198,6 +4223,26 @@ components:
           minimum: 0
           x-oapi-codegen-extra-tags:
             validate: "omitempty,min=0"
+
+    VMwareVersionCountsRequest:
+      type: object
+      properties:
+        perpetualLicensesCount:
+          type: integer
+          minimum: 0
+          x-go-type: json.Number
+        coresLicensingCount:
+          type: integer
+          minimum: 0
+          x-go-type: json.Number
+        environmentCount:
+          type: integer
+          minimum: 0
+          x-go-type: json.Number
+        otherNodesCount:
+          type: integer
+          minimum: 0
+          x-go-type: json.Number
 
     ActiveEnvironmentsInput:
       type: object
@@ -4301,6 +4346,19 @@ components:
           minimum: 0
           x-oapi-codegen-extra-tags:
             validate: "omitempty,min=0"
+        targetHardware:
+          type: string
+          maxLength: 1000
+          x-oapi-codegen-extra-tags:
+            validate: "omitempty,max=1000"
+
+    CustomerDetailsRequest:
+      type: object
+      properties:
+        physicalLocationsCount:
+          type: integer
+          minimum: 0
+          x-go-type: json.Number
         targetHardware:
           type: string
           maxLength: 1000

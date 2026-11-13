@@ -2,6 +2,7 @@ package v1alpha1_test
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -57,7 +58,7 @@ var _ = Describe("enhancement data handler", func() {
 	Describe("SaveAssessmentEnhancementData", func() {
 		It("returns 200 with valid request", func() {
 			env := api.DeployedEnvironmentInputEnvironment("on_premises")
-			request := &api.EnhancementData{
+			request := &api.EnhancementDataRequest{
 				DeployedEnvironment: &api.DeployedEnvironmentInput{
 					Environment: &env,
 				},
@@ -77,7 +78,7 @@ var _ = Describe("enhancement data handler", func() {
 		})
 
 		It("returns 200 with empty data", func() {
-			request := &api.EnhancementData{}
+			request := &api.EnhancementDataRequest{}
 
 			resp, err := handler.SaveAssessmentEnhancementData(ctx, server.SaveAssessmentEnhancementDataRequestObject{
 				Id:   assessmentID,
@@ -90,7 +91,7 @@ var _ = Describe("enhancement data handler", func() {
 		})
 
 		It("returns 404 when assessment does not exist", func() {
-			request := &api.EnhancementData{}
+			request := &api.EnhancementDataRequest{}
 
 			resp, err := handler.SaveAssessmentEnhancementData(ctx, server.SaveAssessmentEnhancementDataRequestObject{
 				Id:   uuid.New(),
@@ -104,7 +105,7 @@ var _ = Describe("enhancement data handler", func() {
 
 		It("returns 400 when an enum field has an invalid value", func() {
 			env := api.DeployedEnvironmentInputEnvironment("not_a_real_environment")
-			request := &api.EnhancementData{
+			request := &api.EnhancementDataRequest{
 				DeployedEnvironment: &api.DeployedEnvironmentInput{
 					Environment: &env,
 				},
@@ -121,9 +122,9 @@ var _ = Describe("enhancement data handler", func() {
 		})
 
 		It("returns 400 when a counter is negative", func() {
-			negative := -1
-			request := &api.EnhancementData{
-				VmwareVersionCounts: &api.VMwareVersionCountsInput{
+			negative := json.Number("-1")
+			request := &api.EnhancementDataRequest{
+				VmwareVersionCounts: &api.VMwareVersionCountsRequest{
 					PerpetualLicensesCount: &negative,
 				},
 			}
@@ -138,6 +139,26 @@ var _ = Describe("enhancement data handler", func() {
 			Expect(ok).To(BeTrue())
 		})
 
+		It("returns a field-specific 400 when a counter exceeds the supported range", func() {
+			tooLarge := json.Number("2147483648")
+			request := &api.EnhancementDataRequest{
+				VmwareVersionCounts: &api.VMwareVersionCountsRequest{
+					PerpetualLicensesCount: &tooLarge,
+				},
+			}
+
+			resp, err := handler.SaveAssessmentEnhancementData(ctx, server.SaveAssessmentEnhancementDataRequestObject{
+				Id:   assessmentID,
+				Body: request,
+			})
+
+			Expect(err).To(BeNil())
+			response, ok := resp.(server.SaveAssessmentEnhancementData400JSONResponse)
+			Expect(ok).To(BeTrue())
+			Expect(response.Message).To(Equal("Number of perpetual licenses must be a whole number within the supported range"))
+			Expect(mockStore.enhancementData[assessmentID.String()]).To(BeNil())
+		})
+
 		It("returns 403 when authz denies access", func() {
 			forbiddenHandler := handlers.NewServiceHandler(
 				nil,
@@ -146,7 +167,7 @@ var _ = Describe("enhancement data handler", func() {
 				service.NewAssessmentEnhancementDataService(mockStore),
 			)
 
-			request := &api.EnhancementData{}
+			request := &api.EnhancementDataRequest{}
 
 			resp, err := forbiddenHandler.SaveAssessmentEnhancementData(ctx, server.SaveAssessmentEnhancementDataRequestObject{
 				Id:   assessmentID,
@@ -160,7 +181,7 @@ var _ = Describe("enhancement data handler", func() {
 
 		It("overwrites previous data on second save", func() {
 			env1 := api.DeployedEnvironmentInputEnvironment("on_premises")
-			first := &api.EnhancementData{
+			first := &api.EnhancementDataRequest{
 				DeployedEnvironment: &api.DeployedEnvironmentInput{
 					Environment: &env1,
 				},
@@ -173,7 +194,7 @@ var _ = Describe("enhancement data handler", func() {
 			Expect(err).To(BeNil())
 
 			env2 := api.DeployedEnvironmentInputEnvironment("on_cloud")
-			second := &api.EnhancementData{
+			second := &api.EnhancementDataRequest{
 				DeployedEnvironment: &api.DeployedEnvironmentInput{
 					Environment: &env2,
 				},
@@ -212,7 +233,7 @@ var _ = Describe("enhancement data handler", func() {
 
 		It("returns 200 with stored data after save", func() {
 			env := api.DeployedEnvironmentInputEnvironment("managed_services")
-			request := &api.EnhancementData{
+			request := &api.EnhancementDataRequest{
 				DeployedEnvironment: &api.DeployedEnvironmentInput{
 					Environment: &env,
 				},
