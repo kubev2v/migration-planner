@@ -16,6 +16,7 @@ import (
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/version"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -47,6 +48,56 @@ var _ = Describe("SourceToApi", func() {
 		result, err := mappers.SourceToApi(source)
 		Expect(err).To(BeNil())
 		Expect(result.UpdateType).To(BeNil())
+	})
+
+	Describe("appliance version fields", func() {
+		var savedVersion, savedMin string
+
+		BeforeEach(func() {
+			savedVersion = version.Get().AgentVersionName
+			savedMin = version.MinApplianceVersion()
+			version.SetAgentVersionName("v0.33.0")
+		})
+
+		AfterEach(func() {
+			version.SetAgentVersionName(savedVersion)
+			version.SetMinApplianceVersion(savedMin)
+		})
+
+		It("maps the agent-reported version and the supported flag", func() {
+			source := model.Source{
+				Agents: []model.Agent{{Version: "v0.33.0"}},
+			}
+			result, err := mappers.SourceToApi(source)
+			Expect(err).To(BeNil())
+			Expect(result.AgentVersion).NotTo(BeNil())
+			Expect(*result.AgentVersion).To(Equal("v0.33.0"))
+			Expect(result.AgentVersionWarning).To(BeNil())
+			Expect(result.ApplianceUpdateSupported).NotTo(BeNil())
+			Expect(*result.ApplianceUpdateSupported).To(BeTrue())
+		})
+
+		It("maps the warning and unsupported flag below the minimum", func() {
+			version.SetMinApplianceVersion("v0.33.0")
+			source := model.Source{
+				Agents: []model.Agent{{Version: "v0.32.0"}},
+			}
+			result, err := mappers.SourceToApi(source)
+			Expect(err).To(BeNil())
+			Expect(*result.AgentVersion).To(Equal("v0.32.0"))
+			Expect(*result.AgentVersionWarning).To(ContainSubstring("does not support in-place updates"))
+			Expect(*result.ApplianceUpdateSupported).To(BeFalse())
+		})
+
+		It("falls back to the image-infra stamp when no agent reported", func() {
+			source := model.Source{
+				ImageInfra: model.ImageInfra{AgentVersion: func() *string { v := "v0.32.0"; return &v }()},
+			}
+			result, err := mappers.SourceToApi(source)
+			Expect(err).To(BeNil())
+			Expect(*result.AgentVersion).To(Equal("v0.32.0"))
+			Expect(*result.AgentVersionWarning).To(ContainSubstring("version mismatch"))
+		})
 	})
 })
 
