@@ -6,10 +6,11 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-event-streamer/pkg/events"
+	"github.com/kubev2v/migration-planner-common/estimations/engines"
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
+	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/store"
-	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
-	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 )
 
 type EventEstimationService struct {
@@ -28,7 +29,7 @@ func (e *EventEstimationService) CalculateMigrationEstimation(
 	clusterIDs []string,
 	schemas []engines.Schema,
 	userParams []estimation.Param,
-) (map[engines.Schema]*service.MigrationAssessmentResult, error) {
+) (*svcmodel.MigrationEstimationResult, error) {
 	results, err := e.inner.CalculateMigrationEstimation(ctx, assessmentID, clusterIDs, schemas, userParams)
 	if err != nil {
 		return nil, err
@@ -44,7 +45,7 @@ func (e *EventEstimationService) CalculateMigrationComplexity(
 	ctx context.Context,
 	assessmentID uuid.UUID,
 	clusterIDs []string,
-) (*service.MigrationComplexityResult, error) {
+) (*svcmodel.MigrationComplexityResult, error) {
 	result, err := e.inner.CalculateMigrationComplexity(ctx, assessmentID, clusterIDs)
 	if err != nil {
 		return nil, err
@@ -56,24 +57,14 @@ func (e *EventEstimationService) CalculateMigrationComplexity(
 	return result, nil
 }
 
-func (e *EventEstimationService) CalculateOsDiskComplexity(ctx context.Context, assessmentID uuid.UUID, clusterIDs []string) (*service.OsDiskComplexityResult, error) {
-	return e.inner.CalculateOsDiskComplexity(ctx, assessmentID, clusterIDs)
-}
-
-func (e *EventEstimationService) ValidateParams(userParams []estimation.Param) error {
-	return e.inner.ValidateParams(userParams)
-}
-
-func (e *EventEstimationService) BuildBaseParams(userParams []estimation.Param) []estimation.Param {
-	return e.inner.BuildBaseParams(userParams)
-}
-
-func (e *EventEstimationService) BuildBucketParams(baseParams []estimation.Param, vmCount int, diskGB float64) []estimation.Param {
-	return e.inner.BuildBucketParams(baseParams, vmCount, diskGB)
-}
-
-func (e *EventEstimationService) RunEstimation(schemas []engines.Schema, params []estimation.Param) (map[engines.Schema]*service.MigrationAssessmentResult, error) {
-	return e.inner.RunEstimation(schemas, params)
+func (e *EventEstimationService) CalculateMigrationEstimationByComplexity(
+	ctx context.Context,
+	assessmentID uuid.UUID,
+	clusterIDs []string,
+	schemas []engines.Schema,
+	userParams []estimation.Param,
+) (*svcmodel.MigrationEstimationByComplexityResult, error) {
+	return e.inner.CalculateMigrationEstimationByComplexity(ctx, assessmentID, clusterIDs, schemas, userParams)
 }
 
 func (e *EventEstimationService) publishUserAction(ctx context.Context, assessmentID uuid.UUID, eventType string) error {

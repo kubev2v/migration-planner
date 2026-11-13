@@ -8,14 +8,13 @@ import (
 	model2 "github.com/kubev2v/migration-planner/internal/model"
 
 	"github.com/google/uuid"
+	"github.com/kubev2v/migration-planner-common/estimations/complexity"
+	"github.com/kubev2v/migration-planner-common/estimations/engines"
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
-	"github.com/kubev2v/migration-planner/internal/service"
 	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
-	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
-	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -52,7 +51,7 @@ var _ = Describe("SourceToApi", func() {
 
 var _ = Describe("MigrationComplexityResultToAPI", func() {
 	It("maps complexityByDisk, complexityByOS, complexityByOSName, diskSizeRatings, osRatings", func() {
-		result := service.MigrationComplexityResult{
+		result := model2.MigrationComplexityResult{
 			ComplexityByDisk: []complexity.DiskComplexityEntry{
 				{Score: 1, VMCount: 10, TotalSizeTB: 5.0},
 			},
@@ -79,13 +78,13 @@ var _ = Describe("MigrationComplexityResultToAPI", func() {
 
 var _ = Describe("MigrationEstimationResultToAPI", func() {
 	It("wraps results under estimation and populates estimationContext", func() {
-		results := map[engines.Schema]*service.MigrationAssessmentResult{
+		results := map[engines.Schema]*estimation.Result{
 			engines.SchemaNetworkBased: {
 				MinTotalDuration: 2 * time.Hour,
 				MaxTotalDuration: 4 * time.Hour,
 			},
 		}
-		ctx := &service.EstimationContext{
+		ctx := &model2.EstimationContext{
 			Schemas:    []engines.Schema{engines.SchemaNetworkBased},
 			BaseParams: []estimation.Param{{Key: "work_hours_per_day", Value: 8.0}},
 		}
@@ -100,11 +99,11 @@ var _ = Describe("MigrationEstimationResultToAPI", func() {
 	})
 
 	It("preserves integer-typed param values in estimationContext", func() {
-		results := map[engines.Schema]*service.MigrationAssessmentResult{
+		results := map[engines.Schema]*estimation.Result{
 			engines.SchemaNetworkBased: {MinTotalDuration: time.Hour, MaxTotalDuration: time.Hour},
 		}
 		// post_migration_engineers default is int(10) — must not be silently dropped
-		ctx := &service.EstimationContext{
+		ctx := &model2.EstimationContext{
 			Schemas: []engines.Schema{engines.SchemaNetworkBased},
 			BaseParams: []estimation.Param{
 				{Key: "post_migration_engineers", Value: 10}, // int
@@ -126,10 +125,10 @@ var _ = Describe("OsDiskEstimationResultToAPI", func() {
 			{Score: 1, VMCount: 20, TotalSizeTB: 4.0},
 			{Score: 2, VMCount: 5, TotalSizeTB: 1.5},
 		}
-		estimations := map[int]map[string]*service.MigrationAssessmentResult{
+		estimations := map[int]map[string]*estimation.Result{
 			1: {"network-based": {MinTotalDuration: 24 * time.Hour, MaxTotalDuration: 48 * time.Hour}},
 		}
-		ctx := &service.EstimationContext{
+		ctx := &model2.EstimationContext{
 			Schemas:    []engines.Schema{engines.SchemaNetworkBased},
 			BaseParams: []estimation.Param{{Key: "work_hours_per_day", Value: 8.0}},
 		}

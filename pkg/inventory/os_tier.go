@@ -13,7 +13,7 @@ type osClass struct{ tier, mtvStatus string }
 
 // osClassMap maps OS name substrings to support tiers and MTV statuses.
 // Entries are checked via case-insensitive substring match, same as
-// ClassifyOS in pkg/estimations/complexity/complexity.go.
+// ClassifyOS in migration-planner-common/estimations/complexity/complexity.go.
 //
 // Tier membership and MTV status follow the Red Hat KCS article:
 // https://access.redhat.com/articles/4234591 (Updated September 24 2026)
