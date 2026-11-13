@@ -42,7 +42,7 @@ require (
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/twmb/franz-go v1.22.2
+	github.com/twmb/franz-go v1.22.3
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.1
 	go.uber.org/zap v1.28.0
@@ -169,7 +169,7 @@ require (
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.19.0 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.15.0 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.15.1 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.64 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
