@@ -31,7 +31,7 @@ require (
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20261113224656-2662c7aa27ef
 	github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5
-	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
+	github.com/openshift/library-go v0.0.0-20261110211704-6859b4a48389
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/prometheus/client_golang v1.25.0
