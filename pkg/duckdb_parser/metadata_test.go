@@ -15,64 +15,108 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+	"github.com/stretchr/testify/require"
 	"github.com/xuri/excelize/v2"
 
 	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 	"github.com/kubev2v/migration-planner/pkg/store"
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
-	"github.com/stretchr/testify/require"
 )
 
 var _ = Describe("VM metadata", func() {
+	var (
+		ctx context.Context
+		p   *Parser
+		db  *sql.DB
+	)
+
+	BeforeEach(func() {
+		ctx = context.Background()
+
+		var cleanup func()
+		p, db, cleanup = setupTestParser(GinkgoTB(), nil)
+		DeferCleanup(cleanup)
+	})
+
 	Context("SQLite tags and custom attributes", func() {
 		var (
-			ctx  context.Context
-			path string
-			db   *sql.DB
+			path      string
+			fixtureDB *sql.DB
 		)
 
 		BeforeEach(func() {
-			t := GinkgoTB()
-
-			ctx = context.Background()
-			path = createTestSQLite(t, "uuid", []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}},
-				[]sqliteVM{{id: "vm1", name: "vm", clusterName: "cluster"}})
+			path = createTestSQLite(GinkgoTB(), "uuid", []sqliteCluster{{
+				id:         "c1",
+				name:       "cluster",
+				datacenter: "dc",
+			}},
+				[]sqliteVM{{
+					id:          "vm1",
+					name:        "vm",
+					clusterName: "cluster",
+				}})
 
 			var err error
-			db, err = sql.Open("duckdb", "")
+			fixtureDB, err = sql.Open("duckdb", "")
 			Expect(err).To(Succeed())
-			DeferCleanup(db.Close)
-			_, err = db.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
-		ALTER TABLE src.VM ADD COLUMN Tags VARCHAR;
-		ALTER TABLE src.VM ADD COLUMN CustomDef VARCHAR;
-		ALTER TABLE src.VM ADD COLUMN CustomValues VARCHAR`)
+			DeferCleanup(fixtureDB.Close)
+
+			_, err = fixtureDB.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
+				ALTER TABLE src.VM ADD COLUMN Tags VARCHAR;
+				ALTER TABLE src.VM ADD COLUMN CustomDef VARCHAR;
+				ALTER TABLE src.VM ADD COLUMN CustomValues VARCHAR`)
 			Expect(err).To(Succeed())
-			_, err = db.Exec(`UPDATE src.VM SET Tags = ?, CustomDef = ?, CustomValues = ?`,
-				`[{"categoryID":"cat1","name":"Payments; QA"},{"categoryID":"cat1","name":"Production"},{"categoryID":"cat1","name":"Payments; QA"},{"categoryID":"cat2","name":"QA"}]`,
-				`[{"key":1,"name":"cat1"},{"key":2,"name":"Owner's; \"name\""},{"key":3,"name":"Empty"}]`,
-				`[{"key":1,"value":"  Finance & IT  "},{"key":2,"value":"HR"},{"key":3,"value":" "},{"key":99,"value":"unmatched"}]`)
+
+			tags := `[
+				{"categoryID":"cat1","name":"Payments; QA"},
+				{"categoryID":"cat1","name":"Production"},
+				{"categoryID":"cat1","name":"Payments; QA"},
+				{"categoryID":"cat2","name":"QA"}
+			]`
+			customDefinitions := `[
+				{"key":1,"name":"cat1"},
+				{"key":2,"name":"Owner's; \"name\""},
+				{"key":3,"name":"Empty"}
+			]`
+			customValues := `[
+				{"key":1,"value":"  Finance & IT  "},
+				{"key":2,"value":"HR"},
+				{"key":3,"value":" "},
+				{"key":99,"value":"unmatched"}
+			]`
+
+			_, err = fixtureDB.Exec(
+				`UPDATE src.VM SET Tags = ?, CustomDef = ?, CustomValues = ?`,
+				tags, customDefinitions, customValues,
+			)
 			Expect(err).To(Succeed())
-			_, err = db.Exec(`DETACH src`)
+
+			_, err = fixtureDB.Exec(`DETACH src`)
 			Expect(err).To(Succeed())
 		})
 
 		It("imports tags and custom attributes", func() {
-			t := GinkgoTB()
-
-			p, _, cleanup := setupTestParser(t, nil)
-			defer cleanup()
 			_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES (?, ?)`, "cat1", "Owner's; \"name\"")
 			Expect(err).To(Succeed())
+
 			result, err := p.IngestSqlite(ctx, path)
 			Expect(err).To(Succeed())
 			Expect(result.HasErrors()).To(BeFalse())
+
 			var temporaryTables int
-			Expect(p.db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.tables WHERE table_catalog = 'temp' AND table_name = 'tag_categories'`).Scan(&temporaryTables)).To(Succeed())
+			err = p.db.QueryRowContext(ctx, `
+				SELECT count(*)
+				FROM information_schema.tables
+				WHERE table_catalog = 'temp' AND table_name = 'tag_categories'
+			`).Scan(&temporaryTables)
+			Expect(err).To(Succeed())
 			Expect(temporaryTables).To(BeZero(), "ingestion must not create a temporary category table")
+
 			var categoryID string
 			Expect(p.db.QueryRowContext(ctx, `SELECT id FROM tag_categories`).Scan(&categoryID)).To(Succeed())
 			Expect(categoryID).To(Equal("cat1"), "ingestion must preserve the category lookup table")
+
 			vms, err := p.VMs(ctx, Filters{}, Options{})
 			Expect(err).To(Succeed())
 			Expect(vms).To(HaveLen(1))
@@ -80,127 +124,176 @@ var _ = Describe("VM metadata", func() {
 				"Owner's; \"name\"": {"HR", "Payments; QA", "Production"},
 				"cat1":              {"  Finance & IT  "},
 			}))
+
 			var count int
 			Expect(p.db.QueryRowContext(ctx, `SELECT count(*) FROM vm_metadata WHERE vm_id = 'vm1'`).Scan(&count)).To(Succeed())
 			Expect(count).To(Equal(4))
-			Expect(p.db.QueryRowContext(ctx, `SELECT count(*) FROM information_schema.columns WHERE table_name='vinfo' AND column_name='metadata'`).Scan(&count)).To(Succeed())
+
+			err = p.db.QueryRowContext(ctx, `
+				SELECT count(*)
+				FROM information_schema.columns
+				WHERE table_name = 'vinfo' AND column_name = 'metadata'
+			`).Scan(&count)
+			Expect(err).To(Succeed())
 			Expect(count).To(BeZero())
 			Expect(vms[0].Labels).To(BeEmpty())
 		})
 
 		DescribeTable("omits unresolved tags without losing custom attributes",
-			func(categoryName string) {
-				t := GinkgoTB()
-
-				unresolved, _, closeUnresolved := setupTestParser(t, nil)
-				defer closeUnresolved()
-				if categoryName != "unavailable" {
-					_, err := unresolved.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', ?)`, categoryName)
+			func(categoryNames []string) {
+				for _, categoryName := range categoryNames {
+					_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', ?)`, categoryName)
 					Expect(err).To(Succeed())
 				}
-				result, err := unresolved.IngestSqlite(ctx, path)
+
+				result, err := p.IngestSqlite(ctx, path)
 				Expect(err).To(Succeed())
 				Expect(result.HasErrors()).To(BeFalse())
-				vms, err := unresolved.VMs(ctx, Filters{}, Options{})
+
+				vms, err := p.VMs(ctx, Filters{}, Options{})
 				Expect(err).To(Succeed())
 				Expect(vms).To(HaveLen(1))
 				Expect(vms[0].Metadata).To(Equal(models.Metadata{
-					"cat1": {"  Finance & IT  "}, "Owner's; \"name\"": {"HR"},
+					"cat1":              {"  Finance & IT  "},
+					"Owner's; \"name\"": {"HR"},
 				}), "unresolved tags must be omitted without losing custom attributes")
 			},
-			Entry("empty category name", ""),
-
-			Entry("blank category name", " "),
-
-			Entry("missing category", "unavailable"),
+			Entry("empty category name", []string{""}),
+			Entry("blank category name", []string{" "}),
+			Entry("missing category", []string(nil)),
 		)
 
 		It("keeps aggregate inventory unchanged by metadata", func() {
-			t := GinkgoTB()
-
-			p, _, cleanup := setupTestParser(t, nil)
-			defer cleanup()
 			_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES (?, ?)`, "cat1", "Owner's; \"name\"")
 			Expect(err).To(Succeed())
 
 			result, err := p.IngestSqlite(ctx, path)
 			Expect(err).To(Succeed())
 			Expect(result.HasErrors()).To(BeFalse())
+
 			withMetadata, err := p.BuildInventory(ctx, nil)
 			Expect(err).To(Succeed())
 
-			_, err = db.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
-		UPDATE src.VM SET Tags = '[]', CustomValues = '[]'; DETACH src`)
+			_, err = fixtureDB.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
+				UPDATE src.VM SET Tags = '[]', CustomValues = '[]'; DETACH src`)
 			Expect(err).To(Succeed())
-			fresh, _, closeFresh := setupTestParser(t, nil)
-			defer closeFresh()
+
+			fresh, _, closeFresh := setupTestParser(GinkgoTB(), nil)
+			DeferCleanup(closeFresh)
+
 			_, err = fresh.IngestSqlite(ctx, path)
 			Expect(err).To(Succeed())
+
 			vms, err := fresh.VMs(ctx, Filters{}, Options{})
 			Expect(err).To(Succeed())
+			Expect(vms).To(HaveLen(1))
 			Expect(vms[0].Metadata).To(BeEmpty())
+
 			withoutMetadata, err := fresh.BuildInventory(ctx, nil)
 			Expect(err).To(Succeed())
+
 			withMetadata.CreatedAt, withoutMetadata.CreatedAt = nil, nil
 			Expect(withoutMetadata).To(Equal(withMetadata), "metadata must not change aggregate inventory")
 		})
 	})
 
-	It("stops on malformed SQLite metadata and permits a clean retry", func() {
-		t := GinkgoTB()
+	Context("after malformed SQLite metadata", func() {
+		BeforeEach(func() {
+			path := createTestSQLite(GinkgoTB(), "uuid", []sqliteCluster{{
+				id:         "c1",
+				name:       "cluster",
+				datacenter: "dc",
+			}},
+				[]sqliteVM{{
+					id:          "vm1",
+					name:        "vm",
+					clusterName: "cluster",
+				}})
+			db, err := sql.Open("duckdb", "")
+			Expect(err).To(Succeed())
+			DeferCleanup(db.Close)
 
-		path := createTestSQLite(t, "uuid", []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}},
-			[]sqliteVM{{id: "vm1", name: "vm", clusterName: "cluster"}})
-		db, err := sql.Open("duckdb", "")
-		Expect(err).To(Succeed())
-		DeferCleanup(db.Close)
-		_, err = db.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
-		ALTER TABLE src.VM ADD COLUMN Tags VARCHAR;
-		UPDATE src.VM SET Tags = 'invalid JSON'; DETACH src`)
-		Expect(err).To(Succeed())
-		p, _, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		_, err = p.db.ExecContext(context.Background(), `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
-		Expect(err).To(Succeed())
-		_, err = p.IngestSqlite(context.Background(), path)
-		Expect(err).To(MatchError(ContainSubstring("Malformed JSON")))
-		var count int
-		Expect(p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM vinfo`).Scan(&count)).To(Succeed())
-		Expect(count).To(Equal(1), "VM insert precedes metadata, but failed ingestion must not be published")
-		Expect(p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM vcpu`).Scan(&count)).To(Succeed())
-		Expect(count).To(BeZero(), "metadata failure must stop later inventory writes")
-		Expect(p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM duckdb_databases() WHERE database_name = 'src'`).Scan(&count)).To(Succeed())
-		Expect(count).To(BeZero(), "failed import must detach its SQLite source")
-		Expect(p.db.QueryRowContext(context.Background(), `SELECT count(*) FROM tag_categories`).Scan(&count)).To(Succeed())
-		Expect(count).To(Equal(1), "failed import must preserve category names for retry")
-		validPath := createTestSQLite(t, "uuid", []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}},
-			[]sqliteVM{{id: "vm2", name: "replacement", clusterName: "cluster"}})
-		_, err = p.IngestSqlite(context.Background(), validPath)
-		Expect(err).To(Succeed())
-		var name string
-		Expect(p.db.QueryRowContext(context.Background(), `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm2'`).Scan(&name)).To(Succeed())
-		Expect(name).To(Equal("replacement"))
+			_, err = db.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
+				ALTER TABLE src.VM ADD COLUMN Tags VARCHAR;
+				UPDATE src.VM SET Tags = 'invalid JSON'; DETACH src`)
+			Expect(err).To(Succeed())
+
+			_, err = p.db.ExecContext(context.Background(), `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
+			Expect(err).To(Succeed())
+
+			_, err = p.IngestSqlite(context.Background(), path)
+			Expect(err).To(MatchError(ContainSubstring("Malformed JSON")))
+		})
+
+		It("stops later inventory writes", func() {
+			var count int
+			Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM vinfo`).Scan(&count)).To(Succeed())
+			Expect(count).To(Equal(1), "VM insert precedes metadata, but failed ingestion must not be published")
+
+			Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM vcpu`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero(), "metadata failure must stop later inventory writes")
+		})
+
+		It("detaches its SQLite source", func() {
+			var count int
+			Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM duckdb_databases() WHERE database_name = 'src'`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
+		})
+
+		It("preserves category names for retry", func() {
+			var count int
+			Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM tag_categories`).Scan(&count)).To(Succeed())
+			Expect(count).To(Equal(1))
+		})
+
+		It("permits a clean retry", func() {
+			validPath := createTestSQLite(GinkgoTB(), "uuid", []sqliteCluster{{
+				id:         "c1",
+				name:       "cluster",
+				datacenter: "dc",
+			}},
+				[]sqliteVM{{
+					id:          "vm2",
+					name:        "replacement",
+					clusterName: "cluster",
+				}})
+			_, err := p.IngestSqlite(context.Background(), validPath)
+			Expect(err).To(Succeed())
+
+			var name string
+			Expect(p.db.QueryRowContext(context.Background(), `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm2'`).Scan(&name)).To(Succeed())
+			Expect(name).To(Equal("replacement"))
+		})
 	})
 
 	It("preserves category names when retrying a cancelled SQLite import", func() {
-		t := GinkgoTB()
-
-		p, db, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		path := createTestSQLite(t, "uuid", []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}},
-			[]sqliteVM{{id: "vm1", name: "vm", clusterName: "cluster"}})
+		path := createTestSQLite(GinkgoTB(), "uuid", []sqliteCluster{{
+			id:         "c1",
+			name:       "cluster",
+			datacenter: "dc",
+		}},
+			[]sqliteVM{{
+				id:          "vm1",
+				name:        "vm",
+				clusterName: "cluster",
+			}})
 		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		DeferCleanup(cancel)
+
 		_, err := db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('cat1', 'Owner')`)
 		Expect(err).To(Succeed())
+
 		p.db = &cancelVMWriteDB{DB: db, cancel: cancel}
 		_, err = p.IngestSqlite(ctx, path)
 		Expect(err).To(MatchError(context.Canceled))
+
 		var count int
 		Expect(db.QueryRowContext(context.Background(), `SELECT count(*) FROM tag_categories`).Scan(&count)).To(Succeed())
 		Expect(count).To(Equal(1))
+
 		Expect(db.QueryRowContext(context.Background(), `SELECT count(*) FROM duckdb_databases() WHERE database_name = 'src'`).Scan(&count)).To(Succeed())
 		Expect(count).To(BeZero())
+
 		result, err := p.IngestSqlite(context.Background(), path)
 		Expect(err).To(Succeed())
 		Expect(result.HasErrors()).To(BeFalse(), "retry must import a valid inventory")
@@ -215,524 +308,726 @@ var _ = Describe("VM metadata", func() {
 	})
 
 	It("retries a cancelled RVTools import after cleanup", func() {
-		t := GinkgoTB()
-
-		p, db, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		sheets := defaultStandardSheets([]map[string]string{{"VM": "vm", "VM ID": "vm1", "VI SDK UUID": "uuid",
-			"Host": "host", "Cluster": "cluster", "Datacenter": "dc", "Owner": "Finance"}},
-			[]map[string]string{{"Host": "host", "Cluster": "cluster", "Datacenter": "dc"}})
+		sheets := defaultStandardSheets([]map[string]string{{
+			"VM":          "vm",
+			"VM ID":       "vm1",
+			"VI SDK UUID": "uuid",
+			"Host":        "host",
+			"Cluster":     "cluster",
+			"Datacenter":  "dc",
+			"Owner":       "Finance",
+		}},
+			[]map[string]string{{
+				"Host":       "host",
+				"Cluster":    "cluster",
+				"Datacenter": "dc",
+			}})
 		sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate", "Template",
 			"Annotation", "Owner", "Datacenter"}
-		path := createTestExcel(t, sheets...)
+		path := createTestExcel(GinkgoTB(), sheets...)
 		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
+		DeferCleanup(cancel)
+
 		p.db = &cancelVMWriteDB{DB: db, cancel: cancel}
 		_, err := p.IngestRvTools(ctx, path)
 		Expect(err).To(MatchError(context.Canceled))
+
 		Expect(p.Cleanup()).To(Succeed())
+
 		_, err = p.IngestRvTools(context.Background(), path)
 		Expect(err).To(Succeed())
-		Expect(storedMetadata(t, db, "vm1")).To(Equal(map[string][]string{"Owner": {"Finance"}}))
+		Expect(storedMetadata(GinkgoTB(), db, "vm1")).To(Equal(map[string][]string{"Owner": {"Finance"}}))
 	})
 
-	Context("SQLite metadata for existing VMs", func() {
-		cases := []struct {
-			template        bool
-			owner           string
-			differentCenter bool
-		}{
-			{template: false, owner: "Finance"},
+	DescribeTable("SQLite metadata for existing VMs",
+		func(incomingTemplate bool, existingOwner, incomingCenter string, expected map[string][]string) {
+			_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('Owner', 'Owner')`)
+			Expect(err).To(Succeed())
 
-			{template: true, owner: "Finance"},
+			fixtureDB, err := sql.Open("duckdb", "")
+			Expect(err).To(Succeed())
+			DeferCleanup(fixtureDB.Close)
 
-			{template: false, owner: ""},
+			type metadataVM struct {
+				id       string
+				name     string
+				owner    string
+				template bool
+			}
 
-			{template: false, owner: "Finance", differentCenter: true},
-		}
+			imports := []struct {
+				center string
+				vms    []metadataVM
+			}{
+				{
+					center: "uuid",
+					vms: []metadataVM{{
+						id:    "vm1",
+						name:  "existing",
+						owner: existingOwner,
+					}},
+				},
+				{
+					center: incomingCenter,
+					vms: []metadataVM{
+						{
+							id:       "vm1",
+							name:     "incoming",
+							owner:    "Payments",
+							template: incomingTemplate,
+						},
+						{
+							id:    "vm2",
+							name:  "new",
+							owner: "Platform",
+						},
+					},
+				},
+			}
 
-		for _, tc := range cases {
-			It(fmt.Sprintf("incoming template=%t, existing owner=%q, different vCenter=%t", tc.template, tc.owner, tc.differentCenter), func() {
-				t := GinkgoTB()
+			for _, inventory := range imports {
+				vms := make([]sqliteVM, 0, len(inventory.vms))
 
-				ctx := context.Background()
-				p, _, cleanup := setupTestParser(t, nil)
-				defer cleanup()
-				_, err := p.db.ExecContext(ctx, `INSERT INTO tag_categories VALUES ('Owner', 'Owner')`)
-				Expect(err).To(Succeed())
-				db, err := sql.Open("duckdb", "")
-				Expect(err).To(Succeed())
-				DeferCleanup(db.Close)
-				for _, incoming := range []bool{false, true} {
-					vms := []sqliteVM{{id: "vm1", name: "existing", clusterName: "cluster"}}
-					owner := tc.owner
-					if incoming {
-						vms[0].name, owner = "incoming", "Payments"
-						vms = append(vms, sqliteVM{id: "vm2", name: "new", clusterName: "cluster"})
-					}
-					center := "uuid"
-					if incoming && tc.differentCenter {
-						center = "other-uuid"
-					}
-					path := createTestSQLite(t, center, []sqliteCluster{{id: "c1", name: "cluster", datacenter: "dc"}}, vms)
-					_, err = db.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
+				for _, vm := range inventory.vms {
+					vms = append(vms, sqliteVM{
+						id:          vm.id,
+						name:        vm.name,
+						clusterName: "cluster",
+					})
+				}
+
+				path := createTestSQLite(GinkgoTB(), inventory.center, []sqliteCluster{{
+					id:         "c1",
+					name:       "cluster",
+					datacenter: "dc",
+				}}, vms)
+
+				_, err = fixtureDB.Exec(`ATTACH '` + escapeSQLString(path) + `' AS src (TYPE sqlite);
 					ALTER TABLE src.VM ADD COLUMN Tags VARCHAR`)
-					Expect(err).To(Succeed())
-					tags, err := json.Marshal([]map[string]string{{"categoryID": "Owner", "name": owner}})
-					Expect(err).To(Succeed())
-					_, err = db.Exec(`UPDATE src.VM SET Tags = ? WHERE ID = 'vm1'`, string(tags))
-					Expect(err).To(Succeed())
-					if incoming {
-						_, err = db.Exec(`UPDATE src.VM SET IsTemplate = ? WHERE ID = 'vm1'`, tc.template)
-						Expect(err).To(Succeed())
-						_, err = db.Exec(`UPDATE src.VM SET Tags = '[{"categoryID":"Owner","name":"Platform"}]' WHERE ID = 'vm2'`)
-						Expect(err).To(Succeed())
-					}
-					_, err = db.Exec(`DETACH src`)
-					Expect(err).To(Succeed())
-					_, err = p.IngestSqlite(ctx, path)
-					Expect(err).To(Succeed())
-				}
-				var name string
-				Expect(p.db.QueryRowContext(ctx, `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm1'`).Scan(&name)).To(Succeed())
-				Expect(name).To(Equal("existing"))
-				expected := map[string][]string{}
-				if tc.owner != "" {
-					expected["Owner"] = []string{tc.owner}
-				}
-				if !tc.template && !tc.differentCenter {
-					expected["Owner"] = append(expected["Owner"], "Payments")
-				}
-				Expect(storedMetadata(t, p.db, "vm1")).To(Equal(expected))
-				Expect(storedMetadata(t, p.db, "vm2")).To(Equal(map[string][]string{"Owner": {"Platform"}}))
-			})
-		}
-	})
-
-	Context("RVTools metadata column layouts", func() {
-		cases := []struct {
-			name  string
-			block []string
-			want  bool
-		}{
-			{
-				name:  "supported",
-				block: []string{"Annotation", "Team's; \"name\" ", "Blank", "Datacenter"},
-				want:  true,
-			},
-
-			{
-				name:  "missing annotation",
-				block: []string{"Team's; \"name\" ", "Datacenter"},
-				want:  false,
-			},
-
-			{
-				name:  "missing datacenter",
-				block: []string{"Annotation", "Team's; \"name\" "},
-				want:  false,
-			},
-
-			{
-				name:  "reordered",
-				block: []string{"Datacenter", "Team's; \"name\" ", "Annotation"},
-				want:  false,
-			},
-
-			{
-				name:  "duplicate boundary",
-				block: []string{"Annotation", "Team's; \"name\" ", "Annotation", "Datacenter"},
-				want:  false,
-			},
-
-			{
-				name:  "duplicate datacenter",
-				block: []string{"Annotation", "Team's; \"name\" ", "Datacenter", "Datacenter"},
-				want:  false,
-			},
-
-			{
-				name:  "duplicate metadata header",
-				block: []string{"Annotation", "Team's; \"name\" ", "Team's; \"name\" ", "Datacenter"},
-				want:  true,
-			},
-
-			{
-				name:  "metadata column",
-				block: []string{"Annotation", "metadata", "Datacenter"},
-				want:  true,
-			},
-
-			{
-				name:  "no metadata",
-				block: []string{"Annotation", "Datacenter"},
-				want:  false,
-			},
-
-			{
-				name:  "older tags",
-				block: []string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "Blank", "VI SDK Server"},
-				want:  true,
-			},
-
-			{
-				name:  "older attributes and tags",
-				block: []string{"Annotation", "metadata", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK Server"},
-				want:  true,
-			},
-
-			{
-				name:  "older missing server",
-				block: []string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" "},
-				want:  false,
-			},
-
-			{
-				name:  "older reordered",
-				block: []string{"Annotation", "Datacenter", "VI SDK Server", "Team's; \"name\" ", "VI SDK API Version"},
-				want:  false,
-			},
-
-			{
-				name:  "older duplicate boundary",
-				block: []string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK API Version", "VI SDK Server"},
-				want:  false,
-			},
-
-			{
-				name:  "older duplicate server",
-				block: []string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK Server", "VI SDK Server"},
-				want:  false,
-			},
-
-			{
-				name:  "modern sdk columns",
-				block: []string{"Annotation", "Team's; \"name\" ", "Datacenter", "VI SDK API Version", "VI SDK Server"},
-				want:  true,
-			},
-		}
-
-		for _, tc := range cases {
-			It(tc.name, func() {
-				t := GinkgoTB()
-
-				p, _, cleanup := setupTestParser(t, nil)
-				defer cleanup()
-				headers := []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate"}
-				headers = append(headers, tc.block...)
-				vms := []map[string]string{{"VM": "vm", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster",
-					"Datacenter": "dc", "Annotation": "free text", "Team's; \"name\" ": "  Payments; QA, [x]  ", "Blank": "  ", "metadata": "Original value"}}
-				sheets := defaultStandardSheets(vms, []map[string]string{{"Host": "host", "Cluster": "cluster", "Datacenter": "dc"}})
-				sheets[0].Headers = headers
-				result, err := p.IngestRvTools(context.Background(), createTestExcel(t, sheets...))
 				Expect(err).To(Succeed())
-				Expect(result.HasErrors()).To(BeFalse())
-				got, err := p.VMs(context.Background(), Filters{}, Options{})
+
+				for _, vm := range inventory.vms {
+					tags, err := json.Marshal([]map[string]string{{"categoryID": "Owner", "name": vm.owner}})
+					Expect(err).To(Succeed())
+
+					_, err = fixtureDB.Exec(`UPDATE src.VM SET Tags = ?, IsTemplate = ? WHERE ID = ?`,
+						string(tags), vm.template, vm.id)
+					Expect(err).To(Succeed())
+				}
+
+				_, err = fixtureDB.Exec(`DETACH src`)
 				Expect(err).To(Succeed())
-				Expect(got).To(HaveLen(1))
-				if tc.want {
-					switch tc.name {
-					case "metadata column":
-						Expect(got[0].Metadata).To(Equal(models.Metadata{"metadata": {"Original value"}}))
-					case "older attributes and tags":
-						Expect(got[0].Metadata).To(Equal(models.Metadata{"metadata": {"Original value"}, "Team's; \"name\" ": {"  Payments; QA, [x]  "}}))
-					default:
-						Expect(got[0].Metadata).To(Equal(models.Metadata{"Team's; \"name\" ": {"  Payments; QA, [x]  "}}))
+
+				_, err = p.IngestSqlite(ctx, path)
+				Expect(err).To(Succeed())
+			}
+
+			var name string
+			Expect(p.db.QueryRowContext(ctx, `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm1'`).Scan(&name)).To(Succeed())
+			Expect(name).To(Equal("existing"))
+			Expect(storedMetadata(GinkgoTB(), p.db, "vm1")).To(Equal(expected))
+			Expect(storedMetadata(GinkgoTB(), p.db, "vm2")).To(Equal(map[string][]string{"Owner": {"Platform"}}))
+		},
+		Entry("merges metadata for the same vCenter",
+			false, "Finance", "uuid", map[string][]string{"Owner": {"Finance", "Payments"}},
+		),
+
+		Entry("ignores incoming template metadata",
+			true, "Finance", "uuid", map[string][]string{"Owner": {"Finance"}},
+		),
+
+		Entry("adds metadata to an existing VM without an owner",
+			false, "", "uuid", map[string][]string{"Owner": {"Payments"}},
+		),
+
+		Entry("keeps metadata from another vCenter separate",
+			false, "Finance", "other-uuid", map[string][]string{"Owner": {"Finance"}},
+		),
+	)
+
+	DescribeTable("RVTools metadata column layouts",
+		func(block []string, expected models.Metadata) {
+			headers := []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate"}
+			headers = append(headers, block...)
+			vms := []map[string]string{{
+				"VM":                "vm",
+				"VM ID":             "vm1",
+				"VI SDK UUID":       "uuid",
+				"Host":              "host",
+				"Cluster":           "cluster",
+				"Datacenter":        "dc",
+				"Annotation":        "free text",
+				"Team's; \"name\" ": "  Payments; QA, [x]  ",
+				"Blank":             "  ",
+				"metadata":          "Original value",
+			}}
+			sheets := defaultStandardSheets(vms, []map[string]string{{
+				"Host":       "host",
+				"Cluster":    "cluster",
+				"Datacenter": "dc",
+			}})
+			sheets[0].Headers = headers
+			result, err := p.IngestRvTools(context.Background(), createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
+			Expect(result.HasErrors()).To(BeFalse())
+
+			got, err := p.VMs(context.Background(), Filters{}, Options{})
+			Expect(err).To(Succeed())
+			Expect(got).To(HaveLen(1))
+			Expect(got[0].Metadata).To(Equal(expected))
+			Expect(got[0].Labels).To(BeEmpty())
+		},
+		Entry("supported",
+			[]string{"Annotation", "Team's; \"name\" ", "Blank", "Datacenter"},
+			models.Metadata{"Team's; \"name\" ": {"  Payments; QA, [x]  "}},
+		),
+
+		Entry("missing annotation",
+			[]string{"Team's; \"name\" ", "Datacenter"},
+			models.Metadata{},
+		),
+
+		Entry("missing datacenter",
+			[]string{"Annotation", "Team's; \"name\" "},
+			models.Metadata{},
+		),
+
+		Entry("reordered",
+			[]string{"Datacenter", "Team's; \"name\" ", "Annotation"},
+			models.Metadata{},
+		),
+
+		Entry("duplicate boundary",
+			[]string{"Annotation", "Team's; \"name\" ", "Annotation", "Datacenter"},
+			models.Metadata{},
+		),
+
+		Entry("duplicate datacenter",
+			[]string{"Annotation", "Team's; \"name\" ", "Datacenter", "Datacenter"},
+			models.Metadata{},
+		),
+
+		Entry("duplicate metadata header",
+			[]string{"Annotation", "Team's; \"name\" ", "Team's; \"name\" ", "Datacenter"},
+			models.Metadata{"Team's; \"name\" ": {"  Payments; QA, [x]  "}},
+		),
+
+		Entry("metadata column",
+			[]string{"Annotation", "metadata", "Datacenter"},
+			models.Metadata{"metadata": {"Original value"}},
+		),
+
+		Entry("no metadata",
+			[]string{"Annotation", "Datacenter"},
+			models.Metadata{},
+		),
+
+		Entry("older tags",
+			[]string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "Blank", "VI SDK Server"},
+			models.Metadata{"Team's; \"name\" ": {"  Payments; QA, [x]  "}},
+		),
+
+		Entry("older attributes and tags",
+			[]string{"Annotation", "metadata", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK Server"},
+			models.Metadata{
+				"metadata":          {"Original value"},
+				"Team's; \"name\" ": {"  Payments; QA, [x]  "},
+			},
+		),
+
+		Entry("older missing server",
+			[]string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" "},
+			models.Metadata{},
+		),
+
+		Entry("older reordered",
+			[]string{"Annotation", "Datacenter", "VI SDK Server", "Team's; \"name\" ", "VI SDK API Version"},
+			models.Metadata{},
+		),
+
+		Entry("older duplicate boundary",
+			[]string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK API Version", "VI SDK Server"},
+			models.Metadata{},
+		),
+
+		Entry("older duplicate server",
+			[]string{"Annotation", "Datacenter", "VI SDK API Version", "Team's; \"name\" ", "VI SDK Server", "VI SDK Server"},
+			models.Metadata{},
+		),
+
+		Entry("modern sdk columns",
+			[]string{"Annotation", "Team's; \"name\" ", "Datacenter", "VI SDK API Version", "VI SDK Server"},
+			models.Metadata{"Team's; \"name\" ": {"  Payments; QA, [x]  "}},
+		),
+	)
+
+	type duplicateVMRow struct {
+		template string
+		owner    string
+	}
+
+	DescribeTable("RVTools metadata for duplicate VM IDs",
+		func(first, second duplicateVMRow, additionalOwner string) {
+			vms := []map[string]string{
+				{
+					"VM":          "first",
+					"VM ID":       "vm1",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Template":    first.template,
+					"Owner":       first.owner,
+				},
+				{
+					"VM":          "second",
+					"VM ID":       "vm1",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Template":    second.template,
+					"Owner":       second.owner,
+				},
+				{
+					"VM":          "unique",
+					"VM ID":       "vm2",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Owner":       "Platform",
+				},
+			}
+			if additionalOwner != "" {
+				vms = append(vms, map[string]string{
+					"VM":          "third",
+					"VM ID":       "vm1",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Owner":       additionalOwner,
+				})
+			}
+			sheets := defaultStandardSheets(vms, []map[string]string{{
+				"Host":       "host",
+				"Cluster":    "cluster",
+				"Datacenter": "dc",
+			}})
+			sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate",
+				"Template", "Annotation", "Owner", "Datacenter"}
+
+			result, err := p.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
+			Expect(result.HasErrors()).To(BeFalse())
+
+			got, err := p.VMs(ctx, Filters{}, Options{})
+			Expect(err).To(Succeed())
+			Expect(got).To(HaveLen(2))
+			Expect([]string{got[0].ID, got[1].ID}).To(ConsistOf("vm1", "vm2"))
+
+			for _, vm := range got {
+				if vm.ID == "vm1" {
+					Expect(vm.Metadata).To(BeEmpty(), "duplicate source IDs must not receive ambiguous metadata")
+					if first.template == "true" {
+						Expect(vm.Name).To(Equal("second"))
+					} else if second.template == "true" {
+						Expect(vm.Name).To(Equal("first"))
 					}
 				} else {
-					Expect(got[0].Metadata).To(BeEmpty())
+					Expect(vm.ID).To(Equal("vm2"))
+					Expect(vm.Metadata).To(Equal(models.Metadata{"Owner": {"Platform"}}))
 				}
-				Expect(got[0].Labels).To(BeEmpty())
+			}
+		},
+		Entry("two eligible rows",
+			duplicateVMRow{owner: "Finance"},
+			duplicateVMRow{owner: "Payments"},
+			"",
+		),
+
+		Entry("first row excluded",
+			duplicateVMRow{template: "true", owner: "Finance"},
+			duplicateVMRow{owner: "Payments"},
+			"",
+		),
+
+		Entry("second row excluded",
+			duplicateVMRow{owner: "Finance"},
+			duplicateVMRow{template: "true", owner: "Payments"},
+			"",
+		),
+
+		Entry("first metadata empty",
+			duplicateVMRow{},
+			duplicateVMRow{owner: "Payments"},
+			"",
+		),
+
+		Entry("second metadata empty",
+			duplicateVMRow{owner: "Finance"},
+			duplicateVMRow{},
+			"",
+		),
+
+		Entry("three duplicate rows",
+			duplicateVMRow{owner: "Finance"},
+			duplicateVMRow{owner: "Payments"},
+			"Another",
+		),
+	)
+
+	DescribeTable("RVTools metadata for existing VMs",
+		func(incomingTemplate, existingOwner, incomingCenter string, expected map[string][]string) {
+			vms := []map[string]string{{
+				"VM":          "existing",
+				"VM ID":       "vm1",
+				"VI SDK UUID": "uuid",
+				"Host":        "host",
+				"Cluster":     "cluster",
+				"Datacenter":  "dc",
+				"Owner":       existingOwner,
+			}}
+			sheets := defaultStandardSheets(vms, []map[string]string{{
+				"Host":       "host",
+				"Cluster":    "cluster",
+				"Datacenter": "dc",
+			}})
+			sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate",
+				"Template", "Annotation", "Owner", "Datacenter"}
+
+			_, err := p.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
+
+			vms[0]["VM"], vms[0]["Owner"], vms[0]["Template"] = "incoming", "Payments", incomingTemplate
+			vms[0]["VI SDK UUID"] = incomingCenter
+			sheets[0].Rows = append(vms, map[string]string{
+				"VM":          "new",
+				"VM ID":       "vm2",
+				"VI SDK UUID": incomingCenter,
+				"Host":        "host",
+				"Cluster":     "cluster",
+				"Datacenter":  "dc",
+				"Owner":       "Platform",
 			})
-		}
-	})
 
-	Context("RVTools metadata for duplicate VM IDs", func() {
-		cases := []struct {
-			name           string
-			firstTemplate  string
-			secondTemplate string
-			firstEmpty     bool
-			secondEmpty    bool
-			thirdDuplicate bool
-		}{
-			{name: "two eligible rows"},
-			{name: "first row excluded", firstTemplate: "true"},
-			{name: "second row excluded", secondTemplate: "true"},
-			{name: "first metadata empty", firstEmpty: true},
-			{name: "second metadata empty", secondEmpty: true},
-			{name: "three duplicate rows", thirdDuplicate: true},
-		}
+			_, err = p.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
 
-		for _, tc := range cases {
-			It(tc.name, func() {
-				t := GinkgoTB()
+			var name string
+			Expect(p.db.QueryRowContext(ctx, `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm1'`).Scan(&name)).To(Succeed())
+			Expect(name).To(Equal("existing"))
+			Expect(storedMetadata(GinkgoTB(), p.db, "vm1")).To(Equal(expected))
+			Expect(storedMetadata(GinkgoTB(), p.db, "vm2")).To(Equal(map[string][]string{"Owner": {"Platform"}}))
+		},
+		Entry("merges metadata for the same vCenter",
+			"false", "Finance", "uuid", map[string][]string{"Owner": {"Finance", "Payments"}},
+		),
 
-				vms := []map[string]string{
-					{"VM": "first", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster",
-						"Datacenter": "dc", "Template": tc.firstTemplate, "Owner": "Finance"},
-					{"VM": "second", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster",
-						"Datacenter": "dc", "Template": tc.secondTemplate, "Owner": "Payments"},
-					{"VM": "unique", "VM ID": "vm2", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster",
-						"Datacenter": "dc", "Owner": "Platform"},
-				}
-				if tc.firstEmpty {
-					vms[0]["Owner"] = ""
-				}
-				if tc.secondEmpty {
-					vms[1]["Owner"] = ""
-				}
-				if tc.thirdDuplicate {
-					vms = append(vms, map[string]string{"VM": "third", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host",
-						"Cluster": "cluster", "Datacenter": "dc", "Owner": "Another"})
-				}
-				sheets := defaultStandardSheets(vms, []map[string]string{{"Host": "host", "Cluster": "cluster", "Datacenter": "dc"}})
-				sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate",
-					"Template", "Annotation", "Owner", "Datacenter"}
-				p, _, cleanup := setupTestParser(t, nil)
-				defer cleanup()
-				ctx := context.Background()
-				result, err := p.IngestRvTools(ctx, createTestExcel(t, sheets...))
-				Expect(err).To(Succeed())
-				Expect(result.HasErrors()).To(BeFalse())
-				got, err := p.VMs(ctx, Filters{}, Options{})
-				Expect(err).To(Succeed())
-				Expect(got).To(HaveLen(2))
-				Expect([]string{got[0].ID, got[1].ID}).To(ConsistOf("vm1", "vm2"))
+		Entry("ignores incoming template metadata",
+			"true", "Finance", "uuid", map[string][]string{"Owner": {"Finance"}},
+		),
 
-				for _, vm := range got {
-					if vm.ID == "vm1" {
-						Expect(vm.Metadata).To(BeEmpty(), "duplicate source IDs must not receive ambiguous metadata")
-						if tc.firstTemplate == "true" {
-							Expect(vm.Name).To(Equal("second"))
-						} else if tc.secondTemplate == "true" {
-							Expect(vm.Name).To(Equal("first"))
-						}
-					} else {
-						Expect(vm.ID).To(Equal("vm2"))
-						Expect(vm.Metadata).To(Equal(models.Metadata{"Owner": {"Platform"}}))
-					}
-				}
-			})
-		}
-	})
+		Entry("adds metadata to an existing VM without an owner",
+			"false", "", "uuid", map[string][]string{"Owner": {"Payments"}},
+		),
 
-	Context("RVTools metadata for existing VMs", func() {
-		cases := []struct {
-			template, owner string
-			differentCenter bool
-		}{
-			{template: "false", owner: "Finance"},
-
-			{template: "true", owner: "Finance"},
-
-			{template: "false", owner: ""},
-
-			{template: "false", owner: "Finance", differentCenter: true},
-		}
-
-		for _, tc := range cases {
-			It(fmt.Sprintf("incoming template=%s, existing owner=%s, different vCenter=%t", tc.template, tc.owner, tc.differentCenter), func() {
-				t := GinkgoTB()
-
-				p, _, cleanup := setupTestParser(t, nil)
-				defer cleanup()
-				ctx := context.Background()
-				vms := []map[string]string{{"VM": "existing", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host",
-					"Cluster": "cluster", "Datacenter": "dc", "Owner": tc.owner}}
-				sheets := defaultStandardSheets(vms, []map[string]string{{"Host": "host", "Cluster": "cluster", "Datacenter": "dc"}})
-				sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate",
-					"Template", "Annotation", "Owner", "Datacenter"}
-				_, err := p.IngestRvTools(ctx, createTestExcel(t, sheets...))
-				Expect(err).To(Succeed())
-				vms[0]["VM"], vms[0]["Owner"], vms[0]["Template"] = "incoming", "Payments", tc.template
-				center := "uuid"
-				if tc.differentCenter {
-					center = "other-uuid"
-				}
-				vms[0]["VI SDK UUID"] = center
-				sheets[0].Rows = append(vms, map[string]string{"VM": "new", "VM ID": "vm2", "VI SDK UUID": center, "Host": "host",
-					"Cluster": "cluster", "Datacenter": "dc", "Owner": "Platform"})
-				_, err = p.IngestRvTools(ctx, createTestExcel(t, sheets...))
-				Expect(err).To(Succeed())
-				var name string
-				Expect(p.db.QueryRowContext(ctx, `SELECT "VM" FROM vinfo WHERE "VM ID" = 'vm1'`).Scan(&name)).To(Succeed())
-				Expect(name).To(Equal("existing"))
-				expected := map[string][]string{}
-				if tc.owner != "" {
-					expected["Owner"] = []string{tc.owner}
-				}
-				if tc.template == "false" && !tc.differentCenter {
-					expected["Owner"] = append(expected["Owner"], "Payments")
-				}
-				Expect(storedMetadata(t, p.db, "vm1")).To(Equal(expected))
-				Expect(storedMetadata(t, p.db, "vm2")).To(Equal(map[string][]string{"Owner": {"Platform"}}))
-			})
-		}
-	})
+		Entry("keeps metadata from another vCenter separate",
+			"false", "Finance", "other-uuid", map[string][]string{"Owner": {"Finance"}},
+		),
+	)
 
 	It("stops later writes after malformed RVTools metadata", func() {
-		t := GinkgoTB()
-
-		p, db, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		ctx := context.Background()
 		err := p.executeStatements(ctx, `INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'first');
-    WITH metadata AS (
-        SELECT key AS vm_id, from_json(value, '"MAP(VARCHAR, VARCHAR[])"') AS entries FROM json_each(?)
-    )
-    INSERT INTO vm_metadata SELECT metadata.vm_id, entry.key, unnest(entry.value)
-    FROM metadata, unnest(map_entries(metadata.entries)) m(entry);
-    INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm2', 'later');`, "invalid JSON")
+			WITH metadata AS (
+			    SELECT key AS vm_id, from_json(value, '"MAP(VARCHAR, VARCHAR[])"') AS entries FROM json_each(?)
+			)
+			INSERT INTO vm_metadata SELECT metadata.vm_id, entry.key, unnest(entry.value)
+			FROM metadata, unnest(map_entries(metadata.entries)) m(entry);
+			INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm2', 'later');`, "invalid JSON")
 		Expect(err).To(MatchError(ContainSubstring("Malformed JSON")))
+
 		var count int
 		Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM vinfo`).Scan(&count)).To(Succeed())
 		Expect(count).To(Equal(1), "metadata failure must stop later statements")
+
 		Expect(db.QueryRowContext(ctx, `SELECT count(*) FROM vm_metadata`).Scan(&count)).To(Succeed())
 		Expect(count).To(BeZero())
 	})
 
-	It("handles missing workbooks, missing sheets and empty headers", func() {
-		t := GinkgoTB()
+	Context("formatted blank cells", func() {
+		var vms []models.VM
 
-		ctx := context.Background()
-		_, err := readRVToolsMetadata(ctx, t.TempDir()+"/missing.xlsx")
-		Expect(err).To(MatchError(ContainSubstring("opening RVTools workbook")))
-
-		missingSheet := createTestExcel(t, NewExcelSheet("vHost", []string{"Host"}, nil))
-		_, err = readRVToolsMetadata(ctx, missingSheet)
-		Expect(err).To(MatchError(ContainSubstring("reading vInfo headers")))
-
-		emptySheet := createTestExcel(t, NewExcelSheet("vInfo", nil, nil))
-		metadata, err := readRVToolsMetadata(ctx, emptySheet)
-		Expect(err).To(Succeed())
-		Expect(metadata).To(BeEmpty())
-
-		query, err := NewBuilder().IngestRvtoolsQuery("not-opened.xlsx", false)
-		Expect(err).To(Succeed())
-		Expect(query).NotTo(ContainSubstring("WITH metadata AS ("))
-	})
-
-	It("skips formatted blank cells while retaining genuine metadata values", func() {
-		t := GinkgoTB()
-
-		// Keep genuine "VM" values and skip formatted blanks.
-		vms := []map[string]string{
-			{"VM": "vm", "VM ID": "vm1", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster", "Datacenter": "dc",
-				"Annotation": "notes", "Blank": "replace-with-formatted-blank", "Real": "VM", "Text": "  Finance's; [QA]  "},
-			{"VM": "empty", "VM ID": "vm2", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster", "Datacenter": "dc"},
-			{"VM": "template", "VM ID": "vm3", "VI SDK UUID": "uuid", "Host": "host", "Cluster": "cluster", "Datacenter": "dc",
-				"Template": "true", "Real": "excluded template value"},
-		}
-		sheets := defaultStandardSheets(vms, []map[string]string{{"Host": "host", "Cluster": "cluster", "Datacenter": "dc"}})
-		sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate", "Template",
-			"Annotation", "Blank", "Real", "Text", "Datacenter"}
-		path := createTestExcel(t, sheets...)
-		source, err := zip.OpenReader(path)
-		Expect(err).To(Succeed())
-		DeferCleanup(source.Close)
-		var buffer bytes.Buffer
-		writer := zip.NewWriter(&buffer)
-		replaced := false
-		for _, file := range source.File {
-			reader, err := file.Open()
-			Expect(err).To(Succeed())
-			data, err := io.ReadAll(reader)
-			Expect(err).To(Succeed())
-			Expect(reader.Close()).To(Succeed())
-			if file.Name == "xl/worksheets/sheet2.xml" {
-				// RVTools emits shared-string cells without a value for formatted blanks.
-				pattern := regexp.MustCompile(`<c\b[^>]*\br="K2"[^>]*>.*?</c>`)
-				Expect(pattern.Match(data)).To(BeTrue())
-				data = pattern.ReplaceAll(data, []byte(`<c r="K2" s="0" t="s"/>`))
-				replaced = true
+		BeforeEach(func() {
+			rows := []map[string]string{
+				{
+					"VM":          "vm",
+					"VM ID":       "vm1",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Annotation":  "notes",
+					"Blank":       "replace-with-formatted-blank",
+					"Real":        "VM",
+					"Text":        "  Finance's; [QA]  ",
+				},
+				{
+					"VM":          "empty",
+					"VM ID":       "vm2",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+				},
+				{
+					"VM":          "template",
+					"VM ID":       "vm3",
+					"VI SDK UUID": "uuid",
+					"Host":        "host",
+					"Cluster":     "cluster",
+					"Datacenter":  "dc",
+					"Template":    "true",
+					"Real":        "excluded template value",
+				},
 			}
-			entry, err := writer.CreateHeader(&file.FileHeader)
+			sheets := defaultStandardSheets(rows, []map[string]string{{
+				"Host":       "host",
+				"Cluster":    "cluster",
+				"Datacenter": "dc",
+			}})
+			sheets[0].Headers = []string{"VM", "VM ID", "VI SDK UUID", "Host", "Cluster", "CPUs", "Memory", "Powerstate", "Template",
+				"Annotation", "Blank", "Real", "Text", "Datacenter"}
+			path := createTestExcel(GinkgoTB(), sheets...)
+			source, err := zip.OpenReader(path)
 			Expect(err).To(Succeed())
-			_, err = entry.Write(data)
-			Expect(err).To(Succeed())
-		}
-		Expect(replaced).To(BeTrue())
-		Expect(writer.Close()).To(Succeed())
-		path = filepath.Join(t.TempDir(), "formatted-blanks.xlsx")
-		Expect(os.WriteFile(path, buffer.Bytes(), 0600)).To(Succeed())
+			DeferCleanup(source.Close)
 
-		p, _, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		result, err := p.IngestRvTools(context.Background(), path)
-		Expect(err).To(Succeed())
-		Expect(result.HasErrors()).To(BeFalse())
-		got, err := p.VMs(context.Background(), Filters{}, Options{})
-		Expect(err).To(Succeed())
-		Expect(got).To(HaveLen(2), "templates must remain excluded")
-		Expect([]string{got[0].ID, got[1].ID}).To(ConsistOf("vm1", "vm2"))
+			var buffer bytes.Buffer
+			writer := zip.NewWriter(&buffer)
+			replaced := false
+			for _, file := range source.File {
+				reader, err := file.Open()
+				Expect(err).To(Succeed())
+				DeferCleanup(reader.Close)
 
-		for _, vm := range got {
-			if vm.ID == "vm1" {
-				Expect(vm.Metadata).To(Equal(models.Metadata{"Real": {"VM"}, "Text": {"  Finance's; [QA]  "}}))
-			} else {
-				Expect(vm.Metadata).To(BeEmpty())
+				data, err := io.ReadAll(reader)
+				Expect(err).To(Succeed())
+				if file.Name == "xl/worksheets/sheet2.xml" {
+					// RVTools emits shared-string cells without a value for formatted blanks.
+					pattern := regexp.MustCompile(`<c\b[^>]*\br="K2"[^>]*>.*?</c>`)
+					Expect(pattern.Match(data)).To(BeTrue())
+
+					data = pattern.ReplaceAll(data, []byte(`<c r="K2" s="0" t="s"/>`))
+					replaced = true
+				}
+				entry, err := writer.CreateHeader(&file.FileHeader)
+				Expect(err).To(Succeed())
+
+				_, err = entry.Write(data)
+				Expect(err).To(Succeed())
 			}
-		}
-	})
+			Expect(replaced).To(BeTrue())
+			Expect(writer.Close()).To(Succeed())
 
-	It("reads older inventories without creating a metadata table", func() {
-		db, err := sql.Open("duckdb", "")
-		Expect(err).To(Succeed())
-		DeferCleanup(db.Close)
-		p := New(db, nil)
-		schema, err := p.builder.CreateSchemaQuery()
-		Expect(err).To(Succeed())
-		schema = regexp.MustCompile(`(?s)CREATE TABLE IF NOT EXISTS vm_metadata \(.*?\);`).ReplaceAllString(schema, "")
-		_, err = db.Exec(schema)
-		Expect(err).To(Succeed())
-		_, err = db.Exec(`INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'vm')`)
-		Expect(err).To(Succeed())
-		vms, err := p.VMs(context.Background(), Filters{}, Options{})
-		Expect(err).To(Succeed())
-		Expect(vms[0].Metadata).To(BeEmpty())
-		var count int
-		Expect(db.QueryRow(`SELECT count(*) FROM information_schema.tables WHERE table_name='vm_metadata'`).Scan(&count)).To(Succeed())
-		Expect(count).To(BeZero())
+			path = filepath.Join(GinkgoT().TempDir(), "formatted-blanks.xlsx")
+			Expect(os.WriteFile(path, buffer.Bytes(), 0600)).To(Succeed())
+
+			result, err := p.IngestRvTools(context.Background(), path)
+			Expect(err).To(Succeed())
+			Expect(result.HasErrors()).To(BeFalse())
+
+			vms, err = p.VMs(context.Background(), Filters{}, Options{})
+			Expect(err).To(Succeed())
+		})
+
+		It("excludes templates", func() {
+			Expect(vms).To(HaveLen(2))
+			Expect([]string{vms[0].ID, vms[1].ID}).To(ConsistOf("vm1", "vm2"))
+		})
+
+		It("preserves genuine metadata values", func() {
+			Expect(vms).To(ContainElement(And(
+				HaveField("ID", "vm1"),
+				HaveField("Metadata", Equal(models.Metadata{
+					"Real": {"VM"},
+					"Text": {"  Finance's; [QA]  "},
+				})),
+			)))
+		})
+
+		It("omits blank metadata", func() {
+			Expect(vms).To(ContainElement(And(
+				HaveField("ID", "vm2"),
+				HaveField("Metadata", BeEmpty()),
+			)))
+		})
 	})
 
 	It("stops later statements when metadata persistence fails", func() {
-		t := GinkgoTB()
-
-		p, db, cleanup := setupTestParser(t, nil)
-		defer cleanup()
 		err := p.executeStatements(context.Background(), `INSERT INTO vm_metadata (vm_id, key, value) VALUES ('missing', 'Owner', 'Finance');
-        INSERT INTO vinfo ("VM ID", "VM") VALUES ('later', 'later');`)
+			INSERT INTO vinfo ("VM ID", "VM") VALUES ('later', 'later');`)
 		Expect(err).To(HaveOccurred())
+
 		var count int
 		Expect(db.QueryRow(`SELECT count(*) FROM vinfo`).Scan(&count)).To(Succeed())
 		Expect(count).To(BeZero(), "failed metadata persistence must stop later statements")
 	})
 
 	It("clears metadata and storage details before parser reuse", func() {
-		t := GinkgoTB()
-
-		p, _, cleanup := setupTestParser(t, nil)
-		defer cleanup()
-		ctx := context.Background()
 		_, err := p.db.ExecContext(ctx, `INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'vm');
-        INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm1', 'Owner', 'Alice');
-        INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Vendor", "LUN Model")
-        VALUES ('host-1', 'naa.shared', 'OLD', 'old-model')`)
+			INSERT INTO vm_metadata (vm_id, key, value) VALUES ('vm1', 'Owner', 'Alice');
+			INSERT INTO vhostscsi ("Host ID", "Canonical Name", "LUN Vendor", "LUN Model")
+			VALUES ('host-1', 'naa.shared', 'OLD', 'old-model')`)
 		Expect(err).To(Succeed())
+
 		Expect(p.Cleanup()).To(Succeed())
-		Expect(storedMetadata(t, p.db, "vm1")).To(BeEmpty())
+		Expect(storedMetadata(GinkgoTB(), p.db, "vm1")).To(BeEmpty())
+
 		vms, err := p.VMs(ctx, Filters{}, Options{})
 		Expect(err).To(Succeed())
 		Expect(vms).To(BeEmpty())
+
 		_, err = p.db.ExecContext(ctx, `INSERT INTO vhost ("Object ID", "Host") VALUES ('host-1', 'esxi1');
-        INSERT INTO vdatastore ("Name", "Hosts", "Backing Devices") VALUES ('new-datastore', 'esxi1', '["naa.shared"]')`)
+			INSERT INTO vdatastore ("Name", "Hosts", "Backing Devices") VALUES ('new-datastore', 'esxi1', '["naa.shared"]')`)
 		Expect(err).To(Succeed())
+
 		datastores, err := p.Datastores(ctx, Filters{}, Options{})
 		Expect(err).To(Succeed())
 		Expect(datastores).To(HaveLen(1))
 		Expect(datastores[0].Vendor).To(Equal("N/A"), "previous LUN metadata must not survive parser reuse")
 		Expect(datastores[0].Model).To(Equal("N/A"))
+	})
+})
+
+var _ = Describe("RVTools metadata inputs", func() {
+	It("reports a missing workbook", func() {
+		_, err := readRVToolsMetadata(context.Background(), filepath.Join(GinkgoT().TempDir(), "missing.xlsx"))
+		Expect(err).To(MatchError(ContainSubstring("opening RVTools workbook")))
+	})
+
+	It("reports a missing vInfo sheet", func() {
+		path := createTestExcel(GinkgoTB(), NewExcelSheet("vHost", []string{"Host"}, nil))
+
+		_, err := readRVToolsMetadata(context.Background(), path)
+		Expect(err).To(MatchError(ContainSubstring("reading vInfo headers")))
+	})
+
+	It("ignores an empty vInfo header", func() {
+		path := createTestExcel(GinkgoTB(), NewExcelSheet("vInfo", nil, nil))
+
+		metadata, err := readRVToolsMetadata(context.Background(), path)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(metadata).To(BeEmpty())
+	})
+
+	It("omits metadata SQL when no metadata was read", func() {
+		query, err := NewBuilder().IngestRvtoolsQuery("not-opened.xlsx", false)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(query).NotTo(ContainSubstring("WITH metadata AS ("))
+	})
+})
+
+var _ = Describe("VM metadata in older inventories", func() {
+	It("reads older inventories without creating a metadata table", func() {
+		db, err := sql.Open("duckdb", "")
+		Expect(err).To(Succeed())
+		DeferCleanup(db.Close)
+
+		p := New(db, nil)
+		schema, err := p.builder.CreateSchemaQuery()
+		Expect(err).To(Succeed())
+
+		schema = regexp.MustCompile(`(?s)CREATE TABLE IF NOT EXISTS vm_metadata \(.*?\);`).ReplaceAllString(schema, "")
+		_, err = db.Exec(schema)
+		Expect(err).To(Succeed())
+
+		_, err = db.Exec(`INSERT INTO vinfo ("VM ID", "VM") VALUES ('vm1', 'vm')`)
+		Expect(err).To(Succeed())
+
+		vms, err := p.VMs(context.Background(), Filters{}, Options{})
+		Expect(err).To(Succeed())
+		Expect(vms).To(HaveLen(1))
+		Expect(vms[0].Metadata).To(BeEmpty())
+
+		var count int
+		Expect(db.QueryRow(`SELECT count(*) FROM information_schema.tables WHERE table_name='vm_metadata'`).Scan(&count)).To(Succeed())
+		Expect(count).To(BeZero())
+	})
+})
+
+var _ = Describe("RVTools validation errors", func() {
+	DescribeTable("accepts results without errors",
+		func(result ValidationResult) {
+			Expect(result.Error()).NotTo(HaveOccurred())
+		},
+		Entry("no issues", ValidationResult{}),
+		Entry("warnings only", ValidationResult{
+			Warnings: []ValidationIssue{{Message: "warning"}},
+		}),
+	)
+
+	It("preserves technical details for the caller's fallback", func() {
+		result := ValidationResult{Errors: []ValidationIssue{
+			{Code: CodeMissingVMID, Message: "First issue: missing VM ID"},
+			{Code: CodeColumnValidationFailed, Message: "SELECT private_column FROM /private/database"},
+			{Code: CodeMissingVMName, Message: "Second issue: missing name"},
+		}}
+
+		err := fmt.Errorf("ingesting: %w", result.Error())
+		var validation *SchemaValidationError
+		Expect(errors.As(err, &validation)).To(BeFalse(), "technical issues must use the caller's fallback")
+		Expect(err).To(MatchError(And(
+			ContainSubstring("private_column"),
+			ContainSubstring("First issue: missing VM ID"),
+			ContainSubstring("Second issue: missing name"),
+		)))
+		Expect(result.Errors).To(HaveLen(3))
+	})
+})
+
+var _ = Describe("RVTools workbook errors", func() {
+	DescribeTable("preserves invalid ZIP errors",
+		func(content string) {
+			path := filepath.Join(GinkgoT().TempDir(), "private.xlsx")
+			Expect(os.WriteFile(path, []byte(content), 0600)).To(Succeed())
+
+			_, err := readRVToolsMetadata(context.Background(), path)
+			Expect(err).To(MatchError(zip.ErrFormat))
+		},
+		Entry("JSON file", "{}"),
+		Entry("empty file", ""),
+	)
+
+	It("preserves the missing sheet error", func() {
+		path := createTestExcel(GinkgoTB(), NewExcelSheet("vHost", []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}, nil))
+
+		_, err := readRVToolsMetadata(context.Background(), path)
+		Expect(err).To(HaveOccurred())
+
+		var missing excelize.ErrSheetNotExist
+		Expect(errors.As(err, &missing)).To(BeTrue())
+		Expect(missing.SheetName).To(Equal("vInfo"))
+	})
+
+	It("rejects a truncated workbook", func() {
+		path := createTestExcel(GinkgoTB(), NewExcelSheet("vInfo", []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}, nil))
+
+		data, err := os.ReadFile(path)
+		Expect(err).NotTo(HaveOccurred())
+
+		Expect(os.Truncate(path, int64(len(data)/2))).To(Succeed())
+
+		_, err = readRVToolsMetadata(context.Background(), path)
+		Expect(err).To(MatchError(zip.ErrFormat))
+	})
+
+	It("preserves a missing file error", func() {
+		path := filepath.Join(GinkgoT().TempDir(), "missing.xlsx")
+
+		_, err := readRVToolsMetadata(context.Background(), path)
+		Expect(err).To(MatchError(os.ErrNotExist))
 	})
 })
 
@@ -762,58 +1057,4 @@ func storedMetadata(t testing.TB, db store.QueryInterceptor, id string) map[stri
 	}
 	require.NoError(t, rows.Err())
 	return values
-}
-
-func TestRVToolsValidationErrorDetails(t *testing.T) {
-	require.NoError(t, (ValidationResult{}).Error())
-	require.NoError(t, (ValidationResult{Warnings: []ValidationIssue{{Message: "warning"}}}).Error())
-	result := ValidationResult{Errors: []ValidationIssue{
-		{Code: CodeMissingVMID, Message: "First issue: missing VM ID"},
-		{Code: CodeColumnValidationFailed, Message: "SELECT private_column FROM /private/database"},
-		{Code: CodeMissingVMName, Message: "Second issue: missing name"},
-	}}
-	err := fmt.Errorf("ingesting: %w", result.Error())
-	var validation *SchemaValidationError
-	require.False(t, errors.As(err, &validation), "technical issues must use the caller's fallback")
-	require.Contains(t, err.Error(), "private_column")
-	require.Contains(t, err.Error(), "First issue: missing VM ID")
-	require.Contains(t, err.Error(), "Second issue: missing name")
-	require.Len(t, result.Errors, 3)
-}
-
-func TestRVToolsWorkbookErrorMessages(t *testing.T) {
-	for _, tc := range []struct {
-		name, sheet, content string
-		truncate             bool
-	}{
-		{name: "JSON", content: "{}"},
-		{name: "empty"},
-		{name: "missing vInfo", sheet: "vHost"},
-		{name: "truncated", sheet: "vInfo", truncate: true},
-	} {
-		t.Run(tc.name, func(t *testing.T) {
-			path := filepath.Join(t.TempDir(), "private.xlsx")
-			if tc.sheet == "" {
-				require.NoError(t, os.WriteFile(path, []byte(tc.content), 0600))
-			} else {
-				path = createTestExcel(t, NewExcelSheet(tc.sheet, []string{"VM ID", "VM", "Cluster", "VI SDK UUID"}, nil))
-				if tc.truncate {
-					data, err := os.ReadFile(path)
-					require.NoError(t, err)
-					require.NoError(t, os.Truncate(path, int64(len(data)/2)))
-				}
-			}
-			_, err := readRVToolsMetadata(context.Background(), path)
-			require.Error(t, err)
-			if tc.sheet == "" || tc.truncate {
-				require.ErrorIs(t, err, zip.ErrFormat)
-			} else {
-				var missing excelize.ErrSheetNotExist
-				require.ErrorAs(t, err, &missing)
-				require.Equal(t, "vInfo", missing.SheetName)
-			}
-		})
-	}
-	_, err := readRVToolsMetadata(context.Background(), "/does/not/exist/private.xlsx")
-	require.ErrorIs(t, err, os.ErrNotExist)
 }
