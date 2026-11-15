@@ -26,7 +26,13 @@ func (p *Parser) VMs(ctx context.Context, filters Filters, options Options) ([]m
 	if err != nil {
 		return nil, err
 	}
-	q, err := p.builder.vmQuery(filters, options, metadataTable, topology)
+
+	network, err := NetworkTopologyQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	q, err := p.builder.vmQuery(filters, options, metadataTable, topology, network)
 	if err != nil {
 		return nil, fmt.Errorf("failed to build vm query: %v", err)
 	}

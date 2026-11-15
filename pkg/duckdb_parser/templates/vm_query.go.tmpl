@@ -15,6 +15,7 @@ Template Parameters:
   - Offset: skip first N results
 */ -}}
 WITH {{.StorageTopology}},
+{{.NetworkTopology}},
 {{template "datastore_backing_info" .}},
 disks AS (
     SELECT
@@ -57,9 +58,10 @@ disks AS (
 ),
 nics AS (
     SELECT
-        "VM ID",
+        vnetwork."VM ID",
         LIST({
             'Network': "Network",
+            'PortGroup': ng.port_group,
             'MAC': "Mac Address",
             'Label': "NIC label",
             'Adapter': "Adapter",
@@ -72,7 +74,8 @@ nics AS (
             'IPv6Addresses': "IPv6 Addresses"
         }) AS nics
     FROM vnetwork
-    GROUP BY "VM ID"
+    LEFT JOIN network_adapter_links ng ON ng.nic_row_id = vnetwork.rowid
+    GROUP BY vnetwork."VM ID"
 ),
 concerns_agg AS (
     SELECT
