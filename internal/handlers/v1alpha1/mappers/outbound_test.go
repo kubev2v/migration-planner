@@ -11,11 +11,13 @@ import (
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/v1alpha1/mappers"
 	"github.com/kubev2v/migration-planner/internal/service"
+	servicemappers "github.com/kubev2v/migration-planner/internal/service/mappers"
 	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )
@@ -295,6 +297,62 @@ var _ = Describe("Inventory datastore storage metadata", func() {
 		Expect(output.Vcenter.Infra.Datastores).To(Equal(input.Vcenter.Infra.Datastores))
 		Expect(output.Clusters["cluster-1"].Infra.Datastores).To(Equal(input.Clusters["cluster-1"].Infra.Datastores))
 	})
+})
+
+var _ = Describe("Storage array API mapping", func() {
+	It("exposes canonical identity through service and API mappings at both scopes", func() {
+		data := inventory.InventoryData{Infra: inventory.InfraData{Datastores: []inventory.Datastore{{
+			DiskId: "vvol", Vendor: "LUN vendor", Model: "LUN model", BackingDeviceIDs: []string{"naa.device"},
+			StorageArrays:      []inventory.StorageArray{{UUID: "array-1", Name: "array", VendorID: "vendor", ModelID: "model"}, {Name: "partial"}},
+			StorageContainerID: "container-1",
+		}}}}
+		domain := servicemappers.InventoryFromDuckDB(&inventory.Inventory{VCenter: &data, Clusters: map[string]inventory.InventoryData{"cluster": data}})
+		result := mappers.InventoryToAPI(*domain)
+		for _, datastore := range []api.Datastore{result.Vcenter.Infra.Datastores[0], result.Clusters["cluster"].Infra.Datastores[0]} {
+			encoded, err := json.Marshal(datastore)
+			Expect(err).NotTo(HaveOccurred())
+			var wire map[string]any
+			Expect(json.Unmarshal(encoded, &wire)).To(Succeed())
+			Expect(wire["storageArrays"]).To(Equal([]any{
+				map[string]any{"uuid": "array-1", "name": "array", "vendorId": "vendor", "modelId": "model"},
+				map[string]any{"name": "partial"},
+			}))
+			Expect(wire["storageContainerId"]).To(Equal("container-1"))
+			Expect(wire["vendor"]).To(Equal("LUN vendor"))
+			Expect(wire["backingDeviceIds"]).To(Equal([]any{"naa.device"}))
+		}
+	})
+
+	DescribeTable("retains uploaded identity through persisted service inventory", func(datastore string, known bool) {
+		raw := []byte(`{"vcenter_id":"vc","vcenter":{"infra":{"datastores":[` + datastore + `]}},"clusters":{"cluster":{"infra":{"datastores":[` + datastore + `]}}}}`)
+		var input api.Inventory
+		Expect(json.Unmarshal(raw, &input)).To(Succeed())
+		domain := mappers.InventoryFromAPI(input)
+		encoded, err := json.Marshal(domain)
+		Expect(err).NotTo(HaveOccurred())
+		var restored model2.Inventory
+		Expect(json.Unmarshal(encoded, &restored)).To(Succeed())
+		result := mappers.InventoryToAPI(restored)
+		for _, datastore := range []api.Datastore{result.Vcenter.Infra.Datastores[0], result.Clusters["cluster"].Infra.Datastores[0]} {
+			encoded, err := json.Marshal(datastore)
+			Expect(err).NotTo(HaveOccurred())
+			var wire map[string]any
+			Expect(json.Unmarshal(encoded, &wire)).To(Succeed())
+			if known {
+				Expect(wire["storageArrays"]).To(Equal([]any{
+					map[string]any{"uuid": "array-1", "name": "Main", "vendorId": "vendor", "modelId": "model"},
+					map[string]any{"name": "partial"},
+				}))
+				Expect(wire["storageContainerId"]).To(Equal("container"))
+			} else {
+				Expect(wire).NotTo(HaveKey("storageArrays"))
+				Expect(wire).NotTo(HaveKey("storageContainerId"))
+			}
+		}
+	},
+		Entry("source records including partial identity", `{"diskId":"vvol","storageArrays":[{"uuid":"array-1","name":"Main","vendorId":"vendor","modelId":"model"},{"name":"partial"}],"storageContainerId":"container"}`, true),
+		Entry("historical payload", `{"diskId":"legacy"}`, false),
+	)
 })
 
 var _ = Describe("Inventory host details and storage metadata", func() {

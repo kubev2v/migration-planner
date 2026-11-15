@@ -496,6 +496,8 @@ func (p *Parser) buildInfraData(
 		datastores := make([]inventory.Datastore, 0, len(datastoreModels))
 		for _, d := range datastoreModels {
 			datastores = append(datastores, inventory.Datastore{
+				StorageArrays:          d.StorageArrays,
+				StorageContainerID:     d.StorageContainerID,
 				DiskId:                 d.DiskId,
 				BackingDeviceIDs:       d.BackingDeviceIDs,
 				FilesystemType:         d.FilesystemType,

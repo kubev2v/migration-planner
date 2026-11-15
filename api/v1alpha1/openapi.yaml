@@ -3373,6 +3373,22 @@ components:
         vmsCount:
           type: integer
 
+    StorageArray:
+      type: object
+      description: Authoritative source VASA array identity associated with this datastore; distinct from LUN inquiry metadata and storage-container identity
+      properties:
+        uuid:
+          type: string
+          description: Array UUID reported by the source, when available
+        name:
+          type: string
+        vendorId:
+          type: string
+          description: VASA vendor ID, not a SCSI inquiry vendor
+        modelId:
+          type: string
+          description: VASA model ID, not a SCSI inquiry model
+
     Datastore:
       type: object
       required:
@@ -3385,6 +3401,14 @@ components:
         - protocolType
         - model
       properties:
+        storageArrays:
+          type: array
+          description: Source-reported VASA arrays; absence does not establish that the datastore has no array
+          items:
+            $ref: '#/components/schemas/StorageArray'
+        storageContainerId:
+          type: string
+          description: Source storage-container identifier, distinct from array UUID and protocol-endpoint identity
         type:
           type: string
         backingDeviceIds:
