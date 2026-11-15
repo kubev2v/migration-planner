@@ -182,6 +182,8 @@ CREATE TABLE IF NOT EXISTS vdatastore (
     "Filesystem Major Version" INTEGER,
     "Backing Devices" VARCHAR DEFAULT '[]',
     "Storage Protocol" VARCHAR,
+    "Storage Arrays" VARCHAR,
+    "Storage Container ID" VARCHAR,
     "SIOC Enabled" BOOLEAN DEFAULT false,
     "SIOC Congestion Threshold" INTEGER DEFAULT 30,
     "SIOC Congestion Threshold Mode" VARCHAR DEFAULT 'automatic',
@@ -192,6 +194,8 @@ CREATE TABLE IF NOT EXISTS vdatastore (
 ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Filesystem Type" VARCHAR;
 ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Filesystem Major Version" INTEGER;
 ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Storage Protocol" VARCHAR;
+ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Storage Arrays" VARCHAR;
+ALTER TABLE vdatastore ADD COLUMN IF NOT EXISTS "Storage Container ID" VARCHAR;
 
 -- Adapter inventory from either collector, identified by host and device.
 CREATE TABLE IF NOT EXISTS vhba (
