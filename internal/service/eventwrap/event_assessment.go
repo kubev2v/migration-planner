@@ -2,7 +2,6 @@ package eventwrap
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
@@ -79,14 +78,8 @@ func (e *EventAssessmentService) CreateAssessment(ctx context.Context, createFor
 		return nil, err
 	}
 
-	inventory, err := json.Marshal(assessment.MainInventory.Inventory)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal assessment inventory: %w", err)
-	}
-
 	payload := events.NewAssessmentCreatedPayload(events.AssessmentData{
 		ID:            assessment.ID.String(),
-		Inventory:     inventory, // Todo: deprecated to be removed
 		MainInventory: mappers.ToStreamerModel(assessment.MainInventory.Inventory),
 		Name:          assessment.Name,
 		OrgID:         assessment.OrgID,
