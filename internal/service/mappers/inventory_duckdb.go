@@ -301,6 +301,17 @@ func infraFromDuckDB(i *inventory.InfraData) svcmodel.Infra {
 			ProtocolType:            d.ProtocolType,
 			Vendor:                  d.Vendor,
 		}
+		if len(d.StorageArrays) > 0 {
+			arrays := make([]svcmodel.StorageArray, 0, len(d.StorageArrays))
+			for _, a := range d.StorageArrays {
+				arrays = append(arrays, svcmodel.StorageArray{
+					Uuid: optionalStorageString(a.UUID), Name: optionalStorageString(a.Name),
+					VendorId: optionalStorageString(a.VendorID), ModelId: optionalStorageString(a.ModelID),
+				})
+			}
+			ds.StorageArrays = &arrays
+		}
+		ds.StorageContainerId = optionalStorageString(d.StorageContainerID)
 		if d.FilesystemType != "" {
 			filesystemType := d.FilesystemType
 			ds.FilesystemType = &filesystemType

@@ -4,6 +4,8 @@ import "github.com/kubev2v/migration-planner/pkg/inventory"
 
 // Datastore represents a VMware datastore.
 type Datastore struct {
+	StorageArrays           StorageArrays    `db:"storageArrays" json:"storageArrays,omitempty"`
+	StorageContainerID      string           `db:"storageContainerId" json:"storageContainerId,omitempty"`
 	Cluster                 string           `db:"cluster" json:"-"`
 	BackingDeviceIDs        BackingDeviceIDs `db:"backingDeviceIds" json:"-"`
 	DiskId                  string           `db:"diskId" json:"diskId"`

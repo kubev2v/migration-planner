@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zaptest/observer"
@@ -1273,3 +1275,245 @@ func TestIngestRvTools_HostStorageSourceOwnership(t *testing.T) {
 		})
 	}
 }
+
+var _ = Describe("Storage array inventory", func() {
+	It("retains normalized source records on each datastore without multiplying host relationships", func() {
+		t := GinkgoTB()
+		parser, db, cleanup := setupTestParser(t, &testValidator{})
+		DeferCleanup(cleanup)
+		path := createTestSQLite(t, "vcenter-arrays",
+			[]sqliteCluster{{id: "cluster-1", name: "cluster1", datacenter: "dc1"}},
+			[]sqliteVM{{id: "vm-1", name: "vm1", clusterName: "cluster1"}})
+		src, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(src.Close)
+		_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", path))
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec(`ALTER TABLE dst.Datastore ADD COLUMN StorageArrays VARCHAR;
+            ALTER TABLE dst.Datastore ADD COLUMN StorageContainerID VARCHAR;
+            UPDATE dst.Host SET Datastores = '[{"id":"ds-1"},{"id":"ds-2"}]';
+            INSERT INTO dst.Host (ID, Cluster, Datastores) VALUES ('host-2', 'cluster-1', '[{"id":"ds-1"}]');`)
+		Expect(err).NotTo(HaveOccurred())
+		arrays := `[{"uuid":"\t array-1 \n","name":"\r Main \t","vendorId":"\n vendor \r","modelId":"\t model \n"},{"name":" Partial "},{}]`
+		_, err = src.Exec(`INSERT INTO dst.Datastore (ID, Name, Type, Free, Capacity, BackingDevicesNames, StorageArrays, StorageContainerID)
+            VALUES ('ds-1', 'vvol-main', 'VVOL', 1073741824, 2147483648, '["naa.device"]', ?, ?),
+                   ('ds-2', 'vvol-secondary', 'VVOL', 1073741824, 2147483648, '[]', '[{"uuid":"array-1"}]', NULL)`, arrays, "\t container-1 \n")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec("DETACH dst")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = parser.IngestSqlite(context.Background(), path)
+		Expect(err).NotTo(HaveOccurred())
+
+		var raw, container string
+		Expect(db.QueryRow(`SELECT "Storage Arrays", "Storage Container ID" FROM vdatastore WHERE "Object ID"='ds-1'`).Scan(&raw, &container)).To(Succeed())
+		var got []map[string]any
+		Expect(json.Unmarshal([]byte(raw), &got)).To(Succeed())
+		Expect(got).To(HaveLen(2))
+		Expect(got[0]).To(HaveKeyWithValue("uuid", "array-1"))
+		Expect(got[0]).To(HaveKeyWithValue("vendorId", "vendor"))
+		Expect(got[1]).To(HaveKeyWithValue("name", "Partial"))
+		Expect(container).To(Equal("container-1"))
+		var count int
+		Expect(db.QueryRow(`SELECT count(*) FROM vdatastore`).Scan(&count)).To(Succeed())
+		Expect(count).To(Equal(2))
+		inv, err := parser.BuildInventory(context.Background(), nil)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(inv.VCenter.Infra.Datastores).To(HaveLen(2))
+		var canonicalArrays []inventory.StorageArray
+		for _, datastore := range inv.VCenter.Infra.Datastores {
+			if datastore.DiskId == "vvol-main" {
+				canonicalArrays = datastore.StorageArrays
+			}
+		}
+		Expect(canonicalArrays).To(Equal([]inventory.StorageArray{{UUID: "array-1", Name: "Main", VendorID: "vendor", ModelID: "model"}, {Name: "Partial"}}))
+
+		for _, filters := range []Filters{{}, {Cluster: "cluster1"}} {
+			datastores, err := parser.Datastores(context.Background(), filters, Options{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(datastores).To(HaveLen(2))
+			for _, datastore := range datastores {
+				encoded, err := json.Marshal(datastore)
+				Expect(err).NotTo(HaveOccurred())
+				var wire map[string]any
+				Expect(json.Unmarshal(encoded, &wire)).To(Succeed())
+				Expect(wire).To(HaveKey("storageArrays"))
+				if datastore.DiskId == "vvol-main" {
+					Expect(wire["storageArrays"]).To(HaveLen(2))
+					Expect(wire["storageContainerId"]).To(Equal("container-1"))
+					Expect(datastore.TotalCapacityGB).To(Equal(float64(2)))
+				} else {
+					Expect(wire["storageArrays"]).To(HaveLen(1))
+					Expect(wire).NotTo(HaveKey("storageContainerId"))
+				}
+			}
+		}
+
+	})
+	It("keeps valid records when sibling records are malformed", func() {
+		t := GinkgoTB()
+		parser, _, cleanup := setupTestParser(t, nil)
+		DeferCleanup(cleanup)
+		path := createTestSQLite(t, "vc", nil, nil)
+		src, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", path))
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec(`ALTER TABLE dst.Datastore ADD COLUMN StorageArrays VARCHAR;
+            INSERT INTO dst.Datastore (ID, Name, Type, StorageArrays) VALUES
+            ('ds', 'mixed', 'VVOL', ?)`,
+			`[{"uuid":" array-1 ","name":"Main"},123,"str",{},[1,2],{"name":"Partial"}]`)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(src.Close()).To(Succeed())
+		_, err = parser.IngestSqlite(context.Background(), path)
+		Expect(err).NotTo(HaveOccurred())
+		datastores, err := parser.Datastores(context.Background(), Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(datastores).To(HaveLen(1))
+		Expect(datastores[0].StorageArrays).To(Equal(models.StorageArrays{
+			{UUID: "array-1", Name: "Main"},
+			{Name: "Partial"},
+		}))
+	})
+
+	It("retains container-only and unmounted datastore source facts independently", func() {
+		t := GinkgoTB()
+		parser, _, cleanup := setupTestParser(t, nil)
+		DeferCleanup(cleanup)
+		path := createTestSQLite(t, "vc", nil, nil)
+		src, err := sql.Open("duckdb", "")
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", path))
+		Expect(err).NotTo(HaveOccurred())
+		_, err = src.Exec(`ALTER TABLE dst.Datastore ADD COLUMN StorageArrays VARCHAR;
+            ALTER TABLE dst.Datastore ADD COLUMN StorageContainerID VARCHAR;
+            INSERT INTO dst.Datastore (ID, Name, Type, StorageArrays, StorageContainerID) VALUES
+            ('container-only','container-only','VVOL',NULL,' container '),
+            ('unmounted','unmounted','VVOL','[{"uuid":"array"}]',NULL)`)
+		Expect(err).NotTo(HaveOccurred())
+		Expect(src.Close()).To(Succeed())
+		_, err = parser.IngestSqlite(context.Background(), path)
+		Expect(err).NotTo(HaveOccurred())
+		datastores, err := parser.Datastores(context.Background(), Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(datastores).To(HaveLen(2))
+		for _, datastore := range datastores {
+			if datastore.DiskId == "container-only" {
+				Expect(datastore.StorageArrays).To(BeEmpty())
+				Expect(datastore.StorageContainerID).To(Equal("container"))
+			} else {
+				Expect(datastore.DiskId).To(Equal("unmounted"))
+				Expect(datastore.StorageArrays).To(Equal(models.StorageArrays{{UUID: "array"}}))
+				Expect(datastore.StorageContainerID).To(BeEmpty())
+			}
+		}
+	})
+
+	DescribeTable("keeps unavailable source arrays unknown", func(source string) {
+		t := GinkgoTB()
+		parser, _, cleanup := setupTestParser(t, &testValidator{})
+		DeferCleanup(cleanup)
+		ctx := context.Background()
+		if source == "RVTools" {
+			path := createTestExcel(t,
+				NewExcelSheet("vInfo", vInfoHeaders, []map[string]string{{"VM ID": "vm-1", "VM": "vm", "Host": "esxi", "Cluster": "cluster1", "VI SDK UUID": "vc"}}),
+				NewExcelSheet("vDatastore", vDatastoreHeaders, []map[string]string{{"Name": "nfs-host:/export", "Type": "NFS"}}))
+			_, err := parser.IngestRvTools(ctx, path)
+			Expect(err).NotTo(HaveOccurred())
+		} else {
+			path := createTestSQLite(t, "vc", nil, nil)
+			src, err := sql.Open("duckdb", "")
+			Expect(err).NotTo(HaveOccurred())
+			_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", path))
+			Expect(err).NotTo(HaveOccurred())
+			_, err = src.Exec(`INSERT INTO dst.Datastore (ID, Name, Type, BackingDevicesNames) VALUES ('ds', 'legacy', 'VMFS', '["naa.not-array"]')`)
+			Expect(err).NotTo(HaveOccurred())
+			if source != "legacy SQLite" {
+				_, err = src.Exec(`ALTER TABLE dst.Datastore ADD COLUMN StorageArrays VARCHAR`)
+				Expect(err).NotTo(HaveOccurred())
+				_, err = src.Exec(`UPDATE dst.Datastore SET StorageArrays = ?`, source)
+				Expect(err).NotTo(HaveOccurred())
+			}
+			Expect(src.Close()).To(Succeed())
+			_, err = parser.IngestSqlite(ctx, path)
+			Expect(err).NotTo(HaveOccurred())
+		}
+		datastores, err := parser.Datastores(ctx, Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(datastores).To(HaveLen(1))
+		Expect(datastores[0].StorageArrays).To(BeEmpty())
+		Expect(datastores[0].StorageContainerID).To(BeEmpty())
+	}, Entry("older SQLite schema", "legacy SQLite"), Entry("RVTools", "RVTools"),
+		Entry("null", "null"), Entry("empty", ""), Entry("empty list", "[]"),
+		Entry("blank records", `[{"uuid":"  ","name":""},{}]`), Entry("control whitespace records", `[{"uuid":"\t\n","name":"\r\n","vendorId":"\f","modelId":"\t"}]`), Entry("malformed", "not-json"))
+
+	It("keeps identically named datastores attached to their own cluster", func() {
+		parser, db, cleanup := setupTestParser(GinkgoTB(), nil)
+		DeferCleanup(cleanup)
+		_, err := db.Exec(`INSERT INTO vhost ("Object ID", "Host", "Cluster") VALUES ('host-1','host-1','one'), ('host-2','host-2','two');
+            INSERT INTO vdatastore ("Object ID", "Name", "Hosts", "Type", "Storage Arrays") VALUES
+            ('ds-1','shared-name','host-1','VVOL','[{"uuid":"array-one"}]'),
+            ('ds-2','shared-name','host-2','VVOL','[{"uuid":"array-two"}]')`)
+		Expect(err).NotTo(HaveOccurred())
+		for cluster, uuid := range map[string]string{"one": "array-one", "two": "array-two"} {
+			datastores, err := parser.Datastores(context.Background(), Filters{Cluster: cluster}, Options{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(datastores).To(HaveLen(1))
+			Expect(datastores[0].StorageArrays).To(Equal(models.StorageArrays{{UUID: uuid}}))
+		}
+	})
+
+	It("reads historical files without mutating them and refreshes writable schema knowledge", func() {
+		path := filepath.Join(GinkgoT().TempDir(), "legacy.duckdb")
+		db, err := sql.Open("duckdb", path)
+		Expect(err).NotTo(HaveOccurred())
+		parser := New(db, nil)
+		Expect(parser.Init()).To(Succeed())
+		_, err = db.Exec(`ALTER TABLE vdatastore DROP COLUMN "Storage Arrays";
+            ALTER TABLE vdatastore DROP COLUMN "Storage Container ID";
+            INSERT INTO vdatastore ("Name", "Type") VALUES ('legacy','VVOL')`)
+		Expect(err).NotTo(HaveOccurred())
+		parser = New(db, nil)
+		datastores, err := parser.Datastores(context.Background(), Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(datastores).To(HaveLen(1))
+		Expect(datastores[0].StorageArrays).To(BeEmpty())
+		Expect(db.Close()).To(Succeed())
+		readonly, err := sql.Open("duckdb", path+"?access_mode=READ_ONLY")
+		Expect(err).NotTo(HaveOccurred())
+		reader := New(readonly, nil)
+		for range 2 {
+			datastores, err = reader.Datastores(context.Background(), Filters{}, Options{})
+			Expect(err).NotTo(HaveOccurred())
+			Expect(datastores).To(HaveLen(1))
+			Expect(datastores[0].StorageArrays).To(BeEmpty())
+		}
+		var count int
+		Expect(readonly.QueryRow(`SELECT count(*) FROM information_schema.columns WHERE table_name='vdatastore' AND column_name='Storage Arrays'`).Scan(&count)).To(Succeed())
+		Expect(count).To(BeZero())
+		Expect(readonly.Close()).To(Succeed())
+		db, err = sql.Open("duckdb", path)
+		Expect(err).NotTo(HaveOccurred())
+		DeferCleanup(db.Close)
+		parser = New(db, nil)
+		_, err = parser.Datastores(context.Background(), Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(parser.Init()).To(Succeed())
+		Expect(parser.Init()).To(Succeed())
+		_, err = db.Exec(`UPDATE vdatastore SET "Storage Arrays"='[{"uuid":"array"}]', "Storage Container ID"='container'`)
+		Expect(err).NotTo(HaveOccurred())
+		datastores, err = parser.Datastores(context.Background(), Filters{}, Options{})
+		Expect(err).NotTo(HaveOccurred())
+		Expect(datastores).To(HaveLen(1))
+		Expect(datastores[0].StorageArrays).To(Equal(models.StorageArrays{{UUID: "array"}}))
+		Expect(datastores[0].StorageContainerID).To(Equal("container"))
+	})
+
+	DescribeTable("scans optional array JSON safely", func(value any, want models.StorageArrays) {
+		arrays := models.StorageArrays{{UUID: "stale"}}
+		Expect(arrays.Scan(value)).To(Succeed())
+		Expect(arrays).To(Equal(want))
+	}, Entry("null SQL", nil, models.StorageArrays(nil)), Entry("empty text", "", models.StorageArrays(nil)),
+		Entry("malformed JSON", "not-json", models.StorageArrays(nil)),
+		Entry("partial identity", `[{"name":"partial"}]`, models.StorageArrays{{Name: "partial"}}))
+
+})
