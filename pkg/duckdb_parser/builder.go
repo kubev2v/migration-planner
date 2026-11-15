@@ -73,6 +73,8 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 
 // queryParams holds all template parameters for queries.
 type queryParams struct {
+	StorageArrays           bool
+	StorageContainerID      bool
 	MetadataTable           string
 	StorageTopology         string
 	RDMColumns              bool
@@ -133,15 +135,17 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, 
 
 // DatastoreQuery builds the datastore query with filters and pagination.
 func (b *QueryBuilder) DatastoreQuery(filters Filters, options Options) (string, error) {
-	return b.datastoreQuery(filters, options, storageTopologyQuery(staticStorageTables, false))
+	return b.datastoreQuery(filters, options, storageTopologyQuery(staticStorageTables, false), datastoreColumns{arrays: true, container: true})
 }
 
-func (b *QueryBuilder) datastoreQuery(filters Filters, options Options, storageTopology string) (string, error) {
+func (b *QueryBuilder) datastoreQuery(filters Filters, options Options, storageTopology string, columns datastoreColumns) (string, error) {
 	params := queryParams{
-		StorageTopology: storageTopology,
-		ClusterFilter:   escapeSQLString(filters.Cluster),
-		Limit:           options.Limit,
-		Offset:          options.Offset,
+		StorageArrays:      columns.arrays,
+		StorageContainerID: columns.container,
+		StorageTopology:    storageTopology,
+		ClusterFilter:      escapeSQLString(filters.Cluster),
+		Limit:              options.Limit,
+		Offset:             options.Offset,
 	}
 	return b.buildQuery("datastore_query", mustGetTemplate("storage_backing")+mustGetTemplate("datastore_query"), params)
 }

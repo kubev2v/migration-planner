@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"go.uber.org/zap"
+
+	"github.com/kubev2v/migration-planner/pkg/inventory"
 )
 
 // Disks is a slice of Disk that implements sql.Scanner for DuckDB LIST type.
@@ -149,6 +151,37 @@ func (ids *BackingDeviceIDs) Scan(value interface{}) error {
 		}
 		*ids = result
 	}
+	return nil
+}
+
+// StorageArrays scans source VASA records stored as JSON text.
+type StorageArrays []inventory.StorageArray
+
+func (arrays *StorageArrays) Scan(value any) error {
+	*arrays = nil
+	if value == nil {
+		return nil
+	}
+
+	var data []byte
+	switch value := value.(type) {
+	case string:
+		data = []byte(value)
+	case []byte:
+		data = value
+	default:
+		return fmt.Errorf("StorageArrays.Scan: unexpected type %T", value)
+	}
+	if len(data) == 0 {
+		return nil
+	}
+
+	var records []inventory.StorageArray
+	if err := json.Unmarshal(data, &records); err != nil {
+		zap.S().Named("duckdb_parser").Warn("invalid datastore storage-array JSON")
+		return nil
+	}
+	*arrays = records
 	return nil
 }
 

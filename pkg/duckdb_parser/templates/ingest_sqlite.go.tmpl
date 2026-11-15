@@ -336,10 +336,18 @@ WITH datastore_metadata AS (
         ds.*,
         NULLIF(to_json(ds)->>'FilesystemType', '') AS filesystem_type,
         NULLIF(TRY_CAST(to_json(ds)->>'FilesystemMajorVersion' AS INTEGER), 0) AS filesystem_major_version,
-        NULLIF(TRIM(to_json(ds)->>'ProtocolEndpointType'), '') AS protocol_endpoint_type
+        NULLIF(TRIM(to_json(ds)->>'ProtocolEndpointType'), '') AS protocol_endpoint_type,
+        NULLIF(regexp_replace(to_json(ds)->>'StorageContainerID', '^[[:space:]]+|[[:space:]]+$', '', 'g'), '') AS storage_container_id,
+        CAST(to_json(list_filter(list_transform(
+            COALESCE(TRY(from_json(NULLIF(to_json(ds)->>'StorageArrays', ''),
+                '[{"uuid":"VARCHAR","name":"VARCHAR","vendorId":"VARCHAR","modelId":"VARCHAR"}]')),
+                []::STRUCT(uuid VARCHAR, name VARCHAR, vendorId VARCHAR, modelId VARCHAR)[]),
+            a -> struct_pack(uuid := NULLIF(regexp_replace(a.uuid, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), name := NULLIF(regexp_replace(a.name, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''),
+                vendorId := NULLIF(regexp_replace(a.vendorId, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), modelId := NULLIF(regexp_replace(a.modelId, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''))),
+            a -> a.uuid IS NOT NULL OR a.name IS NOT NULL OR a.vendorId IS NOT NULL OR a.modelId IS NOT NULL)) AS VARCHAR) AS storage_arrays
     FROM src.Datastore ds
 )
-INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol",
+INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol", "Storage Arrays", "Storage Container ID",
     "SIOC Enabled", "SIOC Congestion Threshold", "SIOC Congestion Threshold Mode", "SIOC Percent Of Peak Throughput")
 SELECT
     string_agg(DISTINCT h.ID, ','),
@@ -380,6 +388,8 @@ SELECT
             IN ('NFS', 'NFS41', 'NFS4.1', 'NFS 4.1') THEN 'NFS'
         ELSE NULL
     END),
+    ds.storage_arrays,
+    ds.storage_container_id,
     COALESCE(ds.IORMEnabled, false),
     COALESCE(ds.IORMCongestionThreshold, 30),
     COALESCE(ds.IORMCongestionThresholdMode, 'automatic'),
@@ -393,7 +403,7 @@ LEFT JOIN (
         []::STRUCT(kind VARCHAR, id VARCHAR)[]
     )) AS t(dsref)
 ) h ON h.datastore_id = ds.ID
-GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.filesystem_type, ds.filesystem_major_version, ds.BackingDevicesNames, ds.protocol_endpoint_type,
+GROUP BY ds.ID, ds.Name, ds.Free, ds.Capacity, ds.MaintenanceMode, ds.Type, ds.filesystem_type, ds.filesystem_major_version, ds.BackingDevicesNames, ds.protocol_endpoint_type, ds.storage_arrays, ds.storage_container_id,
     COALESCE(ds.IORMEnabled, false), COALESCE(ds.IORMCongestionThreshold, 30),
     COALESCE(ds.IORMCongestionThresholdMode, 'automatic'), COALESCE(ds.IORMPercentOfPeakThroughput, 90);
 

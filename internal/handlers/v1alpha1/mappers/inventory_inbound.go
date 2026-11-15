@@ -202,6 +202,7 @@ func vmsFromAPI(v api.VMs) svcmodel.VMs {
 
 func datastoreFromAPI(d api.Datastore) svcmodel.Datastore {
 	result := svcmodel.Datastore{
+		StorageContainerId:      d.StorageContainerId,
 		BackingDeviceIds:        d.BackingDeviceIds,
 		FilesystemMajorVersion:  d.FilesystemMajorVersion,
 		FilesystemType:          d.FilesystemType,
@@ -215,6 +216,15 @@ func datastoreFromAPI(d api.Datastore) svcmodel.Datastore {
 		Type:                    d.Type,
 		Vendor:                  d.Vendor,
 		VsanSnapshotSupport:     d.VsanSnapshotSupport,
+	}
+	if d.StorageArrays != nil {
+		arrays := make([]svcmodel.StorageArray, 0, len(*d.StorageArrays))
+		for _, a := range *d.StorageArrays {
+			arrays = append(arrays, svcmodel.StorageArray{
+				Uuid: a.Uuid, Name: a.Name, VendorId: a.VendorId, ModelId: a.ModelId,
+			})
+		}
+		result.StorageArrays = &arrays
 	}
 	if d.StorageIoConfiguration != nil {
 		configuration := storageIoConfigurationFromAPI(*d.StorageIoConfiguration)

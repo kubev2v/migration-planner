@@ -50,11 +50,16 @@ func (p *Parser) VMCount(ctx context.Context, filters Filters) (int, error) {
 
 // Datastores returns datastores with optional filters and pagination.
 func (p *Parser) Datastores(ctx context.Context, filters Filters, options Options) ([]models.Datastore, error) {
+	columns, err := p.datastoreStorageColumns(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	topology, err := StorageTopologyQuery(ctx, p.db)
 	if err != nil {
 		return nil, err
 	}
-	q, err := p.builder.datastoreQuery(filters, options, topology)
+	q, err := p.builder.datastoreQuery(filters, options, topology, columns)
 	if err != nil {
 		return nil, fmt.Errorf("building datastore query: %w", err)
 	}

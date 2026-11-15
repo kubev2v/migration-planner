@@ -180,8 +180,18 @@ type StorageIoConfiguration struct {
 	PercentOfPeakThroughput int
 }
 
+// StorageArray contains authoritative source VASA identity, separate from LUN inquiry data.
+type StorageArray struct {
+	UUID     string `json:"uuid,omitempty"`
+	Name     string `json:"name,omitempty"`
+	VendorID string `json:"vendorId,omitempty"`
+	ModelID  string `json:"modelId,omitempty"`
+}
+
 // Datastore represents a VMware datastore.
 type Datastore struct {
+	StorageArrays          []StorageArray
+	StorageContainerID     string
 	DiskId                 string
 	BackingDeviceIDs       []string
 	FilesystemType         string

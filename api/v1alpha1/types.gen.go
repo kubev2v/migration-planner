@@ -725,8 +725,14 @@ type Datastore struct {
 	HostId *string `json:"hostId"`
 
 	// Model Model reported by matching backing devices when available
-	Model                  string                  `json:"model"`
-	ProtocolType           string                  `json:"protocolType"`
+	Model        string `json:"model"`
+	ProtocolType string `json:"protocolType"`
+
+	// StorageArrays Source-reported VASA arrays; absence does not establish that the datastore has no array
+	StorageArrays *[]StorageArray `json:"storageArrays,omitempty"`
+
+	// StorageContainerId Source storage-container identifier, distinct from array UUID and protocol-endpoint identity
+	StorageContainerId     *string                 `json:"storageContainerId,omitempty"`
 	StorageIoConfiguration *StorageIoConfiguration `json:"storageIoConfiguration,omitempty"`
 
 	// StorageProtocol Storage access category derived from Datastore.Type
@@ -1503,6 +1509,19 @@ type Status struct {
 
 	// Status Status of the operation. One of: "Success" or "Failure". More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 	Status *string `json:"status,omitempty"`
+}
+
+// StorageArray Authoritative source VASA array identity associated with this datastore; distinct from LUN inquiry metadata and storage-container identity
+type StorageArray struct {
+	// ModelId VASA model ID, not a SCSI inquiry model
+	ModelId *string `json:"modelId,omitempty"`
+	Name    *string `json:"name,omitempty"`
+
+	// Uuid Array UUID reported by the source, when available
+	Uuid *string `json:"uuid,omitempty"`
+
+	// VendorId VASA vendor ID, not a SCSI inquiry vendor
+	VendorId *string `json:"vendorId,omitempty"`
 }
 
 // StorageIoConfiguration defines model for StorageIoConfiguration.

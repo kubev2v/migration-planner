@@ -122,8 +122,18 @@ type VMs struct {
 // DatastoreStorageProtocol is the storage access category derived from a datastore type.
 type DatastoreStorageProtocol string
 
+// StorageArray contains source VASA identity associated with a datastore.
+type StorageArray struct {
+	Uuid     *string `json:"uuid,omitempty"`
+	Name     *string `json:"name,omitempty"`
+	VendorId *string `json:"vendorId,omitempty"`
+	ModelId  *string `json:"modelId,omitempty"`
+}
+
 // Datastore describes a single datastore.
 type Datastore struct {
+	StorageArrays           *[]StorageArray           `json:"storageArrays,omitempty"`
+	StorageContainerId      *string                   `json:"storageContainerId,omitempty"`
 	BackingDeviceIds        *[]string                 `json:"backingDeviceIds,omitempty"`
 	FilesystemMajorVersion  *int32                    `json:"filesystemMajorVersion,omitempty"`
 	FilesystemType          *string                   `json:"filesystemType,omitempty"`
