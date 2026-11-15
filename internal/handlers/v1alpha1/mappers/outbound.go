@@ -8,15 +8,15 @@ import (
 
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 
+	"github.com/kubev2v/migration-planner-common/estimations/complexity"
+	"github.com/kubev2v/migration-planner-common/estimations/engines"
+	"github.com/kubev2v/migration-planner-common/estimations/estimation"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	agentAPI "github.com/kubev2v/migration-planner/api/v1alpha1/agent"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
-	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
-	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
@@ -512,7 +512,7 @@ func ClusterRequirementsInputFormToAPI(form mappers.ClusterRequirementsInputForm
 }
 
 // MigrationComplexityResultToAPI converts the service result to the API response type.
-func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) api.MigrationComplexityResponse {
+func MigrationComplexityResultToAPI(result svcmodel.MigrationComplexityResult) api.MigrationComplexityResponse {
 	byDisk := make([]api.ComplexityDiskScoreEntry, len(result.ComplexityByDisk))
 	for i, entry := range result.ComplexityByDisk {
 		byDisk[i] = api.ComplexityDiskScoreEntry{
@@ -550,8 +550,8 @@ func MigrationComplexityResultToAPI(result service.MigrationComplexityResult) ap
 
 // MigrationEstimationResultToAPI converts the schema-keyed service result map to the API response.
 func MigrationEstimationResultToAPI(
-	results map[engines.Schema]*service.MigrationAssessmentResult,
-	estimationCtx *service.EstimationContext,
+	results map[engines.Schema]*estimation.Result,
+	estimationCtx *svcmodel.EstimationContext,
 ) api.MigrationEstimationResponse {
 	estimation := make(map[string]api.SchemaEstimationResult, len(results))
 	for schema, result := range results {
@@ -585,7 +585,7 @@ func paramMapToAPI(params []estimation.Param) map[string]float32 {
 	return m
 }
 
-func schemaResultToAPI(result *service.MigrationAssessmentResult) api.SchemaEstimationResult {
+func schemaResultToAPI(result *estimation.Result) api.SchemaEstimationResult {
 	breakdown := make(map[string]api.EstimationDetail, len(result.Breakdown))
 	for name, est := range result.Breakdown {
 		breakdown[name] = estimationDetailToAPI(est)
@@ -601,8 +601,8 @@ func schemaResultToAPI(result *service.MigrationAssessmentResult) api.SchemaEsti
 // results, estimation context, and complexity matrix into the API response.
 func OsDiskEstimationResultToAPI(
 	buckets []complexity.OSDiskEntry,
-	estimations map[int]map[string]*service.MigrationAssessmentResult,
-	estimationCtx *service.EstimationContext,
+	estimations map[int]map[string]*estimation.Result,
+	estimationCtx *svcmodel.EstimationContext,
 	complexityMatrix map[complexity.Score]map[complexity.Score]complexity.Score,
 ) api.MigrationEstimationByComplexityResponse {
 	entries := make([]api.OsDiskEstimationEntry, len(buckets))

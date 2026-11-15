@@ -1,6 +1,6 @@
 # Complexity scoring in the duckdb_parser package
 
-Score definitions and OS/disk heuristics are owned by the `pkg/estimations/complexity` package — see its README for the full reference.
+Score definitions and OS/disk heuristics are owned by the `migration-planner-common/estimations/complexity` package — see its README for the full reference.
 
 This document covers only what is specific to how complexity is computed during ingestion.
 
@@ -8,7 +8,7 @@ This document covers only what is specific to how complexity is computed during 
 
 ## How OS classification works in the templates
 
-OS scoring is not hardcoded in the SQL templates. Instead, the CASE clauses are **generated at query-build time** from `OSDifficultyScores` in `pkg/estimations/complexity/complexity.go`.
+OS scoring is not hardcoded in the SQL templates. Instead, the CASE clauses are **generated at query-build time** from `OSDifficultyScores` in `migration-planner-common/estimations/complexity/complexity.go`.
 
 The template placeholder `{{.OSCaseClauses}}` in `populate_complexity.go.tmpl` is replaced with one `WHEN ... THEN '...'` clause per entry in that map, ensuring a single source of truth for OS scores across both the API response path and the ingestion path.
 

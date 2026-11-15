@@ -2,7 +2,7 @@
 Populate Complexity Template - Computes per-VM migration complexity from OS type and disk size.
 
 Complexity levels (stored as INTEGER): 0=Unknown, 1=Easy, 2=Medium, 3=Hard, 4=WhiteGlove.
-See pkg/estimations/complexity/README.md for score definitions and heuristics.
+See migration-planner-common/estimations/complexity/README.md for score definitions and heuristics.
 
 OS CASE clauses are injected via {{.OSCaseClauses}}, generated from OSDifficultyScores at
 query-build time. Disk thresholds and the OS×disk combination matrix are hardcoded below.

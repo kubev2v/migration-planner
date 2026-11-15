@@ -349,6 +349,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns 400 when an unknown param key is provided", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(
 					nil,
 					service.NewAssessmentService(mockStore, nil, nil),
@@ -375,6 +376,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns 400 when a param value is below its minimum", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(
 					nil,
 					service.NewAssessmentService(mockStore, nil, nil),
@@ -1056,6 +1058,7 @@ var _ = Describe("estimation handler", func() {
 
 		Context("param validation errors", func() {
 			It("returns 400 when an unknown param key is provided", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
 				resp, err := handler.CalculateMigrationEstimationByComplexity(ctx,
@@ -1074,6 +1077,7 @@ var _ = Describe("estimation handler", func() {
 			})
 
 			It("returns 400 when a param value is below its minimum", func() {
+				mockStore.assessments[assessmentID] = createTestAssessmentForEstimationHandler(assessmentID, user.Username, user.Organization, clusterID)
 				handler = handlers.NewServiceHandler(nil, service.NewAssessmentService(mockStore, nil, nil), nil, nil, service.NewEstimationService(mockStore), nil, nil, nil)
 
 				// transfer_rate_mbps has Min=0.1

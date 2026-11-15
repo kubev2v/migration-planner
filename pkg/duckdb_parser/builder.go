@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
+	"github.com/kubev2v/migration-planner-common/estimations/complexity"
 )
 
 //go:embed templates/*.tmpl
