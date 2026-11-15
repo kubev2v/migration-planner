@@ -133,6 +133,22 @@ jobs:
             exit 1
           }
 
+      # MIN_APPLIANCE_VERSION gates in-place updates; it must mirror the served
+      # image's min-upgrade-version label and be a valid version (or empty).
+      - name: Check the min appliance version matches the image label
+        run: |
+          source build/migration-planner-iso/config
+          MIN_LABEL=$(skopeo inspect --format '{{index .Labels "io.kubev2v.oma.min-upgrade-version"}}' \
+            "docker://${APPLIANCE_IMAGE}:${APPLIANCE_VERSION}")
+          [[ "$MIN_LABEL" == "${MIN_APPLIANCE_VERSION:-}" ]] || {
+            echo "::error::MIN_APPLIANCE_VERSION=${MIN_APPLIANCE_VERSION:-} does not match the image min-upgrade-version label ${MIN_LABEL}"
+            exit 1
+          }
+          [[ -z "${MIN_APPLIANCE_VERSION:-}" || "${MIN_APPLIANCE_VERSION}" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|main-release-[0-9]+\.[0-9]+-[0-9a-f]{7}|stable-release-[0-9]+\.[0-9]+-[0-9a-f]{7}|on-pr-[0-9a-f]{7})$ ]] || {
+            echo "::error::MIN_APPLIANCE_VERSION=${MIN_APPLIANCE_VERSION} is not a valid appliance version"
+            exit 1
+          }
+
   check-format:
     runs-on: ubuntu-latest
     needs: [config, validate-commits, validate-pr-title]

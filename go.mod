@@ -7,7 +7,7 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.9.1
 	github.com/coreos/butane v0.29.0
 	github.com/georgysavva/scany/v2 v2.1.4
-	github.com/getkin/kin-openapi v0.153.0
+	github.com/getkin/kin-openapi v0.152.0
 	github.com/go-chi/chi v1.5.5
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-chi/cors v1.2.2
@@ -29,20 +29,20 @@ require (
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/open-policy-agent/opa v1.6.0
-	github.com/openshift/api v0.0.0-20261113224656-2662c7aa27ef
+	github.com/openshift/api v0.0.0-20261111192622-61403fc4e89f
 	github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5
 	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
 	github.com/pkg/errors v0.9.1
-	github.com/pressly/goose/v3 v3.29.0
+	github.com/pressly/goose/v3 v3.24.3
 	github.com/prometheus/client_golang v1.25.0
 	github.com/riverqueue/river v0.27.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
 	github.com/riverqueue/river/rivertype v0.27.0
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.1.0
+	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.12.1
 	github.com/thoas/go-funk v0.9.3
-	github.com/twmb/franz-go v1.22.3
+	github.com/twmb/franz-go v1.22.2
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.1
 	go.uber.org/zap v1.28.0
@@ -141,6 +141,8 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
+	github.com/oasdiff/yaml v0.1.3 // indirect
+	github.com/oasdiff/yaml3 v0.0.16 // indirect
 	github.com/oklog/ulid/v2 v2.1.2 // indirect
 	github.com/pandatix/go-abnf v0.5.5 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
@@ -167,7 +169,7 @@ require (
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
 	github.com/twmb/franz-go/pkg/kadm v1.19.0 // indirect
-	github.com/twmb/franz-go/pkg/kmsg v1.15.1 // indirect
+	github.com/twmb/franz-go/pkg/kmsg v1.15.0 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.64 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
@@ -194,7 +196,6 @@ require (
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.5 // indirect
 	go.yaml.in/yaml/v3 v3.0.6 // indirect
-	go.yaml.in/yaml/v4 v4.0.0 // indirect
 	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/mod v0.42.0 // indirect
@@ -222,6 +223,6 @@ require (
 replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.67.3
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
-	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.29.0
+	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.24.3
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )

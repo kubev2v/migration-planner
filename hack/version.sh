@@ -46,6 +46,14 @@ export APPLIANCE_VERSION
 # Release tags (v0.31.0) carry no commit; branch builds end in the agent's short SHA.
 export APPLIANCE_COMMIT=$(echo "$APPLIANCE_VERSION" | sed -n 's/.*-\([0-9a-f]\{7\}\)$/\1/p')
 
+# The minimum appliance version for in-place updates comes from the same config
+# file: the appliance-image update workflow writes it there from the served
+# image's io.kubev2v.oma.min-upgrade-version label. Empty means no gating.
+if [ -z "${MIN_APPLIANCE_VERSION:-}" ] && [ -f "build/migration-planner-iso/config" ]; then
+    MIN_APPLIANCE_VERSION=$(sed -n 's/^MIN_APPLIANCE_VERSION=//p' build/migration-planner-iso/config)
+fi
+export MIN_APPLIANCE_VERSION
+
 # Get git tree state
 if [ ! -d ".git/" ] || git diff --quiet 2>/dev/null; then
     export SOURCE_GIT_TREE_STATE="clean"
@@ -71,4 +79,5 @@ export GO_LDFLAGS="\
 -X github.com/kubev2v/migration-planner/pkg/version.gitTreeState=${SOURCE_GIT_TREE_STATE} \
 -X github.com/kubev2v/migration-planner/pkg/version.buildDate=${BIN_TIMESTAMP} \
 -X github.com/kubev2v/migration-planner/pkg/version.applianceCommit=${APPLIANCE_COMMIT} \
--X github.com/kubev2v/migration-planner/pkg/version.applianceVersion=${APPLIANCE_VERSION}"
+-X github.com/kubev2v/migration-planner/pkg/version.applianceVersion=${APPLIANCE_VERSION} \
+-X github.com/kubev2v/migration-planner/pkg/version.minApplianceVersion=${MIN_APPLIANCE_VERSION}"

@@ -28,21 +28,27 @@ var (
 	// applianceVersion is the version of the appliance image embedded in the ISO
 	// this build serves. It should be set during build via -ldflags.
 	applianceVersion string
+	// minApplianceVersion is the oldest appliance version the served image
+	// supports in-place updates from (io.kubev2v.oma.min-upgrade-version label
+	// of the appliance image, written to the ISO build config on release).
+	// Empty means no gating. It should be set during build via -ldflags.
+	minApplianceVersion string
 )
 
 type Info struct {
-	Major            string `json:"major"`
-	Minor            string `json:"minor"`
-	GitVersion       string `json:"gitVersion"`
-	GitCommit        string `json:"gitCommit"`
-	GitTreeState     string `json:"gitTreeState"`
-	BuildDate        string `json:"buildDate"`
-	GoVersion        string `json:"goVersion"`
-	Compiler         string `json:"compiler"`
-	Platform         string `json:"platform"`
-	Patch            string `json:"patch"`
-	AgentGitCommit   string `json:"agentGitCommit"`
-	AgentVersionName string `json:"agentVersionName"`
+	Major               string `json:"major"`
+	Minor               string `json:"minor"`
+	GitVersion          string `json:"gitVersion"`
+	GitCommit           string `json:"gitCommit"`
+	GitTreeState        string `json:"gitTreeState"`
+	BuildDate           string `json:"buildDate"`
+	GoVersion           string `json:"goVersion"`
+	Compiler            string `json:"compiler"`
+	Platform            string `json:"platform"`
+	Patch               string `json:"patch"`
+	AgentGitCommit      string `json:"agentGitCommit"`
+	AgentVersionName    string `json:"agentVersionName"`
+	MinApplianceVersion string `json:"minApplianceVersion"`
 }
 
 func (info Info) String() string {
@@ -51,19 +57,37 @@ func (info Info) String() string {
 
 func Get() Info {
 	return Info{
-		Major:            majorFromGit,
-		Minor:            minorFromGit,
-		GitCommit:        commitFromGit,
-		GitVersion:       versionFromGit,
-		GitTreeState:     gitTreeState,
-		BuildDate:        buildDate,
-		GoVersion:        runtime.Version(),
-		Compiler:         runtime.Compiler,
-		Platform:         fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
-		Patch:            patchFromGit,
-		AgentGitCommit:   applianceCommit,
-		AgentVersionName: applianceVersion,
+		Major:               majorFromGit,
+		Minor:               minorFromGit,
+		GitCommit:           commitFromGit,
+		GitVersion:          versionFromGit,
+		GitTreeState:        gitTreeState,
+		BuildDate:           buildDate,
+		GoVersion:           runtime.Version(),
+		Compiler:            runtime.Compiler,
+		Platform:            fmt.Sprintf("%s/%s", runtime.GOOS, runtime.GOARCH),
+		Patch:               patchFromGit,
+		AgentGitCommit:      applianceCommit,
+		AgentVersionName:    applianceVersion,
+		MinApplianceVersion: minApplianceVersion,
 	}
+}
+
+// SetAgentVersionName overrides the served appliance version. The ldflag is
+// unset under go test, so tests set it explicitly instead of skipping.
+func SetAgentVersionName(v string) {
+	applianceVersion = v
+}
+
+// MinApplianceVersion returns the oldest appliance version the served image
+// supports in-place updates from; empty means no gating.
+func MinApplianceVersion() string {
+	return minApplianceVersion
+}
+
+// SetMinApplianceVersion overrides the in-place update minimum for tests.
+func SetMinApplianceVersion(v string) {
+	minApplianceVersion = v
 }
 
 // IsValidAgentVersion reports whether ver is usable for agent version comparison and persistence.
