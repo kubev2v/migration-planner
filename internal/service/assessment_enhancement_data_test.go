@@ -101,6 +101,7 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 			Expect(*out.VsphereCore.NiocDetails).To(Equal("Storage traffic is prioritized."))
 			Expect(out.VsphereCore.PortMirroringEnabled).NotTo(BeNil())
 			Expect(*out.VsphereCore.PortMirroringEnabled).To(BeTrue())
+			Expect(out.VsphereCore.PortMirroringDetails).NotTo(BeNil())
 			Expect(*out.VsphereCore.PortMirroringDetails).To(Equal("Mirror application traffic for security analysis."))
 		}),
 		Entry("NIOC-only disabled", api.EnhancementData{
