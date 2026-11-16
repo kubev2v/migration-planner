@@ -13,6 +13,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service"
 	storemappers "github.com/kubev2v/migration-planner/internal/store/mappers"
 	"github.com/kubev2v/migration-planner/internal/store/model"
+	"github.com/kubev2v/migration-planner/internal/util"
 	"github.com/kubev2v/migration-planner/pkg/estimations/complexity"
 	"github.com/kubev2v/migration-planner/pkg/estimations/engines"
 	"github.com/kubev2v/migration-planner/pkg/estimations/estimation"
@@ -240,9 +241,23 @@ var _ = Describe("Inventory collection time", func() {
 		Expect(err).NotTo(HaveOccurred())
 		Expect(subset.Inventory.CollectionTime).To(Equal(&want))
 		assessmentID := uuid.New()
-		main, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "main", false, raw)
-		Expect(err).NotTo(HaveOccurred())
-		group, err := model.NewAssessmentInventory(uuid.New(), assessmentID, "group", true, raw)
+		main := model.AssessmentInventory{
+			AssessmentID: assessmentID,
+			ID:           uuid.New(),
+			Name:         "main",
+			Inventory:    raw,
+			IsSubset:     false,
+			Version:      model.InventoryVersionV2,
+		}
+
+		group := model.AssessmentInventory{
+			AssessmentID: assessmentID,
+			ID:           uuid.New(),
+			Name:         "group",
+			Inventory:    raw,
+			IsSubset:     true,
+			Version:      model.InventoryVersionV2,
+		}
 		Expect(err).NotTo(HaveOccurred())
 		createdAt := want.Add(24 * time.Hour)
 		domainAssessment, err := storemappers.AssessmentFromStore(&model.Assessment{
@@ -331,6 +346,6 @@ var _ = DescribeTable("Inventory OS MTV status preserves through the service mod
 		Expect((*output.Vcenter.Vms.OsInfo)["guest"].MtvStatus).To(Equal(status))
 	},
 	Entry("unreported", nil),
-	Entry("green", new(api.Green)),
-	Entry("blue", new(api.Blue)),
+	Entry("green", util.Ptr(api.Green)),
+	Entry("blue", util.Ptr(api.Blue)),
 )
