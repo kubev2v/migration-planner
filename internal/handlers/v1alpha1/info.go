@@ -23,6 +23,9 @@ func (h *ServiceHandler) GetInfo(ctx context.Context, request server.GetInfoRequ
 	if versionInfo.AgentVersionName != "" {
 		response.AgentVersionName = &versionInfo.AgentVersionName
 	}
+	if versionInfo.MinApplianceVersion != "" {
+		response.MinApplianceVersion = &versionInfo.MinApplianceVersion
+	}
 
 	return server.GetInfo200JSONResponse(response), nil
 }

@@ -4916,6 +4916,10 @@ components:
           nullable: true
           description: Agent version name, based on git tag
           example: "0.1.4-40-gc5a1661"
+        minApplianceVersion:
+          type: string
+          nullable: true
+          description: The oldest appliance version the served image supports in-place updates from; empty when no minimum is set
       required:
         - gitCommit
         - versionName
