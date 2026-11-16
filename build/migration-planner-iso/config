@@ -4,3 +4,4 @@ ISO_CHECKSUM=7a47d0c7a9bf5edb143d52809e793af2d74731567b95d91c6225171a1c49b5ab
 APPLIANCE_IMAGE=quay.io/redhat-services-prod/assisted-migration-tenant/assisted-migration/oma-appliance
 APPLIANCE_VERSION=main-release-0.33-f87c479
 AGENT_UI_IMAGE_TAG=b35ce83c4546cde11c9c914c6be3173be8bec447
+MIN_APPLIANCE_VERSION=main-release-0.31-212e974

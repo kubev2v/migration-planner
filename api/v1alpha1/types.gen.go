@@ -942,6 +942,9 @@ type Info struct {
 	// GitCommit Git commit hash
 	GitCommit string `json:"gitCommit"`
 
+	// MinApplianceVersion The oldest appliance version the served image supports in-place updates from; empty when no minimum is set
+	MinApplianceVersion *string `json:"minApplianceVersion"`
+
 	// VersionName Version name, based on git tag
 	VersionName string `json:"versionName"`
 }
