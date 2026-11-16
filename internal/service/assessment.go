@@ -294,6 +294,9 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 		}
 
 		if _, err := as.store.Assessment().Update(ctx, id, name, inventories); err != nil {
+			if errors.Is(err, store.ErrDuplicateKey) {
+				return nil, NewErrAssessmentDuplicateName(assessment.Name)
+			}
 			return nil, fmt.Errorf("failed to update assessment: %w", err)
 		}
 
@@ -307,6 +310,9 @@ func (as *AssessmentService) UpdateAssessment(ctx context.Context, id uuid.UUID,
 
 	tracer.Step("updating_name_only").Log()
 	if _, err = as.store.Assessment().Update(ctx, id, name, nil); err != nil {
+		if errors.Is(err, store.ErrDuplicateKey) {
+			return nil, NewErrAssessmentDuplicateName(assessment.Name)
+		}
 		return nil, fmt.Errorf("failed to update assessment: %w", err)
 	}
 
