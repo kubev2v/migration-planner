@@ -2,11 +2,9 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/kubev2v/migration-planner/api/v1alpha1"
 )
 
 type AssessmentInventory struct {
@@ -33,55 +31,4 @@ type AssessmentInventoryList []AssessmentInventory
 func (ai AssessmentInventory) String() string {
 	val, _ := json.Marshal(ai)
 	return string(val)
-}
-
-// PopulateFromInventory unmarshals raw inventory JSON and extracts
-// VCenterID and resource counts into the receiver. It sets Inventory to raw.
-func NewAssessmentInventory(id uuid.UUID, assessmentID uuid.UUID, name string, isSubset bool, raw []byte) (AssessmentInventory, error) {
-	ai := AssessmentInventory{
-		AssessmentID: assessmentID,
-		ID:           id,
-		Name:         name,
-		Inventory:    raw,
-		IsSubset:     isSubset,
-	}
-
-	var keys map[string]json.RawMessage
-	if err := json.Unmarshal(raw, &keys); err != nil {
-		return AssessmentInventory{}, fmt.Errorf("failed to unmarshal inventory: %w", err)
-	}
-
-	// NOTE: As we backported the snapshot table content into assessment_inventories, it could happen
-	// that a v1 inventory is copied into the new assessment_inventories table.
-	// Therefore, we need to check of version
-	_, hasClusters := keys["clusters"]
-	_, hasVCenterID := keys["vcenter_id"]
-	if hasClusters || hasVCenterID {
-		ai.Version = InventoryVersionV2
-		var inv v1alpha1.Inventory
-		if err := json.Unmarshal(raw, &inv); err != nil {
-			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v2 inventory: %w", err)
-		}
-		ai.VCenterID = inv.VcenterId
-		if inv.Vcenter != nil {
-			ai.VMsCount = inv.Vcenter.Vms.Total
-			ai.HostsCount = inv.Vcenter.Infra.TotalHosts
-			ai.NetworksCount = len(inv.Vcenter.Infra.Networks)
-			ai.DatastoresCount = len(inv.Vcenter.Infra.Datastores)
-		}
-	} else {
-		ai.Version = InventoryVersionV1
-		var invData v1alpha1.InventoryData
-		if err := json.Unmarshal(raw, &invData); err != nil {
-			return AssessmentInventory{}, fmt.Errorf("failed to unmarshal v1 inventory: %w", err)
-		}
-		ai.VMsCount = invData.Vms.Total
-		ai.HostsCount = invData.Infra.TotalHosts
-		ai.NetworksCount = len(invData.Infra.Networks)
-		ai.DatastoresCount = len(invData.Infra.Datastores)
-		if invData.Vcenter != nil {
-			ai.VCenterID = invData.Vcenter.Id
-		}
-	}
-	return ai, nil
 }
