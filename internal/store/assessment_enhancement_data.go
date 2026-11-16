@@ -46,6 +46,8 @@ func (s *AssessmentEnhancementDataStore) Upsert(ctx context.Context, input model
 			"vsphere_srm_enabled",
 			"vsphere_nioc_enabled",
 			"vsphere_nioc_details",
+			"vsphere_port_mirroring_enabled",
+			"vsphere_port_mirroring_details",
 			"nsx_features",
 			"aria_ops_features",
 			"aria_automation_features",
