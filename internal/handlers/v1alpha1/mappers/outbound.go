@@ -264,6 +264,21 @@ func SourceInventoryToApi(si model.SourceSubsetInventory) (agentAPI.SourceSubset
 	return subset, nil
 }
 
+func sourceTypeToApi(t string) api.SourceType {
+	var sourceType api.SourceType
+
+	switch t {
+	case service.SourceTypeAgent:
+		sourceType = api.SourceTypeSource
+	case service.SourceTypeRvtools:
+		sourceType = api.SourceTypeRvtools
+	case service.SourceTypeInventory:
+		sourceType = api.SourceTypeInventory
+	}
+
+	return sourceType
+}
+
 func AgentToApi(a model.Agent) api.Agent {
 	return api.Agent{
 		Id:            a.ID,
@@ -288,7 +303,7 @@ func AssessmentToApi(a svcmodel.Assessment) api.Assessment {
 	assessment.Snapshots = buildSnapshots(a.MainInventory, a.SubsetInventories)
 
 	// Set source type based on source field
-	sourceType := api.AssessmentSourceType(a.SourceType)
+	sourceType := api.SourceType(a.SourceType)
 	assessment.SourceType = sourceType
 	assessment.SourceId = a.SourceID
 
@@ -356,7 +371,7 @@ func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.Assessme
 		result[i] = api.Assessment{
 			Id: assessment.ID, Name: assessment.Name, CreatedAt: assessment.CreatedAt,
 			OwnerFirstName: assessment.OwnerFirstName, OwnerLastName: assessment.OwnerLastName,
-			SourceType: api.AssessmentSourceType(assessment.SourceType), SourceId: assessment.SourceID,
+			SourceType: api.SourceType(assessment.SourceType), SourceId: assessment.SourceID,
 			Snapshots: []api.Snapshot{}, Sharing: sharingToApi(assessment.Sharing),
 		}
 		inventory := api.Inventory{
@@ -396,7 +411,7 @@ func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.Assessme
 func AssessmentToV2API(assessment *svcmodel.Assessment) (api.AssessmentV2, error) {
 	vcenters := make([]api.SubResource, 0, len(assessment.SubsetInventories))
 	switch assessment.SourceType {
-	case string(api.AssessmentSourceTypeRvtools):
+	case service.SourceTypeRvtools:
 		for _, inv := range assessment.SubsetInventories {
 			vcenters = append(vcenters, api.SubResource{
 				Id: inv.VCenterID,
@@ -426,15 +441,7 @@ func AssessmentSummaryToApi(a svcmodel.AssessmentSummary) api.AssessmentV2Summar
 		SourceId:       a.SourceID,
 	}
 
-	switch a.SourceType {
-	case service.SourceTypeAgent:
-		result.SourceType = api.AssessmentV2SummarySourceTypeSource
-	case service.SourceTypeRvtools:
-		result.SourceType = api.AssessmentV2SummarySourceTypeRvtools
-	case service.SourceTypeInventory:
-		result.SourceType = api.AssessmentV2SummarySourceTypeInventory
-	}
-
+	result.SourceType = sourceTypeToApi(a.SourceType)
 	result.VmsCount = a.VMsCount
 	result.HostsCount = a.HostsCount
 	result.NetworksCount = a.NetworksCount

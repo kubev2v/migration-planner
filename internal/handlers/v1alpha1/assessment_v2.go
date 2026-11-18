@@ -248,13 +248,18 @@ func (h *ServiceHandler) UploadRvtoolsToAssessment(ctx context.Context, request 
 }
 
 // ListAssessmentsV2 (GET /api/v2/assessments)
-func (h *ServiceHandler) ListAssessmentsV2(ctx context.Context, _ server.ListAssessmentsV2RequestObject) (server.ListAssessmentsV2ResponseObject, error) {
+func (h *ServiceHandler) ListAssessmentsV2(ctx context.Context, request server.ListAssessmentsV2RequestObject) (server.ListAssessmentsV2ResponseObject, error) {
 	logger := log.NewDebugLogger("assessment_v2_handler").
 		WithContext(ctx).
 		Operation("list_assessments").
 		Build()
 
-	assessments, err := h.assessmentSrv.ListAssessments(ctx, service.NewAssessmentFilter())
+	filter := service.NewAssessmentFilter()
+	if request.Params.SourceType != nil {
+		filter.WithSource(mappers.SourceTypeFromApi(*request.Params.SourceType))
+	}
+
+	assessments, err := h.assessmentSrv.ListAssessments(ctx, filter)
 	if err != nil {
 		logger.Error(err).Log()
 		return server.ListAssessmentsV2500JSONResponse{Message: fmt.Sprintf("failed to list assessments: %v", err)}, nil
