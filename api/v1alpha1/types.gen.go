@@ -248,6 +248,13 @@ const (
 	SourceCreateNetworkConfigTypeStatic SourceCreateNetworkConfigType = "static"
 )
 
+// Defines values for SourceType.
+const (
+	SourceTypeInventory SourceType = "inventory"
+	SourceTypeRvtools   SourceType = "rvtools"
+	SourceTypeSource    SourceType = "source"
+)
+
 // Defines values for SourceUpdateNetworkConfigType.
 const (
 	SourceUpdateNetworkConfigTypeDhcp   SourceUpdateNetworkConfigType = "dhcp"
@@ -1406,6 +1413,9 @@ type SourceInventoryFileForm struct {
 // SourceList defines model for SourceList.
 type SourceList = []Source
 
+// SourceType defines model for SourceType.
+type SourceType string
+
 // SourceUpdate defines model for SourceUpdate.
 type SourceUpdate struct {
 	CertificateChain *ValidatedCertificateChain `json:"certificateChain" validate:"omitnil,certs"`
@@ -1709,6 +1719,12 @@ type GetSourceDownloadURLParams struct {
 
 // GetSourceDownloadURLParamsImage defines parameters for GetSourceDownloadURL.
 type GetSourceDownloadURLParamsImage string
+
+// ListAssessmentsV2Params defines parameters for ListAssessmentsV2.
+type ListAssessmentsV2Params struct {
+	// SourceType Filter assessments by their source type
+	SourceType *SourceType `form:"sourceType,omitempty" json:"sourceType,omitempty"`
+}
 
 // UploadRvtoolsToAssessmentMultipartBody defines parameters for UploadRvtoolsToAssessment.
 type UploadRvtoolsToAssessmentMultipartBody struct {

@@ -267,7 +267,7 @@ type ClientInterface interface {
 	UploadSourceInventoryFileWithBody(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListAssessmentsV2 request
-	ListAssessmentsV2(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+	ListAssessmentsV2(ctx context.Context, params *ListAssessmentsV2Params, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateRVToolsAssessmentV2WithBody request with any body
 	CreateRVToolsAssessmentV2WithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1064,8 +1064,8 @@ func (c *Client) UploadSourceInventoryFileWithBody(ctx context.Context, id opena
 	return c.Client.Do(req)
 }
 
-func (c *Client) ListAssessmentsV2(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
-	req, err := NewListAssessmentsV2Request(c.Server)
+func (c *Client) ListAssessmentsV2(ctx context.Context, params *ListAssessmentsV2Params, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListAssessmentsV2Request(c.Server, params)
 	if err != nil {
 		return nil, err
 	}
@@ -3025,7 +3025,7 @@ func NewUploadSourceInventoryFileRequestWithBody(server string, id openapi_types
 }
 
 // NewListAssessmentsV2Request generates requests for ListAssessmentsV2
-func NewListAssessmentsV2Request(server string) (*http.Request, error) {
+func NewListAssessmentsV2Request(server string, params *ListAssessmentsV2Params) (*http.Request, error) {
 	var err error
 
 	serverURL, err := url.Parse(server)
@@ -3041,6 +3041,28 @@ func NewListAssessmentsV2Request(server string) (*http.Request, error) {
 	queryURL, err := serverURL.Parse(operationPath)
 	if err != nil {
 		return nil, err
+	}
+
+	if params != nil {
+		queryValues := queryURL.Query()
+
+		if params.SourceType != nil {
+
+			if queryFrag, err := runtime.StyleParamWithLocation("form", true, "sourceType", runtime.ParamLocationQuery, *params.SourceType); err != nil {
+				return nil, err
+			} else if parsed, err := url.ParseQuery(queryFrag); err != nil {
+				return nil, err
+			} else {
+				for k, v := range parsed {
+					for _, v2 := range v {
+						queryValues.Add(k, v2)
+					}
+				}
+			}
+
+		}
+
+		queryURL.RawQuery = queryValues.Encode()
 	}
 
 	req, err := http.NewRequest("GET", queryURL.String(), nil)
@@ -3573,7 +3595,7 @@ type ClientWithResponsesInterface interface {
 	UploadSourceInventoryFileWithBodyWithResponse(ctx context.Context, id openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSourceInventoryFileResponse, error)
 
 	// ListAssessmentsV2WithResponse request
-	ListAssessmentsV2WithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsV2Response, error)
+	ListAssessmentsV2WithResponse(ctx context.Context, params *ListAssessmentsV2Params, reqEditors ...RequestEditorFn) (*ListAssessmentsV2Response, error)
 
 	// CreateRVToolsAssessmentV2WithBodyWithResponse request with any body
 	CreateRVToolsAssessmentV2WithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateRVToolsAssessmentV2Response, error)
@@ -4830,6 +4852,7 @@ type ListAssessmentsV2Response struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *[]AssessmentV2Summary
+	JSON400      *Error
 	JSON401      *Error
 	JSON500      *Error
 }
@@ -5615,8 +5638,8 @@ func (c *ClientWithResponses) UploadSourceInventoryFileWithBodyWithResponse(ctx 
 }
 
 // ListAssessmentsV2WithResponse request returning *ListAssessmentsV2Response
-func (c *ClientWithResponses) ListAssessmentsV2WithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListAssessmentsV2Response, error) {
-	rsp, err := c.ListAssessmentsV2(ctx, reqEditors...)
+func (c *ClientWithResponses) ListAssessmentsV2WithResponse(ctx context.Context, params *ListAssessmentsV2Params, reqEditors ...RequestEditorFn) (*ListAssessmentsV2Response, error) {
+	rsp, err := c.ListAssessmentsV2(ctx, params, reqEditors...)
 	if err != nil {
 		return nil, err
 	}
@@ -8272,6 +8295,13 @@ func ParseListAssessmentsV2Response(rsp *http.Response) (*ListAssessmentsV2Respo
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 400:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON400 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 401:
 		var dest Error

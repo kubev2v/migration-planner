@@ -203,7 +203,7 @@ var _ = Describe("assessment handler", Ordered, func() {
 
 			assessment := resp.(server.CreateAssessment201JSONResponse)
 			Expect(assessment.Name).To(Equal("test-assessment"))
-			Expect(assessment.SourceType).To(Equal(v1alpha1.AssessmentSourceType(service.SourceTypeInventory)))
+			Expect(assessment.SourceType).To(Equal(v1alpha1.AssessmentSourceTypeInventory))
 			Expect(assessment.Snapshots).To(HaveLen(1))
 			Expect(assessment.OwnerFirstName).ToNot(BeNil())
 			Expect(*assessment.OwnerFirstName).To(Equal("Alice"))

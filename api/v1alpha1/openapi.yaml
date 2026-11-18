@@ -1370,6 +1370,13 @@ paths:
         - assessment
       description: List assessments
       operationId: listAssessmentsV2
+      parameters:
+        - name: sourceType
+          in: query
+          description: Filter assessments by their source type
+          required: false
+          schema:
+            $ref: "#/components/schemas/SourceType"
       responses:
         "200":
           description: OK
@@ -1379,6 +1386,12 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AssessmentV2Summary"
+        "400":
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
         "401":
           description: Unauthorized
           content:
@@ -2722,6 +2735,10 @@ components:
         - createdAt
         - updatedAt
         - onPremises
+
+    SourceType:
+      type: string
+      enum: [ inventory, rvtools, source ]
 
     AgentProxy:
       type: object

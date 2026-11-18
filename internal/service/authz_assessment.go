@@ -25,7 +25,7 @@ func NewAuthzAssessmentService(inner AssessmentServicer, s store.Store, accounts
 	return &AuthzAssessmentService{inner: inner, store: s, accountsSrv: accountsSrv}
 }
 
-func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
+func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, filter *AssessmentFilter) ([]svcmodel.AssessmentSummary, error) {
 	user := auth.MustHaveUser(ctx)
 
 	identity, err := a.accountsSrv.GetIdentity(ctx, user)
@@ -53,7 +53,12 @@ func (a *AuthzAssessmentService) ListAssessments(ctx context.Context, _ *Assessm
 		permsByID[r.ID] = storemappers.PermissionsFromStore(r.Permissions)
 	}
 
-	assessments, err := a.inner.ListAssessments(ctx, NewAssessmentFilter().WithIDs(ids))
+	if filter == nil {
+		filter = NewAssessmentFilter()
+	}
+	filter.WithIDs(ids)
+
+	assessments, err := a.inner.ListAssessments(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
