@@ -18,13 +18,13 @@ var _ = Describe("VM network filtering", func() {
 
 		_, err = db.Exec(`
 			INSERT INTO vinfo ("VM ID", "VM", "Network #1", "Network #2", "Network #3", "Network #4", "Network #5", "Network #6")
-			VALUES ('vm-1', 'first', 'management', NULL, '', 'VM', 'storage', 'management')
+			VALUES ('vm-1', 'first', 'backup', NULL, '', 'VM', 'management', 'management')
 		`)
 		Expect(err).To(Succeed())
 
 		vms, err := parser.VMs(context.Background(), Filters{}, Options{})
 		Expect(err).To(Succeed())
 		Expect(vms).To(HaveLen(1))
-		Expect([]string(vms[0].Networks)).To(Equal([]string{"management", "storage", "management"}))
+		Expect([]string(vms[0].Networks)).To(Equal([]string{"backup", "management", "management"}))
 	})
 })
