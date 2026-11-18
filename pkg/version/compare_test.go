@@ -2,6 +2,39 @@ package version
 
 import "testing"
 
+func TestSameChannel(t *testing.T) {
+	cases := []struct {
+		name string
+		a, b string
+		want bool
+	}{
+		{"prod", "v0.31.0", "v0.32.0", true},
+		{"identical", "v0.31.0", "v0.31.0", true},
+		{"dev", "main-release-0.31-abcdef0", "main-release-0.32-1234567", true},
+		{"stage", "stable-release-0.31-abcdef0", "stable-release-0.32-1234567", true},
+		{"pr", "on-pr-abcdef0", "on-pr-1234567", true},
+		{"prod and dev", "v0.31.0", "main-release-0.31-abcdef0", false},
+		{"dev and stage", "main-release-0.31-abcdef0", "stable-release-0.31-abcdef0", false},
+		{"prod and pr", "v0.31.0", "on-pr-abcdef0", false},
+		{"empty", "", "v0.31.0", false},
+		{"unknown", "unknown", "v0.31.0", false},
+		{"legacy", "v0.0.0", "v0.31.0", false},
+		{"malformed", "0.31.0", "v0.31.0", false},
+		{"both invalid", "junk", "junk", false},
+		{"overflow", "v9223372036854775808.0.0", "v0.31.0", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SameChannel(tc.a, tc.b); got != tc.want {
+				t.Errorf("SameChannel(%q, %q) = %v, want %v", tc.a, tc.b, got, tc.want)
+			}
+			if got := SameChannel(tc.b, tc.a); got != tc.want {
+				t.Errorf("SameChannel(%q, %q) = %v, want %v", tc.b, tc.a, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestUpdateAvailable(t *testing.T) {
 	cases := []struct {
 		name    string
