@@ -123,7 +123,7 @@ SELECT
     COALESCE(n.nics, []) AS "NICs",
     LIST_FILTER(
         LIST_VALUE({{ .NetworkColumns }}),
-        x -> x IS NOT NULL AND x != '' AND x != 'VM'
+        lambda x: x IS NOT NULL AND x != '' AND x != 'VM'
     ) AS "Networks",
     COALESCE(con.concerns, []) AS "Concerns",
     COALESCE(i."migration_excluded", false) AS "MigrationExcluded",
