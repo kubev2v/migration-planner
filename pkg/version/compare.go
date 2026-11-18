@@ -83,6 +83,17 @@ func IsKnownFormat(v string) bool {
 	return ok
 }
 
+// SameChannel reports whether both versions have a known appliance format and
+// belong to the same release channel. Invalid versions are never comparable.
+func SameChannel(a, b string) bool {
+	first, ok := parseApplianceVersion(a)
+	if !ok {
+		return false
+	}
+	second, ok := parseApplianceVersion(b)
+	return ok && first.channel == second.channel
+}
+
 // UpdateAvailable reports whether the served appliance version differs from
 // the deployed one per the channel-aware rule: any difference within a
 // channel (numbers or sha) is an update; anything not comparable gives no

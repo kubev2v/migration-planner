@@ -298,6 +298,13 @@ function setup_agent_artifacts() {
     local pull_spec="${AGENT_IMAGE}"
     local image_tar="${image_dir}/migration-planner-agent.tar"
 
+    # Ship a static host executable independently of the replaceable agent image.
+    # No registry, running agent, or network is needed to execute recovery.
+    if [[ "$DRY_RUN" != "true" ]]; then
+        mkdir -p "${work_dir}/host"
+        install -m 0755 "${HOST_UPDATER:-/appliance-updater}" "${work_dir}/host/appliance-updater"
+    fi
+
     if [[ -f "${image_tar}" ]]; then
         log_info "Reusing existing agent image: ${image_tar}"
     else
