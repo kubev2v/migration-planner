@@ -18,6 +18,7 @@ import (
 
 type assessmentV2ServiceStub struct {
 	service.AssessmentServicer
+	listAssessments     func(context.Context, *service.AssessmentFilter) ([]model2.AssessmentSummary, error)
 	assessment          *model2.Assessment
 	updateErr           error
 	updatedAssessmentID uuid.UUID
@@ -25,6 +26,10 @@ type assessmentV2ServiceStub struct {
 	deleteErr           error
 	deletedAssessmentID uuid.UUID
 	deletedVCenterID    uuid.UUID
+}
+
+func (s *assessmentV2ServiceStub) ListAssessments(ctx context.Context, filter *service.AssessmentFilter) ([]model2.AssessmentSummary, error) {
+	return s.listAssessments(ctx, filter)
 }
 
 func (s *assessmentV2ServiceStub) GetAssessment(_ context.Context, id uuid.UUID) (*model2.Assessment, error) {
@@ -93,6 +98,50 @@ var _ = Describe("assessment v2 handler", func() {
 		Expect(response).To(BeAssignableToTypeOf(server.GetAssessmentV2200JSONResponse{}))
 		return response.(server.GetAssessmentV2200JSONResponse)
 	}
+
+	Context("ListAssessmentsV2", func() {
+		agent := model2.AssessmentSummary{ID: uuid.New(), SourceType: service.SourceTypeAgent}
+		inventory := model2.AssessmentSummary{ID: uuid.New(), SourceType: service.SourceTypeInventory}
+		rvtools := model2.AssessmentSummary{ID: uuid.New(), SourceType: service.SourceTypeRvtools}
+		assessmentsBySource := map[string][]model2.AssessmentSummary{
+			"":                          {agent, inventory, rvtools},
+			service.SourceTypeAgent:     {agent},
+			service.SourceTypeInventory: {inventory},
+			service.SourceTypeRvtools:   {rvtools},
+		}
+		sourceType := api.SourceTypeSource
+		inventoryType := api.SourceTypeInventory
+		rvtoolsType := api.SourceTypeRvtools
+
+		DescribeTable("passes the source filter to the service and returns matching assessments",
+			func(sourceType *api.SourceType, expectedSource string, expectedIDs []uuid.UUID) {
+				stub := &assessmentV2ServiceStub{
+					listAssessments: func(_ context.Context, filter *service.AssessmentFilter) ([]model2.AssessmentSummary, error) {
+						Expect(filter.Source).To(Equal(expectedSource))
+						return assessmentsBySource[filter.Source], nil
+					},
+				}
+				handler := handlers.NewServiceHandler(nil, stub, nil, nil, nil, nil, nil, nil)
+
+				response, err := handler.ListAssessmentsV2(context.Background(), server.ListAssessmentsV2RequestObject{
+					Params: api.ListAssessmentsV2Params{SourceType: sourceType},
+				})
+				Expect(err).NotTo(HaveOccurred())
+				Expect(response).To(BeAssignableToTypeOf(server.ListAssessmentsV2200JSONResponse{}))
+
+				assessments := response.(server.ListAssessmentsV2200JSONResponse)
+				ids := make([]uuid.UUID, len(assessments))
+				for i, assessment := range assessments {
+					ids[i] = assessment.Id
+				}
+				Expect(ids).To(ConsistOf(expectedIDs))
+			},
+			Entry("omitted sourceType returns all assessments", nil, "", []uuid.UUID{agent.ID, inventory.ID, rvtools.ID}),
+			Entry("source maps to agent", &sourceType, service.SourceTypeAgent, []uuid.UUID{agent.ID}),
+			Entry("inventory passes through", &inventoryType, service.SourceTypeInventory, []uuid.UUID{inventory.ID}),
+			Entry("rvtools passes through", &rvtoolsType, service.SourceTypeRvtools, []uuid.UUID{rvtools.ID}),
+		)
+	})
 
 	Context("GetAssessmentV2", func() {
 		It("returns RVTools aggregate data and only the individual vCenters",
