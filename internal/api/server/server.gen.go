@@ -162,7 +162,7 @@ type ServerInterface interface {
 	UploadSourceInventoryFile(w http.ResponseWriter, r *http.Request, id openapi_types.UUID)
 
 	// (GET /api/v2/assessments)
-	ListAssessmentsV2(w http.ResponseWriter, r *http.Request)
+	ListAssessmentsV2(w http.ResponseWriter, r *http.Request, params ListAssessmentsV2Params)
 
 	// (POST /api/v2/assessments/rvtools)
 	CreateRVToolsAssessmentV2(w http.ResponseWriter, r *http.Request)
@@ -429,7 +429,7 @@ func (_ Unimplemented) UploadSourceInventoryFile(w http.ResponseWriter, r *http.
 }
 
 // (GET /api/v2/assessments)
-func (_ Unimplemented) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListAssessmentsV2(w http.ResponseWriter, r *http.Request, params ListAssessmentsV2Params) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1641,8 +1641,21 @@ func (siw *ServerInterfaceWrapper) UploadSourceInventoryFile(w http.ResponseWrit
 func (siw *ServerInterfaceWrapper) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListAssessmentsV2Params
+
+	// ------------- Optional query parameter "sourceType" -------------
+
+	err = runtime.BindQueryParameter("form", true, false, "sourceType", r.URL.Query(), &params.SourceType)
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sourceType", Err: err})
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListAssessmentsV2(w, r)
+		siw.Handler.ListAssessmentsV2(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4760,6 +4773,7 @@ func (response UploadSourceInventoryFile500JSONResponse) VisitUploadSourceInvent
 }
 
 type ListAssessmentsV2RequestObject struct {
+	Params ListAssessmentsV2Params
 }
 
 type ListAssessmentsV2ResponseObject interface {
@@ -4771,6 +4785,15 @@ type ListAssessmentsV2200JSONResponse []AssessmentV2Summary
 func (response ListAssessmentsV2200JSONResponse) VisitListAssessmentsV2Response(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type ListAssessmentsV2400JSONResponse Error
+
+func (response ListAssessmentsV2400JSONResponse) VisitListAssessmentsV2Response(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
 
 	return json.NewEncoder(w).Encode(response)
 }
@@ -6748,8 +6771,10 @@ func (sh *strictHandler) UploadSourceInventoryFile(w http.ResponseWriter, r *htt
 }
 
 // ListAssessmentsV2 operation middleware
-func (sh *strictHandler) ListAssessmentsV2(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListAssessmentsV2(w http.ResponseWriter, r *http.Request, params ListAssessmentsV2Params) {
 	var request ListAssessmentsV2RequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListAssessmentsV2(ctx, request.(ListAssessmentsV2RequestObject))

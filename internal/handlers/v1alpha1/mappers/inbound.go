@@ -3,6 +3,8 @@ package mappers
 import (
 	"time"
 
+	"github.com/kubev2v/migration-planner/internal/service"
+
 	"github.com/google/uuid"
 
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
@@ -85,6 +87,21 @@ func SourceFormApi(resource v1alpha1.SourceCreate) mappers.SourceCreateForm {
 	}
 
 	return form
+}
+
+func SourceTypeFromApi(t v1alpha1.SourceType) string {
+	var sourceType string
+
+	switch t {
+	case v1alpha1.SourceTypeSource:
+		sourceType = service.SourceTypeAgent
+	case v1alpha1.SourceTypeRvtools:
+		sourceType = service.SourceTypeRvtools
+	case v1alpha1.SourceTypeInventory:
+		sourceType = service.SourceTypeInventory
+	}
+
+	return sourceType
 }
 
 func SourceUpdateFormApi(resource v1alpha1.SourceUpdate) mappers.SourceUpdateForm {
