@@ -39,7 +39,7 @@ type sqliteVM struct {
 
 // createTestSQLite builds a minimal forklift SQLite database at a temp path and returns
 // that path. Tables match what ingest_sqlite.go.tmpl expects.
-func createTestSQLite(t *testing.T, instanceUUID string, clusters []sqliteCluster, vms []sqliteVM) string {
+func createTestSQLite(t testing.TB, instanceUUID string, clusters []sqliteCluster, vms []sqliteVM) string {
 	t.Helper()
 
 	sqlitePath := filepath.Join(t.TempDir(), "test-forklift.db")

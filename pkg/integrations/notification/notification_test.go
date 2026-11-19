@@ -1,7 +1,7 @@
 package notification_test
 
 import (
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 )

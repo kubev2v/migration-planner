@@ -124,6 +124,9 @@ func (a *AssessmentStore) Update(ctx context.Context, assessmentID uuid.UUID, na
 	now := time.Now()
 	assessment.UpdatedAt = &now
 	if err := a.getDB(ctx).Model(&assessment).Updates(&assessment).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return nil, ErrDuplicateKey
+		}
 		return nil, err
 	}
 

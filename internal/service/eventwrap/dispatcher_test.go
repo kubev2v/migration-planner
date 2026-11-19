@@ -98,9 +98,11 @@ func (m *mockStore) Close() error                                               
 type mockWriter struct {
 	written  [][]byte
 	writeErr error
+	calls    int
 }
 
 func (m *mockWriter) Write(_ context.Context, data []byte) error {
+	m.calls++
 	if m.writeErr != nil {
 		return m.writeErr
 	}
@@ -168,18 +170,17 @@ var _ = Describe("OutboxDispatcher", func() {
 		Expect(outbox.failedIDs).To(ContainElement(id))
 	})
 
-	It("drops events that exceeded the max retry count without writing them", func() {
+	It("deletes events when the final allowed write attempt fails without scheduling another retry", func() {
 		outbox.events = []model.OutboxEvent{
-			{ID: 1, EventType: eventwrap.EventTypeKafka, Payload: []byte("poison"), RetryCount: 15},
-			{ID: 2, EventType: eventwrap.EventTypeKafka, Payload: []byte("fresh")},
+			{ID: 1, EventType: eventwrap.EventTypeKafka, Payload: []byte("poison"), RetryCount: 9},
 		}
+
+		kafkaWriter.writeErr = fmt.Errorf("kafka unavailable")
 
 		runOneTick()
 
-		Expect(kafkaWriter.written).To(HaveLen(1))
-		Expect(kafkaWriter.written[0]).To(Equal([]byte("fresh")))
-		Expect(outbox.deletedIDs).To(ContainElement(1))
-		Expect(outbox.failedIDs).To(BeEmpty())
+		Expect(kafkaWriter.calls).To(Equal(1))
+		Expect(outbox.deletedIDs).To(ConsistOf(1))
 		Expect(outbox.events).To(BeEmpty())
 	})
 

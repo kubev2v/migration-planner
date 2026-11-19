@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kubev2v/migration-planner/pkg/integrations/notification"
+
 	"github.com/google/uuid"
 	svcmodel "github.com/kubev2v/migration-planner/internal/model"
 	. "github.com/onsi/ginkgo/v2"
@@ -20,7 +22,6 @@ import (
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
-	"github.com/kubev2v/migration-planner/pkg/events/notification"
 	"github.com/kubev2v/migration-planner/pkg/integrations/iam"
 )
 
@@ -565,6 +566,32 @@ var _ = Describe("assessment service", Ordered, func() {
 	})
 
 	Context("UpdateAssessment", func() {
+		DescribeTable("returns ErrDuplicateKey when the new name already exists", func(withSource bool) {
+			sourceID := "NULL"
+			sourceType := service.SourceTypeInventory
+			if withSource {
+				id := uuid.New()
+				inventoryJSON := `{"vcenter_id":"test-vcenter","vcenter":{"vms":{"total":10}}}`
+				Expect(gormdb.Exec(fmt.Sprintf(insertSourceStm, id, "test-source", "user1", "org1", inventoryJSON)).Error).To(Succeed())
+				sourceID = fmt.Sprintf("'%s'", id)
+				sourceType = service.SourceTypeAgent
+			}
+
+			assessmentID := uuid.New()
+			newName := "Existing Assessment"
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, uuid.New(), newName, "org1", "user1", "John", "Doe", service.SourceTypeInventory, "NULL")).Error).To(Succeed())
+			Expect(gormdb.Exec(fmt.Sprintf(insertAssessmentStm, assessmentID, "Original Name", "org1", "user1", "John", "Doe", sourceType, sourceID)).Error).To(Succeed())
+
+			updatedAssessment, err := svc.UpdateAssessment(context.TODO(), assessmentID, &newName)
+
+			Expect(updatedAssessment).To(BeNil())
+			var duplicateErr *service.ErrDuplicateKey
+			Expect(errors.As(err, &duplicateErr)).To(BeTrue(), "expected ErrDuplicateKey, got %v", err)
+		},
+			Entry("without a source", false),
+			Entry("with a source", true),
+		)
+
 		Context("assessment with sourceID (source type)", func() {
 			It("successfully updates assessment name and adds new inventory", func() {
 				// Create a source with inventory
