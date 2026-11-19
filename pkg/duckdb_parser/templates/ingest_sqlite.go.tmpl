@@ -127,7 +127,8 @@ WHERE v.ID IN (SELECT "VM ID" FROM vinfo);
 INSERT INTO vdisk (
     "VM ID", "Disk Key", "Unit #", "Path", "Disk Path", "Capacity MiB",
     "Sharing mode", "Raw", "Shared Bus", "Disk Mode", "Disk UUID", "RDM LUN UUID",
-    "Thin", "Controller", "Label", "SCSI Unit #"
+    "RDM Device Name", "RDM Backing UUID", "RDM Compatibility Mode", "RDM LUN UUID Source",
+    "Thin", "Thin Provisioned", "Eagerly Scrubbed", "Controller", "Label", "SCSI Unit #"
 )
 SELECT
     v.ID,
@@ -141,13 +142,29 @@ SELECT
     disk->>'bus',
     disk->>'mode',
     disk->>'serial',
-    CASE WHEN disk->>'rdm' = 'true' THEN NULLIF(TRIM(disk->>'lunUuid'), '') END,
+    CASE WHEN disk.rdm IS TRUE THEN NULLIF(TRIM(disk.lunUuid), '') END,
+    CASE WHEN disk.rdm IS TRUE THEN NULLIF(TRIM(disk.deviceName), '') END,
+    CASE WHEN disk.rdm IS TRUE THEN NULLIF(TRIM(disk.backingUuid), '') END,
+    CASE
+        WHEN disk.rdm IS NOT TRUE THEN NULL
+        WHEN NULLIF(TRIM(disk.compatibilityMode), '') IS NOT NULL THEN
+            CASE LOWER(TRIM(disk.compatibilityMode))
+                WHEN 'physicalmode' THEN 'physical'
+                WHEN 'virtualmode' THEN 'virtual'
+                ELSE 'unknown'
+            END
+        WHEN disk.physicalMode IS TRUE THEN 'physical'
+        ELSE 'unknown'
+    END,
+    CASE WHEN disk.rdm IS TRUE AND NULLIF(TRIM(disk.lunUuid), '') IS NOT NULL THEN 'forklift-rdm' END,
     false,
+    disk.thinProvisioned,
+    disk.eagerlyScrub,
     disk->>'bus',
     '',
     disk->>'unitNumber'
 FROM src.VM v,
-LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR","lunUuid":"VARCHAR"}]')) AS t(disk)
+LATERAL unnest(from_json(v.Disks, '[{"key":"INTEGER","unitNumber":"INTEGER","file":"VARCHAR","capacity":"BIGINT","shared":"BOOLEAN","rdm":"BOOLEAN","bus":"VARCHAR","mode":"VARCHAR","serial":"VARCHAR","lunUuid":"VARCHAR","compatibilityMode":"VARCHAR","backingUuid":"VARCHAR","deviceName":"VARCHAR","physicalMode":"BOOLEAN","thinProvisioned":"BOOLEAN","eagerlyScrub":"BOOLEAN"}]')) AS t(disk)
 WHERE v.Disks != '[]' AND v.ID IN (SELECT "VM ID" FROM vinfo);
 
 WITH nic_flat AS (
@@ -290,14 +307,15 @@ host_scsi_disks AS (
         disk.key AS scsi_disk_key,
         disk.canonicalName AS canonical_name,
         disk.vendor AS vendor,
-        disk.model AS model
+        disk.model AS model,
+        disk.uuid AS lun_uuid
     FROM src.Host h,
     LATERAL unnest(TRY(from_json(COALESCE(NULLIF(h.HostScsiDisks, ''), '[]'),
-        '[{"canonicalName":"VARCHAR","vendor":"VARCHAR","model":"VARCHAR","key":"VARCHAR"}]'
+        '[{"canonicalName":"VARCHAR","vendor":"VARCHAR","model":"VARCHAR","key":"VARCHAR","uuid":"VARCHAR"}]'
     ))) AS t(disk)
 )
 INSERT INTO vhostscsi (
-    "Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model"
+    "Host ID", "HBA Device", "SCSI Disk Key", "Canonical Name", "LUN Vendor", "LUN Model", "LUN UUID"
 )
 SELECT DISTINCT
     COALESCE(disk.host_id, topology.host_id),
@@ -305,7 +323,8 @@ SELECT DISTINCT
     COALESCE(disk.scsi_disk_key, topology.scsi_disk_key),
     NULLIF(TRIM(disk.canonical_name), ''),
     NULLIF(TRIM(disk.vendor), ''),
-    NULLIF(TRIM(disk.model), '')
+    NULLIF(TRIM(disk.model), ''),
+    NULLIF(TRIM(disk.lun_uuid), '')
 FROM host_scsi_disks disk
 FULL OUTER JOIN host_topology_luns topology
     ON disk.host_id = topology.host_id AND disk.scsi_disk_key = topology.scsi_disk_key
