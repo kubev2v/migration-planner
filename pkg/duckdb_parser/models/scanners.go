@@ -139,6 +139,16 @@ func (n *NICs) Scan(value interface{}) error {
 			IPv4Addresses:   append([]string{}, ipv4...),
 			IPv6Addresses:   append([]string{}, ipv6...),
 		}
+
+		group := toString(m["PortGroup"])
+		if group != "" {
+			err := json.Unmarshal([]byte(group), &nic.PortGroup)
+			if err != nil {
+				zap.S().Named("duckdb_parser").Warnw("failed to parse NIC port group", "error", err)
+				nic.PortGroup = nil
+			}
+		}
+
 		result = append(result, nic)
 	}
 	*n = result
