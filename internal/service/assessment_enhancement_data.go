@@ -7,14 +7,15 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	domain "github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/store"
 	"github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/pkg/log"
 )
 
 type AssessmentEnhancementDataServicer interface {
-	Save(ctx context.Context, assessmentID uuid.UUID, data api.EnhancementData) (*api.EnhancementData, error)
-	Get(ctx context.Context, assessmentID uuid.UUID) (*api.EnhancementData, error)
+	Save(ctx context.Context, assessmentID uuid.UUID, data domain.AssessmentEnhancementData) (*domain.AssessmentEnhancementData, error)
+	Get(ctx context.Context, assessmentID uuid.UUID) (*domain.AssessmentEnhancementData, error)
 }
 
 type AssessmentEnhancementDataService struct {
@@ -32,32 +33,32 @@ func NewAssessmentEnhancementDataService(s store.Store) *AssessmentEnhancementDa
 func (s *AssessmentEnhancementDataService) Save(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-	data api.EnhancementData,
-) (*api.EnhancementData, error) {
-	input := enhancementDataAPIToModel(assessmentID, data)
+	data domain.AssessmentEnhancementData,
+) (*domain.AssessmentEnhancementData, error) {
+	input := enhancementDataAPIToModel(assessmentID, api.EnhancementData(data))
 	result, err := s.store.AssessmentEnhancementData().Upsert(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to save enhancement data: %w", err)
 	}
 
-	out := enhancementDataModelToAPI(result)
+	out := domain.AssessmentEnhancementData(enhancementDataModelToAPI(result))
 	return &out, nil
 }
 
 func (s *AssessmentEnhancementDataService) Get(
 	ctx context.Context,
 	assessmentID uuid.UUID,
-) (*api.EnhancementData, error) {
+) (*domain.AssessmentEnhancementData, error) {
 	input, err := s.store.AssessmentEnhancementData().Get(ctx, assessmentID)
 	if err != nil {
 		if errors.Is(err, store.ErrRecordNotFound) {
-			empty := api.EnhancementData{}
+			empty := domain.AssessmentEnhancementData{}
 			return &empty, nil
 		}
 		return nil, fmt.Errorf("failed to get enhancement data: %w", err)
 	}
 
-	out := enhancementDataModelToAPI(input)
+	out := domain.AssessmentEnhancementData(enhancementDataModelToAPI(input))
 	return &out, nil
 }
 

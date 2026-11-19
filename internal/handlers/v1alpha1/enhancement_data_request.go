@@ -6,6 +6,7 @@ import (
 
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
 	"github.com/kubev2v/migration-planner/internal/handlers/validator"
+	"github.com/kubev2v/migration-planner/internal/model"
 )
 
 type manualCountInput struct {
@@ -13,7 +14,7 @@ type manualCountInput struct {
 	number *json.Number
 }
 
-func mapEnhancementDataRequest(request api.EnhancementDataRequest) (api.EnhancementData, error) {
+func mapEnhancementDataRequest(request api.EnhancementDataRequest) (model.AssessmentEnhancementData, error) {
 	data := api.EnhancementData{
 		DeployedEnvironment: request.DeployedEnvironment,
 		ActiveEnvironments:  request.ActiveEnvironments,
@@ -45,7 +46,7 @@ func mapEnhancementDataRequest(request api.EnhancementDataRequest) (api.Enhancem
 			},
 		)
 		if err != nil {
-			return api.EnhancementData{}, err
+			return model.AssessmentEnhancementData{}, err
 		}
 
 		data.VmwareVersionCounts = &api.VMwareVersionCountsInput{
@@ -62,7 +63,7 @@ func mapEnhancementDataRequest(request api.EnhancementDataRequest) (api.Enhancem
 			number: request.CustomerDetails.PhysicalLocationsCount,
 		})
 		if err != nil {
-			return api.EnhancementData{}, err
+			return model.AssessmentEnhancementData{}, err
 		}
 		data.CustomerDetails = &api.CustomerDetailsInput{
 			PhysicalLocationsCount: counts[0],
@@ -70,7 +71,7 @@ func mapEnhancementDataRequest(request api.EnhancementDataRequest) (api.Enhancem
 		}
 	}
 
-	return data, nil
+	return model.AssessmentEnhancementData(data), nil
 }
 
 func parseManualCounts(inputs ...manualCountInput) ([]*int, error) {
