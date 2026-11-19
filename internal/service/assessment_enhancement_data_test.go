@@ -5,6 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	api "github.com/kubev2v/migration-planner/api/v1alpha1"
+	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service"
 	"github.com/kubev2v/migration-planner/internal/util"
 	. "github.com/onsi/ginkgo/v2"
@@ -25,7 +26,7 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 	})
 
 	DescribeTable("round-trips every optional section through save and get",
-		func(input api.EnhancementData, verify func(api.EnhancementData)) {
+		func(input model.AssessmentEnhancementData, verify func(model.AssessmentEnhancementData)) {
 			saved, err := svc.Save(context.Background(), assessmentID, input)
 			Expect(err).To(BeNil())
 			verify(*saved)
@@ -34,53 +35,53 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 			Expect(err).To(BeNil())
 			verify(*fetched)
 		},
-		Entry("deployed environment", api.EnhancementData{
+		Entry("deployed environment", model.AssessmentEnhancementData{
 			DeployedEnvironment: &api.DeployedEnvironmentInput{
 				Environment: util.Ptr(api.DeployedEnvironmentInputEnvironment("on_premises")),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.DeployedEnvironment).NotTo(BeNil())
 			Expect(*out.DeployedEnvironment.Environment).To(Equal(api.DeployedEnvironmentInputEnvironment("on_premises")))
 		}),
-		Entry("vmware version counts", api.EnhancementData{
+		Entry("vmware version counts", model.AssessmentEnhancementData{
 			VmwareVersionCounts: &api.VMwareVersionCountsInput{
 				PerpetualLicensesCount: util.IntPtr(1),
 				CoresLicensingCount:    util.IntPtr(2),
 				EnvironmentCount:       util.IntPtr(3),
 				OtherNodesCount:        util.IntPtr(4),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.VmwareVersionCounts).NotTo(BeNil())
 			Expect(*out.VmwareVersionCounts.PerpetualLicensesCount).To(Equal(1))
 			Expect(*out.VmwareVersionCounts.CoresLicensingCount).To(Equal(2))
 			Expect(*out.VmwareVersionCounts.EnvironmentCount).To(Equal(3))
 			Expect(*out.VmwareVersionCounts.OtherNodesCount).To(Equal(4))
 		}),
-		Entry("active environments with multiple values", api.EnhancementData{
+		Entry("active environments with multiple values", model.AssessmentEnhancementData{
 			ActiveEnvironments: &api.ActiveEnvironmentsInput{
 				Environments: util.Ptr([]api.ActiveEnvironmentsInputEnvironments{"production", "dev"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.ActiveEnvironments).NotTo(BeNil())
 			Expect(*out.ActiveEnvironments.Environments).To(Equal([]api.ActiveEnvironmentsInputEnvironments{"production", "dev"}))
 		}),
-		Entry("active environments with empty slice", api.EnhancementData{
+		Entry("active environments with empty slice", model.AssessmentEnhancementData{
 			ActiveEnvironments: &api.ActiveEnvironmentsInput{
 				Environments: util.Ptr([]api.ActiveEnvironmentsInputEnvironments{}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.ActiveEnvironments).NotTo(BeNil())
 			Expect(*out.ActiveEnvironments.Environments).To(BeEmpty())
 		}),
-		Entry("vmware subscription level", api.EnhancementData{
+		Entry("vmware subscription level", model.AssessmentEnhancementData{
 			VmwareSubscription: &api.VMwareSubscriptionInput{
 				Level: util.Ptr([]api.VMwareSubscriptionInputLevel{"vcf", "vsphere"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.VmwareSubscription).NotTo(BeNil())
 			Expect(*out.VmwareSubscription.Level).To(Equal([]api.VMwareSubscriptionInputLevel{"vcf", "vsphere"}))
 		}),
-		Entry("vsphere core", api.EnhancementData{
+		Entry("vsphere core", model.AssessmentEnhancementData{
 			VsphereCore: &api.VsphereCoreInput{
 				VmEncryptionEnabled: util.BoolPtr(true),
 				VmEncryptionPolicy:  util.ToStrPtr("strict"),
@@ -88,7 +89,7 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 				NiocEnabled:         util.BoolPtr(true),
 				NiocDetails:         util.ToStrPtr("Storage traffic is prioritized."),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.VsphereCore).NotTo(BeNil())
 			Expect(*out.VsphereCore.VmEncryptionEnabled).To(BeTrue())
 			Expect(*out.VsphereCore.VmEncryptionPolicy).To(Equal("strict"))
@@ -98,54 +99,54 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 			Expect(out.VsphereCore.NiocDetails).NotTo(BeNil())
 			Expect(*out.VsphereCore.NiocDetails).To(Equal("Storage traffic is prioritized."))
 		}),
-		Entry("NIOC-only disabled", api.EnhancementData{
+		Entry("NIOC-only disabled", model.AssessmentEnhancementData{
 			VsphereCore: &api.VsphereCoreInput{
 				NiocEnabled: util.BoolPtr(false),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.VsphereCore).NotTo(BeNil())
 			Expect(out.VsphereCore.NiocEnabled).NotTo(BeNil())
 			Expect(*out.VsphereCore.NiocEnabled).To(BeFalse())
 			Expect(out.VsphereCore.NiocDetails).To(BeNil())
 		}),
-		Entry("nsx features", api.EnhancementData{
+		Entry("nsx features", model.AssessmentEnhancementData{
 			Nsx: &api.NsxInput{
 				Features: util.Ptr([]api.NsxInputFeatures{"microsegmentation"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.Nsx).NotTo(BeNil())
 			Expect(*out.Nsx.Features).To(Equal([]api.NsxInputFeatures{"microsegmentation"}))
 		}),
-		Entry("aria ops features", api.EnhancementData{
+		Entry("aria ops features", model.AssessmentEnhancementData{
 			AriaOps: &api.AriaOpsInput{
 				Features: util.Ptr([]api.AriaOpsInputFeatures{"performance_analytics"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.AriaOps).NotTo(BeNil())
 			Expect(*out.AriaOps.Features).To(Equal([]api.AriaOpsInputFeatures{"performance_analytics"}))
 		}),
-		Entry("aria automation features", api.EnhancementData{
+		Entry("aria automation features", model.AssessmentEnhancementData{
 			AriaAutomation: &api.AriaAutomationInput{
 				Features: util.Ptr([]api.AriaAutomationInputFeatures{"orchestrator"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.AriaAutomation).NotTo(BeNil())
 			Expect(*out.AriaAutomation.Features).To(Equal([]api.AriaAutomationInputFeatures{"orchestrator"}))
 		}),
-		Entry("aria secure features", api.EnhancementData{
+		Entry("aria secure features", model.AssessmentEnhancementData{
 			AriaSecure: &api.AriaSecureInput{
 				Features: util.Ptr([]api.AriaSecureInputFeatures{"compliance_monitoring"}),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.AriaSecure).NotTo(BeNil())
 			Expect(*out.AriaSecure.Features).To(Equal([]api.AriaSecureInputFeatures{"compliance_monitoring"}))
 		}),
-		Entry("customer details", api.EnhancementData{
+		Entry("customer details", model.AssessmentEnhancementData{
 			CustomerDetails: &api.CustomerDetailsInput{
 				PhysicalLocationsCount: util.IntPtr(5),
 				TargetHardware:         util.ToStrPtr("Dell PowerEdge R750"),
 			},
-		}, func(out api.EnhancementData) {
+		}, func(out model.AssessmentEnhancementData) {
 			Expect(out.CustomerDetails).NotTo(BeNil())
 			Expect(*out.CustomerDetails.PhysicalLocationsCount).To(Equal(5))
 			Expect(*out.CustomerDetails.TargetHardware).To(Equal("Dell PowerEdge R750"))
@@ -153,7 +154,7 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 	)
 
 	It("omits every section when no fields are set", func() {
-		saved, err := svc.Save(context.Background(), assessmentID, api.EnhancementData{})
+		saved, err := svc.Save(context.Background(), assessmentID, model.AssessmentEnhancementData{})
 		Expect(err).To(BeNil())
 		Expect(saved.DeployedEnvironment).To(BeNil())
 		Expect(saved.VmwareVersionCounts).To(BeNil())
@@ -170,18 +171,18 @@ var _ = Describe("AssessmentEnhancementDataService", func() {
 	It("returns empty data for an assessment with nothing saved yet", func() {
 		fetched, err := svc.Get(context.Background(), uuid.New())
 		Expect(err).To(BeNil())
-		Expect(*fetched).To(Equal(api.EnhancementData{}))
+		Expect(*fetched).To(Equal(model.AssessmentEnhancementData{}))
 	})
 
 	It("clears a section on a subsequent save that omits it", func() {
-		_, err := svc.Save(context.Background(), assessmentID, api.EnhancementData{
+		_, err := svc.Save(context.Background(), assessmentID, model.AssessmentEnhancementData{
 			DeployedEnvironment: &api.DeployedEnvironmentInput{
 				Environment: util.Ptr(api.DeployedEnvironmentInputEnvironment("on_premises")),
 			},
 		})
 		Expect(err).To(BeNil())
 
-		saved, err := svc.Save(context.Background(), assessmentID, api.EnhancementData{
+		saved, err := svc.Save(context.Background(), assessmentID, model.AssessmentEnhancementData{
 			VsphereCore: &api.VsphereCoreInput{
 				SrmEnabled: util.BoolPtr(true),
 			},
