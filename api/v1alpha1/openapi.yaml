@@ -2707,11 +2707,15 @@ components:
         agentVersion:
           type: string
           nullable: true
-          description: Agent version (version tag) stored when OVA was downloaded
+          description: The appliance version the source runs — agent-reported when connected, else the OVA-download stamp
         agentVersionWarning:
           type: string
           nullable: true
-          description: Warning message if stored agent version differs from current agent version
+          description: Warning message if the version the source runs differs from the current appliance version
+        applianceUpdateSupported:
+          type: boolean
+          nullable: true
+          description: Whether the source's appliance can be updated in place with the served image; false means a new OVA must be deployed
         updateType:
           type: string
           enum: [auto, manual]
