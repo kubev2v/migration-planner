@@ -30,7 +30,7 @@ require (
 	github.com/onsi/gomega v1.44.0
 	github.com/open-policy-agent/opa v1.6.0
 	github.com/openshift/api v0.0.0-20261120191000-0e5fe796a10f
-	github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5
+	github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d
 	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.29.0
@@ -76,7 +76,7 @@ require (
 	github.com/coreos/ignition/v2 v2.28.0 // indirect
 	github.com/coreos/vcontext v0.0.0-20260306102053-7a68b5426c74 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
-	github.com/diskfs/go-diskfs v1.9.4 // indirect
+	github.com/diskfs/go-diskfs v1.9.5-0.20261103130516-f6fbf0b9b4f2 // indirect
 	github.com/djherbis/times v1.6.0 // indirect
 	github.com/duckdb/duckdb-go-bindings v0.20000.0 // indirect
 	github.com/duckdb/duckdb-go-bindings/darwin-amd64 v0.1.24 // indirect
