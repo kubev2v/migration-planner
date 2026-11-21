@@ -47,9 +47,9 @@ require (
 	github.com/xuri/excelize/v2 v2.11.1
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
-	gorm.io/driver/postgres v1.5.9
-	gorm.io/driver/sqlite v1.5.6
-	gorm.io/gorm v1.25.11
+	gorm.io/driver/postgres v1.6.3
+	gorm.io/driver/sqlite v1.6.0
+	gorm.io/gorm v1.31.2
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
 	sigs.k8s.io/kind v0.32.0
