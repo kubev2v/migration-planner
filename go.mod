@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.12.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kubev2v/migration-event-streamer v0.0.0-20261105115111-c59ac09c4048
+	github.com/kubev2v/migration-event-streamer v0.0.0-20261117082237-5a1e52edb884
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.0.95
@@ -166,7 +166,7 @@ require (
 	github.com/tidwall/sjson v1.2.7 // indirect
 	github.com/tiendc/go-deepcopy v1.7.2 // indirect
 	github.com/tinylib/msgp v1.6.5 // indirect
-	github.com/twmb/franz-go/pkg/kadm v1.19.0 // indirect
+	github.com/twmb/franz-go/pkg/kadm v1.20.0 // indirect
 	github.com/twmb/franz-go/pkg/kmsg v1.15.1 // indirect
 	github.com/ulikunitz/xz v0.5.17 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.64 // indirect
