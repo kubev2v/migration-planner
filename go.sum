@@ -67,8 +67,8 @@ github.com/dgraph-io/ristretto/v2 v2.2.0 h1:bkY3XzJcXoMuELV8F+vS8kzNgicwQFAaGINA
 github.com/dgraph-io/ristretto/v2 v2.2.0/go.mod h1:RZrm63UmcBAaYWC1DotLYBmTvgkrs0+XhBd7Npn7/zI=
 github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54 h1:SG7nF6SRlWhcT7cNTs5R6Hk4V2lcmLz2NsG2VnInyNo=
 github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54/go.mod h1:if7Fbed8SFyPtHLHbg49SI7NAdJiC5WIA09pe59rfAA=
-github.com/diskfs/go-diskfs v1.9.4 h1:0j2d7eG4IjyxL6+ChWbDPocdBCF6HQ4HBWU2WDYWVnc=
-github.com/diskfs/go-diskfs v1.9.4/go.mod h1:TePJORO83Adh5pb2SqsxAwaP0fofFxKLkxctiS/9OQc=
+github.com/diskfs/go-diskfs v1.9.5-0.20261103130516-f6fbf0b9b4f2 h1:O9tRrzZXsH/iF6ZK5Pc1/BnpaMjtdICClpNc0iyex3M=
+github.com/diskfs/go-diskfs v1.9.5-0.20261103130516-f6fbf0b9b4f2/go.mod h1:TePJORO83Adh5pb2SqsxAwaP0fofFxKLkxctiS/9OQc=
 github.com/djherbis/times v1.6.0 h1:w2ctJ92J8fBvWPxugmXIv7Nz7Q3iDMKNx9v5ocVH20c=
 github.com/djherbis/times v1.6.0/go.mod h1:gOHeRAz2h+VJNZ5Gmc/o7iD9k4wW7NMVqieYCY99oc0=
 github.com/dlclark/regexp2 v1.11.0 h1:G/nrcoOa7ZXlpoa/91N3X7mM3r8eIlMBBJZvsz/mxKI=
@@ -319,8 +319,8 @@ github.com/open-policy-agent/opa v1.6.0 h1:/S/cnNQJ2MUMNzizHPbisTWBHowmLkPrugY5j
 github.com/open-policy-agent/opa v1.6.0/go.mod h1:zFmw4P+W62+CWGYRDDswfVYSCnPo6oYaktQnfIaRFC4=
 github.com/openshift/api v0.0.0-20261120191000-0e5fe796a10f h1:6WDYJQaHC2Q0hPjubOH2+v+gD4+IC/SpjSBrHDOxeFc=
 github.com/openshift/api v0.0.0-20261120191000-0e5fe796a10f/go.mod h1:2oI3aXQFDjjl7l4xA9ZPSkB+l+lyfWLg7P2sWg9yEvM=
-github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5 h1:J5ihxFnzJ0wG7dmsyv1lSeek5aCRANBnZ4OfnLOqSGI=
-github.com/openshift/assisted-image-service v0.0.0-20261107061156-14d0363c13e5/go.mod h1:UISm+/gQYW3cQ0VOgsgFtvtcj1juqyC3cNWvJS1xRkQ=
+github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d h1:F0UnKLninfXd5fUdicdfWW6b85pshHf/DIXZM0rAwYI=
+github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d/go.mod h1:/SbZ4g1fuW4sUQWyNG7DgmSP0qWuG1eFQTvrcpFnZe4=
 github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148 h1:edQNNfcG5AF3X2TbVjaXd07UrpaOeAzwK/LttpMtp34=
 github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148/go.mod h1:SOmIJLGV4ubkJnA2rXH0M5davuY1QpattP3zotdIY3E=
 github.com/pandatix/go-abnf v0.5.5 h1:EXex5KkRQx4Dm6GnpAcQnIMBs9KiK0uf8p/wq+4t9PM=
