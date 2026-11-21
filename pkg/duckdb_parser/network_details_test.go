@@ -4,18 +4,513 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	. "github.com/onsi/ginkgo/v2"
+	. "github.com/onsi/gomega"
+
+	"github.com/kubev2v/migration-planner/pkg/duckdb_parser/models"
 )
 
-func TestIngestRvTools_NetworkDetails(t *testing.T) {
-	for _, withPorts := range []bool{true, false} {
-		t.Run(fmt.Sprintf("portSheets=%t", withPorts), func(t *testing.T) {
+var _ = Describe("Network topology", func() {
+	DescribeTable("ignores invalid optional port-group JSON without losing adapters",
+		func(portGroupJSON string) {
+			value := []interface{}{
+				map[string]interface{}{
+					"MAC":       "01",
+					"Network":   "first-network",
+					"PortGroup": portGroupJSON,
+				},
+				map[string]interface{}{
+					"MAC":       "02",
+					"Network":   "second-network",
+					"PortGroup": `{"name":"management","type":"standard"}`,
+				},
+			}
+			var nics models.NICs
+
+			err := nics.Scan(value)
+
+			Expect(err).To(Succeed())
+			Expect(nics).To(HaveLen(2))
+			Expect(nics[0].MAC).To(Equal("01"))
+			Expect(nics[0].Network.ID).To(Equal("first-network"))
+			Expect(nics[0].PortGroup).To(BeNil())
+
+			Expect(nics[1].MAC).To(Equal("02"))
+			Expect(nics[1].Network.ID).To(Equal("second-network"))
+			Expect(nics[1].PortGroup).NotTo(BeNil())
+			Expect(nics[1].PortGroup.Name).To(Equal("management"))
+		},
+		Entry("malformed JSON", `{"name":`),
+
+		Entry("invalid MTU after partially decoding the group",
+			`{"name":"management","switch":{"name":"vSwitch0","mtu":"invalid"}}`,
+		),
+	)
+
+	It("lists distributed switches by switch name instead of product name", func() {
+		ctx := context.Background()
+		parser, _, cleanup := setupTestParser(GinkgoTB(), nil)
+		DeferCleanup(cleanup)
+
+		vms := []map[string]string{{
+			"VM ID":       "vm-1",
+			"VM":          "first",
+			"Cluster":     "cluster1",
+			"VI SDK UUID": "vc-1",
+		}}
+		switches := []map[string]string{
+			{"Name": "DVS", "Switch": "Production", "Object ID": "dvs-1", "Max MTU": "1500"},
+			{"Name": "DVS", "Switch": "Storage", "Object ID": "dvs-2", "Max MTU": "9000"},
+		}
+		sheets := defaultStandardSheets(vms, nil)
+		sheets = append(sheets, NewExcelSheet("dvSwitch", []string{"Name", "Switch", "Object ID", "Max MTU"}, switches))
+
+		_, err := parser.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+		Expect(err).To(Succeed())
+
+		networks, err := parser.Networks(ctx, Filters{}, Options{})
+		Expect(err).To(Succeed())
+		Expect(networks).To(ConsistOf(
+			HaveField("Name", "Production"),
+			HaveField("Name", "Storage"),
+		))
+	})
+
+	DescribeTableSubtree("VMkernel interfaces and topology from each source",
+		func(source string) {
+			var ctx context.Context
+			var parser *Parser
+			var db *sql.DB
+			var query string
+			rvtools := source == "rvtools" || source == "rvtools-legacy"
+
+			BeforeEach(func() {
+				ctx = context.Background()
+				var cleanup func()
+				parser, db, cleanup = setupTestParser(GinkgoTB(), nil)
+				DeferCleanup(cleanup)
+
+				if rvtools {
+					vms := []map[string]string{{"VM ID": "vm-1", "VM": "first", "Host": "host-1", "Cluster": "cluster1", "VI SDK UUID": "vc-1"}}
+					hosts := []map[string]string{{"Host": "host-1", "Object ID": "host-101", "Cluster": "cluster1"}}
+					sheets := defaultStandardSheets(vms, hosts)
+					var kept []ExcelSheet
+					for _, sheet := range sheets {
+						if sheet.Name != "dvSwitch" && sheet.Name != "dvPort" && sheet.Name != "vPort" && sheet.Name != "vNetwork" {
+							kept = append(kept, sheet)
+						}
+					}
+					switchHeaders := []string{"Name", "Switch", "Max MTU"}
+					portHeaders := []string{"Port", "Switch", "VLAN"}
+					if source == "rvtools" {
+						switchHeaders = append(switchHeaders, "Object ID")
+						portHeaders = append(portHeaders, "Object ID")
+					}
+					sheets = append(kept,
+						NewExcelSheet("vNetwork", []string{"VM ID", "Network", "Mac Address", "NIC label", "Adapter", "Switch", "Connected", "Starts Connected", "Type", "IPv4 Address", "IPv6 Address", "Cluster"}, []map[string]string{
+							{"VM ID": "vm-1", "Network": " management ", "Mac Address": "01", "Switch": "vSwitch0", "Type": "assigned"},
+							{"VM ID": "vm-1", "Network": "storage", "Mac Address": "02", "Switch": "distributed", "Type": "generated"},
+							{"VM ID": "vm-1", "Network": " management ", "Mac Address": "03", "Switch": "vSwitch0", "Type": "manual"},
+						}),
+						NewExcelSheet("vSwitch", []string{"Host", "Switch", "MTU"}, []map[string]string{{"Host": "host-1", "Switch": "vSwitch0", "MTU": "1500"}}),
+						NewExcelSheet("vPort", []string{"Host", "Port Group", "Switch", "VLAN"}, []map[string]string{{"Host": "host-1", "Port Group": " management ", "Switch": "vSwitch0"}}),
+						NewExcelSheet("dvSwitch", switchHeaders, []map[string]string{{"Name": "distributed", "Switch": "distributed", "Object ID": "dvs-1", "Max MTU": "9000"}}),
+						NewExcelSheet("dvPort", portHeaders, []map[string]string{{"Port": "storage", "Switch": "distributed", "Object ID": "dpg-id"}, {"Port": " unlinked ", "Switch": " source-switch ", "Object ID": ""}}),
+						NewExcelSheet("vSC_VMK", []string{"Host", "Device", "Port Group", "MTU"}, []map[string]string{
+							{"Host": "host-1", "Device": "vmk0", "Port Group": " management ", "MTU": "1500"},
+							{"Host": "host-1", "Device": "vmk1", "Port Group": "storage", "MTU": "9000"},
+							{"Host": "host-1", "Device": "vmk2", "Port Group": "missing"},
+							{"Host": "host-1", "Device": "vmk3", "Port Group": ""},
+						}))
+					_, err := parser.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+					Expect(err).To(Succeed())
+				} else {
+					path := createTestSQLite(GinkgoTB(), "vc-1", []sqliteCluster{{id: "c1", name: "cluster1", datacenter: "dc1"}}, []sqliteVM{{id: "vm-1", name: "first", clusterName: "cluster1", nics: `[{"network":{"id":"net-std"},"mac":"01","deviceKey":1},{"network":{"id":"dpg-id"},"mac":"02","deviceKey":2}]`}})
+					_, err := db.Exec(fmt.Sprintf("ATTACH '%s' AS fixture (TYPE sqlite)", escapeSQLString(path)))
+					Expect(err).To(Succeed())
+					_, err = db.Exec(`
+						INSERT INTO fixture.Network (ID, Name, DVSwitch, VlanId, Variant, "Key")
+						VALUES
+						    ('net-std', 'management', NULL, '', 'Standard', NULL),
+						    ('dvs-1', 'distributed', NULL, '', 'DvSwitch', NULL),
+						    ('dpg-id', 'storage', '{"id":"dvs-1"}', '', 'DvPortGroup', 'dpg-key'),
+						    ('blank-group', ' unlinked ', '{"id":"source-switch"}', '', 'DvPortGroup', '');
+
+						UPDATE fixture.Host
+						SET Network = '{
+						    "switches": [{"key": "switch-key", "name": "vSwitch0", "mtu": 1500}],
+						    "portGroups": [{"key": "", "name": "management", "vSwitch": "switch-key", "vlanId": 0}],
+						    "vNICs": [
+						        {"key": "k0", "device": "vmk0", "portGroup": "management", "mtu": 1500},
+						        {"key": "k1", "device": "vmk1", "dPortGroup": "dpg-key", "mtu": 9000},
+						        {"key": "k2", "device": "vmk2", "portGroup": "missing", "mtu": 0},
+						        {"key": "", "device": "vmk3", "dPortGroup": "", "portGroup": "", "mtu": 0}
+						    ]
+						}'
+					`)
+					Expect(err).To(Succeed())
+					if source == "sqlite" {
+						_, err = db.Exec(`UPDATE fixture.Network SET MaxMTU = 9000 WHERE ID = 'dvs-1'`)
+						Expect(err).To(Succeed())
+					}
+					_, err = db.Exec("DETACH fixture")
+					Expect(err).To(Succeed())
+					_, err = parser.IngestSqlite(ctx, path)
+					Expect(err).To(Succeed())
+				}
+
+				var err error
+				query, err = NetworkTopologyQuery()
+				Expect(err).To(Succeed())
+			})
+
+			It("retains every interface and the available measurements", func() {
+				var count int
+				Expect(db.QueryRow(`SELECT COUNT(*) FROM vsc_vmk`).Scan(&count)).To(Succeed())
+				Expect(count).To(Equal(4))
+
+				var unknown sql.NullInt64
+				Expect(db.QueryRow(`SELECT "MTU" FROM vsc_vmk WHERE "Device" = 'vmk2'`).Scan(&unknown)).To(Succeed())
+				Expect(unknown.Valid).To(BeFalse())
+				Expect(db.QueryRow(`SELECT "Max MTU" FROM dvswitch WHERE "Switch" = 'distributed'`).Scan(&unknown)).To(Succeed())
+				Expect(unknown.Valid).To(Equal(source != "sqlite-unknown-mtu"))
+			})
+
+			It("associates interfaces with the VM's host ID", func() {
+				var hostID string
+				Expect(db.QueryRow(`SELECT "Host ID" FROM vsc_vmk WHERE "Device" = 'vmk0'`).Scan(&hostID)).To(Succeed())
+				if rvtools {
+					Expect(hostID).To(Equal("host-101"))
+				} else {
+					Expect(hostID).To(Equal("host-1"))
+				}
+
+				var count int
+				Expect(db.QueryRowContext(ctx, "WITH "+query+`
+					SELECT COUNT(*)
+					FROM network_host_interfaces hv
+					JOIN vinfo v ON v."Host ID" = hv.host_id
+				`).Scan(&count)).To(Succeed())
+				Expect(count).To(Equal(1))
+			})
+
+			It("returns standard and distributed port groups on parser adapters", func() {
+				vms, err := parser.VMs(ctx, Filters{}, Options{})
+				Expect(err).To(Succeed())
+				Expect(vms).To(HaveLen(1))
+				Expect(vms[0].NICs).NotTo(BeEmpty())
+
+				for _, nic := range vms[0].NICs {
+					Expect(nic.PortGroup).NotTo(BeNil(), "adapter %s", nic.MAC)
+					Expect(nic.PortGroup.Switch).NotTo(BeNil())
+					if nic.MAC == "02" {
+						Expect(nic.PortGroup.Name).To(Equal("storage"))
+						Expect(nic.PortGroup.Switch.Type).To(Equal("distributed"))
+						if source == "sqlite-unknown-mtu" {
+							Expect(nic.PortGroup.Switch.MTU).To(BeNil())
+						} else {
+							Expect(nic.PortGroup.Switch.MTU).To(HaveValue(Equal(int32(9000))))
+						}
+					} else {
+						Expect(nic.PortGroup.Switch.Name).To(Equal("vSwitch0"))
+						Expect(nic.PortGroup.Switch.Type).To(Equal("standard"))
+						Expect(nic.PortGroup.Switch.MTU).To(HaveValue(Equal(int32(1500))))
+					}
+				}
+			})
+
+			if source == "rvtools-legacy" {
+				It("keeps missing object IDs unknown", func() {
+					var id sql.NullString
+					Expect(db.QueryRow(`SELECT "Object ID" FROM dvswitch WHERE "Switch" = 'distributed'`).Scan(&id)).To(Succeed())
+					Expect(id.Valid).To(BeFalse())
+					Expect(db.QueryRow(`SELECT "Object ID" FROM dvport WHERE "Port" = 'storage'`).Scan(&id)).To(Succeed())
+					Expect(id.Valid).To(BeFalse())
+				})
+			}
+
+			It("preserves raw references without inventing identities", func() {
+				var reference, identity, switchRef sql.NullString
+				Expect(db.QueryRow(`SELECT "Port Group", "Key" FROM vsc_vmk WHERE "Device" = 'vmk3'`).Scan(&reference, &identity)).To(Succeed())
+				Expect(reference.Valid).To(BeFalse())
+				Expect(identity.Valid).To(BeFalse())
+				Expect(db.QueryRow(`SELECT "Switch", "Switch ID", "Key" FROM dvport WHERE "Port" = ' unlinked '`).Scan(&reference, &switchRef, &identity)).To(Succeed())
+				Expect(identity.Valid).To(BeFalse())
+				if rvtools {
+					Expect(reference.String).To(Equal(" source-switch "))
+					Expect(switchRef.Valid).To(BeFalse())
+				} else {
+					Expect(reference.Valid).To(BeFalse())
+					Expect(switchRef.String).To(Equal("source-switch"))
+				}
+			})
+
+			if rvtools {
+				It("preserves adapter assignment types and reported names", func() {
+					var reference, identity, switchRef sql.NullString
+
+					Expect(db.QueryRow(`SELECT "Type", "Switch", "Network" FROM vnetwork WHERE "Mac Address" = '01'`).Scan(&reference, &switchRef, &identity)).To(Succeed())
+					Expect(reference.String).To(Equal("assigned"))
+					vms, err := parser.VMs(ctx, Filters{}, Options{})
+					Expect(err).To(Succeed())
+					Expect(vms).To(HaveLen(1))
+					Expect(vms[0].NICs).To(HaveLen(3))
+					assignmentTypes := map[string]string{"01": "assigned", "02": "generated", "03": "manual"}
+
+					for _, nic := range vms[0].NICs {
+						Expect(nic.Type).To(Equal(assignmentTypes[nic.MAC]))
+					}
+					Expect(identity.String).To(Equal(" management "))
+					Expect(switchRef.String).To(Equal("vSwitch0"))
+					Expect(db.QueryRow(`SELECT "Type" FROM vnetwork WHERE "Mac Address" = '02'`).Scan(&reference)).To(Succeed())
+					Expect(reference.String).To(Equal("generated"))
+				})
+			} else {
+				It("preserves adapter classifications and missing group keys", func() {
+					var reference, identity, switchRef sql.NullString
+
+					Expect(db.QueryRow(`SELECT "Type", "Switch", "Network" FROM vnetwork WHERE "Mac Address" = '01'`).Scan(&reference, &switchRef, &identity)).To(Succeed())
+					Expect(reference.String).To(Equal("standard"))
+					var groupType string
+					Expect(db.QueryRow(`SELECT "Port Group Type" FROM vnetwork WHERE "Mac Address" = '01'`).Scan(&groupType)).To(Succeed())
+					Expect(groupType).To(Equal("standard"))
+					Expect(db.QueryRow(`SELECT "Port Group Type" FROM vnetwork WHERE "Mac Address" = '02'`).Scan(&groupType)).To(Succeed())
+					Expect(groupType).To(Equal("distributed"))
+					Expect(identity.String).To(Equal("management"))
+					Expect(switchRef.Valid).To(BeFalse())
+					Expect(db.QueryRow(`SELECT "Key" FROM vport WHERE "Port Group" = 'management'`).Scan(&identity)).To(Succeed())
+					Expect(identity.Valid).To(BeFalse())
+
+				})
+			}
+
+			It("returns distributed MTU under the shared mtu field", func() {
+				var unknown sql.NullInt64
+
+				Expect(db.QueryRowContext(ctx, "WITH "+query+`
+					SELECT CAST(port_group->'switch'->>'mtu' AS INTEGER)
+					FROM network_groups
+					WHERE name = 'storage'
+				`).Scan(&unknown)).To(Succeed())
+				Expect(unknown.Valid).To(Equal(source != "sqlite-unknown-mtu"))
+				if unknown.Valid {
+					Expect(unknown.Int64).To(Equal(int64(9000)))
+				}
+
+			})
+
+			It("resolves interface and adapter links without multiplying rows", func() {
+				var count int
+
+				Expect(db.QueryRowContext(ctx, "WITH "+query+`
+					SELECT COUNT(*)
+					FROM network_vmkernel_links
+					WHERE (interface->'portGroup') IS NOT NULL
+				`).Scan(&count)).To(Succeed())
+
+				Expect(count).To(Equal(2))
+				Expect(db.QueryRowContext(ctx, "WITH "+query+`
+					SELECT COUNT(*)
+					FROM network_adapter_links
+					WHERE port_group IS NOT NULL
+				`).Scan(&count)).To(Succeed())
+				if rvtools {
+					Expect(count).To(Equal(3))
+				} else {
+					Expect(count).To(Equal(2))
+				}
+
+			})
+
+			It("clears the interfaces when cleaning up the collection", func() {
+				var count int
+
+				Expect(parser.Cleanup()).To(Succeed())
+				Expect(db.QueryRow(`SELECT COUNT(*) FROM vsc_vmk`).Scan(&count)).To(Succeed())
+				Expect(count).To(BeZero())
+			})
+		},
+		Entry("RVTools with object IDs", "rvtools"),
+
+		Entry("RVTools without object IDs", "rvtools-legacy"),
+
+		Entry("Forklift with MTU", "sqlite"),
+
+		Entry("Forklift without MTU", "sqlite-unknown-mtu"),
+	)
+
+	DescribeTable("retains interfaces without guessing an RVTools host ID",
+		func(hosts []map[string]string) {
 			ctx := context.Background()
-			parser, _, cleanup := setupTestParser(t, &testValidator{})
-			defer cleanup()
+			parser, db, cleanup := setupTestParser(GinkgoTB(), nil)
+			DeferCleanup(cleanup)
+
+			vms := []map[string]string{{
+				"VM ID":       "vm-1",
+				"VM":          "first",
+				"Host":        "esxi.example.com",
+				"Cluster":     "cluster1",
+				"VI SDK UUID": "vc-1",
+			}}
+			sheets := defaultStandardSheets(vms, hosts)
+			sheets = append(sheets, NewExcelSheet("vSC_VMK", []string{"Host", "Device", "Port Group", "MTU"}, []map[string]string{
+				{"Host": "esxi.example.com", "Device": "vmk0", "MTU": "1500"},
+			}))
+
+			_, err := parser.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
+
+			var hostID sql.NullString
+			Expect(db.QueryRow(`SELECT "Host ID" FROM vsc_vmk WHERE "Device" = 'vmk0'`).Scan(&hostID)).To(Succeed())
+			Expect(hostID.Valid).To(BeFalse())
+
+			query, err := NetworkTopologyQuery()
+			Expect(err).To(Succeed())
+
+			var count int
+			Expect(db.QueryRow("WITH " + query + ` SELECT COUNT(*) FROM network_host_interfaces`).Scan(&count)).To(Succeed())
+			Expect(count).To(BeZero())
+		},
+		Entry("missing host", nil),
+		Entry("host without an ID", []map[string]string{{"Host": "esxi.example.com"}}),
+		Entry("ambiguous host name", []map[string]string{
+			{"Host": "esxi.example.com", "Object ID": "host-1"},
+			{"Host": "ESXI.EXAMPLE.COM", "Object ID": "host-2"},
+		}),
+	)
+
+	It("resolves host-scoped links without multiplying adapters or interfaces", func() {
+		ctx := context.Background()
+		_, db, cleanup := setupTestParser(GinkgoTB(), nil)
+		DeferCleanup(cleanup)
+
+		_, err := db.Exec(`
+			INSERT INTO vinfo ("VM ID", "VM", "Host")
+			VALUES
+			    ('vm-1', 'first', 'host-1'),
+			    ('vm-2', 'second', 'host-2');
+
+			INSERT INTO vport ("Host", "Port Group", "Switch")
+			VALUES
+			    ('host-1', 'management', 'vSwitch0'),
+			    ('host-2', 'management', 'vSwitch0');
+
+			INSERT INTO vswitch
+			VALUES
+			    ('host-1', 'vSwitch0', 'key-1', 1500),
+			    ('host-2', 'vSwitch0', 'key-2', 9000);
+
+			INSERT INTO dvswitch
+			VALUES
+			    ('distributed', 'distributed', 'dvs-1', 9000);
+
+			INSERT INTO dvport ("Port", "Switch", "Object ID", "Key", "Switch ID")
+			VALUES
+			    ('storage', 'distributed', 'dpg-id', 'dpg-key', 'dvs-1');
+
+			INSERT INTO dvport ("Port", "Switch", "Object ID")
+			VALUES
+			    ('management', 'vSwitch0', 'other-group');
+
+			INSERT INTO vsc_vmk ("Host", "Host ID", "Device", "Key", "Port Group", "Type", "MTU")
+			VALUES
+			    ('host-1', 'host-101', 'vmk0', 'key', 'management', 'standard', 1500),
+			    ('host-1', 'host-101', 'vmk1', 'key2', 'dpg-key', 'distributed', 9000),
+			    ('host-1', 'host-101', 'vmk2', 'key3', 'missing', NULL, NULL);
+
+			INSERT INTO vnetwork ("VM ID", "Network", "Mac Address", "Switch", "Type", "Port Group Type")
+			VALUES
+			    ('vm-1', 'management', '01', 'vSwitch0', 'assigned', 'standard'),
+			    ('vm-1', 'management', '02', 'vSwitch0', 'generated', 'standard'),
+			    ('vm-2', 'management', '03', 'vSwitch0', 'manual', 'standard');
+
+			INSERT INTO vsc_vmk
+			SELECT * FROM vsc_vmk;
+		`)
+		Expect(err).To(Succeed())
+
+		query, err := NetworkTopologyQuery()
+		Expect(err).To(Succeed())
+
+		var interfaces string
+		Expect(db.QueryRowContext(ctx, "WITH "+query+`
+			SELECT interfaces
+			FROM network_host_interfaces
+			WHERE host_id = 'host-101'
+		`).Scan(&interfaces)).To(Succeed())
+		Expect(interfaces).To(MatchJSON(`
+[
+    {
+        "device": "vmk0",
+        "mtu": 1500,
+        "portGroupRef": "management",
+        "portGroup": {
+            "name": "management",
+            "type": "standard",
+            "switch": {
+                "id": "key-1",
+                "name": "vSwitch0",
+                "type": "standard",
+                "mtu": 1500
+            }
+        }
+    },
+    {
+        "device": "vmk1",
+        "mtu": 9000,
+        "portGroupRef": "dpg-key",
+        "portGroup": {
+            "id": "dpg-id",
+            "name": "storage",
+            "type": "distributed",
+            "switch": {
+                "id": "dvs-1",
+                "name": "distributed",
+                "type": "distributed",
+                "mtu": 9000
+            }
+        }
+    },
+    {
+        "device": "vmk2",
+        "mtu": null,
+        "portGroupRef": "missing"
+    }
+]
+`))
+
+		var count int
+		Expect(db.QueryRowContext(ctx, "WITH "+query+`
+			SELECT COUNT(*)
+			FROM network_adapter_links
+			WHERE port_group IS NOT NULL
+		`).Scan(&count)).To(Succeed())
+		Expect(count).To(Equal(3))
+
+		var adapters string
+		Expect(db.QueryRowContext(ctx, "WITH "+query+`
+			SELECT CAST(to_json(LIST({
+			    'mac': n."Mac Address",
+			    'switchId': l.port_group->'switch'->>'id',
+			    'mtu': CAST(l.port_group->'switch'->>'mtu' AS INTEGER)
+			} ORDER BY n."Mac Address")) AS VARCHAR)
+			FROM network_adapter_links l
+			JOIN vnetwork n ON n.rowid = l.nic_row_id
+		`).Scan(&adapters)).To(Succeed())
+		Expect(adapters).To(MatchJSON(`[
+		    {"mac": "01", "switchId": "key-1", "mtu": 1500},
+		    {"mac": "02", "switchId": "key-1", "mtu": 1500},
+		    {"mac": "03", "switchId": "key-2", "mtu": 9000}
+		]`))
+	})
+
+	DescribeTable("retains adapter details and clears previous port groups",
+		func(withPorts bool) {
+			ctx := context.Background()
+			parser, _, cleanup := setupTestParser(GinkgoTB(), &testValidator{})
+			DeferCleanup(cleanup)
+
 			vms := []map[string]string{
 				{"VM ID": "vm-1", "VM": "first", "Host": "host-1", "VI SDK UUID": "vc-1"},
 				{"VM ID": "vm-2", "VM": "second", "Host": "host-2", "VI SDK UUID": "vc-1"},
@@ -67,12 +562,12 @@ func TestIngestRvTools_NetworkDetails(t *testing.T) {
 					}),
 				)
 			}
-			result, err := parser.IngestRvTools(ctx, createTestExcel(t, sheets...))
-			require.NoError(t, err)
-			require.True(t, result.IsValid(), "%+v", result.Errors)
+			result, err := parser.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets...))
+			Expect(err).To(Succeed())
+			Expect(result.IsValid()).To(BeTrue(), "%+v", result.Errors)
 			got, err := parser.VMs(ctx, Filters{}, Options{})
-			require.NoError(t, err)
-			require.Len(t, got, 2)
+			Expect(err).To(Succeed())
+			Expect(got).To(HaveLen(2))
 			count := 0
 			for _, vm := range got {
 				for _, nic := range vm.NICs {
@@ -88,41 +583,43 @@ func TestIngestRvTools_NetworkDetails(t *testing.T) {
 							"09": "", // A blank standard row still blocks the distributed VLAN.
 						}[nic.MAC]
 					}
-					assert.Equal(t, wantVLAN, nic.VlanID, "MAC %s", nic.MAC)
+					Expect(nic.VlanID).To(Equal(wantVLAN), "MAC %s", nic.MAC)
 					if nic.MAC == "01" {
-						assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, nic.IPv4Addresses)
-						assert.Equal(t, []string{"2001:db8::1", "fe80::1"}, nic.IPv6Addresses)
+						Expect(nic.IPv4Addresses).To(Equal([]string{"10.0.0.1", "10.0.0.2"}))
+						Expect(nic.IPv6Addresses).To(Equal([]string{"2001:db8::1", "fe80::1"}))
 					} else {
-						assert.Empty(t, nic.IPv4Addresses)
-						assert.Empty(t, nic.IPv6Addresses)
+						Expect(nic.IPv4Addresses).To(BeEmpty())
+						Expect(nic.IPv6Addresses).To(BeEmpty())
 					}
 				}
 			}
-			assert.Equal(t, 9, count, "VLAN lookup must not multiply or remove NICs")
+			Expect(count).To(Equal(9), "VLAN lookup must not multiply or remove NICs")
 
-			require.NoError(t, parser.Cleanup())
-			result, err = parser.IngestRvTools(ctx, createTestExcel(t, sheets[:2]...))
-			require.NoError(t, err)
-			require.True(t, result.IsValid(), "%+v", result.Errors)
+			Expect(parser.Cleanup()).To(Succeed())
+			result, err = parser.IngestRvTools(ctx, createTestExcel(GinkgoTB(), sheets[:2]...))
+			Expect(err).To(Succeed())
+			Expect(result.IsValid()).To(BeTrue(), "%+v", result.Errors)
 			got, err = parser.VMs(ctx, Filters{}, Options{})
-			require.NoError(t, err)
-			require.Len(t, got, 2)
+			Expect(err).To(Succeed())
+			Expect(got).To(HaveLen(2))
 			for _, vm := range got {
 				for _, nic := range vm.NICs {
-					assert.Empty(t, nic.VlanID, "previous import's port groups must be cleared")
+					Expect(nic.VlanID).To(BeEmpty(), "previous import's port groups must be cleared")
 				}
 			}
-		})
-	}
-}
+		},
+		Entry("with port-group sheets", true),
 
-func TestIngestSqlite_NetworkDetails(t *testing.T) {
-	for _, hostNetwork := range []string{"present", "null", "empty", "missing-host"} {
-		t.Run(hostNetwork, func(t *testing.T) {
+		Entry("without port-group sheets", false),
+	)
+
+	DescribeTable("retains adapter details with partial host inventory",
+		func(hostNetwork string) {
 			ctx := context.Background()
-			parser, _, cleanup := setupTestParser(t, &testValidator{})
-			defer cleanup()
-			sqlitePath := createTestSQLite(t, "vc-1",
+			parser, _, cleanup := setupTestParser(GinkgoTB(), &testValidator{})
+			DeferCleanup(cleanup)
+
+			sqlitePath := createTestSQLite(GinkgoTB(), "vc-1",
 				[]sqliteCluster{{id: "c1", name: "cluster1", datacenter: "dc1"}},
 				[]sqliteVM{{id: "vm-1", name: "first", clusterName: "cluster1", ipAddress: "192.0.2.99",
 					nics: `[
@@ -148,19 +645,42 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 			]`,
 				}})
 			src, err := sql.Open("duckdb", "")
-			require.NoError(t, err)
-			defer func() { _ = src.Close() }()
+			Expect(err).To(Succeed())
+			DeferCleanup(src.Close)
 			_, err = src.Exec(fmt.Sprintf("ATTACH '%s' AS dst (TYPE sqlite)", sqlitePath))
-			require.NoError(t, err)
-			_, err = src.Exec(`UPDATE dst.Host SET Network = '{"portGroups":[{"name":"shared","vlanId":0},{"name":"management","vlanId":100},{"name":"ambiguous","vlanId":200},{"name":"ambiguous","vlanId":300}]}'`)
-			require.NoError(t, err)
-			_, err = src.Exec(`INSERT INTO dst.Network VALUES
-		('standard', 'shared', '{"kind":"","id":""}', ''),
-		('distributed', 'shared', '{"id":"dvs-1"}', '10-20,30-40'),
-		('unknown', 'shared', '{"id":"dvs-2"}', ''),
-		('management', 'management', NULL, ''),
-		('ambiguous', 'ambiguous', NULL, '')`)
-			require.NoError(t, err)
+			Expect(err).To(Succeed())
+			_, err = src.Exec(`
+				UPDATE dst.Host SET Network = '{
+				    "portGroups": [
+				        {
+				            "name": "shared",
+				            "vlanId": 0
+				        },
+				        {
+				            "name": "management",
+				            "vlanId": 100
+				        },
+				        {
+				            "name": "ambiguous",
+				            "vlanId": 200
+				        },
+				        {
+				            "name": "ambiguous",
+				            "vlanId": 300
+				        }
+				    ]
+				}'
+			`)
+			Expect(err).To(Succeed())
+			_, err = src.Exec(`
+				INSERT INTO dst.Network (ID, Name, DVSwitch, VlanId) VALUES
+						('standard', 'shared', '{"kind":"","id":""}', ''),
+						('distributed', 'shared', '{"id":"dvs-1"}', '10-20,30-40'),
+						('unknown', 'shared', '{"id":"dvs-2"}', ''),
+						('management', 'management', NULL, ''),
+						('ambiguous', 'ambiguous', NULL, '')
+			`)
+			Expect(err).To(Succeed())
 			switch hostNetwork {
 			case "null":
 				_, err = src.Exec(`UPDATE dst.Host SET Network = NULL`)
@@ -169,21 +689,21 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 			case "missing-host":
 				_, err = src.Exec(`UPDATE dst.VM SET Host = 'missing-host'`)
 			}
-			require.NoError(t, err)
+			Expect(err).To(Succeed())
 			_, err = src.Exec("DETACH dst")
-			require.NoError(t, err)
+			Expect(err).To(Succeed())
 			result, err := parser.IngestSqlite(ctx, sqlitePath)
-			require.NoError(t, err)
+			Expect(err).To(Succeed())
 			if hostNetwork == "missing-host" {
-				require.Len(t, result.Errors, 1)
-				require.Equal(t, CodeMissingCluster, result.Errors[0].Code)
+				Expect(result.Errors).To(HaveLen(1))
+				Expect(result.Errors[0].Code).To(Equal(CodeMissingCluster))
 			} else {
-				require.True(t, result.IsValid(), "%+v", result.Errors)
+				Expect(result.IsValid()).To(BeTrue(), "%+v", result.Errors)
 			}
 			got, err := parser.VMs(ctx, Filters{}, Options{})
-			require.NoError(t, err)
-			require.Len(t, got, 1)
-			require.Len(t, got[0].NICs, 7)
+			Expect(err).To(Succeed())
+			Expect(got).To(HaveLen(1))
+			Expect(got[0].NICs).To(HaveLen(7))
 			standardVLAN := ""
 			if hostNetwork == "present" {
 				standardVLAN = "0"
@@ -193,39 +713,47 @@ func TestIngestSqlite_NetworkDetails(t *testing.T) {
 				gotMACs = append(gotMACs, nic.MAC)
 				switch nic.MAC {
 				case "AA:01":
-					assert.Equal(t, "standard", nic.Type)
-					assert.Equal(t, standardVLAN, nic.VlanID)
-					assert.Equal(t, []string{"10.0.0.1/24", "10.0.0.2/25", "10.0.0.3"}, nic.IPv4Addresses)
-					assert.Equal(t, []string{"::ffff:192.0.2.1/128", "fe80::1/64"}, nic.IPv6Addresses)
+					Expect(nic.Type).To(Equal("standard"))
+					Expect(nic.VlanID).To(Equal(standardVLAN))
+					Expect(nic.IPv4Addresses).To(Equal([]string{"10.0.0.1/24", "10.0.0.2/25", "10.0.0.3"}))
+					Expect(nic.IPv6Addresses).To(Equal([]string{"::ffff:192.0.2.1/128", "fe80::1/64"}))
 				case "aa:02":
-					assert.Equal(t, "distributed", nic.Type)
-					assert.Equal(t, "10-20,30-40", nic.VlanID)
-					assert.Equal(t, []string{"10.0.1.1/0"}, nic.IPv4Addresses)
-					assert.Empty(t, nic.IPv6Addresses)
+					Expect(nic.Type).To(Equal("distributed"))
+					Expect(nic.VlanID).To(Equal("10-20,30-40"))
+					Expect(nic.IPv4Addresses).To(Equal([]string{"10.0.1.1/0"}))
+					Expect(nic.IPv6Addresses).To(BeEmpty())
 				case "aa:03":
-					assert.Empty(t, nic.VlanID)
-					assert.Empty(t, nic.IPv4Addresses)
-					assert.Empty(t, nic.IPv6Addresses)
+					Expect(nic.VlanID).To(BeEmpty())
+					Expect(nic.IPv4Addresses).To(BeEmpty())
+					Expect(nic.IPv6Addresses).To(BeEmpty())
 				case "aa:05":
-					assert.Equal(t, "standard", nic.Type)
+					Expect(nic.Type).To(Equal("standard"))
 					if hostNetwork == "present" {
-						assert.Equal(t, "100", nic.VlanID)
+						Expect(nic.VlanID).To(Equal("100"))
 					} else {
-						assert.Empty(t, nic.VlanID)
+						Expect(nic.VlanID).To(BeEmpty())
 					}
-					assert.Empty(t, nic.IPv4Addresses)
-					assert.Empty(t, nic.IPv6Addresses)
+					Expect(nic.IPv4Addresses).To(BeEmpty())
+					Expect(nic.IPv6Addresses).To(BeEmpty())
 				case "aa:04":
-					assert.Equal(t, standardVLAN, nic.VlanID)
-					assert.Empty(t, nic.IPv4Addresses, "duplicate MACs must not receive ambiguous addresses")
+					Expect(nic.VlanID).To(Equal(standardVLAN))
+					Expect(nic.IPv4Addresses).To(BeEmpty(), "duplicate MACs must not receive ambiguous addresses")
 				case "aa:06":
-					assert.Equal(t, "standard", nic.Type)
-					assert.Empty(t, nic.VlanID, "duplicate port-group names must leave VLAN unknown without dropping adapters")
-					assert.Equal(t, []string{"10.0.6.1/24"}, nic.IPv4Addresses)
-					assert.Empty(t, nic.IPv6Addresses)
+					Expect(nic.Type).To(Equal("standard"))
+					Expect(nic.VlanID).To(BeEmpty(), "duplicate port-group names must leave VLAN unknown without dropping adapters")
+					Expect(nic.IPv4Addresses).To(Equal([]string{"10.0.6.1/24"}))
+					Expect(nic.IPv6Addresses).To(BeEmpty())
 				}
 			}
-			assert.ElementsMatch(t, []string{"AA:01", "aa:02", "aa:03", "aa:04", "aa:04", "aa:05", "aa:06"}, gotMACs)
-		})
-	}
-}
+			Expect(gotMACs).To(ConsistOf([]string{"AA:01", "aa:02", "aa:03", "aa:04", "aa:04", "aa:05", "aa:06"}))
+		},
+		Entry("host network present", "present"),
+
+		Entry("host network null", "null"),
+
+		Entry("host network empty", "empty"),
+
+		Entry("host missing", "missing-host"),
+	)
+
+})

@@ -75,6 +75,7 @@ func (b *QueryBuilder) IngestSqliteQuery(filePath string) (string, error) {
 type queryParams struct {
 	MetadataTable           string
 	StorageTopology         string
+	NetworkTopology         string
 	NetworkColumns          string
 	ClusterFilter           string
 	OSFilter                string
@@ -98,10 +99,10 @@ func faultToleranceEnabledPredicate(tableAlias string) string {
 
 // VMQuery builds the VM query with filters and pagination.
 func (b *QueryBuilder) VMQuery(filters Filters, options Options) (string, error) {
-	return b.vmQuery(filters, options, "vm_metadata", storageTopologyQuery("vhba", "vhostscsi", false))
+	return b.vmQuery(filters, options, "vm_metadata", storageTopologyQuery("vhba", "vhostscsi", false), networkTopologyQuery())
 }
 
-func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, storageTopology string) (string, error) {
+func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, storageTopology, networkTopology string) (string, error) {
 	const maxNetworkNumbers = 8 // RVTools vInfo has Network #1 through Network #8
 	quoted := make([]string, 0, maxNetworkNumbers)
 	for i := 1; i <= maxNetworkNumbers; i++ {
@@ -112,6 +113,7 @@ func (b *QueryBuilder) vmQuery(filters Filters, options Options, metadataTable, 
 	params := queryParams{
 		MetadataTable:           metadataTable,
 		StorageTopology:         storageTopology,
+		NetworkTopology:         networkTopology,
 		NetworkColumns:          networkColumns,
 		ClusterFilter:           escapeSQLString(filters.Cluster),
 		OSFilter:                escapeSQLString(filters.OS),
