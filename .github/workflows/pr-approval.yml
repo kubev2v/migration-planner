@@ -6,7 +6,7 @@ on:
 
 jobs:
   approve:
-    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-approval.yml@main
+    uses: kubev2v/migration-planner-workflows/.github/workflows/pr-approval.yml@68cbb5b9d8b568b36c5bd770608bcfab650ae0b1 # main
     with:
       user_path_permissions: |
         migration-planner-sync[bot]:
