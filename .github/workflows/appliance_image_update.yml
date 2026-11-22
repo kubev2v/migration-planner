@@ -40,7 +40,12 @@ jobs:
         grep -Fxq "${CONFIG_KEY}=${IMAGE_TAG}" "$CONFIG_FILE" || { echo "ERROR: tag update failed"; exit 1; }
         # The in-place update minimum travels with the appliance image itself
         # (io.kubev2v.oma.min-upgrade-version label, OMA-3059). Read it from the
-        # exact tag being pinned so the config always describes this image.
+        # exact tag being pinned so the config always describes this image, and
+        # write it to the per-environment key for this branch.
+        case "$SOURCE_BRANCH" in
+          main)   MIN_KEY=MIN_APPLIANCE_VERSION_DEV ;;
+          stable) MIN_KEY=MIN_APPLIANCE_VERSION_STAGE ;;
+        esac
         source "$CONFIG_FILE"
         source hack/appliance-version-regex.sh
         # A failed inspect must fail the workflow: swallowing it would silently
@@ -51,8 +56,8 @@ jobs:
         if [[ -n "$MIN_LABEL" && ! "$MIN_LABEL" =~ $APPLIANCE_VERSION_RE ]]; then
           echo "ERROR: appliance min-upgrade-version label is not a valid version: ${MIN_LABEL}"; exit 1
         fi
-        sed -i "s/^MIN_APPLIANCE_VERSION=.*/MIN_APPLIANCE_VERSION=${MIN_LABEL}/" "$CONFIG_FILE"
-        grep -Fxq "MIN_APPLIANCE_VERSION=${MIN_LABEL}" "$CONFIG_FILE" || { echo "ERROR: min version update failed"; exit 1; }
+        sed -i "s/^${MIN_KEY}=.*/${MIN_KEY}=${MIN_LABEL}/" "$CONFIG_FILE"
+        grep -Fxq "${MIN_KEY}=${MIN_LABEL}" "$CONFIG_FILE" || { echo "ERROR: min version update failed"; exit 1; }
     secrets:
       APP_ID: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_ID }}
       APP_PRIVATE_KEY: ${{ secrets.MIGRATION_PLANNER_SYNC_APP_PRIVATE_KEY }}

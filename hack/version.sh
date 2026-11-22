@@ -46,12 +46,20 @@ export APPLIANCE_VERSION
 # Release tags (v0.31.0) carry no commit; branch builds end in the agent's short SHA.
 export APPLIANCE_COMMIT=$(echo "$APPLIANCE_VERSION" | sed -n 's/.*-\([0-9a-f]\{7\}\)$/\1/p')
 
-# The minimum appliance version for in-place updates comes from the same config
-# file: the appliance-image update workflow writes it there from the served
-# image's io.kubev2v.oma.min-upgrade-version label. Unlike APPLIANCE_VERSION it
-# never changes at release re-tag time, so no build overrides it. Empty means
-# no gating.
-MIN_APPLIANCE_VERSION=$(sed -n 's/^MIN_APPLIANCE_VERSION=//p' build/migration-planner-iso/config)
+# The minimum appliance version for in-place updates is pinned per environment
+# in the same config file, from the served image's io.kubev2v.oma.min-upgrade-version
+# label, and is selected by the served version's channel: a tag build's
+# v-version selects the production minimum, branch builds their own channel.
+# Empty (unknown channel or missing key) means no gating.
+MIN_APPLIANCE_VERSION=""
+if [ -f "build/migration-planner-iso/config" ]; then
+    source hack/appliance-version-regex.sh
+    _min_key=$(min_appliance_version_key "$APPLIANCE_VERSION")
+    if [ -n "$_min_key" ]; then
+        MIN_APPLIANCE_VERSION=$(sed -n "s/^${_min_key}=//p" build/migration-planner-iso/config)
+    fi
+    unset _min_key
+fi
 export MIN_APPLIANCE_VERSION
 
 # Get git tree state

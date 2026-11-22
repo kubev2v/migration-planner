@@ -133,20 +133,24 @@ jobs:
             exit 1
           }
 
-      # MIN_APPLIANCE_VERSION gates in-place updates; it must mirror the served
-      # image's min-upgrade-version label and be a valid version (or empty).
+      # The per-environment minimum gates in-place updates; the key matching the
+      # served image's channel must mirror that image's min-upgrade-version
+      # label and be a valid version (or empty).
       - name: Check the min appliance version matches the image label
         run: |
           source build/migration-planner-iso/config
           source hack/appliance-version-regex.sh
+          MIN_KEY=$(min_appliance_version_key "$APPLIANCE_VERSION")
+          MIN_APPLIANCE_VERSION=""
+          [ -z "$MIN_KEY" ] || MIN_APPLIANCE_VERSION=$(sed -n "s/^${MIN_KEY}=//p" build/migration-planner-iso/config)
           MIN_LABEL=$(skopeo inspect --format '{{index .Labels "io.kubev2v.oma.min-upgrade-version"}}' \
             "docker://${APPLIANCE_IMAGE}:${APPLIANCE_VERSION}")
           [[ "$MIN_LABEL" == "${MIN_APPLIANCE_VERSION:-}" ]] || {
-            echo "::error::MIN_APPLIANCE_VERSION=${MIN_APPLIANCE_VERSION:-} does not match the image min-upgrade-version label ${MIN_LABEL}"
+            echo "::error::${MIN_KEY:-no channel key}=${MIN_APPLIANCE_VERSION:-} does not match the image min-upgrade-version label ${MIN_LABEL}"
             exit 1
           }
           [[ -z "${MIN_APPLIANCE_VERSION:-}" || "${MIN_APPLIANCE_VERSION}" =~ $APPLIANCE_VERSION_RE ]] || {
-            echo "::error::MIN_APPLIANCE_VERSION=${MIN_APPLIANCE_VERSION} is not a valid appliance version"
+            echo "::error::${MIN_KEY}=${MIN_APPLIANCE_VERSION} is not a valid appliance version"
             exit 1
           }
 
