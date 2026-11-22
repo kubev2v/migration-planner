@@ -112,27 +112,22 @@ func UpdateAvailable(served, deployed string) bool {
 }
 
 // IsUpdateSupported reports whether the running appliance version can be
-// updated in place to the served image: same channel as the minimum and not
-// numerically older than it. Not comparable (different channel, missing
-// numbers, invalid) gives no signal — the gate only blocks on a proven
-// comparison, so it fails open.
+// updated in place to the served image: not older than the minimum in
+// major.minor. The minimum always comes from the branch-format config value
+// while the running version may be a prod tag, so major.minor is all that is
+// comparable across channels. Not comparable (missing numbers, invalid)
+// gives no signal — the gate only blocks on a proven shortfall, so it fails
+// open.
 func IsUpdateSupported(runningVersion, minVersionUpdateSupported string) bool {
 	d, ok := parseApplianceVersion(runningVersion)
 	if !ok {
 		return true
 	}
 	m, ok := parseApplianceVersion(minVersionUpdateSupported)
-	if !ok || m.channel != d.channel || !d.hasNumerics || !m.hasNumerics {
+	if !ok || !d.hasNumerics || !m.hasNumerics {
 		return true
 	}
-	switch {
-	case d.major != m.major:
-		return d.major > m.major
-	case d.minor != m.minor:
-		return d.minor > m.minor
-	default:
-		return d.patch >= m.patch
-	}
+	return d.major > m.major || (d.major == m.major && d.minor >= m.minor)
 }
 
 // atoi converts digit-only regex groups. The regexes guarantee digits, so the

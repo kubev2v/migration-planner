@@ -48,10 +48,23 @@ export APPLIANCE_COMMIT=$(echo "$APPLIANCE_VERSION" | sed -n 's/.*-\([0-9a-f]\{7
 
 # The minimum appliance version for in-place updates comes from the same config
 # file: the appliance-image update workflow writes it there from the served
-# image's io.kubev2v.oma.min-upgrade-version label. Unlike APPLIANCE_VERSION it
-# never changes at release re-tag time, so no build overrides it. Empty means
-# no gating.
+# image's io.kubev2v.oma.min-upgrade-version label. Empty means no gating.
 MIN_APPLIANCE_VERSION=$(sed -n 's/^MIN_APPLIANCE_VERSION=//p' build/migration-planner-iso/config)
+# Tag builds serve a v-version while the config minimum is branch-formatted
+# (the release branch inherits it from main); report the minimum in prod
+# format so every consumer — /info, the update gate, the warnings — sees a
+# single channel.
+if [ -n "$MIN_APPLIANCE_VERSION" ]; then
+    case "$APPLIANCE_VERSION" in
+        v[0-9]*.[0-9]*.[0-9]*)
+            case "$MIN_APPLIANCE_VERSION" in
+                *-release-*.[0-9]*-*)
+                    MIN_APPLIANCE_VERSION="v$(echo "$MIN_APPLIANCE_VERSION" | sed -n 's/.*-release-\([0-9]*\.[0-9]*\)-.*/\1/p').0"
+                    ;;
+            esac
+            ;;
+    esac
+fi
 export MIN_APPLIANCE_VERSION
 
 # Get git tree state
