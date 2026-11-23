@@ -25,11 +25,13 @@ type AssessmentEnhancementData struct {
 	VMwareSubLevel StringArray `gorm:"column:vmware_sub_level;type:text[]"`
 
 	// vSphere Core
-	VsphereVmEncryptionEnabled *bool   `gorm:"column:vsphere_vm_encryption_enabled"`
-	VsphereVmEncryptionPolicy  *string `gorm:"column:vsphere_vm_encryption_policy"`
-	VsphereSrmEnabled          *bool   `gorm:"column:vsphere_srm_enabled"`
-	VsphereNiocEnabled         *bool   `gorm:"column:vsphere_nioc_enabled"`
-	VsphereNiocDetails         *string `gorm:"column:vsphere_nioc_details"`
+	VsphereVmEncryptionEnabled  *bool   `gorm:"column:vsphere_vm_encryption_enabled"`
+	VsphereVmEncryptionPolicy   *string `gorm:"column:vsphere_vm_encryption_policy"`
+	VsphereSrmEnabled           *bool   `gorm:"column:vsphere_srm_enabled"`
+	VsphereNiocEnabled          *bool   `gorm:"column:vsphere_nioc_enabled"`
+	VsphereNiocDetails          *string `gorm:"column:vsphere_nioc_details"`
+	VspherePortMirroringEnabled *bool   `gorm:"column:vsphere_port_mirroring_enabled"`
+	VspherePortMirroringDetails *string `gorm:"column:vsphere_port_mirroring_details"`
 
 	// NSX / Aria
 	NsxFeatures            StringArray `gorm:"column:nsx_features;type:text[]"`
