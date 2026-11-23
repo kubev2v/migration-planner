@@ -285,8 +285,12 @@ storage:
         inline: |
           [Unit]
           Description=Watch for agent image updates
+          # Start after the agent without the default Before=paths.target boot cycle.
+          DefaultDependencies=no
           Requires=planner-agent-image-recovery.service
           After=planner-agent-image-recovery.service planner-agent.service
+          Conflicts=shutdown.target
+          Before=shutdown.target
 
           [Path]
           PathExistsGlob=/var/lib/data/agent/updates/*.tar
