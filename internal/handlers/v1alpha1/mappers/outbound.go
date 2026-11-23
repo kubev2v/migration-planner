@@ -264,17 +264,16 @@ func SourceInventoryToApi(si model.SourceSubsetInventory) (agentAPI.SourceSubset
 	return subset, nil
 }
 
-func sourceTypeToApi(t string) api.AssessmentV2SummarySourceType {
-	// todo: to be changed to return SourceType
-	var sourceType api.AssessmentV2SummarySourceType
+func sourceTypeToApi(t string) api.SourceType {
+	var sourceType api.SourceType
 
 	switch t {
 	case service.SourceTypeAgent:
-		sourceType = api.AssessmentV2SummarySourceTypeSource
+		sourceType = api.SourceTypeSource
 	case service.SourceTypeRvtools:
-		sourceType = api.AssessmentV2SummarySourceTypeRvtools
+		sourceType = api.SourceTypeRvtools
 	case service.SourceTypeInventory:
-		sourceType = api.AssessmentV2SummarySourceTypeInventory
+		sourceType = api.SourceTypeInventory
 	}
 
 	return sourceType
@@ -304,7 +303,7 @@ func AssessmentToApi(a svcmodel.Assessment) api.Assessment {
 	assessment.Snapshots = buildSnapshots(a.MainInventory, a.SubsetInventories)
 
 	// Set source type based on source field
-	sourceType := api.AssessmentSourceType(a.SourceType)
+	sourceType := api.SourceType(a.SourceType)
 	assessment.SourceType = sourceType
 	assessment.SourceId = a.SourceID
 
@@ -372,7 +371,7 @@ func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.Assessme
 		result[i] = api.Assessment{
 			Id: assessment.ID, Name: assessment.Name, CreatedAt: assessment.CreatedAt,
 			OwnerFirstName: assessment.OwnerFirstName, OwnerLastName: assessment.OwnerLastName,
-			SourceType: api.AssessmentSourceType(assessment.SourceType), SourceId: assessment.SourceID,
+			SourceType: api.SourceType(assessment.SourceType), SourceId: assessment.SourceID,
 			Snapshots: []api.Snapshot{}, Sharing: sharingToApi(assessment.Sharing),
 		}
 		inventory := api.Inventory{
