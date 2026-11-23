@@ -8,7 +8,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/golang-jwt/jwt/v4"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/kubev2v/migration-event-streamer/pkg/events"
 	imageServer "github.com/kubev2v/migration-planner/internal/api/server/image"
