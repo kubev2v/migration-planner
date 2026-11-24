@@ -46,7 +46,7 @@ require (
 	github.com/twmb/franz-go v1.22.3
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.1
-	go.podman.io/image/v5 v5.41.2
+	go.podman.io/image/v5 v5.42.1
 	go.podman.io/podman/v6 v6.1.3
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -239,7 +239,7 @@ require (
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/sethvargo/go-retry v0.5.0 // indirect
-	github.com/sigstore/fulcio v1.8.7 // indirect
+	github.com/sigstore/fulcio v1.8.8 // indirect
 	github.com/sigstore/protobuf-specs v0.5.2 // indirect
 	github.com/sigstore/sigstore v1.11.3 // indirect
 	github.com/sirupsen/logrus v1.10.2 // indirect
@@ -262,7 +262,7 @@ require (
 	github.com/varlink/go v0.4.1-0.20261015173642-c935be0c53f7 // indirect
 	github.com/vbatts/tar-split v0.12.3 // indirect
 	github.com/vbauerster/cupwriter v0.0.5 // indirect
-	github.com/vbauerster/mpb/v8 v8.15.2 // indirect
+	github.com/vbauerster/mpb/v8 v8.16.2 // indirect
 	github.com/vektah/gqlparser/v2 v2.5.64 // indirect
 	github.com/vincent-petithory/dataurl v1.0.0 // indirect
 	github.com/vishvananda/netlink v1.3.1 // indirect
@@ -288,7 +288,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0 // indirect
 	go.podman.io/buildah v1.45.2 // indirect
 	go.podman.io/common v0.69.2 // indirect
-	go.podman.io/storage v1.65.0 // indirect
+	go.podman.io/storage v1.65.1 // indirect
 	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
