@@ -12,8 +12,8 @@ github.com/BurntSushi/toml v1.6.0 h1:dRaEfpa2VI55EwlIW72hMRHdWouJeRF7TPYhI+AUQjk
 github.com/BurntSushi/toml v1.6.0/go.mod h1:ukJfTF/6rtPPRCnwkur4qwRxa8vTRFBF0uk2lLoLwho=
 github.com/Masterminds/semver/v3 v3.5.0 h1:kQceYJfbupGfZOKZQg0kou0DgAKhzDg2NZPAwZ/2OOE=
 github.com/Masterminds/semver/v3 v3.5.0/go.mod h1:4V+yj/TJE1HU9XfppCwVMZq3I84lprf4nC11bSS5beM=
-github.com/MicahParks/jwkset v0.11.5 h1:ZyJdQj8fZiTHjOX1aDDw0d8Fw6qGkTle12r9LPeoCEA=
-github.com/MicahParks/jwkset v0.11.5/go.mod h1:U2oRhRaLgDCLjtpGL2GseNKGmZtLs/3O7p+OZaL5vo0=
+github.com/MicahParks/jwkset v0.12.0 h1:d/S70TKDneLrBhn9XvyKaKDp/UnDkU1kacVLHytECA4=
+github.com/MicahParks/jwkset v0.12.0/go.mod h1:U2oRhRaLgDCLjtpGL2GseNKGmZtLs/3O7p+OZaL5vo0=
 github.com/MicahParks/keyfunc/v3 v3.9.2 h1:yWvqmCIWMnyp8tJFR3VmNQRBGmNRJ3cMvN9bcG9Bfbc=
 github.com/MicahParks/keyfunc/v3 v3.9.2/go.mod h1:h8DMhdulFa3yjG1q74FqaehNDekB18HrVCXPl9Raa4I=
 github.com/Microsoft/go-winio v0.6.4 h1:kJF2pamtYCWXf0xAT8sAkwKC0pMl2HYBrRPHAqyUc+g=
