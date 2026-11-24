@@ -32,7 +32,7 @@ require (
 	github.com/opencontainers/runtime-spec v1.3.0
 	github.com/openshift/api v0.0.0-20261123012947-9ac77f18ba5d
 	github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d
-	github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148
+	github.com/openshift/library-go v0.0.0-20261120134353-3f167e8fd79a
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/prometheus/client_golang v1.25.0

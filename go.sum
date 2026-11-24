@@ -479,8 +479,8 @@ github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d h
 github.com/openshift/assisted-image-service v0.0.0-20261114040828-0ac60ebed27d/go.mod h1:/SbZ4g1fuW4sUQWyNG7DgmSP0qWuG1eFQTvrcpFnZe4=
 github.com/openshift/imagebuilder v1.2.22 h1:8x/nwCnA09Zkfp2UjhhySUTRe4EL4RACIEuT+6ik0/Y=
 github.com/openshift/imagebuilder v1.2.22/go.mod h1:5LX/Z+OhWMDsmhwVeu9rRxkzCAsbMITsxRY9jsxedFQ=
-github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148 h1:edQNNfcG5AF3X2TbVjaXd07UrpaOeAzwK/LttpMtp34=
-github.com/openshift/library-go v0.0.0-20261030161254-298cf2d19148/go.mod h1:SOmIJLGV4ubkJnA2rXH0M5davuY1QpattP3zotdIY3E=
+github.com/openshift/library-go v0.0.0-20261120134353-3f167e8fd79a h1:J5fV4NgjmtnBG4MmW4QalJtfukTAPo2nHX3OvfpYWYE=
+github.com/openshift/library-go v0.0.0-20261120134353-3f167e8fd79a/go.mod h1:SOmIJLGV4ubkJnA2rXH0M5davuY1QpattP3zotdIY3E=
 github.com/pandatix/go-abnf v0.5.5 h1:EXex5KkRQx4Dm6GnpAcQnIMBs9KiK0uf8p/wq+4t9PM=
 github.com/pandatix/go-abnf v0.5.5/go.mod h1:AE0KD3/VNoCjGzc1gqetRKshbI4SYErXQ/8kPenR5mc=
 github.com/pborman/getopt v0.0.0-20170112200414-7148bc3a4c30/go.mod h1:85jBQOZwpVEaDAr341tbn15RS4fCAsIst0qp7i8ex1o=
