@@ -342,9 +342,9 @@ WITH datastore_metadata AS (
             COALESCE(TRY(from_json(NULLIF(to_json(ds)->>'StorageArrays', ''),
                 '[{"uuid":"VARCHAR","name":"VARCHAR","vendorId":"VARCHAR","modelId":"VARCHAR"}]')),
                 []::STRUCT(uuid VARCHAR, name VARCHAR, vendorId VARCHAR, modelId VARCHAR)[]),
-            a -> struct_pack(uuid := NULLIF(regexp_replace(a.uuid, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), name := NULLIF(regexp_replace(a.name, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''),
+            lambda a: struct_pack(uuid := NULLIF(regexp_replace(a.uuid, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), name := NULLIF(regexp_replace(a.name, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''),
                 vendorId := NULLIF(regexp_replace(a.vendorId, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''), modelId := NULLIF(regexp_replace(a.modelId, '^[[:space:]]+|[[:space:]]+$', '', 'g'), ''))),
-            a -> a.uuid IS NOT NULL OR a.name IS NOT NULL OR a.vendorId IS NOT NULL OR a.modelId IS NOT NULL)) AS VARCHAR) AS storage_arrays
+            lambda a: a.uuid IS NOT NULL OR a.name IS NOT NULL OR a.vendorId IS NOT NULL OR a.modelId IS NOT NULL)) AS VARCHAR) AS storage_arrays
     FROM src.Datastore ds
 )
 INSERT INTO vdatastore ("Hosts", "Address", "Name", "Object ID", "Free MiB", "MHA", "Capacity MiB", "Type", "Filesystem Type", "Filesystem Major Version", "Backing Devices", "Storage Protocol", "Storage Arrays", "Storage Container ID",
