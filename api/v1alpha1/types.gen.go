@@ -80,25 +80,11 @@ const (
 	AssessmentPermissionsShare  AssessmentPermissions = "share"
 )
 
-// Defines values for AssessmentSourceType.
-const (
-	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
-	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
-	AssessmentSourceTypeSource    AssessmentSourceType = "source"
-)
-
 // Defines values for AssessmentV2SummaryPermissions.
 const (
 	AssessmentV2SummaryPermissionsDelete AssessmentV2SummaryPermissions = "delete"
 	AssessmentV2SummaryPermissionsRead   AssessmentV2SummaryPermissions = "read"
 	AssessmentV2SummaryPermissionsShare  AssessmentV2SummaryPermissions = "share"
-)
-
-// Defines values for AssessmentV2SummarySourceType.
-const (
-	AssessmentV2SummarySourceTypeInventory AssessmentV2SummarySourceType = "inventory"
-	AssessmentV2SummarySourceTypeRvtools   AssessmentV2SummarySourceType = "rvtools"
-	AssessmentV2SummarySourceTypeSource    AssessmentV2SummarySourceType = "source"
 )
 
 // Defines values for ClusterFeaturesDrsMode.
@@ -377,14 +363,11 @@ type Assessment struct {
 	Sharing       *AssessmentSharing       `json:"sharing,omitempty"`
 	Snapshots     []Snapshot               `json:"snapshots"`
 	SourceId      *openapi_types.UUID      `json:"sourceId,omitempty"`
-	SourceType    AssessmentSourceType     `json:"sourceType"`
+	SourceType    SourceType               `json:"sourceType"`
 }
 
 // AssessmentPermissions defines model for Assessment.Permissions.
 type AssessmentPermissions string
-
-// AssessmentSourceType defines model for Assessment.SourceType.
-type AssessmentSourceType string
 
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
@@ -456,15 +439,12 @@ type AssessmentV2Summary struct {
 	Permissions   *[]AssessmentV2SummaryPermissions `json:"permissions,omitempty"`
 	Sharing       *AssessmentSharing                `json:"sharing,omitempty"`
 	SourceId      *openapi_types.UUID               `json:"sourceId,omitempty"`
-	SourceType    AssessmentV2SummarySourceType     `json:"sourceType"`
+	SourceType    SourceType                        `json:"sourceType"`
 	VmsCount      int                               `json:"vmsCount"`
 }
 
 // AssessmentV2SummaryPermissions defines model for AssessmentV2Summary.Permissions.
 type AssessmentV2SummaryPermissions string
-
-// AssessmentV2SummarySourceType defines model for AssessmentV2Summary.SourceType.
-type AssessmentV2SummarySourceType string
 
 // AssessmentVCenterV2 defines model for AssessmentVCenterV2.
 type AssessmentVCenterV2 struct {
