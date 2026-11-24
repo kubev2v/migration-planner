@@ -661,6 +661,75 @@ func OsDiskEstimationResultToAPI(
 	}
 }
 
+func EnhancementDataModelToAPI(m *model.AssessmentEnhancementData) api.EnhancementData {
+	var data api.EnhancementData
+
+	if m.DeployedEnvEnvironment != nil {
+		env := api.DeployedEnvironmentInputEnvironment(*m.DeployedEnvEnvironment)
+		data.DeployedEnvironment = &api.DeployedEnvironmentInput{Environment: &env}
+	}
+
+	if m.VMwareVerPerpetualLicensesCount != nil || m.VMwareVerCoresLicensingCount != nil ||
+		m.VMwareVerEnvironmentCount != nil || m.VMwareVerOtherNodesCount != nil {
+		data.VmwareVersionCounts = &api.VMwareVersionCountsInput{
+			PerpetualLicensesCount: m.VMwareVerPerpetualLicensesCount,
+			CoresLicensingCount:    m.VMwareVerCoresLicensingCount,
+			EnvironmentCount:       m.VMwareVerEnvironmentCount,
+			OtherNodesCount:        m.VMwareVerOtherNodesCount,
+		}
+	}
+
+	if m.ActiveEnvEnvironments != nil {
+		envs := model.ToTypedSlice[api.ActiveEnvironmentsInputEnvironments](m.ActiveEnvEnvironments)
+		data.ActiveEnvironments = &api.ActiveEnvironmentsInput{Environments: &envs}
+	}
+
+	if m.VMwareSubLevel != nil {
+		levels := model.ToTypedSlice[api.VMwareSubscriptionInputLevel](m.VMwareSubLevel)
+		data.VmwareSubscription = &api.VMwareSubscriptionInput{Level: &levels}
+	}
+
+	if m.VsphereVmEncryptionEnabled != nil || m.VsphereVmEncryptionPolicy != nil ||
+		m.VsphereSrmEnabled != nil || m.VsphereNiocEnabled != nil || m.VsphereNiocDetails != nil {
+		data.VsphereCore = &api.VsphereCoreInput{
+			VmEncryptionEnabled: m.VsphereVmEncryptionEnabled,
+			VmEncryptionPolicy:  m.VsphereVmEncryptionPolicy,
+			SrmEnabled:          m.VsphereSrmEnabled,
+			NiocEnabled:         m.VsphereNiocEnabled,
+			NiocDetails:         m.VsphereNiocDetails,
+		}
+	}
+
+	if m.NsxFeatures != nil {
+		features := model.ToTypedSlice[api.NsxInputFeatures](m.NsxFeatures)
+		data.Nsx = &api.NsxInput{Features: &features}
+	}
+
+	if m.AriaOpsFeatures != nil {
+		features := model.ToTypedSlice[api.AriaOpsInputFeatures](m.AriaOpsFeatures)
+		data.AriaOps = &api.AriaOpsInput{Features: &features}
+	}
+
+	if m.AriaAutomationFeatures != nil {
+		features := model.ToTypedSlice[api.AriaAutomationInputFeatures](m.AriaAutomationFeatures)
+		data.AriaAutomation = &api.AriaAutomationInput{Features: &features}
+	}
+
+	if m.AriaSecureFeatures != nil {
+		features := model.ToTypedSlice[api.AriaSecureInputFeatures](m.AriaSecureFeatures)
+		data.AriaSecure = &api.AriaSecureInput{Features: &features}
+	}
+
+	if m.CustomerPhysicalLocationsCount != nil || m.CustomerTargetHardware != nil {
+		data.CustomerDetails = &api.CustomerDetailsInput{
+			PhysicalLocationsCount: m.CustomerPhysicalLocationsCount,
+			TargetHardware:         m.CustomerTargetHardware,
+		}
+	}
+
+	return data
+}
+
 func estimationDetailToAPI(est estimation.Estimation) api.EstimationDetail {
 	detail := api.EstimationDetail{Reason: est.Reason}
 	if est.IsRanged() {

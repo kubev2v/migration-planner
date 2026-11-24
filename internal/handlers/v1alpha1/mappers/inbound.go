@@ -1,6 +1,9 @@
 package mappers
 
 import (
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/kubev2v/migration-planner/internal/service"
@@ -11,6 +14,7 @@ import (
 	"github.com/kubev2v/migration-planner/internal/auth"
 	"github.com/kubev2v/migration-planner/internal/model"
 	"github.com/kubev2v/migration-planner/internal/service/mappers"
+	store "github.com/kubev2v/migration-planner/internal/store/model"
 	"github.com/kubev2v/migration-planner/internal/util"
 )
 
@@ -216,8 +220,117 @@ func AssessmentFormToCreateForm(resource v1alpha1.AssessmentForm, user auth.User
 	return form
 }
 
+func EnhancementDataAPIToModel(assessmentID uuid.UUID, data v1alpha1.EnhancementDataRequest) (*store.AssessmentEnhancementData, error) {
+	model := &store.AssessmentEnhancementData{
+		AssessmentID: assessmentID,
+	}
+
+	if data.DeployedEnvironment != nil {
+		model.DeployedEnvEnvironment = store.TypedStringPtr(data.DeployedEnvironment.Environment)
+	}
+
+	if data.VmwareVersionCounts != nil {
+		counts, err := validateManualCounts(
+			manualCountInput{
+				label:  "Number of perpetual licenses",
+				number: data.VmwareVersionCounts.PerpetualLicensesCount,
+			},
+			manualCountInput{
+				label:  "Number of cores licensing",
+				number: data.VmwareVersionCounts.CoresLicensingCount,
+			},
+			manualCountInput{
+				label:  "Number of environments",
+				number: data.VmwareVersionCounts.EnvironmentCount,
+			},
+			manualCountInput{
+				label:  "Number of other nodes",
+				number: data.VmwareVersionCounts.OtherNodesCount,
+			},
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		model.VMwareVerPerpetualLicensesCount = counts[0]
+		model.VMwareVerCoresLicensingCount = counts[1]
+		model.VMwareVerEnvironmentCount = counts[2]
+		model.VMwareVerOtherNodesCount = counts[3]
+	}
+
+	if data.ActiveEnvironments != nil {
+		model.ActiveEnvEnvironments = store.TypedStringSlice(data.ActiveEnvironments.Environments)
+	}
+
+	if data.VmwareSubscription != nil {
+		model.VMwareSubLevel = store.TypedStringSlice(data.VmwareSubscription.Level)
+	}
+
+	if data.VsphereCore != nil {
+		model.VsphereVmEncryptionEnabled = data.VsphereCore.VmEncryptionEnabled
+		model.VsphereVmEncryptionPolicy = data.VsphereCore.VmEncryptionPolicy
+		model.VsphereSrmEnabled = data.VsphereCore.SrmEnabled
+		model.VsphereNiocEnabled = data.VsphereCore.NiocEnabled
+		model.VsphereNiocDetails = data.VsphereCore.NiocDetails
+	}
+
+	if data.Nsx != nil {
+		model.NsxFeatures = store.TypedStringSlice(data.Nsx.Features)
+	}
+
+	if data.AriaOps != nil {
+		model.AriaOpsFeatures = store.TypedStringSlice(data.AriaOps.Features)
+	}
+
+	if data.AriaAutomation != nil {
+		model.AriaAutomationFeatures = store.TypedStringSlice(data.AriaAutomation.Features)
+	}
+
+	if data.AriaSecure != nil {
+		model.AriaSecureFeatures = store.TypedStringSlice(data.AriaSecure.Features)
+	}
+
+	if data.CustomerDetails != nil {
+		counts, err := validateManualCounts(manualCountInput{
+			label:  "Number of physical locations/datacenters",
+			number: data.CustomerDetails.PhysicalLocationsCount,
+		})
+		if err != nil {
+			return nil, err
+		}
+		model.CustomerPhysicalLocationsCount = counts[0]
+		model.CustomerTargetHardware = data.CustomerDetails.TargetHardware
+	}
+
+	return model, nil
+}
+
 func InventoryToForm(inventory v1alpha1.Inventory) mappers.InventoryForm {
 	return mappers.InventoryForm{
 		Data: inventory,
 	}
+}
+
+type manualCountInput struct {
+	label  string
+	number *json.Number
+}
+
+func validateManualCounts(inputs ...manualCountInput) ([]*int, error) {
+	counts := make([]*int, len(inputs))
+	for i, input := range inputs {
+		if input.number == nil {
+			continue
+		}
+
+		count, err := strconv.ParseInt(input.number.String(), 10, 32)
+		if err != nil || count < 0 {
+			return nil, fmt.Errorf("%s must be a whole number within the supported range", input.label)
+		}
+
+		value := int(count)
+		counts[i] = &value
+	}
+
+	return counts, nil
 }
