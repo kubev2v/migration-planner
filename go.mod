@@ -3,7 +3,7 @@ module github.com/kubev2v/migration-planner
 go 1.27.0
 
 require (
-	github.com/MicahParks/jwkset v0.11.5
+	github.com/MicahParks/jwkset v0.12.0
 	github.com/MicahParks/keyfunc/v3 v3.9.2
 	github.com/coreos/butane v0.29.0
 	github.com/georgysavva/scany/v2 v2.1.4
