@@ -36,9 +36,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pressly/goose/v3 v3.30.1
 	github.com/prometheus/client_golang v1.25.0
-	github.com/riverqueue/river v0.27.0
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.27.0
-	github.com/riverqueue/river/rivertype v0.27.0
+	github.com/riverqueue/river v0.51.2
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.51.2
+	github.com/riverqueue/river/rivertype v0.51.2
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.1.0
 	github.com/stretchr/testify v1.12.1
@@ -232,8 +232,8 @@ require (
 	github.com/prometheus/procfs v0.23.0 // indirect
 	github.com/richardlehane/mscfb v1.0.9 // indirect
 	github.com/richardlehane/msoleps v1.0.6 // indirect
-	github.com/riverqueue/river/riverdriver v0.27.0 // indirect
-	github.com/riverqueue/river/rivershared v0.27.0 // indirect
+	github.com/riverqueue/river/riverdriver v0.51.2 // indirect
+	github.com/riverqueue/river/rivershared v0.51.2 // indirect
 	github.com/rs/xid v1.6.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.11.1 // indirect
@@ -289,7 +289,6 @@ require (
 	go.podman.io/buildah v1.46.0 // indirect
 	go.podman.io/common v0.70.0 // indirect
 	go.podman.io/storage v1.65.1 // indirect
-	go.uber.org/goleak v1.3.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.5 // indirect
