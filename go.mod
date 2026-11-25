@@ -22,7 +22,7 @@ require (
 	github.com/kubev2v/migration-event-streamer v0.0.0-20261117082237-5a1e52edb884
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
-	github.com/minio/minio-go/v7 v7.0.95
+	github.com/minio/minio-go/v7 v7.4.1
 	github.com/ngrok/sqlmw v0.0.0-20220520173518-97c9c04efc79
 	github.com/oapi-codegen/nethttp-middleware v1.3.1
 	github.com/oapi-codegen/runtime v1.8.0
@@ -125,7 +125,6 @@ require (
 	github.com/fsouza/go-dockerclient v1.13.3 // indirect
 	github.com/fxamacker/cbor/v2 v2.10.0 // indirect
 	github.com/gabriel-vasile/mimetype v1.4.16 // indirect
-	github.com/go-ini/ini v1.67.3 // indirect
 	github.com/go-jose/go-jose/v4 v4.1.9 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -173,6 +172,7 @@ require (
 	github.com/kevinburke/ssh_config v1.6.0 // indirect
 	github.com/klauspost/compress v1.20.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.2 // indirect
+	github.com/klauspost/crc32 v1.3.0 // indirect
 	github.com/klauspost/pgzip v1.3.0 // indirect
 	github.com/kr/fs v0.1.0 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
@@ -312,6 +312,7 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.13.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/ini.v1 v1.67.3 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	k8s.io/api v0.37.2 // indirect
 	k8s.io/klog/v2 v2.140.0 // indirect
@@ -326,7 +327,7 @@ require (
 
 replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.68.0
-	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.0.95
+	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.4.1
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.30.1
 	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
 )
