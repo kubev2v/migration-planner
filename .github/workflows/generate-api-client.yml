@@ -8,6 +8,10 @@ on:  # yamllint disable-line rule:truthy
       - 'api/v1alpha1/openapi.yaml'
     tags:
       - '*'
+  pull_request:
+    branches: [main, stable]
+    paths:
+      - 'api/v1alpha1/openapi.yaml'
 
 # Required for npm Trusted Publishing (OIDC)
 permissions:
@@ -38,4 +42,5 @@ jobs:
       openapi-spec-url: "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/api/v1alpha1/openapi.yaml"
       package-name: "@openshift-migration-advisor/planner-sdk"
       package-version: ${{ needs.version.outputs.version }}
+      dry-run: ${{ github.event_name == 'pull_request' }}
     secrets: inherit
