@@ -6,6 +6,8 @@ on:
     branches: [main, stable]
   pull_request:
     branches: [main, stable]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
@@ -14,9 +16,10 @@ permissions:
 jobs:
   # Path filtering lives here (not on on.pull_request.paths) so this workflow
   # always runs and required checks are never left pending.
-  # Branch protection should require the "Required e2e" job.
   # Skip list is shared with pull-request.yml via .github/path-filters.yml.
   changes:
+    name: E2E configuration
+    if: github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     outputs:
       run-e2e: ${{ steps.set.outputs.run-e2e }}
@@ -44,7 +47,7 @@ jobs:
 
   test:
     needs: changes
-    if: needs.changes.outputs.run-e2e == 'true'
+    if: github.event_name != 'merge_group' && needs.changes.outputs.run-e2e == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -119,28 +122,3 @@ jobs:
             kubectl describe ${pod} 2>/dev/null || true
             echo "======================="
           done
-
-  # Always runs so branch protection can require this check on docs-only PRs.
-  required:
-    name: Required e2e
-    needs: [changes, test]
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify e2e job
-        env:
-          RUN_E2E: ${{ needs.changes.outputs.run-e2e }}
-          CHANGES: ${{ needs.changes.result }}
-          TEST: ${{ needs.test.result }}
-        run: |
-          echo "changes=$CHANGES run_e2e=$RUN_E2E test=$TEST"
-
-          fail() { echo "::error::$1"; exit 1; }
-
-          [[ "$CHANGES" == success ]] || fail "changes did not succeed ($CHANGES)"
-
-          if [[ "$RUN_E2E" == true ]]; then
-            [[ "$TEST" == success ]] || fail "e2e did not succeed ($TEST)"
-          else
-            echo "Only skippable files changed; e2e was skipped"
-          fi
