@@ -19,7 +19,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.13.0
 	github.com/kelseyhightower/envconfig v1.4.0
-	github.com/kubev2v/migration-event-streamer v0.0.0-20261117082237-5a1e52edb884
+	github.com/kubev2v/migration-event-streamer v0.0.0-20261122122013-27402651520a
 	github.com/libvirt/libvirt-go v7.4.0+incompatible
 	github.com/marcboeker/go-duckdb/v2 v2.4.3
 	github.com/minio/minio-go/v7 v7.4.1
