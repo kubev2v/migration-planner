@@ -485,19 +485,24 @@ var _ = Describe("e2e", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment).NotTo(BeNil())
 
-			assessment, err = svc.GetAssessment(assessment.Id)
-			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment"))
+			assessmentID := assessment.Data.Id
 
-			assessment, err = svc.UpdateAssessment(assessment.Id, "assessment1")
+			assessmentSummary, err := svc.GetAssessmentSummary(assessmentID)
 			Expect(err).To(BeNil())
-			Expect(assessment.Name).To(Equal("assessment1"))
+			Expect(assessmentSummary.Name).To(Equal("assessment"))
+
+			_, err = svc.UpdateAssessment(assessment.Data.Id, "assessment1")
+			Expect(err).To(BeNil())
+
+			assessmentSummary, err = svc.GetAssessmentSummary(assessmentID)
+			Expect(err).To(BeNil())
+			Expect(assessmentSummary.Name).To(Equal("assessment1"))
 
 			assessments, err := svc.GetAssessments()
 			Expect(err).To(BeNil())
-			Expect(*assessments).To(HaveLen(1))
+			Expect(assessments).To(HaveLen(1))
 
-			err = svc.RemoveAssessment(assessment.Id)
+			err = svc.RemoveAssessment(assessmentID)
 			Expect(err).To(BeNil())
 
 			zap.S().Infof("============Successfully Passed: %s=====", CurrentSpecReport().LeafNodeText)

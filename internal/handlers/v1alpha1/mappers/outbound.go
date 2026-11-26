@@ -21,21 +21,6 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
-// normalizeDomainInventory converts a structured domain inventory to the API
-// model and normalizes nil collections so the response is free of null values.
-func normalizeDomainInventory(inv svcmodel.Inventory) api.Inventory {
-	inventory := InventoryToAPI(inv)
-	if inventory.Clusters == nil {
-		inventory.Clusters = map[string]api.InventoryData{}
-	}
-	normalizeInventoryData(inventory.Vcenter)
-	for clusterID, data := range inventory.Clusters {
-		normalizeInventoryData(&data)
-		inventory.Clusters[clusterID] = data
-	}
-	return inventory
-}
-
 func normalizeInventoryData(data *api.InventoryData) {
 	if data == nil {
 		return
@@ -297,62 +282,6 @@ func AgentToApi(a model.Agent) api.Agent {
 	}
 }
 
-func AssessmentToApi(a svcmodel.Assessment) api.Assessment {
-	assessment := api.Assessment{
-		Id:             a.ID,
-		Name:           a.Name,
-		OwnerFirstName: a.OwnerFirstName,
-		OwnerLastName:  a.OwnerLastName,
-		CreatedAt:      a.CreatedAt,
-	}
-
-	assessment.Snapshots = buildSnapshots(a.MainInventory, a.SubsetInventories)
-
-	// Set source type based on source field
-	sourceType := api.AssessmentSourceType(a.SourceType)
-	assessment.SourceType = sourceType
-	assessment.SourceId = a.SourceID
-
-	if len(a.Permissions) > 0 {
-		perms := make([]api.AssessmentPermissions, len(a.Permissions))
-		for i, p := range a.Permissions {
-			perms[i] = api.AssessmentPermissions(p)
-		}
-		assessment.Permissions = &perms
-	}
-
-	assessment.Sharing = sharingToApi(a.Sharing)
-
-	return assessment
-}
-
-func buildSnapshots(mainInventory svcmodel.AssessmentInventory, subsetInventories []svcmodel.AssessmentInventory) []api.Snapshot {
-	if mainInventory.Inventory.Clusters == nil && mainInventory.Inventory.Vcenter == nil {
-		return []api.Snapshot{}
-	}
-
-	var subsets []api.AssessmentSubsetInventory
-	for _, inv := range subsetInventories {
-		subsets = append(subsets, api.AssessmentSubsetInventory{
-			Id:        inv.ID,
-			Name:      inv.Name,
-			VcenterId: inv.VCenterID,
-			VmsCount:  inv.VMsCount,
-			CreatedAt: inv.CreatedAt,
-			Inventory: normalizeDomainInventory(inv.Inventory),
-		})
-	}
-
-	snapshot := api.Snapshot{
-		CreatedAt: mainInventory.CreatedAt,
-		Inventory: normalizeDomainInventory(mainInventory.Inventory),
-	}
-	if len(subsets) > 0 {
-		snapshot.SubsetInventories = &subsets
-	}
-	return []api.Snapshot{snapshot}
-}
-
 // sharingToApi converts domain sharing to the API representation.
 func sharingToApi(s *svcmodel.Sharing) *api.AssessmentSharing {
 	if s == nil {
@@ -371,50 +300,7 @@ func sharingToApi(s *svcmodel.Sharing) *api.AssessmentSharing {
 	return &sharing
 }
 
-func AssessmentListToApi(assessments []svcmodel.AssessmentSummary) (api.AssessmentList, error) {
-	result := make(api.AssessmentList, len(assessments))
-	for i, assessment := range assessments {
-		result[i] = api.Assessment{
-			Id: assessment.ID, Name: assessment.Name, CreatedAt: assessment.CreatedAt,
-			OwnerFirstName: assessment.OwnerFirstName, OwnerLastName: assessment.OwnerLastName,
-			SourceType: api.AssessmentSourceType(assessment.SourceType), SourceId: assessment.SourceID,
-			Snapshots: []api.Snapshot{}, Sharing: sharingToApi(assessment.Sharing),
-		}
-		inventory := api.Inventory{
-			Clusters: map[string]api.InventoryData{},
-			Vcenter: &api.InventoryData{
-				Infra: api.Infra{
-					TotalHosts: assessment.HostsCount,
-					Networks:   make([]api.Network, assessment.NetworksCount),
-					Datastores: make([]api.Datastore, assessment.DatastoresCount),
-				},
-				Vms: api.VMs{Total: assessment.VMsCount},
-			},
-		}
-		// Network constraints require name and type
-		for j := range inventory.Vcenter.Infra.Networks {
-			inventory.Vcenter.Infra.Networks[j] = api.Network{
-				Type: api.Unsupported,
-				Name: "unknown",
-			}
-		}
-		normalizeInventoryData(inventory.Vcenter)
-		result[i].Snapshots = []api.Snapshot{{
-			CreatedAt: assessment.CreatedAt,
-			Inventory: inventory,
-		}}
-		if len(assessment.Permissions) > 0 {
-			permissions := make([]api.AssessmentPermissions, len(assessment.Permissions))
-			for j, permission := range assessment.Permissions {
-				permissions[j] = api.AssessmentPermissions(permission)
-			}
-			result[i].Permissions = &permissions
-		}
-	}
-	return result, nil
-}
-
-func AssessmentToV2API(assessment *svcmodel.Assessment) (api.AssessmentV2, error) {
+func AssessmentToV2API(assessment *svcmodel.Assessment) api.AssessmentV2 {
 	vcenters := make([]api.SubResource, 0, len(assessment.SubsetInventories))
 	switch assessment.SourceType {
 	case service.SourceTypeRvtools:
@@ -434,7 +320,7 @@ func AssessmentToV2API(assessment *svcmodel.Assessment) (api.AssessmentV2, error
 	return api.AssessmentV2{
 		Data:     data,
 		Vcenters: vcenters,
-	}, nil
+	}
 }
 
 func AssessmentSummaryToApi(a svcmodel.AssessmentSummary) api.AssessmentV2Summary {

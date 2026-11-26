@@ -30,19 +30,19 @@ type imageApi interface {
 }
 
 type assessmentApi interface {
-	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.Assessment, error)
-	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.Assessment, error)
-	CreateRVToolsV2Job(name, filepath string) (*v1alpha1.Job, error)
-	UploadRVToolsToAssessment(uuid.UUID, string) (*v1alpha1.Job, error)
-	GetAssessmentV2(uuid.UUID) (*v1alpha1.AssessmentV2, error)
-	GetVCenterV2(uuid.UUID, uuid.UUID) (int, error)
-	DeleteVCenterInventory(uuid.UUID, uuid.UUID) (int, error)
-	GetAssessment(uuid.UUID) (*v1alpha1.Assessment, error)
-	GetAssessments() (*v1alpha1.AssessmentList, error)
-	UpdateAssessment(uuid.UUID, string) (*v1alpha1.Assessment, error)
-	RemoveAssessment(uuid.UUID) error
-	ShareAssessment(uuid.UUID) (int, error)
-	UnshareAssessment(uuid.UUID) (int, error)
+	CreateAssessment(name, sourceType string, sourceId *uuid.UUID, inventory *v1alpha1.Inventory) (*v1alpha1.AssessmentV2, error)
+	CreateAssessmentFromRvtools(name, filepath string) (*v1alpha1.AssessmentV2, error)
+	UploadRVToolsToAssessment(string, string) (*v1alpha1.Job, error)
+	GetVCenter(string, string) (*v1alpha1.AssessmentVCenterV2, error)
+	GetVCenterCluster(string, string, string) (*v1alpha1.InventoryData, error)
+	DeleteVCenterInventory(string, string) (int, error)
+	GetAssessment(string) (*v1alpha1.AssessmentV2, error)
+	GetAssessmentSummary(string) (*v1alpha1.AssessmentV2Summary, error)
+	GetAssessments() ([]v1alpha1.AssessmentV2Summary, error)
+	UpdateAssessment(string, string) (*v1alpha1.AssessmentV2, error)
+	RemoveAssessment(string) error
+	ShareAssessment(string) (int, error)
+	UnshareAssessment(string) (int, error)
 }
 
 type jobApi interface {
@@ -64,9 +64,9 @@ type partnerApi interface {
 }
 
 type estimationApi interface {
-	CalculateMigrationComplexity(uuid.UUID, string) (int, error)
-	CalculateMigrationEstimation(uuid.UUID, string) (int, error)
-	CalculateMigrationEstimationByComplexity(uuid.UUID, string) (int, error)
+	CalculateMigrationComplexity(string, string) (int, error)
+	CalculateMigrationEstimation(string, string) (int, error)
+	CalculateMigrationEstimationByComplexity(string, string) (int, error)
 }
 
 type accountsApi interface {

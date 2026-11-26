@@ -73,25 +73,11 @@ const (
 	AriaSecureInputFeaturesPolicyGovernance     AriaSecureInputFeatures = "policy_governance"
 )
 
-// Defines values for AssessmentPermissions.
-const (
-	AssessmentPermissionsDelete AssessmentPermissions = "delete"
-	AssessmentPermissionsRead   AssessmentPermissions = "read"
-	AssessmentPermissionsShare  AssessmentPermissions = "share"
-)
-
-// Defines values for AssessmentSourceType.
-const (
-	AssessmentSourceTypeInventory AssessmentSourceType = "inventory"
-	AssessmentSourceTypeRvtools   AssessmentSourceType = "rvtools"
-	AssessmentSourceTypeSource    AssessmentSourceType = "source"
-)
-
 // Defines values for AssessmentV2SummaryPermissions.
 const (
-	AssessmentV2SummaryPermissionsDelete AssessmentV2SummaryPermissions = "delete"
-	AssessmentV2SummaryPermissionsRead   AssessmentV2SummaryPermissions = "read"
-	AssessmentV2SummaryPermissionsShare  AssessmentV2SummaryPermissions = "share"
+	Delete AssessmentV2SummaryPermissions = "delete"
+	Read   AssessmentV2SummaryPermissions = "read"
+	Share  AssessmentV2SummaryPermissions = "share"
 )
 
 // Defines values for AssessmentV2SummarySourceType.
@@ -362,30 +348,6 @@ type AriaSecureInput struct {
 // AriaSecureInputFeatures defines model for AriaSecureInput.Features.
 type AriaSecureInputFeatures string
 
-// Assessment defines model for Assessment.
-type Assessment struct {
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
-	Name      string             `json:"name"`
-
-	// OwnerFirstName Owner's first name
-	OwnerFirstName *string `json:"ownerFirstName,omitempty"`
-
-	// OwnerLastName Owner's last name
-	OwnerLastName *string                  `json:"ownerLastName,omitempty"`
-	Permissions   *[]AssessmentPermissions `json:"permissions,omitempty"`
-	Sharing       *AssessmentSharing       `json:"sharing,omitempty"`
-	Snapshots     []Snapshot               `json:"snapshots"`
-	SourceId      *openapi_types.UUID      `json:"sourceId,omitempty"`
-	SourceType    AssessmentSourceType     `json:"sourceType"`
-}
-
-// AssessmentPermissions defines model for Assessment.Permissions.
-type AssessmentPermissions string
-
-// AssessmentSourceType defines model for Assessment.SourceType.
-type AssessmentSourceType string
-
 // AssessmentForm defines model for AssessmentForm.
 type AssessmentForm struct {
 	Inventory *Inventory          `json:"inventory,omitempty"`
@@ -397,9 +359,6 @@ type AssessmentForm struct {
 	//  * `agent` - Collected by OpenShift Migration Advisor agent
 	SourceType string `json:"sourceType" validate:"required,oneof=inventory agent"`
 }
-
-// AssessmentList defines model for AssessmentList.
-type AssessmentList = []Assessment
 
 // AssessmentRvtoolsForm defines model for AssessmentRvtoolsForm.
 type AssessmentRvtoolsForm struct {
@@ -1354,13 +1313,6 @@ type SizingResourceLimits struct {
 	Memory float64 `json:"memory"`
 }
 
-// Snapshot defines model for Snapshot.
-type Snapshot struct {
-	CreatedAt         time.Time                    `json:"createdAt"`
-	Inventory         Inventory                    `json:"inventory"`
-	SubsetInventories *[]AssessmentSubsetInventory `json:"subsetInventories"`
-}
-
 // Source defines model for Source.
 type Source struct {
 	Agent *Agent `json:"agent,omitempty"`
@@ -1712,12 +1664,6 @@ type PresignedUrl struct {
 	Url string `json:"url"`
 }
 
-// GetAssessmentClusterRequirementsStoredInputParams defines parameters for GetAssessmentClusterRequirementsStoredInput.
-type GetAssessmentClusterRequirementsStoredInputParams struct {
-	// ClusterId ID of the VMware cluster
-	ClusterId string `form:"clusterId" json:"clusterId"`
-}
-
 // ListGroupsParams defines parameters for ListGroups.
 type ListGroupsParams struct {
 	// Kind Filter by group kind
@@ -1748,35 +1694,17 @@ type ListAssessmentsV2Params struct {
 	SourceType *SourceType `form:"sourceType,omitempty" json:"sourceType,omitempty"`
 }
 
+// GetAssessmentClusterRequirementsStoredInputParams defines parameters for GetAssessmentClusterRequirementsStoredInput.
+type GetAssessmentClusterRequirementsStoredInputParams struct {
+	// ClusterId ID of the VMware cluster
+	ClusterId string `form:"clusterId" json:"clusterId"`
+}
+
 // UploadRvtoolsToAssessmentMultipartBody defines parameters for UploadRvtoolsToAssessment.
 type UploadRvtoolsToAssessmentMultipartBody struct {
 	// File Rvtools extending the exising assessment
 	File openapi_types.File `json:"file" validate:"required"`
 }
-
-// CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
-type CreateAssessmentJSONRequestBody = AssessmentForm
-
-// CreateRVToolsAssessmentMultipartRequestBody defines body for CreateRVToolsAssessment for multipart/form-data ContentType.
-type CreateRVToolsAssessmentMultipartRequestBody = AssessmentRvtoolsForm
-
-// UpdateAssessmentJSONRequestBody defines body for UpdateAssessment for application/json ContentType.
-type UpdateAssessmentJSONRequestBody = AssessmentUpdate
-
-// CalculateAssessmentClusterRequirementsJSONRequestBody defines body for CalculateAssessmentClusterRequirements for application/json ContentType.
-type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
-
-// CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
-type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
-
-// SaveAssessmentEnhancementDataJSONRequestBody defines body for SaveAssessmentEnhancementData for application/json ContentType.
-type SaveAssessmentEnhancementDataJSONRequestBody = EnhancementData
-
-// CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
-type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
-
-// CalculateMigrationEstimationByComplexityJSONRequestBody defines body for CalculateMigrationEstimationByComplexity for application/json ContentType.
-type CalculateMigrationEstimationByComplexityJSONRequestBody = MigrationEstimationRequest
 
 // CalculateClusterRequirementsJSONRequestBody defines body for CalculateClusterRequirements for application/json ContentType.
 type CalculateClusterRequirementsJSONRequestBody = StandaloneClusterRequirementsRequest
@@ -1811,11 +1739,29 @@ type UpdateInventoryJSONRequestBody = UpdateInventory
 // UploadSourceInventoryFileMultipartRequestBody defines body for UploadSourceInventoryFile for multipart/form-data ContentType.
 type UploadSourceInventoryFileMultipartRequestBody = SourceInventoryFileForm
 
+// CreateAssessmentJSONRequestBody defines body for CreateAssessment for application/json ContentType.
+type CreateAssessmentJSONRequestBody = AssessmentForm
+
 // CreateRVToolsAssessmentV2MultipartRequestBody defines body for CreateRVToolsAssessmentV2 for multipart/form-data ContentType.
 type CreateRVToolsAssessmentV2MultipartRequestBody = AssessmentRvtoolsForm
 
 // UpdateAssessmentV2JSONRequestBody defines body for UpdateAssessmentV2 for application/json ContentType.
 type UpdateAssessmentV2JSONRequestBody = AssessmentUpdate
+
+// CalculateAssessmentClusterRequirementsJSONRequestBody defines body for CalculateAssessmentClusterRequirements for application/json ContentType.
+type CalculateAssessmentClusterRequirementsJSONRequestBody = ClusterRequirementsRequest
+
+// CalculateMigrationComplexityJSONRequestBody defines body for CalculateMigrationComplexity for application/json ContentType.
+type CalculateMigrationComplexityJSONRequestBody = MigrationComplexityRequest
+
+// SaveAssessmentEnhancementDataJSONRequestBody defines body for SaveAssessmentEnhancementData for application/json ContentType.
+type SaveAssessmentEnhancementDataJSONRequestBody = EnhancementData
+
+// CalculateMigrationEstimationJSONRequestBody defines body for CalculateMigrationEstimation for application/json ContentType.
+type CalculateMigrationEstimationJSONRequestBody = MigrationEstimationRequest
+
+// CalculateMigrationEstimationByComplexityJSONRequestBody defines body for CalculateMigrationEstimationByComplexity for application/json ContentType.
+type CalculateMigrationEstimationByComplexityJSONRequestBody = MigrationEstimationRequest
 
 // UploadRvtoolsToAssessmentMultipartRequestBody defines body for UploadRvtoolsToAssessment for multipart/form-data ContentType.
 type UploadRvtoolsToAssessmentMultipartRequestBody UploadRvtoolsToAssessmentMultipartBody

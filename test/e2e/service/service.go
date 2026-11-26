@@ -10,10 +10,8 @@ import (
 
 const (
 	apiV1SourcesPath            = "/api/v1/sources"
-	apiV1AssessmentsPath        = "/api/v1/assessments"
-	apiV1AssessmentsRVToolsPath = "/api/v1/assessments/rvtools"
-	apiV1AssessmentsJobsPath    = "/api/v1/assessments/jobs"
 	apiV2AssessmentsPath        = "/api/v2/assessments"
+	apiV2AssessmentsJobsPath    = "/api/v2/assessments/jobs"
 	apiV2AssessmentsRVToolsPath = "/api/v2/assessments/rvtools"
 )
 

@@ -7,28 +7,27 @@ import (
 	"path"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/kubev2v/migration-planner/api/v1alpha1"
 	"go.uber.org/zap"
 )
 
-func (s *plannerService) CalculateMigrationComplexity(assessmentID uuid.UUID, clusterID string) (int, error) {
+func (s *plannerService) CalculateMigrationComplexity(assessmentID string, clusterID string) (int, error) {
 	return s.postEstimation(
-		path.Join(apiV1AssessmentsPath, assessmentID.String(), "complexity-estimation"),
+		path.Join(apiV2AssessmentsPath, assessmentID, "complexity-estimation"),
 		v1alpha1.MigrationComplexityRequest{ClusterId: &clusterID},
 	)
 }
 
-func (s *plannerService) CalculateMigrationEstimation(assessmentID uuid.UUID, clusterID string) (int, error) {
+func (s *plannerService) CalculateMigrationEstimation(assessmentID string, clusterID string) (int, error) {
 	return s.postEstimation(
-		path.Join(apiV1AssessmentsPath, assessmentID.String(), "migration-estimation"),
+		path.Join(apiV2AssessmentsPath, assessmentID, "migration-estimation"),
 		v1alpha1.MigrationEstimationRequest{ClusterId: &clusterID},
 	)
 }
 
-func (s *plannerService) CalculateMigrationEstimationByComplexity(assessmentID uuid.UUID, clusterID string) (int, error) {
+func (s *plannerService) CalculateMigrationEstimationByComplexity(assessmentID string, clusterID string) (int, error) {
 	return s.postEstimation(
-		path.Join(apiV1AssessmentsPath, assessmentID.String(), "migration-estimation", "by-complexity"),
+		path.Join(apiV2AssessmentsPath, assessmentID, "migration-estimation", "by-complexity"),
 		v1alpha1.MigrationEstimationRequest{ClusterId: &clusterID},
 	)
 }

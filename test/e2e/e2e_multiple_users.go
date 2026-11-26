@@ -123,7 +123,7 @@ var _ = Describe("e2e-multiple-users", func() {
 			Expect(err).To(BeNil())
 			Expect(assessment).ToNot(BeNil())
 
-			assessmentID := assessment.Id
+			assessmentID := assessment.Data.Id
 			DeferCleanup(func() {
 				cleanupErr := ownerService.RemoveAssessment(assessmentID)
 				Expect(cleanupErr).To(BeNil(), "Failed to remove fresh assessment")
@@ -136,8 +136,8 @@ var _ = Describe("e2e-multiple-users", func() {
 				Expect(visibleAssessments).ToNot(BeNil())
 
 				isVisible := false
-				for _, visibleAssessment := range *visibleAssessments {
-					if visibleAssessment.Id == assessmentID {
+				for _, visibleAssessment := range visibleAssessments {
+					if visibleAssessment.Id.String() == assessmentID {
 						isVisible = true
 						break
 					}
