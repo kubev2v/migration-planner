@@ -46,6 +46,7 @@ help:
 	@echo "Targets:"
 	@echo "    generate:               regenerate all generated files"
 	@echo "    tidy:                   tidy go mod"
+	@echo "    tidy-check:             check that Go modules are tidy"
 	@echo "    lint:                   run golangci-lint"
 	@echo "    build:                  run all builds"
 	@echo "    clean:                  clean up all containers and volumes"
@@ -89,6 +90,10 @@ endif
 
 tidy:
 	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -xc 'cd $$(dirname {}) && go mod tidy'
+
+.PHONY: tidy-check
+tidy-check:
+	git ls-files go.mod '**/*go.mod' -z | xargs -0 -I{} bash -ec 'cd $$(dirname {}) && go mod tidy -diff'
 
 migrate:
 	MIGRATION_PLANNER_MIGRATIONS_FOLDER=$(CURDIR)/pkg/migrations/sql ./bin/planner-api migrate

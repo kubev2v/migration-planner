@@ -5,6 +5,8 @@ on:  # yamllint disable-line rule:truthy
   pull_request:
     types: [opened, synchronize, reopened, edited]
     branches: [main, stable]
+  merge_group:
+    types: [checks_requested]
 
 permissions:
   pull-requests: read
@@ -14,8 +16,8 @@ jobs:
   # Configuration job - define all shared values once.
   # Path filtering lives here (not on on.pull_request.paths) so this workflow
   # always runs and required checks are never left pending.
-  # Branch protection should require the "Required validations" job.
   config:
+    name: Validation configuration
     runs-on: ubuntu-latest
     outputs:
       allowed-types: ${{ steps.set-config.outputs.allowed-types }}
@@ -38,6 +40,10 @@ jobs:
         id: filter
         uses: dorny/paths-filter@v3
         with:
+          # Compare the entire queue candidate with its recorded base, not just
+          # the last PR or the current (potentially newer) target branch.
+          base: ${{ github.event.merge_group.base_sha || '' }}
+          ref: ${{ github.event.merge_group.head_sha || '' }}
           filters: .github/path-filters.yml
           predicate-quantifier: 'every'
 
@@ -63,8 +69,8 @@ jobs:
 
   lint:
     runs-on: ubuntu-latest
-    needs: [config, validate-commits, validate-pr-title]
-    if: needs.config.outputs.run-code-validations == 'true'
+    needs: config
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -90,7 +96,7 @@ jobs:
 
   check-generate:
     runs-on: ubuntu-latest
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
@@ -115,7 +121,7 @@ jobs:
 
   check-appliance-version:
     runs-on: ubuntu-latest
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
@@ -152,8 +158,8 @@ jobs:
 
   check-format:
     runs-on: ubuntu-latest
-    needs: [config, validate-commits, validate-pr-title]
-    if: needs.config.outputs.run-code-validations == 'true'
+    needs: config
+    if: github.event_name != 'merge_group' && needs.config.outputs.run-code-validations == 'true'
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -173,7 +179,7 @@ jobs:
 
   unit-test:
     runs-on: ubuntu-latest
-    needs: [config, validate-commits, validate-pr-title]
+    needs: config
     if: needs.config.outputs.run-code-validations == 'true'
     steps:
     - name: Check out code
@@ -202,53 +208,41 @@ jobs:
     - name: Run the tests
       run: make unit-test
 
-  # Always runs so branch protection can require this single check.
-  # Do not require lint/unit-test directly if you want docs-only PRs to merge:
-  # those jobs are skipped when only documentation/static assets change.
-  # Skipped jobs count as success, but a failed commit check would also skip
-  # them — this job fails unless commit/title checks passed and, when code
-  # changed, the code validations passed.
-  required:
-    name: Required validations
-    needs:
-      - config
-      - validate-commits
-      - validate-pr-title
-      - lint
-      - check-generate
-      - check-format
-      - check-appliance-version
-      - unit-test
-    if: always()
+  tidy-check:
+    name: Go Mod Tidy Check
     runs-on: ubuntu-latest
+    needs: config
+    if: needs.config.outputs.run-code-validations == 'true'
     steps:
-      - name: Verify required jobs
-        env:
-          RUN_CODE: ${{ needs.config.outputs.run-code-validations }}
-          CONFIG: ${{ needs.config.result }}
-          COMMITS: ${{ needs.validate-commits.result }}
-          TITLE: ${{ needs.validate-pr-title.result }}
-          LINT: ${{ needs.lint.result }}
-          GENERATE: ${{ needs.check-generate.result }}
-          FORMAT: ${{ needs.check-format.result }}
-          APPLIANCE: ${{ needs.check-appliance-version.result }}
-          TEST: ${{ needs.unit-test.result }}
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Check Go modules are tidy
+        run: make tidy-check
+
+  verify-build:
+    name: Verify Build
+    runs-on: ubuntu-latest
+    needs: config
+    if: needs.config.outputs.run-code-validations == 'true'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Setup libvirt
         run: |
-          echo "config=$CONFIG commits=$COMMITS title=$TITLE run_code=$RUN_CODE"
-          echo "lint=$LINT generate=$GENERATE format=$FORMAT test=$TEST"
+          sudo apt update
+          sudo apt install -y libvirt-dev
 
-          fail() { echo "::error::$1"; exit 1; }
-
-          [[ "$CONFIG" == success ]] || fail "config did not succeed ($CONFIG)"
-          [[ "$COMMITS" == success ]] || fail "validate-commits did not succeed ($COMMITS)"
-          [[ "$TITLE" == success ]] || fail "validate-pr-title did not succeed ($TITLE)"
-
-          if [[ "$RUN_CODE" == true ]]; then
-            [[ "$LINT" == success ]] || fail "lint did not succeed ($LINT)"
-            [[ "$GENERATE" == success ]] || fail "check-generate did not succeed ($GENERATE)"
-            [[ "$FORMAT" == success ]] || fail "check-format did not succeed ($FORMAT)"
-            [[ "$APPLIANCE" == success ]] || fail "check-appliance-version did not succeed ($APPLIANCE)"
-            [[ "$TEST" == success ]] || fail "unit-test did not succeed ($TEST)"
-          else
-            echo "Only skippable files changed; code validations were skipped"
-          fi
+      - name: Build binaries
+        run: make build
