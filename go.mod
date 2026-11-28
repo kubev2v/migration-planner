@@ -44,7 +44,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	github.com/thoas/go-funk v0.9.3
 	github.com/twmb/franz-go v1.22.3
-	github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi v0.56.2
 	github.com/xuri/excelize/v2 v2.11.1
 	go.podman.io/image/v5 v5.42.1
 	go.podman.io/podman/v6 v6.2.1
@@ -328,5 +328,5 @@ replace (
 	github.com/go-ini/ini => gopkg.in/ini.v1 v1.68.0
 	github.com/minio/minio-go/v7 => github.com/minio/minio-go/v7 v7.4.1
 	github.com/pressly/goose/v3 => github.com/pressly/goose/v3 v3.30.1
-	github.com/vmware/govmomi => github.com/vmware/govmomi v0.50.0
+	github.com/vmware/govmomi => github.com/vmware/govmomi v0.56.2
 )
