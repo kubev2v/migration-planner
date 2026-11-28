@@ -47,7 +47,7 @@ require (
 	github.com/vmware/govmomi v0.50.0
 	github.com/xuri/excelize/v2 v2.11.1
 	go.podman.io/image/v5 v5.42.1
-	go.podman.io/podman/v6 v6.2.0
+	go.podman.io/podman/v6 v6.2.1
 	go.uber.org/zap v1.28.0
 	gopkg.in/yaml.v3 v3.0.1
 	gorm.io/driver/postgres v1.6.3
